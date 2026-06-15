@@ -49,14 +49,16 @@ import ApiDocumentation from '@/components/config/ApiDocumentation.vue'
 
 const route = useRoute()
 
+// Canonical paths per the §4.6 URL map; legacy /config/* arrives here only
+// via router redirects, so matching the new tree is sufficient.
 const currentPage = computed(() => {
   const path = route.path
-  if (path.includes('/config/inbound')) return 'inbound'
-  if (path.includes('/config/ai-models')) return 'ai-models'
-  if (path.includes('/config/task-prompts')) return 'task-prompts'
-  if (path.includes('/config/sorting-prompt')) return 'sorting-prompt'
-  if (path.includes('/config/api-keys')) return 'api-keys'
-  if (path.includes('/config/api-documentation')) return 'api-documentation'
+  if (path.startsWith('/channels/api/docs')) return 'api-documentation'
+  if (path.startsWith('/channels/api')) return 'api-keys'
+  if (path.startsWith('/channels')) return 'inbound'
+  if (path.startsWith('/ai/models')) return 'ai-models'
+  if (path.startsWith('/ai/instructions')) return 'task-prompts'
+  if (path.startsWith('/ai/routing')) return 'sorting-prompt'
   return 'inbound'
 })
 </script>

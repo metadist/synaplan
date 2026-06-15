@@ -50,15 +50,6 @@
               <span class="text-sm font-semibold txt-primary">{{ customPromptCount }}</span>
               <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statCustom') }}</span>
             </div>
-            <div
-              v-if="disabledPromptCount > 0"
-              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
-              data-testid="stat-disabled"
-            >
-              <Icon icon="heroicons:eye-slash" class="w-4 h-4 text-gray-500" />
-              <span class="text-sm font-semibold txt-primary">{{ disabledPromptCount }}</span>
-              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statDisabled') }}</span>
-            </div>
           </div>
 
           <button
@@ -217,7 +208,6 @@
                       selectedPromptId === prompt.id
                         ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
                         : 'hover:bg-light-border/10 dark:hover:bg-dark-border/10 txt-primary',
-                      prompt.enabled === false && 'opacity-60',
                     ]"
                     :data-testid="`card-prompt-${prompt.topic}`"
                     :title="prompt.shortDescription || prompt.topic"
@@ -268,40 +258,6 @@
                         {{ prompt.topic }}
                       </p>
                     </div>
-
-                    <!-- Status dots (right side, always visible) -->
-                    <span
-                      v-if="prompt.enabled === false"
-                      class="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0"
-                      :title="$t('config.taskPrompts.badgeDisabled')"
-                      data-testid="dot-disabled"
-                    />
-                    <template v-else-if="topicStatusFor(prompt.topic)">
-                      <span
-                        v-if="
-                          topicStatusFor(prompt.topic)?.indexed &&
-                          !topicStatusFor(prompt.topic)?.stale
-                        "
-                        class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"
-                        :title="$t('config.taskPrompts.indexedTooltip')"
-                        data-testid="dot-indexed"
-                      />
-                      <span
-                        v-else-if="
-                          topicStatusFor(prompt.topic)?.indexed &&
-                          topicStatusFor(prompt.topic)?.stale
-                        "
-                        class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0"
-                        :title="$t('config.taskPrompts.staleTooltip')"
-                        data-testid="dot-stale"
-                      />
-                      <span
-                        v-else
-                        class="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0"
-                        :title="$t('config.taskPrompts.notIndexedTooltip')"
-                        data-testid="dot-not-indexed"
-                      />
-                    </template>
                   </button>
                 </li>
               </ul>
@@ -324,26 +280,6 @@
               {{ $t('config.taskPrompts.clearFilters') }}
             </button>
           </div>
-        </div>
-
-        <!-- Status legend (admin only) -->
-        <div
-          v-if="isAdmin && synapseStatus && filteredPrompts.length > 0"
-          class="px-4 py-2 border-t border-light-border/30 dark:border-dark-border/20 flex items-center gap-3 text-[10px] txt-secondary flex-shrink-0"
-          data-testid="section-list-legend"
-        >
-          <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            {{ $t('config.taskPrompts.statusIndexed') }}
-          </span>
-          <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            {{ $t('config.taskPrompts.statusStale') }}
-          </span>
-          <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-rose-500" />
-            {{ $t('config.taskPrompts.statusNotIndexed') }}
-          </span>
         </div>
 
         <!-- Hidden compat select for legacy automation tools -->
@@ -397,12 +333,6 @@
                   class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 leading-none"
                 >
                   {{ $t('config.taskPrompts.badgeCustom') }}
-                </span>
-                <span
-                  v-if="formData.enabled === false"
-                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-gray-500/10 text-gray-500 leading-none"
-                >
-                  {{ $t('config.taskPrompts.badgeDisabled') }}
                 </span>
               </div>
               <p class="text-xs txt-secondary font-mono truncate">{{ currentPrompt.topic }}</p>
@@ -524,117 +454,33 @@
               </p>
             </div>
 
-            <!-- Keywords -->
+            <!-- Language -->
             <div>
               <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-                <Icon icon="heroicons:tag" class="w-4 h-4" />
-                {{ $t('config.taskPrompts.keywordsLabel') }}
+                <Icon icon="heroicons:language" class="w-4 h-4" />
+                {{ $t('config.taskPrompts.language') }}
               </label>
-              <textarea
-                v-model="formData.keywords"
-                rows="2"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
-                :placeholder="$t('config.taskPrompts.keywordsPlaceholder')"
-                data-testid="input-keywords"
-              />
-              <div class="flex items-center justify-between mt-1.5 flex-wrap gap-2">
-                <p class="text-xs txt-secondary flex items-center gap-1">
-                  <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-                  {{ $t('config.taskPrompts.keywordsHelp') }}
-                </p>
-                <span
-                  v-if="keywordCount > 0"
-                  class="text-[10px] txt-secondary"
-                  data-testid="text-keyword-count"
-                >
-                  {{ $t('config.taskPrompts.keywordCount', { n: keywordCount }) }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Embedding preview -->
-            <div
-              class="surface-chip rounded-lg p-3 border border-dashed border-light-border/30 dark:border-dark-border/20"
-              data-testid="section-embedding-preview"
-            >
-              <div class="flex items-center justify-between gap-2 mb-2">
-                <span
-                  class="text-xs font-semibold txt-primary uppercase tracking-wide flex items-center gap-1.5"
-                >
-                  <Icon icon="heroicons:eye" class="w-4 h-4 text-[var(--brand)]" />
-                  {{ $t('config.taskPrompts.embeddingPreviewTitle') }}
-                </span>
-                <button
-                  class="text-[10px] uppercase tracking-wide txt-secondary hover:txt-primary flex items-center gap-1 px-2 py-1 rounded hover:bg-light-border/10 dark:hover:bg-dark-border/10"
-                  :title="$t('config.taskPrompts.copyToClipboard')"
-                  data-testid="btn-copy-embedding"
-                  @click="copyToClipboard(embeddingPreview)"
-                >
-                  <Icon icon="heroicons:clipboard" class="w-3.5 h-3.5" />
-                  {{ $t('config.taskPrompts.copy') }}
-                </button>
-              </div>
-              <pre
-                class="text-xs txt-secondary whitespace-pre-wrap font-mono leading-relaxed"
-                data-testid="text-embedding-preview"
-                >{{ embeddingPreview }}</pre
+              <select
+                v-model="formData.language"
+                :disabled="currentPrompt.isDefault && isAdmin"
+                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="input-language"
               >
-              <p class="text-[11px] txt-secondary mt-2 flex items-center gap-1">
-                <Icon icon="heroicons:information-circle" class="w-3 h-3" />
-                {{ $t('config.taskPrompts.embeddingPreviewHelp') }}
+                <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
+                  {{ lang.label }}
+                </option>
+              </select>
+              <p
+                v-if="currentPrompt.isDefault && isAdmin"
+                class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1"
+              >
+                <Icon icon="heroicons:lock-closed" class="w-3.5 h-3.5" />
+                {{ $t('config.taskPrompts.systemPromptLanguageFixed') }}
               </p>
-            </div>
-
-            <!-- Enabled + language -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label
-                for="prompt-enabled-toggle"
-                class="flex items-start gap-3 surface-chip rounded-lg p-3 cursor-pointer hover:bg-[var(--brand)]/5 transition-colors"
-              >
-                <input
-                  id="prompt-enabled-toggle"
-                  v-model="formData.enabled"
-                  type="checkbox"
-                  class="mt-0.5 w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-enabled"
-                />
-                <span class="flex-1">
-                  <span class="block text-sm font-semibold txt-primary">
-                    {{ $t('config.taskPrompts.enabledLabel') }}
-                  </span>
-                  <span class="block text-xs txt-secondary mt-0.5">
-                    {{ $t('config.taskPrompts.enabledHelp') }}
-                  </span>
-                </span>
-              </label>
-
-              <div>
-                <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-                  <Icon icon="heroicons:language" class="w-4 h-4" />
-                  {{ $t('config.taskPrompts.language') }}
-                </label>
-                <select
-                  v-model="formData.language"
-                  :disabled="currentPrompt.isDefault && isAdmin"
-                  class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-                  data-testid="input-language"
-                >
-                  <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
-                    {{ lang.label }}
-                  </option>
-                </select>
-                <p
-                  v-if="currentPrompt.isDefault && isAdmin"
-                  class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1"
-                >
-                  <Icon icon="heroicons:lock-closed" class="w-3.5 h-3.5" />
-                  {{ $t('config.taskPrompts.systemPromptLanguageFixed') }}
-                </p>
-                <p v-else class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
-                  <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-                  {{ $t('config.taskPrompts.customPromptLanguageNote') }}
-                </p>
-              </div>
+              <p v-else class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
+                <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+                {{ $t('config.taskPrompts.customPromptLanguageNote') }}
+              </p>
             </div>
           </div>
 
@@ -1142,21 +988,6 @@
 
           <div>
             <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-              <Icon icon="heroicons:tag" class="w-4 h-4" />
-              {{ $t('config.taskPrompts.keywordsLabel') }}
-            </label>
-            <textarea
-              v-model="newPromptKeywords"
-              rows="2"
-              class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
-              :placeholder="$t('config.taskPrompts.keywordsPlaceholder')"
-              data-testid="input-new-keywords"
-            ></textarea>
-            <p class="text-xs txt-secondary mt-1.5">{{ $t('config.taskPrompts.keywordsHelp') }}</p>
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="heroicons:document-text" class="w-4 h-4" />
               {{ $t('config.taskPrompts.promptContent') }}
             </label>
@@ -1322,11 +1153,6 @@ import {
   type UpdatePromptRequest,
 } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
-import {
-  adminSynapseApi,
-  type SynapseStatusResponse,
-  type SynapseTopicEntry,
-} from '@/services/api/adminSynapseApi'
 import type { AIModel, Capability } from '@/types/ai-models'
 import { findModelIdByString } from '@/utils/aiModelDefaults'
 import { useNotification } from '@/composables/useNotification'
@@ -1399,16 +1225,14 @@ const newPromptName = ref('')
 const newPromptTopic = ref('')
 const newPromptContent = ref('')
 const newPromptRules = ref('')
-const newPromptKeywords = ref('')
 const newPromptDescription = ref('')
 const newPromptLanguage = ref(locale.value || 'en')
 const newPromptSelectedFiles = ref<number[]>([])
 const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
 const promptListSearch = ref('')
-const promptListFilter = ref<'all' | 'system' | 'custom' | 'disabled'>('all')
+const promptListFilter = ref<'all' | 'system' | 'custom'>('all')
 const activeTab = ref<EditorTabId>('routing')
-const synapseStatus = ref<SynapseStatusResponse | null>(null)
 const viewDensity = ref<'compact' | 'detailed'>('compact')
 const collapsedGroups = ref<Set<string>>(new Set())
 // Mobile: when an editor is open, the list slides out of view; the back button
@@ -1420,7 +1244,6 @@ const systemPromptCount = computed(
   () => prompts.value.filter((p) => p.isDefault && !p.isUserOverride).length
 )
 const customPromptCount = computed(() => prompts.value.filter((p) => !p.isDefault).length)
-const disabledPromptCount = computed(() => prompts.value.filter((p) => p.enabled === false).length)
 
 const promptListFilters = computed(() => [
   {
@@ -1438,35 +1261,7 @@ const promptListFilters = computed(() => [
     label: t('config.taskPrompts.filterCustom'),
     count: customPromptCount.value,
   },
-  {
-    value: 'disabled' as const,
-    label: t('config.taskPrompts.filterDisabled'),
-    count: disabledPromptCount.value,
-  },
 ])
-
-/**
- * Live preview of the exact text that gets embedded for Synapse Routing.
- * Mirrors `SynapseIndexer::buildEmbeddingText()` on the backend.
- */
-const embeddingPreview = computed(() => {
-  const topic = currentPrompt.value?.topic || ''
-  const desc = (formData.value.shortDescription || '').trim()
-  const keywords = (formData.value.keywords || '').trim()
-  const lines: string[] = [`Topic: ${topic}`]
-  if (desc) lines.push(`Description: ${desc}`)
-  if (keywords) lines.push(`Keywords: ${keywords}`)
-  return lines.join('\n')
-})
-
-const keywordCount = computed(() => {
-  const raw = (formData.value.keywords || '').trim()
-  if (!raw) return 0
-  return raw
-    .split(/[\n,]+/)
-    .map((k) => k.trim())
-    .filter(Boolean).length
-})
 
 const contentLength = computed(() => (formData.value.content || '').length)
 const contentWordCount = computed(() => {
@@ -1484,19 +1279,14 @@ const filteredPrompts = computed(() => {
     if (promptListFilter.value === 'custom' && p.isDefault && !p.isUserOverride) {
       return false
     }
-    if (promptListFilter.value === 'disabled' && p.enabled !== false) {
-      return false
-    }
     if (search === '') return true
-    const haystack = [p.name, p.topic, p.shortDescription, p.keywords ?? ''].join(' ').toLowerCase()
+    const haystack = [p.name, p.topic, p.shortDescription].join(' ').toLowerCase()
     return haystack.includes(search)
   })
 })
 
 /**
- * Map a prompt to a display category. Disabled topics live in their own bucket
- * so they always sink to the bottom and stay out of the way until the user
- * specifically wants to see them.
+ * Map a prompt to a display category for grouping in the sidebar list.
  */
 type CategoryId =
   | 'conversation'
@@ -1505,7 +1295,6 @@ type CategoryId =
   | 'productivity'
   | 'other-system'
   | 'custom'
-  | 'disabled'
 
 interface CategoryDef {
   id: CategoryId
@@ -1514,7 +1303,6 @@ interface CategoryDef {
 }
 
 function topicCategory(prompt: TaskPrompt): CategoryId {
-  if (prompt.enabled === false) return 'disabled'
   if (!prompt.isDefault) return 'custom'
   const t = prompt.topic.toLowerCase()
   if (
@@ -1540,7 +1328,7 @@ function topicCategory(prompt: TaskPrompt): CategoryId {
   ) {
     return 'productivity'
   }
-  if (t.includes('chat') || t === 'general' || t === 'general-chat' || t.includes('smalltalk')) {
+  if (t.includes('chat') || t === 'general' || t.includes('smalltalk')) {
     return 'conversation'
   }
   return 'other-system'
@@ -1578,11 +1366,6 @@ const categorizedPrompts = computed(() => {
       label: t('config.taskPrompts.categoryCustom'),
       icon: 'heroicons:user',
     },
-    {
-      id: 'disabled',
-      label: t('config.taskPrompts.categoryDisabled'),
-      icon: 'heroicons:eye-slash',
-    },
   ]
 
   const buckets: Record<CategoryId, TaskPrompt[]> = {
@@ -1592,7 +1375,6 @@ const categorizedPrompts = computed(() => {
     productivity: [],
     'other-system': [],
     custom: [],
-    disabled: [],
   }
 
   for (const prompt of filteredPrompts.value) {
@@ -1781,8 +1563,7 @@ const markdownTools = [
 
 /**
  * Map a topic slug to a heroicon. Falls back to a generic chat icon.
- * Synapse-routed topics (general-chat, coding, image-generation, ...)
- * get distinct visuals so the list scans well at a glance.
+ * Topics get distinct visuals so the list scans well at a glance.
  */
 function topicIcon(topic: string): string {
   const t = topic.toLowerCase()
@@ -1806,15 +1587,10 @@ function topicIcon(topic: string): string {
   if (t.includes('mail') || t.includes('email')) return 'heroicons:envelope'
   if (t.includes('translate') || t.includes('language')) return 'heroicons:language'
   if (t.startsWith('w_')) return 'heroicons:rectangle-group'
-  if (t.includes('chat') || t === 'general' || t === 'general-chat') {
+  if (t.includes('chat') || t === 'general') {
     return 'heroicons:chat-bubble-left-right'
   }
   return 'heroicons:sparkles'
-}
-
-const topicStatusFor = (topic: string): SynapseTopicEntry | undefined => {
-  if (!isAdmin.value || !synapseStatus.value) return undefined
-  return synapseStatus.value.topics.find((entry) => entry.topic === topic)
 }
 
 const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
@@ -1835,16 +1611,6 @@ const loadAIModels = async () => {
     console.error('Failed to load AI models:', err)
   } finally {
     loadingModels.value = false
-  }
-}
-
-const loadSynapseStatus = async () => {
-  if (!isAdmin.value) return
-  try {
-    synapseStatus.value = await adminSynapseApi.getStatus()
-  } catch (err) {
-    // Status enrichment is optional — never block the page on it
-    console.warn('Failed to load Synapse status:', err)
   }
 }
 
@@ -1901,8 +1667,6 @@ const loadPrompt = () => {
     formData.value = {
       shortDescription: prompt.shortDescription || '',
       selectionRules: prompt.selectionRules || '',
-      keywords: prompt.keywords || '',
-      enabled: prompt.enabled !== false,
       aiModel: prompt.aiModel,
       availableTools: prompt.availableTools,
       content: prompt.content,
@@ -1993,15 +1757,6 @@ const insertMarkdown = (before: string, after: string) => {
   }, 0)
 }
 
-const copyToClipboard = async (text: string) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    success(t('config.taskPrompts.copySuccess'))
-  } catch {
-    showError(t('config.taskPrompts.copyError'))
-  }
-}
-
 const handleSave = saveChanges(async () => {
   if (!currentPrompt.value) return
 
@@ -2025,8 +1780,6 @@ const handleSave = saveChanges(async () => {
         prompt: formData.value.content || '',
         language: formData.value.language || locale.value || 'en',
         selectionRules: formData.value.selectionRules ?? null,
-        keywords: formData.value.keywords ?? null,
-        enabled: formData.value.enabled !== false,
         metadata,
       })
 
@@ -2050,8 +1803,6 @@ const handleSave = saveChanges(async () => {
         shortDescription: formData.value.shortDescription || currentPrompt.value.shortDescription,
         prompt: formData.value.content || '',
         selectionRules: formData.value.selectionRules ?? null,
-        keywords: formData.value.keywords ?? null,
-        enabled: formData.value.enabled !== false,
         metadata,
       }
       if (!isSystemPrompt) {
@@ -2167,8 +1918,6 @@ const handleCreateNew = async () => {
       prompt: newPromptContent.value.trim(),
       language: newPromptLanguage.value || locale.value || 'en',
       selectionRules: newPromptRules.value.trim() || null,
-      keywords: newPromptKeywords.value.trim() || null,
-      enabled: true,
       metadata,
     }
 
@@ -2188,8 +1937,6 @@ const handleCreateNew = async () => {
     formData.value = {
       shortDescription: mappedPrompt.shortDescription || '',
       selectionRules: mappedPrompt.selectionRules || '',
-      keywords: mappedPrompt.keywords || '',
-      enabled: mappedPrompt.enabled !== false,
       aiModel: mappedPrompt.aiModel,
       availableTools: mappedPrompt.availableTools,
       content: mappedPrompt.content,
@@ -2236,7 +1983,6 @@ const handleCreateNew = async () => {
     newPromptTopic.value = ''
     newPromptContent.value = ''
     newPromptRules.value = ''
-    newPromptKeywords.value = ''
     newPromptDescription.value = ''
     newPromptLanguage.value = locale.value || 'en'
     newPromptSelectedFiles.value = []
@@ -2390,24 +2136,19 @@ watch(locale, () => {
 
 onMounted(() => {
   cleanupGuard = setupNavigationGuard()
-  // Disabled topics are demoted to a separate group that is collapsed by default
-  // — they only matter when actively triaging the routing pool.
-  collapsedGroups.value = new Set(['disabled'])
-  Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles(), loadSynapseStatus()]).then(
-    () => {
-      const urlParams = new URLSearchParams(window.location.search)
-      const topicParam = urlParams.get('topic')
-      if (topicParam) {
-        const prompt = prompts.value.find((p) => p.topic === topicParam)
-        if (prompt) {
-          selectedPromptId.value = prompt.id
-          loadPrompt()
-          // Deep link from another page: open the editor and stash the list (mobile)
-          listVisibleMobile.value = false
-        }
+  Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles()]).then(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const topicParam = urlParams.get('topic')
+    if (topicParam) {
+      const prompt = prompts.value.find((p) => p.topic === topicParam)
+      if (prompt) {
+        selectedPromptId.value = prompt.id
+        loadPrompt()
+        // Deep link from another page: open the editor and stash the list (mobile)
+        listVisibleMobile.value = false
       }
     }
-  )
+  })
 })
 
 onUnmounted(() => {

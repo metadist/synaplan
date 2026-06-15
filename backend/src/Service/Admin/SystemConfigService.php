@@ -6,7 +6,7 @@ namespace App\Service\Admin;
 
 use App\Repository\ConfigRepository;
 use App\Service\FeedbackConstants;
-use App\Service\Message\GranularTopicsManager;
+use App\Service\Multitask\MultitaskRoutingConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -22,7 +22,7 @@ final readonly class SystemConfigService
     private const DB_GROUP = 'QDRANT_SEARCH';
     private const DB_OWNER_ID = 0;
 
-    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>}> */
+    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}> */
     private array $schema;
 
     public function __construct(
@@ -30,7 +30,6 @@ final readonly class SystemConfigService
         private readonly LoggerInterface $logger,
         private readonly ConfigRepository $configRepository,
         private readonly string $defaultTtsUrl,
-        private readonly GranularTopicsManager $granularTopicsManager,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -38,7 +37,7 @@ final readonly class SystemConfigService
     /**
      * Get the configuration schema with field definitions.
      *
-     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>}>}
+     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}>}
      */
     public function getSchema(): array
     {
@@ -83,14 +82,16 @@ final readonly class SystemConfigService
                     'brave' => ['label' => 'Web Search (Brave)', 'fields' => ['BRAVE_SEARCH_ENABLED', 'BRAVE_SEARCH_API_KEY', 'BRAVE_SEARCH_COUNT']],
                 ],
             ],
+            'routing' => [
+                'label' => 'Routing',
+                'sections' => [
+                    'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
+                ],
+            ],
             'vectordb' => [
                 'label' => 'Vector DB',
                 'sections' => [
                     'qdrant' => ['label' => 'Qdrant', 'fields' => ['QDRANT_URL']],
-                    'synapse' => ['label' => 'Synapse Routing', 'fields' => [
-                        'SYNAPSE_ROUTING_ENABLED', 'SYNAPSE_CONFIDENCE_THRESHOLD',
-                        'GRANULAR_TOPICS_ENABLED',
-                    ]],
                     'qdrant_search' => ['label' => 'Search Thresholds', 'fields' => [
                         'MIN_CHAT_FEEDBACK_SCORE', 'MIN_CHAT_MEMORY_SCORE', 'MIN_CONTRADICTION_SCORE',
                         'MIN_RESEARCH_SCORE', 'MIN_MEMORY_RESEARCH_SCORE', 'MIN_EXTRACTION_SCORE',
@@ -119,7 +120,11 @@ final readonly class SystemConfigService
             $source = $field['source'] ?? 'env';
 
             if ('database' === $source) {
-                $rawValue = $this->configRepository->getValue(self::DB_OWNER_ID, self::DB_GROUP, $key);
+                $rawValue = $this->configRepository->getValue(
+                    self::DB_OWNER_ID,
+                    $field['dbGroup'] ?? self::DB_GROUP,
+                    $field['dbKey'] ?? $key,
+                );
                 $isSet = null !== $rawValue && '' !== $rawValue;
                 $values[$key] = [
                     'value' => $rawValue ?? $field['default'],
@@ -154,7 +159,7 @@ final readonly class SystemConfigService
      *
      * @return array{success: bool, requiresRestart: bool, message?: string}
      */
-    public function setValue(string $key, string $value): array
+    public function setValue(string $key, string $value, ?int $actingUserId = null): array
     {
         if (!isset($this->schema[$key])) {
             return ['success' => false, 'requiresRestart' => false, 'message' => 'Unknown configuration key'];
@@ -165,7 +170,7 @@ final readonly class SystemConfigService
 
         // Database-backed fields: write to BCONFIG, no restart needed
         if ('database' === $source) {
-            return $this->setDatabaseValue($key, $value, $field);
+            return $this->setDatabaseValue($key, $value, $field, $actingUserId);
         }
 
         $envFile = $this->projectDir.'/.env';
@@ -217,11 +222,11 @@ final readonly class SystemConfigService
     /**
      * Save a database-backed configuration value with validation.
      *
-     * @param array{type: string, default: string} $field
+     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string} $field
      *
      * @return array{success: bool, requiresRestart: bool, message?: string}
      */
-    private function setDatabaseValue(string $key, string $value, array $field): array
+    private function setDatabaseValue(string $key, string $value, array $field, ?int $actingUserId = null): array
     {
         // Validate numeric fields
         if ('number' === $field['type']) {
@@ -244,11 +249,14 @@ final readonly class SystemConfigService
             }
         }
 
+        $group = $field['dbGroup'] ?? self::DB_GROUP;
+        $setting = $field['dbKey'] ?? $key;
+
         try {
-            $this->configRepository->setValue(self::DB_OWNER_ID, self::DB_GROUP, $key, $value);
+            $this->configRepository->setValue(self::DB_OWNER_ID, $group, $setting, $value);
             $this->logChange($key, $value);
 
-            $this->applyConfigSideEffects(self::DB_GROUP, $key, $value);
+            $this->applyConfigSideEffects($group, $setting, $value, $actingUserId);
 
             return ['success' => true, 'requiresRestart' => false];
         } catch (\Throwable $e) {
@@ -262,33 +270,34 @@ final readonly class SystemConfigService
      * Side-effects triggered by specific BCONFIG writes.
      *
      * Kept as an explicit, narrow dispatch table rather than an event
-     * subscriber: there is exactly one cross-module hook today
-     * (`GRANULAR_TOPICS_ENABLED` → flip BPROMPTS.BENABLED), and a full
-     * event/listener layer would add framework surface area without
-     * earning its keep. Add new entries here only when a config write
-     * has to mutate state outside BCONFIG.
-     *
-     * Failures are logged and swallowed: the primary BCONFIG write has
-     * already succeeded, and downstream readers will pick up the new
-     * value on their next request. Re-running `app:seed` converges any
-     * BPROMPTS state that the manager failed to flip.
+     * subscriber. Add new entries here only when a config write has to mutate
+     * state outside BCONFIG. Failures are logged and swallowed: the primary
+     * BCONFIG write has already succeeded.
      */
-    private function applyConfigSideEffects(string $group, string $key, string $value): void
+    private function applyConfigSideEffects(string $group, string $key, string $value, ?int $actingUserId = null): void
     {
-        if (GranularTopicsManager::CONFIG_GROUP === $group && GranularTopicsManager::CONFIG_KEY === $key) {
-            $enabled = filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false;
+        // Multi-task routing master switch: existing users were grandfathered to
+        // an explicit per-user OFF row (migration Version20260607000000), which
+        // overrides this global flag. Drop the acting admin's own override so the
+        // value they just set actually applies to their own account immediately.
+        if (MultitaskRoutingConfig::CONFIG_GROUP === $group
+            && MultitaskRoutingConfig::KEY_ROUTING_ENABLED === $key
+            && null !== $actingUserId && $actingUserId > 0
+        ) {
             try {
-                $report = $this->granularTopicsManager->applyState($enabled);
-                $this->logger->info('SystemConfigService: granular routing topics toggled', [
-                    'enabled' => $enabled,
-                    'flipped' => $report['flipped'],
-                    'unchanged' => $report['unchanged'],
-                    'missing' => $report['missing'],
+                $removed = $this->configRepository->deleteValue(
+                    $actingUserId,
+                    MultitaskRoutingConfig::CONFIG_GROUP,
+                    MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
+                );
+                $this->logger->info('SystemConfigService: cleared admin per-user multitask routing override', [
+                    'userId' => $actingUserId,
+                    'removed' => $removed,
+                    'globalValue' => $value,
                 ]);
             } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: granular topics state sync failed', [
-                    'key' => $key,
-                    'value' => $value,
+                $this->logger->error('SystemConfigService: failed clearing per-user multitask override', [
+                    'userId' => $actingUserId,
                     'error' => $sideEffect->getMessage(),
                 ]);
             }
@@ -625,11 +634,23 @@ final readonly class SystemConfigService
     /**
      * Build the configuration schema.
      *
-     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>}>
+     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}>
      */
     private function buildSchema(): array
     {
         return [
+            // === Routing (database-backed, no restart required) ===
+            // Stored in BCONFIG group MULTITASK / setting ROUTING_ENABLED (the row
+            // MultitaskRoutingConfig reads), not the default QDRANT_SEARCH group.
+            'MULTITASK_ROUTING_ENABLED' => [
+                'tab' => 'routing', 'section' => 'multitask', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Route messages through the multi-task planner (turns a request into a small DAG of capability tasks). When OFF, the legacy single-topic AI sorter handles routing. Global default; existing users keep their own setting until they opt in.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
+                'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
+            ],
             // === AI Services ===
             'OLLAMA_BASE_URL' => [
                 'tab' => 'ai', 'section' => 'ollama', 'type' => 'url',
@@ -857,33 +878,6 @@ final readonly class SystemConfigService
                 'tab' => 'vectordb', 'section' => 'qdrant', 'type' => 'url',
                 'sensitive' => false, 'description' => 'Qdrant REST API URL',
                 'default' => 'http://qdrant:6333',
-            ],
-            // === Synapse Routing (database-backed, no restart required) ===
-            'SYNAPSE_ROUTING_ENABLED' => [
-                'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'boolean',
-                'sensitive' => false, 'description' => '[BETA — disabled by default] Enable embedding-based intent routing via Qdrant vector similarity (~50ms vs ~2000ms AI sort). Known issues in this beta: sticky-topic carry-over after file analysis turns may mis-route follow-ups; granular topics may bypass intent guards; stale embeddings after model changes need manual re-index. Falls back to the AI sorter on low confidence. Keep OFF for production until the beta phase ends.',
-                'default' => 'false',
-                'source' => 'database',
-            ],
-            'SYNAPSE_CONFIDENCE_THRESHOLD' => [
-                'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'number',
-                'sensitive' => false, 'description' => 'Min cosine similarity score for Synapse to route directly (0.0–1.0). Below this threshold, the system falls back to AI-based sorting. Default: 0.78',
-                'default' => '0.78',
-                'source' => 'database',
-            ],
-            // Granular routing aliases (general-chat, coding, image-generation,
-            // video-generation, audio-generation) are aliases of the canonical
-            // legacy topics (`general`, `mediamaker`) — see TopicAliasResolver.
-            // They exist so Synapse Routing v2's embedding tier can discriminate
-            // more finely; the legacy AI sorter sees them as near-duplicate
-            // routing targets and produces brittle picks. Ships OFF; flipping
-            // this toggle also flips BENABLED on the matching BPROMPTS rows
-            // (see GranularTopicsManager + SystemConfigService::setDatabaseValue).
-            'GRANULAR_TOPICS_ENABLED' => [
-                'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'boolean',
-                'sensitive' => false, 'description' => 'Include granular routing topics (general-chat, coding, image-generation, video-generation, audio-generation) in the routing pool. OFF (default) keeps only canonical topics (general, mediamaker) — cleaner choice list for the legacy AI sorter. Turn ON when Synapse Routing v2 is enabled so its embedding tier can discriminate finer-grained intents. Toggling automatically flips BENABLED on the corresponding BPROMPTS rows.',
-                'default' => 'false',
-                'source' => 'database',
             ],
             // === Search Thresholds (database-backed, no restart required) ===
             'MIN_CHAT_FEEDBACK_SCORE' => [

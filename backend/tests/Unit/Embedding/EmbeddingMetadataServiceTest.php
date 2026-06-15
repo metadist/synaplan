@@ -115,4 +115,70 @@ final class EmbeddingMetadataServiceTest extends TestCase
         $this->service->invalidate();
         self::assertSame(2, $this->service->getCurrentModelId());
     }
+
+    public function testCurrentModelHonoursPerUserOverride(): void
+    {
+        // Global default is the test stub (-2); user 7 has pinned bge-m3 (13).
+        $this->modelConfigService->method('getDefaultModel')->willReturnMap([
+            ['VECTORIZE', null, -2],
+            ['VECTORIZE', 7, 13],
+        ]);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('ollama');
+        $this->modelConfigService->method('getModelName')->willReturn('bge-m3');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(1024);
+
+        self::assertSame(-2, $this->service->getCurrentModelId());
+        self::assertSame(13, $this->service->getCurrentModelId(7));
+    }
+
+    public function testUserScopedFilterKeepsHitsIndexedWithUserModel(): void
+    {
+        // Regression: hits embedded+indexed with the user's VECTORIZE
+        // override (13) must NOT be discarded just because the global
+        // default differs (-2) — that silently emptied every scoped
+        // RAG search for override users.
+        $this->modelConfigService->method('getDefaultModel')->willReturnMap([
+            ['VECTORIZE', null, -2],
+            ['VECTORIZE', 7, 13],
+        ]);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('ollama');
+        $this->modelConfigService->method('getModelName')->willReturn('bge-m3');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(1024);
+
+        $hits = [
+            ['payload' => ['embedding_model_id' => 13, 'vector_dim' => 1024], 'score' => 0.9],
+            ['payload' => ['embedding_model_id' => -2, 'vector_dim' => 1024], 'score' => 0.8],
+        ];
+
+        $global = $this->service->filterStaleHits($hits);
+        self::assertCount(1, $global['fresh']);
+        self::assertSame(-2, $global['fresh'][0]['payload']['embedding_model_id']);
+
+        $scoped = $this->service->filterStaleHits($hits, userId: 7);
+        self::assertCount(1, $scoped['fresh']);
+        self::assertSame(13, $scoped['fresh'][0]['payload']['embedding_model_id']);
+    }
+
+    public function testExplicitModelDimCheckUsesThatModelsDim(): void
+    {
+        // Memory path: pinned model 99 emits 1536-dim vectors while the
+        // global VECTORIZE default is a 1024-dim model. A fresh pinned
+        // hit must not be stale-filtered against the global dim.
+        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('text-embedding-3-small');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturnMap([
+            [42, 1024],
+            [99, 1536],
+        ]);
+
+        self::assertFalse($this->service->isStale(
+            ['embedding_model_id' => 99, 'vector_dim' => 1536],
+            99,
+        ));
+        self::assertTrue($this->service->isStale(
+            ['embedding_model_id' => 99, 'vector_dim' => 1024],
+            99,
+        ));
+    }
 }

@@ -15,11 +15,13 @@ use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Media\GeneratedFileMetadataNormalizer;
+use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Message\MessageProcessor;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\SlackNotificationService;
 use App\Service\UrlContentService;
-use App\Service\WidgetEventCacheService;
+use App\Service\WidgetRealtimeBroadcaster;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -55,13 +57,70 @@ class WidgetPublicController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
-        private WidgetEventCacheService $eventCache,
+        private WidgetRealtimeBroadcaster $broadcaster,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
+        private SlackNotificationService $slack,
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
+        private GeneratedFileRegistrar $generatedFileRegistrar,
         private string $uploadDir,
     ) {
+    }
+
+    /**
+     * Resolve the URL operators land on when they click the "Take over"
+     * button in the Slack notification. Lives next to the controller (not in
+     * a service) because it's tied to the frontend route shape — same place
+     * that owns the public API surface.
+     *
+     * Matches the SPA route registered in `frontend/src/router/index.ts`
+     * (`/channels/widgets/:widgetId/chats`). The session id is passed via
+     * `?session=` so the dashboard can deep-link directly to the visitor's
+     * conversation instead of leaving the operator to scan the list.
+     */
+    private function buildHandoffTakeoverUrl(string $widgetId, string $sessionId): string
+    {
+        $frontendBase = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'https://app.synaplan.com';
+        $frontendBase = rtrim((string) $frontendBase, '/');
+
+        return sprintf(
+            '%s/channels/widgets/%s/chats?session=%s',
+            $frontendBase,
+            rawurlencode($widgetId),
+            rawurlencode($sessionId),
+        );
+    }
+
+    /**
+     * Match the visitor's latest message against the operator-configured
+     * trigger phrases (case-insensitive substring match). Returns the first
+     * matching trigger so we can include it in the Slack notification ("AI
+     * was paged because the visitor said: 'speak to a human'"), or null when
+     * no trigger fires.
+     *
+     * Trigger list is bounded to 20 entries by `WidgetService::sanitizeConfig`,
+     * so the linear scan stays cheap even on hot widget traffic.
+     *
+     * @param list<string> $triggers
+     */
+    private function detectHandoffTrigger(string $message, array $triggers): ?string
+    {
+        if ('' === $message || [] === $triggers) {
+            return null;
+        }
+        $haystack = mb_strtolower($message);
+        foreach ($triggers as $trigger) {
+            $needle = mb_strtolower(trim($trigger));
+            if ('' === $needle) {
+                continue;
+            }
+            if (str_contains($haystack, $needle)) {
+                return $trigger;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -91,6 +150,25 @@ class WidgetPublicController extends AbstractController
                 new OA\Property(property: 'name', type: 'string'),
                 new OA\Property(property: 'config', type: 'object'),
                 new OA\Property(property: 'isActive', type: 'boolean'),
+                new OA\Property(
+                    property: 'realtime',
+                    type: 'object',
+                    description: 'Realtime / Centrifugo settings consumed by the embedded widget. The cross-origin widget cannot read /api/v1/config/runtime, so we surface the relevant subset here.',
+                    properties: [
+                        new OA\Property(
+                            property: 'enabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'Master kill-switch. When false, the widget makes no WebSocket connection.'
+                        ),
+                        new OA\Property(
+                            property: 'wsUrl',
+                            type: 'string',
+                            example: 'wss://app.example.com/connection/websocket',
+                            description: 'Browser-facing WebSocket endpoint. Empty string means "derive from apiUrl" (Caddy reverse-proxies /connection/websocket to Centrifugo).'
+                        ),
+                    ]
+                ),
             ]
         )
     )]
@@ -124,6 +202,134 @@ class WidgetPublicController extends AbstractController
             'name' => $widget->getName(),
             'config' => self::buildPublicConfig($config),
             'isActive' => true,
+            'realtime' => [
+                // REALTIME_ENABLED is the global kill-switch shared with the
+                // operator UI (see ConfigController::getRuntimeConfig). Empty
+                // wsUrl tells the widget to derive the endpoint from apiUrl,
+                // which is the right default for both same-origin and
+                // cross-origin embeds. Default OFF when unset so a bare
+                // deployment without a Centrifugo gateway doesn't make the
+                // embedded widget loop on connection errors.
+                'enabled' => 'true' === ($_ENV['REALTIME_ENABLED'] ?? 'false'),
+                'wsUrl' => (string) ($_ENV['REALTIME_PUBLIC_WS_URL'] ?? ''),
+            ],
+        ]);
+    }
+
+    /**
+     * Request a human takeover: pings the operator's Slack channel and flips
+     * the session into WAITING so the dashboard surfaces it for pickup.
+     *
+     * PUBLIC endpoint — no authentication required. Idempotent at the
+     * session-mode level: a second click while the session is already
+     * WAITING or HUMAN returns 200 with `notified: false` instead of paging
+     * Slack again.
+     */
+    #[Route('/{widgetId}/human-handoff', name: 'human_handoff', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widget/{widgetId}/human-handoff',
+        summary: 'Request a human operator (posts to widget owner Slack + sets session to WAITING)',
+        tags: ['Widget (Public)']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['sessionId'],
+            properties: [
+                new OA\Property(property: 'sessionId', type: 'string', example: 'sess_xyz123...'),
+                new OA\Property(property: 'lastMessage', type: 'string', nullable: true, description: 'Optional last visitor message snippet for context (server falls back to its own last-message preview)'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Handoff request accepted',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'notified', type: 'boolean', example: true, description: 'true when Slack accepted the payload, false when delivery failed (session is still moved to WAITING)'),
+                new OA\Property(property: 'mode', type: 'string', example: 'waiting'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Missing sessionId / handoff disabled for this widget')]
+    #[OA\Response(response: 404, description: 'Widget or session not found')]
+    public function humanHandoff(string $widgetId, Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || empty($data['sessionId'])) {
+            return $this->json(['error' => 'Missing required field: sessionId'], Response::HTTP_BAD_REQUEST);
+        }
+        $sessionId = (string) $data['sessionId'];
+
+        $widget = $this->widgetService->getWidgetById($widgetId);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $config = $widget->getConfig();
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
+            return $domainError;
+        }
+
+        $webhookUrl = (string) ($config['slackWebhookUrl'] ?? '');
+        $buttonEnabled = (bool) ($config['humanHandoffButtonEnabled'] ?? true);
+        if ('' === $webhookUrl || !$buttonEnabled) {
+            return $this->json([
+                'error' => 'Human handoff is not enabled for this widget',
+                'reason' => 'handoff_disabled',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $session = $this->em->getRepository(WidgetSession::class)->findByWidgetAndSession($widgetId, $sessionId);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Idempotence: once the session is already waiting for / talking to a
+        // human, swallow repeated button clicks instead of paging Slack
+        // again. The UI hides the button in those modes anyway, but a
+        // double-click race or a stale tab can still get through.
+        if (in_array($session->getMode(), [WidgetSession::MODE_WAITING, WidgetSession::MODE_HUMAN], true)) {
+            return $this->json([
+                'success' => true,
+                'notified' => false,
+                'mode' => $session->getMode(),
+                'message' => 'Handoff already pending or active.',
+            ], Response::HTTP_OK);
+        }
+
+        $lastMessage = isset($data['lastMessage']) && is_string($data['lastMessage'])
+            ? trim($data['lastMessage'])
+            : ($session->getLastMessagePreview() ?? '');
+
+        // Flip-and-flush BEFORE the Slack call. Two reasons:
+        //   1. Race window — `notifyHumanHandoff()` does a synchronous HTTP
+        //      POST with a 5 s timeout. Two simultaneous button clicks would
+        //      both observe MODE_AI through the idempotence check above and
+        //      double-page Slack. Persisting WAITING first shrinks the race
+        //      window from "Slack timeout" to "one DB flush" — concurrent
+        //      requests now see the new mode and short-circuit.
+        //   2. Operator visibility — even on a transient Slack outage the
+        //      dashboard's waiting-sessions filter surfaces the request,
+        //      so the visitor's escalation is never silently dropped.
+        $session->setWaitingForHuman();
+        $this->em->flush();
+
+        $notified = $this->slack->notifyHumanHandoff(
+            widget: $widget,
+            session: $session,
+            webhookUrl: $webhookUrl,
+            takeoverUrl: $this->buildHandoffTakeoverUrl($widgetId, $sessionId),
+            lastUserMessage: '' !== $lastMessage ? $lastMessage : null,
+            triggerReason: 'manual button click',
+            customFieldValues: $session->getCustomFieldValues() ?? [],
+        );
+
+        return $this->json([
+            'success' => true,
+            'notified' => $notified,
+            'mode' => $session->getMode(),
         ]);
     }
 
@@ -156,9 +362,22 @@ class WidgetPublicController extends AbstractController
             'privacyPolicyUrl',
             'detectTheme',
             'sessionMode',
+            'widgetSubtitle',
+            'aiAssistantName',
         ];
 
-        return \array_intersect_key($config, \array_flip($allowed));
+        $public = \array_intersect_key($config, \array_flip($allowed));
+
+        // Surface only the derived enabled-flag, never the raw Slack webhook
+        // URL or the trigger phrases. Both are server-side secrets/policy and
+        // would otherwise leak to every page that embeds the widget.
+        $hasSlackWebhook = isset($config['slackWebhookUrl'])
+            && \is_string($config['slackWebhookUrl'])
+            && '' !== $config['slackWebhookUrl'];
+        $buttonEnabled = (bool) ($config['humanHandoffButtonEnabled'] ?? true);
+        $public['humanHandoffEnabled'] = $hasSlackWebhook && $buttonEnabled;
+
+        return $public;
     }
 
     /**
@@ -354,14 +573,51 @@ class WidgetPublicController extends AbstractController
             $this->em->persist($incomingMessage);
             $this->em->flush();
 
-            // Publish event for user message (so admin panel receives it in real-time)
-            $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [
+            // Publish event for user message (so admin panel receives it in
+            // real-time). The broadcaster fans this out on the widget session
+            // channel via Centrifugo.
+            $this->broadcaster->publishSessionEvent($widgetId, $session->getSessionId(), 'message', [
                 'direction' => 'IN',
                 'text' => $data['text'],
                 'messageId' => $incomingMessage->getId(),
                 'timestamp' => $incomingMessage->getUnixTimestamp(),
                 'sender' => 'user',
             ]);
+
+            // Auto-handoff: if the visitor's message matches any operator-
+            // defined trigger phrase, flip the session to WAITING and THEN
+            // page Slack. The visitor still gets an AI reply afterwards
+            // (we don't suppress it — better to keep the conversation moving
+            // while the operator picks up), but the dashboard immediately
+            // surfaces the session as "needs human" and Slack gets a
+            // clickable takeover button.
+            //
+            // Persisting WAITING before the 5 s Slack call shrinks the
+            // double-notify race window for concurrent visitor messages from
+            // "Slack HTTP timeout" to "one DB flush" — concurrent requests
+            // see the new mode through the idempotence check and skip the
+            // second ping. Same ordering rationale as the manual
+            // `humanHandoff` endpoint.
+            $handoffWebhookUrl = (string) ($config['slackWebhookUrl'] ?? '');
+            if ('' !== $handoffWebhookUrl && WidgetSession::MODE_AI === $session->getMode()) {
+                $triggers = is_array($config['humanHandoffTriggers'] ?? null)
+                    ? array_values(array_filter($config['humanHandoffTriggers'], 'is_string'))
+                    : [];
+                $matchedTrigger = $this->detectHandoffTrigger((string) $data['text'], $triggers);
+                if (null !== $matchedTrigger) {
+                    $session->setWaitingForHuman();
+                    $this->em->flush();
+                    $this->slack->notifyHumanHandoff(
+                        widget: $widget,
+                        session: $session,
+                        webhookUrl: $handoffWebhookUrl,
+                        takeoverUrl: $this->buildHandoffTakeoverUrl($widgetId, $session->getSessionId()),
+                        lastUserMessage: (string) $data['text'],
+                        triggerReason: sprintf('matched phrase: "%s"', $matchedTrigger),
+                        customFieldValues: $session->getCustomFieldValues() ?? [],
+                    );
+                }
+            }
 
             // Attach uploaded files if provided
             $fileIds = [];
@@ -421,6 +677,17 @@ class WidgetPublicController extends AbstractController
 
                 $this->em->flush();
 
+                // Ping every dashboard tab subscribed to widget:operators.{id}
+                // so the LiveSupportView session list refreshes in real time
+                // (this replaced the legacy 3-second polling loop). Envelope
+                // type is 'notification'; `kind` discriminates the payload.
+                $this->broadcaster->publishOperatorNotification($widgetId, [
+                    'kind' => 'new_message',
+                    'sessionId' => $session->getSessionId(),
+                    'preview' => mb_substr((string) $data['text'], 0, 100),
+                    'timestamp' => time(),
+                ]);
+
                 // Generate title if needed (also works in human mode)
                 $this->sessionService->generateTitleIfNeeded($session, $owner->getId());
 
@@ -460,10 +727,10 @@ class WidgetPublicController extends AbstractController
                 'skipSorting' => true,
                 'channel' => 'WIDGET',
                 'rag_group_key' => sprintf('WIDGET:%s', $widget->getWidgetId()),
-                'rag_limit' => (int) ($config['ragResultLimit'] ?? 5),
+                'rag_limit' => max(1, min(50, (int) ($config['ragResultLimit'] ?? 20))),
                 'rag_min_score' => isset($config['ragMinScore'])
                     ? max(0.0, min(1.0, (float) $config['ragMinScore']))
-                    : 0.3,
+                    : 0.2,
                 'widget_id' => $widget->getWidgetId(),
                 'disable_memories' => true,
                 'is_widget_mode' => true,
@@ -689,6 +956,25 @@ class WidgetPublicController extends AbstractController
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
 
+                    // Attach the generated file as a real Message<->File relation:
+                    // the history endpoint and the embedded client only surface
+                    // files via getFiles() + the /files/{id}/download route (which
+                    // requires the attachment), so the legacy BFILEPATH/BFILETYPE
+                    // columns alone leave generated media invisible after a reload
+                    // (mirrors StreamController for the authenticated web channel).
+                    if (null !== $generatedFile) {
+                        $localPath = $responseMetadata['local_path'] ?? null;
+                        $fileEntity = $this->generatedFileRegistrar->register(
+                            $owner->getId(),
+                            is_string($localPath) ? $localPath : null,
+                            $generatedFile['type'],
+                        );
+                        if (null !== $fileEntity) {
+                            $outgoingMessage->addFile($fileEntity);
+                            $this->em->flush();
+                        }
+                    }
+
                     // Update session's last message time and preview with AI response
                     // Re-fetch session to ensure it's managed by the EntityManager
                     $currentSession = $this->sessionService->getOrCreateSession($widgetId, $session->getSessionId());
@@ -696,8 +982,9 @@ class WidgetPublicController extends AbstractController
                     $currentSession->setLastMessagePreview($responseText);
                     $this->em->flush();
 
-                    // Publish event for AI response (so admin panel receives it in real-time)
-                    $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [
+                    // Publish AI response on the session channel so the admin
+                    // dashboard receives it in real time via Centrifugo.
+                    $this->broadcaster->publishSessionEvent($widgetId, $session->getSessionId(), 'message', [
                         'direction' => 'OUT',
                         'text' => $responseText,
                         'messageId' => $outgoingMessage->getId(),
@@ -1564,61 +1851,40 @@ class WidgetPublicController extends AbstractController
     }
 
     /**
-     * Send typing indicator (live preview for admin dashboard).
-     *
-     * PUBLIC endpoint - no authentication required
+     * @deprecated Visitor typing previews now stream over the
+     *             `widgettyping:*` Centrifugo channel via direct
+     *             client-publish from the embedded widget. This endpoint
+     *             is retained for ONE release as a no-op so that
+     *             browser-cached old `widget.js` bundles do not start
+     *             hitting 404s after the cutover. Will be removed in the
+     *             release that follows.
      */
     #[Route('/{widgetId}/typing', name: 'typing', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/widget/{widgetId}/typing',
-        summary: 'Send typing indicator (public)',
+        summary: '[DEPRECATED] Send typing indicator (public)',
+        description: 'Deprecated — visitor typing previews now stream over the `widgettyping:*` Centrifugo channel via direct client-publish. Retained for one release as a no-op for backward compatibility with cached widget bundles.',
+        deprecated: true,
         tags: ['Widget (Public)']
     )]
-    #[OA\RequestBody(
-        content: new OA\JsonContent(
-            required: ['sessionId'],
-            properties: [
-                new OA\Property(property: 'sessionId', type: 'string'),
-                new OA\Property(property: 'text', type: 'string', description: 'Current input text (empty to clear)'),
-            ]
-        )
-    )]
-    #[OA\Response(response: 200, description: 'Typing indicator sent')]
-    public function typing(string $widgetId, Request $request): JsonResponse
+    #[OA\Response(response: 200, description: 'Accepted (deprecated, no-op)')]
+    public function typing(string $widgetId): JsonResponse
     {
-        $widget = $this->widgetService->getWidgetById($widgetId);
-        if (!$widget) {
-            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        if (!$this->widgetService->isWidgetActive($widget)) {
-            return $this->json(['error' => 'Widget is not active'], Response::HTTP_SERVICE_UNAVAILABLE);
-        }
-
-        $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
-            return $domainError;
-        }
-
-        $data = $request->toArray();
-        $sessionId = $data['sessionId'] ?? null;
-        $text = $data['text'] ?? '';
-
-        if (!$sessionId) {
-            return $this->json(['error' => 'Session ID required'], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Get or create session
-        $session = $this->sessionService->getOrCreateSession($widgetId, $sessionId);
-
-        // Publish typing event via cache (ephemeral, auto-expires)
-        // Note: This is user typing (has 'text' field), different from operator typing (no text)
-        $this->eventCache->publish($widgetId, $sessionId, 'typing', [
-            'text' => mb_substr($text, 0, 500),
-            'timestamp' => time(),
+        // debug, not info: the endpoint is unauthenticated, so an attacker
+        // could otherwise flood production logs with arbitrary widget_id
+        // strings at zero cost.
+        $this->logger->debug('Deprecated visitor typing endpoint hit (no-op)', [
+            'widget_id' => $widgetId,
         ]);
 
-        return $this->json(['success' => true]);
+        // Returning 200 lets stale widget bundles silently degrade until
+        // the customer reloads the page and picks up the new bundle that
+        // publishes typing frames directly to Centrifugo.
+        return $this->json([
+            'success' => true,
+            'deprecated' => true,
+            'replacement' => 'widgettyping channel via direct client-publish',
+        ]);
     }
 
     /**

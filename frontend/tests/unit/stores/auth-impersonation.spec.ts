@@ -10,6 +10,17 @@ const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 vi.mock('@/services/api/httpClient', () => ({
   getApiBaseUrl: () => 'http://localhost:8000',
   refreshAccessToken: vi.fn().mockResolvedValue(true),
+  getConfigSync: () => ({ realtime: { enabled: false, wsUrl: '' } }),
+}))
+
+// auth.logout() dynamically imports the realtime store so it can disconnect
+// the Centrifuge client. Mock it here so we can assert it is invoked
+// without pulling in the full realtime stack (centrifuge-js, tokenApi, …).
+const realtimeDisconnectMock = vi.fn().mockResolvedValue(undefined)
+vi.mock('@/stores/realtime', () => ({
+  useRealtimeStore: () => ({
+    disconnect: realtimeDisconnectMock,
+  }),
 }))
 
 const refreshUserMock = vi.fn()
@@ -278,5 +289,8 @@ describe('useAuthStore — impersonation', () => {
     expect(store.user).toBeNull()
     expect(store.impersonator).toBeNull()
     expect(store.isImpersonating).toBe(false)
+    // The realtime client must be torn down before the auth cookie is
+    // cleared so it cannot keep retrying with stale credentials.
+    expect(realtimeDisconnectMock).toHaveBeenCalledOnce()
   })
 })

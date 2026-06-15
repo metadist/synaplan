@@ -27,6 +27,9 @@ class ModelCatalog
         'CHAT' => 'chat',
         'TOOLS' => 'chat',
         'SORT' => 'chat',
+        // PLAN: multi-task router model (gpt-oss-120b on Groq). Tuned
+        // independently of SORT; resolves to a chat-tagged model.
+        'PLAN' => 'chat',
         'SUMMARIZE' => 'chat',
         'ANALYZE' => 'chat',
         'TEXT2PIC' => 'text2pic',
@@ -63,10 +66,14 @@ class ModelCatalog
      *   - **Operator-owned** (only set on INSERT, NEVER overwritten):
      *     BSELECTABLE, BACTIVE, BISDEFAULT, BSHOWWHENFREE. These can be toggled
      *     by admins via the AdminModelsService UI; container restarts must not
-     *     wipe those choices. BSHOWWHENFREE is not part of this statement at all
-     *     (no INSERT column / no UPDATE clause) — it is managed exclusively by
-     *     the admin UI and migrations. Test fixtures that need to force a value
-     *     should issue an explicit UPDATE after the upsert (see ModelSeeder::seed()).
+     *     wipe those choices. They are seeded from the catalog on INSERT only
+     *     (so a FRESH install reflects the catalog default) and are absent from
+     *     the ON DUPLICATE KEY UPDATE clause (so an admin override on an EXISTING
+     *     row survives every restart). For BSHOWWHENFREE the catalog default is 0;
+     *     a catalog row may opt in with `showWhenFree => 1` (e.g. the free,
+     *     self-hosted Ollama bge-m3 embedding model that must stay visible despite
+     *     having no per-token price). Bringing existing installs to a new
+     *     visibility default is a migration's job, not the seeder's.
      *
      * Every write embeds the catalog fingerprint into BJSON under
      * self::FINGERPRINT_KEY. ModelSeeder reads this back to detect manual UI edits
@@ -85,8 +92,8 @@ class ModelCatalog
         $json[self::FINGERPRINT_KEY] = self::fingerprint($model);
 
         return (int) $connection->executeStatement(
-            'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BJSON)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BSHOWWHENFREE, BJSON)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 BSERVICE = VALUES(BSERVICE), BNAME = VALUES(BNAME), BTAG = VALUES(BTAG),
                 BPROVID = VALUES(BPROVID), BPRICEIN = VALUES(BPRICEIN),
@@ -100,6 +107,7 @@ class ModelCatalog
                 $model['priceIn'], $model['inUnit'], $model['priceOut'],
                 $model['outUnit'], $model['quality'], $model['rating'],
                 $system ? 1 : 0,
+                (int) ($model['showWhenFree'] ?? 0),
                 json_encode($json, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE),
             ]
         );
@@ -238,13 +246,19 @@ class ModelCatalog
             'name' => 'bge-m3 (Ollama, self-hosted)',
             'tag' => 'vectorize',
             // Selectable in the admin "switch embedding model" dropdown so
-            // operators running a private Ollama / GPU server can pin RAG and
-            // Synapse routing to their own bge-m3 deployment instead of paying
+            // operators running a private Ollama / GPU server can pin RAG
+            // to their own bge-m3 deployment instead of paying
             // per-token to Cloudflare or OpenAI. Same 1024-dim vector space as
             // the Cloudflare bge-m3 (BID 187), so switching between the two
             // is a "free" change from the collection's point of view.
             'selectable' => 1,
             'active' => 1,
+            // This is the default VECTORIZE model for self-hosted / local-dev
+            // installs (see DefaultModelConfigSeeder). It has no per-token price,
+            // so without this opt-in `isHiddenBecauseFree()` would strip it from
+            // the user-facing model list at /config/ai-models even though RAG
+            // actually depends on it. Keep it visible.
+            'showWhenFree' => 1,
             'providerId' => 'bge-m3',
             'priceIn' => 0,
             'inUnit' => 'free',
@@ -260,27 +274,6 @@ class ModelCatalog
                 ],
                 'features' => ['embedding', 'multilingual'],
                 'meta' => ['dimensions' => 1024, 'context_window' => '8192', 'provider' => 'ollama'],
-            ],
-        ],
-        [
-            'id' => 78,
-            'service' => 'Ollama',
-            'name' => 'gpt-oss:20b',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-oss:20b',
-            'priceIn' => 0.12,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.60,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'Local model on synaplans company server in Germany. OpenAI\'s open-weight GPT-OSS (20B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.',
-                'max_tokens' => 16384,
-                'params' => ['model' => 'gpt-oss:20b'],
-                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
             ],
         ],
         [
@@ -302,27 +295,6 @@ class ModelCatalog
                 'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-oss:120b'],
                 'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
-            ],
-        ],
-        [
-            'id' => 124,
-            'service' => 'Ollama',
-            'name' => 'nemotron-3-nano',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'nemotron-3-nano',
-            'priceIn' => 0.092,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.46,
-            'outUnit' => 'per1M',
-            'quality' => 8,
-            'rating' => 8,
-            'json' => [
-                'description' => 'NVIDIA Nemotron 3 nano',
-                'max_tokens' => 32768,
-                'features' => ['reasoning'],
-                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
             ],
         ],
         [
@@ -1179,6 +1151,95 @@ class ModelCatalog
                 'description' => 'Claude Opus 4.7 for image analysis and vision tasks. Substantially enhanced vision capabilities, supports higher-resolution images (up to 2576px / 3.75MP).',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'claude-opus-4-7'],
+                'meta' => ['supports_images' => true],
+            ],
+        ],
+        [
+            'id' => 238,
+            'service' => 'Anthropic',
+            'name' => 'Claude Opus 4.8',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-opus-4-8',
+            'priceIn' => 5,
+            'inUnit' => 'per1M',
+            'priceOut' => 25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Opus 4.8 - Anthropic\'s most capable model for complex reasoning, long-horizon agentic coding, and high-autonomy work. Adaptive thinking. 1M context, 128K max output.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-opus-4-8'],
+                'features' => ['vision', 'reasoning'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-01-31'],
+            ],
+        ],
+        [
+            'id' => 239,
+            'service' => 'Anthropic',
+            'name' => 'Claude Opus 4.8 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-opus-4-8',
+            'priceIn' => 5,
+            'inUnit' => 'per1M',
+            'priceOut' => 25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Opus 4.8 for image analysis and vision tasks. Most capable Anthropic vision model.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-opus-4-8'],
+                'meta' => ['supports_images' => true],
+            ],
+        ],
+        [
+            // Snapshot 2026-06-09 (https://platform.claude.com/docs/en/about-claude/models/overview).
+            // Claude Fable 5 — Anthropic's most capable widely released model.
+            // Generally available on the Claude API since 2026-06-09.
+            'id' => 240,
+            'service' => 'Anthropic',
+            'name' => 'Claude Fable 5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-fable-5',
+            'priceIn' => 10,
+            'inUnit' => 'per1M',
+            'priceOut' => 50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Fable 5 - Anthropic\'s most capable widely released model for the most demanding reasoning and long-horizon agentic work. Adaptive thinking (always on). 1M context, 128K max output.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-fable-5'],
+                'features' => ['vision', 'reasoning'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000'],
+            ],
+        ],
+        [
+            'id' => 241,
+            'service' => 'Anthropic',
+            'name' => 'Claude Fable 5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-fable-5',
+            'priceIn' => 10,
+            'inUnit' => 'per1M',
+            'priceOut' => 50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Fable 5 for image analysis and vision tasks. Anthropic\'s most capable widely released vision model.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-fable-5'],
                 'meta' => ['supports_images' => true],
             ],
         ],

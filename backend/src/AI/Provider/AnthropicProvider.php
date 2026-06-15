@@ -38,15 +38,19 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-4-5-20251101',
         'claude-opus-4-6',
         'claude-opus-4-7',
+        'claude-opus-4-8',
         'claude-sonnet-4-6',
         'claude-haiku-4-5',
+        'claude-fable-5',
     ];
 
     /** Models that require adaptive thinking format instead of manual budget_tokens. */
     private const ADAPTIVE_THINKING_MODELS = [
         'claude-opus-4-6',
         'claude-opus-4-7',
+        'claude-opus-4-8',
         'claude-sonnet-4-6',
+        'claude-fable-5',
     ];
 
     /**
@@ -58,6 +62,8 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
      */
     private const TEMPERATURE_DEPRECATED_MODELS = [
         'claude-opus-4-7',
+        'claude-opus-4-8',
+        'claude-fable-5',
     ];
 
     public function __construct(
@@ -92,8 +98,8 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     public function getDefaultModels(): array
     {
         return [
-            'chat' => 'claude-3-5-sonnet-20241022',
-            'vision' => 'claude-3-5-sonnet-20241022',
+            'chat' => 'claude-sonnet-4-6',
+            'vision' => 'claude-sonnet-4-6',
         ];
     }
 
@@ -411,7 +417,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     public function compareImages(string $imageUrl1, string $imageUrl2): array
     {
         // Claude supports multiple images in a single request
-        $model = 'claude-3-5-sonnet-20241022';
+        $model = 'claude-sonnet-4-6';
 
         try {
             $image1Data = $this->prepareImageData($imageUrl1);
@@ -471,7 +477,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         }
 
         try {
-            $model = $options['model'] ?? 'claude-3-5-sonnet-20241022';
+            $model = $options['model'] ?? 'claude-sonnet-4-6';
 
             $imageData = $this->prepareImageData($imagePath);
 

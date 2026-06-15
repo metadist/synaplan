@@ -28,11 +28,12 @@ No over-engineering. No unnecessary abstractions.
   await page.locator(...).click();
   ```
 * Prefer: `data-testid` → `getByRole`/`getByLabel` → CSS.
+* **All `data-testid` patterns must be defined in `helpers/selectors.ts`** — including prefix-match patterns (`^=`). No inline `[data-testid="..."]` strings in test files.
 * Never use CSS class selectors (`[class*="..."]`, `.my-class`) — classes are implementation details and break on refactor.
 * Use container-scoped locators.
 * Use the same scope for counting and selecting.
-* Avoid i18n/label/`hasText` for critical controls.
-* Avoid `.first()` / `.last()` unless ordering is guaranteed.
+* Avoid i18n/label/`hasText` for critical controls. Exception: `filter({ hasText })` is acceptable to narrow down a list of same-type elements by unique test data (e.g. finding a card by its generated name).
+* Avoid `.first()` / `.last()` unless ordering is guaranteed. When only one element exists (e.g. after adding exactly one item), omit `.first()` — it adds no safety and reduces readability.
 * Capture state first (e.g. `previousCount`) and assert relative change.
 * Do not rely on implicit UI ordering, empty states, or default counts.
 
@@ -57,6 +58,7 @@ Use the constants from `frontend/tests/e2e/config/config.ts`:
 * **No `waitForTimeout`.** Ever. Wait for a DOM condition instead.
 * Do not stack sequential waits that together behave like a long timeout.
 * Prefer a single, well-scoped wait for the true terminal condition.
+* **After every state-changing action** (click, submit, navigation), wait for the resulting state to be visible before the next action. Do not chain multiple clicks without verifying intermediate states (e.g. wizard step transitions).
 * **No `networkidle`** on SSE/widget pages (keeps connections open → never resolves or silently times out).
 * Do not use text-stabilization polling.
 
@@ -149,7 +151,7 @@ Only with deterministic UI hooks (no text scanning).
 ## 7. Test Data & Cleanup
 
 * Unique data per test (use timestamps, UUIDs, or `test.info().title`).
-* Cleanup via `test.afterEach` or `try/finally` inside the test.
+* **Cleanup is mandatory** for tests that create persistent resources (handlers, widgets, prompts, etc.). Use `test.afterEach` with API calls to delete any resources matching the test's name prefix. This ensures cleanup even when the test fails mid-way.
 * Backend API only for setup/teardown — never for the action under test.
 * Validate final result via UI.
 * Do not assume empty history or `count = 0`.

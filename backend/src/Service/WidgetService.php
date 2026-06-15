@@ -28,31 +28,45 @@ final readonly class WidgetService
     public const DEFAULT_WIDGET_PROMPT = 'tools:widget-default';
 
     /**
+     * Sentinel meaning "no fixed prompt": the widget runs the owner's standard
+     * routing (AI sorter / multi-task planner) instead of a pinned task prompt.
+     * Stored as an empty topic on the entity; the public widget chat then sends
+     * no fixed_task_prompt and the normal classifier handles the turn.
+     */
+    public const STANDARD_SORTING_TOPIC = '__standard__';
+
+    /**
      * Create a new widget.
      *
      * @param User        $owner           The widget owner
      * @param string      $name            Widget display name
-     * @param string|null $taskPromptTopic Optional task prompt topic (defaults to 'widget-default')
+     * @param string|null $taskPromptTopic Task prompt topic; null/empty defaults to the widget-default prompt, the STANDARD_SORTING_TOPIC sentinel means "use standard routing"
      * @param array       $config          Optional widget configuration
      * @param string|null $websiteUrl      Optional website URL to add to allowed domains
      */
     public function createWidget(User $owner, string $name, ?string $taskPromptTopic = null, array $config = [], ?string $websiteUrl = null): Widget
     {
-        // Use default prompt if not specified
-        $taskPromptTopic = $taskPromptTopic ?: self::DEFAULT_WIDGET_PROMPT;
+        if (self::STANDARD_SORTING_TOPIC === $taskPromptTopic) {
+            // Standard sorting: store an empty topic so the widget runs the
+            // normal routing instead of a pinned prompt. No prompt to validate.
+            $taskPromptTopic = '';
+        } else {
+            // Use default prompt if not specified
+            $taskPromptTopic = $taskPromptTopic ?: self::DEFAULT_WIDGET_PROMPT;
 
-        // Validate task prompt exists (check user-specific first, then default)
-        $prompt = $this->promptRepository->findByTopic($taskPromptTopic, $owner->getId());
-        if (!$prompt) {
-            // Try default prompt (BOWNERID = 0)
-            $prompt = $this->promptRepository->findByTopic($taskPromptTopic, 0);
+            // Validate task prompt exists (check user-specific first, then default)
+            $prompt = $this->promptRepository->findByTopic($taskPromptTopic, $owner->getId());
             if (!$prompt) {
-                throw new \InvalidArgumentException('Task prompt not found: '.$taskPromptTopic);
+                // Try default prompt (BOWNERID = 0)
+                $prompt = $this->promptRepository->findByTopic($taskPromptTopic, 0);
+                if (!$prompt) {
+                    throw new \InvalidArgumentException('Task prompt not found: '.$taskPromptTopic);
+                }
+                $this->logger->info('Using default prompt for widget', [
+                    'prompt_topic' => $taskPromptTopic,
+                    'owner_id' => $owner->getId(),
+                ]);
             }
-            $this->logger->info('Using default prompt for widget', [
-                'prompt_topic' => $taskPromptTopic,
-                'owner_id' => $owner->getId(),
-            ]);
         }
 
         // If websiteUrl is provided, add the domain to allowed domains
@@ -308,6 +322,22 @@ HTML;
             'allowedDomains' => [],
             'allowFileUpload' => false,
             'fileUploadLimit' => 3,
+            // Header tagline. NULL = fallback to the i18n default
+            // ("We typically reply in minutes"). '' (empty string) = hide the
+            // line entirely. Non-empty string = render verbatim (customer copy).
+            'widgetSubtitle' => null,
+            // Per-widget display name for AI replies in the chat header
+            // ("AI Assistant · 03:58 PM"). NULL = use the i18n default
+            // ("AI Assistant" / "KI-Assistent"); non-empty string = render
+            // verbatim. Operator copy, NOT translated.
+            'aiAssistantName' => null,
+            // Slack human-handoff. Webhook URL is server-side only — never
+            // shipped to the embedded widget. Triggers run server-side too,
+            // so they also stay private. The widget receives only the derived
+            // boolean `humanHandoffEnabled` via WidgetPublicController.
+            'slackWebhookUrl' => '',
+            'humanHandoffTriggers' => [],
+            'humanHandoffButtonEnabled' => true,
         ];
 
         // Apply defaults only for missing keys (not for empty arrays!)
@@ -385,6 +415,81 @@ HTML;
         if (isset($config['aiModelId'])) {
             $config['aiModelId'] = (int) $config['aiModelId'];
         }
+
+        // Header subtitle: keep null (i18n default), empty string (hide),
+        // or a trimmed non-empty string (max 200 chars). Reject non-string values.
+        if (null === $config['widgetSubtitle']) {
+            // explicit "use i18n default" — keep as-is
+        } elseif (is_string($config['widgetSubtitle'])) {
+            $config['widgetSubtitle'] = mb_substr(trim($config['widgetSubtitle']), 0, 200);
+        } else {
+            $config['widgetSubtitle'] = null;
+        }
+
+        // AI assistant display name. Unlike `widgetSubtitle`, the "hide"
+        // option is meaningless here (the timestamp line always renders a
+        // sender label), so empty string collapses to null = i18n default.
+        // Max 50 chars keeps mobile widgets readable.
+        if (null === $config['aiAssistantName']) {
+            // keep null
+        } elseif (is_string($config['aiAssistantName'])) {
+            $trimmedName = trim($config['aiAssistantName']);
+            $config['aiAssistantName'] = '' === $trimmedName ? null : mb_substr($trimmedName, 0, 50);
+        } else {
+            $config['aiAssistantName'] = null;
+        }
+
+        // Slack webhook URL: only accept the canonical Slack incoming-webhook
+        // hostname over HTTPS. Reject anything else (including http://, empty
+        // value stays empty). Keeps operators from accidentally pasting a
+        // chat URL or a third-party service URL.
+        $rawSlackUrl = is_string($config['slackWebhookUrl'] ?? null)
+            ? trim($config['slackWebhookUrl'])
+            : '';
+        if ('' === $rawSlackUrl) {
+            $config['slackWebhookUrl'] = '';
+        } elseif (1 === preg_match('#^https://hooks\.slack\.com/services/[A-Za-z0-9/_-]+$#', $rawSlackUrl)) {
+            $config['slackWebhookUrl'] = $rawSlackUrl;
+        } else {
+            $this->logger->warning('Widget config: invalid Slack webhook URL rejected', [
+                'value_preview' => mb_substr($rawSlackUrl, 0, 32).'…',
+            ]);
+            $config['slackWebhookUrl'] = '';
+        }
+
+        // Trigger phrases: list of strings (case-insensitive substring match
+        // against incoming user messages). Cap count + length to prevent
+        // pathological config and oversized JSON payloads.
+        //
+        // We also split each stored entry on commas: operators occasionally
+        // pasted multi-phrase lists into a single tag (the v1 placeholder
+        // suggested that pattern), producing mega-strings like
+        // `"real person, human agent, talk to someone"` which the auto-handoff
+        // matcher would search for verbatim and never match. Splitting here
+        // self-heals those legacy entries on the next admin save AND makes
+        // the API more forgiving for clients that build the list themselves.
+        if (!is_array($config['humanHandoffTriggers'] ?? null)) {
+            $config['humanHandoffTriggers'] = [];
+        }
+        $sanitizedTriggers = [];
+        foreach ($config['humanHandoffTriggers'] as $trigger) {
+            if (!is_string($trigger)) {
+                continue;
+            }
+            foreach (explode(',', $trigger) as $piece) {
+                $trimmed = trim($piece);
+                if ('' === $trimmed) {
+                    continue;
+                }
+                $sanitizedTriggers[] = mb_substr($trimmed, 0, 100);
+                if (count($sanitizedTriggers) >= 20) {
+                    break 2;
+                }
+            }
+        }
+        $config['humanHandoffTriggers'] = array_values(array_unique($sanitizedTriggers));
+
+        $config['humanHandoffButtonEnabled'] = (bool) ($config['humanHandoffButtonEnabled'] ?? true);
 
         return $config;
     }

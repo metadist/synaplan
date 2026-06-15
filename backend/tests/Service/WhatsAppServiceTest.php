@@ -6,6 +6,7 @@ namespace App\Tests\Service;
 
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
+use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\DiscordNotificationService;
@@ -1775,5 +1776,217 @@ class WhatsAppServiceTest extends TestCase
 
         // No empty preamble — the citation block should be the entire reply.
         $this->assertStringStartsWith('🔗 *Quellen:*', $result);
+    }
+
+    // ============================================
+    // Multi-task DAG delivery: response text must never be lost, document
+    // outputs must reach the user, extras are best-effort.
+    // ============================================
+
+    /**
+     * Run handleIncomingMessage for a plain text turn whose AI pipeline
+     * produced $aiResponse (content + metadata), capturing every outbound
+     * Meta /messages send. markAsRead is excluded via the 'type' key filter
+     * (its payload has 'status' => 'read' instead).
+     *
+     * @param array<string, mixed>                       $aiResponse {content, metadata}
+     * @param (callable(array<string,mixed>): void)|null $onSend     invoked per send, may throw to simulate API failure
+     *
+     * @return list<array<string, mixed>> captured request json payloads, in send order
+     */
+    private function dispatchTurn(array $aiResponse, ?callable $onSend = null): array
+    {
+        $sends = [];
+        $httpResponse = $this->createMock(ResponseInterface::class);
+        $httpResponse->method('getStatusCode')->willReturn(200);
+        $httpResponse->method('toArray')->willReturn(['messages' => [['id' => 'wamid.out.'.uniqid()]]]);
+
+        $this->httpClient->method('request')->willReturnCallback(
+            function (string $method, string $url, array $options = []) use (&$sends, $onSend, $httpResponse) {
+                $json = $options['json'] ?? [];
+                if (isset($json['type'])) {
+                    $sends[] = $json;
+                    if (null !== $onSend) {
+                        $onSend($json);
+                    }
+                }
+
+                return $httpResponse;
+            }
+        );
+
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->emailChatService->method('findOrCreateWhatsAppChat')->willReturn($this->createMock(Chat::class));
+        $this->messageProcessor->method('processStream')->willReturn([
+            'success' => true,
+            'response' => $aiResponse,
+        ]);
+
+        // Doctrine would assign the id on flush; setMeta() needs it (MessageMeta
+        // mirrors message.id into its typed int column). Simulate on persist.
+        $nextId = 1000;
+        $this->em->method('persist')->willReturnCallback(static function (object $entity) use (&$nextId): void {
+            if ($entity instanceof Message && null === $entity->getId()) {
+                $idProp = new \ReflectionProperty(Message::class, 'id');
+                $idProp->setValue($entity, ++$nextId);
+            }
+        });
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $incomingMsg = [
+            'from' => '+1234567890',
+            'id' => 'wamid.dispatch.'.bin2hex(random_bytes(4)),
+            'timestamp' => (string) time(),
+            'type' => 'text',
+            'text' => ['body' => 'Write me a poem with audio and image'],
+        ];
+        $value = [
+            'messaging_product' => 'whatsapp',
+            'metadata' => [
+                'phone_number_id' => $this->testPhoneNumberId,
+                'display_phone_number' => '+49123456789',
+            ],
+            'contacts' => [['profile' => ['name' => 'Test User'], 'wa_id' => '+1234567890']],
+            'messages' => [$incomingMsg],
+        ];
+
+        $result = $this->service->handleIncomingMessage(IncomingMessageDto::fromPayload($incomingMsg, $value), $user, false);
+        $this->assertTrue($result['success']);
+
+        return $sends;
+    }
+
+    /**
+     * Audio has no caption on WhatsApp — the response text must go out as its
+     * own message BEFORE the audio instead of being silently dropped.
+     */
+    public function testAudioResponseSendsTextSeparatelyBeforeMedia(): void
+    {
+        $sends = $this->dispatchTurn([
+            'content' => 'Here is your spring poem, read aloud.',
+            'metadata' => [
+                'file' => ['path' => '/api/v1/files/uploads/1/000/poem.mp3', 'type' => 'audio'],
+            ],
+        ]);
+
+        $this->assertCount(2, $sends);
+        $this->assertSame('text', $sends[0]['type']);
+        $this->assertStringContainsString('Here is your spring poem', $sends[0]['text']['body']);
+        $this->assertSame('audio', $sends[1]['type']);
+        $this->assertArrayNotHasKey('caption', $sends[1]['audio']);
+        $this->assertStringContainsString('/api/v1/files/uploads/1/000/poem.mp3', $sends[1]['audio']['link']);
+    }
+
+    /**
+     * WhatsApp caps captions at 1024 chars: longer text is a separate message
+     * and the media goes out caption-less (text must not be truncated away).
+     */
+    public function testLongTextIsSentSeparatelyInsteadOfTruncatedCaption(): void
+    {
+        $longText = rtrim(str_repeat('Lorem ipsum dolor sit amet. ', 50)); // ~1400 chars
+
+        $sends = $this->dispatchTurn([
+            'content' => $longText,
+            'metadata' => [
+                'file' => ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
+            ],
+        ]);
+
+        $this->assertCount(2, $sends);
+        $this->assertSame('text', $sends[0]['type']);
+        $this->assertStringContainsString('Lorem ipsum dolor sit amet.', $sends[0]['text']['body']);
+        $this->assertSame('image', $sends[1]['type']);
+        $this->assertArrayNotHasKey('caption', $sends[1]['image']);
+    }
+
+    public function testShortTextRidesAsMediaCaption(): void
+    {
+        $sends = $this->dispatchTurn([
+            'content' => 'A happy dog!',
+            'metadata' => [
+                'file' => ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
+            ],
+        ]);
+
+        // One send only — no separate text message duplicating the caption.
+        $this->assertCount(1, $sends);
+        $this->assertSame('image', $sends[0]['type']);
+        $this->assertSame('A happy dog!', $sends[0]['image']['caption']);
+    }
+
+    /**
+     * Document outputs (.ics / .docx from DAG nodes) were silently dropped
+     * before — the primary-file gate must accept type 'document' and pass the
+     * required filename.
+     */
+    public function testDocumentPrimaryFileIsSentWithFilenameAndCaption(): void
+    {
+        $sends = $this->dispatchTurn([
+            'content' => 'Your meeting invite is attached.',
+            'metadata' => [
+                'file' => ['path' => '/api/v1/files/uploads/1/000/meeting.ics', 'type' => 'document'],
+            ],
+        ]);
+
+        $this->assertCount(1, $sends);
+        $this->assertSame('document', $sends[0]['type']);
+        $this->assertSame('meeting.ics', $sends[0]['document']['filename']);
+        $this->assertSame('Your meeting invite is attached.', $sends[0]['document']['caption']);
+    }
+
+    /**
+     * Multi-task turns emit metadata['files']; every extra file after the
+     * primary must be delivered — including documents.
+     */
+    public function testMultiTaskExtraFilesIncludingDocumentsAreAllSent(): void
+    {
+        $files = [
+            ['path' => '/api/v1/files/uploads/1/000/poem.mp3', 'type' => 'audio'],
+            ['path' => '/api/v1/files/uploads/1/000/invite.ics', 'type' => 'document'],
+            ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
+        ];
+
+        $sends = $this->dispatchTurn([
+            'content' => '',
+            'metadata' => ['file' => $files[0], 'files' => $files],
+        ]);
+
+        $this->assertSame(
+            ['audio', 'document', 'image'],
+            array_map(static fn (array $send): string => $send['type'], $sends),
+        );
+    }
+
+    /**
+     * Best-effort extras: one failing extra send must not abort the
+     * remaining files of the turn.
+     */
+    public function testFailedExtraFileDoesNotAbortRemainingSends(): void
+    {
+        $files = [
+            ['path' => '/api/v1/files/uploads/1/000/poem.mp3', 'type' => 'audio'],
+            ['path' => '/api/v1/files/uploads/1/000/invite.ics', 'type' => 'document'],
+            ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
+        ];
+
+        $sends = $this->dispatchTurn(
+            [
+                'content' => '',
+                'metadata' => ['file' => $files[0], 'files' => $files],
+            ],
+            static function (array $json): void {
+                if ('document' === $json['type']) {
+                    throw new \Exception('Meta API 500');
+                }
+            },
+        );
+
+        // Document send was attempted and failed — the image must still go out.
+        $this->assertSame(
+            ['audio', 'document', 'image'],
+            array_map(static fn (array $send): string => $send['type'], $sends),
+        );
     }
 }

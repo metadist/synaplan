@@ -7,6 +7,10 @@ use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Multitask\TaskPlanExecutor;
+use App\Service\Multitask\TaskPlanner;
+use App\Service\Multitask\TaskPlanStore;
 use App\Service\PerfTimer;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
@@ -38,6 +42,10 @@ final readonly class MessageProcessor
         private SearchQueryGenerator $searchQueryGenerator,
         private UrlContentService $urlContentService,
         private LoggerInterface $logger,
+        private MultitaskRoutingConfig $multitaskConfig,
+        private TaskPlanner $taskPlanner,
+        private TaskPlanStore $taskPlanStore,
+        private TaskPlanExecutor $taskPlanExecutor,
     ) {
     }
 
@@ -179,25 +187,17 @@ final readonly class MessageProcessor
                 ];
             } else {
                 // Normal flow: Run classification
-                if ($this->classifier->isSynapseEnabled()) {
-                    $this->notify($statusCallback, 'classifying', 'Synapse Routing...', [
-                        'model_id' => null,
-                        'provider' => 'synapse',
-                        'model_name' => 'Synapse Routing',
-                    ]);
-                } else {
-                    $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
-                    if ($sortingModelId) {
-                        $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
-                        $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
-                    }
-
-                    $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
-                        'model_id' => $sortingModelId,
-                        'provider' => $sortingProvider,
-                        'model_name' => $sortingModelName,
-                    ]);
+                $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
+                if ($sortingModelId) {
+                    $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
+                    $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
                 }
+
+                $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
+                    'model_id' => $sortingModelId,
+                    'provider' => $sortingProvider,
+                    'model_name' => $sortingModelName,
+                ]);
             }
 
             // Get conversation history for context - STREAMING VERSION
@@ -274,6 +274,27 @@ final readonly class MessageProcessor
                     'sorting_provider' => $sortingProvider,
                     'sorting_model_name' => $sortingModelName,
                 ]);
+
+                // Shadow mode (Sprint 1): generate + persist a task plan for
+                // real traffic WITHOUT executing it. The legacy path above still
+                // answers the user. Inert unless MULTITASK_SHADOW_MODE is on, and
+                // wrapped so it can never affect the turn. Runs only on the
+                // normal-classification branch (never widget/fixed-prompt/again).
+                $this->maybeShadowPlan($message, $conversationHistory);
+            }
+
+            // User-selected knowledge-base folder (RAG group key) from the chat
+            // composer. Scope this turn's retrieval to that group regardless of
+            // the classification path above (normal chat, again, widget, fixed
+            // prompt) so "add a knowledge group to the chat" works everywhere.
+            if (!empty($options['rag_group_key'])) {
+                $classification['rag_group_key'] = $options['rag_group_key'];
+            }
+            if (!empty($options['rag_limit'])) {
+                $classification['rag_limit'] = (int) $options['rag_limit'];
+            }
+            if (isset($options['rag_min_score'])) {
+                $classification['rag_min_score'] = (float) $options['rag_min_score'];
             }
 
             // Step 2.3: Load Prompt Metadata and apply tool restrictions
@@ -291,22 +312,20 @@ final readonly class MessageProcessor
 
             // Step 2.5: Web Search
             //
-            // Project-wide policy: search is the DEFAULT for every chat.
-            // The only ways to suppress it are:
-            //   (a) Topic is a pure asset/document generation topic where
-            //       the handler does not consume web context.
-            //   (b) The user has explicitly opted out by setting
-            //       `tool_internet=false` on the task prompt.
-            //
-            // All other signals (classifier `web_search` vote, AI BWEBSEARCH,
-            // legacy `tools:search` source) are now advisory only — they are
-            // recorded in the decision log for diagnostics, but no longer
-            // gate the decision.
+            // Web-search decision (trust the model):
+            //   (a) Prompt opts in (`tool_internet=true`)        → always search.
+            //   (b) Asset/document-generation topic              → never search.
+            //   (c) Prompt opts out (`tool_internet=false`)      → never search.
+            //   (d) Otherwise → trust the classifier's BWEBSEARCH vote. The AI
+            //       sorter judges whether the message needs live information;
+            //       the fast-path (no model call) carries no vote, so trivial
+            //       chats stay fast and skip the search round-trip.
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
-            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $shouldSearch);
+            $classifierVote = $classification['web_search'] ?? null;
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet, $classifierVote);
+            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $classifierVote, $shouldSearch);
 
             // Consolidated decision log: lets us diagnose "search didn't trigger"
             // reports without correlating multiple log lines from different services.
@@ -370,11 +389,18 @@ final readonly class MessageProcessor
                     if ($searchResults && !empty($searchResults['results']) && $this->searchResultRepository) {
                         $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
 
+                        // Surface the actual sources (not just the count) the
+                        // moment the search returns, so the client can render the
+                        // "sources" box within seconds — while the answer is still
+                        // generating — instead of waiting for the final `complete`
+                        // event. Shape matches StreamController::formatSearchResultsForSse().
                         $this->notify($statusCallback, 'search_complete', sprintf(
                             'Found %d web results',
                             count($searchResults['results'])
                         ), [
                             'results_count' => count($searchResults['results']),
+                            'query' => $searchQuery,
+                            'results' => $this->formatSearchResultsForClient($searchResults['results']),
                         ]);
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
@@ -433,7 +459,15 @@ final readonly class MessageProcessor
             }
 
             $perfTimer->start('handler_total');
-            $response = $this->router->routeStream($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
+            // MULTITASK_ROUTING_ENABLED (Sprint 2): route execution through the
+            // task-plan executor. For single-node plans it delegates to the same
+            // InferenceRouter with the same classification — behaviour is
+            // identical; it only additionally persists the executed plan.
+            // (Single $cls alias keeps the PHPStan "might not be defined" count stable.)
+            $cls = $classification;
+            $response = $this->isMultitaskRoutingEnabled($message)
+                ? $this->taskPlanExecutor->executeStream($message, $conversationHistory, $cls, $streamCallback, $statusCallback, $options)
+                : $this->router->routeStream($message, $conversationHistory, $cls, $streamCallback, $statusCallback, $options);
             $perfTimer->stop('handler_total');
 
             // Re-add sorting model info to result (for StreamController to save)
@@ -542,25 +576,17 @@ final readonly class MessageProcessor
             $languageOverride = $options['language'] ?? null;
 
             if (!$hasFixedPrompt && !$isAgainRequest) {
-                if ($this->classifier->isSynapseEnabled()) {
-                    $this->notify($statusCallback, 'classifying', 'Synapse Routing...', [
-                        'model_id' => null,
-                        'provider' => 'synapse',
-                        'model_name' => 'Synapse Routing',
-                    ]);
-                } else {
-                    $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
-                    if ($sortingModelId) {
-                        $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
-                        $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
-                    }
-
-                    $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
-                        'model_id' => $sortingModelId,
-                        'provider' => $sortingProvider,
-                        'model_name' => $sortingModelName,
-                    ]);
+                $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
+                if ($sortingModelId) {
+                    $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
+                    $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
                 }
+
+                $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
+                    'model_id' => $sortingModelId,
+                    'provider' => $sortingProvider,
+                    'model_name' => $sortingModelName,
+                ]);
             }
 
             // Get conversation history for context - NON-STREAMING VERSION
@@ -695,6 +721,10 @@ final readonly class MessageProcessor
                     'sorting_provider' => $sortingProvider,
                     'sorting_model_name' => $sortingModelName,
                 ]);
+
+                // Shadow mode (Sprint 1): see processStream() for rationale.
+                // Inert unless MULTITASK_SHADOW_MODE is on; never affects the turn.
+                $this->maybeShadowPlan($message, $conversationHistory);
             }
 
             if (isset($classification['prompt_metadata']) && is_array($classification['prompt_metadata'])) {
@@ -716,8 +746,9 @@ final readonly class MessageProcessor
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
-            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $shouldSearch);
+            $classifierVote = $classification['web_search'] ?? null;
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet, $classifierVote);
+            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $classifierVote, $shouldSearch);
 
             $braveEnabled = $this->braveSearchService->isEnabled();
             $this->logger->info('MessageProcessor: Web search decision', [
@@ -769,11 +800,18 @@ final readonly class MessageProcessor
                     if ($searchResults && !empty($searchResults['results']) && $this->searchResultRepository) {
                         $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
 
+                        // Surface the actual sources (not just the count) the
+                        // moment the search returns, so the client can render the
+                        // "sources" box within seconds — while the answer is still
+                        // generating — instead of waiting for the final `complete`
+                        // event. Shape matches StreamController::formatSearchResultsForSse().
                         $this->notify($statusCallback, 'search_complete', sprintf(
                             'Found %d web results',
                             count($searchResults['results'])
                         ), [
                             'results_count' => count($searchResults['results']),
+                            'query' => $searchQuery,
+                            'results' => $this->formatSearchResultsForClient($searchResults['results']),
                         ]);
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
@@ -828,7 +866,10 @@ final readonly class MessageProcessor
                 'model_name' => $chatModelName,
             ]);
 
-            $response = $this->router->route($message, $conversationHistory, $classification, $statusCallback);
+            $clsForRoute = $classification;
+            $response = $this->isMultitaskRoutingEnabled($message)
+                ? $this->taskPlanExecutor->execute($message, $conversationHistory, $clsForRoute, $statusCallback)
+                : $this->router->route($message, $conversationHistory, $clsForRoute, $statusCallback);
 
             $this->notify($statusCallback, 'complete', 'Response generated', [
                 'provider' => $response['metadata']['provider'] ?? 'unknown',
@@ -920,21 +961,122 @@ final readonly class MessageProcessor
      * so the log line directly explains the decision without a reader
      * having to consult two services.
      */
-    private function triggerReasonFor(?string $topic, ?bool $promptToolInternet, bool $shouldSearch): string
+    private function triggerReasonFor(?string $topic, ?bool $promptToolInternet, ?bool $classifierVote, bool $shouldSearch): string
     {
         if (!$shouldSearch) {
-            if (WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
+            if (true !== $promptToolInternet && WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
                 return 'non_web_search_topic';
             }
 
-            return 'disabled_by_prompt_tool_internet';
+            if (false === $promptToolInternet) {
+                return 'disabled_by_prompt_tool_internet';
+            }
+
+            return 'classifier_vote_no_search';
         }
 
         if (true === $promptToolInternet) {
             return 'prompt_tool_internet_opt_in';
         }
 
-        return 'project_default';
+        return 'classifier_vote_search';
+    }
+
+    /**
+     * Shadow-mode task planning (Sprint 1).
+     *
+     * When MULTITASK_SHADOW_MODE is on, generate a task plan for the message and
+     * persist it to BMESSAGE_TASKS for analysis — but DO NOT execute it; the
+     * legacy pipeline still produces the user's answer. Entirely best-effort:
+     * any error is logged and swallowed so the user turn is never affected.
+     *
+     * Resolution uses the effective user id (email/WhatsApp remapping parity).
+     */
+    /**
+     * Whether the task-plan executor should run for this message, resolved for
+     * the EFFECTIVE user id (email/WhatsApp remapping parity with model
+     * selection). Defaults to false on any error so a lookup glitch can never
+     * break a turn.
+     */
+    private function isMultitaskRoutingEnabled(Message $message): bool
+    {
+        try {
+            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+
+            return $this->multitaskConfig->isRoutingEnabled($userId);
+        } catch (\Throwable $e) {
+            $this->logger->warning('MessageProcessor: routing-flag lookup failed, using legacy path', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    private function maybeShadowPlan(Message $message, array $conversationHistory): void
+    {
+        try {
+            if (!$this->multitaskConfig->isShadowMode()) {
+                return;
+            }
+
+            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+            $result = $this->taskPlanner->plan($message, $conversationHistory, $userId);
+
+            $messageId = $message->getId();
+            if (null !== $messageId) {
+                $this->taskPlanStore->persist($messageId, $result->plan, $result->modelId);
+            }
+
+            $this->logger->info('MessageProcessor: shadow task plan generated', [
+                'message_id' => $messageId,
+                'fallback' => $result->fallback,
+                'node_count' => count($result->plan->nodes),
+                'capabilities' => array_map(static fn ($n) => $n->capability->value, $result->plan->nodes),
+                'plan_model_id' => $result->modelId,
+                'validation_errors' => $result->errors,
+            ]);
+        } catch (\Throwable $e) {
+            // Shadow mode must never affect the turn.
+            $this->logger->warning('MessageProcessor: shadow task planning failed (ignored)', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Map raw Brave results into the client source-card shape. Kept in sync with
+     * {@see \App\Controller\StreamController::formatSearchResultsForSse()} so the
+     * early `search_complete` payload and the final `complete` payload render
+     * identically.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function formatSearchResultsForClient(mixed $results): array
+    {
+        if (!is_array($results)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($results as $result) {
+            if (!is_array($result)) {
+                continue;
+            }
+            $profile = $result['profile'] ?? null;
+            $out[] = [
+                'title' => is_string($result['title'] ?? null) ? $result['title'] : '',
+                'url' => is_string($result['url'] ?? null) ? $result['url'] : '',
+                'description' => is_string($result['description'] ?? null) ? $result['description'] : '',
+                'published' => $result['age'] ?? null,
+                'source' => is_array($profile) ? ($profile['name'] ?? null) : null,
+                'thumbnail' => $result['thumbnail'] ?? null,
+            ];
+        }
+
+        return $out;
     }
 
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void

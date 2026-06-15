@@ -15,14 +15,8 @@ namespace App\Service\Message;
  * explicit `tool_internet=true` opt-in: there is nothing useful to do
  * with the results).
  *
- * Used by:
- *   - `SynapseRouter`         — Tier-1 web-search decision
- *   - `MessageProcessor`      — final decision in both streaming and
- *                                non-streaming pipelines
- *
- * The list intentionally includes BOTH canonical legacy topics and the
- * granular Synapse-v2 topics, so the check stays correct even when
- * `TopicAliasResolver` is bypassed (e.g. on the AI-sorter path).
+ * Used by `MessageProcessor` as the final web-search decision in both the
+ * streaming and non-streaming pipelines.
  */
 final class WebSearchTopicPolicy
 {
@@ -34,13 +28,8 @@ final class WebSearchTopicPolicy
      * @var list<string>
      */
     public const NON_WEB_SEARCH_TOPICS = [
-        // Canonical legacy topics
         'mediamaker',
         'officemaker',
-        // Granular Synapse-v2 topics
-        'image-generation',
-        'video-generation',
-        'audio-generation',
         'text2pic',
         'text2vid',
         'text2sound',
@@ -58,7 +47,7 @@ final class WebSearchTopicPolicy
     }
 
     /**
-     * Apply the project-wide "rather search than not" policy.
+     * Decide whether to run a web search, trusting the model's judgment.
      *
      * Decision rule (in order of precedence):
      *   1. Prompt has explicit `tool_internet=true`  → true
@@ -69,13 +58,18 @@ final class WebSearchTopicPolicy
      *   2. Topic is a NON_WEB_SEARCH topic           → false
      *      (the stock handler does not consume web context)
      *   3. Prompt has explicit `tool_internet=false` → false (user opt-out)
-     *   4. Otherwise (`tool_internet` is `null`)     → true (project default)
+     *   4. Otherwise (`tool_internet` is `null`)     → trust the classifier's
+     *      `BWEBSEARCH` vote: the AI sorter judges whether the message needs
+     *      live information. No vote (e.g. the fast-path heuristic, which
+     *      never calls the model) means no search, so trivial chats stay fast.
      *
      * Pass `$promptToolInternet` as the raw value from
      * `$promptMetadata['tool_internet'] ?? null` — the function
      * distinguishes the three states (true / false / null) intentionally.
+     * Pass `$classifierVote` as the classifier's `web_search` hint
+     * (`$classification['web_search'] ?? null`).
      */
-    public static function shouldSearch(?string $topic, ?bool $promptToolInternet): bool
+    public static function shouldSearch(?string $topic, ?bool $promptToolInternet, ?bool $classifierVote = null): bool
     {
         // Rule 1: explicit opt-in is absolute.
         if (true === $promptToolInternet) {
@@ -87,7 +81,12 @@ final class WebSearchTopicPolicy
             return false;
         }
 
-        // Rule 3 + 4: opt-out blocks; null falls through to the default.
-        return false !== $promptToolInternet;
+        // Rule 3: explicit opt-out blocks search.
+        if (false === $promptToolInternet) {
+            return false;
+        }
+
+        // Rule 4: no explicit flag → trust the model's BWEBSEARCH vote.
+        return true === $classifierVote;
     }
 }

@@ -216,6 +216,34 @@ class WidgetControllerTest extends WebTestCase
         $this->assertEquals('general', $responseData['widget']['taskPromptTopic']);
     }
 
+    /**
+     * Standard sorting: the "__standard__" sentinel must create a widget with an
+     * empty task prompt (no pinned prompt) so it runs the owner's normal routing.
+     * No prompt-existence validation should be applied.
+     */
+    public function testCreateWidgetWithStandardSorting(): void
+    {
+        $this->authenticate();
+
+        $this->client->request(
+            'POST',
+            '/api/v1/widgets',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'name' => 'Standard Routing Widget',
+                'taskPromptTopic' => '__standard__',
+            ])
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_CREATED);
+
+        $responseData = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertTrue($responseData['success']);
+        $this->assertSame('', $responseData['widget']['taskPromptTopic']);
+    }
+
     public function testListWidgetsRequiresAuthentication(): void
     {
         $this->client->request('GET', '/api/v1/widgets');

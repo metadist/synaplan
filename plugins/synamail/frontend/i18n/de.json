@@ -1,0 +1,10 @@
+{
+  "title": "Kontaktprofile",
+  "intro": "Fortlaufende KI-Profile Ihrer E-Mail-Kontakte, erstellt über das Synamail-Outlook-Add-in. Sie liegen ausschließlich in Ihrem Workspace — Sie können jedes Profil hier jederzeit löschen.",
+  "loading": "Profile werden geladen…",
+  "empty": "Noch keine Profile. Öffnen Sie eine E-Mail in Outlook und nutzen Sie Contact AI Profiling im Synamail-Add-in.",
+  "updated": "Aktualisiert",
+  "emails": "E-Mails",
+  "delete": "Profil löschen",
+  "confirmDelete": "Dieses Profil dauerhaft löschen?"
+}

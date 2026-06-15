@@ -33,12 +33,14 @@ test.describe('@ci @smoke Chat Again', () => {
       expect(firstAnswer.trim().length).toBeGreaterThan(5)
     })
 
-    // -- Turn 2: Again button on the first response --
+    // -- Turn 2: Again control on the first response (open dropdown + pick) --
     const firstResponseIndex = previousCount
     previousCount = await chat.conversationBubbles().count()
 
     await test.step(
-      'Act: click Again on first response (bubble ' + firstResponseIndex + ')',
+      'Act: open Again dropdown on first response (bubble ' +
+        firstResponseIndex +
+        ') and select a model',
       async () => {
         const bubble = chat.conversationBubbles().nth(firstResponseIndex)
         await bubble.scrollIntoViewIfNeeded()
@@ -46,13 +48,17 @@ test.describe('@ci @smoke Chat Again', () => {
         await expect(againBtn).toBeVisible({ timeout: TIMEOUTS.STANDARD })
         await expect(againBtn).toBeEnabled({ timeout: TIMEOUTS.SHORT })
         await againBtn.click()
+
+        const dropdown = bubble.locator(selectors.chat.againDropdownPanel)
+        await dropdown.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        await dropdown.locator(selectors.chat.againDropdownItem).first().click()
       }
     )
 
     const secondAnswer = await chat.waitForAnswer(previousCount)
     const secondResponseIndex = previousCount
 
-    await test.step('Assert: second response (from Again button) is a real answer', async () => {
+    await test.step('Assert: second response (from Again dropdown) is a real answer', async () => {
       expect(secondAnswer.trim().length).toBeGreaterThan(5)
       const count = await chat.conversationBubbles().count()
       expect(count).toBe(secondResponseIndex + 1)

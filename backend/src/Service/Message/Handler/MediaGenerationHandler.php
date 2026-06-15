@@ -3,6 +3,7 @@
 namespace App\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
+use App\AI\Stream\StreamChunk;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
@@ -68,16 +69,13 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $content = '';
         $metadata = [];
 
-        // Simple accumulator callback
+        // Simple accumulator callback. visibleText() keeps only answer text —
+        // structured reasoning chunks must never end up in the message (#1067).
         $streamCallback = function ($chunk) use (&$content, &$metadata) {
-            if (is_array($chunk)) {
-                $content .= $chunk['content'] ?? '';
-                // Merge metadata if present in chunk
-                if (isset($chunk['metadata']) && is_array($chunk['metadata'])) {
-                    $metadata = array_merge($metadata, $chunk['metadata']);
-                }
-            } else {
-                $content .= $chunk;
+            $content .= StreamChunk::visibleText($chunk);
+            // Merge metadata if present in chunk
+            if (is_array($chunk) && isset($chunk['metadata']) && is_array($chunk['metadata'])) {
+                $metadata = array_merge($metadata, $chunk['metadata']);
             }
         };
 
@@ -386,8 +384,12 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 // Build display URL for StaticUploadController
                 $displayUrl = '/api/v1/files/uploads/'.$relativePath;
 
-                // Stream response
-                $responseText = "Generated audio: {$prompt}";
+                // Clean, localized confirmation (the audio player + download is the
+                // deliverable). Emitting a token — rendered by the frontend via
+                // i18n, like __FILE_GENERATED__ for documents — avoids leaking the
+                // raw English "Generated audio:" prefix and the synthesized prompt
+                // text (which could contain internal markers) into the bubble.
+                $responseText = '__AUDIO_GENERATED__';
                 $streamCallback($responseText);
 
                 $this->notify($progressCallback, 'generating', 'Audio generated successfully.');

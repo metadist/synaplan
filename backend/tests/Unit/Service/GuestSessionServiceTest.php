@@ -27,13 +27,20 @@ class GuestSessionServiceTest extends TestCase
         ?GuestSessionRepository $sessionRepo = null,
         ?UserRepository $userRepo = null,
         ?LoggerInterface $logger = null,
+        ?int $maxSessionsPerIp = null,
     ): GuestSessionService {
-        return new GuestSessionService(
+        $args = [
             $em ?? $this->createStub(EntityManagerInterface::class),
             $sessionRepo ?? $this->createStub(GuestSessionRepository::class),
             $userRepo ?? $this->createStub(UserRepository::class),
             $logger ?? $this->createStub(LoggerInterface::class),
-        );
+        ];
+
+        if (null !== $maxSessionsPerIp) {
+            $args[] = $maxSessionsPerIp;
+        }
+
+        return new GuestSessionService(...$args);
     }
 
     public function testCreateSessionWithCloudflareHeaders(): void
@@ -426,6 +433,60 @@ class GuestSessionServiceTest extends TestCase
         $service->attachChat($session, 42);
 
         $this->assertSame(42, $session->getChatId());
+    }
+
+    public function testCustomMaxSessionsPerIpIsRespected(): void
+    {
+        $request = new Request();
+        $request->headers->set('CF-Connecting-IP', '10.0.0.1');
+
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->method('countActiveSessionsByIp')
+            ->with('10.0.0.1')
+            ->willReturn(2);
+
+        $service = $this->createService(sessionRepo: $sessionRepo, maxSessionsPerIp: 2);
+
+        $this->expectException(\OverflowException::class);
+
+        $service->createSession('cap-at-two', $request);
+    }
+
+    public function testHighMaxSessionsPerIpAllowsMoreSessions(): void
+    {
+        $request = new Request();
+        $request->headers->set('CF-Connecting-IP', '10.0.0.1');
+
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->method('countActiveSessionsByIp')
+            ->with('10.0.0.1')
+            ->willReturn(50);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())->method('flush');
+
+        $service = $this->createService(em: $em, sessionRepo: $sessionRepo, maxSessionsPerIp: 100);
+        $session = $service->createSession('high-cap-uuid', $request);
+
+        $this->assertSame('high-cap-uuid', $session->getSessionId());
+    }
+
+    public function testDefaultMaxSessionsPerIpMatchesConstant(): void
+    {
+        $request = new Request();
+        $request->headers->set('CF-Connecting-IP', '10.0.0.1');
+
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->method('countActiveSessionsByIp')
+            ->with('10.0.0.1')
+            ->willReturn(GuestSessionService::MAX_SESSIONS_PER_IP);
+
+        $service = $this->createService(sessionRepo: $sessionRepo);
+
+        $this->expectException(\OverflowException::class);
+
+        $service->createSession('default-cap', $request);
     }
 
     private function mockUserQueryBuilder(UserRepository&\PHPUnit\Framework\MockObject\MockObject $userRepo, ?User $result): void

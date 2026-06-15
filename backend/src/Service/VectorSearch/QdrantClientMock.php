@@ -169,94 +169,6 @@ final class QdrantClientMock implements QdrantClientInterface
         return [];
     }
 
-    // --- Synapse Routing Operations ---
-
-    /** @var array<string, array{vector: array<int, float>, payload: array}> */
-    private array $synapsePoints = [];
-
-    public function upsertSynapseTopic(string $pointId, array $vector, array $payload): void
-    {
-        $this->logger->info('QdrantClientMock: upsertSynapseTopic', ['point_id' => $pointId]);
-        $payload['_point_id'] = $pointId;
-        $this->synapsePoints[$pointId] = ['vector' => $vector, 'payload' => $payload];
-    }
-
-    public function searchSynapseTopics(
-        array $queryVector,
-        int $userId,
-        int $limit = 5,
-        float $minScore = 0.3,
-    ): array {
-        $this->logger->info('QdrantClientMock: searchSynapseTopics', ['user_id' => $userId]);
-
-        return [];
-    }
-
-    public function deleteSynapseTopic(string $pointId): void
-    {
-        $this->logger->info('QdrantClientMock: deleteSynapseTopic', ['point_id' => $pointId]);
-        unset($this->synapsePoints[$pointId]);
-    }
-
-    public function deleteSynapseTopicsByOwner(int $ownerId): int
-    {
-        $this->logger->info('QdrantClientMock: deleteSynapseTopicsByOwner', ['owner_id' => $ownerId]);
-
-        $deleted = 0;
-        foreach ($this->synapsePoints as $id => $point) {
-            if (($point['payload']['owner_id'] ?? null) === $ownerId) {
-                unset($this->synapsePoints[$id]);
-                ++$deleted;
-            }
-        }
-
-        return $deleted;
-    }
-
-    public function getSynapseTopic(string $pointId): ?array
-    {
-        if (!isset($this->synapsePoints[$pointId])) {
-            return null;
-        }
-
-        return [
-            'id' => $pointId,
-            'payload' => $this->synapsePoints[$pointId]['payload'],
-        ];
-    }
-
-    public function scrollSynapseTopics(?int $ownerId = null, int $limit = 1000): array
-    {
-        $points = [];
-        foreach ($this->synapsePoints as $id => $point) {
-            if (null !== $ownerId && ($point['payload']['owner_id'] ?? null) !== $ownerId) {
-                continue;
-            }
-            $points[] = ['id' => $id, 'payload' => $point['payload']];
-            if (count($points) >= $limit) {
-                break;
-            }
-        }
-
-        return $points;
-    }
-
-    public function getSynapseCollectionInfo(): array
-    {
-        return [
-            'exists' => !empty($this->synapsePoints),
-            'vector_dim' => 1024,
-            'points_count' => count($this->synapsePoints),
-            'distance' => 'Cosine',
-        ];
-    }
-
-    public function recreateSynapseCollection(int $vectorDimension): void
-    {
-        $this->logger->info('QdrantClientMock: recreateSynapseCollection', ['vector_dim' => $vectorDimension]);
-        $this->synapsePoints = [];
-    }
-
     public function getMemoriesCollectionInfo(): array
     {
         return [
@@ -270,11 +182,6 @@ final class QdrantClientMock implements QdrantClientInterface
     public function recreateMemoriesCollection(int $vectorDimension): void
     {
         $this->logger->info('QdrantClientMock: recreateMemoriesCollection', ['vector_dim' => $vectorDimension]);
-    }
-
-    public function getSynapseCollection(): string
-    {
-        return 'synapse_topics';
     }
 
     // --- Health & Info ---

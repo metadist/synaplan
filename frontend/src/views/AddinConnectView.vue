@@ -217,6 +217,34 @@ const targetBaseUrl = computed(() => {
   return window.location.origin
 })
 
+/**
+ * Optional add-in-origin relay to redirect back to with the payload. Calling
+ * Office.context.ui.messageParent from this (cross-origin) bridge is dropped
+ * by Outlook desktop after the login navigations, so the add-in can pass a
+ * `redirect` pointing at a page on its OWN origin which delivers the payload
+ * same-origin. Restricted to trusted hosts to avoid leaking the API key.
+ */
+function isSafeRedirect(url: string): boolean {
+  try {
+    const u = new URL(url)
+    if (u.protocol !== 'https:') return false
+    const h = u.hostname
+    return (
+      h === 'localhost' ||
+      h === '127.0.0.1' ||
+      h === 'addin.synaplan.com' ||
+      h.endsWith('.synaplan.com')
+    )
+  } catch {
+    return false
+  }
+}
+
+const redirectTarget = computed(() => {
+  const raw = route.query.redirect as string | undefined
+  return raw && isSafeRedirect(raw) ? raw : ''
+})
+
 function cycleLanguage(): void {
   const languages = ['de', 'en', 'es', 'tr']
   const currentIndex = languages.indexOf(locale.value)
@@ -351,13 +379,28 @@ async function handleConnect(): Promise<void> {
       throw new Error(t('addinConnect.errorIssuanceFailed'))
     }
 
-    await postPayloadToParent({
+    const payload: SignInPayload = {
       state: stateNonce.value,
       apiKey: response.api_key.key,
       keyId: response.api_key.id,
       email: userEmail.value,
       baseUrl: targetBaseUrl.value,
-    })
+    }
+
+    // Preferred path: redirect back to the add-in's own-origin relay, which
+    // delivers the payload to the taskpane via a same-origin messageParent.
+    // This is reliable on Outlook desktop where cross-origin messageParent
+    // from this bridge is dropped after the login navigations.
+    if (redirectTarget.value) {
+      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
+      const sep = redirectTarget.value.includes('#') ? '&' : '#'
+      viewState.value = 'success'
+      window.location.assign(`${redirectTarget.value}${sep}payload=${encodeURIComponent(encoded)}`)
+      return
+    }
+
+    // Fallback (Outlook on the web): post directly to the parent.
+    await postPayloadToParent(payload)
 
     viewState.value = 'success'
     // The parent taskpane closes the dialog as soon as it receives the
@@ -385,11 +428,17 @@ async function bootstrap(): Promise<void> {
     await authReady
 
     if (!authStore.isAuthenticated) {
-      // Stash in sessionStorage too: a social-provider OAuth round-trip
-      // would otherwise drop the `redirect` query and strand the user.
-      const redirect =
-        `/addin/connect?state=${encodeURIComponent(stateNonce.value)}` +
-        `&baseUrl=${encodeURIComponent(targetBaseUrl.value)}`
+      // Preserve the ENTIRE original query (state, label, baseUrl, AND the
+      // add-in relay `redirect` target) across the login round-trip.
+      // Reconstructing only a subset previously DROPPED the `redirect` param,
+      // which made the post-Connect handshake fall back to a cross-origin
+      // messageParent — silently dropped by Outlook desktop — so the dialog
+      // reported success but never closed. Using route.fullPath keeps every
+      // param intact and is regression-proof against future param additions.
+      // See Synamail/docs/AUTH_FLOW.md ("login round-trip must preserve redirect").
+      const redirect = route.fullPath
+      // Stash in sessionStorage too: a social-provider OAuth round-trip would
+      // otherwise drop the `redirect` query and strand the user.
       setPendingRedirect(redirect)
       void router.push({ path: '/login', query: { redirect } })
       return

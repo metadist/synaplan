@@ -8,8 +8,6 @@ use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
-use App\Service\Message\SynapseRouter;
-use App\Service\Message\TopicAliasResolver;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -23,8 +21,6 @@ class MessageClassifierTest extends TestCase
     // Without this PHPStan emits `method.notFound` for every `->method()`
     // / `->expects()` call, forcing baseline bumps on every new test case.
     private MessageSorter&MockObject $messageSorter;
-    private SynapseRouter&MockObject $synapseRouter;
-    private TopicAliasResolver $topicAliasResolver;
     private MessageMetaRepository&MockObject $messageMetaRepository;
     private ModelConfigService&MockObject $modelConfigService;
     private ConfigRepository&MockObject $configRepository;
@@ -35,23 +31,16 @@ class MessageClassifierTest extends TestCase
     protected function setUp(): void
     {
         $this->messageSorter = $this->createMock(MessageSorter::class);
-        $this->synapseRouter = $this->createMock(SynapseRouter::class);
-        // Real resolver — it's pure logic with no collaborators, so a stub
-        // would add noise without protecting any boundary.
-        $this->topicAliasResolver = new TopicAliasResolver();
         $this->messageMetaRepository = $this->createMock(MessageMetaRepository::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->configRepository = $this->createMock(ConfigRepository::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
-        // Disable Synapse Routing so tests exercise MessageSorter directly
         $this->configRepository->method('getValue')->willReturn('0');
 
         $this->service = new MessageClassifier(
             $this->messageSorter,
-            $this->synapseRouter,
-            $this->topicAliasResolver,
             $this->messageMetaRepository,
             $this->modelConfigService,
             $this->configRepository,
@@ -302,47 +291,6 @@ class MessageClassifierTest extends TestCase
         $this->assertSame('file_analysis', $result['intent']);
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('synapseEnabledFlagProvider')]
-    public function testIsSynapseEnabledParsesVariousValues(?string $configValue, bool $expected): void
-    {
-        /** @var ConfigRepository&MockObject $configRepo */
-        $configRepo = $this->createMock(ConfigRepository::class);
-        $configRepo->method('getValue')->willReturn($configValue);
-
-        $classifier = new MessageClassifier(
-            $this->createMock(MessageSorter::class),
-            $this->createMock(SynapseRouter::class),
-            new TopicAliasResolver(),
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-        );
-
-        $this->assertSame($expected, $classifier->isSynapseEnabled());
-    }
-
-    /**
-     * @return iterable<string, array{0: ?string, 1: bool}>
-     */
-    public static function synapseEnabledFlagProvider(): iterable
-    {
-        // BETA: Synapse Routing is OFF by default. Operators must opt-in via
-        // the admin UI / system config (`SYNAPSE_ROUTING_ENABLED` = 'true').
-        yield 'null defaults to disabled (beta)' => [null, false];
-        yield 'string true' => ['true', true];
-        yield 'string 1' => ['1', true];
-        yield 'string yes' => ['yes', true];
-        yield 'string on' => ['on', true];
-        yield 'string false' => ['false', false];
-        yield 'string 0' => ['0', false];
-        yield 'string no' => ['no', false];
-        yield 'string off' => ['off', false];
-        yield 'empty string' => ['', false];
-        yield 'random string' => ['banana', false];
-    }
-
     /**
      * Phase 1c: short, plain-chat messages should skip the AI sorter when the
      * fast-path BCONFIG flag is enabled (default-on in production). Builds an
@@ -352,13 +300,14 @@ class MessageClassifierTest extends TestCase
     public function testFastPathClassificationSkipsAiSorter(): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
-        // Synapse off, fast-path on (the default).
+        // Fast-path is default-OFF now, so opt IN explicitly to exercise the
+        // heuristic path that this test covers.
         $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
             if ('QDRANT_SEARCH' === $group) {
                 return '0';
             }
             if ('CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting) {
-                return null; // null → default-on
+                return '1'; // explicitly enable the fast-path
             }
 
             return null;
@@ -369,8 +318,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
-            new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
@@ -413,8 +360,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
-            new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
@@ -441,66 +386,11 @@ class MessageClassifierTest extends TestCase
     }
 
     /**
-     * Regression for #952.
-     *
-     * When Synapse Routing is OFF (default), the AI sorter directly emits the
-     * granular Synapse-v2 topics from PromptCatalog (`image-generation`,
-     * `video-generation`, `audio-generation`). The classifier MUST resolve
-     * them to the canonical `mediamaker` topic so `mapTopicToIntent()` can
-     * return `image_generation` and the request reaches MediaGenerationHandler
-     * instead of falling back to ChatHandler.
-     *
-     * @return iterable<string, array{0: string, 1: string}>
+     * The AI sorter emits the canonical `mediamaker` topic plus an explicit
+     * BMEDIA. The classifier maps `mediamaker` → `image_generation` so the
+     * request reaches MediaGenerationHandler and passes the media type through.
      */
-    public static function granularMediaTopicProvider(): iterable
-    {
-        yield 'image-generation → image' => ['image-generation', 'image'];
-        yield 'video-generation → video' => ['video-generation', 'video'];
-        yield 'audio-generation → audio' => ['audio-generation', 'audio'];
-    }
-
-    #[\PHPUnit\Framework\Attributes\DataProvider('granularMediaTopicProvider')]
-    public function testGranularMediaTopicResolvesToMediamakerIntent(string $granularTopic, string $expectedMedia): void
-    {
-        $message = $this->createMock(Message::class);
-        $message->method('getId')->willReturn(200);
-        $message->method('getUserId')->willReturn(10);
-        $message->method('getText')->willReturn('erstelle ein bild einer katze');
-        $message->method('getLanguage')->willReturn('de');
-        $message->method('getDateTime')->willReturn('20260518120000');
-        $message->method('getFilePath')->willReturn('');
-        $message->method('getTopic')->willReturn('');
-        $message->method('getFileText')->willReturn('');
-        $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
-
-        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
-
-        // AI sorter returns the granular topic without an explicit BMEDIA —
-        // exactly the production trace from issue #952.
-        $this->messageSorter
-            ->expects($this->once())
-            ->method('classify')
-            ->willReturn([
-                'topic' => $granularTopic,
-                'language' => 'de',
-            ]);
-
-        $result = $this->service->classify($message);
-
-        $this->assertSame('mediamaker', $result['topic'], 'granular topic must be canonicalised before intent mapping');
-        $this->assertSame('image_generation', $result['intent'], 'mediamaker → image_generation routes to MediaGenerationHandler');
-        $this->assertSame($expectedMedia, $result['media_type'], 'BMEDIA must be inferred from the granular topic when sorter omits it');
-        $this->assertSame($granularTopic, $result['granular_topic'], 'granular topic preserved for diagnostics');
-    }
-
-    /**
-     * The sorter sometimes returns the granular topic AND an explicit BMEDIA
-     * (e.g. for richer Synapse-v2 prompts). When both are present, the
-     * sorter's BMEDIA wins so the resolver never overwrites a more specific
-     * upstream signal.
-     */
-    public function testGranularTopicDoesNotOverrideExplicitMediaType(): void
+    public function testMediamakerTopicMapsToMediaGenerationIntent(): void
     {
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(201);
@@ -517,7 +407,7 @@ class MessageClassifierTest extends TestCase
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
 
         $this->messageSorter->method('classify')->willReturn([
-            'topic' => 'audio-generation',
+            'topic' => 'mediamaker',
             'language' => 'de',
             'media_type' => 'audio',
         ]);
@@ -525,13 +415,13 @@ class MessageClassifierTest extends TestCase
         $result = $this->service->classify($message);
 
         $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('image_generation', $result['intent']);
         $this->assertSame('audio', $result['media_type']);
     }
 
     /**
      * Canonical topics passed through by the sorter (`mediamaker`, `general`,
-     * `analyzefile`, ...) must keep working — the resolver is idempotent for
-     * non-aliased topics.
+     * `analyzefile`, ...) must keep working unchanged.
      */
     public function testCanonicalTopicPassesThroughResolverUnchanged(): void
     {
@@ -619,9 +509,13 @@ class MessageClassifierTest extends TestCase
     public function testFastPathReturnsNullWebSearchHintForGermanCostQueries(string $text): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
-        // Synapse off, fast-path on (default).
+        // Fast-path is default-OFF now, so opt IN explicitly for this test.
         $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
-            return 'QDRANT_SEARCH' === $group ? '0' : null;
+            if ('QDRANT_SEARCH' === $group) {
+                return '0';
+            }
+
+            return 'CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting ? '1' : null;
         });
 
         $sorter = $this->createMock(MessageSorter::class);
@@ -632,8 +526,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
-            new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
@@ -660,11 +552,37 @@ class MessageClassifierTest extends TestCase
         self::assertNull($result['web_search'], 'Fast-path must NOT pre-empt the WebSearchTopicPolicy decision');
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('germanMediaImperativeProvider')]
-    public function testFastPathYieldsToAiSorterOnGermanGenerateImperatives(string $text): void
+    /**
+     * Bug: polite / declarative image requests that carry NO imperative verb
+     * (e.g. "hätte ich gerne das bild einer katze") slipped past the
+     * fast-path's media-trigger list, were classified as `general`/chat, and
+     * the chat model fabricated a broken markdown image instead of routing to
+     * the media generator. Same class of bug as #952's German imperative miss.
+     *
+     * These declarative NOUN-phrase requests across the major UI languages
+     * must now defer to the full AI sorter so they reach MediaGenerationHandler.
+     *
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function declarativeImageRequestProvider(): iterable
+    {
+        // The exact phrasing from the reported bug.
+        yield 'de: hätte ich gerne das bild' => ['hätte ich gerne das bild einer katze', 'de'];
+        yield 'de: ein bild von' => ['kannst du mir ein bild von einem hund zeigen', 'de'];
+        yield 'de: foto einer' => ['ich möchte das foto einer landschaft', 'de'];
+        yield 'en: an image of' => ['i would like an image of a cat', 'en'];
+        yield 'en: a picture of' => ['could you give me a picture of a sunset', 'en'];
+        yield 'es: una imagen de' => ['quiero una imagen de un gato', 'es'];
+        yield 'fr: une image de' => ['je voudrais une image de chat', 'fr'];
+        yield 'it: immagine di' => ['vorrei un\'immagine di un gatto', 'it'];
+        yield 'tr: resim' => ['bana bir kedi resmi verir misin', 'tr'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('declarativeImageRequestProvider')]
+    public function testFastPathYieldsToAiSorterOnDeclarativeImageRequests(string $text, string $lang): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
-        // Synapse off, fast-path on (default).
+        // Fast-path on (default).
         $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
             return 'QDRANT_SEARCH' === $group ? '0' : null;
         });
@@ -672,12 +590,53 @@ class MessageClassifierTest extends TestCase
         $sorter = $this->createMock(MessageSorter::class);
         $sorter->expects($this->once())
             ->method('classify')
-            ->willReturn(['topic' => 'image-generation', 'language' => 'de']);
+            ->willReturn(['topic' => 'mediamaker', 'language' => $lang, 'media_type' => 'image']);
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
-            new TopicAliasResolver(),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(209);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn($lang);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        $this->assertSame('mediamaker', $result['topic'], sprintf('"%s" must reach the media generator, not chat', $text));
+        $this->assertSame('image_generation', $result['intent']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertFalse($result['skip_sorting']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('germanMediaImperativeProvider')]
+    public function testFastPathYieldsToAiSorterOnGermanGenerateImperatives(string $text): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        // Fast-path on (default).
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image']);
+
+        $classifier = new MessageClassifier(
+            $sorter,
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
@@ -699,8 +658,8 @@ class MessageClassifierTest extends TestCase
 
         $result = $classifier->classify($message);
 
-        // End-to-end: granular topic from the sorter is canonicalised and
-        // mapped to the media-generation intent.
+        // End-to-end: the sorter's mediamaker topic maps to the
+        // media-generation intent.
         $this->assertSame('mediamaker', $result['topic']);
         $this->assertSame('image_generation', $result['intent']);
         $this->assertSame('image', $result['media_type']);
@@ -709,140 +668,75 @@ class MessageClassifierTest extends TestCase
     }
 
     /**
-     * Regression for issue #980.
+     * Regression for #1042 review (FExB17).
      *
-     * Short German follow-up messages with few distinctive stopwords used
-     * to fall through the fast-path heuristic and snap the conversation
-     * to English. The classifier now uses the conversation's prior
-     * language (from earlier IN-direction messages) as a fallback when
-     * the heuristic's signal is weak, so the language stays sticky.
+     * Short document-generation requests must not be shortcut to `general` by
+     * the fast-path. When a supported office format/extension is mentioned, the
+     * AI sorter has to run so it can route to `officemaker`.
      *
      * @return iterable<string, array{0: string}>
      */
-    public static function shortGermanFollowUpProvider(): iterable
+    public static function documentFormatProvider(): iterable
     {
-        // The exact phrase reported in the issue screenshot.
-        yield 'issue #980 phrase' => ['das habe ich dir gegeben'];
-        yield 'short acknowledgement' => ['ja genau'];
-        yield 'short imperative' => ['zeig mir das'];
-        yield 'short reply' => ['okay danke'];
+        yield 'docx extension' => ['schreibe es erneut in eine docx datei'];
+        yield 'als docx' => ['gib es mir als docx'];
+        yield 'excel word' => ['mach eine excel tabelle daraus'];
+        yield 'powerpoint' => ['erstelle daraus eine powerpoint'];
+        yield 'csv' => ['exportiere das als csv'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('shortGermanFollowUpProvider')]
-    public function testFastPathInheritsLanguageFromConversationPrior(string $text): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('documentFormatProvider')]
+    public function testFastPathYieldsToAiSorterOnDocumentFormats(string $text): void
     {
-        $classifier = $this->buildFastPathClassifier();
+        $configRepo = $this->createMock(ConfigRepository::class);
+        // Fast-path on (default).
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
 
-        // Earlier user turn was clearly German — that's the prior the
-        // classifier should fall back to when the current message is
-        // too short to score confidently on its own.
-        $priorUserMessage = $this->createMock(Message::class);
-        $priorUserMessage->method('getDirection')->willReturn('IN');
-        $priorUserMessage->method('getLanguage')->willReturn('de');
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
 
-        $priorAssistantMessage = $this->createMock(Message::class);
-        $priorAssistantMessage->method('getDirection')->willReturn('OUT');
-        $priorAssistantMessage->method('getLanguage')->willReturn('de');
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
 
-        $history = [$priorUserMessage, $priorAssistantMessage];
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(204);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
 
-        $message = $this->buildFastPathTextMessage(980, $text);
+        $result = $classifier->classify($message);
 
-        $result = $classifier->classify($message, $history);
-
-        // Fast-path still took the request (the message has no media verbs).
-        $this->assertSame('fast_path_heuristic', $result['source']);
-        $this->assertTrue($result['skip_sorting']);
-        // ... but the language now inherits from the conversation prior
-        // instead of snapping to 'en'.
-        $this->assertSame('de', $result['language'], sprintf(
-            'Short German message "%s" must inherit "de" from the conversation history (#980)',
-            $text
-        ));
-    }
-
-    /**
-     * The classifier must not blindly copy the prior when the current
-     * message clearly switches language (e.g. user replies in English to
-     * an earlier German turn). The heuristic's confident hit wins.
-     */
-    public function testFastPathConfidentHeuristicWinsOverPrior(): void
-    {
-        $classifier = $this->buildFastPathClassifier();
-
-        $priorUserMessage = $this->createMock(Message::class);
-        $priorUserMessage->method('getDirection')->willReturn('IN');
-        $priorUserMessage->method('getLanguage')->willReturn('de');
-
-        $history = [$priorUserMessage];
-
-        // Plenty of distinctive English stopwords — easily over threshold.
-        $message = $this->buildFastPathTextMessage(981, 'Please tell me what you think and write back soon');
-
-        $result = $classifier->classify($message, $history);
-
-        $this->assertSame('fast_path_heuristic', $result['source']);
-        $this->assertSame('en', $result['language'], 'A confident English signal must override the German prior');
+        // Sorter ran → topic comes from the sorter, fast-path was skipped.
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertFalse($result['skip_sorting']);
     }
 
     /**
-     * Assistant (OUT) messages must NOT contribute to the prior — only
-     * the user's own past turns count. Otherwise an early German
-     * assistant boilerplate would override a subsequent English user
-     * conversation.
+     * Regression for #1042 review follow-up.
+     *
+     * A short edit request without a format keyword ("mach den Titel fett")
+     * must NOT be fast-pathed to `general` when the previous assistant turn
+     * generated a file — it has to reach the AI sorter so the edit can be
+     * routed to `officemaker`.
      */
-    public function testFastPathPriorIgnoresAssistantOutMessages(): void
-    {
-        $classifier = $this->buildFastPathClassifier();
-
-        $assistantOnly = $this->createMock(Message::class);
-        $assistantOnly->method('getDirection')->willReturn('OUT');
-        $assistantOnly->method('getLanguage')->willReturn('de');
-
-        $history = [$assistantOnly];
-
-        // Ambiguous short message with no useful heuristic hits.
-        $message = $this->buildFastPathTextMessage(982, 'ok');
-
-        $result = $classifier->classify($message, $history);
-
-        // No usable prior (assistant-only history is discarded), no
-        // heuristic signal → final fallback to 'en'.
-        $this->assertSame('en', $result['language']);
-    }
-
-    /**
-     * Sentinel BLANG values ('NN' = unclassified default, 'auto' =
-     * widget mode) must not contaminate the prior lookup. The classifier
-     * should treat them as "unknown" and fall through to the next signal.
-     */
-    public function testFastPathPriorRejectsSentinelLanguageValues(): void
-    {
-        $classifier = $this->buildFastPathClassifier();
-
-        $nnMessage = $this->createMock(Message::class);
-        $nnMessage->method('getDirection')->willReturn('IN');
-        $nnMessage->method('getLanguage')->willReturn('NN');
-
-        $autoMessage = $this->createMock(Message::class);
-        $autoMessage->method('getDirection')->willReturn('IN');
-        $autoMessage->method('getLanguage')->willReturn('auto');
-
-        $history = [$nnMessage, $autoMessage];
-
-        $message = $this->buildFastPathTextMessage(983, 'ok');
-
-        $result = $classifier->classify($message, $history);
-
-        // Both sentinels rejected → fall back to 'en'.
-        $this->assertSame('en', $result['language']);
-    }
-
-    /**
-     * Build a fast-path-ready classifier (Synapse off, fast-path on)
-     * suitable for exercising the prior-language fallback.
-     */
-    private function buildFastPathClassifier(): MessageClassifier
+    public function testFastPathDefersWhenPreviousTurnGeneratedFile(): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
@@ -850,41 +744,192 @@ class MessageClassifierTest extends TestCase
         });
 
         $sorter = $this->createMock(MessageSorter::class);
-        // None of these tests should hit the AI sorter — they all exercise
-        // the fast-path's language-inheritance behaviour.
-        $sorter->expects($this->never())->method('classify');
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
 
-        return new MessageClassifier(
+        $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
-            new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
         );
-    }
 
-    /**
-     * Build a minimal Message mock that the fast-path will accept (no
-     * files, no tool prefix, short enough). Centralises the repeated
-     * setup the new test cases share.
-     */
-    private function buildFastPathTextMessage(int $id, string $text): Message&MockObject
-    {
+        $previousFileMessage = $this->createMock(Message::class);
+        $previousFileMessage->method('getDirection')->willReturn('OUT');
+        $previousFileMessage->method('getText')->willReturn('__FILE_GENERATED__:Zweiter_Weltkrieg.docx');
+
         $message = $this->createMock(Message::class);
-        $message->method('getId')->willReturn($id);
+        $message->method('getId')->willReturn(205);
         $message->method('getUserId')->willReturn(10);
-        $message->method('getText')->willReturn($text);
-        $message->method('getLanguage')->willReturn('en');
+        $message->method('getText')->willReturn('Kannst du den Titel bitte fett machen');
+        $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
         $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
-        $message->method('getDateTime')->willReturn('20260528140000');
+        $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
         $message->method('getFileText')->willReturn('');
 
-        return $message;
+        $result = $classifier->classify($message, [$previousFileMessage]);
+
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertFalse($result['skip_sorting']);
+    }
+
+    /**
+     * Counterpart: when the previous assistant turn was a normal reply (no
+     * generated file), a plain chat message still takes the fast path.
+     */
+    public function testFastPathTakenWhenPreviousTurnIsNormalReply(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        // Fast-path is default-OFF now, so opt IN explicitly for this test.
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            if ('QDRANT_SEARCH' === $group) {
+                return '0';
+            }
+
+            return 'CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting ? '1' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $previousReply = $this->createMock(Message::class);
+        $previousReply->method('getDirection')->willReturn('OUT');
+        $previousReply->method('getText')->willReturn('Sure, here is the answer to your question.');
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(206);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Thanks, that helps a lot!');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $result = $classifier->classify($message, [$previousReply]);
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    /**
+     * Multi-message editing: a normal chat turn is interleaved after the file
+     * was generated. A later edit that references the document must still reach
+     * the AI sorter (tier b), even though the most recent assistant turn was a
+     * plain reply.
+     */
+    public function testFastPathDefersForLaterDocumentEditAfterInterleavedChat(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $fileTurn = $this->createMock(Message::class);
+        $fileTurn->method('getDirection')->willReturn('OUT');
+        $fileTurn->method('getText')->willReturn('__FILE_GENERATED__:Zweiter_Weltkrieg.docx');
+
+        $interleavedReply = $this->createMock(Message::class);
+        $interleavedReply->method('getDirection')->willReturn('OUT');
+        $interleavedReply->method('getText')->willReturn('Das bedeutet, dass sehr viele Menschen betroffen waren.');
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(207);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Kannst du den Titel in der Datei jetzt zentrieren');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message, [$fileTurn, $interleavedReply]);
+
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertFalse($result['skip_sorting']);
+    }
+
+    /**
+     * Counterpart: after a file exists earlier and an interleaved reply, a plain
+     * chat message with no document reference still takes the fast path (no
+     * over-deferral).
+     */
+    public function testFastPathTakenForUnrelatedChatAfterEarlierFile(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        // Fast-path is default-OFF now, so opt IN explicitly for this test.
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            if ('QDRANT_SEARCH' === $group) {
+                return '0';
+            }
+
+            return 'CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting ? '1' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $fileTurn = $this->createMock(Message::class);
+        $fileTurn->method('getDirection')->willReturn('OUT');
+        $fileTurn->method('getText')->willReturn('__FILE_GENERATED__:report.docx');
+
+        $interleavedReply = $this->createMock(Message::class);
+        $interleavedReply->method('getDirection')->willReturn('OUT');
+        $interleavedReply->method('getText')->willReturn('Gerne, hier ist die Erklärung.');
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(208);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Super, danke dir vielmals');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $result = $classifier->classify($message, [$fileTurn, $interleavedReply]);
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
     }
 }

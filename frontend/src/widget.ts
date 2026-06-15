@@ -20,6 +20,13 @@
 import type { App } from 'vue'
 import { detectApiUrl } from './widget-utils'
 
+interface WidgetRealtimeConfig {
+  /** Master kill-switch echoed by the backend. Defaults to true. */
+  enabled: boolean
+  /** Empty string ⇒ derive from `apiUrl` (recommended). */
+  wsUrl: string
+}
+
 interface WidgetConfig {
   widgetId: string
   position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
@@ -34,6 +41,18 @@ interface WidgetConfig {
   messageLimit?: number
   maxFileSize?: number
   widgetTitle?: string
+  // Header tagline below the title. Four states are meaningful, matching
+  // what the public widget config endpoint can return for the field:
+  //   undefined / null → fall back to the i18n default
+  //                      ("We typically reply in minutes")
+  //   ''               → hide the line entirely (operator opted out)
+  //   string           → render verbatim (operator-provided copy, not translated)
+  // Backend sanitizer stores absence/null as `null`, so the type must accept it.
+  widgetSubtitle?: string | null
+  // Display name shown next to AI message timestamps ("AI Assistant · 03:58 PM").
+  // undefined / null = use the i18n default; non-empty string = render verbatim.
+  // Empty string collapses to default — the timestamp line always needs a label.
+  aiAssistantName?: string | null
   isPreview?: boolean
   allowedDomains?: string[]
   allowFileUpload?: boolean
@@ -47,6 +66,12 @@ interface WidgetConfig {
   externalUserId?: string
   privacyPolicyUrl?: string
   sessionMode?: 'browser' | 'user'
+  /** Populated from /api/v1/widget/{id}/config — never sent in by callers. */
+  realtime?: WidgetRealtimeConfig
+  // Server-derived flag (true when widget has a Slack webhook configured AND
+  // the operator left the in-widget button enabled). Surfaced via the public
+  // /widget/{id}/config endpoint, never the raw Slack URL itself.
+  humanHandoffEnabled?: boolean
 }
 
 const DEFAULT_VUE_CDN = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js'
@@ -169,6 +194,17 @@ class SynaplanWidget {
           ...this.config,
           ...data.config,
           widgetTitle: data.name || this.config.widgetTitle,
+          // Fail closed: only dial WebSockets when the backend explicitly says
+          // realtime is on. An older backend that omits the `realtime` block
+          // can't serve token/WS endpoints, so attempting to connect would
+          // just produce console noise (matches ChatWidget's `enabled: false`
+          // fallback).
+          realtime: data.realtime
+            ? {
+                enabled: Boolean(data.realtime.enabled ?? false),
+                wsUrl: typeof data.realtime.wsUrl === 'string' ? data.realtime.wsUrl : '',
+              }
+            : { enabled: false, wsUrl: '' },
         }
         return true
       }
@@ -417,6 +453,8 @@ class SynaplanWidget {
         messageLimit: this.config!.messageLimit,
         maxFileSize: this.config!.maxFileSize,
         widgetTitle: this.config!.widgetTitle,
+        widgetSubtitle: this.config!.widgetSubtitle,
+        aiAssistantName: this.config!.aiAssistantName,
         apiUrl: this.config!.apiUrl,
         allowFileUpload: this.config!.allowFileUpload,
         fileUploadLimit: this.config!.fileUploadLimit,
@@ -426,7 +464,11 @@ class SynaplanWidget {
         externalUserId: this.config!.externalUserId,
         privacyPolicyUrl: this.config!.privacyPolicyUrl,
         sessionMode: this.config!.sessionMode,
+        humanHandoffEnabled: this.config!.humanHandoffEnabled,
+        buttonIcon: this.config!.buttonIcon,
+        buttonIconUrl: this.config!.buttonIconUrl,
         isPreview: false,
+        realtime: this.config!.realtime,
       })
 
       this.app.use(i18n)

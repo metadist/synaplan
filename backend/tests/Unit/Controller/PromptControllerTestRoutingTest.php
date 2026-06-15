@@ -6,15 +6,16 @@ namespace App\Tests\Unit\Controller;
 
 use App\AI\Service\AiFacade;
 use App\Controller\PromptController;
+use App\Entity\Prompt;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
-use App\Service\Message\SynapseIndexer;
-use App\Service\Message\SynapseRouter;
 use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\Plan\TaskPlanValidator;
+use App\Service\Multitask\TaskPlanner;
 use App\Service\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
@@ -26,34 +27,48 @@ use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Focused unit tests for the new Synapse dry-run endpoint exposed by
- * PromptController (`POST /api/v1/prompts/test`). Heavier CRUD flows
+ * Focused unit tests for the planner-prompt endpoints exposed by
+ * PromptController (`GET/PUT /api/v1/prompts/planning`). Heavier CRUD flows
  * are covered by the existing integration test suite.
  */
 final class PromptControllerTestRoutingTest extends TestCase
 {
-    private SynapseRouter&MockObject $router;
+    private PromptRepository&MockObject $promptRepository;
+    private EntityManagerInterface&MockObject $em;
     private PromptController $controller;
 
     protected function setUp(): void
     {
-        $this->router = $this->createMock(SynapseRouter::class);
+        $this->promptRepository = $this->createMock(PromptRepository::class);
+        $this->em = $this->createMock(EntityManagerInterface::class);
+
+        // TaskPlanner is final readonly (cannot be mocked). Give it its own repo
+        // mock that returns empty topic lists so renderSystemPrompt() works
+        // without crashing on a null foreach.
+        $plannerRepo = $this->createMock(PromptRepository::class);
+        $plannerRepo->method('getAllTopics')->willReturn([]);
+        $plannerRepo->method('getTopicsWithDescriptions')->willReturn([]);
 
         $this->controller = new PromptController(
-            $this->createMock(PromptRepository::class),
+            $this->promptRepository,
             $this->createMock(PromptMetaRepository::class),
             $this->createMock(PromptService::class),
             $this->createMock(RateLimitService::class),
-            $this->createMock(EntityManagerInterface::class),
+            $this->em,
             new NullLogger(),
             $this->createMock(AiFacade::class),
             $this->createMock(MessageRepository::class),
             $this->createMock(FileRepository::class),
             $this->createMock(ModelConfigService::class),
             $this->createMock(VectorStorageFacade::class),
-            $this->createMock(SynapseIndexer::class),
-            $this->router,
             $this->createMock(PromptModelEligibilityValidator::class),
+            new TaskPlanner(
+                $this->createMock(AiFacade::class),
+                $plannerRepo,
+                $this->createMock(ModelConfigService::class),
+                new TaskPlanValidator(),
+                new NullLogger(),
+            ),
         );
 
         $container = new Container();
@@ -74,104 +89,98 @@ final class PromptControllerTestRoutingTest extends TestCase
         return $user;
     }
 
-    public function testTestRoutingRequiresAuthentication(): void
+    private function makeAdmin(int $id = 1): User&MockObject
     {
-        $request = Request::create('/api/v1/prompts/test', 'POST', content: json_encode(['text' => 'hi']));
+        $user = $this->makeUser($id);
+        $user->method('isAdmin')->willReturn(true);
 
-        $response = $this->controller->testRouting($request, null);
+        return $user;
+    }
+
+    private function makePlanPrompt(string $prompt = 'PLAN TEMPLATE [CAPABILITYLIST]'): Prompt&MockObject
+    {
+        $row = $this->createMock(Prompt::class);
+        $row->method('getId')->willReturn(3);
+        $row->method('getTopic')->willReturn('tools:plan');
+        $row->method('getShortDescription')->willReturn('Planner');
+        $row->method('getPrompt')->willReturn($prompt);
+
+        return $row;
+    }
+
+    public function testGetPlanningPromptRequiresAuthentication(): void
+    {
+        $response = $this->controller->getPlanningPrompt(null);
 
         self::assertSame(401, $response->getStatusCode());
     }
 
-    public function testTestRoutingRequiresTextField(): void
+    public function testGetPlanningPromptReturns404WhenMissing(): void
     {
-        $request = Request::create('/api/v1/prompts/test', 'POST', content: json_encode([]));
+        $this->promptRepository->method('findByTopic')->with('tools:plan', 0)->willReturn(null);
 
-        $response = $this->controller->testRouting($request, $this->makeUser());
+        $response = $this->controller->getPlanningPrompt($this->makeUser());
 
-        self::assertSame(400, $response->getStatusCode());
-        $body = json_decode((string) $response->getContent(), true);
-        self::assertStringContainsString('Missing required field: text', $body['error']);
+        self::assertSame(404, $response->getStatusCode());
     }
 
-    public function testTestRoutingDelegatesToRouterDryRunWithDefaultLimit(): void
+    public function testGetPlanningPromptReturnsRawAndRenderedPrompt(): void
     {
-        $user = $this->makeUser(7);
+        $this->promptRepository->method('findByTopic')
+            ->with('tools:plan', 0)
+            ->willReturn($this->makePlanPrompt());
 
-        $this->router->expects($this->once())
-            ->method('dryRun')
-            ->with('How do I write a PHP loop?', 7, 5)
-            ->willReturn([
-                'query' => 'How do I write a PHP loop?',
-                'model' => ['provider' => 'cloudflare', 'model' => 'bge-m3', 'model_id' => 42],
-                'candidates' => [
-                    [
-                        'topic' => 'coding',
-                        'score' => 0.83,
-                        'payload' => [],
-                        'stale' => false,
-                        'alias_target' => 'general',
-                    ],
-                ],
-                'latency_ms' => 11.4,
-                'error' => null,
-            ]);
-
-        $request = Request::create(
-            '/api/v1/prompts/test',
-            'POST',
-            content: json_encode(['text' => 'How do I write a PHP loop?'])
-        );
-        $response = $this->controller->testRouting($request, $user);
+        $response = $this->controller->getPlanningPrompt($this->makeUser());
         $body = json_decode((string) $response->getContent(), true);
 
         self::assertSame(200, $response->getStatusCode());
         self::assertTrue($body['success']);
-        self::assertSame('coding', $body['candidates'][0]['topic']);
-        self::assertSame('general', $body['candidates'][0]['alias_target']);
+        self::assertSame('tools:plan', $body['prompt']['topic']);
+        self::assertSame('PLAN TEMPLATE [CAPABILITYLIST]', $body['prompt']['prompt']);
+        // The rendered preview must substitute the capability placeholder.
+        self::assertStringNotContainsString('[CAPABILITYLIST]', $body['prompt']['renderedPrompt']);
     }
 
-    public function testTestRoutingClampsLimitToMaximum(): void
+    public function testUpdatePlanningPromptRequiresAuthentication(): void
     {
-        $this->router->expects($this->once())
-            ->method('dryRun')
-            ->with('test', 1, 20); // 999 → clamped to 20
+        $request = Request::create('/api/v1/prompts/planning', 'PUT', content: json_encode(['prompt' => 'x']));
 
-        $this->router->method('dryRun')->willReturn([
-            'query' => 'test',
-            'model' => ['provider' => null, 'model' => null, 'model_id' => null],
-            'candidates' => [],
-            'latency_ms' => 0.0,
-            'error' => null,
-        ]);
+        $response = $this->controller->updatePlanningPrompt($request, null);
 
-        $request = Request::create(
-            '/api/v1/prompts/test',
-            'POST',
-            content: json_encode(['text' => 'test', 'limit' => 999])
-        );
-        $this->controller->testRouting($request, $this->makeUser());
+        self::assertSame(401, $response->getStatusCode());
     }
 
-    public function testTestRoutingClampsLimitToMinimum(): void
+    public function testUpdatePlanningPromptRequiresAdmin(): void
     {
-        $this->router->expects($this->once())
-            ->method('dryRun')
-            ->with('test', 1, 1); // 0 → clamped to 1
+        $request = Request::create('/api/v1/prompts/planning', 'PUT', content: json_encode(['prompt' => 'x']));
 
-        $this->router->method('dryRun')->willReturn([
-            'query' => 'test',
-            'model' => ['provider' => null, 'model' => null, 'model_id' => null],
-            'candidates' => [],
-            'latency_ms' => 0.0,
-            'error' => null,
-        ]);
+        $response = $this->controller->updatePlanningPrompt($request, $this->makeUser(5));
 
-        $request = Request::create(
-            '/api/v1/prompts/test',
-            'POST',
-            content: json_encode(['text' => 'test', 'limit' => 0])
-        );
-        $this->controller->testRouting($request, $this->makeUser());
+        self::assertSame(403, $response->getStatusCode());
+    }
+
+    public function testUpdatePlanningPromptValidatesPayload(): void
+    {
+        $request = Request::create('/api/v1/prompts/planning', 'PUT', content: json_encode([]));
+
+        $response = $this->controller->updatePlanningPrompt($request, $this->makeAdmin());
+
+        self::assertSame(400, $response->getStatusCode());
+    }
+
+    public function testUpdatePlanningPromptSavesAndFlushes(): void
+    {
+        $row = $this->makePlanPrompt('NEW PLAN');
+        $row->expects($this->once())->method('setPrompt')->with('NEW PLAN');
+        $this->promptRepository->method('findByTopic')->with('tools:plan', 0)->willReturn($row);
+        $this->em->expects($this->once())->method('flush');
+
+        $request = Request::create('/api/v1/prompts/planning', 'PUT', content: json_encode(['prompt' => 'NEW PLAN']));
+        $response = $this->controller->updatePlanningPrompt($request, $this->makeAdmin());
+        $body = json_decode((string) $response->getContent(), true);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertTrue($body['success']);
+        self::assertSame('tools:plan', $body['prompt']['topic']);
     }
 }

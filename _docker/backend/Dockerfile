@@ -10,11 +10,21 @@
 #
 # Pinned to an immutable digest so reproducible builds don't depend on a
 # moving floating tag. To bump:
-#   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:<new>
+#   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:latest
 # and replace the @sha256:... below.
-FROM ghcr.io/metadist/synaplan-base-php:1.0.1@sha256:35e81beba0b8b09f8b43cd3a371df1e91e6b7c34c9c02e37d263f63308c022d9
+FROM ghcr.io/metadist/synaplan-base-php:1.0.2@sha256:e5d52125b95862bc6f544f09f2ba15b6f7607f870b7149695ab64dbcf8dc4d51 AS dev
 
 WORKDIR /var/www/backend
+
+# phpredis (ext-redis) — required by Symfony Messenger's Redis Streams transport
+# (`symfony/redis-messenger`). Cache, Sessions, and the platform RedisService all
+# use Predis (pure PHP) and do NOT need this extension, but the messenger
+# CONSUMER must speak the binary protocol via phpredis.
+RUN apt-get update && apt-get install -y --no-install-recommends $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set default environment variables for paths and constants
 # These are baked into the image since they reference local filesystem paths
@@ -31,6 +41,29 @@ ENV BRAVE_SEARCH_API_URL=https://api.search.brave.com/res/v1 \
     RASTERIZE_DPI=150 \
     RASTERIZE_PAGE_CAP=10 \
     RASTERIZE_TIMEOUT_MS=30000
+
+# Entrypoint scripts (entrypoint + sourced migrations-bootstrap library).
+# These MUST live in the `dev` stage: the dev/worker compose services bind-mount
+# the host copies for live editing, but the image ENTRYPOINT has to be set so the
+# backend container actually runs composer install + migrations on boot. Without
+# it the container inherits the base image's default and only launches FrankenPHP,
+# leaving vendor/ unpopulated (which then breaks the worker's bin/console).
+COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/
+COPY _docker/backend/lib/ /usr/local/bin/lib/
+COPY _docker/backend/synaplan /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/synaplan
+
+EXPOSE 80
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+
+# ---------------------------------------------------------------------------
+# `dev` target ends here: base image + phpredis + ENV defaults + entrypoint.
+# Everything below builds the self-contained `prod` image and is skipped for
+# dev/worker containers (they bind-mount code/vendor via docker-compose).
+# `prod` inherits EXPOSE and ENTRYPOINT from `dev`.
+# ---------------------------------------------------------------------------
+FROM dev AS prod
 
 # Copy application (exclude .env files - use environment variables instead)
 COPY --chown=www-data:www-data backend/ .
@@ -57,14 +90,11 @@ COPY plugins/ /plugins/
 #   This is safe for Symfony apps where all classes are autoloaded via composer
 #   Provides significant performance improvement by eliminating file_exists() calls
 # Cache is cleared on container startup anyway via docker-entrypoint.sh
-RUN composer install --prefer-dist --no-interaction --no-dev --no-scripts --optimize-autoloader --classmap-authoritative --ignore-platform-req=ext-redis && \
+# COMPOSER_PROCESS_TIMEOUT=0 disables the 300s per-process limit so large
+# packages (e.g. google/apiclient-services) still unzip when this stage is built
+# under qemu emulation (e.g. amd64 image on an Apple Silicon host).
+RUN COMPOSER_PROCESS_TIMEOUT=0 composer install --prefer-dist --no-interaction --no-dev --no-scripts --optimize-autoloader --classmap-authoritative && \
     chown -R www-data:www-data /var/www/backend/vendor
-
-# Copy and setup entrypoint scripts (entrypoint + sourced migrations-bootstrap library)
-COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/
-COPY _docker/backend/lib/ /usr/local/bin/lib/
-COPY _docker/backend/synaplan /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/synaplan
 
 # Copy built frontend (built externally in CI, empty in dev)
 COPY frontend/dist /var/www/frontend
@@ -83,6 +113,4 @@ COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile
 COPY _docker/backend/synaplan-worker-mode.Caddyfile \
     /usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile
 
-EXPOSE 80
-
-ENTRYPOINT ["docker-entrypoint.sh"]
+# EXPOSE 80 and ENTRYPOINT ["docker-entrypoint.sh"] are inherited from the `dev` stage.

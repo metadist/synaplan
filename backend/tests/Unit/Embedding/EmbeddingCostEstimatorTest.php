@@ -83,12 +83,6 @@ final class EmbeddingCostEstimatorTest extends TestCase
             });
 
         $this->qdrantClient->method('scrollMemories')->willReturn(array_fill(0, 50, ['payload' => []]));
-        $this->qdrantClient->method('getSynapseCollectionInfo')->willReturn([
-            'exists' => true,
-            'points_count' => 30,
-            'vector_dim' => 1024,
-            'distance' => 'Cosine',
-        ]);
 
         $estimate = $this->estimator->estimateChange(99);
 
@@ -106,12 +100,9 @@ final class EmbeddingCostEstimatorTest extends TestCase
         self::assertSame(50, $estimate['scopes']['memories']['chunks']);
         self::assertSame(25_000, $estimate['scopes']['memories']['tokensEstimated']);
 
-        // 30 topics × 200 = 6000
-        self::assertSame(30, $estimate['scopes']['synapse']['chunks']);
-        self::assertSame(6000, $estimate['scopes']['synapse']['tokensEstimated']);
-
-        self::assertSame(180, $estimate['totals']['chunks']);
-        self::assertSame(36_000, $estimate['totals']['tokensEstimated']);
+        // documents (100) + memories (50)
+        self::assertSame(150, $estimate['totals']['chunks']);
+        self::assertSame(30_000, $estimate['totals']['tokensEstimated']);
         self::assertSame('info', $estimate['severity']);
     }
 
@@ -127,12 +118,6 @@ final class EmbeddingCostEstimatorTest extends TestCase
 
         $this->connection->method('fetchOne')->willReturn(0);
         $this->qdrantClient->method('scrollMemories')->willReturn([]);
-        $this->qdrantClient->method('getSynapseCollectionInfo')->willReturn([
-            'exists' => false,
-            'points_count' => 0,
-            'vector_dim' => 1024,
-            'distance' => 'Cosine',
-        ]);
 
         $estimate = $this->estimator->estimateChange(42);
 
@@ -160,12 +145,6 @@ final class EmbeddingCostEstimatorTest extends TestCase
             });
 
         $this->qdrantClient->method('scrollMemories')->willReturn([]);
-        $this->qdrantClient->method('getSynapseCollectionInfo')->willReturn([
-            'exists' => true,
-            'points_count' => 0,
-            'vector_dim' => 1024,
-            'distance' => 'Cosine',
-        ]);
 
         $estimate = $this->estimator->estimateChange(99);
 

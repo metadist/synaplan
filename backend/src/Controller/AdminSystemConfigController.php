@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\DTO\AdminConfigUpdateRequest;
+use App\Entity\User;
 use App\Service\Admin\SystemConfigService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -12,6 +13,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
@@ -150,9 +152,11 @@ final class AdminSystemConfigController extends AbstractController
     #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Admin access required')]
     #[OA\Response(response: 422, description: 'Validation error')]
-    public function updateValue(#[MapRequestPayload] AdminConfigUpdateRequest $dto): JsonResponse
-    {
-        $result = $this->configService->setValue($dto->key, $dto->value);
+    public function updateValue(
+        #[MapRequestPayload] AdminConfigUpdateRequest $dto,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        $result = $this->configService->setValue($dto->key, $dto->value, $user?->getId());
 
         if (!$result['success']) {
             return $this->json([

@@ -60,7 +60,7 @@ Always use `<MainLayout>` with a standard container:
 
 ## i18n (Internationalization)
 
-**Always update BOTH `en.json` AND `de.json`!**
+**Always update ALL four locales: `en.json`, `de.json`, `es.json`, AND `tr.json`!** (See `frontend/src/i18n/index.ts` → `supportedLanguages = ['de', 'en', 'es', 'tr']`. A missing key silently falls back to English.)
 
 ```vue
 <!-- In templates -->

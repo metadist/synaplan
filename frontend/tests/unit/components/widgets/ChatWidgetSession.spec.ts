@@ -13,8 +13,8 @@ vi.mock('@/services/api/widgetsApi', async (importOriginal) => {
   }
 })
 
-vi.mock('@/services/sseClient', () => ({
-  subscribeToSession: vi.fn(() => ({ unsubscribe: vi.fn() })),
+vi.mock('@/services/realtime/widgetSessionRealtime', () => ({
+  subscribeToWidgetSessionRealtime: vi.fn(() => ({ unsubscribe: vi.fn() })),
 }))
 
 vi.mock('@heroicons/vue/24/outline', () => ({

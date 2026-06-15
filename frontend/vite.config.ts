@@ -36,6 +36,21 @@ export default defineConfig(({ mode }) => {
   const basePath = env.VITE_BASE_PATH || '/'
   const backendUrl = env.BACKEND_URL || 'http://localhost:8000'
 
+  // Dev server allowed hosts (Vite's anti DNS-rebinding guard).
+  // EMPTY (default) → the guard is ignored and EVERY host is accepted, so the
+  // dev server answers to all requests out of the box (any domain / reverse
+  // proxy). SET to a comma-separated list (e.g. "app.example.com,dev.example.com")
+  // → ONLY those hosts may connect; everything else is rejected.
+  // "true"/"all" are explicit aliases for "allow every host".
+  const allowedHostsEnv = (env.ALLOWED_HOSTS ?? '').trim()
+  const allowedHosts =
+    allowedHostsEnv === '' || allowedHostsEnv === 'true' || allowedHostsEnv === 'all'
+      ? true
+      : allowedHostsEnv
+          .split(',')
+          .map((h) => h.trim())
+          .filter(Boolean)
+
   return {
     base: basePath,
     plugins: [vue(), gitkeepPlugin()],
@@ -81,12 +96,16 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    optimizeDeps: {
+      exclude: ['vue-i18n'],
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
     server: {
+      allowedHosts,
       proxy: {
         '/api': {
           target: backendUrl,
@@ -98,6 +117,26 @@ export default defineConfig(({ mode }) => {
         '/shared': {
           target: backendUrl,
           changeOrigin: true,
+        },
+        // Centrifugo realtime WebSocket gateway.
+        //
+        // In production Caddy serves the dashboard AND reverse-proxies
+        // `/connection/*` to Centrifugo on the same origin, so the operator
+        // browser opens `wss://app.example.com/connection/websocket` without
+        // any CORS or cross-origin gymnastics.
+        //
+        // In dev the dashboard is served by Vite on :5173 while Caddy +
+        // Centrifugo live behind :8000. Without this proxy the operator
+        // RealtimeClient resolves the WS URL from `window.location.host`,
+        // tries `ws://localhost:5173/connection/websocket`, fails, and the
+        // ConnectionStatusBadge flips to "Connection Error" — even though
+        // visitor widgets (which derive the URL from apiBaseUrl) keep
+        // working. `ws: true` is what unlocks the WS upgrade; without it
+        // Vite hijacks the request as plain HTTP and the upgrade 404s.
+        '/connection': {
+          target: backendUrl,
+          changeOrigin: true,
+          ws: true,
         },
       },
     },

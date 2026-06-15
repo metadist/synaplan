@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\Stream\StreamChunk;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Chat;
 use App\Entity\File;
@@ -771,20 +772,9 @@ final class WhatsAppService
         // 7. AI Pipeline Processing (use streaming mode to support TTS/media generation)
         $collectedResponse = '';
         $streamCallback = function (string|array $chunk, array $metadata = []) use (&$collectedResponse): void {
-            if (is_array($chunk)) {
-                $type = $chunk['type'] ?? 'content';
-
-                // Skip finish signal (WhatsApp doesn't need truncation UI)
-                if ('finish' === $type) {
-                    return;
-                }
-
-                if ('content' === $type && isset($chunk['content'])) {
-                    $collectedResponse .= $chunk['content'];
-                }
-            } else {
-                $collectedResponse .= $chunk;
-            }
+            // Centralized chunk filter: only visible answer text is collected,
+            // reasoning/finish chunks are dropped (issue #1067).
+            $collectedResponse .= StreamChunk::visibleText($chunk);
         };
 
         // For image messages WITHOUT caption, force image description mode
@@ -867,12 +857,13 @@ final class WhatsAppService
             ? $this->appendWhatsAppSources($responseText, $searchResultsItems)
             : $responseText;
 
-        // PRIORITY 1: Check if AI generated media (image, video, or audio from MediaGenerationHandler)
+        // PRIORITY 1: Check if AI generated media (image, video, audio, or
+        // document — e.g. .ics / .docx from a multi-task plan)
         if ($fileData) {
             $generatedMediaType = $fileData['type'] ?? null;
             $mediaPath = $fileData['path'] ?? null;
 
-            if ($mediaPath && !empty($this->appUrl) && in_array($generatedMediaType, ['audio', 'video', 'image'], true)) {
+            if ($mediaPath && !empty($this->appUrl) && in_array($generatedMediaType, ['audio', 'video', 'image', 'document'], true)) {
                 $mediaUrl = rtrim($this->appUrl, '/').'/'.ltrim($mediaPath, '/');
 
                 $this->logger->info('WhatsApp: Sending AI-generated media response', [
@@ -881,29 +872,56 @@ final class WhatsAppService
                     'media_url' => $mediaUrl,
                 ]);
 
-                // For images and videos, include the response text as caption
-                $caption = in_array($generatedMediaType, ['image', 'video'], true) && !empty($responseText)
-                    ? mb_substr($responseText, 0, 1024) // WhatsApp caption limit
-                    : null;
+                // The response text must never be lost: WhatsApp captions only
+                // exist on image/video/document and cap at 1024 chars — audio
+                // has no caption at all. Short text rides as the caption
+                // (kept clean of the sources block, issue #652); otherwise the
+                // FULL text (incl. sources) goes out as its own message BEFORE
+                // the media, mirroring how the web chat shows text + media.
+                $caption = null;
+                $textSentSeparately = false;
+                $textMessageId = '';
+                $canUseCaption = in_array($generatedMediaType, ['image', 'video', 'document'], true)
+                    && !empty($responseText)
+                    && mb_strlen($responseText) <= 1024;
+
+                if ($canUseCaption) {
+                    $caption = $responseText;
+                } elseif ('' !== trim($textResponseWithSources)) {
+                    $textSend = $this->sendMessage($dto->from, $textResponseWithSources, $dto->phoneNumberId);
+                    $textSentSeparately = !empty($textSend['success']);
+                    $textMessageId = (string) ($textSend['message_id'] ?? '');
+                    if (!$textSentSeparately) {
+                        $this->logger->warning('WhatsApp: Failed to send response text before media', [
+                            'to' => $dto->from,
+                            'error' => $textSend['error'] ?? 'Unknown',
+                        ]);
+                    }
+                }
 
                 $sendResult = $this->sendMedia($dto->from, $generatedMediaType, $mediaUrl, $dto->phoneNumberId, $caption);
                 if ($sendResult['success']) {
-                    $mediaAction = match ($generatedMediaType) {
-                        'image' => 'IMAGES',
-                        'video' => 'VIDEOS',
-                        default => 'AUDIOS',
-                    };
-                    $this->rateLimitService->recordUsage($user, $mediaAction, [
-                        'provider' => $metadata['provider'] ?? 'unknown',
-                        'model' => $metadata['model'] ?? 'unknown',
-                        'model_id' => $metadata['model_id'] ?? null,
-                        'source' => 'WHATSAPP',
-                        'media_usage' => $metadata['media_usage'] ?? [],
-                    ]);
+                    // Documents have no dedicated media quota — the MESSAGES
+                    // usage recorded above already covers the turn.
+                    if (in_array($generatedMediaType, ['image', 'video', 'audio'], true)) {
+                        $mediaAction = match ($generatedMediaType) {
+                            'image' => 'IMAGES',
+                            'video' => 'VIDEOS',
+                            default => 'AUDIOS',
+                        };
+                        $this->rateLimitService->recordUsage($user, $mediaAction, [
+                            'provider' => $metadata['provider'] ?? 'unknown',
+                            'model' => $metadata['model'] ?? 'unknown',
+                            'model_id' => $metadata['model_id'] ?? null,
+                            'source' => 'WHATSAPP',
+                            'media_usage' => $metadata['media_usage'] ?? [],
+                        ]);
+                    }
 
                     $placeholderText = match ($generatedMediaType) {
                         'image' => '[Image response]',
                         'video' => '[Video response]',
+                        'document' => '[Document response]',
                         default => '[Audio response]', // audio is the remaining case
                     };
                     // Persist the generated media path so the web chat
@@ -952,6 +970,59 @@ final class WhatsAppService
                         ['media_type' => $generatedMediaType],
                         $user->getId(),
                     );
+
+                    // The text already reached the user as its own message —
+                    // persist it and don't let PRIORITY 3 send it twice.
+                    if ($textSentSeparately) {
+                        $this->storeOutgoingMessage($user, $dto, $responseText, $textMessageId, $chat, $searchResults);
+                        $responseSent = true;
+                    }
+                }
+            }
+
+            // Multi-task routing (Sprint 5): a multi-node plan can produce more
+            // than one output file. metadata['file'] (index 0) was just handled
+            // above; send the remaining files as separate WhatsApp media
+            // messages (documents included — .ics/.docx outputs were silently
+            // dropped before). Only the executor sets metadata['files'], so
+            // single-file turns are unaffected. Best-effort: one failed extra
+            // must not abort the remaining sends.
+            $extraFiles = $metadata['files'] ?? null;
+            if (is_array($extraFiles) && count($extraFiles) > 1 && !empty($this->appUrl)) {
+                foreach (array_values($extraFiles) as $idx => $taskFile) {
+                    if (0 === $idx || !is_array($taskFile)) {
+                        continue;
+                    }
+                    $type = $taskFile['type'] ?? null;
+                    $path = $taskFile['path'] ?? null;
+                    if (!is_string($path) || '' === $path || !in_array($type, ['audio', 'video', 'image', 'document'], true)) {
+                        continue;
+                    }
+                    $url = rtrim($this->appUrl, '/').'/'.ltrim($path, '/');
+                    $this->logger->info('WhatsApp: Sending additional multi-task media', [
+                        'to' => $dto->from,
+                        'media_type' => $type,
+                        'index' => $idx,
+                    ]);
+
+                    try {
+                        $extraResult = $this->sendMedia($dto->from, $type, $url, $dto->phoneNumberId, null);
+                        if (empty($extraResult['success'])) {
+                            $this->logger->warning('WhatsApp: Failed to send additional multi-task media', [
+                                'to' => $dto->from,
+                                'media_type' => $type,
+                                'index' => $idx,
+                                'error' => $extraResult['error'] ?? 'Unknown',
+                            ]);
+                        }
+                    } catch (\Throwable $e) {
+                        $this->logger->warning('WhatsApp: Failed to send additional multi-task media', [
+                            'to' => $dto->from,
+                            'media_type' => $type,
+                            'index' => $idx,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             }
         }

@@ -11,6 +11,10 @@ use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Multitask\TaskPlanExecutor;
+use App\Service\Multitask\TaskPlanner;
+use App\Service\Multitask\TaskPlanStore;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
@@ -56,7 +60,11 @@ class MessageProcessorTest extends TestCase
             $this->braveSearchService,
             $this->searchQueryGenerator,
             $this->createMock(UrlContentService::class),
-            $this->logger
+            $this->logger,
+            $this->createMock(MultitaskRoutingConfig::class),
+            $this->createMock(TaskPlanner::class),
+            $this->createMock(TaskPlanStore::class),
+            $this->createMock(TaskPlanExecutor::class)
         );
     }
 
@@ -283,42 +291,86 @@ class MessageProcessorTest extends TestCase
     }
 
     /**
-     * Locks down the project-wide "rather search than not" policy:
-     * a chat-friendly topic with NO explicit `tool_internet` opinion
-     * must trigger search. This is the new default after Variante B —
-     * the user no longer has to enable a toggle to get search.
+     * Trust-the-model policy: a chat-friendly topic with NO explicit
+     * `tool_internet` opinion searches when the classifier voted for it
+     * (`web_search=true` from the AI sorter's BWEBSEARCH).
      */
-    public function testProcessStreamSearchesByDefaultForChatTopic(): void
+    public function testProcessStreamSearchesWhenClassifierVotesYes(): void
     {
         $message = $this->createMock(Message::class);
         $message->method('getUserId')->willReturn(1);
         $message->method('getTrackingId')->willReturn(123);
         $message->method('getFile')->willReturn(0);
         $message->method('getId')->willReturn(98);
-        $message->method('getText')->willReturn('Hallo, was sind die aktuellen News?');
+        $message->method('getText')->willReturn('Was sind die aktuellen News aus Berlin?');
 
         $this->preProcessor->method('process')->willReturn($message);
         $this->messageRepository->method('findConversationHistory')->willReturn([]);
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
+        // AI sorter judged this needs live info → BWEBSEARCH=1.
         $this->classifier->method('classify')->willReturn([
             'topic' => 'general',
             'language' => 'de',
-            'source' => 'fast_path_heuristic',
+            'source' => 'ai_sorting',
+            'web_search' => true,
         ]);
 
-        // No tool_internet opinion → project default kicks in (search).
         $this->promptService
             ->method('getPromptWithMetadata')
             ->willReturn(['metadata' => []]);
 
         $this->braveSearchService->method('isEnabled')->willReturn(true);
-        $this->searchQueryGenerator->method('generate')->willReturn('aktuelle News');
+        $this->searchQueryGenerator->method('generate')->willReturn('aktuelle News Berlin');
 
         $this->braveSearchService
             ->expects($this->once())
             ->method('search')
             ->willReturn(['results' => []]);
+
+        $this->router
+            ->method('routeStream')
+            ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
+
+        $this->processor->processStream($message, function (): void {});
+    }
+
+    /**
+     * Trust-the-model policy: a trivial chat that the classifier did NOT
+     * flag for search (no BWEBSEARCH vote — e.g. the fast-path heuristic, or
+     * the model voting `false`) must NOT trigger a web search. This is the
+     * latency win for simple questions like "wer bist du denn?".
+     */
+    public function testProcessStreamSkipsSearchWhenClassifierDoesNotVote(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(96);
+        $message->method('getText')->willReturn('wer bist du denn?');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        // Fast-path classification carries no BWEBSEARCH vote.
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'fast_path_heuristic',
+            'web_search' => null,
+        ]);
+
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn(['metadata' => []]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+
+        $this->braveSearchService
+            ->expects($this->never())
+            ->method('search');
 
         $this->router
             ->method('routeStream')

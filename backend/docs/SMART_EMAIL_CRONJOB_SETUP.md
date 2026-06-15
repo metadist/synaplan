@@ -62,7 +62,7 @@ Add this line (adjust path and interval as needed):
 
 ```cron
 # Synaplan Smart Email Processor - runs every 2 minutes
-*/2 * * * * cd /netroot/synaplanCluster/synaplan-compose && docker compose exec -T backend php bin/console app:process-emails >> /var/log/synaplan-email.log 2>&1
+*/2 * * * * cd /path/to/your/deployment && docker compose exec -T backend php bin/console app:process-emails >> /var/log/synaplan-email.log 2>&1
 ```
 
 **Note:** If you already have a cronjob for `app:process-mail-handlers`, you can add this as a second line. Both commands can run simultaneously.
@@ -74,19 +74,19 @@ Create `/etc/cron.d/synaplan-smart-email`:
 ```cron
 # Synaplan Smart Email Processor
 # Runs every 2 minutes
-*/2 * * * * root cd /netroot/synaplanCluster/synaplan-compose && docker compose exec -T backend php bin/console app:process-emails >> /var/log/synaplan-email.log 2>&1
+*/2 * * * * root cd /path/to/your/deployment && docker compose exec -T backend php bin/console app:process-emails >> /var/log/synaplan-email.log 2>&1
 ```
 
 **Or add to existing cron script:**
 
-If you have `/netroot/synaplanCluster/synaplan-compose/cron-gmail.sh`, you can add a second line:
+If you have a cron script in your deployment directory (e.g. `cron-gmail.sh`), you can add a second line:
 
 ```bash
 #!/bin/bash
 
-export SYNDBHOST=10.0.0.2
+export SYNDBHOST=<local-galera-node-ip>
 
-cd /netroot/synaplanCluster/synaplan-compose
+cd /path/to/your/deployment
 
 # Mail Handler (existing - for department routing)
 docker compose exec -T backend php bin/console app:process-mail-handlers
@@ -97,7 +97,7 @@ docker compose exec -T backend php bin/console app:process-emails
 
 Replace:
 - `root` with the appropriate user (if different)
-- `/netroot/synaplanCluster/synaplan-compose` with your actual project path
+- `/path/to/your/deployment` with your actual project path
 
 Make it executable:
 ```bash

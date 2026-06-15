@@ -146,6 +146,21 @@ export const useAuthStore = defineStore('auth', () => {
     // by a stale entry from this session.
     clearPendingRedirect()
 
+    // Tear down the realtime client before the server-side session is
+    // invalidated. Otherwise the client keeps trying to refresh its
+    // connection token with a stale (or absent) auth cookie, generating
+    // a noisy reconnect loop until the page reloads.
+    //
+    // Dynamic import keeps `auth.ts` free of a static dependency on the
+    // realtime store (which would force every login screen to bundle
+    // centrifuge-js).
+    try {
+      const { useRealtimeStore } = await import('@/stores/realtime')
+      await useRealtimeStore().disconnect()
+    } catch (realtimeErr) {
+      console.warn('Realtime disconnect failed during logout', realtimeErr)
+    }
+
     try {
       await authService.logout()
     } finally {

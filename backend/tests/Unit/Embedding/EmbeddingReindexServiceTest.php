@@ -10,7 +10,6 @@ use App\Repository\RevectorizeRunRepository;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingReindexService;
 use App\Service\Memory\MemoryEmbeddingModelResolver;
-use App\Service\Message\SynapseIndexer;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -30,7 +29,6 @@ final class EmbeddingReindexServiceTest extends TestCase
 {
     private QdrantClientInterface&MockObject $qdrantClient;
     private AiFacade&MockObject $aiFacade;
-    private SynapseIndexer&MockObject $synapseIndexer;
     private EmbeddingMetadataService&MockObject $metadata;
     private MemoryEmbeddingModelResolver&MockObject $memoryResolver;
     private RevectorizeRunRepository&MockObject $runRepository;
@@ -41,7 +39,6 @@ final class EmbeddingReindexServiceTest extends TestCase
     {
         $this->qdrantClient = $this->createMock(QdrantClientInterface::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
-        $this->synapseIndexer = $this->createMock(SynapseIndexer::class);
         $this->metadata = $this->createMock(EmbeddingMetadataService::class);
         $this->memoryResolver = $this->createMock(MemoryEmbeddingModelResolver::class);
         $this->runRepository = $this->createMock(RevectorizeRunRepository::class);
@@ -50,7 +47,6 @@ final class EmbeddingReindexServiceTest extends TestCase
         $this->service = new EmbeddingReindexService(
             $this->qdrantClient,
             $this->aiFacade,
-            $this->synapseIndexer,
             $this->metadata,
             $this->memoryResolver,
             $this->runRepository,
@@ -188,15 +184,7 @@ final class EmbeddingReindexServiceTest extends TestCase
         $this->qdrantClient->expects($this->never())->method('scrollAllMemoriesForReindex');
         $this->qdrantClient->expects($this->never())->method('recreateMemoriesCollection');
 
-        // Synapse + documents are still invoked. Stub them to no-op.
-        $this->synapseIndexer->method('getEmbeddingModelInfo')->willReturn([
-            'provider' => 'openai',
-            'model' => 'text-embedding-3-small',
-            'model_id' => 21,
-            'vector_dim' => 1536,
-        ]);
-        $this->synapseIndexer->method('indexAllTopics')->willReturn(['indexed' => 0, 'errors' => 0]);
-        $this->qdrantClient->method('recreateSynapseCollection');
+        // Documents are still invoked. Stub to no-op.
         $this->connection->method('fetchAllAssociative')->willReturn([]);
 
         $run = $this->makeRun(RevectorizeRun::SCOPE_ALL, fromId: 10, toId: 21);

@@ -3,13 +3,15 @@
     <SidebarV2 />
 
     <div class="flex-1 flex flex-col min-w-0" data-testid="section-main-shell">
-      <Header />
       <main
         class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
         data-testid="section-primary-content"
       >
         <slot />
       </main>
+
+      <!-- §4.3 #2: primary navigation on small screens (hidden ≥ md) -->
+      <MobileNav />
     </div>
 
     <!-- Help system host -->
@@ -18,25 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
 import SidebarV2 from './SidebarV2.vue'
-import Header from './Header.vue'
+import MobileNav from './MobileNav.vue'
 import HelpHost from './help/HelpHost.vue'
-import { useSidebarStore } from '../stores/sidebar'
-
-const sidebarStore = useSidebarStore()
-
-const handleEscape = (event: KeyboardEvent) => {
-  if (event.key === 'Escape') {
-    sidebarStore.closeMobile()
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('keydown', handleEscape)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('keydown', handleEscape)
-})
 </script>

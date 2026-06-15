@@ -60,7 +60,6 @@ export interface WidgetSessionDetailResponse {
   success: boolean
   session: WidgetSession
   messages: SessionMessage[]
-  latestEventId?: number
 }
 
 export interface ListSessionsParams {
@@ -222,22 +221,10 @@ export async function renameSession(
   )
 }
 
-/**
- * Send typing indicator from operator to widget user
- */
-export async function sendOperatorTyping(
-  widgetId: string,
-  sessionId: string,
-  isTyping: boolean = true
-): Promise<{ success: boolean }> {
-  return await httpClient<{ success: boolean }>(
-    `/api/v1/widgets/${widgetId}/sessions/${sessionId}/typing`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ isTyping }),
-    }
-  )
-}
+// `sendOperatorTyping()` was removed when typing indicators moved to the
+// dedicated `widgettyping:*` Centrifugo channel — the dashboard now
+// publishes them straight from the browser via
+// `openOperatorTypingChannel()` (see `services/realtime/widgetOperatorRealtime.ts`).
 
 /**
  * Eagerly create or pin an internal-mode session for the widget owner.

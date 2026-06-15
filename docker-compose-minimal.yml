@@ -6,6 +6,13 @@
 # - Downloads ~4GB less than standard install
 # - Faster startup for first-time users
 #
+# It still ships the small, mandatory infrastructure the app depends on:
+# - redis      : shared cache / locks / rate-limiter / Messenger Redis Streams /
+#                Centrifugo engine (~15MB image, capped at 256MB RAM)
+# - centrifugo : WebSocket gateway for live chat takeover & realtime features
+# - worker     : consumes async jobs (memories, URL crawling, reindexing)
+# These are tiny compared to the ~4GB Ollama/Whisper stack this file omits.
+#
 # Usage:
 #   docker compose -f docker-compose-minimal.yml up -d
 #
@@ -16,7 +23,7 @@
 services:
   # Vue.js Frontend
   frontend:
-    image: node:22@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6
+    image: node:22@sha256:2d178f2785b96dfbf62a416ca2e40f50e30150b4ff3320d706f0d96e90600eb3
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -41,7 +48,7 @@ services:
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
-    image: node:22@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6
+    image: node:22@sha256:2d178f2785b96dfbf62a416ca2e40f50e30150b4ff3320d706f0d96e90600eb3
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
@@ -62,9 +69,16 @@ services:
   # Serves both API and production frontend from frontend/dist
   backend:
     image: ghcr.io/metadist/synaplan:latest
+    # Always build the lightweight `dev` stage locally so the image carries
+    # ext-redis (phpredis) without baking the app. The published :latest can be
+    # stale; reusing it breaks composer install (symfony/redis-messenger platform
+    # req) and the worker's Redis Streams consumer. The dev stage is independent
+    # of backend source, so every `up -d` is a cache hit after the first build.
+    pull_policy: build
     build:
       context: .
       dockerfile: _docker/backend/Dockerfile
+      target: dev
     container_name: synaplan-backend
     # Optional: Load extra config from backend/.env (for API keys, etc.)
     env_file:
@@ -98,7 +112,19 @@ services:
       AI_DEFAULT_PROVIDER: groq
       # Token Configuration
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
-      LOCK_DSN: ${LOCK_DSN:-flock}
+      # Redis-backed lock so it shares the same infra as cache/messenger.
+      LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
+      # Redis (mandatory infra: cache, locks, rate-limiter, Messenger Redis
+      # Streams transport, Centrifugo engine). Override for an external Redis.
+      REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
+      # Realtime gateway (Centrifugo). REALTIME_ENABLED toggles WS publishing;
+      # set to false to run without realtime (chat falls back to REST).
+      REALTIME_ENABLED: ${REALTIME_ENABLED:-true}
+      REALTIME_API_URL: ${REALTIME_API_URL:-http://centrifugo:8000/api}
+      REALTIME_API_KEY: ${REALTIME_API_KEY:-changeme_centrifugo_api_key}
+      REALTIME_TOKEN_SECRET: ${REALTIME_TOKEN_SECRET:-changeme_centrifugo_token_secret}
+      # Empty string = same-origin (Caddy reverse-proxies /connection/* to centrifugo).
+      REALTIME_PUBLIC_WS_URL: ${REALTIME_PUBLIC_WS_URL:-}
       # Mailer (Mailhog for development)
       MAILER_DSN: smtp://mailhog:1025
       # External API Keys loaded from backend/.env via env_file
@@ -121,9 +147,15 @@ services:
       WHISPER_DEFAULT_MODEL: base
       WHISPER_ENABLED: "false"
       FFMPEG_BINARY: /usr/bin/ffmpeg
+      # See docker-compose.yml for context — raises PHP's silent 20-file cap.
+      PHP_MAX_FILE_UPLOADS: "100"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      centrifugo:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
@@ -134,9 +166,136 @@ services:
     networks:
       - synaplan-network
 
+  # Redis - shared cache / locks / rate-limiter / Messenger Redis Streams /
+  # Centrifugo engine. Single-node here, but the same image/config as the
+  # production cluster. Memory-capped with LRU eviction (no persistence needed:
+  # the durable source of truth is MariaDB).
+  redis:
+    # Pinned to Redis 7.4 for Centrifugo pub/sub compatibility (see
+    # docker-compose.yml for the full rationale). Redis 8.x dropped publication
+    # fan-out to the Centrifugo node and broke realtime delivery.
+    image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    container_name: synaplan-redis
+    command: >-
+      redis-server
+        --appendonly no
+        --save ""
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Centrifugo - WebSocket / real-time gateway (live chat takeover, operator
+  # notifications). Caddy/FrankenPHP reverse-proxies /connection/* and
+  # /centrifugo/api/* so the browser connects same-origin. Auth via short-lived
+  # JWTs minted by the PHP backend.
+  centrifugo:
+    image: centrifugo/centrifugo:v6.8.2@sha256:fbe9a36e870fca382dfaa1afac6e6ea433e79414ad2f8fa3083619660cdd4cad
+    container_name: synaplan-centrifugo
+    command: ["centrifugo", "-c", "/centrifugo/config.json"]
+    volumes:
+      - ./_docker/centrifugo/config.json:/centrifugo/config.json:ro
+    environment:
+      # Secrets must match the backend's REALTIME_* values above so JWTs verify
+      # and HTTP publishes authenticate.
+      CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: ${REALTIME_TOKEN_SECRET:-changeme_centrifugo_token_secret}
+      CENTRIFUGO_HTTP_API_KEY: ${REALTIME_API_KEY:-changeme_centrifugo_api_key}
+      CENTRIFUGO_ADMIN_PASSWORD: ${REALTIME_ADMIN_PASSWORD:-changeme_admin}
+      CENTRIFUGO_ADMIN_SECRET: ${REALTIME_ADMIN_SECRET:-changeme_admin_secret}
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${REALTIME_ALLOWED_ORIGINS:-*}
+      # Dedicated logical DB (/3) keeps Centrifugo keys isolated from the
+      # Symfony cache/lock/messenger which use /0 via REDIS_DSN.
+      CENTRIFUGO_ENGINE_REDIS_ADDRESS: ${REALTIME_REDIS_ADDRESS:-redis://redis:6379/3}
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Worker - consumes async messenger jobs (memory extraction, URL crawling,
+  # reindexing). Runs in `prod` to dodge the dev-mode messenger:consume bug, and
+  # recycles hourly (--time-limit) to bound Doctrine EM growth. Cloud-AI variant:
+  # no Ollama, no Whisper models.
+  worker:
+    image: ghcr.io/metadist/synaplan:latest
+    # Build the same lightweight `dev` stage as the backend (base + phpredis).
+    # The worker bind-mounts ./backend and consumes Redis Streams via
+    # messenger:consume, which needs phpredis at runtime; the dev stage is
+    # source-independent so `up -d` stays a cache hit after the first build.
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: _docker/backend/Dockerfile
+      target: dev
+    container_name: synaplan-worker
+    env_file:
+      - path: backend/.env
+        required: false
+    volumes:
+      - ./backend:/var/www/backend
+      - /var/www/backend/var/cache
+      - ./plugins:/plugins:ro
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: "0"
+      APP_URL: http://backend
+      PLUGINS_DIR: /plugins
+      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      OLLAMA_BASE_URL: ""
+      TIKA_BASE_URL: http://tika:9998
+      AI_DEFAULT_PROVIDER: groq
+      TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
+      LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
+      REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
+      MAILER_DSN: smtp://mailhog:1025
+      AUTO_DOWNLOAD_MODELS: "false"
+      ENABLE_LOCAL_GPT_OSS: "false"
+      WHISPER_ENABLED: "false"
+      FFMPEG_BINARY: /usr/bin/ffmpeg
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        echo "[worker] clearing prod cache..."
+        rm -rf var/cache/prod
+        php bin/console --env=prod cache:warmup
+
+        until php bin/console --env=prod dbal:run-sql 'SELECT 1' >/dev/null 2>&1; do
+          echo "[worker] waiting for db schema..."; sleep 3;
+        done
+
+        echo "[worker] db + cache ready, starting messenger:consume"
+        exec php bin/console --env=prod messenger:consume \
+          async_ai_high async_extract async_index \
+          --time-limit=3600 --memory-limit=512M -v
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+    networks:
+      - synaplan-network
+
   # MariaDB 11.8 Database
   db:
-    image: mariadb:12.2.2@sha256:350261292d0129fd4b24f537dcf05ecd3ebe34d39d5b592af551f38310e7a167
+    image: mariadb:12.3.2@sha256:b1c7bf836e64ed9406a8984af29509f40089d55cea14b32f12c4726a1f17104b
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
@@ -161,7 +320,7 @@ services:
 
   # Apache Tika - Document Text Extraction
   tika:
-    image: apache/tika:3.3.0.0@sha256:2a565f1ea1290bdcb74a7d35957d16a989ed44ef98790dcdcc28121d728fa583
+    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
     container_name: synaplan-tika
     command: -h 0.0.0.0 -p 9998
     ports:

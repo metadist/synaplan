@@ -150,33 +150,17 @@
                   {{ $t('widgets.taskPrompt') }} *
                 </label>
 
-                <!-- No Custom Prompts Available -->
-                <div
-                  v-if="customTaskPrompts.length === 0"
-                  class="surface-card p-4 rounded-lg border-2 border-dashed border-light-border/50 dark:border-dark-border/30 text-center"
+                <select
+                  v-model="formData.taskPromptTopic"
+                  class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-task-prompt"
                 >
-                  <Icon
-                    icon="heroicons:exclamation-triangle"
-                    class="w-8 h-8 txt-secondary opacity-50 mx-auto mb-2"
-                  />
-                  <p class="txt-secondary text-sm mb-3">{{ $t('widgets.noCustomPrompts') }}</p>
-                  <a
-                    href="/config/task-prompts"
-                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] transition-colors text-sm font-medium"
+                  <option value="">{{ $t('widgets.selectTaskPrompt') }}</option>
+                  <option :value="STANDARD_SORTING">{{ $t('widgets.standardSorting') }}</option>
+                  <optgroup
+                    v-if="customTaskPrompts.length > 0"
+                    :label="$t('widgets.customPromptsGroup')"
                   >
-                    <Icon icon="heroicons:plus" class="w-4 h-4" />
-                    {{ $t('widgets.createTaskPrompt') }}
-                  </a>
-                </div>
-
-                <!-- Custom Prompts Available -->
-                <div v-else>
-                  <select
-                    v-model="formData.taskPromptTopic"
-                    class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                    data-testid="input-task-prompt"
-                  >
-                    <option value="">{{ $t('widgets.selectTaskPrompt') }}</option>
                     <option
                       v-for="prompt in customTaskPrompts"
                       :key="prompt.topic"
@@ -184,15 +168,26 @@
                     >
                       {{ prompt.name }}
                     </option>
-                  </select>
-                  <p class="text-xs txt-secondary mt-1.5 flex items-start gap-1">
-                    <Icon
-                      icon="heroicons:information-circle"
-                      class="w-4 h-4 flex-shrink-0 mt-0.5"
-                    />
-                    <span>{{ $t('widgets.taskPromptHelp') }}</span>
-                  </p>
-                </div>
+                  </optgroup>
+                </select>
+                <p class="text-xs txt-secondary mt-1.5 flex items-start gap-1">
+                  <Icon icon="heroicons:information-circle" class="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{{ $t('widgets.taskPromptHelp') }}</span>
+                </p>
+
+                <!-- Hint when the user has no custom prompts yet -->
+                <p
+                  v-if="customTaskPrompts.length === 0"
+                  class="text-xs txt-secondary mt-2 flex items-start gap-1"
+                >
+                  <Icon icon="heroicons:light-bulb" class="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>
+                    {{ $t('widgets.noCustomPromptsHint') }}
+                    <a href="/ai/instructions" class="text-[var(--brand)] hover:underline">
+                      {{ $t('widgets.createTaskPrompt') }}
+                    </a>
+                  </span>
+                </p>
               </div>
             </div>
 
@@ -505,7 +500,7 @@
                 </div>
                 <div>
                   <p class="text-xs txt-secondary">{{ $t('widgets.taskPrompt') }}</p>
-                  <p class="font-medium txt-primary">{{ formData.taskPromptTopic || '-' }}</p>
+                  <p class="font-medium txt-primary">{{ taskPromptLabel }}</p>
                 </div>
                 <div>
                   <p class="text-xs txt-secondary">{{ $t('widgets.appearance') }}</p>
@@ -713,9 +708,21 @@ const sanitizedPreviewUrl = computed(() => {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`
 })
 
+// Sentinel value for the "Standard sorting" choice (no fixed prompt). Must match
+// WidgetService::STANDARD_SORTING_TOPIC on the backend.
+const STANDARD_SORTING = '__standard__'
+
 // Filter out system prompts - only show custom prompts for widgets
 const customTaskPrompts = computed(() => {
   return taskPrompts.value.filter((prompt) => !prompt.isDefault)
+})
+
+// Human-readable label for the review/summary step.
+const taskPromptLabel = computed(() => {
+  const topic = formData.value.taskPromptTopic
+  if (!topic) return '-'
+  if (topic === STANDARD_SORTING) return t('widgets.standardSorting')
+  return customTaskPrompts.value.find((p) => p.topic === topic)?.name ?? topic
 })
 
 const steps = [
@@ -755,6 +762,17 @@ const formData = ref<WidgetFormData>({
     sessionMode: 'browser',
     privacyPolicyUrl: '',
     dataProcessingAccepted: false,
+    // null = fall back to the i18n default header subtitle in ChatWidget.vue;
+    // wizard users can switch to a custom string or hide via the advanced editor.
+    widgetSubtitle: null,
+    // null = use the i18n default AI sender label ("AI Assistant"). Operators
+    // can override this from the advanced editor (e.g. "Acme Bot").
+    aiAssistantName: null,
+    // Slack human-handoff defaults — surfaced in the advanced editor, not in
+    // the wizard's basic flow (most new widgets won't need this on day one).
+    slackWebhookUrl: '',
+    humanHandoffTriggers: [],
+    humanHandoffButtonEnabled: true,
   },
 })
 

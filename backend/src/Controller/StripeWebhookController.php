@@ -90,14 +90,20 @@ class StripeWebhookController extends AbstractController
                 $this->stripeWebhookSecret
             );
         } catch (\Stripe\Exception\SignatureVerificationException $e) {
-            $this->logger->error('Stripe webhook signature verification failed', [
+            // Client-side rejection: bad signature from a scanner/attacker, a
+            // misconfigured third-party, or a Stripe-side secret rotation that
+            // hasn't reached us yet. None of these warrant `error` (which is
+            // reserved for actionable server-side faults per monolog.yaml).
+            $this->logger->warning('Stripe webhook signature verification failed', [
                 'error' => $e->getMessage(),
                 'ip' => $request->getClientIp(),
             ]);
 
             return $this->json(['error' => 'Invalid signature'], Response::HTTP_BAD_REQUEST);
         } catch (\Exception $e) {
-            $this->logger->error('Stripe webhook error', [
+            // Malformed payload from the caller — same reasoning as above:
+            // it's a 400, not an internal error.
+            $this->logger->warning('Stripe webhook invalid payload', [
                 'error' => $e->getMessage(),
             ]);
 
@@ -150,29 +156,34 @@ class StripeWebhookController extends AbstractController
     }
 
     /**
-     * Rate limiting for webhook endpoint.
+     * Rate limiting for webhook endpoint (fixed window per IP).
+     *
+     * The window start is stored alongside the counter because PSR-6
+     * `save()` does not preserve a previously stored expiry: re-saving a
+     * fetched item without `expiresAfter()` falls back to the pool default
+     * (potentially "forever"), which used to make the counter immortal and
+     * permanently 429 an IP once it ever crossed the limit.
      */
     private function checkRateLimit(Request $request): bool
     {
         $ip = $request->getClientIp() ?? 'unknown';
         $cacheKey = 'stripe_webhook_rate_'.md5($ip);
+        $now = time();
 
         $item = $this->cache->getItem($cacheKey);
+        $state = $item->isHit() ? $item->get() : null;
 
-        if (!$item->isHit()) {
-            $item->set(1);
-            $item->expiresAfter(self::RATE_LIMIT_WINDOW);
-            $this->cache->save($item);
-
-            return true;
+        if (!is_array($state) || !isset($state['count'], $state['reset']) || $state['reset'] <= $now) {
+            $state = ['count' => 0, 'reset' => $now + self::RATE_LIMIT_WINDOW];
         }
 
-        $count = $item->get();
-        if ($count >= self::RATE_LIMIT_MAX) {
+        if ($state['count'] >= self::RATE_LIMIT_MAX) {
             return false;
         }
 
-        $item->set($count + 1);
+        ++$state['count'];
+        $item->set($state);
+        $item->expiresAfter(max(1, $state['reset'] - $now));
         $this->cache->save($item);
 
         return true;

@@ -21,32 +21,16 @@ class PromptCatalog
     /**
      * Return all built-in system prompt definitions.
      *
-     * Topic taxonomy (Synapse Routing v2):
+     * Topic taxonomy:
      *
-     *  Granular routing topics (preferred for embedding-based Tier-1):
-     *    - general-chat        ← smalltalk, lifestyle, coding, technical Q&A, everything that resolves to a chat answer
-     *    - image-generation    ← create/edit images, photos, illustrations
-     *    - video-generation    ← create video clips, animations
-     *    - audio-generation    ← TTS, voice output, audio synthesis
+     *  Routing topics (offered to the AI sorter / DYNAMICLIST):
+     *    - general             ← smalltalk, lifestyle, coding, technical Q&A, everything that resolves to a chat answer
+     *    - mediamaker          ← create/edit images, videos and audio
      *    - docsummary          ← summarize a document or attached file text
      *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents
      *
-     *  Note (#878): the previously dedicated `coding` topic was retired.
-     *  Programming questions overlapped too aggressively with everyday
-     *  chat in the embedding space (any "how do I…" sentence scored close
-     *  to it), pulling routine messages off `general-chat`. Coding now
-     *  rides on `general-chat` and the LLM picks the depth from context.
-     *  The legacy alias `coding` → `general` is retained in
-     *  TopicAliasResolver so older AI-fallback responses still resolve.
-     *
-     *  Legacy canonical topics (still used by downstream handlers; the
-     *  TopicAliasResolver maps the granular topics back to these for
-     *  intent routing and groupKey backwards compatibility):
-     *    - general             ← canonical for general-chat
-     *    - mediamaker          ← canonical for *-generation
-     *
      *  Internal helper prompts (excluded from the routing pool):
-     *    - tools:sort          ← AI fallback classifier (DYNAMICLIST template)
+     *    - tools:sort          ← AI classifier (DYNAMICLIST template)
      *    - tools:enhance       ← message rewriter
      *    - tools:search        ← search query optimizer
      *    - tools:mailhandler   ← email routing
@@ -54,123 +38,25 @@ class PromptCatalog
      *    - tools:memory_*      ← memory extraction/parsing
      *    - tools:feedback_*    ← feedback contradiction checks
      *
-     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string, keywords?: string, enabled?: bool}>
+     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string}>
      */
     public static function all(): array
     {
         return [
             // ──────────────────────────────────────────────
-            //  Legacy canonical topics (kept for backward compat)
+            //  Routing topics
             // ──────────────────────────────────────────────
             [
                 'topic' => 'general',
                 'language' => 'en',
-                'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no granular topic matches.',
-                // Keyword list intentionally broad: when the granular
-                // routing aliases are disabled (the default state), Synapse
-                // v2 embedding recall for chat / lifestyle / programming
-                // queries has to land here, so the canonical row carries
-                // the union of vocabulary that would otherwise be spread
-                // across `general-chat` and friends.
-                'keywords' => 'fallback, default, catch-all, allgemein, frage, question, chat, smalltalk, hello, hi, hallo, talk, conversation, opinion, advice, tip, lifestyle, travel, reise, health, gesundheit, recipe, rezept, recommendation, empfehlung, idea, idee, business, hobby, hobbies, plan, planning, planen, project, projekt, learning, lernen, study, school, university, student, code, coding, programming, programmieren, software, php, python, javascript, typescript, java, kotlin, swift, go, rust, ruby, sql, html, css, vue, react, angular, node, function, class, method, variable, error, fehler, exception, bug, debug, refactor, framework, library, api, rest, graphql, regex, algorithm, terminal, shell, bash, docker, kubernetes, fitness, gym, fitnessstudio, sport, food, essen, drink, getränk, shake, restaurant, shop, store, geschäft, idea for, möchte, will, want to',
+                'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no other topic matches.',
                 'prompt' => self::generalPrompt(),
             ],
             [
                 'topic' => 'mediamaker',
                 'language' => 'en',
-                'shortDescription' => 'Canonical media-generation topic that handles all create/edit requests for images, videos and audio. Prefer the more specific image-generation, video-generation or audio-generation topics for routing; this entry stays as a catch-all and downstream handler key.',
-                'keywords' => 'media generation, mediengenerierung, bild, video, audio, image, picture, photo, sound, voice',
+                'shortDescription' => 'Media-generation topic that handles all create/edit requests for images, videos and audio.',
                 'prompt' => self::mediaMakerPrompt(),
-            ],
-
-            // ──────────────────────────────────────────────
-            //  Granular routing topics (Synapse v2)
-            // ──────────────────────────────────────────────
-            //
-            // The five entries below are aliases of canonical legacy topics
-            // (`general` for chat/coding, `mediamaker` for the *-generation
-            // family — see TopicAliasResolver::TOPIC_ALIASES). They give
-            // Synapse Routing v2's embedding tier a finer-grained taxonomy;
-            // downstream handlers only ever see the canonical topic after
-            // TopicAliasResolver runs.
-            //
-            // Shipped DISABLED (BENABLED=0) so the legacy AI sorter sees
-            // only canonical topics and is not asked to disambiguate
-            // alias-vs-canonical near-duplicates. Admins enable them as a
-            // group via the `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` BCONFIG
-            // toggle; GranularTopicsManager keeps BENABLED in lock-step,
-            // and PromptSeeder re-applies the toggle after every seed so a
-            // re-run cannot clobber an admin-enabled state.
-            [
-                'topic' => 'coding',
-                'language' => 'en',
-                'shortDescription' => 'RETIRED. Coding/programming questions are answered by the general-chat topic.',
-                'keywords' => '',
-                'prompt' => self::generalPrompt(),
-                'enabled' => false,
-            ],
-            [
-                'topic' => 'general-chat',
-                'language' => 'en',
-                // Broadened on purpose (#878): everyday business ideas,
-                // hobbies, planning, smalltalk, programming questions and
-                // technical Q&A all fall here so they can't be sucked into
-                // the much narrower media-generation buckets by a stray
-                // embedding match. The dedicated `coding` topic was
-                // retired for the same reason.
-                'shortDescription' => 'Catch-all conversational topic. Use this for casual conversation, smalltalk, opinions, advice, lifestyle, travel, health, recipes, recommendations, business ideas, planning, hobbies, learning questions, programming and technical questions, debugging help, code review, software architecture, frameworks, libraries, errors and stack traces, and any other question that should be answered with a written reply.',
-                'keywords' => 'chat, smalltalk, hello, hi, hallo, talk, conversation, opinion, advice, tip, lifestyle, travel, reise, health, gesundheit, recipe, rezept, recommendation, empfehlung, frage, question, idea, idee, business, hobby, hobbies, plan, planning, planen, project, projekt, learning, lernen, study, school, university, student, code, coding, programming, programmieren, software, php, python, javascript, typescript, java, kotlin, swift, go, rust, ruby, sql, html, css, vue, react, angular, node, function, class, method, variable, error, fehler, exception, bug, debug, refactor, framework, library, api, rest, graphql, regex, algorithm, terminal, shell, bash, docker, kubernetes, fitness, gym, fitnessstudio, sport, food, essen, drink, getränk, shake, restaurant, shop, store, geschäft, idea for, möchte, will, want to',
-                'prompt' => self::generalPrompt(),
-                'enabled' => false,
-            ],
-            [
-                'topic' => 'image-generation',
-                'language' => 'en',
-                // Tightened (#878): only fire when the user *explicitly*
-                // asks for an image to be CREATED, RENDERED or EDITED.
-                // Bare nouns like "Foto" or "Bild" must not pull general
-                // chat in here — that's why every keyword pair includes
-                // a creation verb.
-                'shortDescription' => 'User explicitly asks to CREATE, GENERATE, RENDER or EDIT an image, picture, illustration, drawing, painting, photo or photo-realistic render from a text prompt and/or reference images. Trigger only when the message contains an explicit creation verb directly addressed at an image (for example "create an image of …", "generate a picture of …", "draw me a …", "render a photo of …", "edit this image so that …", "replace the background with …", "merge these two images"). Do NOT trigger for casual conversation that merely mentions a picture, a photo, an illustration or a "Bild" without a clear creation/edit request, and do NOT trigger for vision/OCR questions about an attached image.',
-                // Every entry below pairs a creation verb with a media
-                // noun (or is a self-contained edit verb). Bare noun
-                // phrases like "bild von" / "foto von" have been removed
-                // — they previously matched perfectly innocuous "ich
-                // habe ein bild von gestern" turns and would also fail
-                // the SynapseRouter media-intent guard anyway, so they
-                // were dead weight (caught by Copilot review on PR #884).
-                'keywords' => 'create an image, create a picture, create a photo, create an illustration, generate an image, generate a picture, make a picture, make an image, draw me, paint a picture, render a photo, render an image, render a picture, retouch this image, edit this image, replace the background, combine these images, merge these images, image to image, illustrate this, erstelle ein bild, erstelle ein foto, erstelle eine illustration, generiere ein bild, generiere ein foto, mache ein bild, male ein bild, male mir, zeichne ein bild, zeichne mir, render ein bild, hintergrund ersetzen, bild bearbeiten, bilder kombinieren',
-                'prompt' => self::mediaMakerPrompt(),
-                'enabled' => false,
-            ],
-            [
-                'topic' => 'video-generation',
-                'language' => 'en',
-                // Heavily tightened (#878). The previous entry pulled in
-                // anything mentioning "Kette", "shake", "Wagon" etc.
-                // because the description leaned on common nouns. This
-                // version only matches messages that *imperatively*
-                // request a video to be produced.
-                'shortDescription' => 'User explicitly asks to GENERATE a video, film, clip, animation, motion graphic or moving image from a prompt. Trigger only when the message contains an explicit creation verb directly addressed at video output (for example "create a video of …", "generate a clip of …", "make a short film of …", "animate …", "render a video of …", "erstelle ein Video von …", "mach mir ein Video von …"). Do NOT trigger for general conversation that merely mentions video, film, clips, YouTube, TV, fitness, hobbies, business ideas or anything else that is not an unambiguous request to render a new video file. Duration and resolution may be specified inside the request.',
-                // Verb+noun pairs only; bare phrases like "kurzes video
-                // von …" have been dropped because they ambiguously
-                // match non-creation turns ("ich habe ein kurzes Video
-                // von gestern") and would fail the media-intent guard
-                // anyway (caught by Copilot review on PR #884).
-                'keywords' => 'create a video, create a clip, create an animation, generate a video, generate a clip, make a video, make a clip, make an animation, render a video, render an animation, animate this, animate the, produce a video, shoot a short video, erstelle ein video, erstelle einen clip, erstelle eine animation, generiere ein video, generiere einen clip, mache ein video, mach mir ein video, mache einen clip, animiere, animiere mir, render ein video, render einen clip, render mir ein video',
-                'prompt' => self::mediaMakerPrompt(),
-                'enabled' => false,
-            ],
-            [
-                'topic' => 'audio-generation',
-                'language' => 'en',
-                // Tightened (#878): only fire on explicit speech-output
-                // requests. Bare nouns like "Stimme" or "Audio" must not
-                // be enough.
-                'shortDescription' => 'User explicitly asks for AUDIO output: text-to-speech, narration, voice synthesis, voiceover or any spoken-audio rendering of provided text. Trigger only when the message contains an explicit speech/audio creation verb (for example "read this aloud", "convert to speech", "create an audio of …", "generate a voiceover saying …", "narrate this text", "vertone …", "lies das vor", "sprich folgenden Text", "erstelle ein Audio mit …"). Do NOT trigger for general conversation that mentions audio, voice, sound, music or podcasts without an unambiguous TTS request.',
-                'keywords' => 'read aloud, read this aloud, read it aloud, convert to speech, text to speech, generate audio of, generate a voiceover, generate a narration, create an audio, create a voiceover, create a narration, narrate this, narrate the following, voiceover saying, voice over saying, speak this, say the following, lies vor, lies das vor, lies dies vor, sprich folgenden text, sprich folgendes, sprich diesen text, erstelle ein audio, erstelle eine vertonung, generiere ein audio, generiere eine vertonung, mache ein audio, vertone, vertone diesen text, vertone folgenden text, vertonen, audio generieren',
-                'prompt' => self::mediaMakerPrompt(),
-                'enabled' => false,
             ],
 
             // ──────────────────────────────────────────────
@@ -183,10 +69,15 @@ class PromptCatalog
                 'prompt' => self::sortPrompt(),
             ],
             [
+                'topic' => 'tools:plan',
+                'language' => 'en',
+                'shortDescription' => 'Multi-task router. Turns a user request into a JSON task plan (a small DAG of capability nodes) for the multi-task routing engine. Answers only in JSON.',
+                'prompt' => self::planPrompt(),
+            ],
+            [
                 'topic' => 'docsummary',
                 'language' => 'en',
                 'shortDescription' => 'The user asks for document summarization with specific options (abstractive, extractive, bullet-points). Direct here when user wants a summary of text or document content.',
-                'keywords' => 'summary, summarize, summarise, zusammenfassung, zusammenfassen, fasse zusammen, abstract, bullet points, key points, executive summary, kurzfassung, tldr, tl;dr, document summary, dokument zusammenfassen',
                 'prompt' => self::docSummaryPrompt(),
             ],
             [
@@ -198,8 +89,7 @@ class PromptCatalog
             [
                 'topic' => 'officemaker',
                 'language' => 'en',
-                'shortDescription' => 'The user asks for the generation of an Excel, Powerpoint or Word document. Not for any other format. This prompt can only handle the generation of ONE document with a clear prompt.',
-                'keywords' => 'excel, xlsx, spreadsheet, tabellenkalkulation, csv, word, docx, document, dokument, powerpoint, pptx, presentation, praesentation, slide, folie, sheet, tabelle, office document, office datei, generate excel, erstelle excel, create spreadsheet, create document, dokument erstellen',
+                'shortDescription' => 'The user asks to generate OR to modify/reformat a single Excel, PowerPoint or Word document (CSV, XLSX, DOCX, PPTX). This includes follow-up requests that change the content or formatting of a document the assistant generated earlier in the same conversation (e.g. "make the title bold/bigger in the file", "add a column", "change the document"). Not for any other format. Handles exactly ONE document.',
                 'prompt' => self::officeMakerPrompt(),
             ],
             [
@@ -271,17 +161,14 @@ class PromptCatalog
      * Inserts new prompts or updates existing ones matched by (ownerId=0, topic, language).
      * User-created prompts (ownerId>0) are never touched.
      *
-     * Idempotent: re-running the seed updates BSHORTDESC, BPROMPT, BKEYWORDS and
-     * BENABLED for existing system prompts but never touches BSELECTION_RULES so
-     * admins can keep their custom rule overrides.
+     * Idempotent: re-running the seed updates BSHORTDESC and BPROMPT for existing
+     * system prompts but never touches BSELECTION_RULES so admins can keep their
+     * custom rule overrides.
      *
      * @return array{inserted: list<string>, updated: list<string>} topic keys per outcome
      */
     public static function seed(Connection $connection): array
     {
-        $hasKeywordColumn = self::columnExists($connection, 'BPROMPTS', 'BKEYWORDS');
-        $hasEnabledColumn = self::columnExists($connection, 'BPROMPTS', 'BENABLED');
-
         $inserted = [];
         $updated = [];
 
@@ -291,50 +178,17 @@ class PromptCatalog
                 [$prompt['topic'], $prompt['language']]
             );
 
-            $keywords = $prompt['keywords'] ?? null;
-            $enabled = (bool) ($prompt['enabled'] ?? true);
-
             if (false !== $existing) {
-                $sql = 'UPDATE BPROMPTS SET BSHORTDESC = ?, BPROMPT = ?';
-                $params = [$prompt['shortDescription'], $prompt['prompt']];
-
-                if ($hasKeywordColumn) {
-                    $sql .= ', BKEYWORDS = ?';
-                    $params[] = $keywords;
-                }
-                if ($hasEnabledColumn) {
-                    $sql .= ', BENABLED = ?';
-                    $params[] = $enabled ? 1 : 0;
-                }
-
-                $sql .= ' WHERE BID = ?';
-                $params[] = $existing;
-
-                $connection->executeStatement($sql, $params);
+                $connection->executeStatement(
+                    'UPDATE BPROMPTS SET BSHORTDESC = ?, BPROMPT = ? WHERE BID = ?',
+                    [$prompt['shortDescription'], $prompt['prompt'], $existing]
+                );
                 $updated[] = $prompt['topic'];
             } else {
-                $columns = ['BOWNERID', 'BLANG', 'BTOPIC', 'BSHORTDESC', 'BPROMPT'];
-                $placeholders = ['0', '?', '?', '?', '?'];
-                $params = [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']];
-
-                if ($hasKeywordColumn) {
-                    $columns[] = 'BKEYWORDS';
-                    $placeholders[] = '?';
-                    $params[] = $keywords;
-                }
-                if ($hasEnabledColumn) {
-                    $columns[] = 'BENABLED';
-                    $placeholders[] = '?';
-                    $params[] = $enabled ? 1 : 0;
-                }
-
-                $sql = sprintf(
-                    'INSERT INTO BPROMPTS (%s) VALUES (%s)',
-                    implode(', ', $columns),
-                    implode(', ', $placeholders)
+                $connection->executeStatement(
+                    'INSERT INTO BPROMPTS (BOWNERID, BLANG, BTOPIC, BSHORTDESC, BPROMPT) VALUES (0, ?, ?, ?, ?)',
+                    [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']]
                 );
-
-                $connection->executeStatement($sql, $params);
                 $inserted[] = $prompt['topic'];
             }
         }
@@ -342,54 +196,55 @@ class PromptCatalog
         return ['inserted' => $inserted, 'updated' => $updated];
     }
 
-    private static function columnExists(Connection $connection, string $table, string $column): bool
-    {
-        try {
-            $sm = $connection->createSchemaManager();
-            if (!$sm->tablesExist([$table])) {
-                return false;
-            }
-
-            foreach ($sm->listTableColumns($table) as $col) {
-                if (0 === strcasecmp($col->getName(), $column)) {
-                    return true;
-                }
-            }
-        } catch (\Throwable) {
-            // Fall through to false
-        }
-
-        return false;
-    }
-
     private static function generalPrompt(): string
     {
         return <<<'PROMPT'
-# Your purpose
-You are a helpful assistant with various interfaces to other AI applications.
-You receive messages from users around the world via WhatsApp, GMail, and other channels.
+# Synaplan general chat assistant
 
-Your task is to provide helpful, accurate, and contextual responses to user questions.
+You answer the user's question. That's it. Be direct, accurate, and on-point.
 
-## Guidelines
+## Hard rules (non-negotiable)
 
-1. Analyze the user's intent from their message text and conversation history.
+1. NEVER fabricate a download link, file URL, attachment, or any reference to
+   a file that does not actually exist in this turn. Do NOT write fake URLs
+   like `https://files.example.com/...`, `https://example.com/...mp3`,
+   `/uploads/...`, blob URLs, or "click here to download". If you cannot
+   produce a real file in this turn, you MUST say so plainly.
 
-2. Provide clear, direct answers in the user's language.
+2. NEVER claim you have done something you did not do. Do NOT write phrases
+   like "I have recorded", "I have attached", "Here is the MP3", "I have
+   saved the file", "Here is the audio", "Du kannst die MP3 hier anhören",
+   or any equivalent in any language, unless a real file is genuinely being
+   delivered with this reply (in which case the system attaches it — you
+   never write the URL yourself).
 
-3. If the user asks for current information that you don't have (news, prices, weather, recent events):
-   - Clearly state you need to search for this information
-   - The system will automatically trigger a web search
+3. If the user asks for an MP3, audio, image, video, document, spreadsheet,
+   slide deck, calendar invite, or any file output, you are NOT the right
+   tool to deliver it. Reply briefly in the user's language with: "I can
+   write the text for you, but to deliver it as <format> I need to use the
+   <format> generator — please rephrase as 'create/generate ...' so the
+   request goes to the right tool." Then stop. Do NOT pretend to attach
+   anything.
 
-4. If files are attached to the message:
-   - The extracted text/description is available in your context
-   - Reference and use this information in your response
+4. If the user asks for current information you don't have (news, prices,
+   weather, recent events), say so plainly. The system handles web search
+   separately.
 
-5. Be conversational and helpful, adapting your tone to the user's style.
+5. Use information from attached files only when it is in your context.
+   Never invent file contents.
 
-6. Provide complete answers without requiring JSON formatting.
+6. Answer in the user's language. If the directive at the bottom of the
+   system prompt names a language, follow it exactly.
 
-**Respond with plain text directly to the user. No JSON formatting required.**
+## Style
+
+- Direct. On-point. No filler ("Of course!", "Certainly!", "Great question!").
+- Short paragraphs. Use markdown for structure (lists, bold) when it helps;
+  plain prose when it doesn't.
+- No JSON, no code fences around your answer text.
+- No meta-commentary about being an AI, your limitations, or your training.
+
+Respond with plain text directly to the user.
 PROMPT;
     }
 
@@ -548,6 +403,200 @@ Do not add any additional text beyond the JSON.
 Only send the JSON object.
 
 Update the JSON values and answer with the JSON, you received.
+PROMPT;
+    }
+
+    private static function planPrompt(): string
+    {
+        return <<<'PROMPT'
+# Multi-Task Planner
+
+Turn the user's request into a JSON task plan: a DAG of capability nodes.
+Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
+
+## Output schema (exactly this shape)
+
+{
+  "version": 1,
+  "language": "<2-letter code, e.g. en, de>",
+  "reply_node": "<id of the node whose output is the user-facing reply>",
+  "tasks": [
+    {
+      "id": "n1",
+      "capability": "<one capability from the list below>",
+      "depends_on": ["<id of a node this one consumes>", ...],
+      "inputs": { "<name>": "<literal | $message.text | $message.files | $nX.text | $nX.file>" },
+      "params": { "<knob>": <value> }
+    }
+  ]
+}
+
+## Hard rules (non-negotiable)
+
+1. Output is JSON. Nothing else. No ```json, no comments, no trailing prose.
+2. Node ids are unique ("n1", "n2", …). `depends_on` MUST reference existing
+   ids and MUST NOT form a cycle.
+3. A node that consumes another node's output lists it in `depends_on` and
+   reads it via `$<id>.text` or `$<id>.file`.
+4. NEVER invent file paths, URLs, attachments, or "I have recorded/attached/
+   saved" text. The ONLY way a file reaches the user is as the `file` output
+   of a generator node (text2sound, image_generation, video_generation,
+   document_generation, calendar_event), surfaced through `compose_reply`.
+5. If the user asks for output the capability list cannot produce (e.g. a real
+   PDF, a phone call), use a single `chat` node and tell them plainly what is
+   not possible. Do NOT pretend.
+6. Plans are MINIMAL but COMPLETE. Most messages are 1 node. Combo requests
+   ("write X AND read it as MP3", "summarize AND email", "translate AND speak")
+   are ALWAYS multi-node — never collapse them into a single chat node.
+7. SCOPE each node's input to ITS OWN sub-task. For content nodes (chat,
+   summarize, translate) set `inputs.text` to a literal instruction in the
+   user's language containing ONLY that node's part of the request — STRIP the
+   clauses handled by sibling nodes. Example: for "Schreib mir ein Gedicht und
+   lies es als MP3 vor", the chat node's text is "Schreib mir ein Gedicht."
+   (NOT the whole sentence), and the text2sound node consumes `$n1.text`. Only
+   use `$message.text` when the entire message is that single node's job.
+
+## Capabilities (use ONLY these)
+
+[CAPABILITYLIST]
+
+## Task topics available for `chat` nodes
+
+When the request maps to one of these task topics, use capability `chat` and
+put the topic key in `params.topic_id`:
+
+[DYNAMICLIST]
+
+Allowed topic keys: [KEYLIST]
+
+## Routing decisions (apply in order)
+
+1. Combo / multi-step request → multi-node DAG ending in `compose_reply`.
+   Detect with conjunctions: "and", "und", "et", "y", "e" linking a CONTENT
+   verb (write, schreibe, erstelle, generate, summarize, translate) with an
+   OUTPUT verb (read aloud, vorlesen, als MP3, email, speak, vertonen,
+   convert to speech, narrate, podcast, tabelle, docx).
+2. Audio / TTS / "read aloud" / "vorlesen" / "MP3" / "narrate" / "speech" →
+   `text2sound` node. If the user also asks for content to be generated
+   first ("write X and read it"), GENERATE the content in a prior `chat`
+   node, then feed `$nX.text` into `text2sound`.
+3. Image generate/edit → `image_generation`.
+4. Video generate → `video_generation`. Put `duration` (4|6|8) and
+   `resolution` ("720p"|"1080p"|"4K") in `params` only when the user
+   specified them.
+5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
+   chat). Real PDFs are NOT supported — say so in a single `chat` node.
+6. Question about an attached document/image (read, describe, extract,
+   summarize what's in it) → `file_analysis` (or `extract_text` →
+   `summarize`).
+7. Meeting / appointment / calendar event ("set up a meeting", "mail me a
+   meeting note for tomorrow 15:00 with Tom") → one `calendar_event` node.
+   Resolve the relative time against the time context into an absolute
+   ISO-8601 `start` + IANA `timezone`, fill title/attendees/location/duration.
+8. "Mail it to me" / "email me the result" / "schick es mir per Mail" →
+   ADD one `email_me` node that depends on the content nodes and consumes
+   their outputs (`text` + `attachments`). ONLY when the user EXPLICITLY
+   asks for the result by email — never infer it. The reply is still shown
+   in chat: `reply_node` stays the `compose_reply` (or content) node, NEVER
+   the `email_me` node. (Exception: a meeting invite alone → rule 7.)
+9. Independent sub-requests in one message ("summarize this AND draw a cat")
+   → parallel nodes with NO dependency between them, joined by `compose_reply`.
+10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
+   node, no `compose_reply` needed.
+
+## Canonical multi-step examples (MEMORIZE these patterns)
+
+### Poem written by you, then read as MP3
+User: "Schreib mir ein Liebesgedicht und lies es mir als MP3 vor."
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "chat", "inputs": { "text": "Schreib mir ein Liebesgedicht." }, "params": { "topic_id": "general" } },
+    { "id": "n2", "capability": "text2sound", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "format": "mp3" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n1.text", "attachments": ["$n2.file"] } }
+  ]
+}
+
+Note how the chat node's input is the SCOPED instruction "Schreib mir ein
+Liebesgedicht." — the "und lies es mir als MP3 vor" clause is dropped because
+the text2sound node handles it.
+
+### Document → short MP3 summary
+User: sends report.docx and writes "What's in there? Summarize it into a short MP3."
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n4",
+  "tasks": [
+    { "id": "n1", "capability": "extract_text", "inputs": { "files": "$message.files" } },
+    { "id": "n2", "capability": "summarize", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "style": "short" } },
+    { "id": "n3", "capability": "text2sound", "depends_on": ["n2"], "inputs": { "text": "$n2.text" }, "params": { "format": "mp3" } },
+    { "id": "n4", "capability": "compose_reply", "depends_on": ["n2","n3"], "inputs": { "text": "$n2.text", "attachments": ["$n3.file"] } }
+  ]
+}
+
+### Pure speech ("read this aloud: Hello world")
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "text2sound", "inputs": { "text": "Hello world" }, "params": { "format": "mp3" } }
+  ]
+}
+
+### Poem + MP3 + image, mailed to the user
+User: "Write a spring poem, read it aloud and make a fitting image with it. Mail it to me."
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n5",
+  "tasks": [
+    { "id": "n1", "capability": "chat", "inputs": { "text": "Write a spring poem." }, "params": { "topic_id": "general" } },
+    { "id": "n2", "capability": "text2sound", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "format": "mp3" } },
+    { "id": "n3", "capability": "image_generation", "depends_on": ["n1"], "inputs": { "prompt": "$n1.text" } },
+    { "id": "n4", "capability": "email_me", "depends_on": ["n1","n2","n3"], "inputs": { "text": "$n1.text", "attachments": ["$n2.file","$n3.file"] } },
+    { "id": "n5", "capability": "compose_reply", "depends_on": ["n1","n2","n3"], "inputs": { "text": "$n1.text", "attachments": ["$n2.file","$n3.file"] } }
+  ]
+}
+
+The `email_me` node is an EXTRA side-channel sink — `compose_reply` does NOT
+depend on it (a failed mail must never kill the chat reply), and `reply_node`
+is still the `compose_reply` node so the chat shows everything. Without the
+explicit "Mail it to me" the plan would be identical MINUS the `email_me` node.
+
+### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
+The event fields go in `params`. Resolve the relative time against the time
+context into an absolute ISO-8601 local `start` + IANA `timezone`.
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n2",
+  "tasks": [
+    { "id": "n1", "capability": "calendar_event", "params": { "title": "Meeting with Sanam", "start": "2026-06-10T09:00:00", "timezone": "UTC", "duration_minutes": 60, "attendees": ["Sanam"] } },
+    { "id": "n2", "capability": "compose_reply", "depends_on": ["n1"], "inputs": { "text": "Here is your meeting invite for tomorrow at 09:00 with Sanam.", "attachments": ["$n1.file"] } }
+  ]
+}
+
+### Plain question
+User: "Wer bist du?"
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "general" } }
+  ]
+}
+
+Output ONLY the JSON object.
 PROMPT;
     }
 
@@ -748,13 +797,20 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
 
 ## Supported Formats
 
-1. **CSV** (.csv):
-   - Use comma-separated values
+1. **CSV** (.csv) and **Excel** (.xlsx):
+   - Provide BFILETEXT as comma-separated values (CSV), even for .xlsx
    - First row should contain headers
    - Each subsequent row is a data record
    - Example: "Name,Age\nJohn,25\nJane,30"
 
-2. **Markdown/Text** (.md, .txt):
+2. **Word** (.docx):
+   - Provide BFILETEXT as Markdown (headings with #, **bold**, lists, tables)
+   - The server converts this Markdown into a real Word document
+
+3. **PowerPoint** (.pptx):
+   - Provide BFILETEXT as Markdown; each top-level heading (#) starts a new slide
+
+4. **Markdown/Text** (.md, .txt):
    - For simple text documents
    - Use markdown formatting when appropriate
 
@@ -764,6 +820,28 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
 - For tables/spreadsheets: Include headers and at least 5-10 sample rows
 - For documents: Include proper sections, headings, and formatted text
 - Use appropriate formatting for the file type
+
+## Editing a document from earlier in the conversation
+
+This is a frequent case — handle it carefully. The conversation contains the
+current content of the document, shown either as the user's original text or as
+a block labeled "Current content of the file you previously generated".
+
+When the user asks to change, add to, or reformat that document
+(e.g. "make the title bold/bigger", "add a column", "insert a heading"):
+- START from the existing content. Keep ALL parts the user did not ask to change
+  exactly as they are.
+- Apply EXACTLY the requested change and nothing else.
+- Output the COMPLETE updated document in BFILETEXT. NEVER return only the
+  changed part, and NEVER return the unchanged original — the result must
+  visibly contain the requested change.
+- Keep the same BFILEPATH filename as before.
+- Express all formatting as Markdown in BFILETEXT: `# Title` for a large, bold
+  heading, `**bold**`, `*italic*`, `-` for lists, and Markdown tables.
+
+Example — user says "add a bold, bigger title 'Report' to the file" and the
+current content is "Some body text.":
+{"BFILEPATH":"report.docx","BFILETEXT":"# Report\n\nSome body text."}
 
 ## Example Output
 

@@ -4,6 +4,8 @@ namespace App\Service;
 
 use Parsedown;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 use Symfony\Contracts\Translation\TranslatorInterface;
@@ -24,6 +26,37 @@ final readonly class InternalEmailService
         private TranslatorInterface $translator,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Send with ONE retry on transient transport failures.
+     *
+     * In long-running processes (FrankenPHP workers, messenger consumers) the
+     * SMTP connection is kept open between sends. AWS SES closes connections
+     * idle for ~10s — a hard limit below Symfony's default 100s ping threshold
+     * — so the next send on a reused connection fails with
+     * "451 4.4.2 Timeout waiting for data from client." even though nothing is
+     * wrong with the message. A failed attempt resets the transport's idle
+     * clock, which makes the retry NOOP-ping first, detect the dead socket and
+     * reconnect — so a single retry reliably recovers.
+     *
+     * Permanent SMTP rejections (5xx) are NOT retried.
+     */
+    private function sendWithRetry(Email $email): void
+    {
+        try {
+            $this->mailer->send($email);
+        } catch (TransportExceptionInterface $e) {
+            if ($e instanceof UnexpectedResponseException && $e->getCode() >= 500) {
+                throw $e;
+            }
+
+            $this->logger->warning('Transient mail transport failure, retrying once on a fresh connection', [
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->mailer->send($email);
+        }
     }
 
     /**
@@ -49,7 +82,7 @@ final readonly class InternalEmailService
             ], $locale));
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Verification email sent', ['to' => $to, 'locale' => $locale]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send verification email', [
@@ -83,7 +116,7 @@ final readonly class InternalEmailService
             ], $locale));
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Password reset email sent', ['to' => $to, 'locale' => $locale]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send password reset email', [
@@ -116,7 +149,7 @@ final readonly class InternalEmailService
             ], $locale));
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Welcome email sent', ['to' => $to, 'locale' => $locale]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send welcome email', [
@@ -152,6 +185,7 @@ final readonly class InternalEmailService
         ?string $attachmentPath = null,
         ?string $originalRecipient = null,
         ?string $mediaType = null,
+        ?array $additionalAttachmentPaths = null,
     ): void {
         $fallbackAddress = $_ENV['SMART_EMAIL_ADDRESS'] ?? \App\Service\Email\SmartEmailHelper::getBaseAddress();
         $smartAddress = ($originalRecipient && \App\Service\Email\SmartEmailHelper::isValidSmartAddress($originalRecipient))
@@ -237,8 +271,17 @@ final readonly class InternalEmailService
             }
         }
 
+        // Multi-task routing (Sprint 5): attach any additional output files
+        // beyond the primary one. Single-file turns pass null here, so behaviour
+        // is unchanged.
+        foreach ($additionalAttachmentPaths ?? [] as $extraPath) {
+            if (is_string($extraPath) && '' !== $extraPath && file_exists($extraPath)) {
+                $email->attachFromPath($extraPath);
+            }
+        }
+
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('AI response email sent', [
                 'to' => $to,
                 'subject' => $subject,
@@ -253,6 +296,92 @@ final readonly class InternalEmailService
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Send a multi-task ("email_me" DAG node) result email to the account owner.
+     *
+     * Mirrors {@see sendAiResponseEmail()}: markdown body → HTML via Parsedown,
+     * the FIRST image attachment is embedded inline (CID) for broad client
+     * compatibility, every other file is attached as a regular MIME part.
+     *
+     * @param string                                        $to          Recipient (account owner) address
+     * @param string                                        $subject     Localized subject (caller resolves the locale)
+     * @param string                                        $markdown    Result text in markdown
+     * @param list<array{path: string, type?: string|null}> $attachments Absolute file paths (+ optional media kind)
+     */
+    public function sendTaskResultEmail(string $to, string $subject, string $markdown, array $attachments = []): void
+    {
+        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
+
+        $parsedown = new \Parsedown();
+        $parsedown->setSafeMode(true); // Prevent XSS
+        $htmlBody = $parsedown->text($markdown);
+
+        // Split attachments: first image becomes the inline (CID) hero image.
+        $inlineImagePath = null;
+        $regularPaths = [];
+        foreach ($attachments as $attachment) {
+            $path = $attachment['path'];
+            if ('' === $path || !file_exists($path)) {
+                continue;
+            }
+            if (null === $inlineImagePath && $this->isImageAttachment($path, $attachment['type'] ?? null)) {
+                $inlineImagePath = $path;
+            } else {
+                $regularPaths[] = $path;
+            }
+        }
+
+        if (null !== $inlineImagePath) {
+            $htmlBody .= '<br><br><img src="cid:generated-image" alt="Generated image" style="max-width: 100%; border-radius: 8px;">';
+        }
+
+        $htmlBody .= '<br><br><div style="font-size: 11px; color: #888888; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0;">'
+            .'<a href="https://www.synaplan.com/" style="color: #888888;">www.synaplan.com</a></div>';
+
+        $email = (new Email())
+            ->from(sprintf('%s <%s>', $fromName, $fromEmail))
+            ->to($to)
+            ->subject($subject)
+            ->text($markdown)
+            ->html($htmlBody);
+
+        if (null !== $inlineImagePath) {
+            $email->embedFromPath($inlineImagePath, 'generated-image');
+        }
+        foreach ($regularPaths as $path) {
+            $email->attachFromPath($path);
+        }
+
+        try {
+            $this->sendWithRetry($email);
+            $this->logger->info('Task result email sent', [
+                'to' => $to,
+                'attachment_count' => count($attachments),
+                'has_inline_image' => null !== $inlineImagePath,
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to send task result email', [
+                'to' => $to,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Whether an attachment should be treated as an embeddable image — by
+     * descriptor type first, file extension as fallback.
+     */
+    private function isImageAttachment(string $path, ?string $type): bool
+    {
+        if (is_string($type) && 'image' === strtolower($type)) {
+            return true;
+        }
+
+        return in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['png', 'jpg', 'jpeg', 'gif', 'webp'], true);
     }
 
     /**
@@ -305,7 +434,7 @@ final readonly class InternalEmailService
             ->html($html);
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Embedding fallback warning email sent', ['to' => $adminEmail]);
         } catch (\Exception $e) {
             $this->logger->warning('Failed to send embedding fallback warning email', [

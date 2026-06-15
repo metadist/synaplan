@@ -148,6 +148,59 @@ export interface Message {
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   processingStatus?: string
   processingMetadata?: Record<string, unknown> | null
+  // Multitask routing: live task-card state while a multi-node plan streams.
+  // Only set when a `plan` SSE event arrives (multi-node turns). On reload the
+  // turn is flattened (text + media parts), so this is a streaming-time affordance.
+  taskPlan?: TaskPlanState | null
+  // Multitask routing: true when this assistant turn ran the DAG executor.
+  // Persisted server-side (`multitask` meta), so it survives reloads — used to
+  // show the simple "Again" (full re-plan) instead of "Again with…".
+  wasMultitask?: boolean
+}
+
+export const TASK_CARD_KINDS = [
+  'text',
+  'image',
+  'video',
+  'audio',
+  'document',
+  'search',
+  'extract',
+  'email',
+] as const
+export type TaskCardKind = (typeof TASK_CARD_KINDS)[number]
+
+export const TASK_CARD_STATES = ['pending', 'running', 'done', 'failed', 'skipped'] as const
+export type TaskCardState = (typeof TASK_CARD_STATES)[number]
+
+/** Runtime guards for values arriving over SSE — never trust the wire. */
+export function isTaskCardKind(value: unknown): value is TaskCardKind {
+  return typeof value === 'string' && (TASK_CARD_KINDS as readonly string[]).includes(value)
+}
+
+export function isTaskCardState(value: unknown): value is TaskCardState {
+  return typeof value === 'string' && (TASK_CARD_STATES as readonly string[]).includes(value)
+}
+
+export interface TaskCard {
+  nodeId: string
+  capability: string
+  kind: TaskCardKind
+  state: TaskCardState
+  text?: string
+  url?: string
+  mediaType?: string
+  // Failure details from the `task_update` SSE event (failed/skipped states).
+  error?: string
+  // Resolved generation prompt of a failed media node — payload for the
+  // "retry this step with the next model" action.
+  prompt?: string
+}
+
+export interface TaskPlanState {
+  active: boolean
+  replyNode: string
+  cards: TaskCard[]
 }
 
 /** Attachment row from chat messages API */
@@ -179,6 +232,7 @@ interface ApiLoadedMessageRow {
   aiModels?: Message['aiModels']
   webSearch?: Message['webSearch']
   searchResults?: Message['searchResults']
+  multitask?: boolean
   file?: { path: string; type: string }
   files?: ApiLoadedAttachmentFile[]
 }
@@ -585,6 +639,7 @@ export const useHistoryStore = defineStore('history', () => {
             aiModels: m.aiModels || null,
             webSearch: m.webSearch || null,
             searchResults: m.searchResults || null,
+            wasMultitask: m.multitask === true,
             tool: toolData,
           }
         })

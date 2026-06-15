@@ -9,7 +9,7 @@ use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
-use App\Service\File\FileHelper;
+use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\MemoryExtractionDispatcher;
@@ -52,6 +52,7 @@ class StreamController extends AbstractController
         private PromptService $promptService,
         private MessageForwardingService $messageForwardingService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
+        private DocumentGeneratorService $documentGenerator,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
     ) {
@@ -141,6 +142,13 @@ class StreamController extends AbstractController
         required: false,
         description: 'ID of a specific prompt to use. Takes precedence over promptTopic. The prompt must belong to the current user or be a system prompt.',
         schema: new OA\Schema(type: 'integer', example: 42)
+    )]
+    #[OA\Parameter(
+        name: 'ragGroupKey',
+        in: 'query',
+        required: false,
+        description: 'Knowledge-base folder (file group key) to scope this message\'s RAG retrieval to. Use GET /api/v1/files/groups to list available folders.',
+        schema: new OA\Schema(type: 'string', example: 'project:helios')
     )]
     #[OA\Response(
         response: 200,
@@ -281,6 +289,12 @@ class StreamController extends AbstractController
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
         $promptTopic = $request->query->get('promptTopic');
         $promptId = $request->query->get('promptId');
+        // Typed accessor: `get()` would hand back an array for `ragGroupKey[]=…`,
+        // which then flows into a string-typed processing option and 500s
+        // downstream. `getString()` rejects non-scalar input with a clean 400,
+        // and we normalize the empty string to null so "no folder selected"
+        // behaves the same as an absent parameter.
+        $ragGroupKey = $request->query->getString('ragGroupKey') ?: null;
         $continueMessageId = $request->query->get('continueMessageId');
         // Explicit opt-out from memory loading + extraction (used by public demo via synaplan.com/try-chat)
         $disableMemories = '1' === $request->query->get('disableMemories', '0');
@@ -366,6 +380,14 @@ class StreamController extends AbstractController
             }
         }
 
+        // Approximate user country from the Cloudflare edge geolocation header
+        // (CF-IPCountry). Resolved here, while the Request is in scope, and
+        // forwarded into the processing options so the chat handler can add a
+        // country-only location-awareness line to the system prompt. Country
+        // only by design — it is an imprecise, IP-derived signal. Empty/sentinel
+        // values ("XX" unknown, "T1" Tor) are dropped by the handler.
+        $clientCountry = $request->headers->get('CF-IPCountry');
+
         // StreamedResponse für SSE
         $response = new StreamedResponse();
         $response->headers->set('Content-Type', 'text/event-stream');
@@ -373,7 +395,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -604,6 +626,9 @@ class StreamController extends AbstractController
                     // ExtractMemoriesCommand in `metadata.extraction_payload`
                     // so we can fire it after the flush.
                     'defer_memory_extraction' => true,
+                    // Approximate country (Cloudflare CF-IPCountry header) for the
+                    // location-awareness line appended to the chat system prompt.
+                    'client_country' => $clientCountry,
                 ];
 
                 if ($isWidgetMode || $isGuestMode || $disableMemories) {
@@ -642,6 +667,9 @@ class StreamController extends AbstractController
                         'task_prompt' => $fixedTaskPromptTopic,
                     ]);
                 }
+
+                // User-selected knowledge-base folder (RAG group) from the chat composer.
+                $processingOptions = $this->applyRagGroupKey($processingOptions, $isWidgetMode, $ragGroupKey);
 
                 // Resolve the chat model that ChatHandler will eventually pick. We mirror its
                 // priority order (Again → override → fixed-prompt metadata → DB default) so the
@@ -1029,6 +1057,26 @@ class StreamController extends AbstractController
                     ]);
                 }
 
+                // Multi-task routing (Sprint 3b): a multi-node plan can produce
+                // MORE than one output file. Only the task-plan executor sets
+                // metadata['files'] (legacy handlers never do), so the single-file
+                // path above is unchanged. The first file is already surfaced via
+                // metadata['file']; here we surface the remaining files and
+                // persist every File entity the reload path needs (issue #1055).
+                $taskFileEntities = [];
+                if (isset($response['metadata']['files']) && is_array($response['metadata']['files'])) {
+                    foreach (array_values($response['metadata']['files']) as $idx => $taskFile) {
+                        if (0 === $idx || !is_array($taskFile) || empty($taskFile['path'])) {
+                            continue;
+                        }
+                        $this->sendSSE('file', [
+                            'type' => is_string($taskFile['type'] ?? null) ? $taskFile['type'] : 'file',
+                            'url' => $taskFile['path'],
+                        ]);
+                    }
+                    $taskFileEntities = $this->persistTaskPlanFiles($response['metadata']['files'], $user->getId());
+                }
+
                 if (isset($response['metadata']['links'])) {
                     $this->sendSSE('links', [
                         'links' => $response['metadata']['links'],
@@ -1137,6 +1185,15 @@ class StreamController extends AbstractController
                         $outgoingMessage->addFile($generatedFile);
                         $this->em->flush();
                     }
+
+                    // Attach multi-task output files (Sprint 3b) so they
+                    // appear in history (getFiles()/files[]) after a reload.
+                    if ([] !== $taskFileEntities) {
+                        foreach ($taskFileEntities as $taskFileEntity) {
+                            $outgoingMessage->addFile($taskFileEntity);
+                        }
+                        $this->em->flush();
+                    }
                 }
 
                 $this->logger->info('StreamController: Saving model metadata', [
@@ -1177,6 +1234,13 @@ class StreamController extends AbstractController
                 }
                 if (!empty($response['metadata']['media_type'])) {
                     $outgoingMessage->setMeta('media_type', $response['metadata']['media_type']);
+                }
+
+                // Multi-task routing: mark the OUT message as a DAG turn so the
+                // frontend can offer the simple "Again" (full re-plan) instead of
+                // the single-model "Again with…" after a reload.
+                if (!empty($response['metadata']['multitask'])) {
+                    $outgoingMessage->setMeta('multitask', '1');
                 }
 
                 $this->persistOriginalMediaMeta(
@@ -1838,6 +1902,11 @@ class StreamController extends AbstractController
             // badge and the right capability for the Again dropdown.
             $this->persistOriginalMediaMeta($outgoingMessage, $classification, $metadata);
 
+            // Mirror the streaming branch: flag DAG turns for the history API.
+            if (!empty($metadata['multitask'])) {
+                $outgoingMessage->setMeta('multitask', '1');
+            }
+
             if (!empty($options['web_search'])) {
                 $message->setMeta('web_search_enabled', 'true');
             }
@@ -1961,6 +2030,33 @@ class StreamController extends AbstractController
         }
 
         $this->memoryExtractionDispatcher->dispatch($payload);
+    }
+
+    /**
+     * Scope this turn's RAG retrieval to a user-selected knowledge-base
+     * folder (file group key) picked in the chat composer.
+     *
+     * Widget mode must never honour a caller-supplied group key: the widget
+     * is locked to its own configuration, so an embedded page cannot widen
+     * or redirect retrieval by sending `ragGroupKey`. An empty/absent key is
+     * a no-op (default, unscoped retrieval).
+     *
+     * @param array<string, mixed> $processingOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function applyRagGroupKey(array $processingOptions, bool $isWidgetMode, ?string $ragGroupKey): array
+    {
+        if ($isWidgetMode || empty($ragGroupKey)) {
+            return $processingOptions;
+        }
+
+        $processingOptions['rag_group_key'] = $ragGroupKey;
+        $this->logger->info('StreamController: Scoping RAG to user-selected group', [
+            'rag_group_key' => $ragGroupKey,
+        ]);
+
+        return $processingOptions;
     }
 
     /**
@@ -2200,6 +2296,89 @@ class StreamController extends AbstractController
      * Store AI-generated file in the file system and create File entity
      * Same logic as ChatHandler::storeGeneratedFile.
      */
+    /**
+     * Persist the multi-task output files as File entities so they survive a
+     * page reload — history (`ChatController::getMessages`) serializes only the
+     * Message<->File relation, never the legacy BFILE/BFILEPATH columns.
+     *
+     * The primary file (index 0) also rides the legacy single-file channel,
+     * which the frontend renders inline for image/video/audio on reload —
+     * registering those again would duplicate the media (e.g. a second audio
+     * player). So index 0 is only registered when the legacy channel cannot
+     * render it (document and other types — issue #1055); extra files
+     * (index > 0) are always registered, as before.
+     *
+     * @param array<int|string, mixed> $taskFiles metadata['files'] descriptors from the task-plan executor
+     *
+     * @return list<File>
+     */
+    private function persistTaskPlanFiles(array $taskFiles, int $userId): array
+    {
+        $entities = [];
+
+        foreach (array_values($taskFiles) as $idx => $taskFile) {
+            if (!is_array($taskFile) || empty($taskFile['path'])) {
+                continue;
+            }
+
+            $type = is_string($taskFile['type'] ?? null) ? $taskFile['type'] : '';
+            if (0 === $idx && in_array($type, ['image', 'video', 'audio'], true)) {
+                continue;
+            }
+
+            $entity = $this->registerExistingGeneratedFile(
+                $userId,
+                is_string($taskFile['local_path'] ?? null) ? $taskFile['local_path'] : null,
+                $type,
+            );
+            if ($entity instanceof File) {
+                $entities[] = $entity;
+            }
+        }
+
+        return $entities;
+    }
+
+    /**
+     * Register a File row for an already-on-disk generated file (multi-task
+     * extra output, Sprint 3b). The media/TTS runners save bytes to the user's
+     * upload path; this only records the DB row so the file shows in history and
+     * is access-controlled. Best-effort — never throws.
+     */
+    private function registerExistingGeneratedFile(int $userId, ?string $relativePath, string $type): ?File
+    {
+        if (null === $relativePath || '' === $relativePath) {
+            return null;
+        }
+
+        try {
+            $absolutePath = $this->uploadDir.'/'.$relativePath;
+            $fileSize = is_file($absolutePath) ? (filesize($absolutePath) ?: 0) : 0;
+            $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+
+            $file = new File();
+            $file->setUserId($userId);
+            $file->setFilePath($relativePath);
+            $file->setFileType('' !== $type ? $type : $extension);
+            $file->setFileName(basename($relativePath));
+            $file->setFileSize($fileSize);
+            $file->setFileMime($this->getMimeTypeForExtension($extension));
+            $file->setStatus('generated');
+
+            $this->em->persist($file);
+            $this->em->flush();
+
+            return $file;
+        } catch (\Throwable $e) {
+            $this->logger->warning('StreamController: failed to register multi-task file', [
+                'path' => $relativePath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
     private function storeGeneratedFileInStream(array $fileData, Message $message): ?File
     {
         $userId = $message->getUserId();
@@ -2236,9 +2415,21 @@ class StreamController extends AbstractController
                 }
             }
 
-            // Write file content
-            if (!file_put_contents($absolutePath, $content)) {
-                $this->logger->error('StreamController: Failed to write file', ['path' => $absolutePath]);
+            // Write file content (real OOXML for docx/xlsx/pptx, text otherwise)
+            try {
+                $this->documentGenerator->write($content, $extension, $absolutePath);
+            } catch (\Throwable $e) {
+                $this->logger->error('StreamController: Failed to write file', [
+                    'path' => $absolutePath,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return null;
+            }
+
+            $fileSize = filesize($absolutePath);
+            if (false === $fileSize) {
+                $this->logger->error('StreamController: Failed to read generated file size', ['path' => $absolutePath]);
 
                 return null;
             }
@@ -2252,12 +2443,13 @@ class StreamController extends AbstractController
             $file->setFilePath($relativePath);
             $file->setFileType($extension);
             $file->setFileName($filename);
-            $file->setFileSize(strlen($content));
+            $file->setFileSize($fileSize);
             $file->setFileMime($mimeType);
-            // Only store text content for text-based files (not binary formats)
-            if (FileHelper::isTextBasedMimeType($mimeType)) {
-                $file->setFileText($content);
-            }
+            // Persist the source content (Markdown/CSV/text) the document was
+            // built from — even for binary office formats. It is the document's
+            // text for search and, crucially, lets a later edit transform the
+            // exact current content instead of re-deriving it.
+            $file->setFileText($content);
             $file->setStatus('generated');
 
             $this->em->persist($file);
