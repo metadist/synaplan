@@ -150,7 +150,7 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
         );
     }
 
-    public function findSimilar(int $userId, int $sourceChunkId, int $limit = 10, float $minScore = 0.3): array
+    public function findSimilar(int $userId, int|string $sourceChunkId, int $limit = 10, float $minScore = 0.3): array
     {
         // Get source chunk first
         $source = $this->qdrantClient->getDocument((string) $sourceChunkId);

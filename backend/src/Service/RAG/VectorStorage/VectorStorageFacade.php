@@ -85,7 +85,7 @@ final readonly class VectorStorageFacade implements VectorStorageInterface
         return $storage->search($query);
     }
 
-    public function findSimilar(int $userId, int $sourceChunkId, int $limit = 10, float $minScore = 0.3): array
+    public function findSimilar(int $userId, int|string $sourceChunkId, int $limit = 10, float $minScore = 0.3): array
     {
         return $this->getActiveStorage()->findSimilar($userId, $sourceChunkId, $limit, $minScore);
     }

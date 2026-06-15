@@ -431,7 +431,7 @@ const viewFile = (messageId: number) => {
   showSuccess(t('rag.navigateToFile', { id: messageId }))
 }
 
-const findSimilarDocs = async (chunkId: number) => {
+const findSimilarDocs = async (chunkId: number | string) => {
   try {
     const response = await ragService.findSimilar(chunkId, 5)
     if (response.success && response.results.length > 0) {

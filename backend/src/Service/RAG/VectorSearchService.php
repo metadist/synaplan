@@ -243,19 +243,19 @@ final readonly class VectorSearchService
     }
 
     /**
-     * Find similar documents based on a source message ID.
+     * Find similar documents based on a source chunk ID.
      *
-     * @param int $sourceMessageId Source message to find similar documents for
-     * @param int $userId          User ID for filtering
-     * @param int $limit           Number of results
+     * @param int|string $sourceMessageId Source chunk to find similar documents for (int for MariaDB, string for Qdrant)
+     * @param int        $userId          User ID for filtering
+     * @param int        $limit           Number of results
      *
      * @return array Similar documents
      */
     public function findSimilar(
-        int $sourceMessageId,
+        int|string $sourceMessageId,
         int $userId,
         int $limit = 10,
-        float $minScore = 0.3, // Added minScore parameter to match interface
+        float $minScore = 0.3,
     ): array {
         try {
             $results = $this->vectorStorage->findSimilar($userId, $sourceMessageId, $limit, $minScore);
