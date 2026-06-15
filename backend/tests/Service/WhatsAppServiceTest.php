@@ -1409,6 +1409,128 @@ class WhatsAppServiceTest extends TestCase
         $this->assertStringContainsString('Learn more (https://example.com)', $result);
     }
 
+    // ============================================
+    // Issue #268: markdown fence unwrapping + table conversion
+    // ============================================
+
+    /**
+     * The AI frequently wraps a whole answer in a ```markdown fence when the
+     * user asks for "a clean markdown list/table". WhatsApp renders that fence
+     * as monospace, leaking every #, |, ** to the user. The fence must be
+     * unwrapped and its content converted to WhatsApp formatting.
+     */
+    public function testMarkdownFenceIsUnwrappedAndConverted(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $input = "```markdown\n# Trainingsplan\n\n- **Montag**: Push\n```";
+        $result = $method->invoke($this->service, $input);
+
+        // No leftover fence and no leftover heading hash.
+        $this->assertStringNotContainsString('```', $result);
+        $this->assertStringNotContainsString('#', $result);
+        // Heading became bold, bold became single-asterisk, bullet became •.
+        $this->assertStringContainsString('*Trainingsplan*', $result);
+        $this->assertStringContainsString('• *Montag*: Push', $result);
+    }
+
+    public function testMdFenceAliasIsAlsoUnwrapped(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, "```md\n## Title\n```");
+        $this->assertStringNotContainsString('```', $result);
+        $this->assertStringContainsString('*Title*', $result);
+    }
+
+    /**
+     * Real code fences (python/js/…) must STILL be preserved as monospace —
+     * WhatsApp supports them and developers rely on the formatting.
+     */
+    public function testNonMarkdownFenceIsStillPreserved(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, "```python\nprint('hi')\n```");
+        $this->assertStringContainsString('```', $result);
+        $this->assertStringContainsString("print('hi')", $result);
+        $this->assertStringNotContainsString('python', $result);
+    }
+
+    /**
+     * A GitHub-flavoured table must be flattened into readable
+     * "*Header:* value" blocks instead of leaking raw pipe characters.
+     */
+    public function testMarkdownTableIsConvertedToLabelledRows(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $input = implode("\n", [
+            '| Tag | Fokus | Dauer |',
+            '|--------|-------------------|--------|',
+            '| Montag | Oberkörper – Push | 60 min |',
+            '| Dienstag | Beine | 45 min |',
+        ]);
+
+        $result = $method->invoke($this->service, $input);
+
+        // No raw separator row, no boundary pipes.
+        $this->assertStringNotContainsString('---', $result);
+        $this->assertStringNotContainsString('|', $result);
+        // Each cell is rendered as bold label + value.
+        $this->assertStringContainsString('*Tag:* Montag', $result);
+        $this->assertStringContainsString('*Fokus:* Oberkörper – Push', $result);
+        $this->assertStringContainsString('*Dauer:* 60 min', $result);
+        $this->assertStringContainsString('*Tag:* Dienstag', $result);
+    }
+
+    /**
+     * Tables also appear inside the ```markdown fence the AI produces; the
+     * full pipeline (unwrap → table conversion) must handle the screenshot
+     * from issue #268.
+     */
+    public function testMarkdownTableInsideMarkdownFenceIsConverted(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $input = implode("\n", [
+            '```markdown',
+            '## Wochenübersicht',
+            '| Tag | Fokus |',
+            '|-----|-------|',
+            '| Montag | Push |',
+            '```',
+        ]);
+
+        $result = $method->invoke($this->service, $input);
+
+        $this->assertStringNotContainsString('```', $result);
+        $this->assertStringNotContainsString('|', $result);
+        $this->assertStringContainsString('*Wochenübersicht*', $result);
+        $this->assertStringContainsString('*Tag:* Montag', $result);
+        $this->assertStringContainsString('*Fokus:* Push', $result);
+    }
+
+    /**
+     * A sentence that merely contains a pipe must NOT be mistaken for a table
+     * (no separator row follows it).
+     */
+    public function testPipeSentenceIsNotTreatedAsTable(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $input = 'Use the command foo | grep bar to filter output.';
+        $result = $method->invoke($this->service, $input);
+
+        $this->assertSame($input, $result);
+    }
+
     public function testDuplicateDetectionWhenLockNotAcquired(): void
     {
         // Create lock that cannot be acquired (another process holds it)
