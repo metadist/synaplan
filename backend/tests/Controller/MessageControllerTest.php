@@ -365,6 +365,69 @@ class MessageControllerTest extends WebTestCase
         $this->assertSame('piper-multi', $row['aiModels']['audio']['model']);
     }
 
+    /**
+     * Issue #1070 DAG reload: GET /messages/{id} must return `taskPlan` when the
+     * OUT message has a persisted `task_plan` meta, so the frontend can rebuild
+     * task cards after a page reload.
+     */
+    public function testGetMessageReturnsTaskPlanMeta(): void
+    {
+        $message = new Message();
+        $message->setUserId($this->user->getId());
+        $message->setTrackingId(time() + 5000);
+        $message->setProviderIndex('test');
+        $message->setUnixTimestamp(time());
+        $message->setDateTime(date('YmdHis'));
+        $message->setMessageType('WEB');
+        $message->setTopic('general');
+        $message->setLanguage('en');
+        $message->setText('DAG reply');
+        $message->setDirection('OUT');
+        $message->setStatus('complete');
+        $message->setFile(0);
+
+        $this->em->persist($message);
+        $this->em->flush();
+
+        $taskPlanRender = [
+            'reply_node' => 'n2',
+            'cards' => [
+                ['nodeId' => 'n1', 'capability' => 'summarize', 'kind' => 'text', 'state' => 'done', 'text' => 'Summary here'],
+            ],
+        ];
+
+        $message->setMeta('multitask', '1');
+        $message->setMeta('task_plan', json_encode($taskPlanRender));
+        $this->em->flush();
+
+        $this->client->request(
+            'GET',
+            '/api/v1/messages/'.$message->getId(),
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+            ]
+        );
+
+        $this->assertResponseIsSuccessful();
+
+        $response = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertTrue($response['success']);
+
+        $row = $response['message'];
+        $this->assertTrue($row['multitask']);
+        $this->assertNotNull($row['taskPlan']);
+        $this->assertSame('n2', $row['taskPlan']['reply_node']);
+        $this->assertCount(1, $row['taskPlan']['cards']);
+        $this->assertSame('n1', $row['taskPlan']['cards'][0]['nodeId']);
+        $this->assertSame('summarize', $row['taskPlan']['cards'][0]['capability']);
+        $this->assertSame('text', $row['taskPlan']['cards'][0]['kind']);
+        $this->assertSame('done', $row['taskPlan']['cards'][0]['state']);
+        $this->assertSame('Summary here', $row['taskPlan']['cards'][0]['text']);
+    }
+
     public function testGetMessageOfAnotherUserReturns404(): void
     {
         $otherUser = $this->em->getRepository(User::class)->findOneBy(['mail' => 'admin@synaplan.com']);

@@ -170,11 +170,38 @@ final readonly class MessageApiFormatter
             'webSearch' => $webSearchData, // Web search metadata
             'searchResults' => !empty($searchResultsData) ? $searchResultsData : null, // Actual search results
             'multitask' => $wasMultitask, // True when the turn ran the multi-task DAG
+            // Per-node task-plan render state for reload (issue #1070 — DAG divergence).
+            // Null for non-DAG turns, non-null only on OUT messages of DAG turns.
+            'taskPlan' => $this->decodeTaskPlanMeta($m),
             // Generated content (images, videos, audio from AI)
             'file' => ($m->getFile() && $filePath) ? [
                 'path' => $filePath,
                 'type' => $m->getFileType(),
             ] : null,
         ];
+    }
+
+    /**
+     * Decode the persisted `task_plan` meta into the API shape expected by the
+     * frontend mapper. Returns null for non-DAG messages or if the meta is absent.
+     *
+     * Shape: { reply_node: string, cards: list<{nodeId, capability, kind, state,
+     *          text?, url?, type?, error?}> }
+     *
+     * @return array<string, mixed>|null
+     */
+    private function decodeTaskPlanMeta(Message $m): ?array
+    {
+        $raw = $m->getMeta('task_plan');
+        if (null === $raw || '' === $raw) {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || !isset($decoded['cards']) || !is_array($decoded['cards'])) {
+            return null;
+        }
+
+        return $decoded;
     }
 }

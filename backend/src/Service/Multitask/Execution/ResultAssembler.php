@@ -76,6 +76,45 @@ final class ResultAssembler
             'partial_failure' => $partialFailure,
         ];
 
+        // Persist the per-node render state so the frontend can rebuild the
+        // task cards on reload without another round-trip. Only non-hidden
+        // nodes (uiKind !== 'hidden') produce visible cards — compose_reply
+        // is the assembler and never has its own card.
+        $renderCards = [];
+        foreach ($plan->nodes as $node) {
+            if ('hidden' === $node->capability->uiKind()) {
+                continue;
+            }
+            $nodeResult = $context->getResult($node->id);
+            $nodeStatus = null !== $nodeResult ? $nodeResult->status->value : 'skipped';
+            $card = [
+                'nodeId' => $node->id,
+                'capability' => $node->capability->value,
+                'kind' => $node->capability->uiKind(),
+                'state' => $nodeStatus,
+            ];
+            if (null !== $nodeResult) {
+                if (null !== $nodeResult->text && '' !== $nodeResult->text) {
+                    $card['text'] = $nodeResult->text;
+                }
+                // First file from this node provides the media url/type for the card.
+                $firstFile = $nodeResult->firstFile();
+                if (null !== $firstFile && isset($firstFile['path'])) {
+                    $card['url'] = (string) $firstFile['path'];
+                    $card['type'] = isset($firstFile['type']) ? (string) $firstFile['type'] : $node->capability->uiKind();
+                }
+                if (null !== $nodeResult->error && '' !== $nodeResult->error) {
+                    $card['error'] = $nodeResult->error;
+                }
+            }
+            $renderCards[] = $card;
+        }
+
+        $metadata['task_plan_render'] = [
+            'reply_node' => $plan->replyNode,
+            'cards' => $renderCards,
+        ];
+
         return [
             'content' => $content,
             'files' => $files,

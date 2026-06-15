@@ -88,6 +88,28 @@ test.describe('@ci @multitask Multi-task routing', () => {
       await answerText.first().waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       expect((await answerText.first().innerText()).trim().length).toBeGreaterThan(0)
     })
+
+    await test.step('Assert: task cards are still visible after a page reload (#1070)', async () => {
+      // Before the fix, the persisted row had no card data, so a reload lost the
+      // task-plan bubble entirely — only the compose_reply text remained.
+      await page.reload()
+      const reloadedBubble = chat.conversationBubbles().nth(previousCount)
+      await reloadedBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+
+      const plan = reloadedBubble.locator('[data-testid="task-plan"]')
+      await plan.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+
+      await expect(reloadedBubble.locator('[data-testid="task-card-n1"]')).toHaveAttribute(
+        'data-state',
+        'done',
+        { timeout: TIMEOUTS.STANDARD }
+      )
+      await expect(reloadedBubble.locator('[data-testid="task-card-n2"]')).toHaveAttribute(
+        'data-state',
+        'done',
+        { timeout: TIMEOUTS.STANDARD }
+      )
+    })
   })
 
   /**

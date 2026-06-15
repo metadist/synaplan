@@ -443,6 +443,32 @@ class MessageController extends AbstractController
                                 new OA\Property(property: 'searchResults', type: 'array', nullable: true, items: new OA\Items(type: 'object')),
                                 new OA\Property(property: 'multitask', type: 'boolean'),
                                 new OA\Property(
+                                    property: 'taskPlan',
+                                    type: 'object',
+                                    nullable: true,
+                                    description: 'Per-node render state for DAG turns (null for non-DAG messages). Enables task cards to be rebuilt on reload.',
+                                    properties: [
+                                        new OA\Property(property: 'reply_node', type: 'string'),
+                                        new OA\Property(
+                                            property: 'cards',
+                                            type: 'array',
+                                            items: new OA\Items(
+                                                type: 'object',
+                                                properties: [
+                                                    new OA\Property(property: 'nodeId', type: 'string'),
+                                                    new OA\Property(property: 'capability', type: 'string'),
+                                                    new OA\Property(property: 'kind', type: 'string'),
+                                                    new OA\Property(property: 'state', type: 'string'),
+                                                    new OA\Property(property: 'text', type: 'string', nullable: true),
+                                                    new OA\Property(property: 'url', type: 'string', nullable: true),
+                                                    new OA\Property(property: 'type', type: 'string', nullable: true),
+                                                    new OA\Property(property: 'error', type: 'string', nullable: true),
+                                                ]
+                                            )
+                                        ),
+                                    ]
+                                ),
+                                new OA\Property(
                                     property: 'file',
                                     type: 'object',
                                     nullable: true,

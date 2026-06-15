@@ -1,4 +1,12 @@
-import type { Message, MessageFile, Part } from '@/stores/history'
+import type {
+  Message,
+  MessageFile,
+  Part,
+  TaskPlanState,
+  TaskCardKind,
+  TaskCardState,
+} from '@/stores/history'
+import { isTaskCardKind, isTaskCardState } from '@/stores/history'
 import { extractBTextPayload } from '@/utils/jsonResponse'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
@@ -165,6 +173,20 @@ export interface ApiLoadedMessageRow {
   multitask?: boolean
   file?: { path: string; type: string }
   files?: ApiLoadedAttachmentFile[]
+  /** Per-node render state for DAG turns — present only on OUT messages of DAG turns. */
+  taskPlan?: {
+    reply_node: string
+    cards: Array<{
+      nodeId: string
+      capability: string
+      kind: string
+      state: string
+      text?: string
+      url?: string
+      type?: string
+      error?: string
+    }>
+  } | null
 }
 
 /**
@@ -257,6 +279,47 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     })
   }
 
+  // Rebuild task plan cards from persisted render state (issue #1070 DAG reload).
+  // The card urls are added to a dedup set so we don't also emit them as plain
+  // media parts in the bubble (same dedup logic as reconcileLocalMessage).
+  let taskPlanState: TaskPlanState | null = null
+  const cardMediaUrls = new Set<string>()
+  if (m.taskPlan && m.taskPlan.cards.length > 0) {
+    const cards = m.taskPlan.cards.map((c) => {
+      const kind: TaskCardKind = isTaskCardKind(c.kind) ? c.kind : 'text'
+      const state: TaskCardState = isTaskCardState(c.state) ? c.state : 'skipped'
+      let cardUrl: string | undefined
+      if (c.url) {
+        cardUrl = normalizeMediaUrl(buildUploadUrl(c.url))
+        cardMediaUrls.add(mediaUrlKey(cardUrl))
+      }
+      return {
+        nodeId: c.nodeId,
+        capability: c.capability,
+        kind,
+        state,
+        text: c.text ?? '',
+        url: cardUrl,
+        mediaType: c.type,
+        error: c.error,
+      }
+    })
+    taskPlanState = {
+      active: false,
+      replyNode: m.taskPlan.reply_node,
+      cards,
+    }
+  }
+
+  // Remove any plain-media parts whose URL already appears on a restored card
+  // so the user sees each piece of media exactly once (card is the primary surface).
+  const deduplicatedParts =
+    cardMediaUrls.size > 0
+      ? parts.filter(
+          (p) => !(isMediaPartType(p.type) && p.url && cardMediaUrls.has(mediaUrlKey(p.url)))
+        )
+      : parts
+
   // Reconstruct tool metadata from topic field for user messages
   // Also clean command prefix from message content
   let toolData: { command: string; label: string; icon: string } | null = null
@@ -300,7 +363,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   return {
     id: `backend-${m.id}`,
     role,
-    parts,
+    parts: deduplicatedParts,
     timestamp: new Date(m.timestamp * 1000),
     provider: cleanProvider,
     modelLabel: cleanModelLabel,
@@ -314,6 +377,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     searchResults: m.searchResults || null,
     wasMultitask: m.multitask === true,
     tool: toolData,
+    taskPlan: taskPlanState,
   }
 }
 

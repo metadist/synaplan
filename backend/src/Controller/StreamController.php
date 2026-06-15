@@ -1243,6 +1243,16 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMeta('multitask', '1');
                 }
 
+                // Persist the per-node render state (capabilities, kinds, states,
+                // texts, urls) so the frontend can rebuild task cards on reload
+                // without relying on the live SSE stream (issue #1070).
+                if (!empty($response['metadata']['task_plan_render'])) {
+                    $outgoingMessage->setMeta(
+                        'task_plan',
+                        (string) json_encode($response['metadata']['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
+                    );
+                }
+
                 $this->persistOriginalMediaMeta(
                     $outgoingMessage,
                     $classification,
@@ -1905,6 +1915,14 @@ class StreamController extends AbstractController
             // Mirror the streaming branch: flag DAG turns for the history API.
             if (!empty($metadata['multitask'])) {
                 $outgoingMessage->setMeta('multitask', '1');
+            }
+
+            // Mirror the streaming branch: persist per-node render state for reload.
+            if (!empty($metadata['task_plan_render'])) {
+                $outgoingMessage->setMeta(
+                    'task_plan',
+                    (string) json_encode($metadata['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
+                );
             }
 
             if (!empty($options['web_search'])) {

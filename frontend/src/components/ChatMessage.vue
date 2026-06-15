@@ -392,10 +392,10 @@
             on plain text. Falling back to `${type}-${index}` keeps backward
             compatibility for parts without partId (legacy stored messages).
           -->
-          <!-- Multitask routing: live task cards (only while a multi-node plan
-               streams). On reload the turn is flattened to normal parts below. -->
+          <!-- Multitask routing: show task cards when a plan is active (streaming)
+               or when cards exist from a persisted DAG turn (after reload). -->
           <TaskPlanBubble
-            v-if="taskPlan?.active"
+            v-if="taskPlan && taskPlan.cards.length > 0"
             :plan="taskPlan"
             @retry-task="emit('retryTask', $event)"
           />

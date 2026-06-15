@@ -80,6 +80,95 @@ describe('messageMapper (issue #1070)', () => {
       expect(message.modelLabel).toBe('llama3')
       expect(message.webSearch?.resultsCount).toBe(3)
     })
+
+    it('rebuilds taskPlan cards from persisted render state (DAG reload #1070)', () => {
+      const message = mapApiMessageRow(
+        baseRow({
+          multitask: true,
+          taskPlan: {
+            reply_node: 'n2',
+            cards: [
+              {
+                nodeId: 'n1',
+                capability: 'summarize',
+                kind: 'text',
+                state: 'done',
+                text: 'Summary content',
+              },
+            ],
+          },
+        })
+      )
+
+      expect(message.taskPlan).not.toBeNull()
+      expect(message.taskPlan?.active).toBe(false)
+      expect(message.taskPlan?.replyNode).toBe('n2')
+      expect(message.taskPlan?.cards).toHaveLength(1)
+      expect(message.taskPlan?.cards[0].nodeId).toBe('n1')
+      expect(message.taskPlan?.cards[0].capability).toBe('summarize')
+      expect(message.taskPlan?.cards[0].kind).toBe('text')
+      expect(message.taskPlan?.cards[0].state).toBe('done')
+      expect(message.taskPlan?.cards[0].text).toBe('Summary content')
+    })
+
+    it('rebuilds taskPlan card with media url and normalizes it', () => {
+      const message = mapApiMessageRow(
+        baseRow({
+          multitask: true,
+          taskPlan: {
+            reply_node: 'n2',
+            cards: [
+              {
+                nodeId: 'n1',
+                capability: 'text2sound',
+                kind: 'audio',
+                state: 'done',
+                url: '13/000/tts.mp3',
+                type: 'audio',
+              },
+            ],
+          },
+        })
+      )
+
+      const card = message.taskPlan?.cards[0]
+      expect(card?.url).toBeTruthy()
+      expect(card?.url).toContain('tts.mp3')
+    })
+
+    it('deduplicates card media from flat parts (card is primary surface)', () => {
+      // file.path and the card url point to the same upload — the flat
+      // audio part must be dropped because the card already shows it.
+      const message = mapApiMessageRow(
+        baseRow({
+          multitask: true,
+          file: { path: '13/000/dag_audio.mp3', type: 'audio' },
+          taskPlan: {
+            reply_node: 'n2',
+            cards: [
+              {
+                nodeId: 'n1',
+                capability: 'text2sound',
+                kind: 'audio',
+                state: 'done',
+                url: '13/000/dag_audio.mp3',
+                type: 'audio',
+              },
+            ],
+          },
+        })
+      )
+
+      // The card holds the media; no duplicate flat audio part in the bubble.
+      const audioParts = message.parts.filter((p) => p.type === 'audio')
+      expect(audioParts).toHaveLength(0)
+      expect(message.taskPlan?.cards[0].url).toContain('dag_audio.mp3')
+    })
+
+    it('returns taskPlan: null when taskPlan is absent from the row', () => {
+      const message = mapApiMessageRow(baseRow({ multitask: true }))
+      expect(message.taskPlan).toBeNull()
+    })
   })
 
   describe('reconcileLocalMessage', () => {
@@ -209,6 +298,48 @@ describe('messageMapper (issue #1070)', () => {
       expect(local.topic).toBe('general')
       expect(local.aiModels?.chat?.model).toBe('live-model')
       expect(local.files).toHaveLength(1)
+    })
+
+    it('keeps live taskPlan intact when reconciling (streaming cards must survive)', () => {
+      // During live streaming the local message has an active taskPlan;
+      // reconcileLocalMessage must not overwrite it with the persisted one.
+      const liveTaskPlan = {
+        active: true,
+        replyNode: 'n2',
+        cards: [
+          {
+            nodeId: 'n1',
+            capability: 'summarize',
+            kind: 'text' as const,
+            state: 'done' as const,
+            text: 'Live streamed summary',
+          },
+        ],
+      }
+      const local = localStreamedMessage({ taskPlan: liveTaskPlan, wasMultitask: true })
+      const persisted = mapApiMessageRow(
+        baseRow({
+          multitask: true,
+          taskPlan: {
+            reply_node: 'n2',
+            cards: [
+              {
+                nodeId: 'n1',
+                capability: 'summarize',
+                kind: 'text',
+                state: 'done',
+                text: 'Persisted summary (different)',
+              },
+            ],
+          },
+        })
+      )
+
+      reconcileLocalMessage(local, persisted)
+
+      // Live taskPlan is authoritative during streaming — must stay as-is.
+      expect(local.taskPlan?.active).toBe(true)
+      expect(local.taskPlan?.cards[0].text).toBe('Live streamed summary')
     })
   })
 })
