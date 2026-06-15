@@ -7,6 +7,7 @@ namespace App\Service\Message;
 use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Service\AiResponseSanitizer;
 use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -39,6 +40,18 @@ final readonly class MessageForwardingService
     public function forwardIfNeeded(Chat $chat, string $text): void
     {
         if ('whatsapp' !== $chat->getSource()) {
+            return;
+        }
+
+        // The web chat persists `<think>…</think>` reasoning blocks (rendered
+        // there as a collapsible panel); WhatsApp shows raw text, so the tags
+        // would leak as literal content. Strip them before forwarding (#1067).
+        $text = AiResponseSanitizer::stripForDisplay($text);
+        if ('' === $text) {
+            $this->logger->info('Skipping WhatsApp forward: no visible text left after sanitization', [
+                'chat_id' => $chat->getId(),
+            ]);
+
             return;
         }
 

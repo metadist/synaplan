@@ -23,7 +23,7 @@
 services:
   # Vue.js Frontend
   frontend:
-    image: node:22@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6
+    image: node:22@sha256:2d178f2785b96dfbf62a416ca2e40f50e30150b4ff3320d706f0d96e90600eb3
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -48,7 +48,7 @@ services:
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
-    image: node:22@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6
+    image: node:22@sha256:2d178f2785b96dfbf62a416ca2e40f50e30150b4ff3320d706f0d96e90600eb3
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
@@ -197,7 +197,7 @@ services:
   # /centrifugo/api/* so the browser connects same-origin. Auth via short-lived
   # JWTs minted by the PHP backend.
   centrifugo:
-    image: centrifugo/centrifugo:v6.4.0@sha256:fdc0a9f29bb300578e41263f1084108cca50113837f7c09b4c803ec0eb0ade4f
+    image: centrifugo/centrifugo:v6.8.2@sha256:fbe9a36e870fca382dfaa1afac6e6ea433e79414ad2f8fa3083619660cdd4cad
     container_name: synaplan-centrifugo
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
@@ -295,7 +295,7 @@ services:
 
   # MariaDB 11.8 Database
   db:
-    image: mariadb:12.2.2@sha256:6a4c4bbf0447c2247801309513fcc0dd17c3f35390368139ce419387fdd1144d
+    image: mariadb:12.3.2@sha256:b1c7bf836e64ed9406a8984af29509f40089d55cea14b32f12c4726a1f17104b
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:

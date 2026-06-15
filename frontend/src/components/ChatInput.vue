@@ -1,20 +1,21 @@
 <template>
   <!--
-    Sticky chat input bar — already follows the iOS soft keyboard via
-    `position: sticky; bottom: 0` against the visual viewport. The
-    `pb-[env(safe-area-inset-bottom)]` accounts for the iPhone home
-    indicator (~34px) when the keyboard is HIDDEN, but iOS Safari does not
-    zero that inset out when the keyboard is OPEN, leaving a permanent
-    ~50px gap below the textarea (inset + inner py-4). `useKeyboardOpen()`
-    flips off the home-indicator inset *only* while the keyboard is up,
-    and the inner wrapper drops to `py-2` on mobile. Net effect: ~40-50px
-    less dead space when typing on iPhone, no regression on desktop.
+    Sticky chat input bar — `position: sticky; bottom: 0` keeps it pinned to
+    the bottom of the scroll area and, on iOS, follows the soft keyboard via
+    the visual viewport.
+
+    Safe-area inset is applied at md+ ONLY. On mobile the bottom tab bar
+    (MobileNav → .v2-mobile-tabbar) renders *below* this input and already
+    carries `padding-bottom: env(safe-area-inset-bottom)`. Adding the inset
+    here too would double-count the iOS home indicator and leave a ~34px dead
+    gap (≈ the Safari address-bar height) between the pill row and the tab bar
+    — visible on real iPhones, but invisible in Chrome's responsive emulator
+    where `env(safe-area-inset-bottom)` resolves to 0px. At md+ there is no
+    tab bar and the input sits at the window's bottom edge, so it owns the
+    inset itself.
   -->
   <div
-    :class="[
-      'sticky bottom-0 bg-chat-input-area',
-      isKeyboardOpen ? 'pb-0' : 'pb-[env(safe-area-inset-bottom)]',
-    ]"
+    class="sticky bottom-0 bg-chat-input-area md:pb-[env(safe-area-inset-bottom)]"
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
@@ -311,7 +312,6 @@ import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAutoPersist } from '@/composables/useInputPersistence'
-import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { useChatsStore } from '@/stores/chats'
 import { useAppModeStore } from '@/stores/appMode'
 import { useAuthStore } from '@/stores/auth'
@@ -381,7 +381,6 @@ const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
-const isKeyboardOpen = useKeyboardOpen()
 
 /**
  * Get the speech recognition language code from the current UI locale.

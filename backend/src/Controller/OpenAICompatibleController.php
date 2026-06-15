@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\AI\Service\AiFacade;
+use App\AI\Stream\StreamChunk;
 use App\Entity\User;
 use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
@@ -306,12 +307,11 @@ class OpenAICompatibleController extends AbstractController
                             return;
                         }
 
-                        $content = '';
-                        if (is_array($chunk)) {
-                            $content = $chunk['content'] ?? '';
-                        } elseif (is_string($chunk)) {
-                            $content = $chunk;
-                        }
+                        // Only visible answer text is forwarded — reasoning
+                        // chunks (chain-of-thought) are never exposed (#1067).
+                        $content = is_string($chunk) || is_array($chunk)
+                            ? StreamChunk::visibleText($chunk)
+                            : '';
 
                         if ('' === $content) {
                             return;

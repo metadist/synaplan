@@ -200,6 +200,41 @@ class MessageForwardingServiceTest extends TestCase
         $this->service->forwardIfNeeded($chat, 'Hallo [Memory:12345]!');
     }
 
+    /**
+     * Regression for issue #1067 follow-up: web-persisted responses carry
+     * `<think>…</think>` reasoning blocks (rendered as a collapsible panel in
+     * the web UI). WhatsApp shows raw text, so the blocks must be stripped
+     * before forwarding.
+     */
+    public function testStripsThinkBlocksBeforeForwarding(): void
+    {
+        $chat = $this->createChatWithSource('whatsapp');
+        $inbound = $this->createInboundMessageWithMeta('+491234567890', 'phone-id');
+
+        $this->whatsAppService->method('isAvailable')->willReturn(true);
+        $this->messageRepository->method('findLatestInboundByChannel')->willReturn($inbound);
+
+        $this->whatsAppService->expects($this->once())
+            ->method('sendMessage')
+            ->with('+491234567890', 'Heute wird es sonnig.', 'phone-id')
+            ->willReturn(['success' => true, 'message_id' => 'wa_123']);
+
+        $this->service->forwardIfNeeded(
+            $chat,
+            '<think>The instruction: answer in German, no preamble.</think>Heute wird es sonnig.'
+        );
+    }
+
+    public function testSkipsForwardWhenOnlyReasoningRemains(): void
+    {
+        $chat = $this->createChatWithSource('whatsapp');
+
+        $this->whatsAppService->expects($this->never())->method('sendMessage');
+        $this->messageRepository->expects($this->never())->method('findLatestInboundByChannel');
+
+        $this->service->forwardIfNeeded($chat, '<think>only internal reasoning, stream cut off');
+    }
+
     public function testStripsMemoryTagsWhenUserNotFound(): void
     {
         $chat = $this->createChatWithSource('whatsapp');
