@@ -843,29 +843,28 @@ class ConfigController extends AbstractController
     }
 
     /**
-     * Reset the calling user's model configuration to platform defaults.
+     * Replace the calling user's model configuration with the
+     * code-recommended defaults from DefaultModelConfigSeeder.
      *
-     * Removes all per-user DEFAULTMODEL overrides for the calling user so they
-     * fall back to the global defaults (ownerId=0). Does NOT modify the global
-     * defaults — other users are unaffected. This mirrors the scope of
-     * saveDefaultModels (which writes per-user) so that the button behaves
-     * exactly like manually reverting each dropdown.
+     * Removes stale per-user overrides and writes fresh ones that
+     * match the catalog-recommended models. Other users and the
+     * global (ownerId=0) row are unaffected.
      */
     #[Route('/models/defaults/reset', name: 'models_defaults_reset', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/config/models/defaults/reset',
-        summary: 'Reset own model configuration to platform defaults',
-        description: 'Removes all per-user DEFAULTMODEL overrides for the calling user so they fall back to the global defaults (ownerId=0). Does NOT modify global defaults — other users are unaffected. Returns the effective defaults after reset.',
+        summary: 'Apply recommended model defaults to own configuration',
+        description: 'Replaces all per-user DEFAULTMODEL overrides with the code-recommended defaults (from DefaultModelConfigSeeder). Does NOT modify global defaults — other users are unaffected. Returns the newly written defaults.',
         security: [['Bearer' => []]],
         tags: ['Configuration']
     )]
     #[OA\Response(
         response: 200,
-        description: 'Defaults reset successfully',
+        description: 'Defaults applied successfully',
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
-                new OA\Property(property: 'message', type: 'string', example: 'Default models reset to recommended defaults'),
+                new OA\Property(property: 'message', type: 'string', example: 'Applied 11 recommended defaults (removed 3 previous overrides)'),
                 new OA\Property(
                     property: 'defaults',
                     type: 'object',
@@ -886,7 +885,11 @@ class ConfigController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => sprintf('Removed %d user-specific override(s), now using platform defaults', $result['removed']),
+            'message' => sprintf(
+                'Applied %d recommended default(s) (removed %d previous override(s))',
+                $result['written'],
+                $result['removed'],
+            ),
             'defaults' => $result['defaults'],
         ]);
     }

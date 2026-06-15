@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
+use App\Seed\DefaultModelConfigSeeder;
 use Psr\Cache\CacheItemPoolInterface;
 
 /**
@@ -505,10 +506,13 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Remove all per-user DEFAULTMODEL overrides so the user falls back to
-     * the global platform defaults (ownerId=0).
+     * Replace per-user DEFAULTMODEL overrides with the code-recommended
+     * defaults from {@see DefaultModelConfigSeeder::getRecommendedDefaults()}.
      *
-     * @return array{removed: int, defaults: array<string, int>}
+     * VECTORIZE is system-wide (single Qdrant collection) and is never
+     * written as a per-user override.
+     *
+     * @return array{removed: int, written: int, defaults: array<string, int>}
      */
     public function resetUserDefaults(int $userId): array
     {
@@ -518,19 +522,35 @@ final readonly class ModelConfigService
         ]);
 
         $this->configRepository->removeAll($userOverrides);
+        $removed = count($userOverrides);
 
-        $globalRows = $this->configRepository->findBy([
-            'ownerId' => 0,
-            'group' => 'DEFAULTMODEL',
-        ]);
+        try {
+            $recommended = DefaultModelConfigSeeder::getRecommendedDefaults();
+        } catch (\RuntimeException) {
+            $recommended = [];
+        }
 
+        $written = 0;
         $defaults = [];
-        foreach ($globalRows as $row) {
-            $defaults[$row->getSetting()] = (int) $row->getValue();
+
+        foreach ($recommended as $capability => $modelId) {
+            if ('VECTORIZE' === $capability) {
+                continue;
+            }
+
+            $model = $this->modelRepository->find($modelId);
+            if (!$model || 1 !== $model->getActive()) {
+                continue;
+            }
+
+            $this->configRepository->setValue($userId, 'DEFAULTMODEL', $capability, (string) $modelId);
+            $defaults[$capability] = $modelId;
+            ++$written;
         }
 
         return [
-            'removed' => count($userOverrides),
+            'removed' => $removed,
+            'written' => $written,
             'defaults' => $defaults,
         ];
     }
