@@ -163,6 +163,10 @@
 		path('/api.php') ||
 		path('/widget.php') ||
 		path('/shared/*') ||
+		path('/v1/*') ||
+		path('/mcp') ||
+		path('/.well-known/oauth-protected-resource') ||
+		path('/.well-known/oauth-protected-resource/*') ||
 		({env.APP_ENV} == 'dev' && (path('/_profiler/*') || path('/_wdt/*') || path('/_error/*')))
 	`
 	handle @backend_php {

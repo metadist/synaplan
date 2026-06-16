@@ -85,6 +85,7 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 - **AI Memories** — User profiling with Qdrant vector search
 - **Feedback System** — Feedback capture and analysis powered by Qdrant
 - **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
+- **MCP Server** *(early access)* — Connect AI clients (Claude, Cursor, …) over the Model Context Protocol; your RAG and memories become tools at `POST /mcp` ([MCP guide](https://docs.synaplan.com/index.php/mcp))
 
 ---
 
