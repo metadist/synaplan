@@ -23,6 +23,19 @@ security:
             custom_authenticators:
                 - App\Security\ApiKeyAuthenticator
 
+        # Model Context Protocol (MCP) Streamable HTTP endpoint.
+        # Authenticated by Synaplan API keys (sk_*) or OIDC bearer tokens;
+        # unauthenticated requests get a spec-compliant 401 + WWW-Authenticate
+        # pointing at the RFC 9728 metadata document.
+        mcp:
+            pattern: ^/mcp
+            stateless: true
+            provider: app_user_provider
+            entry_point: App\Security\McpAuthenticationEntryPoint
+            custom_authenticators:
+                - App\Security\OidcBearerAuthenticator
+                - App\Security\ApiKeyAuthenticator
+
         api:
             pattern: ^/api
             stateless: true
@@ -45,6 +58,12 @@ security:
     access_control:
         # OpenAI-compatible endpoints (require API key auth)
         - { path: ^/v1, roles: IS_AUTHENTICATED_FULLY }
+
+        # MCP: public discovery (RFC 9728 metadata) + CORS preflight; the
+        # endpoint itself requires authentication.
+        - { path: ^/\.well-known/oauth-protected-resource, roles: PUBLIC_ACCESS }
+        - { path: ^/mcp, methods: [OPTIONS], roles: PUBLIC_ACCESS }
+        - { path: ^/mcp, roles: IS_AUTHENTICATED_FULLY }
 
         # Public API documentation (Swagger)
         - { path: ^/api/doc, roles: PUBLIC_ACCESS }
