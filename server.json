@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.synaplan/synaplan",
+  "title": "Synaplan",
+  "description": "Connect AI clients to a Synaplan workspace: semantic search over your documents (RAG) and your stored memories, exposed as MCP tools. Authenticated with a Synaplan API key.",
+  "version": "0.1.0",
+  "websiteUrl": "https://synaplan.com",
+  "repository": {
+    "url": "https://github.com/metadist/synaplan",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://web.synaplan.com/mcp",
+      "headers": [
+        {
+          "name": "X-API-Key",
+          "description": "Synaplan API key. Create one under Settings → API Keys at https://web.synaplan.com.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
