@@ -2337,5 +2337,29 @@ class ModelCatalog
                 'features' => ['voice-cloning', 'multilingual', 'streaming'],
             ],
         ],
+        [
+            // Vision variant of Mistral Medium 3.5 (same upstream model id as
+            // BID 244). Routed through the OpenAI-compatible chat endpoint with
+            // image_url content for image understanding / OCR-style extraction.
+            'id' => 248,
+            'service' => 'Mistral',
+            'name' => 'Mistral Medium 3.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'mistral-medium-latest',
+            'priceIn' => 1.50,
+            'inUnit' => 'per1M',
+            'priceOut' => 7.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 2,
+            'json' => [
+                'description' => 'Mistral Medium 3.5 multimodal vision - describe images and extract text (OCR-style) via the chat endpoint.',
+                'max_tokens' => 2048,
+                'params' => ['model' => 'mistral-medium-latest'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+            ],
+        ],
     ];
 }

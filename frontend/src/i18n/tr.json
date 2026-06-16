@@ -363,6 +363,7 @@
     "againWith": "Şununla tekrar",
     "regenerateWith": "Şununla yeniden oluştur",
     "copy": "Mesajı kopyala",
+    "infoAiModel": "Yapay Zeka Modeli",
     "infoAudioModel": "Ses Modeli"
   },
   "commands": {

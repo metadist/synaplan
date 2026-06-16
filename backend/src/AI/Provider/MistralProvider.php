@@ -6,6 +6,7 @@ use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
+use App\AI\Interface\VisionProviderInterface;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
@@ -25,7 +26,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * @see https://docs.mistral.ai/
  * @see https://docs.mistral.ai/studio-api/audio/overview
  */
-class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
+class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, VisionProviderInterface
 {
     private const PROVIDER_NAME = 'mistral';
     private const BASE_URI = 'https://api.mistral.ai/v1';
@@ -36,6 +37,8 @@ class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInte
     private const DEFAULT_TRANSCRIBE_MODEL = 'voxtral-mini-latest';
     private const DEFAULT_TTS_MODEL = 'voxtral-mini-tts-2603';
     private const DEFAULT_TTS_FORMAT = 'mp3';
+    private const DEFAULT_VISION_MODEL = 'mistral-medium-latest';
+    private const VISION_MAX_TOKENS = 2048;
 
     private const TIMEOUT_AUDIO_SECONDS = 120;
 
@@ -75,7 +78,7 @@ class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInte
 
     public function getCapabilities(): array
     {
-        return ['chat', 'speech_to_text', 'text_to_speech'];
+        return ['chat', 'vision', 'speech_to_text', 'text_to_speech'];
     }
 
     public function getDefaultModels(): array
@@ -194,6 +197,74 @@ class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInte
             ]);
 
             throw new ProviderException('Mistral streaming error: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
+        }
+    }
+
+    // ==================== VISION (Pixtral / multimodal chat) ====================
+
+    public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
+    {
+        $this->assertApiKey();
+
+        $model = $options['model'] ?? self::DEFAULT_VISION_MODEL;
+        $prompt = '' !== $prompt ? $prompt : 'Please describe this image in detail.';
+
+        try {
+            $response = $this->client->chat()->create([
+                'model' => $model,
+                'messages' => [[
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => $prompt],
+                        ['type' => 'image_url', 'image_url' => ['url' => $this->imageToDataUrl($imageUrl)]],
+                    ],
+                ]],
+                'max_tokens' => $options['max_tokens'] ?? self::VISION_MAX_TOKENS,
+            ]);
+
+            return $response->choices[0]->message->content ?? '';
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw new ProviderException('Mistral vision error: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
+        }
+    }
+
+    public function extractTextFromImage(string $imageUrl): string
+    {
+        return $this->explainImage(
+            $imageUrl,
+            'Extract all text from this image. Provide only the extracted text, preserving line breaks, without any commentary.',
+        );
+    }
+
+    public function compareImages(string $imageUrl1, string $imageUrl2): array
+    {
+        $this->assertApiKey();
+
+        try {
+            $response = $this->client->chat()->create([
+                'model' => self::DEFAULT_VISION_MODEL,
+                'messages' => [[
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => 'Compare these two images and describe the differences and similarities.'],
+                        ['type' => 'image_url', 'image_url' => ['url' => $this->imageToDataUrl($imageUrl1)]],
+                        ['type' => 'image_url', 'image_url' => ['url' => $this->imageToDataUrl($imageUrl2)]],
+                    ],
+                ]],
+                'max_tokens' => self::VISION_MAX_TOKENS,
+            ]);
+
+            return [
+                'comparison' => $response->choices[0]->message->content ?? '',
+                'image1' => basename($imageUrl1),
+                'image2' => basename($imageUrl2),
+            ];
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw new ProviderException('Mistral image comparison error: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
         }
     }
 
@@ -515,6 +586,30 @@ class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInte
         }
 
         return $fullPath;
+    }
+
+    /**
+     * Build a base64 `data:` URL for the Mistral chat vision API. Remote
+     * http(s) URLs are passed through unchanged (Mistral fetches them).
+     */
+    private function imageToDataUrl(string $imageUrl): string
+    {
+        if (str_starts_with($imageUrl, 'http://') || str_starts_with($imageUrl, 'https://') || str_starts_with($imageUrl, 'data:')) {
+            return $imageUrl;
+        }
+
+        $fullPath = str_starts_with($imageUrl, '/')
+            ? $imageUrl
+            : $this->uploadDir.'/'.ltrim($imageUrl, '/');
+
+        if (!file_exists($fullPath)) {
+            throw new ProviderException("Image file not found: {$fullPath}", self::PROVIDER_NAME);
+        }
+
+        $mimeType = mime_content_type($fullPath) ?: 'image/jpeg';
+        $base64 = base64_encode((string) file_get_contents($fullPath));
+
+        return "data:{$mimeType};base64,{$base64}";
     }
 
     private function assertHttpOk(ResponseInterface $response, string $context): void

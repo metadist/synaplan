@@ -395,6 +395,7 @@
     "messageDetails": "Nachrichtendetails",
     "infoTopic": "Thema",
     "infoModel": "Modell",
+    "infoAiModel": "KI-Modell",
     "infoProvider": "Anbieter",
     "infoAudioModel": "Audio-Modell"
   },

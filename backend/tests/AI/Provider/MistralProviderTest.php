@@ -56,6 +56,7 @@ class MistralProviderTest extends TestCase
         $capabilities = $this->makeProvider()->getCapabilities();
 
         $this->assertContains('chat', $capabilities);
+        $this->assertContains('vision', $capabilities);
         $this->assertContains('speech_to_text', $capabilities);
         $this->assertContains('text_to_speech', $capabilities);
     }
@@ -108,6 +109,24 @@ class MistralProviderTest extends TestCase
     {
         $this->expectExceptionMessageContains('MISTRAL_API_KEY');
         $this->makeProvider(apiKey: null)->synthesize('hello');
+    }
+
+    public function testExplainImageThrowsWithoutApiKey(): void
+    {
+        $this->expectExceptionMessageContains('MISTRAL_API_KEY');
+        $this->makeProvider(apiKey: null)->explainImage('image.png');
+    }
+
+    public function testExtractTextFromImageThrowsWithoutApiKey(): void
+    {
+        $this->expectExceptionMessageContains('MISTRAL_API_KEY');
+        $this->makeProvider(apiKey: null)->extractTextFromImage('image.png');
+    }
+
+    public function testExplainImageThrowsWhenFileMissing(): void
+    {
+        $this->expectExceptionMessageContains('Image file not found');
+        $this->makeProvider()->explainImage('does-not-exist.png');
     }
 
     public function testTranslateAudioIsNotSupported(): void

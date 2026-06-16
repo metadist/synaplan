@@ -648,9 +648,15 @@
                       </router-link>
                     </div>
 
-                    <!-- Chat Model -->
-                    <div v-if="aiModels?.chat" class="flex items-center justify-between gap-2">
-                      <span class="text-xs txt-tertiary">{{ getModelTypeLabel }}</span>
+                    <!-- AI Model (the model actually used for this response,
+                         after topic sorting/routing). Hidden when the backend
+                         did not record a concrete model (e.g. "unknown") so
+                         non-chat responses don't show a wrong/empty value. -->
+                    <div
+                      v-if="aiModels?.chat && isKnownModelName(aiModels.chat.model)"
+                      class="flex items-center justify-between gap-2"
+                    >
+                      <span class="text-xs txt-tertiary">{{ t('chatMessage.infoAiModel') }}</span>
                       <button
                         type="button"
                         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
@@ -942,7 +948,7 @@ import type { Part, MessageFile, TaskPlanState } from '@/stores/history'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
-import { chatBadgeIcon, chatBadgeLabel } from '@/utils/chatModelBadge'
+import { chatBadgeIcon } from '@/utils/chatModelBadge'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -1255,12 +1261,17 @@ const mediaHint = computed(() => {
 // Pure-function helpers live in chatModelBadge.ts so the voice-reply
 // label rule (#583) is unit-testable in isolation. The computed
 // wrappers below just bind them to reactive component state.
-const getModelTypeLabel = computed(() =>
-  chatBadgeLabel(mediaHint.value, !!props.aiModels?.audio, isFileAnalysisResponse.value)
-)
 const getModelTypeIcon = computed(() =>
   chatBadgeIcon(mediaHint.value, !!props.aiModels?.audio, isFileAnalysisResponse.value)
 )
+
+// A model name is only worth showing when the backend recorded a concrete
+// value. Non-chat responses (vision/audio/image) sometimes leave the chat
+// slot as an empty/"unknown" placeholder — those must not be displayed.
+const isKnownModelName = (name?: string | null): boolean => {
+  const n = (name ?? '').trim().toLowerCase()
+  return n !== '' && n !== 'unknown'
+}
 
 const formattedTime = computed(() => formatTime(props.timestamp))
 
