@@ -41,12 +41,39 @@ not raw CRUD.
 | Area | Decision | Rationale |
 | :--- | :--- | :--- |
 | **Transport** | **Streamable HTTP** (single `POST /mcp` endpoint, optional SSE upgrade for streaming). **No** standalone HTTP+SSE transport. | SSE transport is legacy/deprecated; Streamable HTTP is the modern, stateless-friendly standard. |
-| **Statelessness** | Stateless core; route on `Mcp-Method` / `Mcp-Name` headers (SEP-2243). | Runs behind plain round-robin LB — no sticky sessions / shared session store. Fits FrankenPHP + multi-server Galera. |
+| **Sessions** | `mcp/sdk` v0.6.0 implements the **2025-11-25** spec, which is **session-based**: `initialize` mints an `Mcp-Session-Id`, and every later request replays it. Sessions are persisted in the **shared Redis cache** (PSR-16), so any node can serve any request. The fully **stateless** routing (`Mcp-Method` / `Mcp-Name`, SEP-2243) lands with the `2026-07-28` spec and is **not yet in the SDK** — adopt when it ships. | Works behind a round-robin LB via the shared store (no sticky sessions, but a shared store *is* required today). Fits Redis + multi-server Galera. |
 | **Implementation** | **`mcp/sdk` core directly** (the official PHP SDK), **not** `symfony/mcp-bundle`. | We need to reuse our own multi-tenant authenticators and firewall config; the bundle's auth/discovery assumptions are too opinionated and the bundle is pre-1.0. We still pin `mcp/sdk` and budget for upgrades. |
 | **Authorization** | OAuth 2.1 **Resource Server** backed by **Keycloak** (existing). Plus `sk_*` API-key header path for simple/CI clients. | We already run Keycloak OIDC (`OidcBearerAuthenticator`, `/api/v1/oidc/discovery`). This is the single biggest head start. |
 | **Endpoint / firewall** | Dedicated `/mcp` firewall in `security.yaml`, sibling to the existing `/v1/` OpenAI-compatible firewall. | Mirrors the proven `OpenAICompatibleController` pattern. |
 | **Exposure policy** | **Curated allowlist** (10–20 ops), not a 1:1 dump of ~200 endpoints. Read tools first; write tools gated behind allowlist + confirmation/elicitation. | Safety, clarity, and a small, well-named catalog beat an exhaustive one. |
 | **Scoping** | Per-user via existing `userId` scoping + `getRoles()` RBAC. | No new authz model needed. |
+
+---
+
+## Implementation status
+
+**Phase 1 spike — shipped** (lint + PHPStan + full PHPUnit suite green; verified
+live against the dev stack). Implemented with `mcp/sdk` v0.6.0:
+
+| Capability | Status | Where |
+| :--- | :--- | :--- |
+| Streamable HTTP `POST /mcp` (drives the SDK from a Symfony controller via PSR-7/Guzzle) | ✅ | `App\Controller\McpController` |
+| `mcp` firewall — API key (`sk_*`, `X-API-Key`) **and** OIDC bearer | ✅ | `config/packages/security.yaml` (reuses `ApiKeyAuthenticator` + `OidcBearerAuthenticator`) |
+| `401` + `WWW-Authenticate` challenge → PRM | ✅ | `App\Security\McpAuthenticationEntryPoint` |
+| RFC 9728 Protected Resource Metadata (`/.well-known/oauth-protected-resource[/mcp]`) | ✅ | `McpController::protectedResourceMetadata` |
+| DNS-rebinding (Origin/Host) + protocol-version middleware | ✅ | SDK middleware; allow-list via `MCP_ALLOWED_HOSTS` |
+| Session persistence across requests (Redis / PSR-16) | ✅ | `App\Mcp\McpServerFactory` (`Psr16SessionStore`) |
+| Tools `rag_search`, `memory_search` (user-scoped) | ✅ | `App\Mcp\McpServerFactory` |
+| Edge routing for `/mcp` + `/.well-known/…` (also fixed `/v1/*`) | ✅ | `_docker/backend/Caddyfile` |
+| Functional tests | ✅ | `tests/Controller/McpControllerTest.php` |
+| Public docs | ✅ | `synaplan-docs/docs/mcp.md` |
+
+**Not yet done (next):** remaining tools (`synaplan_chat`, `rag_similar`,
+`memory_add`, `file_ingest`, `list_chats`/`get_messages`, `list_prompts`),
+Resources, Prompts, Tasks, per-call audit log + rate limiting, the registry
+`server.json`, and full OAuth 2.1 Resource-Server token validation
+(RFC 8707/9207) — the API-key path works today; OAuth bearer relies on the
+existing Keycloak validation.
 
 ---
 
@@ -169,9 +196,11 @@ stable.
 
 ## 5. Immediate next actions
 
-1. Spike: stand up `POST /mcp` on `mcp/sdk` behind a new `/mcp` firewall with the
-   two read tools `rag_search` + `memory_search`, authed via existing Keycloak
-   bearer.
-2. Implement RFC 9728 PRM `.well-known` endpoint → Keycloak.
-3. Finalize the v1 tool allowlist (§1.3) and tool-naming convention.
+1. ✅ **Done** — `POST /mcp` on `mcp/sdk` behind a new `/mcp` firewall with the two
+   read tools `rag_search` + `memory_search` (API key + OIDC bearer). See
+   [Implementation status](#implementation-status).
+2. ✅ **Done** — RFC 9728 PRM `.well-known` endpoint. (OAuth token-validation
+   hardening per RFC 8707/9207 still pending.)
+3. Finalize the v1 tool allowlist (§1.3) and tool-naming convention; add
+   `synaplan_chat` next.
 4. Update Phase-2 docs (`02-…`, `03-…`) to Streamable HTTP terminology.
