@@ -180,7 +180,7 @@ services:
 
   # Generates a self-signed TLS certificate for Keycloak HTTPS (runs once)
   keycloak_certs:
-    image: alpine:3.24@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
+    image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
     container_name: synaplan-keycloak-certs-test
     command: sh -c 'if [ -f /certs/cert.pem ]; then echo "Keycloak TLS cert exists"; exit 0; fi && apk add --no-cache openssl && openssl req -x509 -newkey rsa:2048 -keyout /certs/key.pem -out /certs/cert.pem -days 3650 -nodes -subj "/CN=host.docker.internal" -addext "subjectAltName=DNS:host.docker.internal,DNS:keycloak_test,DNS:localhost" && chmod 644 /certs/*.pem && echo "Keycloak TLS cert generated"'
     volumes:
