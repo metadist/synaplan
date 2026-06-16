@@ -44,7 +44,8 @@ export const getProviderIcon = (provider: string): string => {
 export const getProviderFlag = (provider: string): string => {
   const p = provider.toLowerCase()
 
-  if (p.includes('ollama')) {
+  if (p.includes('ollama') || p.includes('piper') || p.includes('synaplan')) {
+    // Ollama and the self-hosted Synaplan/Piper TTS are German-hosted.
     return 'circle-flags:de'
   } else if (p.includes('mistral')) {
     return 'circle-flags:fr'
