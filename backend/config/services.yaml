@@ -30,6 +30,10 @@ parameters:
     env(REALTIME_API_KEY): ''
     env(REALTIME_TOKEN_SECRET): ''
 
+    # Mistral AI is optional; default empty so the backend boots when the key
+    # is unset (matches the other optional cloud-AI providers).
+    env(MISTRAL_API_KEY): ''
+
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
     # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)
@@ -191,6 +195,16 @@ services:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.vision' }
             - { name: 'app.ai.speech_to_text' }
+
+    App\AI\Provider\MistralProvider:
+        arguments:
+            $apiKey: '%env(MISTRAL_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.text_to_speech' }
 
     App\AI\Provider\GoogleProvider:
         arguments:

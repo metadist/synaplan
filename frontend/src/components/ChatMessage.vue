@@ -14,8 +14,7 @@
       v-if="role === 'assistant'"
       class="hidden md:flex w-10 h-10 rounded-full items-center justify-center flex-shrink-0 surface-card"
     >
-      <GroqIcon v-if="displayProvider.toLowerCase().includes('groq')" :size="24" class-name="" />
-      <Icon v-else :icon="getProviderIcon(displayProvider)" class="w-6 h-6" />
+      <ServiceIcon :service="displayProvider" :size="24" />
     </div>
 
     <!-- Wrapper for thinking blocks + bubble -->
@@ -649,9 +648,15 @@
                       </router-link>
                     </div>
 
-                    <!-- Chat Model -->
-                    <div v-if="aiModels?.chat" class="flex items-center justify-between gap-2">
-                      <span class="text-xs txt-tertiary">{{ getModelTypeLabel }}</span>
+                    <!-- AI Model (the model actually used for this response,
+                         after topic sorting/routing). Hidden when the backend
+                         did not record a concrete model (e.g. "unknown") so
+                         non-chat responses don't show a wrong/empty value. -->
+                    <div
+                      v-if="aiModels?.chat && isKnownModelName(aiModels.chat.model)"
+                      class="flex items-center justify-between gap-2"
+                    >
+                      <span class="text-xs txt-tertiary">{{ t('chatMessage.infoAiModel') }}</span>
                       <button
                         type="button"
                         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
@@ -835,16 +840,7 @@
                     ]"
                     @click="selectModel(option)"
                   >
-                    <GroqIcon
-                      v-if="option.provider.toLowerCase().includes('groq')"
-                      :size="20"
-                      class-name="flex-shrink-0"
-                    />
-                    <Icon
-                      v-else
-                      :icon="getProviderIcon(option.provider)"
-                      class="w-5 h-5 flex-shrink-0"
-                    />
+                    <ServiceIcon :service="option.provider" :size="20" />
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2">
                         <span class="text-sm font-medium">{{ option.label }}</span>
@@ -936,7 +932,6 @@ import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
-import { getProviderIcon } from '@/utils/providerIcons'
 import { isChannelSource } from '@/utils/channelSource'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
@@ -945,7 +940,7 @@ import type { UserMemory } from '@/services/api/userMemoriesApi'
 import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
-import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'
@@ -953,7 +948,7 @@ import type { Part, MessageFile, TaskPlanState } from '@/stores/history'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
-import { chatBadgeIcon, chatBadgeLabel } from '@/utils/chatModelBadge'
+import { chatBadgeIcon } from '@/utils/chatModelBadge'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -1266,12 +1261,17 @@ const mediaHint = computed(() => {
 // Pure-function helpers live in chatModelBadge.ts so the voice-reply
 // label rule (#583) is unit-testable in isolation. The computed
 // wrappers below just bind them to reactive component state.
-const getModelTypeLabel = computed(() =>
-  chatBadgeLabel(mediaHint.value, !!props.aiModels?.audio, isFileAnalysisResponse.value)
-)
 const getModelTypeIcon = computed(() =>
   chatBadgeIcon(mediaHint.value, !!props.aiModels?.audio, isFileAnalysisResponse.value)
 )
+
+// A model name is only worth showing when the backend recorded a concrete
+// value. Non-chat responses (vision/audio/image) sometimes leave the chat
+// slot as an empty/"unknown" placeholder — those must not be displayed.
+const isKnownModelName = (name?: string | null): boolean => {
+  const n = (name ?? '').trim().toLowerCase()
+  return n !== '' && n !== 'unknown'
+}
 
 const formattedTime = computed(() => formatTime(props.timestamp))
 
