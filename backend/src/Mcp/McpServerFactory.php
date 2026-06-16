@@ -107,7 +107,7 @@ final class McpServerFactory
                     'chunk_id' => $r['chunk_id'] ?? null,
                     'message_id' => $r['message_id'] ?? null,
                     'text' => $r['chunk_text'] ?? '',
-                    'score' => $r['distance'] ?? null,
+                    'score' => $r['score'] ?? null,
                 ], $results),
             ];
         };

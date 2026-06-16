@@ -16,6 +16,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -136,16 +137,38 @@ class McpController extends AbstractController
 
     private function toSymfonyResponse(ResponseInterface $psrResponse): Response
     {
-        $response = new Response(
-            (string) $psrResponse->getBody(),
-            $psrResponse->getStatusCode(),
-        );
+        $contentType = $psrResponse->getHeaderLine('Content-Type');
+        $isEventStream = str_contains(strtolower($contentType), 'text/event-stream');
+
+        $response = $isEventStream
+            ? $this->toStreamedResponse($psrResponse)
+            : new Response((string) $psrResponse->getBody(), $psrResponse->getStatusCode());
 
         foreach ($psrResponse->getHeaders() as $name => $values) {
             $response->headers->set($name, $values);
         }
 
         return $response;
+    }
+
+    /**
+     * Bridge an SSE PSR-7 response to a Symfony {@see StreamedResponse} so the
+     * Streamable HTTP transport keeps streaming instead of buffering the whole
+     * `text/event-stream` body (which would block until EOF).
+     */
+    private function toStreamedResponse(ResponseInterface $psrResponse): StreamedResponse
+    {
+        return new StreamedResponse(static function () use ($psrResponse): void {
+            $body = $psrResponse->getBody();
+            if ($body->isSeekable()) {
+                $body->rewind();
+            }
+
+            while (!$body->eof()) {
+                echo $body->read(8192);
+                flush();
+            }
+        }, $psrResponse->getStatusCode());
     }
 
     /**
