@@ -3,7 +3,13 @@
     <GroqIcon v-if="isGroq" :size="size" />
     <MistralIcon v-else-if="isMistral" :size="size" />
     <Icon v-else :icon="providerIcon" :style="rootStyle" />
-    <Icon :icon="flagIcon" class="service-icon__flag" :style="flagStyle" aria-hidden="true" />
+    <Icon
+      v-if="hasService"
+      :icon="flagIcon"
+      class="service-icon__flag"
+      :style="flagStyle"
+      aria-hidden="true"
+    />
   </span>
 </template>
 
@@ -23,6 +29,7 @@ const props = withDefaults(defineProps<Props>(), {
   size: 20,
 })
 
+const hasService = computed(() => props.service.trim().length > 0)
 const isGroq = computed(() => props.service.toLowerCase().includes('groq'))
 const isMistral = computed(() => props.service.toLowerCase().includes('mistral'))
 const providerIcon = computed(() => getProviderIcon(props.service))

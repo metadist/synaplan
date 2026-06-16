@@ -7,7 +7,6 @@ use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\Service\File\FileHelper;
-use OpenAI;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\Multipart\FormDataPart;
