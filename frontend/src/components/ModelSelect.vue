@@ -5,16 +5,7 @@
       data-testid="btn-model-select-toggle"
       @click="isOpen = !isOpen"
     >
-      <GroqIcon
-        v-if="modelsStore.selectedProvider.toLowerCase().includes('groq')"
-        :size="20"
-        class-name="flex-shrink-0"
-      />
-      <Icon
-        v-else
-        :icon="getProviderIcon(modelsStore.selectedProvider)"
-        class="w-4 h-4 md:w-5 md:h-5"
-      />
+      <ServiceIcon :service="modelsStore.selectedProvider" :size="20" />
       <span class="text-xs md:text-sm font-medium hidden sm:inline">{{ currentLabel }}</span>
       <ChevronDownIcon class="w-4 h-4" />
     </button>
@@ -38,12 +29,7 @@
         ]"
         @click="selectModel(option)"
       >
-        <GroqIcon
-          v-if="option.provider.toLowerCase().includes('groq')"
-          :size="20"
-          class-name="flex-shrink-0"
-        />
-        <Icon v-else :icon="getProviderIcon(option.provider)" class="w-5 h-5 flex-shrink-0" />
+        <ServiceIcon :service="option.provider" :size="20" />
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium">{{ option.label }}</div>
           <div class="text-xs txt-secondary">{{ option.provider }}</div>
@@ -56,10 +42,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ChevronDownIcon } from '@heroicons/vue/24/outline'
-import { Icon } from '@iconify/vue'
 import { useModelsStore } from '@/stores/models'
-import { getProviderIcon } from '@/utils/providerIcons'
-import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 
 const modelsStore = useModelsStore()
 const isOpen = ref(false)

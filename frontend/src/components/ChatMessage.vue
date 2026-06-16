@@ -14,8 +14,7 @@
       v-if="role === 'assistant'"
       class="hidden md:flex w-10 h-10 rounded-full items-center justify-center flex-shrink-0 surface-card"
     >
-      <GroqIcon v-if="displayProvider.toLowerCase().includes('groq')" :size="24" class-name="" />
-      <Icon v-else :icon="getProviderIcon(displayProvider)" class="w-6 h-6" />
+      <ServiceIcon :service="displayProvider" :size="24" />
     </div>
 
     <!-- Wrapper for thinking blocks + bubble -->
@@ -835,16 +834,7 @@
                     ]"
                     @click="selectModel(option)"
                   >
-                    <GroqIcon
-                      v-if="option.provider.toLowerCase().includes('groq')"
-                      :size="20"
-                      class-name="flex-shrink-0"
-                    />
-                    <Icon
-                      v-else
-                      :icon="getProviderIcon(option.provider)"
-                      class="w-5 h-5 flex-shrink-0"
-                    />
+                    <ServiceIcon :service="option.provider" :size="20" />
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2">
                         <span class="text-sm font-medium">{{ option.label }}</span>
@@ -936,7 +926,6 @@ import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
-import { getProviderIcon } from '@/utils/providerIcons'
 import { isChannelSource } from '@/utils/channelSource'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
@@ -945,7 +934,7 @@ import type { UserMemory } from '@/services/api/userMemoriesApi'
 import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
-import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'
