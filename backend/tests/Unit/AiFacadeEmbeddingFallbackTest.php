@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit;
 
+use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Service\AiFacade;
@@ -459,6 +460,7 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
             emailService: $this->emailService,
             cache: $this->cache,
             cachePool: $this->cachePool,
+            higgsfieldCredentials: $this->createMock(HiggsfieldCredentialResolver::class),
             embeddingFallbackProvider: $fallbackProvider,
         );
     }

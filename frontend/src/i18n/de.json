@@ -19,6 +19,7 @@
     "ragSearch": "Suche",
     "configInbound": "Kanäle",
     "configAiModels": "KI-Modelle",
+    "configProviderHiggsfield": "Higgsfield-Verbindung",
     "configTaskPrompts": "KI-Anweisungen",
     "configSortingPrompt": "Routing",
     "configApiKeys": "API-Schlüssel",
@@ -314,6 +315,7 @@
     "accountDescription": "Konto & Einstellungen",
     "configInbound": "Übersicht",
     "configAiModels": "KI-Modelle",
+    "configProviderHiggsfield": "Higgsfield-Verbindung",
     "configTaskPrompts": "KI-Anweisungen",
     "configSortingPrompt": "Routing",
     "configApiKeys": "API-Schlüssel",
@@ -1152,6 +1154,37 @@
         "completed": "Abgeschlossen",
         "failed": "Fehlgeschlagen",
         "cancelled": "Abgebrochen"
+      }
+    },
+    "providers": {
+      "higgsfield": {
+        "title": "Higgsfield",
+        "description": "Cinematische Bild- und Videogenerierung: Soul (Text-zu-Bild), DoP, Kling 2.1 Pro, Seedance v1 Pro (Bild-zu-Video) und Seedream v4. Die Authentifizierung erfolgt mit einem Schlüssel-Paar (Key + Secret) aus deinem Higgsfield-Konto.",
+        "getKeyLink": "Hol dir deinen API-Key + Secret auf cloud.higgsfield.ai →",
+        "statusTitle": "Aktuelle Verbindung",
+        "userKeyLabel": "Dein Schlüssel",
+        "sourceUser": "Verwendet deinen persönlichen Higgsfield-Schlüssel",
+        "sourcePlatform": "Verwendet den plattformweiten Schlüssel",
+        "sourceNone": "Nicht verbunden — kein Schlüssel konfiguriert",
+        "noCredentialsHint": "Higgsfield-Modelle sind ausgeblendet, bis du entweder hier einen persönlichen Schlüssel hinterlegst oder der Plattform-Betreiber einen globalen HIGGSFIELD_API_KEY / HIGGSFIELD_API_SECRET setzt.",
+        "connectTitle": "Higgsfield-Konto verbinden",
+        "replaceTitle": "Schlüssel ersetzen",
+        "formHint": "Beide Felder sind erforderlich. Das Paar wird verschlüsselt gespeichert und niemals an deinen Browser zurückgegeben.",
+        "apiKeyLabel": "API-Key",
+        "apiKeyPlaceholder": "hf_pub_…",
+        "apiSecretLabel": "API-Secret",
+        "apiSecretPlaceholder": "hf_sec_…",
+        "saveButton": "Speichern",
+        "replaceButton": "Ersetzen",
+        "testButton": "Verbindung testen",
+        "clearButton": "Meinen Schlüssel entfernen",
+        "clearConfirm": "Persönlichen Higgsfield-Schlüssel entfernen? Du fällst dann auf den Plattform-Schlüssel zurück (falls vorhanden).",
+        "saveSuccess": "Higgsfield-Schlüssel gespeichert.",
+        "saveError": "Schlüssel konnte nicht gespeichert werden.",
+        "clearSuccess": "Persönlicher Schlüssel entfernt.",
+        "clearError": "Schlüssel konnte nicht entfernt werden.",
+        "testError": "Higgsfield konnte nicht erreicht werden.",
+        "loadError": "Higgsfield-Verbindungsstatus konnte nicht geladen werden."
       }
     },
     "taskPrompts": {
