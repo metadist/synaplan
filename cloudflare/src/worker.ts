@@ -33,6 +33,10 @@ function isSseRequest(pathname: string, request: Request): boolean {
   return SSE_PATH_PATTERNS.some((re) => re.test(pathname))
 }
 
+function isWebSocketUpgrade(request: Request): boolean {
+  return (request.headers.get('Upgrade') ?? '').toLowerCase() === 'websocket'
+}
+
 function shouldNeverCache(pathname: string): boolean {
   return NO_CACHE_PATHS.includes(pathname)
 }
@@ -55,6 +59,15 @@ export default {
   async fetch(request: Request, _env: Env): Promise<Response> {
     const url = new URL(request.url)
     const { pathname } = url
+
+    // WebSocket upgrade bypass — the 101 response carries the live socket on
+    // its non-standard `webSocket` property, which `new Response(...)` below
+    // drops. Pass the request straight through so the socket reaches the
+    // client untouched (operator dashboard + embedded widget both dial
+    // wss://.../connection/websocket).
+    if (isWebSocketUpgrade(request)) {
+      return fetch(request)
+    }
 
     // SSE bypass — return the streaming Response unmodified. Don't even
     // wrap it in a new Response(); cloning the body to copy headers can
