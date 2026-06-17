@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution;
 
+use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlan;
 
 /**
@@ -76,6 +77,29 @@ final class ResultAssembler
             'partial_failure' => $partialFailure,
         ];
 
+        // Propagate web_search results from the first successful WebSearch node
+        // into the top-level metadata so StreamController can set the
+        // web_search_query/count metas and populate the Sources dropdown.
+        // The replyNode is typically chat/summarize/compose_reply and does NOT
+        // carry search_results in its own metadata, which is why DAG turns were
+        // missing the Sources dropdown (issue: QA feedback PR #1076).
+        if (!isset($metadata['search_results'])) {
+            foreach ($plan->nodes as $node) {
+                if (Capability::WebSearch !== $node->capability) {
+                    continue;
+                }
+                $searchNodeResult = $context->getResult($node->id);
+                if (null === $searchNodeResult || !$searchNodeResult->isSuccessful()) {
+                    continue;
+                }
+                $sr = $searchNodeResult->metadata['search_results'] ?? null;
+                if (is_array($sr) && !empty($sr['results'])) {
+                    $metadata['search_results'] = $sr;
+                    break;
+                }
+            }
+        }
+
         // Persist the per-node render state so the frontend can rebuild the
         // task cards on reload without another round-trip. Only non-hidden
         // nodes (uiKind !== 'hidden') produce visible cards — compose_reply
@@ -94,7 +118,23 @@ final class ResultAssembler
                 'state' => $nodeStatus,
             ];
             if (null !== $nodeResult) {
-                if (null !== $nodeResult->text && '' !== $nodeResult->text) {
+                if ('search' === $node->capability->uiKind()) {
+                    // Store a compact summary (query + count) instead of the full
+                    // formatted text dump. The full results are available via the
+                    // Sources dropdown on the message body — showing a 10-item dump
+                    // in the task card is verbose and redundant (QA feedback #1076).
+                    $srMeta = $nodeResult->metadata['search_results'] ?? null;
+                    $srQuery = is_string($nodeResult->metadata['query'] ?? null) ? $nodeResult->metadata['query'] : '';
+                    $srCount = is_array($srMeta) && is_array($srMeta['results'] ?? null)
+                        ? count($srMeta['results'])
+                        : 0;
+                    if ('' !== $srQuery) {
+                        $card['query'] = $srQuery;
+                    }
+                    if ($srCount > 0) {
+                        $card['resultsCount'] = $srCount;
+                    }
+                } elseif (null !== $nodeResult->text && '' !== $nodeResult->text) {
                     $card['text'] = $nodeResult->text;
                 }
                 // First file from this node provides the media url/type for the card.

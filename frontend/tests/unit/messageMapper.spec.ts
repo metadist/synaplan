@@ -169,6 +169,42 @@ describe('messageMapper (issue #1070)', () => {
       const message = mapApiMessageRow(baseRow({ multitask: true }))
       expect(message.taskPlan).toBeNull()
     })
+
+    it('maps query and resultsCount from a search card (QA feedback #1076)', () => {
+      const message = mapApiMessageRow(
+        baseRow({
+          multitask: true,
+          taskPlan: {
+            reply_node: 'n2',
+            cards: [
+              {
+                nodeId: 'n1',
+                capability: 'web_search',
+                kind: 'search',
+                state: 'done',
+                query: 'latest AI news',
+                resultsCount: 5,
+              },
+              {
+                nodeId: 'n2',
+                capability: 'chat',
+                kind: 'text',
+                state: 'done',
+                text: 'Here is the summary.',
+              },
+            ],
+          },
+        })
+      )
+
+      const searchCard = message.taskPlan?.cards.find((c) => c.nodeId === 'n1')
+      expect(searchCard).toBeDefined()
+      expect(searchCard?.kind).toBe('search')
+      expect(searchCard?.query).toBe('latest AI news')
+      expect(searchCard?.resultsCount).toBe(5)
+      // The raw text dump must not appear on a search card
+      expect(searchCard?.text).toBe('')
+    })
   })
 
   describe('reconcileLocalMessage', () => {

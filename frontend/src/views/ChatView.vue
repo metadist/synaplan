@@ -1892,6 +1892,13 @@ const streamAIResponse = async (
               if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
                 card.prompt = data.metadata.prompt
               }
+              // Web search card compact summary — populated by DagExecutor on done.
+              if (typeof data.metadata?.query === 'string' && data.metadata.query) {
+                card.query = data.metadata.query
+              }
+              if (typeof data.metadata?.results_count === 'number') {
+                card.resultsCount = data.metadata.results_count
+              }
             }
           } else if (data.status === 'task_chunk') {
             const message = historyStore.messages.find((m) => m.id === messageId)

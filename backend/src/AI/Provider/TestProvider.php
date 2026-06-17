@@ -209,6 +209,19 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
             ], JSON_THROW_ON_ERROR);
         }
 
+        // web_search + chat plan — used by @webSearch E2E tests.
+        if (str_contains($text, 'websearch:')) {
+            return json_encode([
+                'version' => 1,
+                'language' => 'en',
+                'reply_node' => 'n2',
+                'tasks' => [
+                    ['id' => 'n1', 'capability' => 'web_search', 'inputs' => ['query' => '$message.text']],
+                    ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
+                ],
+            ], JSON_THROW_ON_ERROR);
+        }
+
         return json_encode([
             'version' => 1,
             'language' => 'en',

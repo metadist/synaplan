@@ -195,6 +195,10 @@ export interface TaskCard {
   // Resolved generation prompt of a failed media node — payload for the
   // "retry this step with the next model" action.
   prompt?: string
+  // Web search card compact summary — populated by WebSearchRunner/DagExecutor
+  // so the card shows "Searched the web · N sources" instead of the raw dump.
+  query?: string
+  resultsCount?: number
 }
 
 export interface TaskPlanState {

@@ -185,6 +185,9 @@ export interface ApiLoadedMessageRow {
       url?: string
       type?: string
       error?: string
+      /** Compact web-search summary fields (search cards only) */
+      query?: string
+      resultsCount?: number
     }>
   } | null
 }
@@ -302,6 +305,8 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         url: cardUrl,
         mediaType: c.type,
         error: c.error,
+        query: c.query,
+        resultsCount: c.resultsCount,
       }
     })
     taskPlanState = {

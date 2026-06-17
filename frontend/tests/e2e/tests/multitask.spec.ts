@@ -113,6 +113,72 @@ test.describe('@ci @multitask Multi-task routing', () => {
   })
 
   /**
+   * QA feedback PR #1076: a DAG turn with a web_search node must produce
+   * the Sources (N) dropdown just like a single-task web search does.
+   *
+   * Requires BraveSearch to be configured (BRAVE_SEARCH_API_KEY set).
+   * Tagged @webSearch only (not @ci) — skip in CI unless env is configured.
+   * TestProvider recognises "websearch:" prefix in the message text and
+   * returns the web_search + chat plan.
+   */
+  test('@webSearch Sources dropdown appears after a DAG web-search turn (PR #1076)', async ({
+    page,
+    credentials,
+  }) => {
+    await login(page, credentials)
+    const chat = new ChatHelper(page)
+
+    await test.step('Arrange: start a new chat', async () => {
+      await chat.startNewChat()
+    })
+
+    const previousCount = await chat.conversationBubbles().count()
+
+    await test.step('Act: send a DAG web-search prompt', async () => {
+      // The "websearch:" prefix triggers the TestProvider web_search+chat plan.
+      await page
+        .locator(selectors.chat.textInput)
+        .fill(
+          'websearch: What are the latest developments in AI agents? ' +
+            'Please summarise the most recent news from this year 2026.'
+        )
+      await page.locator(selectors.chat.sendBtn).click()
+    })
+
+    const bubble = chat.conversationBubbles().nth(previousCount)
+    await bubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+
+    await test.step('Assert: task-plan cards appear with web_search card', async () => {
+      const plan = bubble.locator('[data-testid="task-plan"]')
+      await plan.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
+      await bubble
+        .locator('[data-testid="task-card-n1"]')
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    })
+
+    await test.step('Assert: turn completes successfully', async () => {
+      await bubble
+        .locator(selectors.chat.messageDone)
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+    })
+
+    await test.step('Assert: Sources dropdown is visible (QA feedback #1076)', async () => {
+      await expect(bubble.locator(selectors.chat.sourcesToggle)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+    })
+
+    await test.step('Assert: Sources dropdown still visible after reload', async () => {
+      await page.reload()
+      const reloadedBubble = chat.conversationBubbles().nth(previousCount)
+      await reloadedBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      await expect(reloadedBubble.locator(selectors.chat.sourcesToggle)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+    })
+  })
+
+  /**
    * Issue #1070 acceptance: a multi-step DAG turn with voice reply (text +
    * TTS) must show the audio player BOTH live (without a reload) and after
    * a page reload.

@@ -133,4 +133,94 @@ final class ResultAssemblerTest extends TestCase
         $n2 = array_values(array_filter($cards, fn ($c) => 'n2' === $c['nodeId']))[0];
         $this->assertSame('skipped', $n2['state']);
     }
+
+    private function searchPlan(): TaskPlan
+    {
+        return TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'web_search', 'inputs' => ['query' => '$message.text']],
+                ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
+            ],
+        ]);
+    }
+
+    public function testWebSearchResultsPropagatedToMetadata(): void
+    {
+        $plan = $this->searchPlan();
+        $ctx = $this->context('latest AI news');
+
+        $rawResults = [
+            'query' => 'latest AI news',
+            'results' => [
+                ['title' => 'Article 1', 'url' => 'https://example.com/1', 'description' => 'desc 1'],
+                ['title' => 'Article 2', 'url' => 'https://example.com/2', 'description' => 'desc 2'],
+            ],
+        ];
+        $ctx->setResult('n1', NodeResult::ok('formatted search text', [], [
+            'web_search' => true,
+            'query' => 'latest AI news',
+            'search_results' => $rawResults,
+        ]));
+        $ctx->setResult('n2', NodeResult::ok('Here is the AI summary.'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        // search_results must be lifted to top-level metadata so StreamController
+        // can set the web_search_query/count metas and populate the Sources dropdown.
+        $this->assertArrayHasKey('search_results', $result['metadata']);
+        $this->assertSame('latest AI news', $result['metadata']['search_results']['query']);
+        $this->assertCount(2, $result['metadata']['search_results']['results']);
+    }
+
+    public function testWebSearchCardContainsCompactSummaryNotDump(): void
+    {
+        $plan = $this->searchPlan();
+        $ctx = $this->context('latest AI news');
+
+        $rawResults = [
+            'query' => 'latest AI news',
+            'results' => [
+                ['title' => 'A1', 'url' => 'https://example.com/1', 'description' => 'd1'],
+                ['title' => 'A2', 'url' => 'https://example.com/2', 'description' => 'd2'],
+                ['title' => 'A3', 'url' => 'https://example.com/3', 'description' => 'd3'],
+            ],
+        ];
+        $ctx->setResult('n1', NodeResult::ok('Web Search Results for: "latest AI news"\n\n1. A1...', [], [
+            'web_search' => true,
+            'query' => 'latest AI news',
+            'search_results' => $rawResults,
+        ]));
+        $ctx->setResult('n2', NodeResult::ok('Summary.'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+        $cards = $result['metadata']['task_plan_render']['cards'];
+
+        $n1Card = array_values(array_filter($cards, fn ($c) => 'n1' === $c['nodeId']))[0];
+        $this->assertSame('search', $n1Card['kind']);
+        $this->assertSame('latest AI news', $n1Card['query']);
+        $this->assertSame(3, $n1Card['resultsCount']);
+        // The raw formatted dump must NOT appear in the card text.
+        $this->assertArrayNotHasKey('text', $n1Card);
+    }
+
+    public function testWebSearchResultsNotOverriddenWhenAlreadySet(): void
+    {
+        $plan = $this->searchPlan();
+        $ctx = $this->context();
+
+        // Pre-populate metadata via replyNode (unlikely but defensive).
+        $existingResults = ['query' => 'pre-set', 'results' => [['url' => 'https://a.com']]];
+        $ctx->setResult('n2', NodeResult::ok('Answer', [], ['search_results' => $existingResults]));
+        $ctx->setResult('n1', NodeResult::ok('search text', [], [
+            'web_search' => true,
+            'query' => 'different query',
+            'search_results' => ['query' => 'different query', 'results' => [['url' => 'https://b.com']]],
+        ]));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        // replyNode metadata wins (it was already set from n2).
+        $this->assertSame('pre-set', $result['metadata']['search_results']['query']);
+    }
 }

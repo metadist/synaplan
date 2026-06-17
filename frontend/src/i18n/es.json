@@ -1028,6 +1028,7 @@
     "title": "Plan de tareas",
     "download": "Descargar",
     "failedBody": "Este paso no se pudo completar.",
+    "searchSummary": "Búsqueda web · {count} {count, plural, one {fuente} other {fuentes}}",
     "retryWith": "Reintentar con {model}",
     "state": {
       "pending": "En cola",

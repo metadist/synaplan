@@ -162,6 +162,8 @@ export const selectors = {
     toolEnhance: '[data-testid="btn-tool-enhance"]',
     enhanceButton: '[data-testid="btn-chat-enhance"]',
     toolSummarizerLink: '[data-testid="link-tool-summarizer"]',
+    /** Sources (N) dropdown toggle — appears on messages that used web search */
+    sourcesToggle: '[data-testid="btn-message-sources-toggle"]',
     knowledgeFolderBtn: '[data-testid="btn-knowledge-folder"]',
     knowledgeFolderPanel: '[data-testid="dropdown-knowledge-folder"]',
     knowledgeFolderNone: '[data-testid="opt-knowledge-folder-none"]',
