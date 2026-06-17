@@ -97,6 +97,64 @@ final class McpControllerTest extends WebTestCase
         self::assertContains('synaplan_chat', $toolNames);
         self::assertContains('rag_search', $toolNames);
         self::assertContains('memory_search', $toolNames);
+        self::assertContains('memory_add', $toolNames);
+        self::assertContains('file_ingest', $toolNames);
+        self::assertContains('rag_similar', $toolNames);
+        self::assertContains('list_chats', $toolNames);
+        self::assertContains('get_messages', $toolNames);
+        self::assertContains('list_prompts', $toolNames);
+    }
+
+    public function testResourceTemplatesAreListed(): void
+    {
+        $this->client->disableReboot();
+
+        $sessionId = $this->initialize();
+
+        $result = $this->jsonRpc(
+            [
+                'jsonrpc' => '2.0',
+                'id' => 2,
+                'method' => 'resources/templates/list',
+                'params' => new \stdClass(),
+            ],
+            $sessionId,
+        );
+
+        self::assertArrayHasKey('result', $result, json_encode($result));
+        self::assertArrayHasKey('resourceTemplates', $result['result']);
+
+        $uriTemplates = array_map(
+            static fn (array $t): string => $t['uriTemplate'],
+            $result['result']['resourceTemplates'],
+        );
+        self::assertContains('synaplan://file/{id}', $uriTemplates);
+        self::assertContains('synaplan://memory/{id}', $uriTemplates);
+    }
+
+    public function testPromptsListExcludesInternalToolPrompts(): void
+    {
+        $this->client->disableReboot();
+
+        $sessionId = $this->initialize();
+
+        $result = $this->jsonRpc(
+            [
+                'jsonrpc' => '2.0',
+                'id' => 2,
+                'method' => 'prompts/list',
+                'params' => new \stdClass(),
+            ],
+            $sessionId,
+        );
+
+        self::assertArrayHasKey('result', $result, json_encode($result));
+        self::assertArrayHasKey('prompts', $result['result']);
+
+        // Whatever task prompts are exposed, internal `tools:*` prompts must never leak.
+        foreach ($result['result']['prompts'] as $prompt) {
+            self::assertStringStartsNotWith('tools:', (string) $prompt['name']);
+        }
     }
 
     /**
