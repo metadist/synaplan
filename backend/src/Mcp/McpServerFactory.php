@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace App\Mcp;
 
+use App\Entity\Message;
 use App\Entity\User;
+use App\Service\Message\MessageProcessor;
 use App\Service\RAG\VectorSearchService;
+use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
+use Doctrine\ORM\EntityManagerInterface;
+use Mcp\Schema\ToolAnnotations;
 use Mcp\Server;
 use Mcp\Server\Session\Psr16SessionStore;
 use Mcp\Server\Session\SessionStoreInterface;
@@ -40,6 +45,9 @@ final class McpServerFactory
     public function __construct(
         private readonly VectorSearchService $vectorSearch,
         private readonly UserMemoryService $memoryService,
+        private readonly MessageProcessor $messageProcessor,
+        private readonly RateLimitService $rateLimit,
+        private readonly EntityManagerInterface $em,
         private readonly CacheItemPoolInterface $cache,
         private readonly LoggerInterface $logger,
     ) {
@@ -65,12 +73,25 @@ final class McpServerFactory
             ->setLogger($this->logger)
             ->setSession($this->sessionStore())
             ->addTool(
+                $this->chatHandler($user),
+                'synaplan_chat',
+                'Synaplan chat',
+                'Send a message through Synaplan\'s full AI pipeline — intent classification, '
+                .'web search, RAG over the user\'s documents, long-term memories, and inference — '
+                .'and return the synthesized answer. This is richer than a raw model call: it uses '
+                .'the authenticated account\'s knowledge base and memories.',
+                // Not read-only (creates a message record), additive only, may reach the
+                // open web via the pipeline's web-search step.
+                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, openWorldHint: true),
+                self::chatSchema(),
+            )
+            ->addTool(
                 $this->ragSearchHandler($user),
                 'rag_search',
                 'RAG knowledge search',
                 'Semantic search across the authenticated user\'s vectorized documents and '
                 .'knowledge base. Returns the most relevant text chunks with similarity scores.',
-                null,
+                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
                 self::ragSearchSchema(),
             )
             ->addTool(
@@ -79,10 +100,82 @@ final class McpServerFactory
                 'User memory search',
                 'Search the authenticated user\'s stored long-term memories (preferences, '
                 .'facts, context) using semantic similarity.',
-                null,
+                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
                 self::memorySearchSchema(),
             )
             ->build();
+    }
+
+    /**
+     * @return \Closure(string): array<string, mixed>
+     */
+    private function chatHandler(User $user): \Closure
+    {
+        return function (string $message) use ($user): array {
+            $rateLimit = $this->rateLimit->checkLimit($user, 'MESSAGES');
+            if (!($rateLimit['allowed'] ?? false)) {
+                return [
+                    'success' => false,
+                    'error' => 'Rate limit exceeded.',
+                    'limit' => $rateLimit['limit'] ?? null,
+                    'used' => $rateLimit['used'] ?? null,
+                    'reset_at' => $rateLimit['reset_at'] ?? null,
+                ];
+            }
+
+            // Mirrors WebhookController::generic(): persist an IN message, run the
+            // full pipeline synchronously, return the assistant's answer.
+            $entity = new Message();
+            $entity->setUserId((int) $user->getId());
+            $entity->setTrackingId(time());
+            $entity->setProviderIndex('MCP');
+            $entity->setUnixTimestamp(time());
+            $entity->setDateTime(date('YmdHis'));
+            $entity->setMessageType('API');
+            $entity->setFile(0);
+            $entity->setTopic('CHAT');
+            $entity->setLanguage('en');
+            $entity->setText($message);
+            $entity->setDirection('IN');
+            $entity->setStatus('processing');
+
+            $this->em->persist($entity);
+            $this->em->flush();
+
+            $result = $this->messageProcessor->process($entity);
+
+            if (!($result['success'] ?? false)) {
+                return [
+                    'success' => false,
+                    'error' => $result['error'] ?? 'Processing failed.',
+                ];
+            }
+
+            $response = $result['response'] ?? [];
+            $answer = $response['content'] ?? '';
+            $meta = $response['metadata'] ?? [];
+            $classification = $result['classification'] ?? [];
+
+            $this->rateLimit->recordUsage($user, 'MESSAGES', [
+                'provider' => $meta['provider'] ?? 'unknown',
+                'model' => $meta['model'] ?? 'unknown',
+                'usage' => $meta['usage'] ?? [],
+                'model_id' => $meta['model_id'] ?? null,
+                'source' => 'MCP',
+                'response_text' => $answer,
+                'input_text' => $message,
+            ]);
+
+            return [
+                'success' => true,
+                'answer' => $answer,
+                'topic' => $classification['topic'] ?? null,
+                'intent' => $classification['intent'] ?? null,
+                'files' => \is_array($meta['files'] ?? null)
+                    ? $meta['files']
+                    : (isset($meta['file']) ? [$meta['file']] : []),
+            ];
+        };
     }
 
     /**
@@ -143,6 +236,26 @@ final class McpServerFactory
                 'memories' => $memories,
             ];
         };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function chatSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'message' => [
+                    'type' => 'string',
+                    'description' => 'The message or question to send through Synaplan\'s full AI '
+                        .'pipeline (classification, web search, RAG over the user\'s documents, '
+                        .'memories, and inference).',
+                ],
+            ],
+            'required' => ['message'],
+            'additionalProperties' => false,
+        ];
     }
 
     /**

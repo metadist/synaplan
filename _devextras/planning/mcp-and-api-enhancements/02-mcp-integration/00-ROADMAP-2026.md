@@ -63,14 +63,17 @@ live against the dev stack). Implemented with `mcp/sdk` v0.6.0:
 | RFC 9728 Protected Resource Metadata (`/.well-known/oauth-protected-resource[/mcp]`) | ✅ | `McpController::protectedResourceMetadata` |
 | DNS-rebinding (Origin/Host) + protocol-version middleware | ✅ | SDK middleware; allow-list via `MCP_ALLOWED_HOSTS` |
 | Session persistence across requests (Redis / PSR-16) | ✅ | `App\Mcp\McpServerFactory` (`Psr16SessionStore`) |
-| Tools `rag_search`, `memory_search` (user-scoped) | ✅ | `App\Mcp\McpServerFactory` |
+| Tools `synaplan_chat` (full pipeline), `rag_search`, `memory_search` (user-scoped) | ✅ | `App\Mcp\McpServerFactory` |
+| Per-call rate-limit check + usage recording (`source: MCP`) — `synaplan_chat` | ✅ | `App\Mcp\McpServerFactory` (`RateLimitService`) |
+| Registry manifest `server.json` (created; not yet published) | ✅ | repo root `server.json` |
 | Edge routing for `/mcp` + `/.well-known/…` (also fixed `/v1/*`) | ✅ | `_docker/backend/Caddyfile` |
 | Functional tests | ✅ | `tests/Controller/McpControllerTest.php` |
 | Public docs | ✅ | `synaplan-docs/docs/mcp.md` |
 
-**Not yet done (next):** remaining tools (`synaplan_chat`, `rag_similar`,
-`memory_add`, `file_ingest`, `list_chats`/`get_messages`, `list_prompts`),
-Resources, Prompts, Tasks, per-call audit log + rate limiting, the registry
+**Not yet done (next):** remaining tools (`rag_similar`, `memory_add`,
+`file_ingest`, `list_chats`/`get_messages`, `list_prompts`), Resources, Prompts,
+Tasks, a structured per-call **audit log** (rate-limit + usage recording is wired
+for `synaplan_chat`; extend to the read tools), **publishing** the registry
 `server.json`, and full OAuth 2.1 Resource-Server token validation
 (RFC 8707/9207) — the API-key path works today; OAuth bearer relies on the
 existing Keycloak validation.
@@ -201,6 +204,7 @@ stable.
    [Implementation status](#implementation-status).
 2. ✅ **Done** — RFC 9728 PRM `.well-known` endpoint. (OAuth token-validation
    hardening per RFC 8707/9207 still pending.)
-3. Finalize the v1 tool allowlist (§1.3) and tool-naming convention; add
-   `synaplan_chat` next.
+3. ✅ **Done** — `synaplan_chat` added (full `MessageProcessor` pipeline, mirrors
+   `WebhookController::generic()`). Next: write tools (`memory_add`,
+   `file_ingest`) and the remaining read tools, then Resources + Prompts.
 4. Update Phase-2 docs (`02-…`, `03-…`) to Streamable HTTP terminology.

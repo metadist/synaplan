@@ -94,6 +94,7 @@ final class McpControllerTest extends WebTestCase
         self::assertArrayHasKey('tools', $result['result']);
 
         $toolNames = array_map(static fn (array $t): string => $t['name'], $result['result']['tools']);
+        self::assertContains('synaplan_chat', $toolNames);
         self::assertContains('rag_search', $toolNames);
         self::assertContains('memory_search', $toolNames);
     }
