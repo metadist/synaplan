@@ -63,20 +63,25 @@ live against the dev stack). Implemented with `mcp/sdk` v0.6.0:
 | RFC 9728 Protected Resource Metadata (`/.well-known/oauth-protected-resource[/mcp]`) | ✅ | `McpController::protectedResourceMetadata` |
 | DNS-rebinding (Origin/Host) + protocol-version middleware | ✅ | SDK middleware; allow-list via `MCP_ALLOWED_HOSTS` |
 | Session persistence across requests (Redis / PSR-16) | ✅ | `App\Mcp\McpServerFactory` (`Psr16SessionStore`) |
-| Tools `synaplan_chat` (full pipeline), `rag_search`, `memory_search` (user-scoped) | ✅ | `App\Mcp\McpServerFactory` |
+| Tools — `synaplan_chat`, `rag_search`, `rag_similar`, `memory_search`, `memory_add`, `file_ingest`, `list_chats`, `get_messages`, `list_prompts` (user-scoped) | ✅ | `App\Mcp\McpServerFactory` |
+| Resources `synaplan://file/{id}`, `synaplan://memory/{id}` (read-only templates) | ✅ | `App\Mcp\McpServerFactory` |
+| Prompts — user task prompts exposed as MCP prompts (`tools:*` excluded) | ✅ | `App\Mcp\McpServerFactory` (`PromptRepository`) |
 | Per-call rate-limit check + usage recording (`source: MCP`) — `synaplan_chat` | ✅ | `App\Mcp\McpServerFactory` (`RateLimitService`) |
 | Registry manifest `server.json` (created; not yet published) | ✅ | repo root `server.json` |
 | Edge routing for `/mcp` + `/.well-known/…` (also fixed `/v1/*`) | ✅ | `_docker/backend/Caddyfile` |
 | Functional tests | ✅ | `tests/Controller/McpControllerTest.php` |
 | Public docs | ✅ | `synaplan-docs/docs/mcp.md` |
 
-**Not yet done (next):** remaining tools (`rag_similar`, `memory_add`,
-`file_ingest`, `list_chats`/`get_messages`, `list_prompts`), Resources, Prompts,
-Tasks, a structured per-call **audit log** (rate-limit + usage recording is wired
-for `synaplan_chat`; extend to the read tools), **publishing** the registry
+**Not yet done (next):** a `synaplan://chat/{shareToken}` resource, the **Tasks**
+extension, a structured per-call **audit log** (rate-limit + usage recording is
+wired for `synaplan_chat`; extend to the other tools), **publishing** the registry
 `server.json`, and full OAuth 2.1 Resource-Server token validation
 (RFC 8707/9207) — the API-key path works today; OAuth bearer relies on the
 existing Keycloak validation.
+
+**Future track (design only):** Phase 4 — agent scheduling & job dispatch for
+autonomous agents (`brogent` et al.). See
+[07-AGENT-SCHEDULING.md](./07-AGENT-SCHEDULING.md).
 
 ---
 
@@ -173,6 +178,21 @@ into repeatable "Synaplan Processes" via a JSON DSL executed on Symfony
 Messenger, with HITL gates and full traceability. Deferred until Phases 1–2 are
 stable.
 
+### Phase 4 — Agent scheduling & dispatch (autonomous agents) — **planning target**
+
+A new capability track on the **server** side: let autonomous external agents —
+starting with **`brogent`** (a browser agent), then others — **pull scheduled
+jobs** from the Synaplan MCP server. The agent asks *"what should I do and when
+should I come back?"*; a single `agent_checkin` tool returns **a job-description
+JSON** and **a schedule-update JSON** (`next_call_at` + recurrence:
+minutely / hourly / daily-at-X / weekly-on-X). Synaplan owns the *what* and the
+*when* (server-authoritative, poll-based, with jitter + adaptive backoff); the
+agent owns only the *how* (runtime, browser engine, site credentials).
+
+**Status: not implemented — design captured only.** We finish the Phase-1/2 tool
+foundation first. Full design, tool surface, schedule + job schemas, storage, and
+security: **[07-AGENT-SCHEDULING.md](./07-AGENT-SCHEDULING.md)**.
+
 ---
 
 ## 3. Distribution
@@ -204,7 +224,9 @@ stable.
    [Implementation status](#implementation-status).
 2. ✅ **Done** — RFC 9728 PRM `.well-known` endpoint. (OAuth token-validation
    hardening per RFC 8707/9207 still pending.)
-3. ✅ **Done** — `synaplan_chat` added (full `MessageProcessor` pipeline, mirrors
-   `WebhookController::generic()`). Next: write tools (`memory_add`,
-   `file_ingest`) and the remaining read tools, then Resources + Prompts.
+3. ✅ **Done** — full v1 tool catalog (`synaplan_chat`, `rag_search`,
+   `rag_similar`, `memory_search`, `memory_add`, `file_ingest`, `list_chats`,
+   `get_messages`, `list_prompts`), read-only Resources (`file`/`memory`), and
+   Prompts (user task prompts). Next: the shared-chat resource, then Tasks +
+   audit log + registry publish.
 4. Update Phase-2 docs (`02-…`, `03-…`) to Streamable HTTP terminology.
