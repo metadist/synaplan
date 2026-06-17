@@ -117,11 +117,13 @@ test.describe('@ci @multitask Multi-task routing', () => {
    * the Sources (N) dropdown just like a single-task web search does.
    *
    * Requires BraveSearch to be configured (BRAVE_SEARCH_API_KEY set).
-   * Tagged @webSearch only (not @ci) — skip in CI unless env is configured.
-   * TestProvider recognises "websearch:" prefix in the message text and
-   * returns the web_search + chat plan.
+   * Tagged @noci so it is excluded from the CI grep (the enclosing describe
+   * is @ci, which Playwright would otherwise match on the full title) — run
+   * locally with a configured BraveSearch env. The TestProvider recognises
+   * the "websearch:" prefix and returns the web_search + chat plan, but the
+   * actual search (and thus the Sources dropdown) needs a real Brave key.
    */
-  test('@webSearch Sources dropdown appears after a DAG web-search turn (PR #1076)', async ({
+  test('@webSearch @noci Sources dropdown appears after a DAG web-search turn (PR #1076)', async ({
     page,
     credentials,
   }) => {
