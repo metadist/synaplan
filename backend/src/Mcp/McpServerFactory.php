@@ -22,6 +22,7 @@ use App\Service\StorageQuotaService;
 use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use Mcp\Exception\ResourceNotFoundException;
+use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
 use Mcp\Server;
 use Mcp\Server\Builder;
@@ -43,14 +44,20 @@ use Symfony\Component\Cache\Psr16Cache;
  *    outgoing queues) and is persisted in the shared cache so the
  *    initialize → tools/list → tools/call round-trip survives across the
  *    stateless HTTP requests.
- *  - Tools are a deliberately small, read-only allowlist for the first
- *    iteration (see _devextras/planning/.../02-mcp-integration/00-ROADMAP-2026.md).
+ *  - Tools are a curated allowlist (read + write) covering chat, RAG, memories,
+ *    document ingestion, and conversation browsing
+ *    (see _devextras/planning/.../02-mcp-integration/00-ROADMAP-2026.md). Mutating
+ *    tools enforce per-call rate limits and record usage; tool-level failures are
+ *    reported to the client via the MCP `isError` flag (thrown ToolCallException).
  */
 final class McpServerFactory
 {
     private const SERVER_NAME = 'Synaplan';
     private const SERVER_VERSION = '0.1.0';
     private const SESSION_TTL_SECONDS = 3600;
+
+    /** Cap resource bodies so a single large document can't produce a huge MCP response. */
+    private const MAX_RESOURCE_CHARS = 100000;
 
     private ?SessionStoreInterface $sessionStore = null;
 
@@ -83,10 +90,13 @@ final class McpServerFactory
                 'Synaplan MCP server — knowledge retrieval (RAG) and user memories.',
             )
             ->setInstructions(
-                'Use rag_search to retrieve relevant chunks from the user\'s vectorized '
-                .'documents and chat knowledge base, and memory_search to look up facts the '
-                .'user has stored about themselves. Both tools are scoped to the authenticated '
-                .'Synaplan account.',
+                'Synaplan exposes the authenticated account\'s knowledge and assistant as tools. '
+                .'Use synaplan_chat for a full answer through Synaplan\'s pipeline; rag_search / '
+                .'rag_similar to retrieve document chunks; memory_search / memory_add to read and '
+                .'store long-term memories; file_ingest to add documents to the knowledge base; and '
+                .'list_chats / get_messages / list_prompts to browse conversations and task prompts. '
+                .'Documents and memories are also available as resources, and task prompts as MCP '
+                .'prompts. Everything is scoped to the authenticated Synaplan account.',
             )
             ->setLogger($this->logger)
             ->setSession($this->sessionStore())
@@ -271,19 +281,21 @@ final class McpServerFactory
     private function listChatsHandler(User $user): \Closure
     {
         return function (int $limit = 50) use ($user): array {
-            $chats = $this->chatRepository->findByUser((int) $user->getId());
-            $chats = \array_slice($chats, 0, max(1, min(200, $limit)));
+            $rows = $this->chatRepository->findByUserWithMessageCount(
+                (int) $user->getId(),
+                max(1, min(200, $limit)),
+            );
 
             return [
-                'total' => \count($chats),
-                'chats' => array_map(static fn (Chat $c): array => [
-                    'id' => $c->getId(),
-                    'title' => $c->getTitle() ?? 'New Chat',
-                    'source' => $c->getSource(),
-                    'created_at' => $c->getCreatedAt()->format('c'),
-                    'updated_at' => $c->getUpdatedAt()->format('c'),
-                    'message_count' => $c->getMessages()->count(),
-                ], $chats),
+                'total' => \count($rows),
+                'chats' => array_map(static fn (array $row): array => [
+                    'id' => $row['chat']->getId(),
+                    'title' => $row['chat']->getTitle() ?? 'New Chat',
+                    'source' => $row['chat']->getSource(),
+                    'created_at' => $row['chat']->getCreatedAt()->format('c'),
+                    'updated_at' => $row['chat']->getUpdatedAt()->format('c'),
+                    'message_count' => $row['messageCount'],
+                ], $rows),
             ];
         };
     }
@@ -296,7 +308,7 @@ final class McpServerFactory
         return function (int $chat_id, int $limit = 50) use ($user): array {
             $chat = $this->chatRepository->find($chat_id);
             if (!$chat instanceof Chat || $chat->getUserId() !== (int) $user->getId()) {
-                return ['success' => false, 'error' => 'Chat not found.'];
+                throw new ToolCallException('Chat not found.');
             }
 
             // Newest N, then chronological order for reading.
@@ -361,7 +373,7 @@ final class McpServerFactory
                 throw new ResourceNotFoundException($uri);
             }
 
-            return $file->getFileText();
+            return self::truncateResource($file->getFileText());
         };
     }
 
@@ -387,68 +399,77 @@ final class McpServerFactory
     }
 
     /**
-     * @return \Closure(string): array<string, mixed>
+     * @return \Closure(string, ?int): array<string, mixed>
      */
     private function chatHandler(User $user): \Closure
     {
-        return function (string $message) use ($user): array {
-            $rateLimit = $this->rateLimit->checkLimit($user, 'MESSAGES');
-            if (!($rateLimit['allowed'] ?? false)) {
-                return [
-                    'success' => false,
-                    'error' => 'Rate limit exceeded.',
-                    'limit' => $rateLimit['limit'] ?? null,
-                    'used' => $rateLimit['used'] ?? null,
-                    'reset_at' => $rateLimit['reset_at'] ?? null,
-                ];
+        return function (string $message, ?int $chat_id = null) use ($user): array {
+            if (!($this->rateLimit->checkLimit($user, 'MESSAGES')['allowed'] ?? false)) {
+                throw new ToolCallException('Rate limit exceeded for chat messages.');
             }
 
-            // Mirrors WebhookController::generic(): persist an IN message, run the
-            // full pipeline synchronously, return the assistant's answer.
-            $entity = new Message();
-            $entity->setUserId((int) $user->getId());
-            $entity->setTrackingId(time());
-            $entity->setProviderIndex('MCP');
-            $entity->setUnixTimestamp(time());
-            $entity->setDateTime(date('YmdHis'));
-            $entity->setMessageType('API');
-            $entity->setFile(0);
-            $entity->setTopic('CHAT');
-            $entity->setLanguage('en');
-            $entity->setText($message);
-            $entity->setDirection('IN');
-            $entity->setStatus('processing');
+            $userId = (int) $user->getId();
+            // Persist into a Chat so MCP conversations show up in list_chats /
+            // get_messages and thread correctly (pipeline history uses chatId).
+            $chat = $this->resolveChat($user, $chat_id, $message);
+            $trackingId = time();
 
-            $this->em->persist($entity);
+            $incoming = (new Message())
+                ->setUserId($userId)
+                ->setChat($chat)
+                ->setTrackingId($trackingId)
+                ->setProviderIndex('MCP')
+                ->setUnixTimestamp(time())
+                ->setDateTime(date('YmdHis'))
+                ->setMessageType('API')
+                ->setFile(0)
+                ->setTopic('CHAT')
+                ->setLanguage('en')
+                ->setText($message)
+                ->setDirection('IN')
+                ->setStatus('processing');
+
+            $this->em->persist($incoming);
             $this->em->flush();
 
-            $result = $this->messageProcessor->process($entity);
+            $result = $this->messageProcessor->process($incoming);
 
             if (!($result['success'] ?? false)) {
-                return [
-                    'success' => false,
-                    'error' => $result['error'] ?? 'Processing failed.',
-                ];
+                throw new ToolCallException($result['error'] ?? 'Message processing failed.');
             }
 
             $response = $result['response'] ?? [];
             $answer = $response['content'] ?? '';
-            $meta = $response['metadata'] ?? [];
+            $meta = \is_array($response['metadata'] ?? null) ? $response['metadata'] : [];
             $classification = $result['classification'] ?? [];
 
-            $this->rateLimit->recordUsage($user, 'MESSAGES', [
-                'provider' => $meta['provider'] ?? 'unknown',
-                'model' => $meta['model'] ?? 'unknown',
-                'usage' => $meta['usage'] ?? [],
-                'model_id' => $meta['model_id'] ?? null,
-                'source' => 'MCP',
-                'response_text' => $answer,
-                'input_text' => $message,
-            ]);
+            $incoming->setStatus('complete');
+
+            $outgoing = (new Message())
+                ->setUserId($userId)
+                ->setChat($chat)
+                ->setTrackingId($trackingId)
+                ->setProviderIndex('MCP')
+                ->setUnixTimestamp(time())
+                ->setDateTime(date('YmdHis'))
+                ->setMessageType('API')
+                ->setFile(0)
+                ->setTopic((string) ($classification['topic'] ?? 'CHAT'))
+                ->setLanguage((string) ($classification['language'] ?? 'en'))
+                ->setText($answer)
+                ->setDirection('OUT')
+                ->setStatus('complete');
+
+            $this->em->persist($outgoing);
+            $chat->updateTimestamp();
+            $this->em->flush();
+
+            $this->recordChatUsage($user, $message, $answer, $meta);
 
             return [
                 'success' => true,
                 'answer' => $answer,
+                'chat_id' => $chat->getId(),
                 'topic' => $classification['topic'] ?? null,
                 'intent' => $classification['intent'] ?? null,
                 'files' => \is_array($meta['files'] ?? null)
@@ -456,6 +477,71 @@ final class McpServerFactory
                     : (isset($meta['file']) ? [$meta['file']] : []),
             ];
         };
+    }
+
+    /**
+     * Reuse the caller's chat (when `chat_id` is given and owned) or create a new one.
+     */
+    private function resolveChat(User $user, ?int $chatId, string $firstMessage): Chat
+    {
+        if (null !== $chatId) {
+            $chat = $this->chatRepository->find($chatId);
+            if ($chat instanceof Chat && $chat->getUserId() === (int) $user->getId()) {
+                return $chat;
+            }
+
+            throw new ToolCallException('Chat not found.');
+        }
+
+        $chat = (new Chat())
+            ->setUserId((int) $user->getId())
+            ->setSource('mcp');
+
+        $title = mb_substr(trim($firstMessage), 0, 40);
+        if ('' !== $title) {
+            $chat->setTitle($title);
+        }
+
+        $this->em->persist($chat);
+        $this->em->flush();
+
+        return $chat;
+    }
+
+    /**
+     * Record chat usage (and media usage for image/video/audio turns), mirroring
+     * WebhookController::generic() so MCP traffic counts against the same budgets.
+     *
+     * @param array<string, mixed> $meta
+     */
+    private function recordChatUsage(User $user, string $input, string $answer, array $meta): void
+    {
+        $this->rateLimit->recordUsage($user, 'MESSAGES', [
+            'provider' => $meta['provider'] ?? 'unknown',
+            'model' => $meta['model'] ?? 'unknown',
+            'usage' => $meta['usage'] ?? [],
+            'model_id' => $meta['model_id'] ?? null,
+            'source' => 'MCP',
+            'response_text' => $answer,
+            'input_text' => $input,
+        ]);
+
+        $mediaAction = match ($meta['media_type'] ?? null) {
+            'image' => 'IMAGES',
+            'video' => 'VIDEOS',
+            'audio' => 'AUDIOS',
+            default => null,
+        };
+
+        if (null !== $mediaAction) {
+            $this->rateLimit->recordUsage($user, $mediaAction, [
+                'provider' => $meta['provider'] ?? 'unknown',
+                'model' => $meta['model'] ?? 'unknown',
+                'model_id' => $meta['model_id'] ?? null,
+                'source' => 'MCP',
+                'media_usage' => $meta['media_usage'] ?? [],
+            ]);
+        }
     }
 
     /**
@@ -493,7 +579,12 @@ final class McpServerFactory
     {
         return function (string $name, string $content, ?string $group_key = null) use ($user): array {
             if ('' === trim($content)) {
-                return ['success' => false, 'error' => 'content must not be empty.'];
+                throw new ToolCallException('content must not be empty.');
+            }
+
+            // Ingestion runs the embedding pipeline (provider cost) — gate it.
+            if (!($this->rateLimit->checkLimit($user, 'FILE_ANALYSIS')['allowed'] ?? false)) {
+                throw new ToolCallException('Rate limit exceeded for file ingestion.');
             }
 
             $userId = (int) $user->getId();
@@ -502,14 +593,14 @@ final class McpServerFactory
             try {
                 $this->storageQuota->checkStorageLimit($user, $size);
             } catch (\RuntimeException $e) {
-                return ['success' => false, 'error' => $e->getMessage()];
+                throw new ToolCallException($e->getMessage());
             }
 
             $title = '' !== trim($name) ? trim($name) : 'mcp-document';
 
             $stored = $this->fileStorage->storeRawContent($content, $userId, $title.'.txt', 'text/plain');
             if (!$stored['success']) {
-                return ['success' => false, 'error' => $stored['error'] ?? 'Failed to store content.'];
+                throw new ToolCallException($stored['error'] ?? 'Failed to store content.');
             }
 
             $file = (new File())
@@ -535,13 +626,13 @@ final class McpServerFactory
             );
 
             if (!($vector['success'] ?? false)) {
-                // Keep the stored document (text is searchable later via re-vectorize)
-                // but surface the failure to the caller.
-                return [
-                    'success' => false,
-                    'file_id' => $file->getId(),
-                    'error' => $vector['error'] ?? 'Vectorization failed.',
-                ];
+                // Roll back so a failed ingest does not leave an un-searchable file
+                // consuming storage quota.
+                $this->fileStorage->deleteFile((string) $stored['path']);
+                $this->em->remove($file);
+                $this->em->flush();
+
+                throw new ToolCallException($vector['error'] ?? 'Vectorization failed.');
             }
 
             $file->setStatus('vectorized');
@@ -564,19 +655,22 @@ final class McpServerFactory
     private function memoryAddHandler(User $user): \Closure
     {
         return function (string $category, string $key, string $value) use ($user): array {
+            // Creating a memory embeds the value (provider cost) — gate it.
+            // createMemory() records the EMBEDDINGS usage internally.
+            if (!($this->rateLimit->checkLimit($user, 'EMBEDDINGS')['allowed'] ?? false)) {
+                throw new ToolCallException('Rate limit exceeded for embeddings.');
+            }
+
             if (!$this->memoryService->isAvailable()) {
-                return [
-                    'success' => false,
-                    'error' => 'Memory service is currently unavailable.',
-                ];
+                throw new ToolCallException('Memory service is currently unavailable.');
             }
 
             try {
                 $memory = $this->memoryService->createMemory($user, $category, $key, $value, 'user_created');
             } catch (\InvalidArgumentException $e) {
-                return ['success' => false, 'error' => $e->getMessage()];
+                throw new ToolCallException($e->getMessage());
             } catch (MemoryServiceUnavailableException) {
-                return ['success' => false, 'error' => 'Memory service is currently unavailable.'];
+                throw new ToolCallException('Memory service is currently unavailable.');
             }
 
             return [
@@ -715,6 +809,11 @@ final class McpServerFactory
                         .'pipeline (classification, web search, RAG over the user\'s documents, '
                         .'memories, and inference).',
                 ],
+                'chat_id' => [
+                    'type' => ['integer', 'null'],
+                    'description' => 'Optional existing chat id (from list_chats) to continue a '
+                        .'conversation. Omit to start a new chat.',
+                ],
             ],
             'required' => ['message'],
             'additionalProperties' => false,
@@ -840,6 +939,15 @@ final class McpServerFactory
             'required' => ['query'],
             'additionalProperties' => false,
         ];
+    }
+
+    private static function truncateResource(string $text): string
+    {
+        if (mb_strlen($text) <= self::MAX_RESOURCE_CHARS) {
+            return $text;
+        }
+
+        return mb_substr($text, 0, self::MAX_RESOURCE_CHARS)."\n\n[… truncated …]";
     }
 
     private function sessionStore(): SessionStoreInterface
