@@ -21,6 +21,7 @@ use App\Service\PerfPipelineFlag;
 use App\Service\PerfTimer;
 use App\Service\Plugin\PluginContextProviderInterface;
 use App\Service\Prompt\LanguageDirectiveBuilder;
+use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
@@ -57,6 +58,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private PerfPipelineFlag $perfPipelineFlag,
         private DocumentGeneratorService $documentGenerator,
+        private TimeContextBuilder $timeContextBuilder,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -94,6 +96,30 @@ final readonly class ChatHandler implements MessageHandlerInterface
         return "\n\n## User location context\n"
             ."- Approximate country (from network geolocation, ISO 3166-1 alpha-2): {$country}.\n"
             .'- This is an approximate, IP-based signal — not a precise location. If the exact location matters, ask the user to confirm.';
+    }
+
+    /**
+     * Build the current date/time block for the chat system prompt.
+     *
+     * Delegates the formatting + timezone resolution to {@see TimeContextBuilder}
+     * and only resolves the two inputs from request state here: the user's
+     * stored IANA timezone (profile) and the approximate Cloudflare country
+     * (already forwarded as $options['client_country'] for buildLocationContext).
+     * Both are optional — guests/widget visitors simply fall back to the
+     * server timezone, clearly labelled.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function buildTimeContext(?User $user, array $options): string
+    {
+        $details = $user?->getUserDetails() ?? [];
+        $userTimezone = $details['timezone'] ?? null;
+        $country = $options['client_country'] ?? null;
+
+        return $this->timeContextBuilder->build(
+            is_string($userTimezone) ? $userTimezone : null,
+            is_string($country) ? $country : null,
+        );
     }
 
     /**
@@ -308,6 +334,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Country-only location awareness from the Cloudflare CF-IPCountry header.
         $systemPrompt .= $this->buildLocationContext($options);
+
+        // Current date/time: profile timezone → unambiguous country → server.
+        $systemPrompt .= $this->buildTimeContext($user, $options);
 
         $modelMaxTokens = null;
         if ($modelId) {
@@ -832,6 +861,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Country-only location awareness from the Cloudflare CF-IPCountry header.
         $systemPrompt .= $this->buildLocationContext($options);
+
+        // Current date/time: profile timezone → unambiguous country → server.
+        $systemPrompt .= $this->buildTimeContext($user, $options);
 
         // Check if model supports system messages (o1 models don't)
         if ($modelId) {
