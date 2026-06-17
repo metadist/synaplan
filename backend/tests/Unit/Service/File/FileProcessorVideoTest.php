@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\File;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Service\File\FileProcessor;
 use App\Service\File\PdfRasterizer;
@@ -20,6 +21,10 @@ use Psr\Log\NullLogger;
  * audio-track transcript with a visual key-frame description into one
  * labelled block. These tests pin that combination, including the
  * silent-video (visual-only) corner case.
+ *
+ * Review fix: external STT must fall back to local Whisper when it returns
+ * empty or throws (e.g. "file too large" on WhatsApp videos before
+ * extractAudioTrack() strips the video stream).
  */
 class FileProcessorVideoTest extends TestCase
 {
@@ -123,6 +128,102 @@ class FileProcessorVideoTest extends TestCase
 
         $this->assertSame('', $text);
         $this->assertSame('video_failed', $meta['strategy']);
+    }
+
+    /**
+     * Issue #983 review fix: when an external STT provider is configured and
+     * returns empty (e.g. file-size rejection), the processor must fall back
+     * to local Whisper instead of silently returning an empty transcript.
+     *
+     * Fresh mocks are used so setUp's willReturn(false) stubs cannot interfere.
+     */
+    public function testExternalSttEmptyFallsBackToLocalWhisper(): void
+    {
+        $relative = $this->writeBinaryVideo('whatsapp.mp4');
+
+        // Build a fresh FileProcessor with the exact mock behaviour this test needs.
+        $aiFacade = $this->createMock(AiFacade::class);
+        $whisperService = $this->createMock(WhisperService::class);
+        $videoAnalysisService = $this->createMock(VideoAnalysisService::class);
+
+        $processor = $this->makeProcessor($aiFacade, $whisperService, $videoAnalysisService);
+
+        // External STT configured but returns empty (simulates file-too-large rejection)
+        $aiFacade->method('hasConfiguredSttProvider')->willReturn(true);
+        $aiFacade
+            ->expects($this->once())
+            ->method('transcribe')
+            ->willReturn(['text' => '', 'provider' => 'groq']);
+
+        // Local Whisper available and returns a real transcript
+        $whisperService->method('isAvailable')->willReturn(true);
+        $whisperService
+            ->expects($this->once())
+            ->method('transcribe')
+            ->willReturn(['text' => 'Content from local whisper.', 'language' => 'en', 'duration' => 5.2, 'model' => 'base']);
+
+        $videoAnalysisService->method('describeKeyFrame')->willReturn('A speaker at a podium.');
+
+        [$text, $meta] = $processor->extractText($relative, 'mp4', 7);
+
+        $this->assertStringContainsString('Content from local whisper.', $text);
+        $this->assertStringContainsString('A speaker at a podium.', $text);
+        $this->assertSame('video_transcript_vision', $meta['strategy']);
+        $this->assertTrue($meta['has_transcript']);
+        // The local-whisper result is reflected in the audio_strategy slot
+        $this->assertSame('whisper_local', $meta['audio_strategy']);
+    }
+
+    /**
+     * When external STT throws a ProviderException AND local Whisper is
+     * unavailable, the processor returns the external error result without
+     * making a second request to the external provider.
+     */
+    public function testExternalSttThrowsAndNoLocalWhisperReturnsEmptyWithoutRetry(): void
+    {
+        $relative = $this->writeBinaryVideo('fail.mp4');
+
+        $aiFacade = $this->createMock(AiFacade::class);
+        $whisperService = $this->createMock(WhisperService::class);
+        $videoAnalysisService = $this->createMock(VideoAnalysisService::class);
+
+        $processor = $this->makeProcessor($aiFacade, $whisperService, $videoAnalysisService);
+
+        $aiFacade->method('hasConfiguredSttProvider')->willReturn(true);
+        $aiFacade
+            ->expects($this->once()) // must NOT be called a second time
+            ->method('transcribe')
+            ->willThrowException(new ProviderException('quota exceeded', 'groq'));
+
+        $whisperService->method('isAvailable')->willReturn(false);
+        $videoAnalysisService->method('describeKeyFrame')->willReturn(null);
+
+        [$text, $meta] = $processor->extractText($relative, 'mp4', 3);
+
+        $this->assertSame('', $text);
+        $this->assertSame('video_failed', $meta['strategy']);
+    }
+
+    /**
+     * Build a FileProcessor with the provided mocks (and the shared uploadDir).
+     */
+    private function makeProcessor(
+        AiFacade $aiFacade,
+        WhisperService $whisperService,
+        VideoAnalysisService $videoAnalysisService,
+    ): FileProcessor {
+        return new FileProcessor(
+            $this->tikaClient,
+            $this->createMock(PdfRasterizer::class),
+            new TextCleaner(),
+            $aiFacade,
+            $whisperService,
+            $videoAnalysisService,
+            new NullLogger(),
+            $this->uploadDir,
+            tikaMinLength: 32,
+            tikaMinEntropy: 2.0,
+        );
     }
 
     /**

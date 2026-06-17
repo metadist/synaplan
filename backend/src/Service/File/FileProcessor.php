@@ -402,6 +402,11 @@ final readonly class FileProcessor
      * the full local/external speech-to-text pipeline) AND describe a
      * representative key frame via Vision AI (issue #983).
      *
+     * Audio is stripped from the video container before being sent to any
+     * external STT API. This prevents external providers (Groq, OpenAI) from
+     * rejecting the request with "file too large" — a WhatsApp video is
+     * typically 30–80 MB while its audio-only track is 2–4 MB (issue #983).
+     *
      * The two results are merged into one labelled block so the chat model
      * can both "read" what was said and "see" what was shown. Either part
      * may be empty (a silent clip yields visual-only; a video the vision
@@ -417,9 +422,21 @@ final readonly class FileProcessor
      */
     private function extractFromVideo(string $relativePath, string $absolutePath, array $baseMeta, ?int $userId = null): array
     {
-        // 1. Audio track -> transcript (handles ffmpeg -vn extraction and
-        //    the local-Whisper -> external-API fallback chain).
-        [$transcript, $audioMeta] = $this->extractFromAudio($absolutePath, $baseMeta, $userId);
+        // 1. Strip video stream before calling the STT pipeline so that external
+        //    APIs never receive the full container file (issue #983).
+        $audioOnlyPath = $this->extractAudioTrack($absolutePath);
+        $audioInputPath = $audioOnlyPath ?? $absolutePath;
+
+        $audioMeta = [];
+
+        try {
+            [$transcript, $audioMeta] = $this->extractFromAudio($audioInputPath, $baseMeta, $userId);
+        } finally {
+            if (null !== $audioOnlyPath && file_exists($audioOnlyPath)) {
+                @unlink($audioOnlyPath);
+            }
+        }
+
         $transcript = trim((string) $transcript);
 
         // 2. Representative frame -> visual description (fault tolerant).
@@ -462,61 +479,168 @@ final readonly class FileProcessor
     }
 
     /**
+     * Extract audio track from a video file into a compact MP3 for STT.
+     *
+     * Runs ffmpeg with -vn to strip the video stream so that external STT
+     * providers never receive the full container (issue #983: WhatsApp videos
+     * are typically 30–80 MB but the audio-only track is 2–4 MB).
+     *
+     * @return string|null absolute path to temp MP3, or null when ffmpeg is
+     *                     unavailable or the extraction fails (caller falls
+     *                     back to the original video path)
+     */
+    private function extractAudioTrack(string $videoPath): ?string
+    {
+        if (!file_exists($this->ffmpegBinary) || !is_executable($this->ffmpegBinary)) {
+            $this->logger->debug('FileProcessor: FFmpeg unavailable, skipping audio-track extraction', [
+                'video' => basename($videoPath),
+            ]);
+
+            return null;
+        }
+
+        $tempPath = sys_get_temp_dir().'/audio_track_'.uniqid().'.mp3';
+
+        $process = new Process([
+            $this->ffmpegBinary,
+            '-i', $videoPath,
+            '-vn',          // strip video stream
+            '-ar', '16000', // 16 kHz (optimal for speech recognition)
+            '-ac', '1',     // mono
+            '-b:a', '64k',  // 64 kbps (good balance of size and speech quality)
+            '-f', 'mp3',
+            '-y',
+            $tempPath,
+        ]);
+        $process->setTimeout(120);
+
+        try {
+            $process->run();
+
+            if (!$process->isSuccessful() || !file_exists($tempPath) || filesize($tempPath) < 100) {
+                if (file_exists($tempPath)) {
+                    @unlink($tempPath);
+                }
+                $this->logger->warning('FileProcessor: Audio track extraction failed', [
+                    'video' => basename($videoPath),
+                    'exit_code' => $process->getExitCode(),
+                ]);
+
+                return null;
+            }
+
+            $this->logger->info('FileProcessor: Extracted audio track from video', [
+                'video' => basename($videoPath),
+                'video_size' => filesize($videoPath),
+                'audio_size' => filesize($tempPath),
+            ]);
+
+            return $tempPath;
+        } catch (\Throwable $e) {
+            if (file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
+            $this->logger->warning('FileProcessor: Audio track extraction exception', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * Extract text from audio/video file using Whisper.cpp with external API fallback.
      *
      * Strategy order:
-     * 1. Local Whisper.cpp (fast, free, no external dependencies)
-     * 2. External OpenAI Whisper API (fallback when local not available)
+     * 1. External STT (when user configured one): try first; on empty result fall
+     *    through to local Whisper so that oversized files processed by
+     *    extractAudioTrack() still get a transcript via the local path (issue #983).
+     * 2. Local Whisper.cpp: preferred when available and no external configured,
+     *    or as fallback when the external provider returned empty.
+     * 3. External STT (when no external configured and local unavailable/failed).
      *
-     * @param string $absolutePath Full path to the audio file
-     * @param array  $baseMeta     Base metadata for logging
+     * @param string   $absolutePath Full path to the audio file
+     * @param array    $baseMeta     Base metadata for logging
+     * @param int|null $userId       User ID for provider selection
      *
      * @return array [extractedText, meta]
      */
     private function extractFromAudio(string $absolutePath, array $baseMeta, ?int $userId = null): array
     {
-        // If user has configured an external STT provider, use it directly
+        // If user has configured an external STT provider, try it first.
+        // Fall through to local Whisper when it returns empty (issue #983).
         if ($this->aiFacade->hasConfiguredSttProvider($userId)) {
-            $this->logger->info('FileProcessor: User has external STT provider configured, using external API', $baseMeta);
+            $this->logger->info('FileProcessor: User has external STT provider configured, trying external API first', $baseMeta);
 
-            return $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
-        }
+            [$text, $extMeta] = $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
 
-        // No external provider configured — try local Whisper.cpp first (preferred)
-        if ($this->whisperService->isAvailable()) {
-            $this->logger->info('FileProcessor: Transcribing audio with local Whisper', $baseMeta);
-
-            try {
-                $result = $this->whisperService->transcribe($absolutePath);
-                $text = $result['text'] ?? '';
-                $text = $this->textCleaner->clean($text);
-
-                if (!empty(trim($text))) {
-                    $this->logger->info('FileProcessor: Local Whisper transcription success', [
-                        'strategy' => 'whisper_local',
-                        'bytes' => strlen($text),
-                        'language' => $result['language'] ?? 'unknown',
-                        'duration' => $result['duration'] ?? 0,
-                    ]);
-
-                    return [$text, [
-                        'strategy' => 'whisper_local',
-                        'language' => $result['language'] ?? 'unknown',
-                        'duration' => $result['duration'] ?? 0,
-                        'model' => $result['model'] ?? 'base',
-                    ] + $baseMeta];
-                }
-
-                $this->logger->warning('FileProcessor: Local Whisper returned empty text, trying external API', $baseMeta);
-            } catch (\Throwable $e) {
-                $this->logger->warning('FileProcessor: Local Whisper failed, trying external API', [
-                    'error' => $e->getMessage(),
-                ] + $baseMeta);
+            if ('' !== trim((string) $text)) {
+                return [$text, $extMeta];
             }
+
+            // External returned empty — try local Whisper as fallback
+            $this->logger->info('FileProcessor: External STT returned empty, trying local Whisper fallback', $baseMeta);
+
+            $localResult = $this->tryLocalWhisper($absolutePath, $baseMeta);
+            if (null !== $localResult) {
+                return $localResult;
+            }
+
+            // Both paths exhausted — return external's (empty/error) result
+            return [$text, $extMeta];
         }
 
-        // Try external speech-to-text provider (user's configured provider or OpenAI)
+        // No external configured — prefer local Whisper, fall back to external.
+        $localResult = $this->tryLocalWhisper($absolutePath, $baseMeta);
+        if (null !== $localResult) {
+            return $localResult;
+        }
+
         return $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
+    }
+
+    /**
+     * Attempt to transcribe audio using local Whisper.cpp.
+     *
+     * @return array|null [text, meta] on non-empty transcript, null when Whisper is
+     *                    unavailable, fails, or returns only silence
+     */
+    private function tryLocalWhisper(string $absolutePath, array $baseMeta): ?array
+    {
+        if (!$this->whisperService->isAvailable()) {
+            return null;
+        }
+
+        $this->logger->info('FileProcessor: Transcribing audio with local Whisper', $baseMeta);
+
+        try {
+            $result = $this->whisperService->transcribe($absolutePath);
+            $text = $this->textCleaner->clean($result['text'] ?? '');
+
+            if (!empty(trim($text))) {
+                $this->logger->info('FileProcessor: Local Whisper transcription success', [
+                    'strategy' => 'whisper_local',
+                    'bytes' => strlen($text),
+                    'language' => $result['language'] ?? 'unknown',
+                    'duration' => $result['duration'] ?? 0,
+                ]);
+
+                return [$text, [
+                    'strategy' => 'whisper_local',
+                    'language' => $result['language'] ?? 'unknown',
+                    'duration' => $result['duration'] ?? 0,
+                    'model' => $result['model'] ?? 'base',
+                ] + $baseMeta];
+            }
+
+            $this->logger->warning('FileProcessor: Local Whisper returned empty text', $baseMeta);
+        } catch (\Throwable $e) {
+            $this->logger->warning('FileProcessor: Local Whisper failed', [
+                'error' => $e->getMessage(),
+            ] + $baseMeta);
+        }
+
+        return null;
     }
 
     /**
@@ -591,6 +715,11 @@ final readonly class FileProcessor
      * WhatsApp and other sources may send audio in formats not supported
      * by OpenAI/Groq Whisper APIs (e.g., AMR, 3GP). This method converts
      * unsupported formats to MP3 using FFmpeg.
+     *
+     * Note: video files (.mp4 etc.) reach this method only in the pure-audio
+     * path (no video extension). For video files the audio track is stripped
+     * earlier in extractAudioTrack(), so by the time we arrive here the input
+     * is already a compact MP3, and this method is a no-op.
      *
      * @param string $absolutePath Full path to the audio file
      *
