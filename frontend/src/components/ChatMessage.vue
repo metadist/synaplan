@@ -37,7 +37,7 @@
       <!-- Single bubble with content + footer -->
       <div
         :class="[
-          'flex flex-col relative group/bubble',
+          'flex flex-col relative group/bubble min-w-0 max-w-full',
           role === 'user' ? 'bubble-user' : 'bubble-ai',
         ]"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
