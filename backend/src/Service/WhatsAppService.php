@@ -2043,17 +2043,35 @@ final class WhatsAppService
      * - Monospace: ```text``` or `text` (same as MD)
      * - Lists: - item or * item (same as MD, but we use • for safety)
      * - Quotes: > text (same as MD)
-     * - No support for [text](url) links or ![alt](url) images
+     * - No support for [text](url) links, ![alt](url) images, # headings or tables
+     *
+     * Markdown that WhatsApp cannot render is rewritten into a supported subset:
+     * headings → bold, links → "text (url)", tables → "*Header:* value" blocks,
+     * and ```markdown fences are unwrapped (see {@see convertTablesToWhatsApp()}).
      *
      * @see https://faq.whatsapp.com/539178204879377
      */
     private function convertToWhatsAppMarkdown(string $text): string
     {
-        // 1. Protect code blocks and strip language identifiers (```python → ```)
+        // 1. Protect code blocks and strip language identifiers (```python → ```).
+        // Exception: ```markdown / ```md fences are UNWRAPPED instead of frozen.
+        // The AI often returns a whole answer inside a ```markdown block when the
+        // user asks for "a markdown list/table". WhatsApp renders that fence as
+        // monospace, leaking every #, |, ** to the user (issue #268). Unwrapping
+        // lets the inner Markdown flow through the conversion below so the user
+        // sees formatted text instead of raw syntax. Real code fences
+        // (python/js/…) stay monospace — WhatsApp supports and benefits from it.
         $codeBlocks = [];
-        $text = preg_replace_callback('/```[^\n`]*\n?([\s\S]*?)```/', function ($match) use (&$codeBlocks) {
+        $text = preg_replace_callback('/```([^\n`]*)\n?([\s\S]*?)```/', function ($match) use (&$codeBlocks) {
+            $language = strtolower(trim($match[1]));
+            $content = $match[2];
+
+            if (in_array($language, ['markdown', 'md'], true)) {
+                return $content;
+            }
+
             $placeholder = '{{CODE_BLOCK_'.count($codeBlocks).'}}';
-            $codeBlocks[$placeholder] = '```'.$match[1].'```';
+            $codeBlocks[$placeholder] = '```'.$content.'```';
 
             return $placeholder;
         }, $text);
@@ -2066,6 +2084,12 @@ final class WhatsAppService
 
             return $placeholder;
         }, $text);
+
+        // 2b. Convert Markdown tables to a WhatsApp-friendly layout. WhatsApp has
+        // no table support, so a raw pipe table leaks as a wall of "| col |"
+        // characters (issue #268). Done before the bold/link steps so the emitted
+        // labels and any inline markup inside cells still get converted.
+        $text = $this->convertTablesToWhatsApp($text);
 
         // 3. Convert image links ![alt](url) → alt text or URL
         $text = preg_replace('/!\[([^\]]*)\]\(([^)]+)\)/', '$2', $text);
@@ -2132,6 +2156,132 @@ final class WhatsAppService
         }
 
         return $text;
+    }
+
+    /**
+     * Convert GitHub-flavoured Markdown tables into a WhatsApp-friendly layout.
+     *
+     * WhatsApp has no table support, so a raw pipe table leaks as a wall of
+     * "| col | col |" characters (issue #268). Mobile screens are also too narrow
+     * for column alignment in a proportional font, so each data row is rendered
+     * as a small block of "*Header:* value" lines instead — readable and using
+     * only WhatsApp-supported bold. The header labels are emitted as standard
+     * Markdown bold (**Header:**) so the downstream bold step turns them into
+     * WhatsApp's single-asterisk bold.
+     *
+     * A table is only recognised when a row containing a pipe is immediately
+     * followed by a separator row (e.g. |---|:--:|), matching the GFM spec.
+     */
+    private function convertTablesToWhatsApp(string $text): string
+    {
+        $lines = explode("\n", $text);
+        $lineCount = count($lines);
+        $out = [];
+        $i = 0;
+
+        while ($i < $lineCount) {
+            $line = $lines[$i];
+
+            if ($this->isTableRow($line)
+                && $i + 1 < $lineCount
+                && $this->isTableSeparator($lines[$i + 1])
+            ) {
+                $headers = $this->splitTableRow($line);
+                $i += 2; // skip the header row and the separator row
+
+                $renderedRows = [];
+                while ($i < $lineCount && $this->isTableRow($lines[$i]) && !$this->isTableSeparator($lines[$i])) {
+                    $renderedRows[] = $this->renderTableRow($headers, $this->splitTableRow($lines[$i]));
+                    ++$i;
+                }
+
+                if ([] !== $renderedRows) {
+                    // Blank line between rows keeps each record visually distinct.
+                    $out[] = implode("\n\n", array_filter($renderedRows, static fn (string $row): bool => '' !== $row));
+                }
+
+                continue;
+            }
+
+            $out[] = $line;
+            ++$i;
+        }
+
+        return implode("\n", $out);
+    }
+
+    /**
+     * A table row is any line that contains at least one pipe delimiter.
+     */
+    private function isTableRow(string $line): bool
+    {
+        return str_contains(trim($line), '|');
+    }
+
+    /**
+     * A separator row contains only alignment markers (-, :, |, spaces),
+     * e.g. |---|:--:|---:|. This is what distinguishes a real table from a
+     * stray sentence that happens to contain a pipe.
+     */
+    private function isTableSeparator(string $line): bool
+    {
+        $trimmed = trim($line);
+        if (!str_contains($trimmed, '-')) {
+            return false;
+        }
+
+        $cells = $this->splitTableRow($trimmed);
+        if ([] === $cells) {
+            return false;
+        }
+
+        foreach ($cells as $cell) {
+            if (1 !== preg_match('/^:?-{1,}:?$/', trim($cell))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Split a table row into trimmed cells, dropping the optional leading and
+     * trailing pipe so boundary cells don't show up as empty entries.
+     *
+     * @return list<string>
+     */
+    private function splitTableRow(string $line): array
+    {
+        $trimmed = trim($line);
+        $trimmed = preg_replace('/^\|/', '', $trimmed) ?? $trimmed;
+        $trimmed = preg_replace('/\|$/', '', $trimmed) ?? $trimmed;
+
+        return array_map('trim', explode('|', $trimmed));
+    }
+
+    /**
+     * Render a single data row as "*Header:* value" lines (one per non-empty
+     * cell). Cells without a matching header fall back to the bare value.
+     *
+     * @param list<string> $headers
+     * @param list<string> $cells
+     */
+    private function renderTableRow(array $headers, array $cells): string
+    {
+        $parts = [];
+
+        foreach ($cells as $index => $cell) {
+            if ('' === $cell) {
+                continue;
+            }
+
+            $header = trim($headers[$index] ?? '');
+            // Emit standard Markdown bold (**…**) so the existing bold step
+            // converts it to WhatsApp's single-asterisk bold downstream.
+            $parts[] = '' !== $header ? '**'.$header.':** '.$cell : $cell;
+        }
+
+        return implode("\n", $parts);
     }
 
     /**
