@@ -48,6 +48,15 @@ final readonly class FileProcessor
     ];
 
     /**
+     * Video container formats that must always have their audio track stripped
+     * before being sent to an external STT API — even though some containers
+     * (mp4, mkv) appear in API_SUPPORTED_AUDIO_FORMATS. A full video file can
+     * easily be 40+ MB while the extracted audio-only payload is a few MB;
+     * every hosted Whisper endpoint enforces a ~25 MB ceiling.
+     */
+    private const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv', 'mpeg', 'mpg'];
+
+    /**
      * Audio formats supported by external APIs (OpenAI/Groq Whisper).
      * Formats not in this list need to be converted before sending.
      *
@@ -374,61 +383,109 @@ final readonly class FileProcessor
     }
 
     /**
+     * Public static variant used by FileUploadService to distinguish a
+     * transcription failure (audio/video → empty result is an error) from a
+     * legitimate no-content result (e.g. a blank PDF has no extractable text).
+     */
+    public static function isTranscribableMediaExtension(string $ext): bool
+    {
+        return in_array(strtolower($ext), self::TRANSCRIBABLE_MEDIA_EXTENSIONS, true);
+    }
+
+    /**
      * Extract text from audio/video file using Whisper.cpp with external API fallback.
      *
-     * Strategy order:
-     * 1. Local Whisper.cpp (fast, free, no external dependencies)
-     * 2. External OpenAI Whisper API (fallback when local not available)
+     * Strategy when an external STT provider is configured:
+     *   1. External provider (faster, handles many languages)
+     *   2. Local Whisper.cpp if external returns empty or fails (fallback)
      *
-     * @param string $absolutePath Full path to the audio file
+     * Strategy when no external provider is configured:
+     *   1. Local Whisper.cpp (free, no network dependency)
+     *   2. External provider as last resort
+     *
+     * @param string $absolutePath Full path to the audio/video file
      * @param array  $baseMeta     Base metadata for logging
      *
      * @return array [extractedText, meta]
      */
     private function extractFromAudio(string $absolutePath, array $baseMeta, ?int $userId = null): array
     {
-        // If user has configured an external STT provider, use it directly
         if ($this->aiFacade->hasConfiguredSttProvider($userId)) {
-            $this->logger->info('FileProcessor: User has external STT provider configured, using external API', $baseMeta);
+            $this->logger->info('FileProcessor: Trying external STT provider first', $baseMeta);
+            $externalResult = $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
 
-            return $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
-        }
-
-        // No external provider configured — try local Whisper.cpp first (preferred)
-        if ($this->whisperService->isAvailable()) {
-            $this->logger->info('FileProcessor: Transcribing audio with local Whisper', $baseMeta);
-
-            try {
-                $result = $this->whisperService->transcribe($absolutePath);
-                $text = $result['text'] ?? '';
-                $text = $this->textCleaner->clean($text);
-
-                if (!empty(trim($text))) {
-                    $this->logger->info('FileProcessor: Local Whisper transcription success', [
-                        'strategy' => 'whisper_local',
-                        'bytes' => strlen($text),
-                        'language' => $result['language'] ?? 'unknown',
-                        'duration' => $result['duration'] ?? 0,
-                    ]);
-
-                    return [$text, [
-                        'strategy' => 'whisper_local',
-                        'language' => $result['language'] ?? 'unknown',
-                        'duration' => $result['duration'] ?? 0,
-                        'model' => $result['model'] ?? 'base',
-                    ] + $baseMeta];
-                }
-
-                $this->logger->warning('FileProcessor: Local Whisper returned empty text, trying external API', $baseMeta);
-            } catch (\Throwable $e) {
-                $this->logger->warning('FileProcessor: Local Whisper failed, trying external API', [
-                    'error' => $e->getMessage(),
-                ] + $baseMeta);
+            if ('' !== trim((string) ($externalResult[0] ?? ''))) {
+                return $externalResult;
             }
+
+            // External returned empty (provider error, file too large, etc.) —
+            // fall back to local Whisper before giving up.
+            $this->logger->info('FileProcessor: External STT returned empty, falling back to local Whisper', $baseMeta);
+            $localResult = $this->transcribeLocally($absolutePath, $baseMeta);
+            if (null !== $localResult) {
+                return $localResult;
+            }
+
+            return $externalResult;
         }
 
-        // Try external speech-to-text provider (user's configured provider or OpenAI)
+        // No external provider configured — prefer local Whisper, fall back to external.
+        $localResult = $this->transcribeLocally($absolutePath, $baseMeta);
+        if (null !== $localResult) {
+            return $localResult;
+        }
+
         return $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
+    }
+
+    /**
+     * Attempt transcription with local Whisper.cpp.
+     *
+     * Returns the [text, meta] pair on success, or null when Whisper is
+     * unavailable, throws, or produces an empty transcript.  Callers treat
+     * null as "not available — try something else".
+     *
+     * @param string $absolutePath Full path to the audio/video file
+     * @param array  $baseMeta     Base metadata for logging
+     *
+     * @return array{0: string, 1: array<string, mixed>}|null
+     */
+    private function transcribeLocally(string $absolutePath, array $baseMeta): ?array
+    {
+        if (!$this->whisperService->isAvailable()) {
+            return null;
+        }
+
+        $this->logger->info('FileProcessor: Transcribing with local Whisper', $baseMeta);
+
+        try {
+            $result = $this->whisperService->transcribe($absolutePath);
+            $text = $this->textCleaner->clean($result['text'] ?? '');
+
+            if ('' !== trim($text)) {
+                $this->logger->info('FileProcessor: Local Whisper transcription success', [
+                    'strategy' => 'whisper_local',
+                    'bytes' => strlen($text),
+                    'language' => $result['language'] ?? 'unknown',
+                    'duration' => $result['duration'] ?? 0,
+                ]);
+
+                return [$text, [
+                    'strategy' => 'whisper_local',
+                    'language' => $result['language'] ?? 'unknown',
+                    'duration' => $result['duration'] ?? 0,
+                    'model' => $result['model'] ?? 'base',
+                ] + $baseMeta];
+            }
+
+            $this->logger->warning('FileProcessor: Local Whisper returned empty text', $baseMeta);
+        } catch (\Throwable $e) {
+            $this->logger->warning('FileProcessor: Local Whisper failed', [
+                'error' => $e->getMessage(),
+            ] + $baseMeta);
+        }
+
+        return null;
     }
 
     /**
@@ -512,8 +569,16 @@ final readonly class FileProcessor
     {
         $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
 
-        // Check if format is already supported
-        if (in_array($ext, self::API_SUPPORTED_AUDIO_FORMATS, true)) {
+        // Video files must always be converted to an audio-only MP3 even when
+        // their container extension (mp4, mkv…) is listed in
+        // API_SUPPORTED_AUDIO_FORMATS.  The full video stream easily exceeds
+        // the ~25 MB ceiling enforced by Groq, OpenAI, and every other hosted
+        // Whisper endpoint; the extracted audio-only payload is typically just
+        // a few MB.  The -vn flag in the ffmpeg call below strips the video
+        // track so the conversion applies universally to all future providers.
+        $isVideo = in_array($ext, self::VIDEO_EXTENSIONS, true);
+
+        if (!$isVideo && in_array($ext, self::API_SUPPORTED_AUDIO_FORMATS, true)) {
             return $absolutePath;
         }
 

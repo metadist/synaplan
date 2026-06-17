@@ -1824,6 +1824,7 @@
     "status_extracted": "Extrahiert",
     "status_vectorizing": "Wird indexiert…",
     "status_vectorized": "Bereit",
+    "status_error": "Fehler",
     "status_processed": "Verarbeitet",
     "attached": "Angehängt",
     "standalone": "Eigenständig",
