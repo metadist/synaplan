@@ -19,12 +19,7 @@
     </button>
 
     <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-      <GroqIcon
-        v-if="selectedModel?.service?.toLowerCase().includes('groq')"
-        :size="16"
-        class-name="txt-primary"
-      />
-      <Icon v-else :icon="getProviderIcon(selectedModel?.service ?? '')" class="w-4 h-4" />
+      <ServiceIcon :service="selectedModel?.service ?? ''" :size="16" />
     </div>
 
     <ChevronDownIcon
@@ -64,12 +59,7 @@
             :class="['dropdown-item w-full', isSelected(model) && 'dropdown-item--active']"
             @click="selectModel(model)"
           >
-            <GroqIcon
-              v-if="model.service.toLowerCase().includes('groq')"
-              :size="20"
-              class-name="flex-shrink-0"
-            />
-            <Icon v-else :icon="getProviderIcon(model.service)" class="w-5 h-5 flex-shrink-0" />
+            <ServiceIcon :service="model.service" :size="20" />
             <div class="flex-1 min-w-0 text-left">
               <div class="flex items-center gap-2">
                 <span class="font-medium truncate">{{ model.name }}</span>
@@ -93,9 +83,8 @@
 import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { ChevronDownIcon } from '@heroicons/vue/20/solid'
-import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
-import { getProviderIcon } from '@/utils/providerIcons'
 import type { AIModel, Capability } from '@/types/ai-models'
 
 export interface ModelGroup {

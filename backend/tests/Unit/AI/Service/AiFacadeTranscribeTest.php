@@ -101,6 +101,9 @@ class AiFacadeTranscribeTest extends TestCase
         $this->assertSame('hello', $result['text']);
         $this->assertSame('groq', $result['provider']);
         $this->assertSame('whisper-large-v3', $result['model']);
+        // model_id must be surfaced so the message-details popover can resolve
+        // the concrete BMODELS row (and the "AI Model" badge stays clickable).
+        $this->assertSame(21, $result['model_id']);
     }
 
     public function testTranscribeForwardsNonTurboModelWhenSameProviderHasMultiple(): void

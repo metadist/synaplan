@@ -30,6 +30,10 @@ parameters:
     env(REALTIME_API_KEY): ''
     env(REALTIME_TOKEN_SECRET): ''
 
+    # Mistral AI is optional; default empty so the backend boots when the key
+    # is unset (matches the other optional cloud-AI providers).
+    env(MISTRAL_API_KEY): ''
+
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
     # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)
@@ -93,6 +97,12 @@ parameters:
     # Production default is 5; the E2E suite raises it (all tests share one
     # client IP, which would otherwise trip the limit and 429).
     env(GUEST_MAX_SESSIONS_PER_IP): '5'
+
+    # Extra hostnames (comma-separated, no port) accepted by the MCP endpoint's
+    # DNS-rebinding protection, on top of localhost variants and the APP_URL
+    # host. Set this to the public MCP host(s) in production, e.g.
+    # "web.synaplan.com".
+    env(MCP_ALLOWED_HOSTS): ''
 
 services:
     _defaults:
@@ -191,6 +201,16 @@ services:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.vision' }
             - { name: 'app.ai.speech_to_text' }
+
+    App\AI\Provider\MistralProvider:
+        arguments:
+            $apiKey: '%env(MISTRAL_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.text_to_speech' }
 
     App\AI\Provider\GoogleProvider:
         arguments:
@@ -348,6 +368,18 @@ services:
     App\Controller\WebhookController:
         bind:
             $whatsappWebhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
+
+    # MCP (Model Context Protocol) Streamable HTTP endpoint
+    App\Controller\McpController:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+            $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+            $mcpAllowedHosts: '%env(MCP_ALLOWED_HOSTS)%'
+
+    # MCP firewall entry point (401 + WWW-Authenticate → RFC 9728 metadata)
+    App\Security\McpAuthenticationEntryPoint:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
 
     # Message Processing Services
     App\Service\Message\MessagePreProcessor:

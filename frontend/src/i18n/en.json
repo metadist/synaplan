@@ -400,6 +400,7 @@
     "messageDetails": "Message details",
     "infoTopic": "Topic",
     "infoModel": "Model",
+    "infoAiModel": "AI Model",
     "infoProvider": "Provider",
     "infoAudioModel": "Audio Model"
   },

@@ -57,7 +57,7 @@
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
       >
-        <Icon :icon="getProviderIcon(model.service)" class="w-5 h-5 flex-shrink-0" />
+        <ServiceIcon :service="model.service" :size="20" />
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">{{ model.name }}</span>
@@ -85,6 +85,7 @@ import { Icon } from '@iconify/vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useI18n } from 'vue-i18n'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import type { AIModel } from '@/types/ai-models'
 
 const props = defineProps<{
@@ -122,17 +123,6 @@ const selectedModelName = computed(() => {
   if (selectedModelObj.value) return selectedModelObj.value.name
   return t('chatInput.modelDropdown.default')
 })
-
-const getProviderIcon = (provider: string): string => {
-  const p = provider.toLowerCase()
-  if (p.includes('openai')) return 'mdi:robot-outline'
-  if (p.includes('anthropic')) return 'mdi:robot-outline'
-  if (p.includes('google')) return 'mdi:google'
-  if (p.includes('ollama')) return 'mdi:server'
-  if (p.includes('cloudflare')) return 'simple-icons:cloudflare'
-  if (p.includes('groq')) return 'mdi:lightning-bolt'
-  return 'mdi:robot-outline'
-}
 
 const toggleOpen = () => {
   isOpen.value = !isOpen.value

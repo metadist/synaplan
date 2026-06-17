@@ -33,3 +33,33 @@ export const getProviderIcon = (provider: string): string => {
 
   return 'mdi:robot'
 }
+
+/**
+ * Country/region flag shown as a small badge behind a provider's service icon.
+ *
+ * Uses the circular `circle-flags` Iconify set so every badge shares the same
+ * round shape. Providers without a clear home country (or any unlisted service)
+ * fall back to the UN "world" emblem.
+ */
+export const getProviderFlag = (provider: string): string => {
+  const p = provider.toLowerCase()
+
+  if (p.includes('ollama') || p.includes('piper') || p.includes('synaplan')) {
+    // Ollama and the self-hosted Synaplan/Piper TTS are German-hosted.
+    return 'circle-flags:de'
+  } else if (p.includes('mistral')) {
+    return 'circle-flags:fr'
+  } else if (
+    p.includes('openai') ||
+    p.includes('anthropic') ||
+    p.includes('google') ||
+    p.includes('groq') ||
+    p.includes('thehive') ||
+    p.includes('the hive')
+  ) {
+    return 'circle-flags:us'
+  }
+
+  // HuggingFace and any unlisted service → world icon.
+  return 'circle-flags:un'
+}

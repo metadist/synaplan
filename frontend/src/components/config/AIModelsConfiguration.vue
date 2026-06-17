@@ -99,19 +99,9 @@
               </span>
             </button>
             <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-              <GroqIcon
-                v-if="
-                  getSelectedModelService(capability as Capability)
-                    .toLowerCase()
-                    .includes('groq')
-                "
+              <ServiceIcon
+                :service="getSelectedModelService(capability as Capability)"
                 :size="16"
-                class-name="txt-primary"
-              />
-              <Icon
-                v-else
-                :icon="getProviderIcon(getSelectedModelService(capability as Capability))"
-                class="w-4 h-4"
               />
             </div>
             <ChevronDownIcon
@@ -145,12 +135,7 @@
                 data-testid="btn-model-option"
                 @click="selectModel(capability as Capability, model.id)"
               >
-                <GroqIcon
-                  v-if="model.service.toLowerCase().includes('groq')"
-                  :size="20"
-                  class-name="flex-shrink-0"
-                />
-                <Icon v-else :icon="getProviderIcon(model.service)" class="w-5 h-5 flex-shrink-0" />
+                <ServiceIcon :service="model.service" :size="20" />
                 <div class="flex-1 min-w-0 text-left">
                   <div class="flex items-center gap-2">
                     <span class="font-medium truncate">{{ model.name }}</span>
@@ -310,16 +295,7 @@
             >
               <td class="py-3 px-2 sm:px-3">
                 <div class="flex items-center gap-2">
-                  <GroqIcon
-                    v-if="model.service.toLowerCase().includes('groq')"
-                    :size="16"
-                    class-name="flex-shrink-0"
-                  />
-                  <Icon
-                    v-else
-                    :icon="getProviderIcon(model.service)"
-                    class="w-4 h-4 flex-shrink-0"
-                  />
+                  <ServiceIcon :service="model.service" :size="16" />
                   <span class="txt-primary text-sm font-medium">{{ model.name }}</span>
                 </div>
               </td>
@@ -458,12 +434,11 @@ import {
   ListBulletIcon,
   LockClosedIcon,
 } from '@heroicons/vue/24/outline'
-import { Icon } from '@iconify/vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
-import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
@@ -484,7 +459,6 @@ import {
   type ModelWithPurposes,
   type PurposeChip,
 } from '@/utils/aiModelDedupe'
-import { getProviderIcon } from '@/utils/providerIcons'
 import { useI18n } from 'vue-i18n'
 
 type ModelsData = Partial<Record<Capability, AIModel[]>>

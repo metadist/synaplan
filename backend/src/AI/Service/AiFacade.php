@@ -4,6 +4,7 @@ namespace App\AI\Service;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\EmbeddingProviderInterface;
+use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Provider\GoogleProvider;
 use App\Service\CircuitBreaker;
 use App\Service\DiscordNotificationService;
@@ -769,7 +770,7 @@ class AiFacade
                 return [
                     'content' => $response,
                     'provider' => $provider->getName(),
-                    'model' => $candidateOptions['model'] ?? 'unknown',
+                    'model' => $this->reportedModel($provider, $candidateOptions, 'vision'),
                 ];
             } catch (ProviderException $e) {
                 $this->logger->warning('AI vision provider failed: '.$provider->getName().' - '.$e->getMessage(), [
@@ -850,7 +851,7 @@ class AiFacade
         return [
             'images' => $images,
             'provider' => $provider->getName(),
-            'model' => $options['model'] ?? 'unknown',
+            'model' => $this->reportedModel($provider, $options, 'image_generation'),
             'image_count' => is_array($images) ? count($images) : 1,
         ];
     }
@@ -906,7 +907,7 @@ class AiFacade
         return [
             'videos' => $videos,
             'provider' => $provider->getName(),
-            'model' => $options['model'] ?? 'unknown',
+            'model' => $this->reportedModel($provider, $options, 'video_generation'),
             'duration_seconds' => $durationSeconds,
             'resolution' => $resolution,
         ];
@@ -991,12 +992,36 @@ class AiFacade
     /**
      * Transcribe Audio (Whisper).
      *
-     * @param string   $audioPath Relative path to audio file from upload dir
-     * @param int|null $userId    User ID for config lookup
-     * @param array    $options   Additional options (provider, model, language, etc.)
+     * @param array $options Additional options (provider, model, language, etc.)
      *
      * @return array Transcription result with text, language, duration, segments
      */
+    /**
+     * Resolve the concrete model name to report in a response's metadata.
+     *
+     * The message-details popover ("AI Model" row) surfaces this value, so a
+     * literal "unknown" makes the row disappear. Prefer the explicitly
+     * requested model, then the provider's advertised default for the given
+     * capability, before falling back to "unknown" as a last resort.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function reportedModel(ProviderMetadataInterface $provider, array $options, string $capability): string
+    {
+        $requested = $options['model'] ?? null;
+        if (is_string($requested) && '' !== trim($requested)) {
+            return $requested;
+        }
+
+        $defaults = $provider->getDefaultModels();
+        $default = $defaults[$capability] ?? null;
+        if (is_string($default) && '' !== trim($default)) {
+            return $default;
+        }
+
+        return 'unknown';
+    }
+
     public function transcribe(string $audioPath, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
@@ -1051,7 +1076,8 @@ class AiFacade
 
         return array_merge($result, [
             'provider' => $provider->getName(),
-            'model' => $options['model'] ?? 'unknown',
+            'model' => $this->reportedModel($provider, $options, 'speech_to_text'),
+            'model_id' => $sttModelId,
         ]);
     }
 
@@ -1132,7 +1158,7 @@ class AiFacade
             'filename' => basename($relativePath),
             'relativePath' => $relativePath,
             'provider' => $provider->getName(),
-            'model' => $options['model'] ?? 'unknown',
+            'model' => $this->reportedModel($provider, $options, 'text_to_speech'),
             'model_id' => $ttsModelId ?? null,
             'text_length' => mb_strlen($text),
         ];

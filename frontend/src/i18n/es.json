@@ -363,6 +363,7 @@
     "againWith": "Otra vez con",
     "regenerateWith": "Regenerar con",
     "copy": "Copiar mensaje",
+    "infoAiModel": "Modelo de IA",
     "infoAudioModel": "Modelo de audio"
   },
   "commands": {
