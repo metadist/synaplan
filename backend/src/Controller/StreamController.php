@@ -37,6 +37,9 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Messages')]
 class StreamController extends AbstractController
 {
+    /** Server-side cap for a quoted-reference excerpt ("Mention in chat"). */
+    private const MAX_QUOTED_TEXT_LENGTH = 4000;
+
     public function __construct(
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
@@ -310,10 +313,18 @@ class StreamController extends AbstractController
         // behaves the same as an absent parameter.
         $ragGroupKey = $request->query->getString('ragGroupKey') ?: null;
         // Quoted reference the user selected from an earlier message ("Mention
-        // in chat"). `getString()` rejects array input with a clean 400, and we
-        // normalize the empty string to null so an absent quote behaves the same.
-        $quotedText = $request->query->getString('quotedText') ?: null;
-        $quotedMessageId = $request->query->get('quotedMessageId');
+        // in chat"). `getString()` rejects array input with a clean 400. We trim
+        // and cap the excerpt server-side so a crafted request cannot bloat the
+        // stored meta or the AI prompt, and normalize empty to null.
+        $quotedText = trim($request->query->getString('quotedText'));
+        if (mb_strlen($quotedText) > self::MAX_QUOTED_TEXT_LENGTH) {
+            $quotedText = mb_substr($quotedText, 0, self::MAX_QUOTED_TEXT_LENGTH);
+        }
+        $quotedText = '' !== $quotedText ? $quotedText : null;
+        // `getInt()` rejects array input (e.g. `quotedMessageId[]=…`) with a clean
+        // 400 instead of silently coercing it to 0/1 and resolving the wrong
+        // message. 0 (absent/invalid) collapses to null.
+        $quotedMessageId = $request->query->getInt('quotedMessageId') ?: null;
         $continueMessageId = $request->query->get('continueMessageId');
         // Explicit opt-out from memory loading + extraction (used by public demo via synaplan.com/try-chat)
         $disableMemories = '1' === $request->query->get('disableMemories', '0');

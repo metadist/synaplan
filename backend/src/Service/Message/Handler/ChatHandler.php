@@ -326,14 +326,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
-        // Quoted reference ("Mention in chat") — non-streaming/channel parity.
-        if (!empty($options['quoted_text'])) {
-            $systemPrompt .= $this->formatQuotedReferenceForPrompt($options);
-            $this->logger->info('ChatHandler: Quoted reference appended to system prompt (non-streaming)', [
-                'quoted_message_id' => $options['quoted_message_id'] ?? null,
-            ]);
-        }
-
         // Append explicit language directive based on detected language from classification.
         // Built via LanguageDirectiveBuilder so the wording stays consistent
         // across handlers and includes the anti-echo clause that prevents
@@ -373,6 +365,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $searchResults = null;
         }
 
+        // Quoted reference ("Mention in chat") — injected after the capability
+        // check so it lands in the SYSTEM role when supported, and falls back to
+        // the user turn (via buildMessages) for models without system messages.
+        if (null !== $systemPrompt && !empty($options['quoted_text'])) {
+            $systemPrompt .= $this->formatQuotedReferenceForPrompt($options);
+            $this->logger->info('ChatHandler: Quoted reference appended to system prompt (non-streaming)', [
+                'quoted_message_id' => $options['quoted_message_id'] ?? null,
+            ]);
+            unset($options['quoted_text'], $options['quoted_message_id']);
+        }
+
         if ($hasImages && !$includeImagesInMessages) {
             throw new VisionModelRequiredException();
         }
@@ -381,6 +384,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'search_results' => $searchResults,
             'rag_context' => $ragContext,
             'include_images' => $includeImagesInMessages,
+            'quoted_text' => $options['quoted_text'] ?? null,
+            'quoted_message_id' => $options['quoted_message_id'] ?? null,
         ]);
 
         $aiOptions = [
@@ -1468,6 +1473,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'results_count' => count($options['search_results']['results']),
                 'query' => $options['search_results']['query'] ?? '',
             ]);
+        }
+
+        // Fallback only: handle() injects the quote into the system prompt and
+        // clears this option for models with system-message support. Models
+        // without it (e.g. o1) keep the quote here on the user turn.
+        if (!empty($options['quoted_text'])) {
+            $msgArr['BTEXT'] .= "\n\n".$this->formatQuotedReferenceForPrompt($options);
         }
 
         // Extract images from current message for vision support (only if enabled)
