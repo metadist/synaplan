@@ -225,6 +225,32 @@ class HuggingFaceProviderTest extends TestCase
         $this->assertSame('moonshotai/Kimi-K2.6:fastest', $captured['model']);
     }
 
+    public function testKimiK27ForcedSamplingParamsOverrideCallerValues(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return new MockResponse(json_encode([
+                'choices' => [['message' => ['content' => 'ok']]],
+                'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+            ]), ['response_headers' => ['content-type' => 'application/json']]);
+        });
+
+        $this->makeProvider(httpClient: $client)->chat(
+            [['role' => 'user', 'content' => 'hi']],
+            [
+                'model' => 'moonshotai/Kimi-K2.7-Code',
+                'temperature' => 0.0,
+                'top_p' => 0.1,
+            ],
+        );
+
+        $this->assertSame(1.0, $captured['temperature'], 'K2.7 must enforce temperature=1.0 regardless of caller input');
+        $this->assertSame(0.95, $captured['top_p'], 'K2.7 must enforce top_p=0.95 regardless of caller input');
+        $this->assertSame('moonshotai/Kimi-K2.7-Code', $captured['model']);
+    }
+
     public function testChatWrapsHttpErrorsAsProviderException(): void
     {
         $client = new MockHttpClient(static fn () => new MockResponse('err', ['http_code' => 500]));

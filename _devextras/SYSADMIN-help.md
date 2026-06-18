@@ -30,9 +30,9 @@ Synaplan uses a multi-repository architecture:
 
 | Aspect    | Local (`synaplan/`)        | Production (`synaplan-platform/`)  |
 | --------- | -------------------------- | ---------------------------------- |
-| Image     | Built from source          | `ghcr.io/metadist/synaplan:latest` |
+| Image     | Built locally (dev stage, incl. phpredis) | `ghcr.io/metadist/synaplan:latest` |
 | Database  | Local MariaDB container    | Galera cluster (multi-node)        |
-| Ollama    | Local container            | Shared server (10.0.1.10)          |
+| Ollama    | Local container            | Shared GPU server (internal IP)    |
 | Frontend  | Vite dev server (5173)     | Built assets in Docker image       |
 | Dev tools | phpMyAdmin, MailHog        | None                               |
 | Qdrant    | Docker service (port 6333) | Docker service or external         |
@@ -150,9 +150,8 @@ docker compose exec db bash         # Database
         │                    │                    │
         ▼                    ▼                    ▼
 ┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│   synweb100   │    │   synweb101   │    │   synweb102   │
-│   (web1)      │    │   (web2)      │    │   (web3)      │
-│   10.0.0.2    │    │   10.0.0.3    │    │   10.0.0.4    │
+│     web1      │    │     web2      │    │     web3      │
+│  <node-ip-1>  │    │  <node-ip-2>  │    │  <node-ip-3>  │
 └───────┬───────┘    └───────┬───────┘    └───────┬───────┘
         │                    │                    │
         └────────────────────┼────────────────────┘
@@ -174,12 +173,12 @@ docker compose exec db bash         # Database
 cd synaplan-platform/
 
 # Start on specific node (sets SYNDBHOST for Galera)
-./startweb1.sh   # On synweb100
-./startweb2.sh   # On synweb101
-./startweb3.sh   # On synweb102
+./startweb1.sh   # On node web1
+./startweb2.sh   # On node web2
+./startweb3.sh   # On node web3
 
 # Or manually:
-export SYNDBHOST=10.0.0.2   # Local Galera node IP
+export SYNDBHOST=<local-galera-node-ip>
 docker compose up --pull always -d
 ```
 
@@ -194,8 +193,8 @@ environment:
   FRONTEND_URL: https://web.synaplan.com
   APP_URL: https://web.synaplan.com
   DATABASE_WRITE_URL: mysql://...@host.docker.internal:3306/synaplan
-  OLLAMA_BASE_URL: http://10.0.1.10:11434        # Shared Ollama server
-  TIKA_URL: http://tika.synaplan.com             # External Tika
+  OLLAMA_BASE_URL: http://<gpu-server-ip>:11434  # Shared Ollama server
+  TIKA_URL: http://<tika-host>                   # External Tika
   QDRANT_URL: http://qdrant:6333                # Qdrant vector database
 ```
 
@@ -269,6 +268,234 @@ Collections are auto-created on first use with appropriate vector config and pay
 ## Cluster Mode
 
 For high availability, Qdrant supports clustering. See [Qdrant documentation](https://qdrant.tech/documentation/guides/distributed_deployment/).
+
+---
+
+# REDIS + REALTIME (CENTRIFUGO)
+
+The realtime stack (live chat takeover, operator notifications, future
+WebSocket features) runs on **Redis** as the shared state layer and
+**Centrifugo** as the WebSocket gateway. Both are sized to be
+"infrastructure" — many features depend on them, not just the chat widget.
+
+## Architecture
+
+```
+                Browser (visitor / operator)
+                           │  WSS /connection/websocket
+                           ▼
+                Cloudflare ──► Load Balancer
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+   Caddy (web1)       Caddy (web2)       Caddy (web3)
+        │                  │                  │
+        ├─► PHP/Symfony ──► HTTP publish ──► Centrifugo (web1)
+        │                  │                       │
+        │                  │                       ▼
+        │                  │                    Redis (shared)
+        │                  │                       ▲
+        └─► Centrifugo (local) ◄──── Redis pub/sub ┘
+```
+
+* **Redis** is shared across all web nodes. It backs Symfony cache, lock,
+  rate-limiter, sessions, and the Centrifugo engine (logical DB 3 by
+  default — see `_docker/centrifugo/config.json`).
+* **Centrifugo** runs locally on every web node. The load balancer can
+  send a WebSocket upgrade to any node — Centrifugo instances exchange
+  publishes via the shared Redis, so a publish on node A reaches a
+  subscriber on node B in <100ms. **No sticky sessions required.**
+* PHP publishes via Centrifugo's HTTP server API
+  (`REALTIME_API_URL=http://centrifugo:8000/api`), authenticated with
+  `REALTIME_API_KEY`.
+* Browsers obtain short-lived (60s) JWTs from
+  `/api/v1/realtime/token` (operators) or
+  `/api/v1/realtime/widget/{widgetId}/sessions/{sessionId}/token`
+  (visitors), signed with `REALTIME_TOKEN_SECRET`.
+
+## Cloudflare
+
+WebSockets work out of the box on every Cloudflare plan (WSS terminates
+identically to HTTPS). A few specifics worth knowing:
+
+* **Idle timeout is 100s.** Centrifugo sends pings every 25s by default,
+  so this never trips.
+* **Caching rules:** `/connection/*` should be set to "Bypass Cache" if
+  you have an aggressive cache policy. The default rules already exclude
+  WebSocket upgrade requests.
+* **No special config required for the WSS upgrade itself** — Cloudflare
+  automatically detects `Upgrade: websocket` and proxies it.
+
+## Load Balancer
+
+* Health check `/up` (PHP backend) is sufficient — the LB does not need
+  to know about Centrifugo specifically; the Caddy reverse-proxy maps
+  `/connection/*` to the local Centrifugo.
+* No sticky sessions / cookie affinity required (Redis fan-out handles
+  cross-node visibility).
+
+## Sizing & Failure Modes
+
+* If **Redis goes down**: cache misses degrade to "fresh fetch" everywhere,
+  rate-limit counters reset, locks throw, and Centrifugo loses cross-node
+  fan-out (subscribers on the same node still see local publishes).
+  Treat Redis as **mandatory infrastructure** — run it with HA / Sentinel.
+* If **Centrifugo goes down on one node**: the LB will route subsequent
+  WS upgrades to a healthy node automatically. Existing connections drop
+  and the browser auto-reconnects within seconds (Centrifuge JS handles
+  this).
+* If **the publish HTTP call fails**: the publisher logs a warning and
+  swallows — no chat reply is dropped because of realtime infra. The
+  message is persisted in MariaDB and the next refresh will show it.
+
+## Realtime kill switch
+
+Set `REALTIME_ENABLED=false` in the backend env to stop the frontend from
+opening WebSocket connections (the runtime config endpoint will report
+the flag). This is an **emergency switch** — there is no SSE fallback
+after the cleanup phase.
+
+## Quick health checks
+
+```bash
+# Redis (DSN-aware ping)
+docker compose exec backend php bin/console redis:health 2>/dev/null || \
+  docker compose exec redis redis-cli ping
+
+# Centrifugo (internal-only — the admin UI / HTTP API are NOT proxied
+# publicly; run these from inside the Docker network)
+docker compose exec backend curl -fsS http://centrifugo:8000/health
+
+# Backend → Centrifugo HTTP publish
+docker compose exec backend curl -fsS -X POST http://centrifugo:8000/api \
+  -H "X-API-Key: ${REALTIME_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"method":"info"}'
+```
+
+---
+
+# UPGRADING: DOCTRINE → REDIS QUEUE CUTOVER
+
+This revision switches every Symfony Messenger transport from the Doctrine
+`messenger_messages` table to **Redis Streams** (see
+`backend/config/packages/messenger.yaml`). Jobs that were still queued in
+the table when you deploy are **NOT migrated automatically** — without the
+runbook below, in-flight async work (AI processing, file extraction,
+indexing, the dead-letter queue) is silently orphaned.
+
+## Redis is now mandatory infrastructure
+
+There is **no filesystem/doctrine fallback** in dev or prod anymore:
+
+* Symfony cache pools, locks, rate-limiter, Messenger and Centrifugo all
+  require `REDIS_DSN` to be reachable.
+* `/api/health` (HealthController) reports **503 when Redis is down** — the
+  LB will take the node out of rotation. Run Redis with HA (Sentinel /
+  managed) in production; a Redis outage degrades the whole node, by design.
+* Single-node installs: the bundled `redis` compose service is enough,
+  but it must be running — `docker compose up -d redis`.
+
+## Cutover runbook (one-time, per environment)
+
+```bash
+# 0. BEFORE deploying: note the legacy queue depth
+mysql -e "SELECT queue_name, COUNT(*) FROM messenger_messages GROUP BY queue_name;"
+
+# 1. Stop producing new jobs (maintenance window / remove node from LB)
+#    and stop the old messenger:consume workers.
+
+# 2. Deploy this revision. New jobs now go to Redis Streams.
+
+# 3. Drain the legacy Doctrine queues. The legacy_* transports are
+#    drain-only aliases of the old queue names — nothing routes to them.
+docker compose exec backend php bin/console messenger:consume \
+  legacy_async_ai_high legacy_async_extract legacy_async_index \
+  --time-limit=3600 -vv
+# Repeat until it idles at "no messages". A job that fails during the
+# drain lands in the NEW Redis `failed` transport (inspect as usual with
+# messenger:failed:show).
+
+# 4. Old dead-letter queue: inspect, then either re-run or discard.
+docker compose exec backend php bin/console messenger:consume legacy_failed -vv   # re-run
+# …or accept the loss consciously and truncate in step 5.
+
+# 5. Verify the table is empty, then it can be dropped at leisure.
+mysql -e "SELECT COUNT(*) FROM messenger_messages;"   # must be 0
+
+# 6. Start the new workers (one per priority, scale per node):
+docker compose exec -d backend php bin/console messenger:consume async_ai_high --time-limit=3600
+docker compose exec -d backend php bin/console messenger:consume async_extract async_index --time-limit=3600
+```
+
+Skipping step 3 on an install with a non-empty `messenger_messages` table
+**loses queued user work** — treat the runbook as part of the deploy, not
+as optional housekeeping.
+
+---
+
+# UPGRADING: MULTI-TASK (DAG) FOLLOW-UP — ONE-TIME PROD STEPS
+
+Two operational steps ship with the DAG follow-up release (simple "Again",
+per-task errors/retry, `email_me`, WhatsApp multi-file). Neither is handled
+by code or migrations — both are environment state.
+
+## 1. Default image model → Nano Banana 2 (BID 190)
+
+`DefaultModelConfigSeeder` already points fresh installs at
+`google:gemini-3.1-flash-image-preview:text2pic` ("Nano Banana 2", BID 190)
+for `TEXT2PIC` and `PIC2PIC`. The seeder **never overwrites existing rows**
+(by design — it must not clobber operator tuning), so environments seeded
+before this release still route DAG "generate image" nodes at the old,
+slower default.
+
+Run once on the production DB:
+
+```sql
+-- Global platform default ONLY (BOWNERID = 0).
+-- Do NOT drop the owner filter: per-user overrides share this table
+-- with BOWNERID = <userId> and must keep the user's own choice.
+UPDATE BCONFIG SET BVALUE = '190'
+WHERE BOWNERID = 0
+  AND BGROUP = 'DEFAULTMODEL'
+  AND BSETTING IN ('TEXT2PIC', 'PIC2PIC');
+
+-- Verify:
+SELECT BOWNERID, BSETTING, BVALUE FROM BCONFIG
+WHERE BGROUP = 'DEFAULTMODEL' AND BSETTING IN ('TEXT2PIC', 'PIC2PIC');
+```
+
+Users can still pick any other model via Settings → AI Models (per-user
+`DEFAULTMODEL` override) and the "Again with…" / failed-task "Retry with…"
+controls — this only changes what the platform falls back to.
+
+## 2. WhatsApp media delivery requires a publicly reachable APP_URL
+
+Outbound WhatsApp media (DAG images/audio/documents, TTS replies) is sent
+as a **link**: the backend builds `${APP_URL}/api/v1/files/uploads/<path>`
+and Meta's servers fetch it. The send is silently skipped when `APP_URL`
+is empty, and fails when Meta cannot reach the URL (private host, broken
+TLS, auth wall). If "no files arrived on WhatsApp", check this BEFORE
+suspecting the code path:
+
+```bash
+# 1. APP_URL set in the backend env?
+docker compose exec backend php -r 'echo $_ENV["APP_URL"] ?? "(unset)", PHP_EOL;'
+
+# 2. Is a served upload reachable from the PUBLIC internet (Meta's view)?
+#    Use a real AI-generated file path (filename like tts_*, generated_*,
+#    or <messageId>_<provider>_<timestamp>.<ext>) — StaticUploadController
+#    serves exactly these patterns WITHOUT auth (by-link), which is what
+#    the WhatsApp media links point at. Other paths require auth and are
+#    not representative.
+curl -sSI "${APP_URL}/api/v1/files/uploads/<relative-path>" | head -1
+# Expect HTTP 200. A redirect to a login page, 401/403, or a timeout means
+# Meta cannot fetch the media → WhatsApp silently delivers no files.
+```
+
+Sanity check after deploy: send "write a poem, read it aloud and make an
+image of it" to the WhatsApp number — expect the text message first, then
+the MP3, then the image as separate WhatsApp messages.
 
 ---
 

@@ -29,10 +29,11 @@ const MAX_AGE_MS = 30 * 60 * 1000 // 30 minutes
  */
 export function useInputPersistence(baseKey: string, chatId?: Ref<number | null>) {
   /**
-   * Get storage key for current chat
+   * Get storage key for a given chat id (falls back to the reactive chatId, then to the
+   * bare base key for the no-chat-yet case).
    */
-  function getStorageKey(): string {
-    const id = chatId?.value
+  function getStorageKey(idOverride?: number | null): string {
+    const id = idOverride !== undefined ? idOverride : chatId?.value
     if (id !== undefined && id !== null) {
       return `${STORAGE_KEY_PREFIX}${baseKey}_${id}`
     }
@@ -40,12 +41,13 @@ export function useInputPersistence(baseKey: string, chatId?: Ref<number | null>
   }
 
   /**
-   * Save input to localStorage
+   * Save input to localStorage.
+   * Pass idOverride to target a specific chat's storage slot (e.g. when flushing a
+   * draft for the chat we are leaving before the reactive chatId has updated).
    */
-  function saveInput(message: string) {
+  function saveInput(message: string, idOverride?: number | null) {
     if (!message.trim()) {
-      // Don't save empty messages
-      clearInput()
+      clearInput(idOverride)
       return
     }
 
@@ -55,25 +57,25 @@ export function useInputPersistence(baseKey: string, chatId?: Ref<number | null>
     }
 
     try {
-      localStorage.setItem(getStorageKey(), JSON.stringify(data))
+      localStorage.setItem(getStorageKey(idOverride), JSON.stringify(data))
     } catch (error) {
       console.error('Failed to save input to localStorage:', error)
     }
   }
 
   /**
-   * Load input from localStorage
+   * Load input from localStorage.
+   * Pass idOverride to read a specific chat's storage slot.
    */
-  function loadInput(): string | null {
+  function loadInput(idOverride?: number | null): string | null {
     try {
-      const stored = localStorage.getItem(getStorageKey())
+      const stored = localStorage.getItem(getStorageKey(idOverride))
       if (!stored) return null
 
       const data: PersistedInput = JSON.parse(stored)
 
-      // Check age
       if (Date.now() - data.timestamp > MAX_AGE_MS) {
-        clearInput()
+        clearInput(idOverride)
         return null
       }
 
@@ -85,11 +87,12 @@ export function useInputPersistence(baseKey: string, chatId?: Ref<number | null>
   }
 
   /**
-   * Clear input from localStorage
+   * Clear input from localStorage.
+   * Pass idOverride to target a specific chat's storage slot.
    */
-  function clearInput() {
+  function clearInput(idOverride?: number | null) {
     try {
-      localStorage.removeItem(getStorageKey())
+      localStorage.removeItem(getStorageKey(idOverride))
     } catch (error) {
       console.error('Failed to clear input from localStorage:', error)
     }
@@ -197,10 +200,24 @@ export function useAutoPersist(
   if (chatId) {
     watch(
       chatId,
-      () => {
-        // Always load the draft for the new chat (or empty if no draft exists)
-        const newPersisted = loadInput()
-        inputRef.value = newPersisted || ''
+      (newId, oldId) => {
+        if (newId === oldId) return
+
+        // Flush the current text into the slot we are leaving so it is not lost.
+        saveInput(inputRef.value, oldId)
+
+        const incoming = loadInput(newId)
+
+        // Special case: activeChatId transitions from null → realId when a brand-new
+        // chat receives its ID from the server. The user (or the test) may have already
+        // typed into the field during that window. Carry the text into the new slot
+        // instead of wiping it.
+        if (!incoming && oldId == null && inputRef.value.trim()) {
+          saveInput(inputRef.value, newId)
+          return
+        }
+
+        inputRef.value = incoming || ''
       },
       { immediate: false }
     )

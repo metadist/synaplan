@@ -1,5 +1,12 @@
 # MCP Integration Roadmap (Planning)
 
+> **⚠️ Partially superseded — see [`00-ROADMAP-2026.md`](./00-ROADMAP-2026.md).**
+> The product goals and the 3-step framing (Expose → Consume → Orchestrate)
+> below still stand. However, the **"SSE-only" transport decision is obsolete**:
+> the MCP spec replaced HTTP+SSE with **Streamable HTTP** (`2025-03-26`), and the
+> current spec (stable `2025-11-25`, RC `2026-07-28`) is Streamable-HTTP-first.
+> Use the 2026 roadmap for transport, auth, and implementation-stack decisions.
+
 ## Executive Summary
 Synaplan will integrate the **Model Context Protocol (MCP)** to transform from a static knowledge system into a dynamic AI agent platform. This roadmap follows a 3-step evolution:
 1.  **Expose (Synaplan as Server)**: Standardize Synaplan's core services and plugins as tools for external AI agents (e.g., Cursor, Claude Desktop).

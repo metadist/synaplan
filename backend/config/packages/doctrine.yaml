@@ -1,14 +1,19 @@
 parameters:
     # Tables that are NOT ORM entities and must be excluded from schema diffing /
-    # validation. Each table listed here is framework-managed (e.g. Symfony Messenger's
-    # Doctrine transport creates `messenger_messages` on demand). In APP_ENV=test the
-    # messenger transports are overridden to `in-memory://` (see
-    # config/packages/messenger.yaml `when@test`), which means
-    # `doctrine:schema:validate` would otherwise see the table as orphaned and
-    # propose DROPping it. The filter is a regex applied to table names by DBAL's
-    # comparator — migrations still run normally because they use raw
-    # `addSql(...)`, not schema diff. Keep the list in sync across ADD events.
-    app.doctrine.schema_filter: '~^(?!messenger_messages$).*$~'
+    # validation. Each table listed here is intentionally entity-less:
+    #   - `messenger_messages` is created on demand by Symfony Messenger's Doctrine
+    #     transport. In APP_ENV=test the messenger transports are overridden to
+    #     `in-memory://` (see config/packages/messenger.yaml `when@test`), which
+    #     means `doctrine:schema:validate` would otherwise see the table as
+    #     orphaned and propose DROPping it.
+    #   - `BMESSAGE_TASKS` is a raw multi-task-routing plan-persistence table,
+    #     created by Version20260607010000 and written via plain DBAL inserts
+    #     (see App\Service\Multitask\TaskPlanStore) — deliberately no Doctrine
+    #     entity, so without this filter schema:validate proposes DROPping it.
+    # The filter is a regex applied to table names by DBAL's comparator — migrations
+    # still run normally because they use raw `addSql(...)`, not schema diff. Keep
+    # the negative-lookahead list in sync across ADD events.
+    app.doctrine.schema_filter: '~^(?!(messenger_messages|BMESSAGE_TASKS)$).*$~'
 
 doctrine:
     dbal:

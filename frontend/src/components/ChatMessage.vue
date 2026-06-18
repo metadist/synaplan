@@ -14,8 +14,7 @@
       v-if="role === 'assistant'"
       class="hidden md:flex w-10 h-10 rounded-full items-center justify-center flex-shrink-0 surface-card"
     >
-      <GroqIcon v-if="displayProvider.toLowerCase().includes('groq')" :size="24" class-name="" />
-      <Icon v-else :icon="getProviderIcon(displayProvider)" class="w-6 h-6" />
+      <ServiceIcon :service="displayProvider" :size="24" />
     </div>
 
     <!-- Wrapper for thinking blocks + bubble -->
@@ -392,6 +391,14 @@
             on plain text. Falling back to `${type}-${index}` keeps backward
             compatibility for parts without partId (legacy stored messages).
           -->
+          <!-- Multitask routing: live task cards (only while a multi-node plan
+               streams). On reload the turn is flattened to normal parts below. -->
+          <TaskPlanBubble
+            v-if="taskPlan?.active"
+            :plan="taskPlan"
+            @retry-task="emit('retryTask', $event)"
+          />
+
           <MessagePart
             v-for="(part, index) in contentParts"
             :key="part.partId ?? `${part.type}-${index}`"
@@ -632,7 +639,7 @@
                     <div v-if="topic" class="flex items-center justify-between gap-2">
                       <span class="text-xs txt-tertiary">{{ t('chatMessage.infoTopic') }}</span>
                       <router-link
-                        :to="`/config/task-prompts?topic=${topic}`"
+                        :to="`/ai/instructions?topic=${topic}`"
                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                         @click="closeInfoPopover"
                       >
@@ -641,9 +648,15 @@
                       </router-link>
                     </div>
 
-                    <!-- Chat Model -->
-                    <div v-if="aiModels?.chat" class="flex items-center justify-between gap-2">
-                      <span class="text-xs txt-tertiary">{{ getModelTypeLabel }}</span>
+                    <!-- AI Model (the model actually used for this response,
+                         after topic sorting/routing). Hidden when the backend
+                         did not record a concrete model (e.g. "unknown") so
+                         non-chat responses don't show a wrong/empty value. -->
+                    <div
+                      v-if="aiModels?.chat && isKnownModelName(aiModels.chat.model)"
+                      class="flex items-center justify-between gap-2"
+                    >
+                      <span class="text-xs txt-tertiary">{{ t('chatMessage.infoAiModel') }}</span>
                       <button
                         type="button"
                         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
@@ -747,29 +760,23 @@
               />
             </button>
 
+            <!-- Multitask (DAG) turn: a single model pick can't represent the
+                 whole plan, so offer one plain "Again" that re-runs the full
+                 pipeline (re-classify + re-plan). -->
             <button
+              v-if="isMultitaskTurn"
               type="button"
-              :disabled="isSuperseded || isGuestMode || !selectedModel || !hasModels"
+              :disabled="isSuperseded || isGuestMode"
               :class="[
                 'pill text-xs whitespace-nowrap relative',
-                isSuperseded || isGuestMode || !selectedModel || !hasModels
-                  ? 'opacity-50 cursor-not-allowed'
-                  : '',
+                isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
               ]"
               :aria-label="$t('chatMessage.again')"
               data-testid="btn-message-again"
-              @click="!isGuestMode && handleAgain()"
+              @click.stop="!isGuestMode && handleSimpleAgain()"
             >
               <ArrowPathIcon class="w-4 h-4" />
-              <span v-if="!isGuestMode && selectedModel" class="font-medium hidden sm:inline"
-                >{{ $t('chatMessage.againWith') }} {{ selectedModel.label }}</span
-              >
-              <span v-else-if="!isGuestMode" class="font-medium hidden sm:inline">{{
-                $t('chatMessage.again')
-              }}</span>
-              <span :class="isGuestMode ? 'font-medium' : 'font-medium sm:hidden'">{{
-                $t('chatMessage.again')
-              }}</span>
+              <span class="font-medium">{{ $t('chatMessage.again') }}</span>
               <Icon
                 v-if="isGuestMode"
                 icon="mdi:lock-outline"
@@ -777,19 +784,25 @@
               />
             </button>
 
-            <div class="relative">
+            <div v-else class="relative">
+              <!-- Single "Again with… ▾" control: opening the dropdown and
+                   picking a model re-runs the prompt (see selectModel). The old
+                   standalone "Again with <model>" button was merged into this to
+                   save horizontal space. -->
               <button
                 type="button"
-                :disabled="isSuperseded || isGuestMode"
+                :disabled="isSuperseded || isGuestMode || !hasModels"
                 :class="[
-                  'pill text-xs relative',
-                  isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
+                  'pill text-xs whitespace-nowrap relative',
+                  isSuperseded || isGuestMode || !hasModels ? 'opacity-50 cursor-not-allowed' : '',
                 ]"
                 :aria-label="$t('chatMessage.regenerateWith')"
-                data-testid="btn-message-model-toggle"
+                data-testid="btn-message-again"
                 @click.stop="!isGuestMode && toggleModelDropdown()"
                 @keydown.escape="closeModelDropdown"
               >
+                <ArrowPathIcon class="w-4 h-4" />
+                <span class="font-medium">{{ $t('chatMessage.againWith') }}…</span>
                 <ChevronDownIcon class="w-4 h-4" />
                 <Icon
                   v-if="isGuestMode"
@@ -827,16 +840,7 @@
                     ]"
                     @click="selectModel(option)"
                   >
-                    <GroqIcon
-                      v-if="option.provider.toLowerCase().includes('groq')"
-                      :size="20"
-                      class-name="flex-shrink-0"
-                    />
-                    <Icon
-                      v-else
-                      :icon="getProviderIcon(option.provider)"
-                      class="w-5 h-5 flex-shrink-0"
-                    />
+                    <ServiceIcon :service="option.provider" :size="20" />
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2">
                         <span class="text-sm font-medium">{{ option.label }}</span>
@@ -928,7 +932,6 @@ import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
-import { getProviderIcon } from '@/utils/providerIcons'
 import { isChannelSource } from '@/utils/channelSource'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
@@ -937,14 +940,15 @@ import type { UserMemory } from '@/services/api/userMemoriesApi'
 import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
-import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'
-import type { Part, MessageFile } from '@/stores/history'
+import type { Part, MessageFile, TaskPlanState } from '@/stores/history'
+import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
-import { chatBadgeIcon, chatBadgeLabel } from '@/utils/chatModelBadge'
+import { chatBadgeIcon } from '@/utils/chatModelBadge'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -1016,6 +1020,11 @@ interface Props {
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   truncated?: boolean
+  // Multitask routing: live task-card state while a multi-node plan streams.
+  taskPlan?: TaskPlanState | null
+  // Multitask routing: this assistant turn ran the DAG (persisted flag, also
+  // true for live plans). Switches "Again with…" to the simple "Again".
+  wasMultitask?: boolean
   // Status for failed/pending messages
   isGuestMode?: boolean
   status?: 'sent' | 'failed' | 'rate_limited'
@@ -1057,8 +1066,12 @@ const copyMessageText = async () => {
 // Badge collapse state
 const showAllBadges = ref(false)
 
-// Sources expand/collapse state
-const sourcesExpanded = ref(false)
+// Sources expand/collapse state.
+// Default OPEN: when the assistant ran a web search, the sources are part of
+// the answer's citation context, so they should be visible without an extra
+// click. Users can still collapse the section via the chevron toggle if they
+// want a denser thread view.
+const sourcesExpanded = ref(true)
 
 // Carousel state for search results
 const carouselPage = ref(0) // Which "page" we're on (0-based)
@@ -1248,12 +1261,17 @@ const mediaHint = computed(() => {
 // Pure-function helpers live in chatModelBadge.ts so the voice-reply
 // label rule (#583) is unit-testable in isolation. The computed
 // wrappers below just bind them to reactive component state.
-const getModelTypeLabel = computed(() =>
-  chatBadgeLabel(mediaHint.value, !!props.aiModels?.audio, isFileAnalysisResponse.value)
-)
 const getModelTypeIcon = computed(() =>
   chatBadgeIcon(mediaHint.value, !!props.aiModels?.audio, isFileAnalysisResponse.value)
 )
+
+// A model name is only worth showing when the backend recorded a concrete
+// value. Non-chat responses (vision/audio/image) sometimes leave the chat
+// slot as an empty/"unknown" placeholder — those must not be displayed.
+const isKnownModelName = (name?: string | null): boolean => {
+  const n = (name ?? '').trim().toLowerCase()
+  return n !== '' && n !== 'unknown'
+}
 
 const formattedTime = computed(() => formatTime(props.timestamp))
 
@@ -1303,6 +1321,8 @@ const emit = defineEmits<{
   regenerate: [model: ModelOption]
   again: [backendMessageId: number, modelId?: number]
   retry: [messageContent: string]
+  /** Bubbled from a failed task card: re-run that step with another model. */
+  retryTask: [payload: { prompt: string; modelId: number }]
   falsePositive: [text: string, messageId?: number]
   'click-memory': [memory: UserMemory]
   continue: []
@@ -1389,13 +1409,13 @@ const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
       audio: props.aiModels?.audio ? 'CHAT' : 'TEXT2SOUND',
     }
     const capability = capabilityMap[mediaHint.value ?? ''] ?? 'CHAT'
-    router.push({ path: '/config/ai-models', query: { highlight: capability } })
+    router.push({ path: '/ai/models', query: { highlight: capability } })
   } else if (modelType === 'sorting') {
-    router.push({ path: '/config/ai-models', query: { highlight: 'SORT' } })
+    router.push({ path: '/ai/models', query: { highlight: 'SORT' } })
   } else if (modelType === 'audio') {
-    router.push({ path: '/config/ai-models', query: { highlight: 'TEXT2SOUND' } })
+    router.push({ path: '/ai/models', query: { highlight: 'TEXT2SOUND' } })
   } else {
-    router.push('/config/ai-models')
+    router.push('/ai/models')
   }
 }
 
@@ -1409,21 +1429,6 @@ const handleRetry = () => {
 
   if (textContent) {
     emit('retry', textContent)
-  }
-}
-
-const handleAgain = () => {
-  const model = selectedModel.value
-  if (!model) {
-    return
-  }
-
-  if (props.backendMessageId && model.id) {
-    // New backend-driven again
-    emit('again', props.backendMessageId, model.id)
-  } else {
-    // Fallback to old regenerate
-    emit('regenerate', model)
   }
 }
 
@@ -1447,6 +1452,18 @@ const toggleModelDropdown = () => {
 
 const closeModelDropdown = () => {
   modelDropdownOpen.value = false
+}
+
+// Multitask turns get a single "Again" (full re-classify + re-plan) instead of
+// the per-model dropdown — one model pick can't represent a whole DAG.
+const isMultitaskTurn = computed(
+  () => props.taskPlan?.active === true || props.wasMultitask === true
+)
+
+const handleSimpleAgain = () => {
+  if (props.backendMessageId) {
+    emit('again', props.backendMessageId)
+  }
 }
 
 const selectModel = (model: ModelOption) => {

@@ -13,11 +13,13 @@ use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\FeedbackConfigService;
+use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
+use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
@@ -78,12 +80,43 @@ class ChatHandlerTest extends TestCase
             $this->rateLimitService,
             $this->memoryExtractionDispatcher,
             $this->perfPipelineFlag,
+            $this->createMock(DocumentGeneratorService::class),
+            new TimeContextBuilder(),
         );
     }
 
     public function testGetName(): void
     {
         $this->assertEquals('chat', $this->handler->getName());
+    }
+
+    public function testHumanizeFileMarkersReplacesGeneratedMarker(): void
+    {
+        $result = $this->handler->humanizeFileMarkersForModel('__FILE_GENERATED__:Zweiter_Weltkrieg.docx');
+
+        $this->assertStringNotContainsString('__FILE_GENERATED__', $result);
+        $this->assertStringNotContainsString('FILE_GENERATED', $result);
+        $this->assertStringContainsString('Zweiter_Weltkrieg.docx', $result);
+    }
+
+    public function testHumanizeFileMarkersReplacesFailedMarker(): void
+    {
+        $result = $this->handler->humanizeFileMarkersForModel('__FILE_GENERATION_FAILED__');
+
+        $this->assertStringNotContainsString('__FILE_GENERATION_FAILED__', $result);
+        $this->assertStringContainsString('could not be generated', $result);
+    }
+
+    public function testHumanizeFileMarkersLeavesRegularContentUntouched(): void
+    {
+        $text = 'Here is a normal assistant reply with no markers.';
+
+        $this->assertSame($text, $this->handler->humanizeFileMarkersForModel($text));
+    }
+
+    public function testHumanizeFileMarkersHandlesNull(): void
+    {
+        $this->assertSame('', $this->handler->humanizeFileMarkersForModel(null));
     }
 
     public function testHandleUsesUserSelectedModel(): void
@@ -207,6 +240,69 @@ class ChatHandlerTest extends TestCase
 
         $this->assertEquals('Extracted text content', $result['content']);
         $this->assertArrayHasKey('file', $result['metadata']);
+    }
+
+    /**
+     * Regression for issue #1067: web search results are system-injected
+     * context and must ride in the SYSTEM role. Putting them into the user
+     * turn makes the model attribute them to the user ("the user gave web
+     * search results") and blurs the prompt-injection trust boundary.
+     */
+    public function testHandleInjectsWebSearchResultsIntoSystemPrompt(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('wie wird das Wetter in Münster heute');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260612120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+
+        $classification = [
+            'topic' => 'CHAT',
+            'language' => 'de',
+            'search_results' => [
+                'query' => 'Wetter Münster heute',
+                'results' => [
+                    [
+                        'title' => 'Wetter Münster',
+                        'url' => 'https://example.com/wetter',
+                        'description' => 'Sonnig, 20 Grad',
+                    ],
+                ],
+            ],
+        ];
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $capturedMessages = null;
+        $this->aiFacade
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$capturedMessages): array {
+                $capturedMessages = $messages;
+
+                return ['content' => 'Sonnig.', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handle($message, [], $classification);
+
+        $this->assertIsArray($capturedMessages);
+        $this->assertSame('system', $capturedMessages[0]['role']);
+        $this->assertStringContainsString('Web Search Results', $capturedMessages[0]['content']);
+        $this->assertStringContainsString('https://example.com/wetter', $capturedMessages[0]['content']);
+        $this->assertStringContainsString('NOT provided by the user', $capturedMessages[0]['content']);
+
+        foreach ($capturedMessages as $msg) {
+            if ('user' !== $msg['role']) {
+                continue;
+            }
+            $content = is_string($msg['content']) ? $msg['content'] : (string) json_encode($msg['content']);
+            $this->assertStringNotContainsString('Web Search Results', $content);
+        }
     }
 
     public function testHandleIncludesThreadMessages(): void

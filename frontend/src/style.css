@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/*
+ * Tailwind v4 defaults `dark:` to the prefers-color-scheme MEDIA query.
+ * Our theme is a user setting (useTheme toggles `.dark` on <html>, also for
+ * "system"), so `dark:` must follow that class — otherwise OS-dark + app-light
+ * renders hybrid colors (dark badge tints on light cards, dark sheets with
+ * light-mode text).
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-light-border: rgb(0 0 0);
   --color-dark-border: rgb(255 255 255);
@@ -58,8 +67,12 @@
     --status-warning-muted: #fef9c3;
     --status-warning-text: #854d0e;
     --status-error: #dc2626;
+    --status-error-muted: #fee2e2;
+    --status-error-text: #991b1b;
     --status-info: #3b82f6;
     --status-neutral: #9ca3af;
+    --status-neutral-muted: #f1f5f9;
+    --status-neutral-text: #475569;
     --divider: rgba(0, 0, 0, 0.1);
   }
 
@@ -87,8 +100,12 @@
     --status-warning-muted: rgba(250, 204, 21, 0.15);
     --status-warning-text: #fef08a;
     --status-error: #f87171;
+    --status-error-muted: rgba(239, 68, 68, 0.15);
+    --status-error-text: #fca5a5;
     --status-info: #60a5fa;
     --status-neutral: #6b7280;
+    --status-neutral-muted: rgba(100, 116, 139, 0.2);
+    --status-neutral-text: #cbd5e1;
     --divider: rgba(255, 255, 255, 0.1);
   }
 
@@ -115,18 +132,6 @@
   }
   .dark .bg-sidebar {
     box-shadow: inset 0 0 0 1px var(--brand-alpha-light);
-  }
-
-  .bg-header {
-    background: var(--bg-sidebar);
-    box-shadow:
-      inset 0 0 0 1px rgb(212 212 212 / 0.6),
-      0 1px 2px rgb(0 0 0 / 0.03);
-  }
-  .dark .bg-header {
-    box-shadow:
-      inset 0 0 0 1px var(--brand-alpha-light),
-      0 1px 2px rgb(0 0 0 / 0.05);
   }
 
   .bg-chat {
@@ -278,6 +283,24 @@
       color: #ffffff !important;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     }
+  }
+
+  /* Selection inside the user bubble: the forced white text becomes invisible
+     against the browser's pale default highlight. Flip it to a white highlight
+     with brand-colored text so the user can actually read what they select to
+     copy. Covers the bubble itself and all descendants; resets the light-mode
+     text-shadow so selected text stays crisp. */
+  .bubble-user::selection,
+  .bubble-user *::selection {
+    background-color: #ffffff !important;
+    color: var(--brand) !important;
+    text-shadow: none !important;
+  }
+  .bubble-user::-moz-selection,
+  .bubble-user *::-moz-selection {
+    background-color: #ffffff !important;
+    color: var(--brand) !important;
+    text-shadow: none !important;
   }
 
   /* Textfarben */
@@ -620,46 +643,6 @@
   }
 
   /* Icon ghost */
-  /*
-   * Mobile-only sidebar toggle. Stays high-contrast in both themes so the
-   * primary nav entry on small screens is never mistaken for decoration.
-   * 44x44 hit area = WCAG 2.5.5 Level AAA touch target.
-   */
-  .btn-sidebar-burger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    border-radius: 0.625rem;
-    color: var(--txt-primary);
-    background: rgba(0, 0, 0, 0.05);
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
-    transition:
-      background 0.15s ease,
-      box-shadow 0.15s ease,
-      transform 0.1s ease;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .btn-sidebar-burger:hover,
-  .btn-sidebar-burger:focus-visible {
-    background: var(--brand-alpha-light);
-    box-shadow: inset 0 0 0 1px rgba(0, 63, 199, 0.25);
-    outline: none;
-  }
-  .btn-sidebar-burger:active {
-    transform: scale(0.94);
-  }
-  .dark .btn-sidebar-burger {
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-  }
-  .dark .btn-sidebar-burger:hover,
-  .dark .btn-sidebar-burger:focus-visible {
-    background: rgba(107, 143, 214, 0.18);
-    box-shadow: inset 0 0 0 1px rgba(107, 143, 214, 0.35);
-  }
-
   .icon-ghost {
     color: #8a8a8e;
     border-radius: 0.5rem;

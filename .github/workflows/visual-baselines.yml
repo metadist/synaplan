@@ -1,0 +1,106 @@
+# Regenerates the Playwright visual snapshot baselines (@visual project) on
+# the SAME runner image CI uses — baselines generated on a laptop are invalid
+# (font rendering differs) and would be permanently red.
+#
+# Usage: run CI on your branch first (push), then dispatch this workflow on
+# the same branch within 24h (the docker-image artifact retention). The job
+# reuses the docker image from that CI run, re-records the snapshots and
+# commits them back to the branch, where the diff is reviewed like code.
+name: Update Visual Baselines
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: visual-baselines-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update-baselines:
+    name: Regenerate visual snapshot baselines
+    runs-on: ubuntu-latest
+    env:
+      APP_IMAGE: synaplan-test:ci
+      APP_URL: http://localhost:8001
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Find latest CI run for this branch
+        id: cirun
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_ID=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?branch=${{ github.ref_name }}&status=completed&per_page=1" --jq '.workflow_runs[0].id')
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "::error::No completed CI run found for branch ${{ github.ref_name }} — push the branch and let CI build the image first."
+            exit 1
+          fi
+          echo "Using docker image from CI run $RUN_ID"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download Docker image artifact from CI run
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: docker-image
+          path: /tmp
+          run-id: ${{ steps.cirun.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Load Docker image
+        run: |
+          docker load -i /tmp/docker-image.tar
+          IMAGE_TAG=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
+          docker tag $IMAGE_TAG synaplan-test:ci
+
+      - name: Start test services
+        run: |
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
+          n=0; until $COMPOSE pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
+          $COMPOSE up -d
+          $COMPOSE up --wait || { $COMPOSE ps; $COMPOSE logs; exit 1; }
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Playwright dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: |
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
+
+      - name: Re-record visual baselines
+        working-directory: frontend
+        env:
+          BASE_URL: http://localhost:8001
+        run: npm run test:e2e:visual -- --update-snapshots
+
+      - name: Commit updated baselines
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/tests/e2e/tests/*-snapshots
+          if git diff --cached --quiet; then
+            echo "Baselines unchanged — nothing to commit."
+            exit 0
+          fi
+          git commit -m "test(e2e): update visual snapshot baselines"
+          git push
+
+      - name: Stop test services
+        if: always()
+        run: |
+          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v

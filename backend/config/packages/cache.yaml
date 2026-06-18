@@ -1,27 +1,87 @@
+# Symfony cache configuration
+#
+# Strategy: Redis is the canonical default for caching across all web nodes
+# (the production cluster runs ≥3 backend instances behind a load balancer,
+# so a node-local filesystem cache would silently desync). The same Redis
+# instance is shared with:
+#   * Symfony Lock component (`framework.lock`)
+#   * Symfony Rate-Limiter (`framework.rate_limiter`)
+#   * Centrifugo realtime engine (different Redis logical DB, see
+#     `_docker/centrifugo/config.json`)
+#   * Symfony Messenger transports (Redis Streams, see `messenger.yaml`)
+#   * Native PHP sessions (`RedisSessionHandler`, see `framework.yaml`)
+#
+# `REDIS_DSN` is mandatory infrastructure and is provided by every official
+# docker-compose file (and the production env). It has no application-level
+# fallback in dev/prod: a load-balanced cluster MUST share its cache, so a
+# silent downgrade to a node-local adapter would reintroduce cross-node desync.
+# The ONLY override is the `when@test` block below, which swaps every pool to a
+# node-local filesystem adapter so PHPUnit runs without a Redis server. We use
+# the filesystem (not array) adapter on purpose: the array adapter implements
+# ResettableInterface and is wiped by Symfony's ServicesResetter on every
+# `kernel.reset` (fired after each test request), which breaks cross-request
+# cache semantics like webhook idempotency and rate limiting. Filesystem cache
+# survives between requests within a test, matching production behaviour.
 framework:
     cache:
         prefix_seed: synaplan_sf
-        
-        # Filesystem cache (Redis removed)
-        app: cache.adapter.filesystem
-        
+
+        # `cache.app` (and every pool below that uses `cache.adapter.redis`)
+        # picks up its DSN from `default_redis_provider`. Per-pool `provider:`
+        # entries are deliberately omitted: they get propagated as tag
+        # attributes through Symfony's CachePoolPass and survive the
+        # `when@test` adapter swap, which then crashes kernel boot with
+        # `argument "1" doesn't exist in ArrayAdapter` (the leftover Redis
+        # provider becomes ctor arg 0 of the wrong adapter).
+        app: cache.adapter.redis
+        default_redis_provider: '%env(REDIS_DSN)%'
+
         pools:
-            # Provider status cache (short TTL)
+            # Provider status cache (short TTL - hot path, kept on Redis for
+            # cross-node consistency so all backend nodes see the same
+            # provider health snapshot).
             cache.provider_status:
-                adapter: cache.adapter.filesystem
+                adapter: cache.adapter.redis
                 default_lifetime: 60
-                
-            # Model configuration cache
+
+            # Model configuration cache.
             cache.model_config:
-                adapter: cache.adapter.filesystem
+                adapter: cache.adapter.redis
                 default_lifetime: 3600
-                
-            # User config cache
+
+            # User config cache.
             cache.user_config:
-                adapter: cache.adapter.filesystem
+                adapter: cache.adapter.redis
                 default_lifetime: 1800
 
-            # NOTE: Widget real-time events are no longer cache-backed. A node-local
-            # filesystem cache is invisible to other nodes behind the load balancer,
-            # which dropped operator/visitor messages until a reload. They now live in
-            # the Galera-replicated BWIDGET_EVENTS table via DatabaseWidgetEventStore.
+            # Symfony Rate-Limiter storage. Used by `framework.rate_limiter.*`
+            # named limiters (see config/packages/rate_limiter.yaml). Lives in
+            # the shared Redis instance so per-user / per-IP quotas are
+            # consistent across the load-balanced backend nodes — without a
+            # shared store, a user could circumvent quotas by hitting different
+            # backend nodes.
+            cache.rate_limiter:
+                adapter: cache.adapter.redis
+                default_lifetime: 3600
+
+            # NOTE: Widget real-time events are delivered via Centrifugo
+            # WebSockets (see docs/REALTIME.md), not via a Symfony cache pool
+            # or the legacy BWIDGET_EVENTS table.
+
+# Test profile uses a node-local filesystem cache so we don't require Redis to
+# run unit tests, while still persisting entries across requests within a test
+# (see the rationale in the header comment). Pools that PHPUnit hits via DI
+# inherit this default.
+when@test:
+    framework:
+        cache:
+            app: cache.adapter.filesystem
+            pools:
+                cache.provider_status:
+                    adapter: cache.adapter.filesystem
+                cache.model_config:
+                    adapter: cache.adapter.filesystem
+                cache.user_config:
+                    adapter: cache.adapter.filesystem
+                cache.rate_limiter:
+                    adapter: cache.adapter.filesystem

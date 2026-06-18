@@ -74,8 +74,10 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 ## Features
 
 - **AI Chat** — Ollama, OpenAI, Anthropic, Groq, Gemini
+- **Multi-Task Routing** — An AI planner decomposes complex requests into a task graph (extract → summarize → generate → reply) and streams live task cards while the steps execute
 - **RAG Search** — Semantic document search with MariaDB VECTOR or Qdrant
 - **Chat Widget** — Embed on any website ([widget guide](https://docs.synaplan.com/index.php/widget))
+- **Live Support** — Realtime WebSocket layer (Centrifugo + Redis): human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md))
 - **WhatsApp** — Meta Business API integration
 - **Email** — AI-powered email responses
 - **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output)
@@ -83,6 +85,7 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 - **AI Memories** — User profiling with Qdrant vector search
 - **Feedback System** — Feedback capture and analysis powered by Qdrant
 - **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
+- **MCP Server** *(early access)* — Connect AI clients (Claude, Cursor, …) over the Model Context Protocol; your RAG and memories become tools at `POST /mcp` ([MCP guide](https://docs.synaplan.com/index.php/mcp))
 
 ---
 
@@ -91,6 +94,20 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 Qdrant runs as an internal Docker service — no configuration needed. It powers AI memories, RAG document search, and the feedback system.
 
 Starts automatically with `docker compose up -d`. Synaplan works fully without it (memories and vector search will be disabled).
+
+---
+
+## Realtime & Background Processing
+
+Both compose files also start three internal services (no host ports, no setup needed):
+
+| Service | Role |
+|---------|------|
+| `redis` | Mandatory shared infrastructure: cache, sessions, locks, rate limits, message queues (Redis Streams), Centrifugo engine |
+| `centrifugo` | WebSocket gateway for realtime features (live chat takeover, typing indicators, operator notifications) — browsers connect same-origin via `/connection/websocket` |
+| `worker` | Symfony Messenger consumer that executes async jobs (AI processing, document indexing, widget crawling) |
+
+In a multi-node cluster all nodes share one Redis, so WebSocket events published on one node reach browsers connected to any other. Details: [docs/REALTIME.md](docs/REALTIME.md).
 
 ---
 
@@ -136,6 +153,7 @@ In-repo guides (for developers working on this codebase):
 | [Installation](docs/INSTALLATION.md) | Detailed setup instructions |
 | [Configuration](docs/CONFIGURATION.md) | Environment variables, API keys |
 | [Development](docs/DEVELOPMENT.md) | Commands, testing, architecture |
+| [Realtime / WebSockets](docs/REALTIME.md) | Centrifugo + Redis realtime layer, multi-node deployment |
 | [RAG System](docs/RAG.md) | Document search and processing |
 | [Chat Widget](docs/WIDGET.md) | Embed chat on websites |
 | [WhatsApp](docs/WHATSAPP.md) | Meta Business API setup |

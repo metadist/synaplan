@@ -252,7 +252,7 @@
     >
       <!-- Current Chat Model Display -->
       <router-link
-        to="/config/ai-models?highlight=CHAT"
+        to="/ai/models?highlight=CHAT"
         class="flex items-center gap-2 px-3 py-2 rounded-lg surface-elevated border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)] transition-all group w-full sm:w-auto"
       >
         <svg

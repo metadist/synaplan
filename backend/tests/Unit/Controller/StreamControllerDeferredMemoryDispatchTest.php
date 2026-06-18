@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Controller;
 use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
 use App\Message\ExtractMemoriesCommand;
+use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\MemoryExtractionDispatcher;
@@ -73,6 +74,7 @@ final class StreamControllerDeferredMemoryDispatchTest extends TestCase
             $this->createMock(PromptService::class),
             $this->createMock(MessageForwardingService::class),
             $this->memoryExtractionDispatcher,
+            $this->createMock(DocumentGeneratorService::class),
         );
     }
 

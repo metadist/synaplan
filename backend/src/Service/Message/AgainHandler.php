@@ -2,6 +2,7 @@
 
 namespace App\Service\Message;
 
+use App\AI\Stream\StreamChunk;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Entity\User;
@@ -161,17 +162,15 @@ final readonly class AgainHandler
         $buffer = '';
 
         $streamCallback = function ($chunk) use (&$buffer) {
-            if (is_array($chunk)) {
-                if (($chunk['type'] ?? '') === 'content' && isset($chunk['content'])) {
-                    $buffer .= $chunk['content'];
-                } elseif (isset($chunk['message'])) {
-                    $buffer .= (string) $chunk['message'];
-                } elseif (isset($chunk['content'])) {
-                    $buffer .= (string) $chunk['content'];
-                }
-            } else {
-                $buffer .= (string) $chunk;
+            if (is_array($chunk) && isset($chunk['message']) && !isset($chunk['content'])) {
+                $buffer .= (string) $chunk['message'];
+
+                return;
             }
+
+            // visibleText() drops structured non-content chunks (reasoning/finish)
+            // so internal chain-of-thought never reaches the regenerated message (#1067).
+            $buffer .= StreamChunk::visibleText($chunk);
         };
 
         $statusCallback = function (array $status) {

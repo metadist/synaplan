@@ -17,7 +17,7 @@ final readonly class FileStorageService
     public const MAX_FILE_SIZE = 128 * 1024 * 1024; // 128 MB
     public const ALLOWED_EXTENSIONS = [
         'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
-        'odt', 'ods', 'odp', 'odg', 'odf',
+        'odt', 'ods', 'odp', 'odg', 'odf', 'ics',
         'jpg', 'jpeg', 'png', 'gif', 'webp',
         'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm',
     ];
@@ -194,6 +194,41 @@ final readonly class FileStorageService
         }
 
         return ['valid' => true, 'error' => null];
+    }
+
+    /**
+     * Store raw string content as a file under the user's upload tree.
+     *
+     * Used by generators that produce content in memory (e.g. .ics calendar
+     * files) rather than from an UploadedFile. Returns the same shape as
+     * {@see storeUploadedFile}.
+     *
+     * @return array{success: bool, path: string, size: int, mime: string, error: string|null}
+     */
+    public function storeRawContent(string $content, int $userId, string $filename, string $mimeType): array
+    {
+        try {
+            $relativePath = $this->generateStoragePath($userId, $filename);
+            $absolutePath = $this->uploadDir.'/'.$relativePath;
+
+            $dir = dirname($absolutePath);
+            if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+                $this->logger->error('FileStorage: Failed to create directory for raw content', ['dir' => $dir]);
+
+                return ['success' => false, 'path' => '', 'size' => 0, 'mime' => '', 'error' => 'Failed to create directory'];
+            }
+
+            $bytes = file_put_contents($absolutePath, $content);
+            if (false === $bytes) {
+                return ['success' => false, 'path' => '', 'size' => 0, 'mime' => '', 'error' => 'Failed to write file'];
+            }
+
+            return ['success' => true, 'path' => $relativePath, 'size' => $bytes, 'mime' => $mimeType, 'error' => null];
+        } catch (\Throwable $e) {
+            $this->logger->error('FileStorage: storeRawContent failed', ['error' => $e->getMessage()]);
+
+            return ['success' => false, 'path' => '', 'size' => 0, 'mime' => '', 'error' => 'Storage failed'];
+        }
     }
 
     /**

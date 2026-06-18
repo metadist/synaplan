@@ -48,7 +48,7 @@ export default defineConfig({
           ],
         },
       },
-      grepInvert: /@oidc-redirect|@noci/,
+      grepInvert: /@oidc-redirect|@noci|@visual/,
     },
     {
       name: 'firefox',
@@ -56,12 +56,40 @@ export default defineConfig({
         ...devices['Desktop Firefox'],
         ...(process.env.CI ? {} : { launchOptions: { args: ['--start-maximized'] } }),
       },
-      grepInvert: /@oidc-redirect|@noci/,
+      // Layout guard runs in chromium (desktop) + chromium-mobile only —
+      // geometry contracts are browser-agnostic, firefox stays functional.
+      grepInvert: /@oidc-redirect|@noci|@visual|@layout/,
     },
     {
       name: 'chromium-oidc-redirect',
       use: { ...devices['Desktop Chrome'] },
       grep: /@oidc-redirect/,
+    },
+    {
+      // Mobile viewport for the layout UI guard only — functional specs are
+      // desktop-designed and would produce noise, not signal, on a phone.
+      name: 'chromium-mobile',
+      use: {
+        ...devices['iPhone 14'],
+        browserName: 'chromium',
+        launchOptions: {
+          args: ['--disable-features=LocalNetworkAccessChecks'],
+        },
+      },
+      grep: /@layout/,
+    },
+    {
+      // Visual snapshots (hard-capped, see layout guard docs). CI-only:
+      // baselines are generated on the ubuntu runner via workflow dispatch —
+      // local font rendering differs and would be permanently red.
+      name: 'chromium-visual',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: ['--disable-features=LocalNetworkAccessChecks'],
+        },
+      },
+      grep: /@visual/,
     },
   ],
 })

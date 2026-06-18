@@ -4,6 +4,7 @@ namespace App\AI\Service;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\EmbeddingProviderInterface;
+use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Provider\GoogleProvider;
 use App\Service\CircuitBreaker;
 use App\Service\DiscordNotificationService;
@@ -11,11 +12,25 @@ use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 class AiFacade
 {
+    /**
+     * 7 days. The vector for a given (text, provider, model, options) tuple is
+     * deterministic, so once a successful primary-path embedding is cached we
+     * can reuse it across requests AND across web nodes (cache.app is Redis).
+     * Bump the EMBEDDING_SHARED_CACHE_KEY_PREFIX version when the on-disk
+     * shape of the returned array changes, so old entries are skipped instead
+     * of mis-deserialised.
+     */
+    private const EMBEDDING_SHARED_CACHE_TTL_SECONDS = 604800;
+
+    private const EMBEDDING_SHARED_CACHE_KEY_PREFIX = 'embed.v1.';
+
     /** @var array<string, array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}> */
     private array $embedCache = [];
 
@@ -28,6 +43,12 @@ class AiFacade
         private DiscordNotificationService $discordNotification,
         private InternalEmailService $emailService,
         private CacheInterface $cache,
+        // Same physical pool as `$cache` (cache.app → Redis in prod, array in
+        // tests). The Contracts interface is great for the cache-aside helper
+        // used by embed(), but embedBatch() needs the PSR-6 surface so it can
+        // distinguish hits from misses WITHOUT triggering one provider call
+        // per missing text. Both interfaces target the same Redis keys.
+        private CacheItemPoolInterface $cachePool,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private string $embeddingFallbackProvider = '',
     ) {
@@ -222,42 +243,124 @@ class AiFacade
         $provider = $this->registry->getEmbeddingProvider($providerName);
         $resolvedModel = $model ?? $provider->getDefaultModels()['embedding'] ?? 'default';
 
-        $cacheKey = md5($text.'|'.$provider->getName().'|'.$resolvedModel);
-        if (isset($this->embedCache[$cacheKey])) {
-            $this->logger->debug('AI embedding cache hit', [
+        // Two-layer cache:
+        //   1. In-process (`$this->embedCache`) collapses duplicates inside the
+        //      same request — useful for batch handlers that re-embed the same
+        //      chunk multiple times.
+        //   2. Shared (Symfony cache.app → Redis) collapses duplicates across
+        //      requests AND across web nodes. The vector for a given
+        //      (text, provider, model, options) tuple is deterministic, so
+        //      this is a pure performance win — no provider call needed.
+        $inProcessKey = $this->embeddingInProcessCacheKey($text, $provider->getName(), $resolvedModel, $options);
+        if (isset($this->embedCache[$inProcessKey])) {
+            $this->logger->debug('AI embedding in-process cache hit', [
                 'provider' => $provider->getName(),
                 'model' => $resolvedModel,
                 'text_length' => strlen($text),
             ]);
 
-            return $this->embedCache[$cacheKey];
+            return $this->embedCache[$inProcessKey];
         }
 
-        $this->logger->info('AI embedding request', [
-            'provider' => $provider->getName(),
-            'user_id' => $userId,
-            'model' => $resolvedModel,
-            'text_length' => strlen($text),
-        ]);
+        $sharedKey = $this->embeddingSharedCacheKey($text, $provider->getName(), $resolvedModel, $options);
 
         try {
-            $result = $provider->embed($text, $options);
-        } catch (\Throwable $primaryError) {
-            $result = $this->tryEmbeddingFallback(
+            // The callback only runs on a cache MISS, so the
+            // 'AI embedding request' log line below faithfully reflects when
+            // we actually call out to a provider.
+            return $this->embedCache[$inProcessKey] = $this->cache->get(
+                $sharedKey,
+                function (ItemInterface $item) use ($text, $provider, $options, $userId, $resolvedModel): array {
+                    $item->expiresAfter(self::EMBEDDING_SHARED_CACHE_TTL_SECONDS);
+                    $this->logger->info('AI embedding request', [
+                        'provider' => $provider->getName(),
+                        'user_id' => $userId,
+                        'model' => $resolvedModel,
+                        'text_length' => strlen($text),
+                    ]);
+
+                    return $provider->embed($text, $options);
+                }
+            );
+        } catch (ProviderException $primaryError) {
+            // Fallback path is intentionally NOT cached under the primary key:
+            // a Cloudflare vector must never be returned later when the
+            // primary (e.g. Ollama) is healthy again — different model spaces
+            // are not interchangeable. We still fill the in-process cache so
+            // the same request doesn't double-bill the fallback provider.
+            $fresh = $this->tryEmbeddingFallback(
                 fn ($fb, $fbOpts) => $fb->embed($text, $fbOpts),
                 $provider->getName(),
                 $primaryError,
                 $options,
             );
+            $this->embedCache[$inProcessKey] = $fresh;
+
+            return $fresh;
         }
+    }
 
-        $this->embedCache[$cacheKey] = $result;
+    /**
+     * Options that can change the embedding vector for the same text+model+provider.
+     * Anything outside this allow-list (e.g. request-id, telemetry tags) MUST
+     * NOT influence the cache key — otherwise the shared cache hit-rate
+     * collapses to ~zero.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function embeddingOptionsForCacheKey(array $options): array
+    {
+        $slice = array_intersect_key($options, array_flip(['dimensions', 'encoding_format']));
+        ksort($slice);
 
-        return $result;
+        return $slice;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function embeddingInProcessCacheKey(string $text, string $providerName, string $resolvedModel, array $options): string
+    {
+        return md5($text.'|'.$providerName.'|'.$resolvedModel.'|'.$this->embeddingOptionsJson($options));
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function embeddingSharedCacheKey(string $text, string $providerName, string $resolvedModel, array $options): string
+    {
+        return self::EMBEDDING_SHARED_CACHE_KEY_PREFIX.md5(
+            $text.'|'.$providerName.'|'.$resolvedModel.'|'.$this->embeddingOptionsJson($options)
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function embeddingOptionsJson(array $options): string
+    {
+        try {
+            return json_encode($this->embeddingOptionsForCacheKey($options), JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return '';
+        }
     }
 
     /**
      * Batch Embedding.
+     *
+     * Cache strategy mirrors {@see embed()} on a per-text basis: every input
+     * text is looked up under the same `embed.v1.*` key shape, so single and
+     * batch calls share one Redis namespace. Only the texts that miss the
+     * cache are forwarded to the provider in a single batch call. The
+     * resulting vectors are persisted under their respective keys so a later
+     * `embed()` for the same text can return without a provider hop.
+     *
+     * Fallback path stays intentionally uncached — exactly like `embed()` —
+     * to prevent vectors from one model space leaking into another model's
+     * key once the primary recovers.
      *
      * @param string[]    $texts        Texts to embed
      * @param int|null    $userId       User ID for config lookup
@@ -268,21 +371,105 @@ class AiFacade
      */
     public function embedBatch(array $texts, ?int $userId = null, ?string $providerName = null, array $options = []): array
     {
+        if ([] === $texts) {
+            return [
+                'embeddings' => [],
+                'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
+            ];
+        }
+
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'embedding');
         }
 
         $provider = $this->registry->getEmbeddingProvider($providerName);
+        $resolvedModel = $options['model'] ?? $provider->getDefaultModels()['embedding'] ?? 'default';
+
+        // Resolve every input slot from the in-process and shared caches
+        // first. We deliberately keep the original index of each missing text
+        // so the final vector list maps 1:1 to the caller-supplied order — a
+        // hard requirement for VectorizationService and EmbeddingReindexService.
+        $resolved = array_fill(0, count($texts), null);
+        /** @var array<int, string> $missingByIndex */
+        $missingByIndex = [];
+        /** @var array<int, string> $sharedKeyByIndex */
+        $sharedKeyByIndex = [];
+        /** @var array<int, string> $inProcessKeyByIndex */
+        $inProcessKeyByIndex = [];
+
+        foreach ($texts as $i => $text) {
+            $inProcessKey = $this->embeddingInProcessCacheKey($text, $provider->getName(), $resolvedModel, $options);
+            $inProcessKeyByIndex[$i] = $inProcessKey;
+
+            if (isset($this->embedCache[$inProcessKey])) {
+                $resolved[$i] = $this->embedCache[$inProcessKey];
+                continue;
+            }
+
+            $sharedKey = $this->embeddingSharedCacheKey($text, $provider->getName(), $resolvedModel, $options);
+            $sharedKeyByIndex[$i] = $sharedKey;
+            $missingByIndex[$i] = $text;
+        }
+
+        if ([] !== $sharedKeyByIndex) {
+            try {
+                $items = $this->cachePool->getItems(array_values(array_unique($sharedKeyByIndex)));
+            } catch (\Psr\Cache\InvalidArgumentException $e) {
+                // Cache lookup failure must never break embedding — fall back
+                // to treating every shared-cache entry as a miss and let the
+                // provider produce fresh vectors.
+                $this->logger->warning('AI batch embedding shared-cache lookup failed', [
+                    'error' => $e->getMessage(),
+                ]);
+                $items = [];
+            }
+
+            $itemsByKey = [];
+            foreach ($items as $item) {
+                $itemsByKey[$item->getKey()] = $item;
+            }
+
+            foreach ($sharedKeyByIndex as $i => $sharedKey) {
+                $item = $itemsByKey[$sharedKey] ?? null;
+                if (null !== $item && $item->isHit()) {
+                    /** @var array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}} $cached */
+                    $cached = $item->get();
+                    $resolved[$i] = $cached;
+                    $this->embedCache[$inProcessKeyByIndex[$i]] = $cached;
+                    unset($missingByIndex[$i]);
+                }
+            }
+        }
 
         $this->logger->info('AI batch embedding request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
             'count' => count($texts),
+            'cache_hits' => count($texts) - count($missingByIndex),
+            'cache_misses' => count($missingByIndex),
         ]);
 
+        // Whole batch served from cache → skip the provider entirely.
+        if ([] === $missingByIndex) {
+            return [
+                'embeddings' => array_map(static fn (array $r): array => $r['embedding'], $resolved),
+                'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
+            ];
+        }
+
+        // Preserve insertion order so the returned embeddings line up with
+        // the texts we sent to the provider (most providers preserve order
+        // by index in their response array).
+        $missingTexts = array_values($missingByIndex);
+        $missingIndexes = array_keys($missingByIndex);
+
         try {
-            return $provider->embedBatch($texts, $options);
+            $batch = $provider->embedBatch($missingTexts, $options);
         } catch (\Throwable $primaryError) {
+            // The fallback covers the FULL original text list (not just the
+            // misses). Mixing cached primary vectors with fallback vectors
+            // would silently violate the model-space invariant the cache key
+            // is designed to enforce.
             return $this->tryEmbeddingFallback(
                 fn ($fb, $fbOpts) => $fb->embedBatch($texts, $fbOpts),
                 $provider->getName(),
@@ -290,6 +477,51 @@ class AiFacade
                 $options,
             );
         }
+
+        $providerEmbeddings = $batch['embeddings'];
+        $usage = $batch['usage'];
+
+        foreach ($missingIndexes as $position => $originalIndex) {
+            $vector = $providerEmbeddings[$position] ?? [];
+            $entry = [
+                'embedding' => $vector,
+                // Per-text usage cannot be reconstructed from a batch response,
+                // so we only attach the aggregate to the first miss to keep
+                // the cache shape compatible with embed()'s schema. Everything
+                // else stores zeroes — the cache hit path doesn't account for
+                // tokens anyway.
+                'usage' => 0 === $position
+                    ? ['prompt_tokens' => $usage['prompt_tokens'], 'total_tokens' => $usage['total_tokens']]
+                    : ['prompt_tokens' => 0, 'total_tokens' => 0],
+            ];
+
+            $resolved[$originalIndex] = $entry;
+            $this->embedCache[$inProcessKeyByIndex[$originalIndex]] = $entry;
+
+            // Empty vectors typically signal a downstream issue (dimension
+            // mismatch, transient provider hiccup, etc.). Skipping the cache
+            // write keeps the next call fresh instead of pinning a bad value
+            // for a week.
+            if ([] === $vector) {
+                continue;
+            }
+
+            try {
+                $item = $this->cachePool->getItem($sharedKeyByIndex[$originalIndex]);
+                $item->set($entry);
+                $item->expiresAfter(self::EMBEDDING_SHARED_CACHE_TTL_SECONDS);
+                $this->cachePool->save($item);
+            } catch (\Psr\Cache\InvalidArgumentException $e) {
+                $this->logger->warning('AI batch embedding shared-cache write failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return [
+            'embeddings' => array_map(static fn (?array $r): array => null === $r ? [] : $r['embedding'], $resolved),
+            'usage' => ['prompt_tokens' => $usage['prompt_tokens'], 'total_tokens' => $usage['total_tokens']],
+        ];
     }
 
     /**
@@ -311,7 +543,7 @@ class AiFacade
 
         // Use `error` (not `warning`) so this shows up in the same log
         // bucket as production incidents — silent failovers were called
-        // out as a risk in the Synapse Routing v2 review. The success
+        // out as a risk in the embedding-stack review. The success
         // path further down logs `notice` so on-call can correlate
         // "primary failed" with "fallback succeeded" without grepping
         // two channels.
@@ -538,7 +770,7 @@ class AiFacade
                 return [
                     'content' => $response,
                     'provider' => $provider->getName(),
-                    'model' => $candidateOptions['model'] ?? 'unknown',
+                    'model' => $this->reportedModel($provider, $candidateOptions, 'vision'),
                 ];
             } catch (ProviderException $e) {
                 $this->logger->warning('AI vision provider failed: '.$provider->getName().' - '.$e->getMessage(), [
@@ -619,7 +851,7 @@ class AiFacade
         return [
             'images' => $images,
             'provider' => $provider->getName(),
-            'model' => $options['model'] ?? 'unknown',
+            'model' => $this->reportedModel($provider, $options, 'image_generation'),
             'image_count' => is_array($images) ? count($images) : 1,
         ];
     }
@@ -675,7 +907,7 @@ class AiFacade
         return [
             'videos' => $videos,
             'provider' => $provider->getName(),
-            'model' => $options['model'] ?? 'unknown',
+            'model' => $this->reportedModel($provider, $options, 'video_generation'),
             'duration_seconds' => $durationSeconds,
             'resolution' => $resolution,
         ];
@@ -760,12 +992,36 @@ class AiFacade
     /**
      * Transcribe Audio (Whisper).
      *
-     * @param string   $audioPath Relative path to audio file from upload dir
-     * @param int|null $userId    User ID for config lookup
-     * @param array    $options   Additional options (provider, model, language, etc.)
+     * @param array $options Additional options (provider, model, language, etc.)
      *
      * @return array Transcription result with text, language, duration, segments
      */
+    /**
+     * Resolve the concrete model name to report in a response's metadata.
+     *
+     * The message-details popover ("AI Model" row) surfaces this value, so a
+     * literal "unknown" makes the row disappear. Prefer the explicitly
+     * requested model, then the provider's advertised default for the given
+     * capability, before falling back to "unknown" as a last resort.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function reportedModel(ProviderMetadataInterface $provider, array $options, string $capability): string
+    {
+        $requested = $options['model'] ?? null;
+        if (is_string($requested) && '' !== trim($requested)) {
+            return $requested;
+        }
+
+        $defaults = $provider->getDefaultModels();
+        $default = $defaults[$capability] ?? null;
+        if (is_string($default) && '' !== trim($default)) {
+            return $default;
+        }
+
+        return 'unknown';
+    }
+
     public function transcribe(string $audioPath, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
@@ -820,7 +1076,8 @@ class AiFacade
 
         return array_merge($result, [
             'provider' => $provider->getName(),
-            'model' => $options['model'] ?? 'unknown',
+            'model' => $this->reportedModel($provider, $options, 'speech_to_text'),
+            'model_id' => $sttModelId,
         ]);
     }
 
@@ -901,7 +1158,7 @@ class AiFacade
             'filename' => basename($relativePath),
             'relativePath' => $relativePath,
             'provider' => $provider->getName(),
-            'model' => $options['model'] ?? 'unknown',
+            'model' => $this->reportedModel($provider, $options, 'text_to_speech'),
             'model_id' => $ttsModelId ?? null,
             'text_length' => mb_strlen($text),
         ];

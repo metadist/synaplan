@@ -36,6 +36,19 @@ class HealthControllerTest extends WebTestCase
 
         $this->assertArrayHasKey('providers', $responseData);
         $this->assertIsArray($responseData['providers']);
+
+        $this->assertArrayHasKey('whisper', $responseData);
+        $this->assertIsArray($responseData['whisper']);
+
+        // The Redis ping is intentionally bypassed under APP_ENV=test (see
+        // HealthController::redisHealth) so the suite never depends on a
+        // running Redis. The contract still requires the field to be present
+        // and to advertise itself as skipped, so monitoring dashboards can
+        // tell "test bypass" from "production outage".
+        $this->assertArrayHasKey('redis', $responseData);
+        $this->assertIsArray($responseData['redis']);
+        $this->assertTrue($responseData['redis']['available']);
+        $this->assertTrue($responseData['redis']['skipped'] ?? false);
     }
 
     public function testHealthEndpointReturnsProviderStatus(): void

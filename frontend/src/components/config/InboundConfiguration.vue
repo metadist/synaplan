@@ -2,17 +2,17 @@
   <div class="space-y-6" data-testid="page-config-inbound">
     <div class="mb-8" data-testid="section-header">
       <h1 class="text-2xl font-semibold txt-primary mb-2">
-        {{ $t('config.inbound.title') }}
+        {{ $t('channels.title') }}
       </h1>
       <p class="txt-secondary">
-        {{ $t('config.inbound.description') }}
+        {{ $t('channels.description') }}
       </p>
     </div>
 
     <div class="surface-card p-6" data-testid="section-whatsapp">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <DevicePhoneMobileIcon class="w-5 h-5 text-green-500" />
-        {{ $t('config.inbound.whatsappChannels') }}
+        {{ $t('channels.whatsappChannels') }}
       </h3>
 
       <div class="space-y-3">
@@ -36,7 +36,7 @@
     <div class="surface-card p-6" data-testid="section-email">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <EnvelopeIcon class="w-5 h-5 text-blue-500" />
-        {{ $t('config.inbound.emailChannels') }}
+        {{ $t('channels.emailChannels') }}
       </h3>
 
       <div class="space-y-4">
@@ -55,7 +55,7 @@
 
         <div class="mt-4 pt-4 border-t border-light-border/30 dark:border-dark-border/20">
           <p class="text-sm txt-secondary mb-3">
-            {{ $t('config.inbound.addKeyword') }}
+            {{ $t('channels.addKeyword') }}
           </p>
           <div class="flex items-center gap-2 flex-wrap">
             <span class="txt-primary">{{ emailKeywordBase }}</span>
@@ -63,7 +63,7 @@
               v-model="emailKeyword"
               type="text"
               class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] max-w-xs"
-              :placeholder="$t('config.inbound.keywordPlaceholder')"
+              :placeholder="$t('channels.keywordPlaceholder')"
               data-testid="input-email-keyword"
             />
             <span class="txt-primary">{{ emailKeywordDomain }}</span>
@@ -74,7 +74,7 @@
           >
             <p class="text-sm txt-primary">
               <CheckCircleIcon class="w-5 h-5 text-blue-500 inline mr-2" />
-              <i18n-t keypath="config.inbound.yourEmailAddress" tag="span">
+              <i18n-t keypath="channels.yourEmailAddress" tag="span">
                 <template #email>
                   <span class="font-medium font-mono text-blue-600 dark:text-blue-400">{{
                     personalEmailAddress
@@ -85,7 +85,7 @@
           </div>
           <div v-else class="mt-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
             <p class="text-sm txt-primary">
-              <i18n-t keypath="config.inbound.noKeywordSet" />
+              <i18n-t keypath="channels.noKeywordSet" />
             </p>
           </div>
         </div>
@@ -95,23 +95,23 @@
     <div class="surface-card p-6" data-testid="section-api">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <CommandLineIcon class="w-5 h-5 text-purple-500" />
-        {{ $t('config.inbound.apiChannel') }}
+        {{ $t('channels.apiChannel') }}
       </h3>
 
       <p class="txt-secondary mb-4">
-        {{ $t('config.inbound.apiDescription') }}
+        {{ $t('channels.apiDescription') }}
       </p>
 
       <div class="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
         <p class="text-sm txt-primary mb-3">
-          {{ $t('config.inbound.apiDocumentationInfo') }}
+          {{ $t('channels.apiDocumentationInfo') }}
         </p>
         <router-link
-          to="/config/api-documentation"
+          to="/channels/api/docs"
           class="btn-primary px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2"
         >
           <CommandLineIcon class="w-4 h-4" />
-          {{ $t('config.inbound.viewApiDocumentation') }}
+          {{ $t('channels.viewApiDocumentation') }}
         </router-link>
       </div>
     </div>
@@ -173,7 +173,7 @@ const originalData = ref({
 const whatsappChannels = computed(() => formData.value.whatsappChannels)
 const emailChannels = computed<EmailChannel[]>(() => {
   const channels: EmailChannel[] = [
-    { id: 'base', email: baseEmailAddress, handling: t('config.inbound.defaultHandling') },
+    { id: 'base', email: baseEmailAddress, handling: t('channels.defaultHandling') },
   ]
   if (
     formData.value.personalEmailAddress &&
@@ -182,7 +182,7 @@ const emailChannels = computed<EmailChannel[]>(() => {
     channels.push({
       id: 'personal',
       email: formData.value.personalEmailAddress,
-      handling: t('config.inbound.personalKeyword'),
+      handling: t('channels.personalKeyword'),
     })
   }
   return channels
@@ -235,7 +235,7 @@ const handleSave = saveChanges(async () => {
       formData.value.personalEmailAddress = response.emailAddress
       originalData.value.emailKeyword = response.keyword || ''
       originalData.value.personalEmailAddress = response.emailAddress
-      success(t('config.inbound.keywordSaved'))
+      success(t('channels.keywordSaved'))
     }
   } catch (err: unknown) {
     const errorMessage = getApiErrorMessage(err) || 'Failed to save email keyword'

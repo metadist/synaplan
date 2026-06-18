@@ -30,10 +30,7 @@ test.describe('@noci @nightly Chat bubble flicker guard', () => {
     const chat = new ChatHelper(page)
     await chat.startNewChat()
 
-    const previousCount = await chat.conversationBubbles().count()
-
-    await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
-    await page.locator(selectors.chat.sendBtn).click()
+    const previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
 
     // Bubble for the new assistant response. Index = previousCount in the
     // bubbles list (assistant bubbles only).

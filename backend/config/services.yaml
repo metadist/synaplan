@@ -19,10 +19,20 @@ parameters:
     # OIDC scopes requested during login (space-separated)
     env(OIDC_SCOPES): 'openid email profile offline_access'
 
-    # Health monitoring defaults (so autowiring works when env not set)
-    env(HEALTH_MONITOR_TOKEN): ''
-    env(HEALTH_MONITOR_USER_EMAIL): ''
-    env(HEALTH_MONITOR_USER_PASSWORD): ''
+    # Realtime (Centrifugo) defaults so the backend boots even when no realtime
+    # gateway is configured (bare/custom deployment). With these unset,
+    # CentrifugoPublisher short-circuits (enabled=false → no publish, never
+    # throws) and the runtime-config endpoint reports realtime as disabled, so
+    # the frontend never opens a WebSocket and the chat falls back to REST.
+    # The official docker-compose files set REALTIME_ENABLED=true explicitly.
+    env(REALTIME_ENABLED): 'false'
+    env(REALTIME_API_URL): ''
+    env(REALTIME_API_KEY): ''
+    env(REALTIME_TOKEN_SECRET): ''
+
+    # Mistral AI is optional; default empty so the backend boots when the key
+    # is unset (matches the other optional cloud-AI providers).
+    env(MISTRAL_API_KEY): ''
 
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
@@ -52,7 +62,6 @@ parameters:
     env(QDRANT_URL): ''
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
-    env(QDRANT_SYNAPSE_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''
@@ -84,15 +93,34 @@ parameters:
     env(DEFAULT_USER_PLUGINS): '[]'
     default_user_plugins: '%env(json:DEFAULT_USER_PLUGINS)%'
 
+    # Anti-abuse cap on concurrent active guest sessions per IP.
+    # Production default is 5; the E2E suite raises it (all tests share one
+    # client IP, which would otherwise trip the limit and 429).
+    env(GUEST_MAX_SESSIONS_PER_IP): '5'
+
+    # Extra hostnames (comma-separated, no port) accepted by the MCP endpoint's
+    # DNS-rebinding protection, on top of localhost variants and the APP_URL
+    # host. Set this to the public MCP host(s) in production, e.g.
+    # "web.synaplan.com".
+    env(MCP_ALLOWED_HOSTS): ''
+
 services:
     _defaults:
         autowire: true
         autoconfigure: true
 
-    # Plugin Context Providers — plugins can inject context into chat system prompts
+    # Auto-tagging:
+    #   * Plugin context providers — inject context into chat system prompts.
+    #   * Realtime channel authorizers — collected by ChannelAuthorizerLocator.
     _instanceof:
         App\Service\Plugin\PluginContextProviderInterface:
             tags: ['app.plugin.context_provider']
+        # Multi-task routing: capability runners (Sprint 3). Concrete runners
+        # are added in Sprint 3b; this tag wires them into the RunnerRegistry.
+        App\Service\Multitask\Execution\TaskRunner:
+            tags: ['app.multitask.runner']
+        App\Realtime\Authorizer\ChannelAuthorizerInterface:
+            tags: ['app.realtime.authorizer']
 
     App\:
         resource: '../src/'
@@ -101,6 +129,20 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
             - '../src/Test/'
+
+    # Multi-task parallel media offload (Sprint 4): subprocess dispatcher needs
+    # the project dir for Symfony Process cwd. Alias binds the interface.
+    App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+    App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
+        alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
+
+    # email_me DAG node: resolves upstream file descriptors to absolute paths
+    # under the shared uploads dir before attaching them to the result mail.
+    App\Service\Multitask\Execution\Runner\EmailMeRunner:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
 
     # Idempotent seeders for production-essential catalog data.
     # Run from docker-entrypoint.sh after migrations (app:seed) and re-runnable from CLI.
@@ -160,6 +202,16 @@ services:
             - { name: 'app.ai.vision' }
             - { name: 'app.ai.speech_to_text' }
 
+    App\AI\Provider\MistralProvider:
+        arguments:
+            $apiKey: '%env(MISTRAL_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.text_to_speech' }
+
     App\AI\Provider\GoogleProvider:
         arguments:
             $apiKey: '%env(GOOGLE_GEMINI_API_KEY)%'
@@ -210,6 +262,71 @@ services:
         arguments:
             $embeddingFallbackProvider: '%env(EMBEDDING_FALLBACK_PROVIDER)%'
 
+    # ----------------------------------------------------------------------
+    # Infrastructure / platform services
+    # ----------------------------------------------------------------------
+
+    # Redis platform wrapper. Symfony's cache/lock/rate-limiter components
+    # talk to Redis directly through their adapters; this service is for
+    # feature code (counters, idempotency, presence, ad-hoc pub/sub).
+    App\Service\Infrastructure\RedisService:
+        arguments:
+            $redisDsn: '%env(REDIS_DSN)%'
+            $environment: '%kernel.environment%'
+
+    # ----------------------------------------------------------------------
+    # Native PHP sessions backed by Redis (see framework.yaml session block).
+    # We use Predis (pure PHP) on purpose: the cache/lock/messenger trio
+    # already pulls in Predis, and sessions don't need the binary throughput
+    # that would justify pulling phpredis into every web request. The TTL
+    # mirrors framework.session.gc_maxlifetime so PHP's GC and Redis's own
+    # expiry don't fight each other.
+    # ----------------------------------------------------------------------
+    session.handler.redis_connection:
+        class: Predis\Client
+        arguments:
+            - '%env(REDIS_DSN)%'
+            - { parameters: { read_write_timeout: 2.5, timeout: 2.5 } }
+        lazy: true
+
+    Symfony\Component\HttpFoundation\Session\Storage\Handler\RedisSessionHandler:
+        autowire: false
+        autoconfigure: false
+        arguments:
+            - '@session.handler.redis_connection'
+            - { prefix: synaplan_sess_, ttl: 604800 }
+
+    # ----------------------------------------------------------------------
+    # Realtime framework (App\Realtime)
+    # ----------------------------------------------------------------------
+
+    # Channel authorizers are auto-tagged via the _instanceof block above and
+    # injected here as a tagged iterator.
+    App\Realtime\Authorizer\ChannelAuthorizerLocator:
+        arguments:
+            $authorizers: !tagged_iterator app.realtime.authorizer
+
+    # JWT minting service used by RealtimeTokenController. The environment is
+    # injected so minting can hard-fail in prod when REALTIME_TOKEN_SECRET is
+    # still the shipped changeme_* placeholder (forgeable JWTs otherwise).
+    App\Realtime\Token\RealtimeTokenService:
+        arguments:
+            $hmacSecret: '%env(REALTIME_TOKEN_SECRET)%'
+            $ttlSeconds: 60
+            $environment: '%kernel.environment%'
+
+    # Default publisher: HTTP POST to Centrifugo. NullPublisher is bound in
+    # the test profile below so unit tests don't need a running gateway.
+    App\Realtime\Publisher\CentrifugoPublisher:
+        arguments:
+            $apiUrl: '%env(REALTIME_API_URL)%'
+            $apiKey: '%env(REALTIME_API_KEY)%'
+            $enabled: '%env(bool:REALTIME_ENABLED)%'
+            $environment: '%kernel.environment%'
+
+    App\Realtime\Publisher\RealtimePublisherInterface:
+        alias: App\Realtime\Publisher\CentrifugoPublisher
+
     # Whisper Service for Audio Transcription
     App\Service\WhisperService:
         arguments:
@@ -252,14 +369,24 @@ services:
         bind:
             $whatsappWebhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
 
+    # MCP (Model Context Protocol) Streamable HTTP endpoint
+    App\Controller\McpController:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+            $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+            $mcpAllowedHosts: '%env(MCP_ALLOWED_HOSTS)%'
+
+    # MCP firewall entry point (401 + WWW-Authenticate → RFC 9728 metadata)
+    App\Security\McpAuthenticationEntryPoint:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
     # Message Processing Services
     App\Service\Message\MessagePreProcessor:
         arguments:
             $uploadsDir: '%kernel.project_dir%/var/uploads'
     App\Service\Message\MessageSorter: ~
     App\Service\Message\MessageClassifier: ~
-    App\Service\Message\SynapseRouter: ~
-    App\Service\Message\SynapseIndexer: ~
     App\Service\Message\InferenceRouter: ~
     App\Service\Message\MessageProcessor: ~
 
@@ -294,8 +421,19 @@ services:
     App\Service\MediaGenerationServiceInterface:
         alias: App\Service\MediaGenerationService
 
-    # Model Configuration Service
-    App\Service\ModelConfigService: ~
+    App\Service\Media\GeneratedFileRegistrar:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    # Model Configuration Service. Pinned to its own cache pool so the 5-min
+    # per-key TTL the service sets in code lives alongside the pool's own
+    # 1-hour upper bound (see config/packages/cache.yaml). Without an
+    # explicit binding this would resolve to `cache.app`, mixing model
+    # config keys with everything else and making targeted invalidation
+    # (`bin/console cache:pool:clear cache.model_config`) ineffective.
+    App\Service\ModelConfigService:
+        arguments:
+            $cache: '@cache.model_config'
 
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\InternalEmailService: ~
@@ -430,6 +568,11 @@ services:
 
     App\Service\Message\AgainHandler: ~
 
+    # Guest trial chat session service (per-IP cap configurable for E2E)
+    App\Service\GuestSessionService:
+        arguments:
+            $maxSessionsPerIp: '%env(int:GUEST_MAX_SESSIONS_PER_IP)%'
+
     # File Processing Services
     App\Service\File\TikaClient:
         arguments:
@@ -520,7 +663,6 @@ services:
             $qdrantUrl: '%env(QDRANT_URL)%'
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
-            $synapseCollection: '%env(default::QDRANT_SYNAPSE_COLLECTION)%'
 
     App\Service\VectorSearch\QdrantClientInterface:
         alias: App\Service\VectorSearch\QdrantClientDirect
@@ -550,6 +692,11 @@ services:
         arguments:
             $projectDir: '%kernel.project_dir%'
             $defaultTtsUrl: '%synaplan_tts_url_default%'
+
+    # System Info Service (Admin server diagnostics: PHP / memory / disk)
+    App\Service\Admin\SystemInfoService:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
 
     # Vector Storage Configuration
     App\Service\RAG\VectorStorage\VectorStorageConfig:
@@ -601,6 +748,11 @@ when@dev:
 
 when@test:
     services:
+        # Bind the no-op publisher so PHPUnit doesn't require a running
+        # Centrifugo instance.
+        App\Realtime\Publisher\RealtimePublisherInterface:
+            alias: App\Realtime\Publisher\NullPublisher
+
         App\AI\Provider\TestProvider:
             tags:
                 - { name: 'app.ai.chat' }

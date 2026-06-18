@@ -16,13 +16,18 @@
 services:
   # Vue.js Frontend
   frontend:
-    image: node:22@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6
+    image: node:22@sha256:2d178f2785b96dfbf62a416ca2e40f50e30150b4ff3320d706f0d96e90600eb3
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
     environment:
       NODE_ENV: development
       BACKEND_URL: http://backend
+      # Vite dev-server host check (anti DNS-rebinding). EMPTY by default →
+      # ignored, so the dev server answers to ALL hosts out of the box (works
+      # behind any domain / reverse proxy). Set ALLOWED_HOSTS to a
+      # comma-separated allow-list to restrict to ONLY those hosts.
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
     ports:
       - "5173:5173"
     volumes:
@@ -32,7 +37,8 @@ services:
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - synaplan-network
@@ -40,16 +46,19 @@ services:
   # Widget Build Watcher (dev only)
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
+  # 6g: the Rolldown-based Vite (>= 8.0.16) peaks above the old 4g cap while
+  # rendering chunks (native binary + JS heap), which OOM-killed every build
+  # and left dist-widget without widget.js.
   frontend-widgets:
-    image: node:22@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6
+    image: node:22@sha256:2d178f2785b96dfbf62a416ca2e40f50e30150b4ff3320d706f0d96e90600eb3
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
     environment:
       NODE_ENV: development
-      NODE_OPTIONS: '--max-old-space-size=3072'
-    mem_limit: 4g
-    memswap_limit: 4g
+      NODE_OPTIONS: '--max-old-space-size=4096'
+    mem_limit: 6g
+    memswap_limit: 6g
     volumes:
       - ./frontend:/app
       # Anonymous volume to prevent host node_modules from being mounted
@@ -70,9 +79,16 @@ services:
       - 8.8.8.8
       - 8.8.4.4
     image: ghcr.io/metadist/synaplan:latest
+    # Always build the lightweight `dev` stage locally so the image carries
+    # ext-redis (phpredis) without baking the app. The published :latest can be
+    # stale; reusing it breaks composer install (symfony/redis-messenger platform
+    # req) and the worker's Redis Streams consumer. The dev stage is independent
+    # of backend source, so every `up -d` is a cache hit after the first build.
+    pull_policy: build
     build:
       context: .
       dockerfile: _docker/backend/Dockerfile
+      target: dev
     container_name: synaplan-backend
     # Optional: Load extra config from backend/.env (for API keys, etc.)
     env_file:
@@ -103,12 +119,25 @@ services:
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama:11434
+      QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
       # Token Configuration
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
-      LOCK_DSN: ${LOCK_DSN:-flock}
+      LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
+      # Redis (general-purpose: cache, locks, rate-limiter, realtime fan-out)
+      # Override REDIS_DSN for production (e.g. redis://redis-cluster.internal:6379).
+      REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
+      # Realtime gateway (Centrifugo). REALTIME_ENABLED toggles WS publishing
+      # at runtime; there is no SSE fallback after the realtime cleanup phase.
+      REALTIME_ENABLED: ${REALTIME_ENABLED:-true}
+      REALTIME_API_URL: ${REALTIME_API_URL:-http://centrifugo:8000/api}
+      REALTIME_API_KEY: ${REALTIME_API_KEY:-changeme_centrifugo_api_key}
+      REALTIME_TOKEN_SECRET: ${REALTIME_TOKEN_SECRET:-changeme_centrifugo_token_secret}
+      # WebSocket URL exposed to browser clients via /api/v1/config/runtime.
+      # Empty string = same-origin (Caddy reverse-proxies /connection/* to centrifugo).
+      REALTIME_PUBLIC_WS_URL: ${REALTIME_PUBLIC_WS_URL:-}
       # Mailer (Mailhog for development)
       MAILER_DSN: smtp://mailhog:1025
       # External API Keys loaded from backend/.env via env_file
@@ -148,6 +177,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      centrifugo:
+        condition: service_started
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -185,9 +218,15 @@ services:
   # Symfony pattern to bound Doctrine EM growth on long-lived consumers.
   worker:
     image: ghcr.io/metadist/synaplan:latest
+    # Build the same lightweight `dev` stage as the backend (base + phpredis).
+    # The worker bind-mounts ./backend and consumes Redis Streams via
+    # messenger:consume, which needs phpredis at runtime; the dev stage is
+    # source-independent so `up -d` stays a cache hit after the first build.
+    pull_policy: build
     build:
       context: .
       dockerfile: _docker/backend/Dockerfile
+      target: dev
     container_name: synaplan-worker
     env_file:
       - path: backend/.env
@@ -205,10 +244,15 @@ services:
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama:11434
+      QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
-      LOCK_DSN: ${LOCK_DSN:-flock}
+      LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
+      # Redis (general-purpose: cache, locks, rate-limiter, Messenger Redis Streams
+      # transport). The worker consumes async_ai_high/async_extract/async_index,
+      # all of which use the Redis transport, so REDIS_DSN is mandatory here.
+      REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
       MAILER_DSN: smtp://mailhog:1025
       AUTO_DOWNLOAD_MODELS: "false"
       ENABLE_LOCAL_GPT_OSS: ${ENABLE_LOCAL_GPT_OSS:-false}
@@ -253,6 +297,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       backend:
         condition: service_started
     restart: unless-stopped
@@ -271,7 +317,7 @@ services:
 
   # MariaDB 11.8 Database
   db:
-    image: mariadb:12.2.2@sha256:350261292d0129fd4b24f537dcf05ecd3ebe34d39d5b592af551f38310e7a167
+    image: mariadb:12.3.2@sha256:b1c7bf836e64ed9406a8984af29509f40089d55cea14b32f12c4726a1f17104b
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
@@ -294,9 +340,91 @@ services:
     networks:
       - synaplan-network
 
+  # ----------------------------------------------------------------------------
+  # Redis - General-purpose in-memory data store.
+  #
+  # Used by:
+  #   * Symfony cache.adapter.redis (pools: app, widget_events, model_config, ...)
+  #   * Symfony Lock component (LOCK_DSN=redis://redis:6379)
+  #   * Symfony Rate-Limiter storage (per-user quotas)
+  #   * Centrifugo Redis engine (cross-node WebSocket pub/sub)
+  #   * Symfony Messenger transports (Redis Streams, consumed by the worker)
+  #   * Native PHP sessions (RedisSessionHandler)
+  #
+  # Production note: replace with managed/clustered Redis (e.g. one shared
+  # instance for all 3 web nodes). Keep --maxmemory and eviction policy in
+  # mind once persistent caches grow beyond a few hundred MB.
+  # ----------------------------------------------------------------------------
+  redis:
+    # Pinned to Redis 7.4: Centrifugo v6.4.0 (rueidis/RESP3) reliably receives
+    # client publications from 7.x, whereas Redis 8.x dropped pub/sub fan-out to
+    # the Centrifugo node (control messages arrived, publications did not),
+    # which silently broke realtime delivery to dashboard + widget clients.
+    image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    container_name: synaplan-redis
+    command: >-
+      redis-server
+        --appendonly no
+        --save ""
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # ----------------------------------------------------------------------------
+  # Centrifugo - WebSocket / real-time gateway.
+  #
+  # One instance per web node in production. All instances share state through
+  # the Redis engine, so a publish on node A reaches subscribers on node B.
+  # Caddy/FrankenPHP reverse-proxies `/connection/*` and `/centrifugo/api/*`
+  # so browsers connect to the same origin (Cloudflare-friendly, no CORS).
+  # Authentication uses short-lived JWTs issued by the PHP backend.
+  # ----------------------------------------------------------------------------
+  centrifugo:
+    image: centrifugo/centrifugo:v6.8.2@sha256:fbe9a36e870fca382dfaa1afac6e6ea433e79414ad2f8fa3083619660cdd4cad
+    container_name: synaplan-centrifugo
+    command: ["centrifugo", "-c", "/centrifugo/config.json"]
+    volumes:
+      - ./_docker/centrifugo/config.json:/centrifugo/config.json:ro
+    environment:
+      # Real configuration lives in config.json; these vars override secrets so
+      # production deployments don't ship credentials in the repo. Centrifugo v6
+      # nests config under typed sections, so env var names mirror the JSON path
+      # (CENTRIFUGO_<SECTION>_<FIELD>, with `_` for nested levels).
+      CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: ${REALTIME_TOKEN_SECRET:-changeme_centrifugo_token_secret}
+      CENTRIFUGO_HTTP_API_KEY: ${REALTIME_API_KEY:-changeme_centrifugo_api_key}
+      CENTRIFUGO_ADMIN_PASSWORD: ${REALTIME_ADMIN_PASSWORD:-changeme_admin}
+      CENTRIFUGO_ADMIN_SECRET: ${REALTIME_ADMIN_SECRET:-changeme_admin_secret}
+      # Space-separated list of origins allowed to upgrade to WebSocket.
+      # Leave default for dev; in production set to your domain(s).
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${REALTIME_ALLOWED_ORIGINS:-*}
+      # Redis engine address (cross-node pub/sub). Override REALTIME_REDIS_ADDRESS
+      # in production to point at the shared/managed Redis, e.g.
+      # redis://redis-prod.internal:6379/3. Keep the dedicated logical DB suffix
+      # (/3) — it isolates Centrifugo keys from Symfony cache/lock/messenger which
+      # use /0 via REDIS_DSN. (For Redis Cluster use a host without a DB suffix.)
+      CENTRIFUGO_ENGINE_REDIS_ADDRESS: ${REALTIME_REDIS_ADDRESS:-redis://redis:6379/3}
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
   # Ollama - Local AI Models (GPU-accelerated if NVIDIA available)
   ollama:
-    image: ollama/ollama:latest@sha256:a6149234667efc71d37766d61c1a16f24c33e4cd7a0bf4125c44a7e47e2419c4
+    image: ollama/ollama:latest@sha256:05b6fe5143ed006d6d4abd39bdd575f962a5822bdf81e6fbb5e6894eb984ab9c
     container_name: synaplan-ollama
     ports:
       - "11435:11434"
@@ -366,7 +494,7 @@ services:
 
   # Whisper Models Download (runs once)
   whisper-models:
-    image: alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+    image: alpine:3.24@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
     container_name: synaplan-whisper-models
     command: >
       sh -c '
@@ -419,7 +547,7 @@ services:
 
   # Generates a self-signed TLS certificate for Keycloak HTTPS (runs once)
   keycloak_certs:
-    image: alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+    image: alpine:3.24@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
     container_name: synaplan-keycloak-certs
     command: sh -c 'if [ -f /certs/cert.pem ]; then echo "Keycloak TLS cert exists"; exit 0; fi && apk add --no-cache openssl && openssl req -x509 -newkey rsa:2048 -keyout /certs/key.pem -out /certs/cert.pem -days 3650 -nodes -subj "/CN=host.docker.internal" -addext "subjectAltName=DNS:host.docker.internal,DNS:keycloak,DNS:localhost" && chmod 644 /certs/*.pem && echo "Keycloak TLS cert generated"'
     volumes:
@@ -431,7 +559,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak:
-    image: quay.io/keycloak/keycloak:26.6@sha256:f9ba7b2af90db8dc749a57ca9aedca51e840cb9224441ab546a968da941da900
+    image: quay.io/keycloak/keycloak:26.6@sha256:5fdbf2dbb5897cc34e82de49d13e23db011f9925089dbc555fc095f2c8bc1dac
     container_name: synaplan-keycloak
     depends_on:
       keycloak_certs:
@@ -464,7 +592,7 @@ services:
       - synaplan-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.6@sha256:f9ba7b2af90db8dc749a57ca9aedca51e840cb9224441ab546a968da941da900
+    image: quay.io/keycloak/keycloak:26.6@sha256:5fdbf2dbb5897cc34e82de49d13e23db011f9925089dbc555fc095f2c8bc1dac
     container_name: synaplan-keycloak-setup
     depends_on:
       keycloak:
@@ -485,7 +613,7 @@ services:
 
   # Qdrant Vector Database (memories + document vectors)
   qdrant:
-    image: qdrant/qdrant:v1.18.1@sha256:45f8e3ddc2570a4d029877e1b5ec1045c19b3852b4e22a55c7f43b05aea0ca89
+    image: qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c
     container_name: synaplan-qdrant
     ports:
       - "6333:6333"

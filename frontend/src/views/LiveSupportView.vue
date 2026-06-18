@@ -5,10 +5,15 @@
       <div class="w-80 border-r border-light-border/30 dark:border-dark-border/20 flex flex-col">
         <!-- Header -->
         <div class="p-4 border-b border-light-border/30 dark:border-dark-border/20">
-          <h1 class="text-lg font-semibold txt-primary flex items-center gap-2">
-            <Icon icon="heroicons:chat-bubble-left-ellipsis" class="w-5 h-5 txt-brand" />
-            {{ $t('liveSupport.title') }}
-          </h1>
+          <div class="flex items-center justify-between gap-2">
+            <h1 class="text-lg font-semibold txt-primary flex items-center gap-2">
+              <Icon icon="heroicons:chat-bubble-left-ellipsis" class="w-5 h-5 txt-brand" />
+              {{ $t('liveSupport.title') }}
+            </h1>
+            <!-- Centrifugo connection state — surfaces drops & reconnects so
+                 operators don't think a missing notification means "no traffic". -->
+            <ConnectionStatusBadge />
+          </div>
           <p class="text-xs txt-secondary mt-1">{{ $t('liveSupport.subtitle') }}</p>
         </div>
 
@@ -219,7 +224,11 @@ import MainLayout from '@/components/MainLayout.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import { useNotification } from '@/composables/useNotification'
-import { subscribeToNotifications, type EventSubscription } from '@/services/sseClient'
+import {
+  subscribeToWidgetOperatorChannel,
+  type WidgetSubscription,
+} from '@/services/realtime/widgetOperatorRealtime'
+import ConnectionStatusBadge from '@/components/realtime/ConnectionStatusBadge.vue'
 
 const { t } = useI18n()
 const { formatRelativeTime, formatTime: formatTimeStr } = useDateFormat()
@@ -237,7 +246,7 @@ const replyText = ref('')
 const sending = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 
-let notificationSubscriptions: EventSubscription[] = []
+let notificationSubscriptions: WidgetSubscription[] = []
 
 const waitingCount = computed(() => sessions.value.filter((s) => s.mode === 'waiting').length)
 const activeCount = computed(() => sessions.value.filter((s) => s.mode === 'human').length)
@@ -252,9 +261,12 @@ const filteredSessions = computed(() => {
 const loadWidgets = async () => {
   try {
     widgets.value = await widgetsApi.listWidgets()
-    // Subscribe to notifications for all widgets
+    // Subscribe to the operator notifications channel for every widget the
+    // current user owns. All channels share the same Centrifuge connection
+    // (held by the realtime Pinia store), so the cost is one extra
+    // subscription frame per widget — no extra sockets.
     for (const widget of widgets.value) {
-      const sub = subscribeToNotifications(widget.widgetId, handleNotification)
+      const sub = subscribeToWidgetOperatorChannel(widget.widgetId, handleNotification)
       notificationSubscriptions.push(sub)
     }
   } catch (err: unknown) {
@@ -367,8 +379,11 @@ const handBackToAi = async () => {
   }
 }
 
-const handleNotification = (data: { type?: string }) => {
-  if (data.type === 'new_message') {
+// Operator-channel envelopes arrive flattened as { type, ...data }. The
+// backend publishes with envelope type 'notification' and discriminates the
+// payload via `kind` (see WidgetPublicController's human-mode branch).
+const handleNotification = (data: { type?: string; kind?: string }) => {
+  if (data.type === 'notification' && data.kind === 'new_message') {
     // Reload sessions to show new messages
     loadSessions()
   }

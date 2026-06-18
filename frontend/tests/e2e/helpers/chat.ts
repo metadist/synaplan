@@ -10,6 +10,26 @@ export class ChatHelper {
     return this.page.locator(selectors.chat.messageContainer).locator(selectors.chat.aiAnswerBubble)
   }
 
+  /**
+   * Fill the chat input and click send. Returns the AI-bubble count before
+   * sending so callers can pass it straight to {@link waitForAnswer}.
+   *
+   * Waits for the send button to become enabled after filling — this guards
+   * against the rare race where Playwright's synthetic fill() event reaches
+   * Vue's @input handler a tick too late for canSend to flip before click().
+   */
+  async sendMessage(text: string): Promise<number> {
+    const previousCount = await this.conversationBubbles().count()
+    const textInput = this.page.locator(selectors.chat.textInput)
+    const sendBtn = this.page.locator(selectors.chat.sendBtn)
+
+    await textInput.fill(text)
+    await expect(sendBtn).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
+    await sendBtn.click()
+
+    return previousCount
+  }
+
   async waitForAnswer(previousCount: number, longTimeout = false): Promise<string> {
     const bubbles = this.conversationBubbles()
     const newBubble = bubbles.nth(previousCount)
@@ -89,7 +109,7 @@ export class ChatHelper {
     await this.page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
     await this.page.reload()
     await this.page
-      .locator(selectors.nav.sidebarV2Settings)
+      .locator(selectors.nav.sidebarV2Channels)
       .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
 

@@ -41,11 +41,22 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 final readonly class ReVectorizeMessageHandler
 {
     /**
-     * Scopes whose BCONFIG binding should be rolled back when the run
-     * fails. `synapse` switches a different binding (SYNAPSE_VECTORIZE)
-     * which is handled by the same `setSynapseVectorizeModel` flow.
+     * Scopes whose BCONFIG binding should be rolled back when the run fails.
      */
     private const VECTORIZE_BOUND_SCOPES = [
+        RevectorizeRun::SCOPE_DOCUMENTS,
+        RevectorizeRun::SCOPE_MEMORIES,
+        RevectorizeRun::SCOPE_ALL,
+    ];
+
+    /**
+     * Every scope this release knows how to execute. A queued run with any
+     * other scope (e.g. the retired `synapse` scope from before the embedding-
+     * routing removal) used to fall through every branch in
+     * EmbeddingReindexService::execute() and come back as a green
+     * `COMPLETED (0 chunks)` — fail it loudly instead.
+     */
+    private const KNOWN_SCOPES = [
         RevectorizeRun::SCOPE_DOCUMENTS,
         RevectorizeRun::SCOPE_MEMORIES,
         RevectorizeRun::SCOPE_ALL,
@@ -75,6 +86,23 @@ final readonly class ReVectorizeMessageHandler
             $this->logger->info('ReVectorize: skipping already-handled run', [
                 'run_id' => $run->getId(),
                 'status' => $run->getStatus(),
+            ]);
+
+            return;
+        }
+
+        if (!in_array($run->getScope(), self::KNOWN_SCOPES, true)) {
+            $run->setStatus(RevectorizeRun::STATUS_FAILED);
+            $run->setError(sprintf(
+                'Unsupported scope "%s" — this run was queued by a previous release and cannot be replayed. Start a new re-vectorize run.',
+                $run->getScope(),
+            ));
+            $run->setFinishedAt(time());
+            $this->em->flush();
+
+            $this->logger->warning('ReVectorize: rejected run with unknown scope', [
+                'run_id' => $run->getId(),
+                'scope' => $run->getScope(),
             ]);
 
             return;
@@ -171,9 +199,7 @@ final readonly class ReVectorizeMessageHandler
         $scope = $run->getScope();
 
         try {
-            if (RevectorizeRun::SCOPE_SYNAPSE === $scope) {
-                $this->bindingService->setSynapseVectorizeModel($fromModelId);
-            } elseif (in_array($scope, self::VECTORIZE_BOUND_SCOPES, true)) {
+            if (in_array($scope, self::VECTORIZE_BOUND_SCOPES, true)) {
                 $this->bindingService->setVectorizeModel($fromModelId);
             } else {
                 return;
@@ -211,8 +237,7 @@ final readonly class ReVectorizeMessageHandler
      * we recreate the collection with the rollback model's dim so the
      * memory service is usable again immediately after a failure.
      *
-     * Skipped for SCOPE_SYNAPSE (different collection, different
-     * recovery path) and SCOPE_DOCUMENTS (memories untouched).
+     * Skipped for SCOPE_DOCUMENTS (memories untouched).
      */
     private function rollbackMemoriesCollection(RevectorizeRun $run, string $reason): void
     {

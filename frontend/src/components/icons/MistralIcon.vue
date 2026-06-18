@@ -1,0 +1,36 @@
+<template>
+  <svg
+    :height="size + 'px'"
+    :width="size + 'px'"
+    viewBox="0 0 21 15"
+    preserveAspectRatio="xMidYMid meet"
+    fill="none"
+    style="flex: none; line-height: 1"
+    xmlns="http://www.w3.org/2000/svg"
+    :class="className"
+  >
+    <title>Mistral</title>
+    <path d="M6 0H3V3H6V0Z" fill="#FFAF01" />
+    <path d="M6 9H3V12H6V9Z" fill="#E61300" />
+    <path d="M9 12H0V15H9V12Z" fill="#C4001D" />
+    <path d="M9 3H3V6H9V3Z" fill="#FF8204" />
+    <path d="M12 9H9V12H12V9Z" fill="#E61300" />
+    <path d="M18 6H3V9H18V6Z" fill="#FA500F" />
+    <path d="M18 3H12V6H18V3Z" fill="#FF8204" />
+    <path d="M18 0H15V3H18V0Z" fill="#FFAF01" />
+    <path d="M18 9H15V12H18V9Z" fill="#E61300" />
+    <path d="M21 12H12V15H21V12Z" fill="#C4001D" />
+  </svg>
+</template>
+
+<script setup lang="ts">
+interface Props {
+  size?: number
+  className?: string
+}
+
+withDefaults(defineProps<Props>(), {
+  size: 24,
+  className: '',
+})
+</script>

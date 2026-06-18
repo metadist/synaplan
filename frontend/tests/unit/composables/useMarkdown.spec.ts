@@ -197,6 +197,58 @@ describe('useMarkdown', () => {
         expect(html).toContain('report.pdf')
       })
     })
+
+    describe('images (fabricated/broken guard)', () => {
+      it('should render same-origin absolute-path images as <img>', () => {
+        const html = markdown.render('![Katze](/api/v1/files/uploads/10/cat.png)')
+        expect(html).toContain('<img')
+        expect(html).toContain('src="/api/v1/files/uploads/10/cat.png"')
+        expect(html).toContain('alt="Katze"')
+      })
+
+      it('should render same-origin absolute URLs as <img>', () => {
+        const src = `${window.location.origin}/api/v1/files/uploads/10/cat.png`
+        const html = markdown.render(`![Katze](${src})`)
+        expect(html).toContain('<img')
+        expect(html).toContain(`src="${src}"`)
+      })
+
+      it('should degrade fabricated external images to the alt text', () => {
+        // A text model hallucinating "here is a cat" emits a dead external URL.
+        const html = markdown.render('![Katze](https://example.com/made-up-cat.jpg)')
+        expect(html).not.toContain('<img')
+        expect(html).not.toContain('made-up-cat.jpg')
+        expect(html).toContain('markdown-img-fallback')
+        expect(html).toContain('Katze')
+      })
+
+      it('should degrade bare-filename images to the alt text', () => {
+        const html = markdown.render('![Katze](cat.jpg)')
+        expect(html).not.toContain('<img')
+        expect(html).toContain('markdown-img-fallback')
+        expect(html).toContain('Katze')
+      })
+
+      it('should degrade sandbox:/attachment: images to the alt text', () => {
+        const sandbox = markdown.render('![Katze](sandbox:/mnt/cat.png)')
+        expect(sandbox).not.toContain('<img')
+        expect(sandbox).toContain('Katze')
+        const attachment = markdown.render('![Katze](attachment://cat.png)')
+        expect(attachment).not.toContain('<img')
+        expect(attachment).toContain('Katze')
+      })
+
+      it('should never render data: images', () => {
+        const html = markdown.render('![x](data:image/png;base64,iVBORw0KGgo=)')
+        expect(html).not.toContain('<img')
+      })
+
+      it('should reject protocol-relative image URLs', () => {
+        const html = markdown.render('![Katze](//evil.example.com/cat.jpg)')
+        expect(html).not.toContain('<img')
+        expect(html).toContain('Katze')
+      })
+    })
   })
 
   describe('XSS prevention', () => {
@@ -218,6 +270,42 @@ describe('useMarkdown', () => {
     it('should sanitize data: URLs in images', () => {
       const html = markdown.render('![img](data:text/html,<script>alert(1)</script>)')
       expect(html).not.toContain('<script')
+    })
+
+    it('should not render data: URI links as clickable downloads', () => {
+      const html = markdown.render(
+        '[DOCX herunterladen](data:text/markdown;charset=utf-8,raw%20text)'
+      )
+      expect(html).not.toContain('href="data:')
+      expect(html).not.toContain('<a')
+      // The label is preserved as plain text so no broken download button is shown
+      expect(html).toContain('DOCX herunterladen')
+    })
+
+    it('should not render obfuscated data: URI links (whitespace/control chars)', () => {
+      const html = markdown.render('[fake](data:\n text/plain,broken)')
+      expect(html).not.toContain('href="data:')
+    })
+
+    it('should not render data: URI links obfuscated with DEL/C1 control chars', () => {
+      const del = markdown.render('[fake](da\u007fta:text/plain,broken)')
+      expect(del).not.toContain('<a')
+      const c1 = markdown.render('[fake](da\u0085ta:text/plain,broken)')
+      expect(c1).not.toContain('<a')
+    })
+
+    it('should not render vbscript: or file: links', () => {
+      const vbscript = markdown.render('[click](vbscript:msgbox(1))')
+      expect(vbscript).not.toContain('href="vbscript:')
+      const file = markdown.render('[open](file:///etc/passwd)')
+      expect(file).not.toContain('href="file:')
+    })
+
+    it('should still render safe http and mailto links', () => {
+      const http = markdown.render('[External](https://example.com)')
+      expect(http).toContain('href="https://example.com"')
+      const mailto = markdown.render('[Mail](mailto:test@example.com)')
+      expect(mailto).toContain('href="mailto:test@example.com"')
     })
 
     it('should allow safe HTML elements', () => {

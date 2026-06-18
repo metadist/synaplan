@@ -14,6 +14,7 @@ use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\Cache\CacheInterface;
 
@@ -58,6 +59,7 @@ class AiFacadeTranscribeTest extends TestCase
             $this->createMock(DiscordNotificationService::class),
             $this->createMock(InternalEmailService::class),
             $this->createMock(CacheInterface::class),
+            $this->createMock(CacheItemPoolInterface::class),
             '/tmp'
         );
     }
@@ -99,6 +101,9 @@ class AiFacadeTranscribeTest extends TestCase
         $this->assertSame('hello', $result['text']);
         $this->assertSame('groq', $result['provider']);
         $this->assertSame('whisper-large-v3', $result['model']);
+        // model_id must be surfaced so the message-details popover can resolve
+        // the concrete BMODELS row (and the "AI Model" badge stays clickable).
+        $this->assertSame(21, $result['model_id']);
     }
 
     public function testTranscribeForwardsNonTurboModelWhenSameProviderHasMultiple(): void

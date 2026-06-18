@@ -49,7 +49,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
      * methods are part of {@see VisionProviderInterface} and have no
      * options parameter, so a reasonable HF-routed default is required.
      */
-    private const DEFAULT_VISION_MODEL = 'moonshotai/Kimi-K2.6';
+    private const DEFAULT_VISION_MODEL = 'moonshotai/Kimi-K2.7-Code';
     private const DEFAULT_VISION_MAX_TOKENS = 1000;
 
     private const TIMEOUT_CHAT_SECONDS = 120;
@@ -67,6 +67,18 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
     private const DEFAULT_IMAGE_EDIT_MODEL = 'black-forest-labs/FLUX.1-Kontext-dev';
     private const DEFAULT_IMAGE_EDIT_GUIDANCE_SCALE = 7.5;
+
+    /**
+     * Kimi K2.7-Code enforces thinking mode and rejects requests that deviate from
+     * these sampling parameters with an API error. They are applied after all other
+     * options so that caller-supplied values are safely overridden.
+     *
+     * @see https://huggingface.co/moonshotai/Kimi-K2.7-Code
+     */
+    private const KIMI_K2_7_FORCED_SAMPLING = [
+        'temperature' => 1.0,
+        'top_p' => 0.95,
+    ];
 
     /**
      * Optional chat parameters that are forwarded as-is to the OpenAI-compatible
@@ -689,6 +701,13 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
         foreach (self::FORWARDABLE_CHAT_OPTIONS as $key) {
             if (array_key_exists($key, $options)) {
                 $body[$key] = $options[$key];
+            }
+        }
+
+        // K2.7-Code forces thinking mode with fixed sampling params; override any user-provided values.
+        if (str_contains($model, 'Kimi-K2.7')) {
+            foreach (self::KIMI_K2_7_FORCED_SAMPLING as $key => $value) {
+                $body[$key] = $value;
             }
         }
 

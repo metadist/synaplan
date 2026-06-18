@@ -40,8 +40,6 @@ final readonly class MessageClassifier
 
     public function __construct(
         private MessageSorter $messageSorter,
-        private SynapseRouter $synapseRouter,
-        private TopicAliasResolver $topicAliasResolver,
         private MessageMetaRepository $messageMetaRepository,
         private ModelConfigService $modelConfigService,
         private ConfigRepository $configRepository,
@@ -80,34 +78,60 @@ final readonly class MessageClassifier
         if (null === $overrideModelId
             && !empty($text)
             && $this->isClassifierFastPathEnabled($userId)
-            && $this->canFastPathClassify($message, $text)
+            && $this->canFastPathClassify($message, $text, $conversationHistory)
         ) {
-            $detectedLanguage = $this->detectLanguageHeuristic($text);
+            // The fast-path skips the AI sorter, so it has to determine the
+            // language itself. We only keep the latency win when we can
+            // establish the language *without guessing*:
+            //   1. a confident local text heuristic, else
+            //   2. a language already pinned on the message (frontend UI
+            //      locale or a previously detected turn; 'NN' is the entity
+            //      default = unknown).
+            // If neither is available we deliberately do NOT default to 'en'
+            // — we fall through to the AI sorter below so the sorting model
+            // defines BLANG. Guessing 'en' here is exactly how a German
+            // "wer bist du?" got an English answer: the directive built
+            // downstream from this value told the chat model to reply in
+            // English.
+            $confidentLanguage = $this->detectLanguageConfident($text);
 
-            $this->logger->info('MessageClassifier: Fast-path classification (skipped AI sorter)', [
+            if (null === $confidentLanguage) {
+                $existingLanguage = strtolower(trim($message->getLanguage()));
+                if ('nn' !== $existingLanguage && 1 === preg_match('/^[a-z]{2}$/', $existingLanguage)) {
+                    $confidentLanguage = $existingLanguage;
+                }
+            }
+
+            if (null !== $confidentLanguage) {
+                $this->logger->info('MessageClassifier: Fast-path classification (skipped AI sorter)', [
+                    'message_id' => $messageId,
+                    'language' => $confidentLanguage,
+                    'text_length' => strlen($text),
+                ]);
+
+                // `web_search` is intentionally null on the fast-path: it never
+                // calls the AI sorter, so there is no BWEBSEARCH vote. With the
+                // "trust the model" policy a missing vote means no search, so
+                // these trivial chats answer immediately without a web round-trip.
+                // An explicit prompt `tool_internet=true` still forces search
+                // later in `MessageProcessor` via `WebSearchTopicPolicy`.
+                return [
+                    'topic' => 'general',
+                    'language' => $confidentLanguage,
+                    'web_search' => null,
+                    'source' => 'fast_path_heuristic',
+                    'skip_sorting' => true,
+                    'intent' => 'chat',
+                    'model_id' => null,
+                    'provider' => null,
+                    'model_name' => null,
+                ];
+            }
+
+            $this->logger->info('MessageClassifier: Fast-path declined (language ambiguous) — deferring to AI sorter', [
                 'message_id' => $messageId,
-                'language' => $detectedLanguage,
                 'text_length' => strlen($text),
             ]);
-
-            // `web_search` is intentionally null on the fast-path: under
-            // the project-wide policy the actual decision is made later
-            // in `MessageProcessor::processStream()` via
-            // `WebSearchTopicPolicy::shouldSearch()`, which combines the
-            // resolved prompt's `tool_internet` flag with the topic
-            // exclusion list. The fast-path has no access to prompt
-            // metadata and must not pre-empt that decision (see #1000).
-            return [
-                'topic' => 'general',
-                'language' => $detectedLanguage,
-                'web_search' => null,
-                'source' => 'fast_path_heuristic',
-                'skip_sorting' => true,
-                'intent' => 'chat',
-                'model_id' => null,
-                'provider' => null,
-                'model_name' => null,
-            ];
         }
 
         // 1. Check for "Again" function - user-selected AI/prompt
@@ -196,50 +220,26 @@ final readonly class MessageClassifier
             ];
         }
 
-        // 4. Use Synapse Routing (embedding-based with AI fallback)
+        // 4. Classify with the LLM AI sorter (DEFAULTMODEL.SORT).
         $messageData = $this->buildMessageData($message);
-        $result = $this->isSynapseEnabled()
-            ? $this->synapseRouter->route($messageData, $conversationHistory, $userId)
-            : $this->messageSorter->classify($messageData, $conversationHistory, $userId);
+        $result = $this->messageSorter->classify($messageData, $conversationHistory, $userId);
 
         $source = $result['source'] ?? 'ai_sorting';
 
-        // Resolve granular Synapse-v2 topics (image-generation, video-generation,
-        // audio-generation, coding, general-chat) to their canonical legacy topics
-        // BEFORE mapping to intent. The AI sorter (used when Synapse Routing is
-        // OFF — the default) returns the granular topic from PromptCatalog, but
-        // downstream code (mapTopicToIntent, handler resolution, BFILEPATH keys)
-        // only understands canonical topics. Without this resolution all media-
-        // generation requests fall back to `chat`/ChatHandler (#952).
-        //
-        // SynapseRouter already runs this resolver internally, so calling it
-        // again here is idempotent for already-canonical topics — but it
-        // guarantees the contract for the AI-sorter path too.
-        $rawTopic = (string) ($result['topic'] ?? 'general');
-        $alias = $this->topicAliasResolver->resolve($rawTopic);
-        $canonicalTopic = $alias['topic'];
-        $impliedMedia = $alias['media'];
-
-        if (null !== $alias['alias_source']) {
-            $this->logger->info('MessageClassifier: Resolved granular topic to canonical', [
-                'message_id' => $messageId,
-                'granular_topic' => $alias['alias_source'],
-                'canonical_topic' => $canonicalTopic,
-                'implied_media' => $impliedMedia,
-            ]);
-        }
+        // The AI sorter returns a canonical topic (general, mediamaker,
+        // officemaker, docsummary, …) that downstream code (mapTopicToIntent,
+        // handler resolution, BFILEPATH keys) understands directly.
+        $canonicalTopic = (string) ($result['topic'] ?? 'general');
 
         $this->logger->info('MessageClassifier: Classification complete', [
             'message_id' => $messageId,
             'topic' => $canonicalTopic,
-            'granular_topic' => $alias['alias_source'],
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
-            'media_type' => $result['media_type'] ?? $impliedMedia,
+            'media_type' => $result['media_type'] ?? null,
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
             'source' => $source,
-            'synapse_score' => $result['synapse_score'] ?? null,
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
@@ -255,19 +255,13 @@ final readonly class MessageClassifier
             'model_name' => $result['sorting_model_name'] ?? null,
         ];
 
-        if (null !== $alias['alias_source']) {
-            $classification['granular_topic'] = $alias['alias_source'];
-        }
-
         if ($overrideModelId) {
             $classification['override_model_id'] = $overrideModelId;
         }
 
-        // Pass through media_type if detected (for mediamaker topic). Prefer
-        // the sorter's explicit BMEDIA value, fall back to the implied media
-        // from the granular topic alias (image-generation → 'image', etc.) so
-        // MediaGenerationHandler always knows which provider to invoke.
-        $mediaType = $result['media_type'] ?? $impliedMedia;
+        // Pass through media_type if the sorter set BMEDIA (for the mediamaker
+        // topic) so MediaGenerationHandler knows which provider to invoke.
+        $mediaType = $result['media_type'] ?? null;
         if (null !== $mediaType) {
             $classification['media_type'] = $mediaType;
         }
@@ -480,50 +474,52 @@ final readonly class MessageClassifier
     }
 
     /**
-     * Whether the Phase 1c fast-path is enabled (default: true).
+     * Whether the Phase 1c fast-path is enabled (default: OFF — see below).
+     *
+     * TEMPORARILY DISABLED BY DEFAULT. The local regex/keyword heuristic
+     * mis-routes requests it doesn't recognise (e.g. polite/declarative
+     * media requests like "hätte ich gerne das bild einer katze") to
+     * `general`/chat instead of the proper handler. Until the heuristic is
+     * reworked we send EVERY message through the AI sorter (the model bound
+     * to DEFAULTMODEL.SORT), which classifies far more reliably. The heuristic
+     * code is intentionally KEPT, not removed — flip the default back to
+     * `true` (or set BCONFIG `CLASSIFIER.FAST_PATH_ENABLED=1`) to re-enable.
      *
      * Read from BCONFIG group `CLASSIFIER`, key `FAST_PATH_ENABLED`. A
      * per-user row (BOWNERID = $userId) takes precedence over the global
-     * row (BOWNERID = 0). Operators who notice mis-routing can disable
-     * globally; users who need richer classification (e.g. heavy
-     * media-generation traffic that shouldn't go through the chat
-     * handler) can opt out per-account by inserting their own BCONFIG
-     * row.
+     * row (BOWNERID = 0). Operators can therefore still opt INTO the
+     * fast-path globally or per-account by inserting an explicit
+     * `FAST_PATH_ENABLED=1` row, without touching this code.
      */
     private function isClassifierFastPathEnabled(int $userId): bool
     {
         if ($userId > 0) {
             $perUser = $this->configRepository->getValue($userId, 'CLASSIFIER', 'FAST_PATH_ENABLED');
             if (null !== $perUser) {
-                return filter_var($perUser, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? true;
+                return filter_var($perUser, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
             }
         }
 
         $value = $this->configRepository->getValue(0, 'CLASSIFIER', 'FAST_PATH_ENABLED');
 
         if (null === $value) {
-            return true; // default-on
+            return false; // default-off (temporarily disabled — route everything via the AI sorter)
         }
 
-        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? true;
+        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
     }
 
     /**
      * Decide whether a message can skip the AI sorter without risk of misroute.
      *
      * The conservative checks below mean only "obviously chat" messages take
-     * the fast path. Anything ambiguous — files, tool prefixes, media verbs,
-     * Synapse-enabled accounts — still gets the full classifier.
+     * the fast path. Anything ambiguous — files, tool prefixes, media verbs —
+     * still gets the full classifier.
+     *
+     * @param array<int, Message> $conversationHistory oldest-first thread
      */
-    private function canFastPathClassify(Message $message, string $text): bool
+    private function canFastPathClassify(Message $message, string $text, array $conversationHistory = []): bool
     {
-        // Synapse routing has its own embedding-based classifier and may surface
-        // intent we'd lose with the heuristic (e.g. 'mediamaker' for "draw a
-        // cat"). Defer to it when enabled.
-        if ($this->isSynapseEnabled()) {
-            return false;
-        }
-
         // Files of any kind go through the full pipeline (vision/analyze/etc).
         if ($message->getFile() > 0 || $message->getFiles()->count() > 0) {
             return false;
@@ -546,23 +542,86 @@ final readonly class MessageClassifier
             return false;
         }
 
-        // Media / media-generation verbs in EN/DE/ES/FR. If any appear, the
-        // sorter may pick a topic other than `general`/`chat` (e.g.
-        // mediamaker → image_generation), so don't shortcut.
-        // The list is intentionally narrow to avoid false negatives in normal
-        // chat ("describe the picture I just saw" → fine to fast-path).
+        // Document-generation requests are usually very short and would
+        // otherwise be shortcut to `general` ("schreibe es als docx",
+        // "mach eine excel tabelle", #1042 review). If the message names a
+        // supported office format/extension, defer to the AI sorter so it can
+        // pick `officemaker`. PDF is intentionally excluded: we cannot produce
+        // real PDFs, so we must not route PDF requests to the office maker.
+        if (preg_match('/\b(docx|xlsx|pptx|csv|word|excel|powerpoint|spreadsheet|tabellenkalkulation|praesentation|präsentation)\b/iu', $trimmed)) {
+            return false;
+        }
+
+        // Follow-up edits to a just-generated document are usually phrased
+        // without naming the format again ("mach den Titel fett", "ändere das
+        // in der Datei"). Two cases defer to the AI sorter so the edit reaches
+        // `officemaker` instead of being shortcut to `general` (#1042 review):
+        //
+        // (a) The most recent assistant turn produced a file — the very next
+        //     turn is almost certainly a follow-up about it, regardless of
+        //     wording.
+        // (b) A file was generated earlier in the thread and the current
+        //     message references a document or its structure. This covers
+        //     multi-message editing where normal chat is interleaved between
+        //     edits ("...kannst du in der Datei den Titel ändern").
+        if ($this->lastAssistantGeneratedFile($conversationHistory)) {
+            return false;
+        }
+
+        if ($this->threadHasGeneratedFile($conversationHistory)
+            && $this->mentionsDocumentReference($trimmed)) {
+            return false;
+        }
+
+        // Media / media-generation triggers across the major UI languages
+        // (EN/DE/ES/FR/IT/TR + a little PT). If any appear, the sorter may
+        // pick a topic other than `general`/`chat` (e.g. mediamaker →
+        // image_generation), so don't shortcut.
+        //
+        // Two families of trigger:
+        //   1. Imperative verbs ("generate", "zeichne", "dibuja", …).
+        //   2. Declarative / polite NOUN phrases ("image of", "bild einer",
+        //      "una imagen de", …). These matter because a request like
+        //      "hätte ich gerne das bild einer katze" carries NO imperative
+        //      verb, so without the noun phrases it slipped past the
+        //      fast-path, got classified as `general`/chat, and the chat
+        //      model fabricated a (broken) markdown image instead of routing
+        //      to the media generator. Same class of bug as the German
+        //      imperative miss in #952, just a different phrasing.
+        //
+        // A false positive here only costs one extra AI-sorter call (it will
+        // correctly fall back to chat), so we err on the generous side.
         static $mediaTriggers = [
+            // English
             'generate ', 'create ', 'draw ', 'paint ', 'sketch ', 'render ',
             'make a picture', 'make an image', 'make a video', 'make a song',
             'image of', 'picture of', 'photo of', 'illustration of',
-            // German imperatives. `generiere`/`generier` cover "generiere
-            // ein bild...", "generier mir...", "generiert eine grafik..."
-            // which would otherwise slip past the fast-path and get
-            // misclassified as `general`/chat (#952).
+            'an image', 'a picture', 'a photo', 'a drawing', 'an illustration',
+            'a wallpaper', 'a logo', 'an icon',
+            // German. `generiere`/`generier` cover the imperatives from #952;
+            // the `bild …`/`foto …` noun phrases cover polite/declarative
+            // requests like "hätte ich gerne das bild einer katze".
             'erstelle', 'erzeuge', 'zeichne', 'male ', 'rendere',
             'generiere', 'generier ', 'generiert ',
-            'genera ', 'crea ', 'dibuja ',
-            'génère', 'crée', 'dessine',
+            'bild von', 'bild einer', 'bild eines', 'bild der', 'bild des',
+            'bild mit', ' ein bild', 'foto von', 'foto einer', 'foto eines',
+            ' ein foto', 'grafik von', 'grafik einer', 'zeichnung von',
+            'illustration von', 'logo von', 'logo für', 'logo mit',
+            // Spanish
+            'genera ', 'crea ', 'dibuja ', 'imagen de', 'una imagen',
+            'una foto', 'foto de', 'dibujo de', 'ilustración de', 'un logo',
+            // French
+            'génère', 'crée', 'dessine', 'image de', 'une image',
+            'une photo', 'photo de', 'dessin de', 'illustration de', 'un logo',
+            // Italian
+            'crea un', 'genera un', 'disegna', 'immagine di', "un'immagine",
+            'una immagine', 'foto di', 'disegno di',
+            // Turkish (resim/görsel/fotoğraf = picture/visual/photo)
+            'resim', 'resmi', 'resmini', 'görsel', 'görseli', 'fotoğraf',
+            'çiz ', 'çizer misin', 'oluştur',
+            // Portuguese
+            'imagem de', 'uma imagem', 'uma foto', 'desenho de',
+            'desenha', 'gera uma',
         ];
         $lower = mb_strtolower($trimmed);
         foreach ($mediaTriggers as $trigger) {
@@ -571,67 +630,190 @@ final readonly class MessageClassifier
             }
         }
 
-        // Note: there is no longer a `$searchTriggers` blocklist here.
-        // It was a workaround for the fast-path's inability to decide
-        // `web_search` on its own — under the project-wide policy
-        // "search unless explicitly opted out", the fast-path no longer
-        // needs to defer to the slow AI sorter just to surface results
-        // (see issue #1000). The actual search decision is owned by
-        // `WebSearchTopicPolicy` and applied in `MessageProcessor`.
+        // Audio / text-to-speech triggers. A request to read something aloud,
+        // produce an MP3, narrate, or "say" something must reach the AI sorter
+        // (→ mediamaker / BMEDIA=audio) AND, when it combines a content request
+        // with an audio output ("write a love poem AND read it to me as an MP3"),
+        // the multi-task planner. The fast-path emits source=fast_path_heuristic,
+        // which TaskPlanExecutor treats as "single-node, no planning" — so a
+        // shortcut here meant the chat model answered in prose and FABRICATED a
+        // fake download link (https://files.example.com/...mp3) instead of
+        // generating real audio. Deferring costs at most one extra sorter call.
+        static $audioTriggers = [
+            // English
+            'mp3', 'wav', '.ogg', ' audio', 'audio ', 'read aloud', 'read it aloud',
+            'read this aloud', 'say it', 'say this', 'speak ', 'spoken', 'voice over',
+            'voiceover', 'text to speech', 'text-to-speech', ' tts', 'podcast',
+            'narrate', 'narration', 'voice message', 'as speech', 'into speech',
+            'out loud',
+            // German
+            'vorlesen', 'vorlies', 'lies vor', 'lies mir', 'lies das', 'vorgelesen',
+            'sprich ', 'sprachausgabe', 'als sprache', 'audiodatei', 'audio datei',
+            'sprachnachricht', 'vertone', 'vertonen', 'vertont', 'als hörbuch',
+            'sprachversion', 'laut vor',
+            // Spanish
+            'en voz alta', 'léelo', 'leelo', 'lee en voz', 'audio de', 'a voz',
+            // French
+            'à voix haute', 'lis-moi', 'lis le', 'lire à voix', 'en audio',
+            // Italian
+            'ad alta voce', 'leggi ad', 'in audio',
+        ];
+        foreach ($audioTriggers as $trigger) {
+            if (str_contains($lower, $trigger)) {
+                return false;
+            }
+        }
+
+        // Note: there is no `$searchTriggers` blocklist here. The fast-path
+        // deliberately answers trivial chats without a web search — under the
+        // "trust the model" policy a fast-pathed message carries no BWEBSEARCH
+        // vote and therefore does not search. Messages that genuinely need
+        // live data are longer / less trivial and fall through to the AI
+        // sorter, which votes for search itself.
         return true;
     }
 
     /**
-     * Cheap language heuristic for fast-path classification.
+     * Whether the most recent assistant turn in the thread produced a generated
+     * file (its stored content is the "__FILE_GENERATED__:filename" marker).
+     *
+     * Only the latest assistant message is considered so the deferral is
+     * limited to the turn directly following a file generation.
+     *
+     * @param array<int, Message> $conversationHistory oldest-first thread
+     */
+    private function lastAssistantGeneratedFile(array $conversationHistory): bool
+    {
+        for ($i = count($conversationHistory) - 1; $i >= 0; --$i) {
+            $msg = $conversationHistory[$i];
+            if ('OUT' !== $msg->getDirection()) {
+                continue;
+            }
+
+            return str_starts_with((string) $msg->getText(), '__FILE_GENERATED__:');
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether any assistant turn in the thread produced a generated file.
+     *
+     * @param array<int, Message> $conversationHistory
+     */
+    private function threadHasGeneratedFile(array $conversationHistory): bool
+    {
+        foreach ($conversationHistory as $msg) {
+            if ('OUT' === $msg->getDirection()
+                && str_starts_with((string) $msg->getText(), '__FILE_GENERATED__:')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the message refers to a document or one of its structural parts.
+     *
+     * Used together with {@see threadHasGeneratedFile()} to detect document
+     * edits that span multiple turns. The noun list is intentionally
+     * document-specific to keep false positives in normal chat low; the worst
+     * case of a false positive is one extra AI-sorter call.
+     */
+    private function mentionsDocumentReference(string $text): bool
+    {
+        return 1 === preg_match(
+            '/\b(datei|dokument|file|document|doc|tabelle|sheet|spreadsheet|folie|slide|'
+            .'titel|title|überschrift|ueberschrift|heading|spalte|column|zeile|row|zelle|cell)\b/iu',
+            $text
+        );
+    }
+
+    /**
+     * Cheap, confidence-aware language heuristic for the fast-path.
      *
      * The full AI sorter detects language too — we lose that signal when we
-     * skip it, so reproduce a "good enough" guess locally. Uses common
-     * stopwords as anchors, falls back to `'en'` when too ambiguous.
+     * skip it, so reproduce a "good enough" guess locally from distinctive
+     * stopwords / question words / greetings.
      *
-     * IMPORTANT: returns a 2-character ISO code, NEVER `'auto'`. The
-     * `'auto'` sentinel is used elsewhere in the pipeline (fixed-prompt
-     * widget mode) for the system-prompt directive only and is NOT
-     * persistable to `BMESSAGES.BLANG` (varchar(2)). My fast-path
-     * classification result flows through paths that DO persist BLANG
-     * (e.g. WebhookController email reply), so leaking `'auto'` here
-     * triggers SQLSTATE[22001] "Data too long for column 'BLANG'" on the
-     * outgoing message insert. Stick to ISO codes.
+     * Returns a 2-character ISO code when a distinctive anchor matched, or
+     * `null` when there is no signal — the fast-path caller treats `null` as
+     * "defer to the AI sorter" rather than guessing the wrong language.
+     *
+     * IMPORTANT: never returns `'auto'`. The `'auto'` sentinel is used
+     * elsewhere in the pipeline (fixed-prompt widget mode) for the
+     * system-prompt directive only and is NOT persistable to
+     * `BMESSAGES.BLANG` (varchar(2)); leaking it here would trigger
+     * SQLSTATE[22001] "Data too long for column 'BLANG'" on the outgoing
+     * message insert. Stick to ISO codes (or null).
      */
-    private function detectLanguageHeuristic(string $text): string
+    private function detectLanguageConfident(string $text): ?string
     {
-        $lower = ' '.mb_strtolower($text).' ';
+        // Normalize first: collapse every run of non-letters to a single
+        // space, then pad with spaces. Without this, punctuation-hugging
+        // tokens defeat the space-delimited anchors below — e.g.
+        // "wer bist du?" lowercases to " wer bist du? " and the " du " /
+        // "du?" mismatch meant the most common German phrase scored 0 and
+        // fell back to English. Letters (incl. umlauts) survive; everything
+        // else becomes a separator.
+        $normalized = preg_replace('/[^\p{L}]+/u', ' ', mb_strtolower($text)) ?? '';
+        $lower = ' '.trim($normalized).' ';
 
-        // Order matters: check stopwords with low ambiguity first.
         $hits = [
             'de' => 0, 'en' => 0, 'fr' => 0, 'es' => 0, 'it' => 0,
         ];
 
-        // German stopwords with diacritics or German-only forms.
-        foreach (['ich ', ' der ', ' die ', ' und ', ' nicht ', ' ist ', 'für ', 'können', 'möchte', 'über', 'wäre'] as $w) {
+        // German: stopwords, question words, pronouns, common verbs and
+        // greetings. These short function words are what carry the signal in
+        // a one-line chat ("wer bist du?", "wie geht es dir?", "danke").
+        foreach ([
+            ' ich ', ' der ', ' die ', ' das ', ' und ', ' nicht ', ' ist ', ' für ',
+            ' können ', ' kannst ', ' möchte ', ' über ', ' wäre ', ' mit ', ' auch ',
+            ' wer ', ' wie ', ' was ', ' warum ', ' wo ', ' wann ', ' welche ', ' welcher ',
+            ' du ', ' bist ', ' bin ', ' sind ', ' hast ', ' habe ', ' mir ', ' mich ',
+            ' dich ', ' dein ', ' deine ', ' machst ', ' heißt ', ' gibt ', ' soll ',
+            ' mein ', ' eine ', ' einen ', ' hallo ', ' danke ', ' bitte ', ' guten ',
+        ] as $w) {
             if (str_contains($lower, $w)) {
                 $hits['de'] += 2;
             }
         }
-        // English (commonest stopwords).
-        foreach ([' the ', ' and ', ' you ', ' please ', ' what ', ' write ', 'don\'t ', 'i\'m ', 'i\'ll '] as $w) {
+        // English: stopwords, question words, pronouns, common verbs and
+        // greetings.
+        foreach ([
+            ' the ', ' and ', ' you ', ' please ', ' what ', ' write ', ' dont ', ' im ', ' ill ',
+            ' who ', ' how ', ' why ', ' where ', ' when ', ' which ',
+            ' are ', ' is ', ' do ', ' does ', ' can ', ' your ', ' me ', ' my ', ' a ', ' an ',
+            ' hello ', ' hi ', ' hey ', ' thanks ', ' thank ',
+        ] as $w) {
             if (str_contains($lower, $w)) {
                 $hits['en'] += 2;
             }
         }
         // French.
-        foreach ([' le ', ' la ', ' les ', ' un ', ' une ', ' est ', ' pour ', ' avec ', 'écrire', 'merci'] as $w) {
+        foreach ([
+            ' le ', ' la ', ' les ', ' un ', ' une ', ' est ', ' pour ', ' avec ', ' écrire ',
+            ' qui ', ' quoi ', ' comment ', ' pourquoi ', ' es ', ' tu ', ' merci ', ' bonjour ',
+        ] as $w) {
             if (str_contains($lower, $w)) {
                 $hits['fr'] += 2;
             }
         }
         // Spanish.
-        foreach ([' el ', ' la ', ' los ', ' las ', ' por ', ' para ', 'escribir', 'gracias'] as $w) {
+        foreach ([
+            ' el ', ' la ', ' los ', ' las ', ' por ', ' para ', ' escribir ',
+            ' quién ', ' qué ', ' cómo ', ' por qué ', ' eres ', ' gracias ', ' hola ',
+        ] as $w) {
             if (str_contains($lower, $w)) {
                 $hits['es'] += 2;
             }
         }
         // Italian.
-        foreach ([' il ', ' lo ', ' la ', ' gli ', ' una ', ' per ', 'scrivere', 'grazie'] as $w) {
+        foreach ([
+            ' il ', ' lo ', ' la ', ' gli ', ' una ', ' per ', ' scrivere ',
+            ' chi ', ' cosa ', ' come ', ' perché ', ' sei ', ' grazie ', ' ciao ',
+        ] as $w) {
             if (str_contains($lower, $w)) {
                 $hits['it'] += 2;
             }
@@ -641,35 +823,14 @@ final readonly class MessageClassifier
         $best = array_key_first($hits);
         $bestScore = $hits[$best];
 
-        // Below 4 hits we have no strong signal — fall back to 'en'. The 2-
-        // char constraint matters: BMESSAGES.BLANG is varchar(2), so even
-        // though the existing 'auto' sentinel works for in-memory routing,
-        // it'd break any downstream code that persists $classification['language']
-        // to BLANG (email webhook reply, queue-mode chat persistence, ...).
-        return $bestScore >= 4 ? $best : 'en';
-    }
-
-    /**
-     * Synapse Routing is currently a BETA feature and OFF by default.
-     *
-     * Why off-by-default:
-     *   - The embedding-based router can mis-route in edge cases (sticky topic
-     *     after a file analysis turn, granular vs canonical topics, models
-     *     with mismatched dimensions, ...).
-     *   - Operators must explicitly opt-in via the admin UI / system config.
-     *
-     * The proven AI-sorter (`MessageSorter`) remains the default routing
-     * path. The toggle is read from BCONFIG group `QDRANT_SEARCH`, key
-     * `SYNAPSE_ROUTING_ENABLED`.
-     */
-    public function isSynapseEnabled(): bool
-    {
-        $value = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_ROUTING_ENABLED');
-
-        if (null === $value) {
-            return false;
-        }
-
-        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
+        // A single distinctive anchor (score 2) is already a strong signal
+        // for a short chat one-liner, so we trust it; below that we have no
+        // signal and return null so the caller can decide (persist 'en', or
+        // defer to the AI sorter). The 2-char constraint matters elsewhere:
+        // BMESSAGES.BLANG is varchar(2), so even though the 'auto' sentinel
+        // works for in-memory routing, it'd break any downstream code that
+        // persists $classification['language'] to BLANG (email webhook reply,
+        // queue-mode chat persistence, ...).
+        return $bestScore >= 2 ? $best : null;
     }
 }

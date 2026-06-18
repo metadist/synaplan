@@ -107,6 +107,21 @@ Configure in `backend/.env`:
 MAILER_DSN=smtp://user:pass@smtp.example.com:587
 ```
 
+> **AWS SES (and other strict SMTP servers):** SES hard-closes connections
+> that are idle for more than ~10 seconds, while Symfony Mailer keeps the
+> connection open between sends and only health-checks it after 100 seconds.
+> In long-running processes (FrankenPHP workers, messenger consumers) a reused
+> stale connection fails with `451 4.4.2 Timeout waiting for data from client`.
+> Append `?ping_threshold=9` to the DSN so the transport pings (and reconnects)
+> before reusing a connection that has been idle for 9+ seconds:
+>
+> ```bash
+> MAILER_DSN=smtp://USER:PASS@email-smtp.eu-west-1.amazonaws.com:587?ping_threshold=9
+> ```
+>
+> Independently of this setting, the backend retries a transiently failed
+> send once on a fresh connection (permanent 5xx rejections are not retried).
+
 ---
 
 ## API Reference

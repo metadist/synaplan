@@ -137,6 +137,12 @@ export const useChatsStore = defineStore('chats', () => {
     loading.value = true
     error.value = null
 
+    // Selection as of the moment the request is fired. If the user (or a
+    // faster concurrent createChat) switches the active chat while this
+    // request is still in flight, the late response must NOT steal the
+    // selection — switching views mid-stream aborts a running answer.
+    const selectionAtRequest = activeChatId.value
+
     try {
       const data = await httpClient<{ success: boolean; chat: unknown }>('/api/v1/chats', {
         method: 'POST',
@@ -146,7 +152,9 @@ export const useChatsStore = defineStore('chats', () => {
       const newChat = normalizeChat(data.chat)
 
       chats.value.unshift(newChat)
-      updateActiveChatSelection(newChat.id)
+      if (activeChatId.value === selectionAtRequest) {
+        updateActiveChatSelection(newChat.id)
+      }
 
       return newChat
     } catch (err: unknown) {
@@ -321,7 +329,7 @@ export const useChatsStore = defineStore('chats', () => {
   /**
    * Mark a chat as recently active so it re-sorts to the top of sidebar lists.
    *
-   * Sidebars (`SidebarV2`, `ChatDropdown`) order chats by `updatedAt DESC` so
+   * The history sheet (`SidebarV2`) orders chats by `updatedAt DESC` so
    * the most recently active conversation is always at the top. The backend
    * keeps `updatedAt` in sync, but local in-memory chats only see that change
    * after a full reload. Whenever a new message lands on a chat (web SSE,

@@ -7,7 +7,7 @@ namespace App\Message;
 /**
  * Async message dispatched by the admin "switch embedding model"
  * endpoint. The handler re-vectorizes one or more scopes (documents,
- * memories, synapse) using the model already set as VECTORIZE default
+ * memories) using the model already set as VECTORIZE default
  * at the time of dispatch, updating the matching `BREVECTORIZE_RUNS`
  * row as it progresses.
  *

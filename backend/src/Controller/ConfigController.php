@@ -12,6 +12,8 @@ use App\Service\BillingService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\Infrastructure\RedisService;
+use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
 use App\Service\UserMemoryService;
@@ -42,6 +44,8 @@ class ConfigController extends AbstractController
         private UserMemoryService $memoryService,
         private EmbeddingModelChangeGuard $embeddingChangeGuard,
         private EmbeddingMetadataService $embeddingMetadata,
+        private ModelConfigService $modelConfigService,
+        private RedisService $redisService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -190,6 +194,25 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'realtime',
+                    type: 'object',
+                    description: 'Realtime / WebSocket gateway settings consumed by the frontend Centrifugo client. There is no transport fallback — when `enabled` is false the dashboard simply does not subscribe.',
+                    properties: [
+                        new OA\Property(
+                            property: 'enabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'Master kill-switch. When false, the dashboard skips every realtime subscription.'
+                        ),
+                        new OA\Property(
+                            property: 'wsUrl',
+                            type: 'string',
+                            example: 'wss://app.example.com/connection/websocket',
+                            description: 'Browser-facing WebSocket endpoint. Empty string means "use same-origin /connection/websocket" (Caddy reverse-proxies to centrifugo).'
+                        ),
+                    ]
+                ),
+                new OA\Property(
                     property: 'unavailableProviders',
                     type: 'array',
                     description: 'AI providers that are disabled due to missing API keys (only for authenticated users)',
@@ -289,6 +312,25 @@ class ConfigController extends AbstractController
             }
         }
 
+        // Realtime / WebSocket gateway settings.
+        // - enabled: master kill-switch so we can disable WS instantly without a deploy.
+        // - wsUrl:   empty string ⇒ frontend uses same-origin /connection/websocket
+        //            (Caddy reverse-proxies to centrifugo). Override only for setups
+        //            where Centrifugo lives on a separate hostname.
+        // There is no fallback transport: when realtime is disabled the dashboard
+        // simply skips its subscriptions (operators still see fresh data via the
+        // existing REST endpoints, just without push updates).
+        // Default OFF when unset: realtime needs a configured Centrifugo gateway,
+        // so a bare deployment without REALTIME_ENABLED must not advertise WS to
+        // the frontend (otherwise it would loop on connection errors). The
+        // official docker-compose files set REALTIME_ENABLED=true explicitly.
+        $realtimeEnabled = 'true' === ($_ENV['REALTIME_ENABLED'] ?? 'false');
+        $realtimeWsUrl = (string) ($_ENV['REALTIME_PUBLIC_WS_URL'] ?? '');
+        $realtimeConfig = [
+            'enabled' => $realtimeEnabled,
+            'wsUrl' => $realtimeWsUrl,
+        ];
+
         $response = [
             'billing' => [
                 'enabled' => $this->billingService->isEnabled(),
@@ -299,6 +341,7 @@ class ConfigController extends AbstractController
             'plugins' => $plugins,
             'googleTag' => $googleTagConfig,
             'build' => $buildInfo,
+            'realtime' => $realtimeConfig,
         ];
 
         if ($user && !empty($unavailableProviders)) {
@@ -749,13 +792,9 @@ class ConfigController extends AbstractController
             }
 
             // VECTORIZE controls how the user's OWN files/memories get
-            // embedded — explicitly user-scoped now that Synapse Routing
-            // has its own admin-only system-wide setting (see
-            // `DEFAULTMODEL.SYNAPSE_VECTORIZE`, managed via
-            // `AdminEmbeddingController`). Routing therefore can no longer
-            // disagree with a per-user VECTORIZE choice, and we must NOT
-            // silently escalate a user-scoped write into a global config
-            // change (raised by Copilot review on PR #853).
+            // embedded — explicitly user-scoped. We must NOT silently
+            // escalate a user-scoped write into a global config change
+            // (raised by Copilot review on PR #853).
             //
             // The only path that may write to ownerId=0 is the `global`
             // flag above, which already requires `ROLE_ADMIN`.
@@ -781,8 +820,8 @@ class ConfigController extends AbstractController
         $this->em->flush();
 
         // Drop cached active-model snapshot so the very next read
-        // (Synapse status, RAG search, /admin/embedding/status) sees
-        // the new VECTORIZE model immediately. Skip the invalidation
+        // (RAG search, /admin/embedding/status) sees the new VECTORIZE
+        // model immediately. Skip the invalidation
         // when VECTORIZE didn't actually change — the cache already
         // holds the correct value and there's no point thrashing it
         // on every CHAT-only save (#891).
@@ -801,6 +840,58 @@ class ConfigController extends AbstractController
         }
 
         return $this->json($response);
+    }
+
+    /**
+     * Replace the calling user's model configuration with the
+     * code-recommended defaults from DefaultModelConfigSeeder.
+     *
+     * Removes stale per-user overrides and writes fresh ones that
+     * match the catalog-recommended models. Other users and the
+     * global (ownerId=0) row are unaffected.
+     */
+    #[Route('/models/defaults/reset', name: 'models_defaults_reset', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/config/models/defaults/reset',
+        summary: 'Apply recommended model defaults to own configuration',
+        description: 'Replaces all per-user DEFAULTMODEL overrides with the code-recommended defaults (from DefaultModelConfigSeeder). Does NOT modify global defaults — other users are unaffected. Returns the newly written defaults.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Defaults applied successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Applied 11 recommended defaults (removed 3 previous overrides)'),
+                new OA\Property(
+                    property: 'defaults',
+                    type: 'object',
+                    description: 'New default model IDs per capability',
+                    example: ['CHAT' => 161, 'SORT' => 76]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function resetDefaultModels(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $result = $this->modelConfigService->resetUserDefaults($user->getId());
+
+        return $this->json([
+            'success' => true,
+            'message' => sprintf(
+                'Applied %d recommended default(s) (removed %d previous override(s))',
+                $result['written'],
+                $result['removed'],
+            ),
+            'defaults' => $result['defaults'],
+        ]);
     }
 
     /**
@@ -1163,35 +1254,6 @@ class ConfigController extends AbstractController
             'models_available' => count($imageModels),
         ];
 
-        // Synapse Routing (embedding-based intent classification).
-        //
-        // Off-by-default: Synapse is a beta feature. The `null` (no row)
-        // case used to be reported as enabled here, which contradicted
-        // `MessageClassifier::isSynapseEnabled()` and would have caused
-        // `/features/status` to lie about the runtime classifier (raised
-        // by Copilot review on PR #853). We mirror MessageClassifier's
-        // parser exactly so this endpoint and the actual routing path
-        // never disagree.
-        $synapseValue = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_ROUTING_ENABLED');
-        $synapseEnabled = null !== $synapseValue
-            && '' !== $synapseValue
-            && true === filter_var($synapseValue, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
-        $qdrantConfigured = !empty($_ENV['QDRANT_URL'] ?? '');
-        $synapseReady = $synapseEnabled && $qdrantConfigured;
-        $features['synapse-routing'] = [
-            'id' => 'synapse-routing',
-            'category' => 'AI Features',
-            'name' => 'Synapse Routing',
-            'enabled' => $synapseEnabled,
-            'status' => $synapseReady ? 'active' : ($synapseEnabled ? 'unhealthy' : 'disabled'),
-            'message' => $synapseReady
-                ? 'Embedding-based intent routing is active (Tier 1: ~50ms, AI fallback for low confidence)'
-                : ($synapseEnabled
-                    ? 'Synapse is enabled but Qdrant is not configured'
-                    : 'Synapse Routing is disabled — using AI-based sorting for every message'),
-            'setup_required' => !$qdrantConfigured,
-        ];
-
         // ========== AI Providers (Dynamic from ProviderRegistry) ==========
 
         $providersMetadata = $this->providerRegistry->getProvidersMetadata();
@@ -1385,6 +1447,82 @@ class ConfigController extends AbstractController
             'version' => $dbVersion,
         ];
 
+        // Redis (cache, locks, rate-limiter, sessions, realtime fan-out)
+        $redisHealthy = $this->redisService->ping();
+        $redisError = $this->redisService->getLastConnectionError();
+        $redisDsn = (string) ($_ENV['REDIS_DSN'] ?? '');
+
+        $features['redis'] = [
+            'id' => 'redis',
+            'category' => 'Infrastructure',
+            'name' => 'Redis',
+            'enabled' => true,
+            'status' => $redisHealthy ? 'healthy' : 'unhealthy',
+            'message' => $redisHealthy
+                ? 'Cache, locks, rate-limiter, sessions and realtime fan-out are operational'
+                // Dev-only endpoint (403 in prod), so the raw connection
+                // error is safe and far more useful than a generic message.
+                : 'Redis unreachable'.(null !== $redisError ? ': '.$redisError->getMessage() : ''),
+            'setup_required' => !$redisHealthy,
+            'url' => '' !== $redisDsn ? $this->redactDsn($redisDsn) : 'not configured',
+            'version' => $redisHealthy ? ($this->redisService->serverVersion() ?? '') : '',
+            'env_vars' => [
+                'REDIS_DSN' => [
+                    'required' => true,
+                    'set' => '' !== $redisDsn,
+                    'hint' => 'Redis connection DSN shared by cache, locks, rate-limiter and Messenger (e.g. redis://redis:6379)',
+                ],
+            ],
+        ];
+
+        // Centrifugo (realtime WebSocket gateway)
+        $realtimeEnabled = 'true' === ($_ENV['REALTIME_ENABLED'] ?? 'false');
+        $realtimeApiUrl = (string) ($_ENV['REALTIME_API_URL'] ?? '');
+        // REALTIME_API_URL points at the server API (…/api); the health
+        // endpoint lives at the server root (health.enabled in config.json).
+        $centrifugoBaseUrl = '' !== $realtimeApiUrl
+            ? (string) preg_replace('#/api/?$#', '', $realtimeApiUrl)
+            : '';
+        $centrifugoHealthy = $realtimeEnabled
+            && '' !== $centrifugoBaseUrl
+            && $this->checkServiceHealth($centrifugoBaseUrl.'/health');
+
+        if (!$realtimeEnabled) {
+            $centrifugoStatus = 'disabled';
+            $centrifugoMessage = 'Realtime is disabled (REALTIME_ENABLED=false) — clients see fresh data via REST only, without push updates';
+        } elseif ($centrifugoHealthy) {
+            $centrifugoStatus = 'healthy';
+            $centrifugoMessage = 'Realtime WebSocket gateway is running (chat streaming, widget events, presence)';
+        } else {
+            $centrifugoStatus = 'unhealthy';
+            $centrifugoMessage = '' === $centrifugoBaseUrl
+                ? 'REALTIME_API_URL not configured'
+                : 'Centrifugo is not responding';
+        }
+
+        $features['centrifugo'] = [
+            'id' => 'centrifugo',
+            'category' => 'Infrastructure',
+            'name' => 'Centrifugo',
+            'enabled' => $realtimeEnabled,
+            'status' => $centrifugoStatus,
+            'message' => $centrifugoMessage,
+            'setup_required' => !$centrifugoHealthy,
+            'url' => '' !== $centrifugoBaseUrl ? $centrifugoBaseUrl : 'not configured',
+            'env_vars' => [
+                'REALTIME_ENABLED' => [
+                    'required' => true,
+                    'set' => $realtimeEnabled,
+                    'hint' => 'Master switch for WebSocket publishing (no SSE fallback)',
+                ],
+                'REALTIME_API_URL' => [
+                    'required' => true,
+                    'set' => '' !== $realtimeApiUrl,
+                    'hint' => 'Centrifugo server API endpoint, e.g. http://centrifugo:8000/api',
+                ],
+            ],
+        ];
+
         // Count ready services
         $totalServices = count($features);
         $healthyServices = count(array_filter($features, fn ($f) => in_array($f['status'], ['active', 'healthy'])
@@ -1399,6 +1537,14 @@ class ConfigController extends AbstractController
                 'all_ready' => $healthyServices === $totalServices,
             ],
         ]);
+    }
+
+    /**
+     * Strip credentials from a DSN before exposing it (`redis://user:pass@host` → `redis://***@host`).
+     */
+    private function redactDsn(string $dsn): string
+    {
+        return (string) preg_replace('#://[^@/]*@#', '://***@', $dsn);
     }
 
     /**

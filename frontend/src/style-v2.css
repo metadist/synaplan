@@ -472,40 +472,6 @@
   box-shadow: 0 0 10px var(--v2-glow);
 }
 
-/* Sidebar burger — V2 glass treatment with brand glow */
-.design-v2 .btn-sidebar-burger {
-  background: rgba(0, 63, 199, 0.08);
-  color: var(--brand);
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 63, 199, 0.2),
-    0 1px 4px rgba(0, 0, 0, 0.04),
-    0 0 8px rgba(0, 63, 199, 0.06);
-}
-.design-v2 .btn-sidebar-burger:hover,
-.design-v2 .btn-sidebar-burger:focus-visible {
-  background: rgba(0, 63, 199, 0.14);
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 63, 199, 0.34),
-    0 2px 8px rgba(0, 63, 199, 0.18),
-    0 0 14px var(--v2-glow);
-}
-.design-v2.dark .btn-sidebar-burger {
-  background: rgba(107, 143, 214, 0.12);
-  color: var(--brand-light);
-  box-shadow:
-    inset 0 0 0 1px rgba(107, 143, 214, 0.22),
-    0 1px 4px rgba(0, 0, 0, 0.25),
-    0 0 8px rgba(107, 143, 214, 0.06);
-}
-.design-v2.dark .btn-sidebar-burger:hover,
-.design-v2.dark .btn-sidebar-burger:focus-visible {
-  background: rgba(107, 143, 214, 0.2);
-  box-shadow:
-    inset 0 0 0 1px rgba(107, 143, 214, 0.38),
-    0 2px 8px rgba(107, 143, 214, 0.18),
-    0 0 14px var(--v2-glow);
-}
-
 /* ----------------------------------------------------------
    11. Alerts & Info Boxes — Glass
    ---------------------------------------------------------- */
@@ -551,14 +517,10 @@
      mobile Safari, matching the MainLayout h-dvh fix from PR #832. */
   height: 100vh;
   height: 100dvh;
-  /* Respect the iOS notch (PWA / standalone) and home-indicator bar so the
-     close button at the top and the avatar at the bottom stay tappable. */
+  /* Respect the iOS notch (PWA / standalone) so the avatar at the bottom
+     stays tappable. */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  /* Hint the compositor so the mobile slide-in animation stays smooth on
-     older iPhones, where fixed + backdrop-filter + transform can otherwise
-     produce a half-painted first frame. */
-  will-change: transform;
 
   background: var(--bg-sidebar);
   backdrop-filter: blur(var(--v2-blur-lg));
@@ -570,36 +532,6 @@
 }
 .design-v2.dark .v2-sidebar-rail {
   box-shadow: 1px 0 20px rgba(0, 0, 0, 0.3);
-}
-
-/*
- * On mobile the rail is a slide-in over a dimming backdrop, and the iOS
- * keyboard can shove chat content right under the header. Drop the glass
- * blur on those surfaces and use near-solid fills so the burger and the
- * rail icons keep high contrast no matter what's behind them.
- *
- * Tailwind's md: breakpoint is 768px, so target everything below it.
- */
-@media (max-width: 767.98px) {
-  .design-v2 .v2-sidebar-rail {
-    background: rgba(255, 255, 255, 0.97);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: 2px 0 24px rgba(0, 0, 0, 0.12);
-  }
-  .design-v2.dark .v2-sidebar-rail {
-    background: rgba(10, 16, 30, 0.97);
-    box-shadow: 2px 0 24px rgba(0, 0, 0, 0.45);
-  }
-
-  .design-v2 .bg-header {
-    background: rgba(255, 255, 255, 0.97);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-  .design-v2.dark .bg-header {
-    background: rgba(10, 16, 30, 0.97);
-  }
 }
 
 .design-v2 .v2-sidebar-flyout {
@@ -717,6 +649,56 @@
   background: rgba(107, 143, 214, 0.08);
   color: var(--brand-light);
   box-shadow: 0 0 14px var(--v2-glow);
+}
+
+/* ----------------------------------------------------------
+   13b. Mobile bottom tab bar (§4.3 #2 — replaces the drawer)
+   ---------------------------------------------------------- */
+
+.design-v2 .v2-mobile-tabbar {
+  background: rgba(255, 255, 255, 0.97);
+  border-top: 1px solid var(--v2-border);
+  box-shadow: 0 -2px 24px rgba(0, 0, 0, 0.08);
+  /* Keep the tabs above the iOS home-indicator bar. */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.design-v2.dark .v2-mobile-tabbar {
+  background: rgba(10, 16, 30, 0.97);
+  box-shadow: 0 -2px 24px rgba(0, 0, 0, 0.4);
+}
+
+.design-v2 .v2-mobile-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  justify-content: center;
+  gap: 2px;
+  flex: 1 1 0;
+  /* 44px minimum touch target (§4.3 #1) with breathing room. */
+  min-height: 56px;
+  padding: 6px 4px;
+  border-radius: 0.75rem;
+  margin: 4px 4px;
+}
+
+/* The New tab keeps the brand accent of the rail's new-chat button, flat. */
+.design-v2 .v2-new-chat-btn-flat {
+  background: rgba(0, 63, 199, 0.1);
+  color: var(--brand);
+  border: 1px solid rgba(0, 63, 199, 0.2);
+}
+.design-v2 .v2-new-chat-btn-flat:active {
+  background: rgba(0, 63, 199, 0.18);
+}
+.design-v2.dark .v2-new-chat-btn-flat {
+  background: rgba(107, 143, 214, 0.08);
+  color: var(--brand-light);
+  border: 1px solid rgba(107, 143, 214, 0.15);
+}
+.design-v2.dark .v2-new-chat-btn-flat:active {
+  background: rgba(107, 143, 214, 0.15);
 }
 
 /* ----------------------------------------------------------
@@ -1053,7 +1035,11 @@
 .design-v2.dark [data-testid='comp-chat-input-shell'] textarea {
   background: transparent !important;
   border-color: transparent !important;
-  border-radius: 1rem;
+  /* No own rounded box — the outer shell is the single visible field.
+     appearance: none kills native mobile textarea chrome (iOS/Samsung). */
+  border-radius: 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 .design-v2 [data-testid='comp-chat-input-shell'] textarea:focus,
 .design-v2.dark [data-testid='comp-chat-input-shell'] textarea:focus {

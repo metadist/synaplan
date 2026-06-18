@@ -5,10 +5,22 @@
       :class="openDropdown ? 'z-20' : 'z-0'"
       data-testid="section-default-config"
     >
-      <h2 class="text-2xl font-semibold txt-primary mb-6 flex items-center gap-2">
-        <CpuChipIcon class="w-6 h-6 text-[var(--brand)]" />
-        {{ $t('config.aiModels.defaultConfigTitle') }}
-      </h2>
+      <div class="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="text-2xl font-semibold txt-primary flex items-center gap-2 min-w-0">
+          <CpuChipIcon class="w-6 h-6 flex-shrink-0 text-[var(--brand)]" />
+          {{ $t('config.aiModels.defaultConfigTitle') }}
+        </h2>
+        <button
+          type="button"
+          class="self-start sm:self-auto flex-shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="resetting"
+          data-testid="btn-reset-defaults"
+          @click="confirmResetDefaults"
+        >
+          <ArrowPathIcon :class="['w-4 h-4', resetting && 'animate-spin']" />
+          {{ $t('config.aiModels.resetDefaults') }}
+        </button>
+      </div>
 
       <div v-if="loading" class="text-center py-8" data-testid="section-loading">
         <div
@@ -87,19 +99,9 @@
               </span>
             </button>
             <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-              <GroqIcon
-                v-if="
-                  getSelectedModelService(capability as Capability)
-                    .toLowerCase()
-                    .includes('groq')
-                "
+              <ServiceIcon
+                :service="getSelectedModelService(capability as Capability)"
                 :size="16"
-                class-name="txt-primary"
-              />
-              <Icon
-                v-else
-                :icon="getProviderIcon(getSelectedModelService(capability as Capability))"
-                class="w-4 h-4"
               />
             </div>
             <ChevronDownIcon
@@ -133,12 +135,7 @@
                 data-testid="btn-model-option"
                 @click="selectModel(capability as Capability, model.id)"
               >
-                <GroqIcon
-                  v-if="model.service.toLowerCase().includes('groq')"
-                  :size="20"
-                  class-name="flex-shrink-0"
-                />
-                <Icon v-else :icon="getProviderIcon(model.service)" class="w-5 h-5 flex-shrink-0" />
+                <ServiceIcon :service="model.service" :size="20" />
                 <div class="flex-1 min-w-0 text-left">
                   <div class="flex items-center gap-2">
                     <span class="font-medium truncate">{{ model.name }}</span>
@@ -298,16 +295,7 @@
             >
               <td class="py-3 px-2 sm:px-3">
                 <div class="flex items-center gap-2">
-                  <GroqIcon
-                    v-if="model.service.toLowerCase().includes('groq')"
-                    :size="16"
-                    class-name="flex-shrink-0"
-                  />
-                  <Icon
-                    v-else
-                    :icon="getProviderIcon(model.service)"
-                    class="w-4 h-4 flex-shrink-0"
-                  />
+                  <ServiceIcon :service="model.service" :size="16" />
                   <span class="txt-primary text-sm font-medium">{{ model.name }}</span>
                 </div>
               </td>
@@ -439,19 +427,20 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
 import { useRoute } from 'vue-router'
 import {
+  ArrowPathIcon,
   ChevronDownIcon,
   CpuChipIcon,
   FunnelIcon,
   ListBulletIcon,
   LockClosedIcon,
 } from '@heroicons/vue/24/outline'
-import { Icon } from '@iconify/vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
-import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { serviceColors } from '@/mocks/aiModels'
 import {
@@ -459,6 +448,7 @@ import {
   getDefaultModels,
   saveDefaultModels,
   checkModelAvailability,
+  resetDefaultModels,
 } from '@/services/api/configApi'
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
 import { ApiError } from '@/services/api/httpClient'
@@ -469,7 +459,6 @@ import {
   type ModelWithPurposes,
   type PurposeChip,
 } from '@/utils/aiModelDedupe'
-import { getProviderIcon } from '@/utils/providerIcons'
 import { useI18n } from 'vue-i18n'
 
 type ModelsData = Partial<Record<Capability, AIModel[]>>
@@ -497,6 +486,7 @@ const purposeLabels = computed<Record<Capability, string>>(() => ({
 
 const loading = ref(false)
 const saving = ref(false)
+const resetting = ref(false)
 const availableModels = ref<ModelsData>({})
 const defaultConfig = ref<Record<Capability, number | null>>({
   SORT: null,
@@ -537,6 +527,7 @@ const switchModalTargetProvider = ref('')
 const switchModalGuardReason = ref<'requires_premium' | 'cooldown_active' | null>(null)
 
 const { success, error: showError, warning } = useNotification()
+const { confirm: confirmDialog } = useDialog()
 
 // Map URL parameter to actual capability name
 const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
@@ -1081,6 +1072,29 @@ const saveConfiguration = async () => {
     }
   } finally {
     saving.value = false
+  }
+}
+
+const confirmResetDefaults = async () => {
+  const confirmed = await confirmDialog({
+    title: t('config.aiModels.resetDefaults'),
+    message: t('config.aiModels.resetDefaultsConfirm'),
+    confirmText: t('config.aiModels.resetDefaults'),
+    cancelText: t('common.cancel'),
+  })
+  if (!confirmed) return
+
+  resetting.value = true
+  try {
+    const response = await resetDefaultModels()
+    if (response.success) {
+      success(t('config.aiModels.resetDefaultsSuccess'))
+      await loadData()
+    }
+  } catch {
+    showError(t('config.aiModels.resetDefaultsError'))
+  } finally {
+    resetting.value = false
   }
 }
 </script>

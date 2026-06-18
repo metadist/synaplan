@@ -27,6 +27,9 @@ class ModelCatalog
         'CHAT' => 'chat',
         'TOOLS' => 'chat',
         'SORT' => 'chat',
+        // PLAN: multi-task router model (gpt-oss-120b on Groq). Tuned
+        // independently of SORT; resolves to a chat-tagged model.
+        'PLAN' => 'chat',
         'SUMMARIZE' => 'chat',
         'ANALYZE' => 'chat',
         'TEXT2PIC' => 'text2pic',
@@ -63,10 +66,14 @@ class ModelCatalog
      *   - **Operator-owned** (only set on INSERT, NEVER overwritten):
      *     BSELECTABLE, BACTIVE, BISDEFAULT, BSHOWWHENFREE. These can be toggled
      *     by admins via the AdminModelsService UI; container restarts must not
-     *     wipe those choices. BSHOWWHENFREE is not part of this statement at all
-     *     (no INSERT column / no UPDATE clause) — it is managed exclusively by
-     *     the admin UI and migrations. Test fixtures that need to force a value
-     *     should issue an explicit UPDATE after the upsert (see ModelSeeder::seed()).
+     *     wipe those choices. They are seeded from the catalog on INSERT only
+     *     (so a FRESH install reflects the catalog default) and are absent from
+     *     the ON DUPLICATE KEY UPDATE clause (so an admin override on an EXISTING
+     *     row survives every restart). For BSHOWWHENFREE the catalog default is 0;
+     *     a catalog row may opt in with `showWhenFree => 1` (e.g. the free,
+     *     self-hosted Ollama bge-m3 embedding model that must stay visible despite
+     *     having no per-token price). Bringing existing installs to a new
+     *     visibility default is a migration's job, not the seeder's.
      *
      * Every write embeds the catalog fingerprint into BJSON under
      * self::FINGERPRINT_KEY. ModelSeeder reads this back to detect manual UI edits
@@ -85,8 +92,8 @@ class ModelCatalog
         $json[self::FINGERPRINT_KEY] = self::fingerprint($model);
 
         return (int) $connection->executeStatement(
-            'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BJSON)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BSHOWWHENFREE, BJSON)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 BSERVICE = VALUES(BSERVICE), BNAME = VALUES(BNAME), BTAG = VALUES(BTAG),
                 BPROVID = VALUES(BPROVID), BPRICEIN = VALUES(BPRICEIN),
@@ -100,6 +107,7 @@ class ModelCatalog
                 $model['priceIn'], $model['inUnit'], $model['priceOut'],
                 $model['outUnit'], $model['quality'], $model['rating'],
                 $system ? 1 : 0,
+                (int) ($model['showWhenFree'] ?? 0),
                 json_encode($json, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE),
             ]
         );
@@ -238,13 +246,19 @@ class ModelCatalog
             'name' => 'bge-m3 (Ollama, self-hosted)',
             'tag' => 'vectorize',
             // Selectable in the admin "switch embedding model" dropdown so
-            // operators running a private Ollama / GPU server can pin RAG and
-            // Synapse routing to their own bge-m3 deployment instead of paying
+            // operators running a private Ollama / GPU server can pin RAG
+            // to their own bge-m3 deployment instead of paying
             // per-token to Cloudflare or OpenAI. Same 1024-dim vector space as
             // the Cloudflare bge-m3 (BID 187), so switching between the two
             // is a "free" change from the collection's point of view.
             'selectable' => 1,
             'active' => 1,
+            // This is the default VECTORIZE model for self-hosted / local-dev
+            // installs (see DefaultModelConfigSeeder). It has no per-token price,
+            // so without this opt-in `isHiddenBecauseFree()` would strip it from
+            // the user-facing model list at /config/ai-models even though RAG
+            // actually depends on it. Keep it visible.
+            'showWhenFree' => 1,
             'providerId' => 'bge-m3',
             'priceIn' => 0,
             'inUnit' => 'free',
@@ -260,27 +274,6 @@ class ModelCatalog
                 ],
                 'features' => ['embedding', 'multilingual'],
                 'meta' => ['dimensions' => 1024, 'context_window' => '8192', 'provider' => 'ollama'],
-            ],
-        ],
-        [
-            'id' => 78,
-            'service' => 'Ollama',
-            'name' => 'gpt-oss:20b',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-oss:20b',
-            'priceIn' => 0.12,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.60,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'Local model on synaplans company server in Germany. OpenAI\'s open-weight GPT-OSS (20B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.',
-                'max_tokens' => 16384,
-                'params' => ['model' => 'gpt-oss:20b'],
-                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
             ],
         ],
         [
@@ -302,27 +295,6 @@ class ModelCatalog
                 'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-oss:120b'],
                 'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
-            ],
-        ],
-        [
-            'id' => 124,
-            'service' => 'Ollama',
-            'name' => 'nemotron-3-nano',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'nemotron-3-nano',
-            'priceIn' => 0.092,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.46,
-            'outUnit' => 'per1M',
-            'quality' => 8,
-            'rating' => 8,
-            'json' => [
-                'description' => 'NVIDIA Nemotron 3 nano',
-                'max_tokens' => 32768,
-                'features' => ['reasoning'],
-                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
             ],
         ],
         [
@@ -1226,6 +1198,52 @@ class ModelCatalog
             ],
         ],
         [
+            // Snapshot 2026-06-09 (https://platform.claude.com/docs/en/about-claude/models/overview).
+            // Claude Fable 5 — Anthropic's most capable widely released model.
+            // Generally available on the Claude API since 2026-06-09.
+            'id' => 240,
+            'service' => 'Anthropic',
+            'name' => 'Claude Fable 5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-fable-5',
+            'priceIn' => 10,
+            'inUnit' => 'per1M',
+            'priceOut' => 50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Fable 5 - Anthropic\'s most capable widely released model for the most demanding reasoning and long-horizon agentic work. Adaptive thinking (always on). 1M context, 128K max output.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-fable-5'],
+                'features' => ['vision', 'reasoning'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000'],
+            ],
+        ],
+        [
+            'id' => 241,
+            'service' => 'Anthropic',
+            'name' => 'Claude Fable 5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-fable-5',
+            'priceIn' => 10,
+            'inUnit' => 'per1M',
+            'priceOut' => 50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Fable 5 for image analysis and vision tasks. Anthropic\'s most capable widely released vision model.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-fable-5'],
+                'meta' => ['supports_images' => true],
+            ],
+        ],
+        [
             // Snapshot 2026-05-27 (https://platform.claude.com/docs/en/about-claude/models/overview).
             'id' => 235,
             'service' => 'Anthropic',
@@ -1965,6 +1983,50 @@ class ModelCatalog
                 'meta' => ['supports_images' => true, 'routed_via' => 'huggingface'],
             ],
         ],
+        [
+            // Snapshot 2026-06-12 (https://huggingface.co/moonshotai/Kimi-K2.7-Code).
+            'id' => 242,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K2.7 Code',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K2.7-Code',
+            'priceIn' => 0.95,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Kimi K2.7 Code via HuggingFace - coding-focused 1T MoE (32B active) with 256K context. Always thinks; 30% fewer reasoning tokens than K2.6. Routed through HF Inference Providers.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'moonshotai/Kimi-K2.7-Code'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'meta' => ['context_window' => '262144', 'max_output' => '32768', 'routed_via' => 'huggingface', 'forced_thinking' => true],
+            ],
+        ],
+        [
+            'id' => 243,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K2.7 Code (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K2.7-Code',
+            'priceIn' => 0.95,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Kimi K2.7 Code via HuggingFace for image analysis and vision tasks. Coding-optimised Kimi with MoonViT vision encoder.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'moonshotai/Kimi-K2.7-Code'],
+                'meta' => ['supports_images' => true, 'routed_via' => 'huggingface', 'forced_thinking' => true],
+            ],
+        ],
         // ==================== THEHIVE MODELS ====================
         [
             'id' => 130,
@@ -2188,6 +2250,115 @@ class ModelCatalog
                 'params' => ['model' => '@cf/qwen/qwen3-embedding-0.6b'],
                 'features' => ['embedding', 'multilingual', 'instruction-aware'],
                 'meta' => ['dimensions' => 1024, 'context_window' => '8192', 'provider' => 'cloudflare'],
+            ],
+        ],
+        // ==================== MISTRAL MODELS ====================
+        [
+            'id' => 244,
+            'service' => 'Mistral',
+            'name' => 'Mistral Medium 3.5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'mistral-medium-latest',
+            'priceIn' => 1.50,
+            'inUnit' => 'per1M',
+            'priceOut' => 7.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 3,
+            'json' => [
+                'description' => 'Mistral Medium 3.5 - frontier-class multimodal model optimised for agentic and coding use cases. OpenAI-compatible chat endpoint.',
+                'max_tokens' => 8192,
+                'params' => ['model' => 'mistral-medium-latest'],
+                'meta' => ['context_window' => '262144', 'max_output' => '8192'],
+            ],
+        ],
+        [
+            'id' => 245,
+            'service' => 'Mistral',
+            'name' => 'Mistral Large 3',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'mistral-large-latest',
+            'priceIn' => 0.50,
+            'inUnit' => 'per1M',
+            'priceOut' => 1.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 3,
+            'json' => [
+                'description' => 'Mistral Large 3 - state-of-the-art, open-weight, general-purpose multimodal model. OpenAI-compatible chat endpoint.',
+                'max_tokens' => 8192,
+                'params' => ['model' => 'mistral-large-latest'],
+                'meta' => ['context_window' => '262144', 'max_output' => '8192'],
+            ],
+        ],
+        [
+            'id' => 246,
+            'service' => 'Mistral',
+            'name' => 'Voxtral Mini Transcribe',
+            'tag' => 'sound2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'voxtral-mini-latest',
+            // Voxtral Mini Transcribe V2 is billed per minute of input audio.
+            'priceIn' => 0.003,
+            'inUnit' => 'permin',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 8,
+            'rating' => 2,
+            'json' => [
+                'description' => 'Voxtral Mini Transcribe - efficient speech-to-text via Mistral /v1/audio/transcriptions. ~4% WER on FLEURS, 13 languages, up to 3h audio per request.',
+                'params' => ['model' => 'voxtral-mini-latest'],
+                'features' => ['multilingual', 'diarization', 'timestamps'],
+            ],
+        ],
+        [
+            'id' => 247,
+            'service' => 'Mistral',
+            'name' => 'Voxtral TTS',
+            'tag' => 'text2sound',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'voxtral-mini-tts-2603',
+            // Voxtral TTS is billed per input token (the text to synthesise).
+            'priceIn' => 16.0,
+            'inUnit' => 'per1M',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 8,
+            'rating' => 2,
+            'json' => [
+                'description' => 'Voxtral TTS - expressive text-to-speech with zero-shot voice cloning and 9-language support via Mistral /v1/audio/speech.',
+                'params' => ['model' => 'voxtral-mini-tts-2603'],
+                'features' => ['voice-cloning', 'multilingual', 'streaming'],
+            ],
+        ],
+        [
+            // Vision variant of Mistral Medium 3.5 (same upstream model id as
+            // BID 244). Routed through the OpenAI-compatible chat endpoint with
+            // image_url content for image understanding / OCR-style extraction.
+            'id' => 248,
+            'service' => 'Mistral',
+            'name' => 'Mistral Medium 3.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'mistral-medium-latest',
+            'priceIn' => 1.50,
+            'inUnit' => 'per1M',
+            'priceOut' => 7.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 2,
+            'json' => [
+                'description' => 'Mistral Medium 3.5 multimodal vision - describe images and extract text (OCR-style) via the chat endpoint.',
+                'max_tokens' => 2048,
+                'params' => ['model' => 'mistral-medium-latest'],
+                'features' => ['vision', 'ocr', 'multilingual'],
             ],
         ],
     ];

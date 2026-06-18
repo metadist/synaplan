@@ -1,20 +1,21 @@
 <template>
   <!--
-    Sticky chat input bar — already follows the iOS soft keyboard via
-    `position: sticky; bottom: 0` against the visual viewport. The
-    `pb-[env(safe-area-inset-bottom)]` accounts for the iPhone home
-    indicator (~34px) when the keyboard is HIDDEN, but iOS Safari does not
-    zero that inset out when the keyboard is OPEN, leaving a permanent
-    ~50px gap below the textarea (inset + inner py-4). `useKeyboardOpen()`
-    flips off the home-indicator inset *only* while the keyboard is up,
-    and the inner wrapper drops to `py-2` on mobile. Net effect: ~40-50px
-    less dead space when typing on iPhone, no regression on desktop.
+    Sticky chat input bar — `position: sticky; bottom: 0` keeps it pinned to
+    the bottom of the scroll area and, on iOS, follows the soft keyboard via
+    the visual viewport.
+
+    Safe-area inset is applied at md+ ONLY. On mobile the bottom tab bar
+    (MobileNav → .v2-mobile-tabbar) renders *below* this input and already
+    carries `padding-bottom: env(safe-area-inset-bottom)`. Adding the inset
+    here too would double-count the iOS home indicator and leave a ~34px dead
+    gap (≈ the Safari address-bar height) between the pill row and the tab bar
+    — visible on real iPhones, but invisible in Chrome's responsive emulator
+    where `env(safe-area-inset-bottom)` resolves to 0px. At md+ there is no
+    tab bar and the input sits at the window's bottom edge, so it owns the
+    inset itself.
   -->
   <div
-    :class="[
-      'sticky bottom-0 bg-chat-input-area',
-      isKeyboardOpen ? 'pb-0' : 'pb-[env(safe-area-inset-bottom)]',
-    ]"
+    class="sticky bottom-0 bg-chat-input-area md:pb-[env(safe-area-inset-bottom)]"
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
@@ -213,6 +214,11 @@
         class="mt-3 flex items-center gap-2"
         data-testid="section-chat-secondary-actions"
       >
+        <!-- §4.7: exactly three pills — Model, Tools, Knowledge folder.
+             Thinking + Voice reply live INSIDE the Tools dropdown as toggles;
+             "Manage folders…" lives INSIDE the folder picker. Labels stay
+             visible on mobile (no hidden sm:inline). -->
+
         <!-- Model dropdown: show gated pill in guest mode -->
         <template v-if="isGuestMode">
           <button
@@ -221,7 +227,7 @@
             @click="emit('guestFeatureGate', 'models')"
           >
             <Icon icon="mdi:tune-vertical" class="w-4 h-4 md:w-5 md:h-5" />
-            <span class="text-xs md:text-sm font-medium hidden sm:inline">Model</span>
+            <span class="text-xs md:text-sm font-medium">Model</span>
             <Icon icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
           </button>
         </template>
@@ -235,49 +241,35 @@
             @click="emit('guestFeatureGate', 'tools')"
           >
             <Icon icon="mdi:toolbox-outline" class="w-4 h-4 md:w-5 md:h-5" />
-            <span class="text-xs md:text-sm font-medium hidden sm:inline">Tools</span>
+            <span class="text-xs md:text-sm font-medium">Tools</span>
             <Icon icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
           </button>
         </template>
         <ToolsDropdown
           v-else
           :active-command="activeCommand"
+          :thinking-enabled="thinkingEnabled"
+          :voice-reply="voiceReply"
+          :supports-reasoning="supportsReasoning"
+          :enhance-enabled="enhanceEnabled"
+          :enhance-loading="enhanceLoading"
+          :enhance-available="message.trim().length > 0"
           class="flex-shrink-0"
           @insert-command="handleInsertCommand"
+          @toggle-thinking="toggleThinking"
+          @toggle-voice-reply="toggleVoiceReply"
+          @toggle-enhance="toggleEnhance"
         />
 
-        <button
-          type="button"
-          :disabled="!isGuestMode && !supportsReasoning"
-          :class="[
-            'pill flex-shrink-0',
-            !isGuestMode && thinkingEnabled && 'pill--active',
-            isGuestMode && 'opacity-50',
-            !isGuestMode && !supportsReasoning && 'opacity-50 cursor-not-allowed',
-          ]"
-          :aria-label="$t('chatInput.thinking')"
-          data-testid="btn-chat-thinking"
-          @click="isGuestMode ? emit('guestFeatureGate', 'models') : toggleThinking()"
-        >
-          <Icon icon="mdi:brain" class="w-4 h-4 md:w-5 md:h-5" />
-          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
-            $t('chatInput.thinking')
-          }}</span>
-          <Icon v-if="isGuestMode" icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
-        </button>
-        <button
-          type="button"
-          :class="['pill flex-shrink-0', voiceReply && 'pill--active']"
-          :aria-label="$t('chatInput.voiceReply')"
-          :title="$t('chatInput.voiceReplyTooltip')"
-          data-testid="btn-chat-voice-reply"
-          @click="toggleVoiceReply"
-        >
-          <Icon icon="mdi:volume-high" class="w-4 h-4 md:w-5 md:h-5" />
-          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
-            $t('chatInput.voiceReply')
-          }}</span>
-        </button>
+        <!-- Knowledge-base folder (RAG group) picker: scope the chat to a
+             folder. Signed-in users only; its panel carries the "Manage
+             folders…" link row to the Files page. -->
+        <KnowledgeFolderPicker
+          v-if="!isGuestMode"
+          v-model="selectedGroupKey"
+          :groups="knowledgeGroups"
+          class="flex-shrink-0"
+        />
       </div>
     </div>
 
@@ -305,6 +297,7 @@ import CommandPalette from './CommandPalette.vue'
 import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
 import ModelDropdown from './ModelDropdown.vue'
+import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import { parseCommand } from '../commands/parse'
 import { useCommandsStore, type Command } from '@/stores/commands'
@@ -312,14 +305,16 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api/chatApi'
 import type { FileItem } from '@/services/filesService'
+import { getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { useAutoPersist } from '@/composables/useInputPersistence'
-import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { useChatsStore } from '@/stores/chats'
 import { useAppModeStore } from '@/stores/appMode'
+import { useAuthStore } from '@/stores/auth'
 
 interface UploadedFile {
   file_id: number
@@ -369,6 +364,9 @@ const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
 const discardNextRecording = ref(false)
 const selectedModelId = ref<number | null>(null)
+// Knowledge-base folder ("group key") to scope this chat's RAG retrieval to.
+const knowledgeGroups = ref<Array<{ name: string; count: number }>>([])
+const selectedGroupKey = ref<string>('')
 
 const SILENCE_TIMEOUT_MS = 4000
 const silenceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
@@ -378,9 +376,11 @@ const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const appModeStore = useAppModeStore()
+const authStore = useAuthStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
-const isKeyboardOpen = useKeyboardOpen()
+const route = useRoute()
+const router = useRouter()
 
 /**
  * Get the speech recognition language code from the current UI locale.
@@ -419,8 +419,12 @@ const showMicrophoneButton = computed(() => {
   return webSpeechSupported || speechToTextAvailable
 })
 
-/** Icon-only enhance control inside the input shell; visible when there is text to act on. */
-const showEnhanceInInput = computed(() => message.value.trim().length > 0)
+/**
+ * Icon-only enhance control inside the input shell; visible when there is
+ * text to act on. Desktop only — on mobile it crowds the narrow input, so the
+ * control moves into the Tools dropdown instead.
+ */
+const showEnhanceInInput = computed(() => message.value.trim().length > 0 && !isMobile.value)
 
 /** Reserve horizontal space so the textarea does not sit under the absolute action buttons. */
 const textareaPaddingRightPx = computed(() => {
@@ -459,6 +463,7 @@ const emit = defineEmits<{
       fileIds?: number[]
       voiceReply?: boolean
       modelId?: number
+      ragGroupKey?: string
     },
   ]
   stop: []
@@ -554,9 +559,16 @@ watch(
       activeCommand.value = null
     }
 
-    // Detect @mention trigger: match @ preceded by start-of-string or whitespace, at end of input
+    // Detect @mention trigger: match @ preceded by start-of-string or whitespace, at end of input.
+    // The mention palette lists the user's knowledge-base files via the
+    // auth-guarded /api/v1/files endpoint. Opening it as a guest returns 401
+    // and the http client force-redirects to /login (issue #1037). Guests have
+    // no knowledge-base files anyway, so we never open the palette for them and
+    // let "@" stay as plain text (e.g. when typing an email address). Gate on
+    // authentication rather than the isGuestMode prop, which can still be false
+    // at mount while the guest session is initializing.
     const mentionMatch = newValue.match(/(?:^|\s)@(\S*)$/)
-    if (mentionMatch && !paletteVisible.value) {
+    if (mentionMatch && !paletteVisible.value && authStore.isAuthenticated) {
       mentionQuery.value = mentionMatch[1]
       mentionPaletteVisible.value = true
     } else if (!mentionMatch) {
@@ -639,6 +651,7 @@ const sendMessage = () => {
     fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
     voiceReply: voiceReply.value,
     modelId: selectedModelId.value || undefined,
+    ragGroupKey: selectedGroupKey.value || undefined,
   }
   emit('send', messageToSend, options)
   message.value = ''
@@ -949,6 +962,60 @@ onUnmounted(() => {
     uploadAbortController.value = null
   }
 })
+
+// Load the user's knowledge-base folders so they can scope a chat to one.
+// `/api/v1/files/groups` is auth-gated: calling it as a guest (or before auth
+// has resolved) returns 401, which the http client turns into a hard redirect
+// to /login. Gate strictly on authentication — not on the `isGuestMode` prop,
+// which can still be false at mount while the guest session is initializing —
+// and (re)load whenever auth state flips to authenticated.
+async function loadKnowledgeGroups(): Promise<void> {
+  if (!authStore.isAuthenticated) return
+  try {
+    knowledgeGroups.value = await getFileGroups()
+    applyFolderFromQuery()
+  } catch {
+    // Non-fatal — the picker still renders with just the "none" option, so a
+    // failed load simply means no folders are available to scope to.
+  }
+}
+
+/**
+ * §4.8 #2 ("Use in chat"): the Files page deep-links to `/?folder=<name>`.
+ * Preselect that knowledge folder in the picker, then consume the query so
+ * a reload or share of the URL doesn't re-apply it.
+ */
+function applyFolderFromQuery(): void {
+  const folder = route.query.folder
+  if (typeof folder !== 'string' || folder === '') return
+  if (knowledgeGroups.value.some((g) => g.name === folder)) {
+    selectedGroupKey.value = folder
+  }
+  const rest = { ...route.query }
+  delete rest.folder
+  void router.replace({ query: rest })
+}
+
+watch(
+  () => authStore.isAuthenticated,
+  (authed) => {
+    if (authed) void loadKnowledgeGroups()
+  },
+  {
+    immediate: true,
+  }
+)
+
+// "Use in chat" while already on the chat page: the query changes without a
+// remount, so apply it whenever it (re)appears.
+watch(
+  () => route.query.folder,
+  (folder) => {
+    if (typeof folder === 'string' && folder !== '' && knowledgeGroups.value.length > 0) {
+      applyFolderFromQuery()
+    }
+  }
+)
 
 /**
  * Toggle speech recording using hybrid approach.

@@ -156,29 +156,34 @@ class StripeWebhookController extends AbstractController
     }
 
     /**
-     * Rate limiting for webhook endpoint.
+     * Rate limiting for webhook endpoint (fixed window per IP).
+     *
+     * The window start is stored alongside the counter because PSR-6
+     * `save()` does not preserve a previously stored expiry: re-saving a
+     * fetched item without `expiresAfter()` falls back to the pool default
+     * (potentially "forever"), which used to make the counter immortal and
+     * permanently 429 an IP once it ever crossed the limit.
      */
     private function checkRateLimit(Request $request): bool
     {
         $ip = $request->getClientIp() ?? 'unknown';
         $cacheKey = 'stripe_webhook_rate_'.md5($ip);
+        $now = time();
 
         $item = $this->cache->getItem($cacheKey);
+        $state = $item->isHit() ? $item->get() : null;
 
-        if (!$item->isHit()) {
-            $item->set(1);
-            $item->expiresAfter(self::RATE_LIMIT_WINDOW);
-            $this->cache->save($item);
-
-            return true;
+        if (!is_array($state) || !isset($state['count'], $state['reset']) || $state['reset'] <= $now) {
+            $state = ['count' => 0, 'reset' => $now + self::RATE_LIMIT_WINDOW];
         }
 
-        $count = $item->get();
-        if ($count >= self::RATE_LIMIT_MAX) {
+        if ($state['count'] >= self::RATE_LIMIT_MAX) {
             return false;
         }
 
-        $item->set($count + 1);
+        ++$state['count'];
+        $item->set($state);
+        $item->expiresAfter(max(1, $state['reset'] - $now));
         $this->cache->save($item);
 
         return true;

@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Service\Embedding;
 
 use App\Repository\ConfigRepository;
-use App\Service\Message\SynapseIndexer;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
  * VectorizeBindingService — single seam for persisting the active
- * embedding-model bindings (`DEFAULTMODEL.VECTORIZE` and
- * `DEFAULTMODEL.SYNAPSE_VECTORIZE`).
+ * embedding-model binding (`DEFAULTMODEL.VECTORIZE`).
  *
  * Extracted from `AdminEmbeddingController` so the SafeModelChange
  * rollback path (live in `ReVectorizeMessageHandler`) can reuse the
@@ -42,23 +40,6 @@ final readonly class VectorizeBindingService
         $this->embeddingMetadata->invalidate();
 
         $this->logger->info('VectorizeBindingService: VECTORIZE binding updated', [
-            'model_id' => $modelId,
-        ]);
-    }
-
-    public function setSynapseVectorizeModel(int $modelId): void
-    {
-        $config = $this->configRepository->setValue(
-            0,
-            'DEFAULTMODEL',
-            SynapseIndexer::SYNAPSE_CAPABILITY,
-            (string) $modelId,
-        );
-        $this->em->persist($config);
-        $this->em->flush();
-        $this->embeddingMetadata->invalidate();
-
-        $this->logger->info('VectorizeBindingService: SYNAPSE_VECTORIZE binding updated', [
             'model_id' => $modelId,
         ]);
     }

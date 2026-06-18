@@ -46,17 +46,17 @@ See [Installation Guide](INSTALLATION.md) for full setup instructions.
 
 ### Health Check Endpoint
 
-`GET /api/health/login` exercises the full auth stack (DB, password hash, email-verified gate, token generation) and returns `STATUS:OK` or `STATUS:ERROR`.
+`GET /api/health/probe` exercises the auth stack (DB via API-Key lookup, email-verified gate, token generation) and returns `STATUS:OK` or `STATUS:ERROR`.
 
-Protected by `X-Health-Monitor-Token` header. No sensitive details in the response — diagnostics are logged server-side only.
+Protected by standard API-Key authentication (`X-API-Key` header). No sensitive details in the response — diagnostics are logged server-side only.
 
 Quick smoke test:
 
 ```bash
-curl -i -H "X-Health-Monitor-Token: <token>" https://your-domain.com/api/health/login
+curl -i -H "X-API-Key: sk_your-health-monitor-api-key" https://your-domain.com/api/health/probe
 ```
 
-See [Health Monitoring](HEALTH_MONITORING.md) for full setup: token generation, monitor user creation, Uptime Robot configuration.
+See [Health Monitoring](HEALTH_MONITORING.md) for full setup: monitor user creation, API-Key generation, Uptime Robot configuration.
 
 ### Recommended Uptime Robot Settings
 
@@ -130,11 +130,10 @@ Verify the application works after the update. If something breaks, restore from
 
 ### Token Rotation
 
-Rotate `HEALTH_MONITOR_TOKEN`:
+Rotate health monitor API-Key:
 
-1. Generate new token: `openssl rand -hex 32`
-2. Update ENV var, restart backend
-3. Update Uptime Robot header
+1. Log in as the health-monitor user, revoke old API-Key, create new one
+2. Update Uptime Robot header with the new key
 
 Rotate `APP_SECRET`:
 

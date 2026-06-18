@@ -1,0 +1,40 @@
+email:
+  password_reset:
+    title: 'Restablecer su contraseña'
+    intro: 'Ha solicitado restablecer la contraseña de su cuenta de Synaplan.'
+    instruction: 'Haga clic en el botón de abajo para restablecer su contraseña:'
+    button: 'Restablecer contraseña'
+    or_copy: 'O copie y pegue este enlace en su navegador:'
+    security_notice:
+      title: 'Aviso de seguridad:'
+      text: 'Este enlace caducará en 1 hora. Si no ha solicitado este restablecimiento de contraseña, ignore este correo y su contraseña permanecerá sin cambios.'
+
+  verification:
+    title: 'Verifique su dirección de correo electrónico'
+    intro: '¡Gracias por registrarse en Synaplan!'
+    instruction: 'Haga clic en el botón de abajo para verificar su dirección de correo electrónico:'
+    button: 'Verificar correo'
+    or_copy: 'O copie y pegue este enlace en su navegador:'
+    expiry: 'Este enlace caducará en 24 horas.'
+    footer_notice: 'Si no ha creado una cuenta en Synaplan, puede ignorar este correo con tranquilidad.'
+
+  welcome:
+    title: '¡Bienvenido a Synaplan!'
+    greeting: 'Hola %name%:'
+    intro: 'Su correo electrónico se ha verificado correctamente y su cuenta ya está activa.'
+    features_intro: 'Ya puede empezar a usar todas las funciones de Synaplan:'
+    feature_1: 'Asistente de chat con IA'
+    feature_2: 'Análisis de documentos'
+    feature_3: 'Comunicación multicanal'
+    feature_4: '¡Y mucho más!'
+    button: 'Comenzar'
+
+  task_result:
+    subject: 'Sus resultados de Synaplan'
+    sent_confirmation: 'Los resultados se han enviado por correo a %email%.'
+
+  footer:
+    support: 'Si tiene problemas, póngase en contacto con nuestro equipo de soporte.'
+    help: '¿Necesita ayuda? Consulte nuestra documentación o contacte con el soporte.'
+    company: 'Synaplan'
+    rights: 'Todos los derechos reservados'

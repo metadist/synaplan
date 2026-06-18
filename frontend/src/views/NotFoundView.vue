@@ -89,7 +89,7 @@
             <span class="text-sm txt-primary">{{ $t('nav.chat') }}</span>
           </router-link>
           <router-link
-            to="/tools/chat-widget"
+            to="/channels/widgets"
             class="p-4 rounded-lg hover-surface transition-colors group"
           >
             <Cog6ToothIcon

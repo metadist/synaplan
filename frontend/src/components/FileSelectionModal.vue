@@ -64,9 +64,15 @@
               />
               <span
                 v-if="isUploading && uploadProgress"
-                class="text-xs sm:text-sm txt-secondary flex items-center gap-1.5 min-w-0"
+                class="text-xs sm:text-sm flex items-center gap-1.5 min-w-0"
+                :class="isUploadSlow ? 'text-yellow-600 dark:text-yellow-400' : 'txt-secondary'"
               >
                 <template v-if="uploadBytePercent !== null && uploadBytePercent < 100">
+                  <Icon
+                    v-if="isUploadSlow"
+                    icon="mdi:timer-sand"
+                    class="w-3.5 h-3.5 flex-shrink-0"
+                  />
                   {{
                     $t('fileSelection.uploadingFilePercent', {
                       current: uploadProgress.current,
@@ -74,6 +80,9 @@
                       percent: uploadBytePercent,
                     })
                   }}
+                  <span v-if="isUploadSlow" class="hidden sm:inline">
+                    — {{ $t('fileSelection.uploadSlow') }}
+                  </span>
                 </template>
                 <template v-else-if="isFinishingUpload">
                   {{ $t('fileSelection.storingFile') }}
@@ -319,7 +328,12 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import filesService, { type FileItem, UploadBlockedError } from '@/services/filesService'
+import filesService, {
+  type FileItem,
+  type UploadPhase,
+  UploadBlockedError,
+  UploadFailedError,
+} from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useNotification } from '@/composables/useNotification'
 import FileContentModal from './FileContentModal.vue'
@@ -357,6 +371,17 @@ const translateUploadBlocked = (err: UploadBlockedError): string => {
   return params.message ? `${params.filename}: ${params.message}` : params.filename
 }
 
+// Localized message for a transfer-level failure (stall, timeout, proxy
+// limit, network drop). Keeps the user informed with a remediation hint
+// instead of a silent spinner, and never echoes server internals.
+const translateUploadFailed = (filename: string, err: UploadFailedError): string => {
+  const key = `fileSelection.uploadFailed.${err.code}`
+  const params = { filename, percent: err.percentReached ?? 0, status: err.status ?? 0 }
+  const translated = t(key, params)
+  if (translated !== key) return translated
+  return `${filename}: ${err.message}`
+}
+
 // State
 const isLoading = ref(false)
 const isUploading = ref(false)
@@ -371,6 +396,8 @@ const uploadProgress = ref<{ current: number; total: number } | null>(null)
 const uploadBytePercent = ref<number | null>(null)
 /** Bytes finished; waiting for HTTP response body (store) */
 const isFinishingUpload = ref(false)
+/** True once the transfer has gone quiet long enough to warn the user (#589) */
+const isUploadSlow = ref(false)
 const isDragging = ref(false)
 
 // Sub-dialog state
@@ -572,6 +599,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
 
       uploadBytePercent.value = 0
       isFinishingUpload.value = false
+      isUploadSlow.value = false
 
       try {
         // XHR + onProgress: real byte progress vs server "store" response (#589)
@@ -585,6 +613,15 @@ const uploadFiles = async (filesToUpload: File[]) => {
               isFinishingUpload.value = true
             }
           },
+          onPhase: (phase: UploadPhase) => {
+            isUploadSlow.value = phase === 'slow'
+            if (phase === 'finishing') isFinishingUpload.value = true
+          },
+          // 'store' is just an NFS write — it should answer in seconds. If a
+          // node hangs (busy FrankenPHP worker, dead LB upstream), surface a
+          // timeout instead of spinning forever. The transfer-stall guard in
+          // filesService handles the "stuck at 89%" body-stall case.
+          serverTimeoutMs: 90_000,
         })
 
         if (result.success && result.files.length > 0) {
@@ -611,12 +648,23 @@ const uploadFiles = async (filesToUpload: File[]) => {
           showError(translateUploadBlocked(err))
           continue
         }
+        if (err instanceof UploadFailedError) {
+          // Stall / timeout failures may have left a partial file on the
+          // server (#589) — refresh the list so a stored-but-unfinished
+          // upload is visible rather than appearing lost.
+          if (err.code === 'transfer_stalled' || err.code === 'server_timeout') {
+            await loadFiles()
+          }
+          showError(translateUploadFailed(file.name, err))
+          continue
+        }
         console.error('Upload failed:', file.name, err)
         const msg = err instanceof Error ? err.message : 'Unknown error'
         showError(`${file.name}: ${msg}`)
       } finally {
         uploadBytePercent.value = null
         isFinishingUpload.value = false
+        isUploadSlow.value = false
       }
     }
 
@@ -652,6 +700,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
     uploadProgress.value = null
     uploadBytePercent.value = null
     isFinishingUpload.value = false
+    isUploadSlow.value = false
     uploadAbortController.value = null
   }
 }
@@ -737,6 +786,7 @@ watch(
       pendingProcessingIds.value.clear()
       uploadBytePercent.value = null
       isFinishingUpload.value = false
+      isUploadSlow.value = false
       selectedFileIds.value.clear()
       contentModalOpen.value = false
       confirmDialogOpen.value = false

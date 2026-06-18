@@ -18,13 +18,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: "8.4"
-          extensions: mbstring, xml, ctype, iconv, intl
+          # `redis` (phpredis) is in composer.json's require for `symfony/redis-messenger`,
+          # so installing without it would force `--ignore-platform-req=ext-redis` here too.
+          extensions: mbstring, xml, ctype, iconv, intl, redis
           coverage: none
 
       - name: Cache composer dependencies
@@ -52,7 +54,7 @@ jobs:
 
     services:
       mysql:
-        image: mariadb:12.2@sha256:350261292d0129fd4b24f537dcf05ecd3ebe34d39d5b592af551f38310e7a167
+        image: mariadb:12.3@sha256:b1c7bf836e64ed9406a8984af29509f40089d55cea14b32f12c4726a1f17104b
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: synaplan_test
@@ -66,15 +68,34 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
+      # Redis backs cache.app, the lock + rate-limiter components and the
+      # Messenger Redis Streams transport. PHPUnit needs a live instance so the
+      # HealthController Redis probe and any transport-backed tests pass instead
+      # of failing on a refused connection. `.env.test` points REDIS_DSN at
+      # 127.0.0.1:6379. Digest pinned to match docker-compose.yml for parity
+      # (Redis 7.4 — see docker-compose.yml for the Centrifugo pub/sub rationale).
+      redis:
+        image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: "8.4"
-          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc
+          # `redis` (phpredis) is required by `symfony/redis-messenger`. Sessions
+          # and cache.app use Predis (pure PHP) so they don't need it, but `composer
+          # install` would refuse to run without it on the platform-req check.
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
           coverage: none
 
       - name: Cache composer dependencies
@@ -168,7 +189,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -245,7 +266,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Download frontend build artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -264,7 +285,7 @@ jobs:
 
       - name: Extract metadata (tags, labels)
         id: meta
-        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -299,7 +320,7 @@ jobs:
           retention-days: 1
 
   e2e:
-    name: E2E Tests (${{ matrix.browser }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }})
+    name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }})
     runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
@@ -308,23 +329,35 @@ jobs:
         include:
           # Standard password auth (both browsers) — exclude @oidc tests (no Keycloak running)
           - browser: chromium
+            variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e"
             grep_filter: "@ci"
           - browser: firefox
+            variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e:firefox"
             grep_filter: "@ci"
+          # Mobile viewport layout guard (chromium device emulation; runs the
+          # @layout suite only — see frontend/tests/e2e/playwright.config.ts)
+          - browser: chromium
+            variant: "Mobile"
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e:mobile"
+            grep_filter: "@ci"
           # OIDC auth (chromium only — auth flow testing, not browser compat)
           - browser: chromium
+            variant: ""
             auth_method: oidc
             compose_profiles: "--profile oidc"
             npm_script: "test:e2e:oidc"
             grep_filter: "@oidc"
           # OIDC auto-redirect (starts app with OIDC_AUTO_REDIRECT=true)
           - browser: chromium
+            variant: ""
             auth_method: oidc-redirect
             compose_profiles: "--profile oidc"
             npm_script: "test:e2e:oidc-redirect"
@@ -335,7 +368,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Download Docker image artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -448,7 +481,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: playwright-results-${{ matrix.browser }}-${{ matrix.auth_method }}
+          name: playwright-results-${{ matrix.browser }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}-${{ matrix.auth_method }}
           path: |
             frontend/tests/e2e/test-results/
             frontend/tests/e2e/reports/
@@ -461,6 +494,97 @@ jobs:
           COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
           PROFILE="${{ matrix.compose_profiles }}"
           $COMPOSE $PROFILE down -v
+
+  e2e-visual:
+    # Layer 3 of the UI guard: hard-capped visual snapshots (@visual project).
+    # Skips gracefully while no baselines are committed — generate them with
+    # the "Update visual baselines" workflow dispatch (same runner image,
+    # never from a laptop).
+    name: E2E Visual Snapshots
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    env:
+      APP_IMAGE: synaplan-test:ci
+      APP_URL: http://localhost:8001
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Check for committed baselines
+        id: baselines
+        run: |
+          if compgen -G "frontend/tests/e2e/tests/*-snapshots" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No visual baselines committed yet — skipping (run the 'Update visual baselines' dispatch to create them)."
+          fi
+
+      - name: Download Docker image artifact
+        if: steps.baselines.outputs.exists == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        if: steps.baselines.outputs.exists == 'true'
+        run: |
+          docker load -i /tmp/docker-image.tar
+          IMAGE_TAG=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
+          docker tag $IMAGE_TAG synaplan-test:ci
+
+      - name: Start test services
+        if: steps.baselines.outputs.exists == 'true'
+        run: |
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
+          n=0; until $COMPOSE pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
+          $COMPOSE up -d
+          $COMPOSE up --wait || { $COMPOSE ps; $COMPOSE logs; exit 1; }
+
+      - name: Setup Node.js
+        if: steps.baselines.outputs.exists == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Playwright dependencies
+        if: steps.baselines.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        if: steps.baselines.outputs.exists == 'true'
+        working-directory: frontend
+        run: |
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
+
+      - name: Run visual snapshot tests
+        if: steps.baselines.outputs.exists == 'true'
+        working-directory: frontend
+        env:
+          BASE_URL: http://localhost:8001
+        run: npm run test:e2e:visual
+
+      - name: Upload results
+        if: always() && steps.baselines.outputs.exists == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-results-visual
+          path: |
+            frontend/tests/e2e/test-results/
+            frontend/tests/e2e/reports/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Stop test services
+        if: always() && steps.baselines.outputs.exists == 'true'
+        run: |
+          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v
 
   docker-push:
     name: Push Docker Image
@@ -509,7 +633,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -531,7 +655,7 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, backend, frontend, docker-build, e2e, docker-push, cloudflare-deploy]
+    needs: [lint, backend, frontend, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
     if: always()
     steps:
       - name: Check for failures
@@ -542,6 +666,7 @@ jobs:
             needs.frontend.result != 'success' ||
             needs.docker-build.result != 'success' ||
             needs.e2e.result != 'success' ||
+            needs.e2e-visual.result != 'success' ||
             (needs.docker-push.result != 'success' && needs.docker-push.result != 'skipped') ||
             (needs.cloudflare-deploy.result != 'success' && needs.cloudflare-deploy.result != 'skipped')
           )

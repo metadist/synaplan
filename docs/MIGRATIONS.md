@@ -11,12 +11,14 @@ commands** for production-essential catalog data. Demo/test data lives in DataFi
 | System prompts (`BPROMPTS`)      | `App\Seed\PromptSeeder` / `app:prompt:seed`                      | dev + prod      |
 | Default model config (`BCONFIG`) | `App\Seed\DefaultModelConfigSeeder` / `app:config:seed-defaults` | dev + prod      |
 | Rate-limit config (`BCONFIG`)    | `App\Seed\RateLimitConfigSeeder` / `app:ratelimit:seed-defaults` | dev + prod      |
+| Subscription budgets (`BSUBSCRIPTIONS`) | `App\Seed\SubscriptionPlanSeeder`                         | dev + prod      |
+| Multitask routing flags (`BCONFIG`) | `App\Seed\MultitaskConfigSeeder`                              | dev + prod      |
 | Demo widget config (`BCONFIG`)   | `App\Seed\DemoWidgetConfigSeeder`                                | dev + test only |
 | Demo users (`BUSER`)             | `App\DataFixtures\UserFixtures`                                  | dev + test only |
 
 
 The orchestrator `app:seed` runs all idempotent seeders in the correct dependency order
-(models → prompts → defaults → rate-limits → demo-widget).
+(models → prompts → defaults → rate-limits → subscriptions → multitask → demo-widget).
 
 ## Daily Workflow
 
@@ -130,7 +132,26 @@ docker compose up -d         # entrypoint runs migrations + fixtures + seed
     ```bash
     bash _docker/backend/tests/test-migrations-bootstrap.sh
     ```
-3. Run `doctrine:migrations:migrate` (fresh DB → full schema; legacy DB → every migration newer than the baseline).
+3. Run `doctrine:migrations:migrate` (fresh DB → full schema; legacy DB → every migration
+   newer than the baseline) **via `run_migrations_with_retry`** — a bounded retry wrapper
+   that makes a failed first start self-heal *within the same container start* instead of
+   crash-looping under `restart: unless-stopped`:
+
+   - It re-runs the idempotent metadata bootstrap (step 2) **before every attempt**. So if
+     the very first `migrate` dies mid-baseline (the baseline is non-transactional —
+     MariaDB can't roll back DDL — and creates `BAPIKEYS` first, `BUSER` last), the next
+     attempt's bootstrap detects the "`BAPIKEYS` without `BUSER`" half-applied state, drops
+     the orphan tables, and the retry rebuilds the schema cleanly — no operator action.
+   - Transient failures (DB still warming up behind the `SELECT 1` probe, lock contention,
+     deadlocks, two instances racing the same migration) get a few more chances rather than
+     instantly killing the container.
+   - Tunable via env: `MIGRATION_MAX_ATTEMPTS` (default `5`) and
+     `MIGRATION_RETRY_DELAY_SECONDS` (default `5`). After the attempts are exhausted the
+     container exits non-zero (so a genuinely broken migration is still loud and visible).
+
+   The retry wrapper is covered by the same bash test suite (cases 10–12): first-try
+   success, fail-twice-then-succeed (asserts the bootstrap re-runs before each attempt),
+   and always-fail (asserts it gives up after `MIGRATION_MAX_ATTEMPTS`).
 4. Repeat steps 2 and 3 for the test DB (dev only).
 5. **Dev/test only:** load `UserFixtures` if `BUSER` is empty (this purges entity tables first).
 6. **Always:** run `app:seed` to (re-)populate models/prompts/config catalogs.
@@ -196,6 +217,13 @@ constant in `_docker/backend/lib/migrations-bootstrap.sh` MUST be updated in the
 same commit to point at the new rolled-up version. Otherwise the self-healing
 bootstrap will try to mark a version that no longer exists as applied, and
 `doctrine:migrations:migrate` will fail on legacy DBs with "unknown version".
+- **Dropping a column the previous release still maps must be two-phase**
+(expand/contract). Migrations run on the FIRST new container start against the
+shared Galera DB while web1/web2/web3 roll one node at a time — a `DROP COLUMN`
+instantly breaks every node still running the old entity (its SELECTs name the
+column). Phase 1: stop mapping/using the column, ship defaults that keep old
+code working. Phase 2 (next release): drop the column. Current open phase-2
+item: `BPROMPTS.BKEYWORDS` + `BPROMPTS.BENABLED` (see `Version20260608000000`).
 
 ## Testing the Migration Path Locally
 
@@ -247,6 +275,8 @@ backend/
 │   │   ├── PromptSeeder.php
 │   │   ├── DefaultModelConfigSeeder.php
 │   │   ├── RateLimitConfigSeeder.php
+│   │   ├── SubscriptionPlanSeeder.php
+│   │   ├── MultitaskConfigSeeder.php
 │   │   └── DemoWidgetConfigSeeder.php
 │   ├── Model/ModelCatalog.php        # Source of truth for AI models
 │   └── Prompt/PromptCatalog.php      # Source of truth for system prompts

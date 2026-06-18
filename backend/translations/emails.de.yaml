@@ -29,6 +29,10 @@ email:
     feature_4: 'Und vieles mehr!'
     button: 'Jetzt starten'
   
+  task_result:
+    subject: 'Ihre Ergebnisse von Synaplan'
+    sent_confirmation: 'Die Ergebnisse wurden per E-Mail an %email% gesendet.'
+
   footer:
     support: 'Bei Problemen wenden Sie sich bitte an unser Support-Team.'
     help: 'Benötigen Sie Hilfe? Schauen Sie in unsere Dokumentation oder kontaktieren Sie den Support.'

@@ -18,7 +18,12 @@ This section details the plan for integrating the Model Context Protocol (MCP) i
 - **[04-UI-UX-DESIGN.md](./04-UI-UX-DESIGN.md):** Outlines the user interface for managing MCP servers, tools, and prompt mappings.
 - **[05-ENRICHMENT-UI-LOGGING.md](./05-ENRICHMENT-UI-LOGGING.md):** Displaying results in the Chat GUI and structured logging.
 - **[06-TEST-STRATEGY.md](./06-TEST-STRATEGY.md):** Test matrix and strategy for the MCP plugin.
+- **[07-AGENT-SCHEDULING.md](./07-AGENT-SCHEDULING.md):** *(planning target — not implemented)* Agent scheduling & job dispatch: autonomous agents (`brogent`, …) pull a job-description JSON + schedule-update JSON from the MCP server via `agent_checkin`.
+
+## Authoritative Roadmap
+
+- **[00-ROADMAP-2026.md](./00-ROADMAP-2026.md)** — Authoritative 2026 roadmap. Locks Streamable HTTP transport, `mcp/sdk` core, OAuth 2.1 (Keycloak) auth, and a server-first sequencing of both directions. **Supersedes the transport/stack decisions in the original roadmap.**
 
 ## Reference
 
-- [00-ORIGINAL-ROADMAP.md](./00-ORIGINAL-ROADMAP.md) — Original 3-step MCP roadmap (Expose → Consume → Orchestrate) that preceded this detailed plan.
+- [00-ORIGINAL-ROADMAP.md](./00-ORIGINAL-ROADMAP.md) — Original 3-step MCP roadmap (Expose → Consume → Orchestrate). Goals still valid; "SSE-only" transport decision is obsolete (see 2026 roadmap).

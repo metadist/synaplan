@@ -1,174 +1,79 @@
 <template>
   <div class="space-y-6" data-testid="page-config-routing">
-    <!-- Header -->
+    <!-- Header: what routing is + how to add custom prompts -->
     <div class="surface-card p-6" data-testid="section-routing-overview">
       <div class="flex items-start gap-3">
         <div class="p-2 rounded-lg bg-[var(--brand)]/10">
           <Icon icon="heroicons:share" class="w-6 h-6 text-[var(--brand)]" />
         </div>
-        <div class="flex-1">
+        <div class="flex-1 min-w-0">
           <h2 class="text-2xl font-semibold txt-primary mb-1">
             {{ $t('config.routing.title') }}
           </h2>
           <p class="txt-secondary text-sm">
-            {{ $t('config.routing.subtitle') }}
+            {{ $t('config.routing.flowBody') }}
           </p>
-          <p class="text-xs txt-secondary mt-2">
-            {{ $t('config.routing.editPromptsHint') }}
-            <router-link
-              to="/config/task-prompts"
-              class="text-[var(--brand)] hover:underline font-medium"
-            >
-              {{ $t('config.routing.editPromptsLink') }}
-            </router-link>
-          </p>
-        </div>
-      </div>
-    </div>
 
-    <!-- Beta toggle (admin only) -->
-    <div v-if="isAdmin" class="surface-card overflow-hidden" data-testid="section-routing-beta">
-      <div class="p-6 border-b border-light-border/30 dark:border-dark-border/20">
-        <div class="flex items-start gap-4 flex-wrap">
+          <!-- Prominent callout: custom prompts live in Task Prompts -->
           <div
-            class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0 flex items-center justify-center w-10 h-10"
+            class="mt-4 p-4 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20 flex items-start gap-3"
+            data-testid="callout-custom-prompts"
           >
-            <img
-              :src="synaplanLogoSrc"
-              alt="Synaplan"
-              class="w-6 h-6"
-              data-testid="img-synapse-logo"
+            <Icon
+              icon="heroicons:light-bulb"
+              class="w-5 h-5 text-[var(--brand)] flex-shrink-0 mt-0.5"
             />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap mb-1">
-              <h3 class="text-lg font-semibold txt-primary">
-                {{ $t('config.routing.betaTitle') }}
-              </h3>
-              <span
-                class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                data-testid="badge-beta"
+            <p class="text-sm txt-secondary leading-relaxed">
+              {{ $t('config.routing.customCalloutBody') }}
+              <router-link
+                to="/ai/instructions"
+                class="text-[var(--brand)] hover:underline font-medium"
               >
-                {{ $t('config.routing.betaBadge') }}
-              </span>
-            </div>
-            <p class="text-sm txt-secondary">
-              {{ $t('config.routing.betaSubtitle') }}
+                {{ $t('config.routing.customCalloutLink') }}
+              </router-link>
             </p>
           </div>
-          <label
-            class="inline-flex items-center gap-3 cursor-pointer flex-shrink-0"
-            data-testid="toggle-synapse-enabled"
-          >
-            <span class="text-sm font-medium txt-primary">
-              {{ synapseEnabled ? $t('config.routing.betaOn') : $t('config.routing.betaOff') }}
-            </span>
-            <span class="relative inline-flex">
-              <input
-                type="checkbox"
-                class="sr-only peer"
-                :checked="synapseEnabled"
-                :disabled="togglingSynapse"
-                data-testid="toggle-synapse-input"
-                @change="onToggleSynapse(($event.target as HTMLInputElement).checked)"
-              />
-              <span
-                class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-amber-500 peer-disabled:opacity-50 transition-colors"
-              ></span>
-              <span
-                class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
-              ></span>
-            </span>
-          </label>
         </div>
-      </div>
-
-      <div
-        v-if="synapseEnabled"
-        class="p-5 bg-amber-500/5 border-t border-amber-500/20 flex items-start gap-3"
-        data-testid="banner-beta-warning"
-      >
-        <Icon
-          icon="heroicons:exclamation-triangle"
-          class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
-        />
-        <div class="text-sm">
-          <p class="font-medium text-amber-700 dark:text-amber-300 mb-1">
-            {{ $t('config.routing.betaWarningTitle') }}
-          </p>
-          <p class="text-amber-700/90 dark:text-amber-300/90 leading-relaxed">
-            {{ $t('config.routing.betaWarningBody') }}
-          </p>
-          <ul class="mt-2 ml-4 list-disc text-amber-700/80 dark:text-amber-300/80 space-y-1">
-            <li>{{ $t('config.routing.betaIssueSticky') }}</li>
-            <li>{{ $t('config.routing.betaIssueGranular') }}</li>
-            <li>{{ $t('config.routing.betaIssueStale') }}</li>
-          </ul>
-        </div>
-      </div>
-
-      <div
-        v-else
-        class="p-5 bg-emerald-500/5 border-t border-emerald-500/20 flex items-start gap-3"
-        data-testid="banner-ai-default"
-      >
-        <Icon
-          icon="heroicons:check-circle"
-          class="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5"
-        />
-        <p class="text-sm text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed">
-          {{ $t('config.routing.aiDefaultBody') }}
-        </p>
       </div>
     </div>
 
-    <!--
-      Granular routing topics toggle — admin-only. Controls whether the
-      granular routing aliases (general-chat, coding, image-generation,
-      video-generation, audio-generation) are active in the routing pool.
-      Sibling of the Synapse Routing toggle above: when Synapse v2 is on,
-      enabling this lets the embedding tier discriminate finer-grained
-      intents; when Synapse is off, leaving this OFF keeps the legacy AI
-      sorter from seeing duplicate near-identical routing targets.
-      The backend flips BENABLED on the matching BPROMPTS rows in
-      lock-step via GranularTopicsManager.
-    -->
-    <div v-if="isAdmin" class="surface-card overflow-hidden" data-testid="section-routing-granular">
+    <!-- Master switch (admin only): turn the multi-task planner on/off -->
+    <div v-if="isAdmin" class="surface-card overflow-hidden" data-testid="section-routing-master">
       <div class="p-6">
         <div class="flex items-start gap-4 flex-wrap">
           <div
             class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0 flex items-center justify-center w-10 h-10"
           >
-            <Icon icon="heroicons:squares-2x2" class="w-6 h-6 text-[var(--brand)]" />
+            <Icon icon="heroicons:bolt" class="w-6 h-6 text-[var(--brand)]" />
           </div>
           <div class="flex-1 min-w-0">
             <h3 class="text-lg font-semibold txt-primary mb-1">
-              {{ $t('config.routing.granularTitle') }}
+              {{ $t('config.routing.masterTitle') }}
             </h3>
             <p class="text-sm txt-secondary">
-              {{ $t('config.routing.granularSubtitle') }}
+              {{ $t('config.routing.masterDesc') }}
             </p>
             <p class="text-xs txt-secondary mt-2">
-              {{ $t('config.routing.granularPromptHint') }}
+              {{ $t('config.routing.masterHint') }}
             </p>
           </div>
           <label
             class="inline-flex items-center gap-3 cursor-pointer flex-shrink-0"
-            data-testid="toggle-granular-enabled"
+            data-testid="toggle-multitask-enabled"
           >
             <span class="text-sm font-medium txt-primary">
               {{
-                granularTopicsEnabled ? $t('config.routing.betaOn') : $t('config.routing.betaOff')
+                multitaskEnabled ? $t('config.routing.masterOn') : $t('config.routing.masterOff')
               }}
             </span>
             <span class="relative inline-flex">
               <input
                 type="checkbox"
                 class="sr-only peer"
-                :checked="granularTopicsEnabled"
-                :disabled="togglingGranular"
-                data-testid="toggle-granular-input"
-                @change="onToggleGranular(($event.target as HTMLInputElement).checked)"
+                :checked="multitaskEnabled"
+                :disabled="togglingMultitask"
+                data-testid="toggle-multitask-input"
+                @change="onToggleMultitask(($event.target as HTMLInputElement).checked)"
               />
               <span
                 class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 transition-colors"
@@ -182,756 +87,377 @@
       </div>
     </div>
 
-    <!--
-      Embedding-model picker — admin-only. The whole card is wrapped in
-      `v-if="isAdmin"` so non-admin users never receive the markup, not
-      even disabled. The amber accents and ADMIN pill make it visually
-      obvious that this is operator surface area, not a per-user setting.
-    -->
-    <div
-      v-if="isAdmin"
-      class="surface-card p-6 ring-1 ring-amber-500/20 border-l-4 border-l-amber-500/70"
-      data-testid="section-routing-embedding-model"
-    >
-      <div class="flex items-start gap-3 mb-5">
-        <div class="p-2 rounded-lg bg-amber-500/10 flex-shrink-0">
-          <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-amber-600 dark:text-amber-400" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 flex-wrap mb-1">
-            <h3 class="text-lg font-semibold txt-primary">
-              {{ $t('config.routing.embeddingTitle') }}
-            </h3>
-            <span
-              class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300"
-              data-testid="badge-admin-only"
-            >
-              {{ $t('config.routing.embeddingAdminBadge') }}
-            </span>
-          </div>
-          <p class="text-sm txt-secondary">
-            {{ $t('config.routing.embeddingSubtitle') }}
-          </p>
-        </div>
-      </div>
-
-      <div v-if="synapseEmbeddingStatus" class="space-y-2">
-        <label
-          for="select-synapse-embedding-model"
-          class="block text-xs txt-secondary uppercase tracking-wide"
-        >
-          {{ $t('config.routing.embeddingActive') }}
-        </label>
-        <!--
-          Select + button must share the row so they stay vertically
-          aligned regardless of helper text below; using items-end on a
-          parent with a label / hint of different heights misaligned
-          the button when the column wrapped its label.
-        -->
-        <div class="flex flex-col sm:flex-row gap-2">
-          <select
-            id="select-synapse-embedding-model"
-            v-model.number="synapseEmbeddingSelection"
-            class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-            :disabled="switchingSynapseEmbedding || !!synapseActiveRun"
-            data-testid="select-synapse-embedding-model"
-          >
-            <option
-              v-for="model in synapseEmbeddingStatus.availableModels"
-              :key="model.id"
-              :value="model.id"
-            >
-              {{ model.name }} · {{ model.service }}
-            </option>
-          </select>
-          <button
-            class="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
-            data-testid="btn-synapse-embedding-switch"
-            :disabled="
-              switchingSynapseEmbedding ||
-              !!synapseActiveRun ||
-              synapseEmbeddingSelection === synapseEmbeddingStatus.currentModel.modelId
-            "
-            @click="switchSynapseEmbedding"
-          >
-            <Icon
-              :icon="
-                switchingSynapseEmbedding ? 'heroicons:arrow-path' : 'heroicons:arrows-right-left'
-              "
-              :class="['w-4 h-4', switchingSynapseEmbedding && 'animate-spin']"
-            />
-            {{ $t('config.routing.embeddingSwitch') }}
-          </button>
-        </div>
-        <p class="text-xs txt-secondary">
-          {{
-            $t('config.routing.embeddingCurrent', {
-              model: synapseEmbeddingStatus.currentModel.model || '—',
-              provider: synapseEmbeddingStatus.currentModel.provider || '—',
-              dim: synapseEmbeddingStatus.currentModel.vectorDim,
-            })
-          }}
-        </p>
-      </div>
-
-      <div
-        v-if="synapseActiveRun"
-        class="mt-4 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 flex items-center gap-3"
-        data-testid="banner-synapse-embedding-running"
-      >
-        <Icon
-          icon="heroicons:arrow-path"
-          class="w-5 h-5 text-amber-600 dark:text-amber-400 animate-spin flex-shrink-0"
-        />
-        <div class="text-sm flex-1">
-          <p class="font-medium txt-primary">
-            {{ $t('config.routing.embeddingRunningTitle') }}
-          </p>
-          <p class="txt-secondary">
-            {{
-              $t('config.routing.embeddingRunningBody', {
-                processed: synapseActiveRun.chunksProcessed,
-                status: synapseActiveRun.status,
-              })
-            }}
-          </p>
-        </div>
-      </div>
-
-      <p v-if="!synapseEmbeddingStatus && !loadingSynapseEmbedding" class="text-sm txt-secondary">
-        {{ $t('config.routing.embeddingLoadFailed') }}
-      </p>
-    </div>
-
-    <!-- Live status (admin) -->
-    <div v-if="isAdmin" class="surface-card p-6" data-testid="section-routing-status">
-      <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
-          <Icon icon="heroicons:signal" class="w-5 h-5 text-[var(--brand)]" />
-          {{ $t('config.routing.statusTitle') }}
-        </h3>
-        <div class="flex items-center gap-2">
-          <button
-            class="px-3 py-2 rounded-lg surface-chip txt-secondary hover:txt-primary text-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="btn-status-refresh"
-            :disabled="loadingStatus"
-            @click="loadStatus"
-          >
-            <Icon
-              :icon="loadingStatus ? 'heroicons:arrow-path' : 'heroicons:arrow-path'"
-              :class="['w-4 h-4', loadingStatus && 'animate-spin']"
-            />
-            {{ $t('config.routing.refresh') }}
-          </button>
-          <button
-            class="px-3 py-2 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="btn-reindex-force"
-            :disabled="reindexing"
-            @click="reindex({ force: true })"
-          >
-            <Icon icon="heroicons:bolt" class="w-4 h-4" />
-            {{ $t('config.routing.reindexForce') }}
-          </button>
-          <button
-            class="px-3 py-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="btn-reindex-recreate"
-            :disabled="reindexing"
-            @click="confirmRecreate"
-          >
-            <Icon icon="heroicons:arrow-uturn-left" class="w-4 h-4" />
-            {{ $t('config.routing.reindexRecreate') }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Dim mismatch warning -->
-      <div
-        v-if="status?.dimensionMismatch"
-        class="p-3 mb-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-2"
-        data-testid="banner-dim-mismatch"
-      >
-        <Icon
-          icon="heroicons:exclamation-triangle"
-          class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
-        />
-        <div class="text-sm">
-          <p class="font-medium text-amber-700 dark:text-amber-300">
-            {{ $t('config.routing.dimMismatchTitle') }}
-          </p>
-          <p class="text-amber-700/80 dark:text-amber-300/80 mt-1">
-            {{
-              $t('config.routing.dimMismatchBody', {
-                collectionDim: status?.collection.vectorDim ?? '?',
-                modelDim: status?.activeModel.vectorDim ?? '?',
-              })
-            }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Stat cards -->
-      <div v-if="status" class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div class="surface-chip rounded-lg p-3" data-testid="stat-active-model">
-          <p class="text-xs txt-secondary uppercase tracking-wide mb-1">
-            {{ $t('config.routing.activeModel') }}
-          </p>
-          <p class="text-sm font-semibold txt-primary truncate">
-            {{ status.activeModel.model || '—' }}
-          </p>
-          <p class="text-xs txt-secondary">
-            {{ status.activeModel.provider || '—' }}
-            ·
-            {{ $t('config.routing.dim', { dim: status.activeModel.vectorDim }) }}
-          </p>
-        </div>
-
-        <div class="surface-chip rounded-lg p-3" data-testid="stat-indexed">
-          <p class="text-xs txt-secondary uppercase tracking-wide mb-1">
-            {{ $t('config.routing.indexed') }}
-          </p>
-          <p class="text-2xl font-semibold txt-primary">{{ status.totalIndexed }}</p>
-          <p class="text-xs txt-secondary">
-            {{ $t('config.routing.collection', { name: status.collection.name }) }}
-          </p>
-        </div>
-
-        <div class="surface-chip rounded-lg p-3" data-testid="stat-stale">
-          <p class="text-xs txt-secondary uppercase tracking-wide mb-1">
-            {{ $t('config.routing.stale') }}
-          </p>
-          <p
-            class="text-2xl font-semibold"
-            :class="status.staleCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'txt-primary'"
-          >
-            {{ status.staleCount }}
-          </p>
-          <p class="text-xs txt-secondary">
-            {{ $t('config.routing.staleHint') }}
-          </p>
-        </div>
-
-        <div class="surface-chip rounded-lg p-3" data-testid="stat-disabled">
-          <p class="text-xs txt-secondary uppercase tracking-wide mb-1">
-            {{ $t('config.routing.disabled') }}
-          </p>
-          <p class="text-2xl font-semibold txt-primary">{{ disabledTopicsCount }}</p>
-          <p class="text-xs txt-secondary">
-            {{ $t('config.routing.disabledHint') }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Per-model breakdown -->
-      <div v-if="status && status.perModel.length > 0" class="mt-4">
-        <p class="text-xs txt-secondary uppercase tracking-wide mb-2">
-          {{ $t('config.routing.perModelBreakdown') }}
-        </p>
-        <div class="flex flex-wrap gap-2">
-          <span
-            v-for="(entry, idx) in status.perModel"
-            :key="`pm-${idx}`"
-            class="px-3 py-1.5 rounded-full text-xs surface-chip txt-primary flex items-center gap-1.5"
-            data-testid="chip-per-model"
-          >
-            <Icon
-              :icon="
-                entry.modelId === status.activeModel.modelId
-                  ? 'heroicons:check-circle'
-                  : 'heroicons:exclamation-triangle'
-              "
-              :class="[
-                'w-3.5 h-3.5',
-                entry.modelId === status.activeModel.modelId
-                  ? 'text-emerald-500'
-                  : 'text-amber-500',
-              ]"
-            />
-            {{ entry.model || $t('config.routing.unknownModel') }}
-            <span class="txt-secondary">({{ entry.vectorDim ?? '?' }}d)</span>
-            <span class="font-semibold">×{{ entry.count }}</span>
-          </span>
-        </div>
-      </div>
-
-      <p
-        v-if="!status && !loadingStatus"
-        class="text-sm txt-secondary mt-2"
-        data-testid="text-status-empty"
-      >
-        {{ $t('config.routing.statusEmpty') }}
-      </p>
-    </div>
-
-    <!-- Topic cards -->
-    <div
-      v-if="isAdmin && status && status.topics.length > 0"
-      class="surface-card p-6"
-      data-testid="section-routing-topics"
-    >
-      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
-          <Icon icon="heroicons:rectangle-group" class="w-5 h-5 text-[var(--brand)]" />
-          {{ $t('config.routing.topicsTitle') }}
-        </h3>
-        <div class="relative w-full sm:w-72">
-          <Icon
-            icon="heroicons:magnifying-glass"
-            class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary"
-          />
-          <input
-            v-model="topicSearch"
-            type="text"
-            class="w-full pl-9 pr-3 py-2 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-            :placeholder="$t('config.routing.topicSearchPlaceholder')"
-            data-testid="input-topic-search"
-          />
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <router-link
-          v-for="topic in filteredTopics"
-          :key="`${topic.ownerId}-${topic.topic}`"
-          :to="`/config/task-prompts?topic=${encodeURIComponent(topic.topic)}`"
-          class="surface-chip rounded-lg p-3 flex items-start justify-between gap-3 hover:bg-[var(--brand)]/5 transition-colors"
-          data-testid="card-topic"
-        >
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap mb-1">
-              <span class="font-mono text-sm font-semibold txt-primary truncate">
-                {{ topic.topic }}
-              </span>
-              <span
-                v-if="!topic.enabled"
-                class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-gray-500/10 text-gray-500 dark:text-gray-400"
-                data-testid="badge-disabled"
-              >
-                {{ $t('config.routing.badgeDisabled') }}
-              </span>
-              <span
-                v-if="topic.stale"
-                class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                data-testid="badge-stale"
-              >
-                {{ $t('config.routing.badgeStale') }}
-              </span>
-              <span
-                v-if="!topic.indexed && topic.enabled"
-                class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                data-testid="badge-not-indexed"
-              >
-                {{ $t('config.routing.badgeNotIndexed') }}
-              </span>
-              <span
-                v-if="topic.indexed && !topic.stale"
-                class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                data-testid="badge-indexed"
-              >
-                {{ $t('config.routing.badgeIndexed') }}
-              </span>
+    <!-- Planner prompt (admin only): the instructions the planner follows -->
+    <div v-if="isAdmin" class="surface-card overflow-hidden" data-testid="section-routing-planner">
+      <div class="p-6 border-b border-light-border/30 dark:border-dark-border/20">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div class="flex items-start gap-3 min-w-0">
+            <div class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0">
+              <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-[var(--brand)]" />
             </div>
-            <p class="text-xs txt-secondary truncate">
-              <template v-if="topic.indexed">
-                {{ topic.embeddingModel || '—' }}
-                · {{ topic.vectorDim ?? '?' }}d
-                <span v-if="topic.indexedAt" class="opacity-75">
-                  · {{ formatIndexedAt(topic.indexedAt) }}
-                </span>
-              </template>
-              <template v-else>
-                {{ $t('config.routing.notIndexedHint') }}
-              </template>
-            </p>
+            <div class="min-w-0">
+              <h3 class="text-lg font-semibold txt-primary">
+                {{ $t('config.routing.plannerTitle') }}
+              </h3>
+              <p class="text-sm txt-secondary mt-0.5">
+                {{ $t('config.routing.plannerDesc') }}
+              </p>
+            </div>
           </div>
-          <Icon icon="heroicons:chevron-right" class="w-4 h-4 txt-secondary flex-shrink-0" />
-        </router-link>
+          <button
+            class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-planner-toggle-mode"
+            :disabled="loadingPlanner"
+            @click="togglePlannerEditMode"
+          >
+            <PencilIcon v-if="!plannerEditMode" class="w-4 h-4 inline mr-1" />
+            <EyeIcon v-else class="w-4 h-4 inline mr-1" />
+            {{
+              plannerEditMode ? $t('config.routing.plannerView') : $t('config.routing.plannerEdit')
+            }}
+          </button>
+        </div>
       </div>
 
-      <p
-        v-if="filteredTopics.length === 0"
-        class="text-sm txt-secondary mt-2"
-        data-testid="text-topics-empty"
-      >
-        {{ $t('config.routing.topicsEmpty') }}
-      </p>
-    </div>
-
-    <!-- Test box -->
-    <div class="surface-card p-6" data-testid="section-routing-test">
-      <h3 class="text-lg font-semibold txt-primary mb-2 flex items-center gap-2">
-        <Icon icon="heroicons:beaker" class="w-5 h-5 text-[var(--brand)]" />
-        {{ $t('config.routing.testTitle') }}
-      </h3>
-      <p class="text-xs txt-secondary mb-4">
-        {{ $t('config.routing.testSubtitle') }}
-      </p>
-
-      <div class="flex flex-col sm:flex-row gap-2 mb-3">
-        <input
-          v-model="testInput"
-          type="text"
-          class="flex-1 px-4 py-2.5 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          :placeholder="$t('config.routing.testPlaceholder')"
-          data-testid="input-test-text"
-          @keydown.enter="runTest"
-        />
-        <button
-          class="px-5 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid="btn-test-run"
-          :disabled="testRunning || !testInput.trim()"
-          @click="runTest"
-        >
-          <Icon
-            :icon="testRunning ? 'heroicons:arrow-path' : 'heroicons:play'"
-            :class="['w-4 h-4', testRunning && 'animate-spin']"
-          />
-          {{ $t('config.routing.testRun') }}
-        </button>
-      </div>
-
-      <!-- Result -->
-      <div
-        v-if="testResult"
-        class="border border-light-border/30 dark:border-dark-border/20 rounded-lg overflow-hidden"
-        data-testid="section-test-result"
-      >
-        <div
-          class="surface-chip px-4 py-3 border-b border-light-border/30 dark:border-dark-border/20"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <p class="text-xs txt-secondary">
-              {{ $t('config.routing.testQuery') }}:
-              <span class="font-mono txt-primary">"{{ testResult.query }}"</span>
-            </p>
-            <p class="text-xs txt-secondary">
-              {{ $t('config.routing.testLatency', { ms: testResult.latency_ms }) }}
-            </p>
-          </div>
-          <p class="text-xs txt-secondary mt-1">
-            {{ $t('config.routing.testModel') }}:
-            <span class="font-mono txt-primary">
-              {{ testResult.model.model || '—' }}
-            </span>
-            <span class="opacity-75">({{ testResult.model.provider || '—' }})</span>
-          </p>
+      <div class="p-6 space-y-4">
+        <div v-if="!plannerEditMode" class="flex gap-2">
+          <button
+            v-for="tab in ['rendered', 'source']"
+            :key="tab"
+            :class="[
+              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+              plannerTab === tab
+                ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+                : 'surface-chip txt-secondary hover:txt-primary',
+            ]"
+            data-testid="btn-planner-tab"
+            @click="plannerTab = tab as 'rendered' | 'source'"
+          >
+            {{
+              tab === 'rendered'
+                ? $t('config.routing.plannerRendered')
+                : $t('config.routing.plannerSource')
+            }}
+          </button>
         </div>
 
         <div
-          v-if="testResult.error"
-          class="p-4 bg-rose-500/5 text-rose-600 dark:text-rose-400 text-sm"
+          v-if="!plannerEditMode"
+          class="surface-chip p-6 rounded border border-light-border/30 dark:border-dark-border/20"
+          data-testid="section-planner-preview"
         >
-          {{ testResult.error }}
+          <pre class="whitespace-pre-wrap font-mono text-xs txt-primary leading-relaxed">{{
+            plannerTab === 'rendered' ? plannerPrompt.renderedPrompt : plannerPrompt.prompt
+          }}</pre>
         </div>
 
-        <div v-else-if="testResult.candidates.length === 0" class="p-4 text-sm txt-secondary">
-          {{ $t('config.routing.testNoCandidates') }}
-        </div>
+        <textarea
+          v-else
+          v-model="plannerPrompt.prompt"
+          rows="22"
+          class="w-full px-4 py-3 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
+          data-testid="input-planner-prompt"
+        />
 
-        <ul v-else class="divide-y divide-light-border/30 dark:divide-dark-border/20">
-          <li
-            v-for="(c, idx) in testResult.candidates"
-            :key="`cand-${idx}`"
-            class="px-4 py-3 flex items-center justify-between gap-3"
-            data-testid="item-test-candidate"
+        <div v-if="plannerEditMode" class="flex gap-3">
+          <button
+            class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-planner-save"
+            :disabled="savingPlanner || loadingPlanner"
+            @click="savePlannerPrompt"
           >
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-xs txt-secondary">#{{ idx + 1 }}</span>
-                <span class="font-mono text-sm font-semibold txt-primary">
-                  {{ c.topic }}
-                </span>
-                <span
-                  v-if="c.alias_target && c.alias_target !== c.topic"
-                  class="text-xs txt-secondary inline-flex items-center gap-1"
-                  data-testid="text-alias-target"
-                >
-                  <Icon icon="heroicons:arrow-right" class="w-3 h-3" />
-                  <span class="font-mono">{{ c.alias_target }}</span>
-                </span>
-                <span
-                  v-if="c.stale"
-                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                >
-                  {{ $t('config.routing.badgeStale') }}
-                </span>
-              </div>
-            </div>
-            <div class="text-right flex-shrink-0">
-              <p class="text-sm font-mono font-semibold" :class="scoreColor(c.score)">
-                {{ c.score.toFixed(3) }}
-              </p>
-              <p class="text-[10px] txt-secondary uppercase tracking-wide">
-                {{ $t('config.routing.score') }}
-              </p>
-            </div>
-          </li>
-        </ul>
+            <CheckIcon class="w-5 h-5" />
+            {{ $t('config.routing.plannerSave') }}
+          </button>
+          <button
+            class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-planner-reset"
+            :disabled="savingPlanner || loadingPlanner"
+            @click="resetPlannerPrompt"
+          >
+            {{ $t('config.routing.plannerReset') }}
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- AI Fallback Prompt (collapsed accordion) -->
-    <div class="surface-card overflow-hidden" data-testid="section-routing-fallback">
+    <!-- Legacy fallback (admin only) — collapsed by default -->
+    <div v-if="isAdmin" class="space-y-6" data-testid="section-routing-legacy">
       <button
         type="button"
-        class="w-full px-6 py-4 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-        data-testid="btn-fallback-toggle"
-        @click="fallbackOpen = !fallbackOpen"
+        class="surface-card w-full px-6 py-4 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        data-testid="btn-legacy-toggle"
+        @click="legacyOpen = !legacyOpen"
       >
         <div class="flex items-start gap-3 text-left">
-          <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-[var(--brand)] mt-0.5" />
+          <Icon icon="heroicons:archive-box" class="w-5 h-5 text-[var(--brand)] mt-0.5" />
           <div>
             <h3 class="text-lg font-semibold txt-primary">
-              {{ $t('config.routing.fallbackTitle') }}
+              {{ $t('config.routing.legacyTitle') }}
             </h3>
             <p class="text-xs txt-secondary mt-0.5">
-              {{ $t('config.routing.fallbackSubtitle') }}
+              {{ $t('config.routing.legacyDesc') }}
             </p>
           </div>
         </div>
         <Icon
-          :icon="fallbackOpen ? 'heroicons:chevron-up' : 'heroicons:chevron-down'"
+          :icon="legacyOpen ? 'heroicons:chevron-up' : 'heroicons:chevron-down'"
           class="w-5 h-5 txt-secondary flex-shrink-0"
         />
       </button>
 
-      <div v-if="fallbackOpen" class="border-t border-light-border/30 dark:border-dark-border/20">
-        <div class="flex border-b border-light-border/30 dark:border-dark-border/20">
+      <div v-show="legacyOpen" class="space-y-6">
+        <!-- AI Fallback Prompt (collapsed accordion) -->
+        <div class="surface-card overflow-hidden" data-testid="section-routing-fallback">
           <button
-            v-for="tab in tabs"
-            :key="tab.id"
-            :class="[
-              'px-6 py-3 text-sm font-medium transition-colors relative',
-              activeTab === tab.id
-                ? 'txt-primary bg-[var(--brand)]/5 border-b-2 border-[var(--brand)]'
-                : 'txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
-            ]"
-            data-testid="btn-tab"
-            @click="activeTab = tab.id"
+            type="button"
+            class="w-full px-6 py-4 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            data-testid="btn-fallback-toggle"
+            @click="fallbackOpen = !fallbackOpen"
           >
-            {{ tab.label }}
-          </button>
-        </div>
-
-        <div class="p-6">
-          <div v-if="activeTab === 'rendered'" data-testid="section-rendered">
-            <div class="space-y-6">
+            <div class="flex items-start gap-3 text-left">
+              <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-[var(--brand)] mt-0.5" />
               <div>
-                <h3 class="text-xl font-semibold txt-primary mb-3">
-                  {{ introTitle }}
-                </h3>
-                <!-- eslint-disable-next-line vue/no-v-html -->
-                <div class="markdown-content txt-secondary text-sm" v-html="introHtml"></div>
-              </div>
-
-              <div>
-                <h4 class="text-lg font-semibold txt-primary mb-3">
-                  {{ $t('config.sortingPrompt.yourTasks') }}
-                </h4>
-                <!-- eslint-disable-next-line vue/no-v-html -->
-                <div class="markdown-content txt-secondary text-sm" v-html="tasksHtml"></div>
-              </div>
-
-              <div>
-                <h4 class="text-lg font-semibold txt-primary mb-3">
-                  Your tasks in every new message are to:
-                </h4>
-                <ol class="space-y-4 txt-secondary text-sm">
-                  <li
-                    v-for="(instructionHtml, index) in instructionHtmls"
-                    :key="`instruction-${index}`"
-                    class="flex gap-3"
-                  >
-                    <span class="font-semibold txt-primary">{{ index + 1 }}.</span>
-                    <div>
-                      <!-- eslint-disable-next-line vue/no-v-html -->
-                      <div class="markdown-content" v-html="instructionHtml"></div>
-                      <ul v-if="index === 1" class="space-y-3 ml-4 mt-3">
-                        <li
-                          v-for="category in sortingPrompt.categories"
-                          :key="category.name"
-                          class="pl-4 border-l-2 border-[var(--brand)]/30"
-                        >
-                          <div class="flex items-center gap-2 mb-1">
-                            <router-link
-                              :to="getPromptLink(category.name)"
-                              class="font-semibold txt-primary hover:underline"
-                            >
-                              {{ category.name }}
-                            </router-link>
-                            <span v-if="category.type === 'default'" class="text-xs txt-secondary"
-                              >(default)</span
-                            >
-                            <span v-else class="text-xs text-purple-500">(custom)</span>
-                          </div>
-                          <p class="text-sm txt-secondary">{{ category.description }}</p>
-                        </li>
-                      </ul>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-            </div>
-          </div>
-
-          <div v-else-if="activeTab === 'source'" data-testid="section-source">
-            <div class="space-y-4">
-              <div class="flex justify-between items-center">
                 <h3 class="text-lg font-semibold txt-primary">
-                  {{ $t('config.sortingPrompt.tabSource') }}
+                  {{ $t('config.routing.fallbackTitle') }}
                 </h3>
-                <button
-                  class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  data-testid="btn-toggle-mode"
-                  :disabled="!canEdit || loading"
-                  @click="toggleEditMode"
-                >
-                  <PencilIcon v-if="!editMode" class="w-4 h-4 inline mr-1" />
-                  <EyeIcon v-else class="w-4 h-4 inline mr-1" />
-                  {{ editMode ? 'View Mode' : 'Edit Mode' }}
-                </button>
-              </div>
-
-              <div
-                v-if="!editMode"
-                class="surface-chip p-6 rounded border border-light-border/30 dark:border-dark-border/20"
-                data-testid="section-prompt-preview"
-              >
-                <pre class="whitespace-pre-wrap font-mono text-xs txt-primary leading-relaxed">{{
-                  sortingPrompt.promptContent
-                }}</pre>
-              </div>
-
-              <textarea
-                v-else
-                v-model="sortingPrompt.promptContent"
-                rows="25"
-                class="w-full px-4 py-3 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
-                data-testid="input-prompt"
-              />
-
-              <div v-if="editMode" class="flex gap-3">
-                <button
-                  class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  data-testid="btn-save"
-                  :disabled="saving || loading"
-                  @click="savePrompt"
-                >
-                  <CheckIcon class="w-5 h-5" />
-                  {{ $t('config.sortingPrompt.savePrompt') }}
-                </button>
-                <button
-                  class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  data-testid="btn-reset"
-                  :disabled="saving || loading"
-                  @click="resetPrompt"
-                >
-                  {{ $t('config.sortingPrompt.resetPrompt') }}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div v-else-if="activeTab === 'json'" data-testid="section-json">
-            <div class="space-y-4">
-              <div>
-                <h3 class="text-lg font-semibold txt-primary mb-2">
-                  {{ $t('config.sortingPrompt.tabJson') }}
-                </h3>
-                <p class="txt-secondary text-sm mb-3">
-                  {{ $t('config.sortingPrompt.jsonDescription') }}
-                </p>
-                <p class="txt-secondary text-sm mb-3">
-                  {{ $t('config.sortingPrompt.jsonNote') }}
-                </p>
-                <p class="txt-secondary text-sm font-medium mb-4">
-                  {{ $t('config.sortingPrompt.jsonExample') }}
-                </p>
-              </div>
-
-              <div
-                class="bg-black/90 dark:bg-black/50 rounded-lg p-4 font-mono text-sm text-green-400 overflow-x-auto"
-              >
-                <pre>{{ sortingPrompt.jsonExample }}</pre>
-              </div>
-
-              <div class="p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-lg">
-                <p class="text-sm txt-primary">
-                  <InformationCircleIcon class="w-5 h-5 text-cyan-500 inline mr-2" />
-                  {{ $t('config.sortingPrompt.btopicNote') }}
+                <p class="text-xs txt-secondary mt-0.5">
+                  {{ $t('config.routing.fallbackSubtitle') }}
                 </p>
               </div>
             </div>
+            <Icon
+              :icon="fallbackOpen ? 'heroicons:chevron-up' : 'heroicons:chevron-down'"
+              class="w-5 h-5 txt-secondary flex-shrink-0"
+            />
+          </button>
+
+          <div
+            v-if="fallbackOpen"
+            class="border-t border-light-border/30 dark:border-dark-border/20"
+          >
+            <div class="flex border-b border-light-border/30 dark:border-dark-border/20">
+              <button
+                v-for="tab in tabs"
+                :key="tab.id"
+                :class="[
+                  'px-6 py-3 text-sm font-medium transition-colors relative',
+                  activeTab === tab.id
+                    ? 'txt-primary bg-[var(--brand)]/5 border-b-2 border-[var(--brand)]'
+                    : 'txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
+                ]"
+                data-testid="btn-tab"
+                @click="activeTab = tab.id"
+              >
+                {{ tab.label }}
+              </button>
+            </div>
+
+            <div class="p-6">
+              <div v-if="activeTab === 'rendered'" data-testid="section-rendered">
+                <div class="space-y-6">
+                  <div>
+                    <h3 class="text-xl font-semibold txt-primary mb-3">
+                      {{ introTitle }}
+                    </h3>
+                    <!-- eslint-disable-next-line vue/no-v-html -->
+                    <div class="markdown-content txt-secondary text-sm" v-html="introHtml"></div>
+                  </div>
+
+                  <div>
+                    <h4 class="text-lg font-semibold txt-primary mb-3">
+                      {{ $t('config.sortingPrompt.yourTasks') }}
+                    </h4>
+                    <!-- eslint-disable-next-line vue/no-v-html -->
+                    <div class="markdown-content txt-secondary text-sm" v-html="tasksHtml"></div>
+                  </div>
+
+                  <div>
+                    <h4 class="text-lg font-semibold txt-primary mb-3">
+                      Your tasks in every new message are to:
+                    </h4>
+                    <ol class="space-y-4 txt-secondary text-sm">
+                      <li
+                        v-for="(instructionHtml, index) in instructionHtmls"
+                        :key="`instruction-${index}`"
+                        class="flex gap-3"
+                      >
+                        <span class="font-semibold txt-primary">{{ index + 1 }}.</span>
+                        <div>
+                          <!-- eslint-disable-next-line vue/no-v-html -->
+                          <div class="markdown-content" v-html="instructionHtml"></div>
+                          <ul v-if="index === 1" class="space-y-3 ml-4 mt-3">
+                            <li
+                              v-for="category in sortingPrompt.categories"
+                              :key="category.name"
+                              class="pl-4 border-l-2 border-[var(--brand)]/30"
+                            >
+                              <div class="flex items-center gap-2 mb-1">
+                                <router-link
+                                  :to="getPromptLink(category.name)"
+                                  class="font-semibold txt-primary hover:underline"
+                                >
+                                  {{ category.name }}
+                                </router-link>
+                                <span
+                                  v-if="category.type === 'default'"
+                                  class="text-xs txt-secondary"
+                                  >(default)</span
+                                >
+                                <span v-else class="text-xs text-purple-500">(custom)</span>
+                              </div>
+                              <p class="text-sm txt-secondary">{{ category.description }}</p>
+                            </li>
+                          </ul>
+                        </div>
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else-if="activeTab === 'source'" data-testid="section-source">
+                <div class="space-y-4">
+                  <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold txt-primary">
+                      {{ $t('config.sortingPrompt.tabSource') }}
+                    </h3>
+                    <button
+                      class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="btn-toggle-mode"
+                      :disabled="!canEdit || loading"
+                      @click="toggleEditMode"
+                    >
+                      <PencilIcon v-if="!editMode" class="w-4 h-4 inline mr-1" />
+                      <EyeIcon v-else class="w-4 h-4 inline mr-1" />
+                      {{
+                        editMode
+                          ? $t('config.sortingPrompt.viewMode')
+                          : $t('config.sortingPrompt.editMode')
+                      }}
+                    </button>
+                  </div>
+
+                  <div
+                    v-if="!editMode"
+                    class="surface-chip p-6 rounded border border-light-border/30 dark:border-dark-border/20"
+                    data-testid="section-prompt-preview"
+                  >
+                    <pre
+                      class="whitespace-pre-wrap font-mono text-xs txt-primary leading-relaxed"
+                      >{{ sortingPrompt.promptContent }}</pre
+                    >
+                  </div>
+
+                  <textarea
+                    v-else
+                    v-model="sortingPrompt.promptContent"
+                    rows="25"
+                    class="w-full px-4 py-3 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
+                    data-testid="input-prompt"
+                  />
+
+                  <div v-if="editMode" class="flex gap-3">
+                    <button
+                      class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="btn-save"
+                      :disabled="saving || loading"
+                      @click="savePrompt"
+                    >
+                      <CheckIcon class="w-5 h-5" />
+                      {{ $t('config.sortingPrompt.savePrompt') }}
+                    </button>
+                    <button
+                      class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="btn-reset"
+                      :disabled="saving || loading"
+                      @click="resetPrompt"
+                    >
+                      {{ $t('config.sortingPrompt.resetPrompt') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else-if="activeTab === 'json'" data-testid="section-json">
+                <div class="space-y-4">
+                  <div>
+                    <h3 class="text-lg font-semibold txt-primary mb-2">
+                      {{ $t('config.sortingPrompt.tabJson') }}
+                    </h3>
+                    <p class="txt-secondary text-sm mb-3">
+                      {{ $t('config.sortingPrompt.jsonDescription') }}
+                    </p>
+                    <p class="txt-secondary text-sm mb-3">
+                      {{ $t('config.sortingPrompt.jsonNote') }}
+                    </p>
+                    <p class="txt-secondary text-sm font-medium mb-4">
+                      {{ $t('config.sortingPrompt.jsonExample') }}
+                    </p>
+                  </div>
+
+                  <div
+                    class="bg-black/90 dark:bg-black/50 rounded-lg p-4 font-mono text-sm text-green-400 overflow-x-auto"
+                  >
+                    <pre>{{ sortingPrompt.jsonExample }}</pre>
+                  </div>
+
+                  <div class="p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-lg">
+                    <p class="text-sm txt-primary">
+                      <InformationCircleIcon class="w-5 h-5 text-cyan-500 inline mr-2" />
+                      {{ $t('config.sortingPrompt.btopicNote') }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+          <!-- /AI Fallback Prompt -->
         </div>
+        <!-- /legacy disclosure body -->
       </div>
+      <!-- /Legacy fallback -->
     </div>
+    <!-- /page-config-routing -->
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { PencilIcon, EyeIcon, CheckIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import { mockSortingPrompt } from '@/mocks/sortingPrompt'
 import type { SortingPromptData } from '@/mocks/sortingPrompt'
 import { promptsApi } from '@/services/api/promptsApi'
-import type { SortingPromptPayload, RoutingTestResult } from '@/services/api/promptsApi'
-import { adminSynapseApi } from '@/services/api/adminSynapseApi'
-import type {
-  SynapseStatusResponse,
-  SynapseReindexFailure,
-  SynapseReindexFailureCode,
-} from '@/services/api/adminSynapseApi'
-import { adminEmbeddingApi } from '@/services/api/adminEmbeddingApi'
-import type { SynapseEmbeddingStatusResponse, EmbeddingRun } from '@/services/api/adminEmbeddingApi'
+import type { SortingPromptPayload } from '@/services/api/promptsApi'
 import { getConfigValues, updateConfigValue } from '@/services/api/adminConfigApi'
 import { useNotification } from '@/composables/useNotification'
-import { useDialog } from '@/composables/useDialog'
 import { useAuthStore } from '@/stores/auth'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
-import { useDateFormat } from '@/composables/useDateFormat'
-import { useTheme } from '@/composables/useTheme'
 
-// --- Routing-status state ---------------------------------------------------
-const status = ref<SynapseStatusResponse | null>(null)
-const loadingStatus = ref(false)
-const reindexing = ref(false)
-const topicSearch = ref('')
+// --- Multi-task routing master switch (admin/global) ------------------------
+// Reads/writes BCONFIG MULTITASK/ROUTING_ENABLED via the admin config API.
+// This is the primary router; when OFF, the legacy AI sorter handles routing
+// (see the collapsed "Legacy fallback" section).
+const multitaskEnabled = ref(false)
+const togglingMultitask = ref(false)
 
-// --- Beta toggle state ------------------------------------------------------
-const synapseEnabled = ref(false)
-const togglingSynapse = ref(false)
-
-// --- Granular routing topics toggle ----------------------------------------
-// Sibling of `SYNAPSE_ROUTING_ENABLED`. When ON, the granular routing
-// aliases (general-chat, coding, image-generation, video-generation,
-// audio-generation) are included in the AI sort pool AND their matching
-// BPROMPTS rows are flipped to BENABLED=1 (the backend toggle hook does
-// this in lock-step via GranularTopicsManager). OFF (default) keeps the
-// canonical-only routing experience.
-const granularTopicsEnabled = ref(false)
-const togglingGranular = ref(false)
-
-// --- Synapse embedding-model state -----------------------------------------
-const synapseEmbeddingStatus = ref<SynapseEmbeddingStatusResponse | null>(null)
-const synapseEmbeddingSelection = ref<number | null>(null)
-const loadingSynapseEmbedding = ref(false)
-const switchingSynapseEmbedding = ref(false)
-let synapseEmbeddingPollHandle: number | null = null
-
-const synapseActiveRun = computed<EmbeddingRun | null>(() => {
-  const run = synapseEmbeddingStatus.value?.activeRun
-  if (!run) return null
-  return run.scope === 'synapse' || run.scope === 'all' ? run : null
+// --- Planner prompt (tools:plan) editor state ------------------------------
+const plannerPrompt = ref<{ prompt: string; renderedPrompt: string }>({
+  prompt: '',
+  renderedPrompt: '',
 })
+const plannerOriginal = ref('')
+const plannerTab = ref<'rendered' | 'source'>('rendered')
+const plannerEditMode = ref(false)
+const loadingPlanner = ref(false)
+const savingPlanner = ref(false)
 
-// --- Test-box state ---------------------------------------------------------
-const testInput = ref('')
-const testRunning = ref(false)
-const testResult = ref<RoutingTestResult | null>(null)
+// --- Legacy fallback disclosure (collapsed by default) ----------------------
+const legacyOpen = ref(false)
 
-// --- AI-fallback prompt state (legacy) -------------------------------------
+// --- AI-fallback prompt state (legacy single-topic sorter) -----------------
 const fallbackOpen = ref(false)
 const activeTab = ref('rendered')
 const editMode = ref(false)
@@ -944,56 +470,10 @@ const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
 const canEdit = computed(() => authStore.isAdmin)
 const { success, error: showError, warning } = useNotification()
-const dialog = useDialog()
 const { t, locale } = useI18n()
-const { formatRelativeTime } = useDateFormat()
 const markdownRenderer = getMarkdownRenderer()
-const { theme } = useTheme()
 
-// Synapse Routing is a Synaplan-native feature — show the brand logo
-// instead of a generic icon. Resolve the variant from the active theme so
-// the logo stays readable on both light and dark backgrounds.
-const isDark = computed(() => {
-  if (theme.value === 'dark') return true
-  if (theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
-const synaplanLogoSrc = computed(
-  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
-)
-
-const getPromptLink = (topic: string) => `/config/task-prompts?topic=${encodeURIComponent(topic)}`
-const formatIndexedAt = (iso: string): string => {
-  try {
-    return formatRelativeTime(new Date(iso))
-  } catch {
-    return iso
-  }
-}
-
-// --- Computed ---------------------------------------------------------------
-const disabledTopicsCount = computed(() => {
-  if (!status.value) return 0
-  return status.value.topics.filter((t) => !t.enabled).length
-})
-
-const filteredTopics = computed(() => {
-  if (!status.value) return []
-  const search = topicSearch.value.trim().toLowerCase()
-  if (!search) return status.value.topics
-  return status.value.topics.filter((topic) =>
-    [topic.topic, topic.embeddingModel ?? '', topic.embeddingProvider ?? '']
-      .join(' ')
-      .toLowerCase()
-      .includes(search)
-  )
-})
-
-const scoreColor = (score: number): string => {
-  if (score >= 0.7) return 'text-emerald-600 dark:text-emerald-400'
-  if (score >= 0.55) return 'text-amber-600 dark:text-amber-400'
-  return 'text-rose-600 dark:text-rose-400'
-}
+const getPromptLink = (topic: string) => `/ai/instructions?topic=${encodeURIComponent(topic)}`
 
 // --- AI-fallback markdown rendering (kept verbatim from previous component) -
 const renderedPromptText = computed(
@@ -1131,7 +611,7 @@ const loadSortingPrompt = async () => {
     sortingPrompt.value = { ...mapped }
     originalPrompt.value = { ...mapped }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load sorting prompt'
+    const message = err instanceof Error ? err.message : t('config.sortingPrompt.loadFailed')
     showError(message)
     sortingPrompt.value = { ...mockSortingPrompt }
     originalPrompt.value = { ...mockSortingPrompt }
@@ -1142,7 +622,7 @@ const loadSortingPrompt = async () => {
 
 const toggleEditMode = () => {
   if (!canEdit.value) {
-    warning('Admin access required to edit the sorting prompt.')
+    warning(t('config.sortingPrompt.adminRequired'))
     return
   }
   editMode.value = !editMode.value
@@ -1150,18 +630,18 @@ const toggleEditMode = () => {
 
 const savePrompt = async () => {
   if (!canEdit.value) {
-    warning('Admin access required to edit the sorting prompt.')
+    warning(t('config.sortingPrompt.adminRequired'))
     return
   }
 
   saving.value = true
   try {
     await promptsApi.updateSortingPrompt(sortingPrompt.value.promptContent)
-    success('Sorting prompt saved.')
+    success(t('config.sortingPrompt.saved'))
     await loadSortingPrompt()
     editMode.value = false
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to save sorting prompt'
+    const message = err instanceof Error ? err.message : t('config.sortingPrompt.saveFailed')
     showError(message)
   } finally {
     saving.value = false
@@ -1173,349 +653,106 @@ const resetPrompt = () => {
   editMode.value = false
 }
 
-// --- Status loading ---------------------------------------------------------
-const loadStatus = async () => {
-  if (!isAdmin.value) return
-  loadingStatus.value = true
-  try {
-    status.value = await adminSynapseApi.getStatus()
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load Synapse status'
-    showError(message)
-  } finally {
-    loadingStatus.value = false
-  }
-}
-
-// --- Beta toggle loading + persistence -------------------------------------
+// --- Routing toggle loading + persistence ----------------------------------
 const parseBoolConfigValue = (raw: string | undefined): boolean =>
   ['true', '1', 'yes', 'on'].includes((raw ?? 'false').toLowerCase())
 
-/**
- * Hydrate both the Synapse Routing and the Granular Topics toggles from
- * a single `/api/v1/admin/config/values` response. The endpoint returns
- * the full BCONFIG map either way, so reading once and routing the same
- * payload into both refs avoids any duplicate fetch as the page grows.
- */
 const loadRoutingToggles = async () => {
   if (!isAdmin.value) return
   try {
     const values = await getConfigValues()
-    synapseEnabled.value = parseBoolConfigValue(values['SYNAPSE_ROUTING_ENABLED']?.value)
-    granularTopicsEnabled.value = parseBoolConfigValue(values['GRANULAR_TOPICS_ENABLED']?.value)
+    multitaskEnabled.value = parseBoolConfigValue(values['MULTITASK_ROUTING_ENABLED']?.value)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load routing configuration'
+    const message = err instanceof Error ? err.message : t('config.routing.togglesLoadFailed')
     showError(message)
   }
 }
 
-const onToggleSynapse = async (next: boolean) => {
+// --- Multi-task routing master switch ---------------------------------------
+const onToggleMultitask = async (next: boolean) => {
   if (!isAdmin.value) return
 
-  // Confirmation when enabling — surface the beta caveat one more time
-  if (next) {
-    const confirmed = await dialog.confirm({
-      title: t('config.routing.confirmEnableTitle'),
-      message: t('config.routing.confirmEnableBody'),
-      confirmText: t('config.routing.confirmEnableConfirm'),
-      cancelText: t('config.routing.confirmEnableCancel'),
-      danger: true,
-    })
-    if (!confirmed) return
-  }
-
-  togglingSynapse.value = true
-  const previous = synapseEnabled.value
-  synapseEnabled.value = next
+  togglingMultitask.value = true
+  const previous = multitaskEnabled.value
+  multitaskEnabled.value = next
   try {
-    const result = await updateConfigValue('SYNAPSE_ROUTING_ENABLED', next ? 'true' : 'false')
+    const result = await updateConfigValue('MULTITASK_ROUTING_ENABLED', next ? 'true' : 'false')
     if (!result.success) {
-      throw new Error(result.error || 'Failed to update Synapse routing state')
+      throw new Error(result.error || t('config.routing.masterUpdateFailed'))
     }
     success(
-      next ? t('config.routing.toggleEnabledNotice') : t('config.routing.toggleDisabledNotice')
+      next ? t('config.routing.masterEnabledNotice') : t('config.routing.masterDisabledNotice')
     )
-    if (next) {
-      await loadStatus()
-    }
   } catch (err) {
-    synapseEnabled.value = previous
-    const message = err instanceof Error ? err.message : 'Failed to update Synapse routing state'
+    multitaskEnabled.value = previous
+    const message = err instanceof Error ? err.message : t('config.routing.masterUpdateFailed')
     showError(message)
   } finally {
-    togglingSynapse.value = false
+    togglingMultitask.value = false
   }
 }
 
-// --- Granular routing topics toggle -----------------------------------------
-const onToggleGranular = async (next: boolean) => {
-  if (!isAdmin.value) return
-
-  togglingGranular.value = true
-  const previous = granularTopicsEnabled.value
-  granularTopicsEnabled.value = next
+// --- Planner prompt (tools:plan) load / save --------------------------------
+const loadPlannerPrompt = async () => {
+  loadingPlanner.value = true
   try {
-    const result = await updateConfigValue('GRANULAR_TOPICS_ENABLED', next ? 'true' : 'false')
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to update granular topics state')
-    }
-    // The backend hook (GranularTopicsManager) flips BENABLED on the
-    // matching catalog rows in the same write transaction. Reload the
-    // task-prompts cache the next time the user navigates there;
-    // nothing on this page depends on per-prompt BENABLED state.
-    success(
-      next
-        ? t('config.routing.granularToggleEnabledNotice')
-        : t('config.routing.granularToggleDisabledNotice')
-    )
+    const data = await promptsApi.getPlanningPrompt()
+    plannerPrompt.value = { prompt: data.prompt, renderedPrompt: data.renderedPrompt }
+    plannerOriginal.value = data.prompt
   } catch (err) {
-    granularTopicsEnabled.value = previous
-    const message = err instanceof Error ? err.message : 'Failed to update granular topics state'
+    const message = err instanceof Error ? err.message : t('config.routing.plannerLoadFailed')
     showError(message)
   } finally {
-    togglingGranular.value = false
+    loadingPlanner.value = false
   }
 }
 
-const reindex = async (opts: { force?: boolean; recreate?: boolean }) => {
-  if (!isAdmin.value) {
-    warning('Admin access required.')
+const togglePlannerEditMode = () => {
+  if (!canEdit.value) {
+    warning(t('config.routing.plannerAdminRequired'))
     return
   }
-  reindexing.value = true
-  try {
-    const result = await adminSynapseApi.reindex(opts)
-
-    const counts = {
-      indexed: result.indexed,
-      skipped: result.skipped,
-      errors: result.errors,
-    }
-
-    if (result.errors > 0 && result.failures && result.failures.length > 0) {
-      logReindexFailures(result.failures, opts)
-    }
-
-    // Pick severity from the counts so a "0 indexed / N errors" run does not
-    // get reported as success (#issue: green toast for failed reindex).
-    if (result.errors > 0 && result.indexed === 0) {
-      // Total failure: every topic errored. Surface as error + keep the toast
-      // visible long enough to read (default 5 s is too short for an actionable
-      // diagnostic), and append the hint pointing at the backend logs.
-      showError(t('config.routing.reindexResultAllFailed', counts), 12000)
-    } else if (result.errors > 0) {
-      // Partial: some topics indexed, some failed. Warning is the right level —
-      // routing will work for the indexed subset, the failed ones fall back to
-      // the AI sorter at runtime.
-      warning(t('config.routing.reindexResultPartial', counts), 8000)
-    } else if (result.indexed === 0 && result.skipped === 0) {
-      // Nothing to do: usually means there are no enabled non-tool topics with
-      // a description / keywords. Not a success in any meaningful sense.
-      warning(t('config.routing.reindexResultEmpty'))
-    } else {
-      success(t('config.routing.reindexResult', counts))
-    }
-
-    await loadStatus()
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Re-index failed'
-    showError(message)
-    // Surface the raw error in devtools so the operator gets a useful
-    // stack trace + URL when the request itself fails (not just the
-    // per-topic case where `failures` arrives in the 200 response).
-    console.error('[Synapse Reindex] Request failed', err)
-  } finally {
-    reindexing.value = false
+  plannerEditMode.value = !plannerEditMode.value
+  if (plannerEditMode.value) {
+    plannerTab.value = 'source'
   }
 }
 
-/**
- * Per-failure-code action hint shown next to the sanitized backend hint
- * in the JS console. Codes are the stable contract from the backend
- * (`SynapseIndexer::classifyIndexError()`) so the mapping survives
- * future refactors.
- */
-const FAILURE_ACTION_HINTS: Record<SynapseReindexFailureCode, string> = {
-  provider_auth_failed:
-    'Action: Open admin → Providers, re-enter the API key for the embedding provider.',
-  model_not_available:
-    "Action: Pick a different routing model in 'Routing Embedding Model' above. The current slug is rejected by the provider.",
-  provider_rate_limited: 'Action: Wait a minute and retry, or upgrade the provider plan.',
-  provider_unavailable:
-    'Action: Provider returned a 5xx — usually transient. Retry; if it persists, switch provider.',
-  provider_timeout:
-    'Action: Check network/proxy/firewall to the provider, or pick a closer region.',
-  provider_error:
-    'Action: Check backend logs for the raw provider response — the error did not match a known shape.',
-  qdrant_unreachable:
-    'Action: Verify QDRANT_URL and that the synaplan-qdrant container is healthy.',
-  dimension_mismatch:
-    'Action: Click "Recreate Collection" — the active model emits a different vector size than the existing collection.',
-  embedding_empty:
-    'Action: The provider returned a zero-length vector. Try a different routing model.',
-  unknown:
-    'Action: Check the backend logs (synaplan-backend) for the full exception — this code path is not specifically handled.',
-}
-
-/**
- * Render the per-topic failure list into the browser devtools as a
- * collapsed group. Sanitization is the backend's job (see
- * SynapseIndexer::sanitizeMessageForUi); the frontend just renders.
- */
-const logReindexFailures = (
-  failures: SynapseReindexFailure[],
-  opts: { force?: boolean; recreate?: boolean }
-): void => {
-  // Group by code so an admin can spot "all 10 failures are the same auth
-  // problem" at a glance instead of scrolling per-topic noise.
-  const byCode = failures.reduce<Record<string, SynapseReindexFailure[]>>((acc, f) => {
-    ;(acc[f.code] ||= []).push(f)
-    return acc
-  }, {})
-
-  console.groupCollapsed(
-    `[Synapse Reindex] ${failures.length} topic(s) failed — expand for details`
-  )
-  console.info('Run options:', opts)
-  console.table(
-    failures.map((f) => ({
-      topic: f.topic,
-      ownerId: f.ownerId,
-      code: f.code,
-      hint: f.hint,
-    }))
-  )
-  for (const [code, list] of Object.entries(byCode)) {
-    const action =
-      FAILURE_ACTION_HINTS[code as SynapseReindexFailureCode] ?? FAILURE_ACTION_HINTS.unknown
-    const topics = list.map((f) => f.topic).join(', ')
-    console.warn(
-      `${list.length}× ${code}\n  Affected topics: ${topics}\n  ${list[0].hint}\n  ${action}`
-    )
+const savePlannerPrompt = async () => {
+  if (!canEdit.value) {
+    warning(t('config.routing.plannerAdminRequired'))
+    return
   }
-  console.groupEnd()
-}
-
-const confirmRecreate = async () => {
-  const confirmed = await dialog.confirm({
-    title: t('config.routing.confirmRecreateTitle'),
-    message: t('config.routing.confirmRecreateBody'),
-    confirmText: t('config.routing.confirmRecreateConfirm'),
-    cancelText: t('config.routing.confirmRecreateCancel'),
-    danger: true,
-  })
-  if (!confirmed) return
-  await reindex({ recreate: true, force: true })
-}
-
-// --- Test box ---------------------------------------------------------------
-const runTest = async () => {
-  const text = testInput.value.trim()
-  if (!text) return
-  testRunning.value = true
+  savingPlanner.value = true
   try {
-    if (isAdmin.value) {
-      testResult.value = await adminSynapseApi.dryRun(text, 5)
-    } else {
-      testResult.value = await promptsApi.testRouting(text, 5)
-    }
+    await promptsApi.updatePlanningPrompt(plannerPrompt.value.prompt)
+    success(t('config.routing.plannerSaved'))
+    await loadPlannerPrompt()
+    plannerEditMode.value = false
+    plannerTab.value = 'rendered'
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Test routing failed'
+    const message = err instanceof Error ? err.message : t('config.routing.plannerSaveFailed')
     showError(message)
   } finally {
-    testRunning.value = false
+    savingPlanner.value = false
   }
+}
+
+const resetPlannerPrompt = () => {
+  plannerPrompt.value = { ...plannerPrompt.value, prompt: plannerOriginal.value }
+  plannerEditMode.value = false
+  plannerTab.value = 'rendered'
 }
 
 watch(locale, () => {
   loadSortingPrompt()
 })
 
-const loadSynapseEmbedding = async () => {
-  loadingSynapseEmbedding.value = true
-  try {
-    const response = await adminEmbeddingApi.getSynapseStatus()
-    synapseEmbeddingStatus.value = response
-    if (synapseEmbeddingSelection.value === null) {
-      synapseEmbeddingSelection.value = response.currentModel.modelId
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load Synapse embedding state'
-    showError(message)
-  } finally {
-    loadingSynapseEmbedding.value = false
-  }
-}
-
-const switchSynapseEmbedding = async () => {
-  if (!synapseEmbeddingStatus.value || synapseEmbeddingSelection.value === null) return
-  const target = synapseEmbeddingSelection.value
-  if (target === synapseEmbeddingStatus.value.currentModel.modelId) return
-
-  const targetModel = synapseEmbeddingStatus.value.availableModels.find((m) => m.id === target)
-  const confirmed = await dialog.confirm({
-    title: t('config.routing.embeddingConfirmTitle'),
-    message: t('config.routing.embeddingConfirmBody', {
-      from: synapseEmbeddingStatus.value.currentModel.model || '—',
-      to: targetModel?.name || '—',
-    }),
-    confirmText: t('config.routing.embeddingConfirmAction'),
-    cancelText: t('config.routing.embeddingConfirmCancel'),
-    danger: true,
-  })
-  if (!confirmed) return
-
-  switchingSynapseEmbedding.value = true
-  try {
-    await adminEmbeddingApi.switchSynapse(target)
-    success(t('config.routing.embeddingSwitchQueued'))
-    await loadSynapseEmbedding()
-    startSynapseEmbeddingPolling()
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Switch failed'
-    showError(message)
-    if (synapseEmbeddingStatus.value) {
-      synapseEmbeddingSelection.value = synapseEmbeddingStatus.value.currentModel.modelId
-    }
-  } finally {
-    switchingSynapseEmbedding.value = false
-  }
-}
-
-// Poll while a synapse re-index is active so the UI clears the
-// switching banner the moment the worker finishes — without forcing
-// the admin to refresh manually. Stops itself on completion.
-const startSynapseEmbeddingPolling = () => {
-  if (synapseEmbeddingPollHandle !== null) return
-  synapseEmbeddingPollHandle = window.setInterval(async () => {
-    await loadSynapseEmbedding()
-    if (!synapseActiveRun.value) {
-      stopSynapseEmbeddingPolling()
-      await loadStatus()
-    }
-  }, 2000)
-}
-
-const stopSynapseEmbeddingPolling = () => {
-  if (synapseEmbeddingPollHandle !== null) {
-    window.clearInterval(synapseEmbeddingPollHandle)
-    synapseEmbeddingPollHandle = null
-  }
-}
-
-onMounted(async () => {
+onMounted(() => {
   loadSortingPrompt()
   if (isAdmin.value) {
     loadRoutingToggles()
-    loadStatus()
-    await loadSynapseEmbedding()
-    if (synapseActiveRun.value) {
-      startSynapseEmbeddingPolling()
-    }
+    loadPlannerPrompt()
   }
-})
-
-onBeforeUnmount(() => {
-  stopSynapseEmbeddingPolling()
 })
 </script>

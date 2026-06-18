@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
+use App\Seed\DefaultModelConfigSeeder;
 use Psr\Cache\CacheItemPoolInterface;
 
 /**
@@ -502,6 +503,56 @@ final readonly class ModelConfigService
 
         // Default: true (backward compatibility)
         return true;
+    }
+
+    /**
+     * Replace per-user DEFAULTMODEL overrides with the code-recommended
+     * defaults from {@see DefaultModelConfigSeeder::getRecommendedDefaults()}.
+     *
+     * VECTORIZE is system-wide (single Qdrant collection) and is never
+     * written as a per-user override.
+     *
+     * @return array{removed: int, written: int, defaults: array<string, int>}
+     */
+    public function resetUserDefaults(int $userId): array
+    {
+        $userOverrides = $this->configRepository->findBy([
+            'ownerId' => $userId,
+            'group' => 'DEFAULTMODEL',
+        ]);
+
+        $this->configRepository->removeAll($userOverrides);
+        $removed = count($userOverrides);
+
+        try {
+            $recommended = DefaultModelConfigSeeder::getRecommendedDefaults();
+        } catch (\RuntimeException) {
+            $recommended = [];
+        }
+
+        $written = 0;
+        $defaults = [];
+
+        foreach ($recommended as $capability => $modelId) {
+            if ('VECTORIZE' === $capability) {
+                continue;
+            }
+
+            $model = $this->modelRepository->find($modelId);
+            if (!$model || 1 !== $model->getActive()) {
+                continue;
+            }
+
+            $this->configRepository->setValue($userId, 'DEFAULTMODEL', $capability, (string) $modelId);
+            $defaults[$capability] = $modelId;
+            ++$written;
+        }
+
+        return [
+            'removed' => $removed,
+            'written' => $written,
+            'defaults' => $defaults,
+        ];
     }
 
     public function getModelTag(int $modelId): ?string

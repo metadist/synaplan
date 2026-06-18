@@ -365,7 +365,7 @@ final readonly class DiscordNotificationService
             ];
         }
 
-        // Synapse Routing metrics
+        // Routing metrics
         $source = $classificationResult['source'] ?? null;
         if (null !== $source) {
             $fields[] = [
@@ -375,39 +375,8 @@ final readonly class DiscordNotificationService
             ];
         }
 
-        $synapseScore = $classificationResult['synapse_score'] ?? null;
-        if (null !== $synapseScore) {
-            $fields[] = [
-                'name' => '📊 Confidence',
-                'value' => sprintf('%.4f', $synapseScore),
-                'inline' => true,
-            ];
-        }
-
-        $fallbackReason = $classificationResult['synapse_fallback_reason'] ?? null;
-        if (null !== $fallbackReason) {
-            $fields[] = [
-                'name' => '🔄 Fallback Reason',
-                'value' => $fallbackReason,
-                'inline' => true,
-            ];
-        }
-
-        $synapseLatency = $classificationResult['synapse_latency_ms'] ?? null;
-        if (null !== $synapseLatency) {
-            $fields[] = [
-                'name' => '⏱️ Synapse Latency',
-                'value' => $synapseLatency.'ms',
-                'inline' => true,
-            ];
-        }
-
-        $isSynapse = str_starts_with($source ?? '', 'synapse_');
-        $emoji = $isSynapse ? '⚡' : '🔍';
-        $label = $isSynapse ? 'Synapse' : 'AI';
-
         $this->sendEmbed(
-            title: "{$emoji} {$label} Classification Result",
+            title: '🔍 AI Classification Result',
             color: null !== $mediaType ? self::COLOR_SUCCESS : 0xFFA500,
             fields: $fields,
             footer: 'Synaplan Classifier'
@@ -696,7 +665,7 @@ final readonly class DiscordNotificationService
      *
      * This is treated as a P1 incident — the primary embedding stack
      * (e.g. local Ollama / OpenAI) is down and the system is now
-     * burning Cloudflare quota for every RAG/Memory/Synapse request.
+     * burning Cloudflare quota for every RAG/Memory request.
      * Operators MUST ack this fast, so we:
      *   - mention `@everyone` (requires `allowed_mentions.parse`,
      *     handled in `sendEmbed`),

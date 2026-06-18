@@ -5,13 +5,11 @@
       data-testid="page-files-upload"
     >
       <div class="max-w-7xl mx-auto space-y-6">
+        <!-- §4.8: the knowledge base has two tabs — Files (browse) + Search -->
+        <FilesTabs active="files" />
+
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
-
-        <!-- Cross-promotion: Nextcloud + OpenCloud integrations. Lives only
-             on the Files page (the audience that already cares about
-             file-sharing tooling) and is user-dismissible. -->
-        <FilesIntegrationsBanner />
 
         <!-- Compact Upload Bar -->
         <div
@@ -80,7 +78,7 @@
             <!-- Smart Upload Button -->
             <button
               :disabled="isUploading"
-              class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              class="btn-primary px-6 py-2.5 min-h-[44px] rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               data-testid="btn-upload"
               @click="smartUploadAction"
             >
@@ -352,11 +350,17 @@
                     icon="heroicons:magnifying-glass"
                     class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
                   />
+                  <!--
+                    §4.8 vocabulary: "Search" is reserved for the semantic
+                    Search tab — this field is a keyword FILTER over the list
+                    (backend matches file name + extracted text).
+                  -->
                   <input
                     v-model="searchQuery"
                     type="text"
                     class="w-full pl-9 pr-8 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
                     :placeholder="$t('files.searchPlaceholder')"
+                    :aria-label="$t('files.searchPlaceholder')"
                     data-testid="input-search"
                     @input="onSearchInput"
                   />
@@ -554,71 +558,99 @@
                 <div
                   class="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3"
                 >
-                  <button
+                  <div
                     v-for="folder in displayedFolders"
                     :key="folder.name"
-                    class="group/f flex flex-col items-center gap-2 sm:gap-3 p-3 sm:p-5 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer"
-                    :class="
-                      folderDropTarget === folder.name
-                        ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
-                        : folder.pending
-                          ? 'border-dashed border-[var(--brand)]/40 hover:border-[var(--brand)]/60 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
-                          : 'border-light-border/20 dark:border-dark-border/7 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
-                    "
-                    :data-testid="`folder-card-${folder.name}`"
-                    @click="enterFolder(folder.name)"
-                    @dragenter.prevent="onFolderDragEnter(folder.name)"
-                    @dragover.prevent
-                    @dragleave="onFolderDragLeave(folder.name)"
-                    @drop.prevent.stop="onFolderDrop($event, folder.name)"
+                    class="group/f relative"
                   >
-                    <div class="relative">
-                      <Icon
-                        :icon="
-                          folderDropTarget === folder.name
-                            ? 'heroicons:folder-open-solid'
-                            : folder.pending
-                              ? 'heroicons:folder-plus'
-                              : 'heroicons:folder-solid'
-                        "
-                        class="w-9 h-9 sm:w-12 sm:h-12 transition-all duration-200"
-                        :class="
-                          folderDropTarget === folder.name
-                            ? 'text-[var(--brand)] scale-110'
-                            : folder.pending
-                              ? 'text-[var(--brand)]/40 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
-                              : 'text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
-                        "
-                      />
-                      <span
-                        v-if="!folder.pending"
-                        class="absolute -top-1 -right-2.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold transition-all duration-200"
-                        :class="
-                          folderDropTarget === folder.name
-                            ? 'bg-[var(--brand)] text-white'
-                            : 'bg-[var(--brand)]/15 text-[var(--brand)] group-hover/f:bg-[var(--brand)] group-hover/f:text-white'
-                        "
-                      >
-                        {{ folder.count }}
-                      </span>
-                    </div>
-                    <span
-                      class="text-xs font-medium truncate max-w-full text-center transition-colors"
+                    <button
+                      type="button"
+                      class="w-full flex flex-col items-center gap-2 sm:gap-3 p-3 sm:p-5 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer"
                       :class="
                         folderDropTarget === folder.name
-                          ? 'text-[var(--brand)]'
-                          : 'txt-primary group-hover/f:text-[var(--brand)]'
+                          ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
+                          : folder.pending
+                            ? 'border-dashed border-[var(--brand)]/40 hover:border-[var(--brand)]/60 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
+                            : 'border-light-border/20 dark:border-dark-border/7 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
                       "
+                      :data-testid="`folder-card-${folder.name}`"
+                      @click="enterFolder(folder.name)"
+                      @dragenter.prevent="onFolderDragEnter(folder.name)"
+                      @dragover.prevent
+                      @dragleave="onFolderDragLeave(folder.name)"
+                      @drop.prevent.stop="onFolderDrop($event, folder.name)"
                     >
-                      {{ folder.name }}
-                    </span>
-                    <span
-                      v-if="folder.pending"
-                      class="text-[10px] uppercase tracking-wider font-semibold text-[var(--brand)]/70"
+                      <div class="relative">
+                        <Icon
+                          :icon="
+                            folderDropTarget === folder.name
+                              ? 'heroicons:folder-open-solid'
+                              : folder.pending
+                                ? 'heroicons:folder-plus'
+                                : 'heroicons:folder-solid'
+                          "
+                          class="w-9 h-9 sm:w-12 sm:h-12 transition-all duration-200"
+                          :class="
+                            folderDropTarget === folder.name
+                              ? 'text-[var(--brand)] scale-110'
+                              : folder.pending
+                                ? 'text-[var(--brand)]/40 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
+                                : 'text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
+                          "
+                        />
+                        <span
+                          v-if="!folder.pending"
+                          class="absolute -top-1 -right-2.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold transition-all duration-200"
+                          :class="
+                            folderDropTarget === folder.name
+                              ? 'bg-[var(--brand)] text-white'
+                              : 'bg-[var(--brand)]/15 text-[var(--brand)] group-hover/f:bg-[var(--brand)] group-hover/f:text-white'
+                          "
+                        >
+                          {{ folder.count }}
+                        </span>
+                      </div>
+                      <span
+                        class="text-xs font-medium truncate max-w-full text-center transition-colors"
+                        :class="
+                          folderDropTarget === folder.name
+                            ? 'text-[var(--brand)]'
+                            : 'txt-primary group-hover/f:text-[var(--brand)]'
+                        "
+                      >
+                        {{ folder.name }}
+                      </span>
+                      <span
+                        v-if="folder.pending"
+                        class="text-[10px] uppercase tracking-wider font-semibold text-[var(--brand)]/70"
+                      >
+                        {{ $t('files.newFolderEmpty') }}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      class="absolute top-1 right-1 p-1.5 rounded-lg text-red-500 bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-red-500/15 transition-all"
+                      :title="$t('files.deleteFolder')"
+                      :aria-label="$t('files.deleteFolder')"
+                      :data-testid="`btn-delete-folder-${folder.name}`"
+                      @click.stop="requestDeleteFolder(folder)"
                     >
-                      {{ $t('files.newFolderEmpty') }}
-                    </span>
-                  </button>
+                      <TrashIcon class="w-3.5 h-3.5" />
+                    </button>
+                    <!-- §4.8 #2: close the loop with chat — open a chat with
+                         this knowledge folder preselected in the picker. -->
+                    <button
+                      v-if="!folder.pending"
+                      type="button"
+                      class="absolute top-1 left-1 p-1.5 rounded-lg text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
+                      :title="$t('files.useInChat')"
+                      :aria-label="$t('files.useInChat')"
+                      :data-testid="`btn-use-in-chat-${folder.name}`"
+                      @click.stop="useFolderInChat(folder.name)"
+                    >
+                      <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -900,6 +932,15 @@
               >
                 {{ totalCount }}
               </span>
+              <button
+                type="button"
+                class="ml-auto shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+                data-testid="btn-delete-current-folder"
+                @click="requestDeleteCurrentFolder"
+              >
+                <TrashIcon class="w-3.5 h-3.5" />
+                <span class="hidden sm:inline">{{ $t('files.deleteFolder') }}</span>
+              </button>
             </div>
 
             <!-- Bulk actions -->
@@ -1171,6 +1212,11 @@
             </div>
           </template>
         </div>
+
+        <!-- Cross-promotion: Nextcloud + OpenCloud integrations. Below the
+             user's own content (§4.8 #3 — the promo must not outrank it);
+             user-dismissible. -->
+        <FilesIntegrationsBanner />
       </div>
     </div>
 
@@ -1195,6 +1241,20 @@
       variant="danger"
       @confirm="confirmDelete"
       @cancel="cancelDelete"
+    />
+
+    <!-- Confirm Delete Dialog (Folder + contained files) -->
+    <ConfirmDialog
+      :is-open="isDeleteFolderOpen"
+      :title="
+        folderToDelete ? $t('files.deleteFolderConfirmTitle', { folder: folderToDelete.name }) : ''
+      "
+      :message="folderDeleteMessage"
+      :confirm-text="$t('files.deleteFolderConfirmButton')"
+      :cancel-text="$t('common.cancel')"
+      variant="danger"
+      @confirm="confirmDeleteFolder"
+      @cancel="cancelDeleteFolder"
     />
 
     <!-- Confirm Delete Selected Dialog (Multiple Files) -->
@@ -1270,9 +1330,11 @@ import ShareModal from '@/components/ShareModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
 import FilesIntegrationsBanner from '@/components/FilesIntegrationsBanner.vue'
+import FilesTabs from '@/components/files/FilesTabs.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import { Icon } from '@iconify/vue'
 import {
+  ChatBubbleLeftRightIcon,
   CloudArrowUpIcon,
   TrashIcon,
   ArrowDownTrayIcon,
@@ -1286,8 +1348,15 @@ import filesService, {
 } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useFilePersistence } from '@/composables/useInputPersistence'
+import { useRouter } from 'vue-router'
 
 const { t } = useI18n()
+const router = useRouter()
+
+/** §4.8 #2: open a chat with this knowledge folder preselected (chat-input picker). */
+function useFolderInChat(folderName: string): void {
+  router.push({ path: '/', query: { folder: folderName } })
+}
 const { success: showSuccess, error: showError, info: showInfo } = useNotification()
 
 // File persistence - save selected files metadata
@@ -1461,6 +1530,11 @@ const isConfirmOpen = ref(false)
 const fileToDelete = ref<number | null>(null)
 const isDeleteSelectedOpen = ref(false)
 const totalCount = ref(0)
+
+// Folder (group) deletion — careful delete of a whole folder + its files.
+const isDeleteFolderOpen = ref(false)
+const folderToDelete = ref<DisplayedFolder | null>(null)
+const isDeletingFolder = ref(false)
 
 const totalPages = computed(() => {
   return Math.ceil(totalCount.value / itemsPerPage)
@@ -1981,6 +2055,117 @@ const confirmDelete = async () => {
 const cancelDelete = () => {
   isConfirmOpen.value = false
   fileToDelete.value = null
+}
+
+// ====== Folder (group) deletion ======
+
+const folderDeleteMessage = computed(() => {
+  const f = folderToDelete.value
+  if (!f) return ''
+  if (f.pending || f.count === 0) {
+    return t('files.deleteFolderEmptyConfirmMessage', { folder: f.name })
+  }
+  return t('files.deleteFolderConfirmMessage', { folder: f.name, count: f.count })
+})
+
+const requestDeleteFolder = (folder: DisplayedFolder) => {
+  folderToDelete.value = folder
+  isDeleteFolderOpen.value = true
+}
+
+const requestDeleteCurrentFolder = () => {
+  if (!openFolder.value) return
+  const name = openFolder.value
+  const match = displayedFolders.value.find((f) => f.name === name)
+  requestDeleteFolder(match ?? { name, count: totalCount.value, pending: false })
+}
+
+const cancelDeleteFolder = () => {
+  if (isDeletingFolder.value) return
+  isDeleteFolderOpen.value = false
+  folderToDelete.value = null
+}
+
+const removePendingFolder = (name: string) => {
+  const remaining = pendingFolders.value.filter((f) => f !== name)
+  if (remaining.length !== pendingFolders.value.length) {
+    pendingFolders.value = remaining
+    savePendingFolders(remaining)
+  }
+}
+
+const confirmDeleteFolder = async () => {
+  const folder = folderToDelete.value
+  if (!folder || isDeletingFolder.value) return
+
+  // Pending (empty, local-only) folder — nothing on the server to delete.
+  if (folder.pending) {
+    removePendingFolder(folder.name)
+    if (openFolder.value === folder.name) exitFolder()
+    showSuccess(t('files.folderEmptyDeleted', { folder: folder.name }))
+    isDeleteFolderOpen.value = false
+    folderToDelete.value = null
+    return
+  }
+
+  isDeletingFolder.value = true
+  try {
+    // Resolve the folder's CURRENT contents, then delete each file. Reuses
+    // the tested list + delete endpoints (no new server surface) and stays
+    // correct even if the cached folder `count` is stale. The backend clamps
+    // `limit` to 100, so page through every result instead of assuming one
+    // request returns the whole folder.
+    const pageSize = 100
+    const ids: number[] = []
+    let page = 1
+    let totalPages = 1
+    do {
+      const response = await filesService.listFiles({
+        groupKey: folder.name,
+        page,
+        limit: pageSize,
+      })
+      ids.push(...response.files.map((f) => f.id))
+      totalPages = response.pagination.pages
+      page++
+    } while (page <= totalPages)
+
+    if (ids.length === 0) {
+      showSuccess(t('files.folderEmptyDeleted', { folder: folder.name }))
+    } else {
+      const results = await filesService.deleteMultipleFiles(ids)
+      const successCount = results.filter((r) => r.success).length
+      const failCount = results.filter((r) => !r.success).length
+      if (failCount > 0) {
+        showError(
+          t('files.deleteFolderPartial', {
+            folder: folder.name,
+            success: successCount,
+            failed: failCount,
+          })
+        )
+      } else {
+        showSuccess(t('files.folderDeleted', { folder: folder.name, count: successCount }))
+      }
+    }
+
+    removePendingFolder(folder.name)
+    selectedFileIds.value = []
+    if (openFolder.value === folder.name) {
+      exitFolder()
+    } else {
+      await loadFiles()
+    }
+    await loadFileGroups()
+    if (storageWidget.value) await storageWidget.value.refresh()
+  } catch (error) {
+    console.error('Folder delete error:', error)
+    showError(t('files.deleteFolderFailed', { folder: folder.name }))
+  } finally {
+    isDeletingFolder.value = false
+    isDeleteFolderOpen.value = false
+    folderToDelete.value = null
+  }
 }
 
 const viewFileContent = (fileId: number) => {
