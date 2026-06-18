@@ -255,6 +255,78 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
     }
 
     /**
+     * Issue #722: a video whose audio track has been transcribed must be
+     * answered from its transcript via the document/summary path, instead
+     * of the old "This file type cannot be analyzed" dead end.
+     */
+    public function testVideoTranscriptIsSummarizedViaDocumentPath(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'atomic-habits.mp4', type: 'mp4', path: '13/000/atomic-habits.mp4', text: 'Small habits compound over time.'),
+        ], text: 'fasse den inhalt zusammen');
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$captured) {
+                $captured = $messages;
+
+                return ['content' => 'The video argues that tiny habits accumulate.', 'provider' => 'openai', 'model' => 'gpt-4'];
+            });
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertNotNull($captured);
+        $system = $captured[0]['content'];
+
+        $this->assertStringContainsString('atomic-habits.mp4 (video transcript)', $system);
+        $this->assertStringContainsString('Video transcript:', $system);
+        $this->assertStringContainsString('Small habits compound over time.', $system);
+        $this->assertSame('fasse den inhalt zusammen', $captured[1]['content']);
+        $this->assertSame('chat_with_extracted_text', $result['metadata']['analysis_type']);
+        $this->assertSame(1, $result['metadata']['analyzed_file_count']);
+    }
+
+    /**
+     * A video that is still being transcribed must tell the user to wait
+     * (not silently fail), mirroring the document/audio pending guards.
+     */
+    public function testVideoStillTranscribingReturnsPendingMessage(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'clip.mp4', type: 'mp4', path: '13/000/clip.mp4', text: '', status: 'extracting'),
+        ], text: 'summarize this');
+
+        $this->aiFacade->expects($this->never())->method('chat');
+        $this->aiFacade->expects($this->never())->method('chatStream');
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertSame('video_transcription_in_progress', $result['metadata']['error']);
+        $this->assertStringContainsString('still being processed', $result['content']);
+    }
+
+    /**
+     * A video with no usable speech (finished processing, empty transcript)
+     * must surface a clear, video-specific failure message.
+     */
+    public function testVideoWithoutSpeechReturnsFailedMessage(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'silent.mp4', type: 'mp4', path: '13/000/silent.mp4', text: '', status: 'error'),
+        ], text: 'what is in this');
+
+        $this->aiFacade->expects($this->never())->method('chat');
+        $this->aiFacade->expects($this->never())->method('chatStream');
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertSame('video_transcription_failed', $result['metadata']['error']);
+        $this->assertStringContainsString("couldn't get any speech", $result['content']);
+    }
+
+    /**
      * Multi-image uploads previously stopped after the first vision
      * call. The handler must dispatch one vision call per image and
      * combine the per-image descriptions into a single labelled

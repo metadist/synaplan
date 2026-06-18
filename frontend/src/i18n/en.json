@@ -689,6 +689,7 @@
     "status_extracted": "Extracted",
     "status_vectorizing": "Indexing…",
     "status_vectorized": "Ready",
+    "status_error": "Error",
     "status_processed": "Processed",
     "attached": "Attached",
     "standalone": "Standalone",
