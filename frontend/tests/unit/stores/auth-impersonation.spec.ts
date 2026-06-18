@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 import { useAuthStore } from '@/stores/auth'
+import { useChatsStore } from '@/stores/chats'
+import { useHistoryStore } from '@/stores/history'
+
+const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
 vi.mock('@/services/api/httpClient', () => ({
   getApiBaseUrl: () => 'http://localhost:8000',
@@ -44,6 +48,10 @@ vi.mock('@/services/authService', async () => {
       logout: vi.fn(),
       revokeAllSessions: vi.fn(),
       handleOAuthCallback: vi.fn(),
+      // chatsStore / historyStore guard their network methods behind this
+      // helper; even though our tests only touch synchronous setters, leave
+      // the door open so a future test doesn't trip a redirect-to-login.
+      isAuthenticated: vi.fn().mockReturnValue(true),
     },
     /** Test-only handles to drive the mocked refs from the spec. */
     __setUser: (next: { id: number; email: string; level: string; isAdmin?: boolean } | null) => {
@@ -77,10 +85,12 @@ describe('useAuthStore — impersonation', () => {
     refreshUserMock.mockClear()
     startApiMock.mockReset()
     stopApiMock.mockReset()
+    localStorage.clear()
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+    localStorage.clear()
   })
 
   it('starts in non-impersonating state', () => {
@@ -168,6 +178,97 @@ describe('useAuthStore — impersonation', () => {
     expect(store.user?.isAdmin).toBe(true)
     expect(store.impersonator).toBeNull()
     expect(store.isImpersonating).toBe(false)
+  })
+
+  // Issue #999: an admin's `activeChatId` (persisted in localStorage) must
+  // not leak into the impersonated user's session. The store has to wipe
+  // chats + history state on every principal swap so the ChatView mounts
+  // with a clean slate instead of 404-ing on a foreign chat id.
+  it('startImpersonation clears the persisted activeChatId and in-memory chat/history state', async () => {
+    const authServiceModule = (await import('@/services/authService')) as unknown as {
+      __setUser: (u: unknown) => void
+      __setImpersonator: (i: unknown) => void
+    }
+
+    // Seed the admin's chat state exactly the way ChatView would have:
+    // active chat selected, persisted in localStorage, messages loaded.
+    const chatsStore = useChatsStore()
+    chatsStore.chats = [
+      {
+        id: 42,
+        title: 'Admin chat',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]
+    chatsStore.setActiveChat(42)
+    expect(localStorage.getItem(ACTIVE_CHAT_STORAGE_KEY)).toBe('42')
+
+    const historyStore = useHistoryStore()
+    historyStore.addMessage('user', [{ partId: 'p1', type: 'text', content: 'admin secret' }])
+    expect(historyStore.messages.length).toBe(1)
+
+    startApiMock.mockResolvedValueOnce({ success: true })
+    authServiceModule.__setUser({ id: 99, email: 'target@example.com', level: 'PRO' })
+    authServiceModule.__setImpersonator({ id: 1, email: 'admin@example.com', level: 'ADMIN' })
+
+    const store = useAuthStore()
+    const result = await store.startImpersonation(99)
+
+    expect(result.success).toBe(true)
+    // The persisted handle is what triggered the original 404 — verify it's
+    // gone end-to-end, not just the in-memory copy.
+    expect(localStorage.getItem(ACTIVE_CHAT_STORAGE_KEY)).toBeNull()
+    expect(chatsStore.activeChatId).toBeNull()
+    expect(chatsStore.chats).toEqual([])
+    expect(historyStore.messages).toEqual([])
+  })
+
+  it('stopImpersonation clears the persisted activeChatId and in-memory chat/history state', async () => {
+    const authServiceModule = (await import('@/services/authService')) as unknown as {
+      __setUser: (u: unknown) => void
+      __setImpersonator: (i: unknown) => void
+    }
+
+    // Pre-condition: we're already impersonating and the impersonated user
+    // has their own chat open.
+    authServiceModule.__setUser({ id: 99, email: 'target@example.com', level: 'PRO' })
+    authServiceModule.__setImpersonator({ id: 1, email: 'admin@example.com', level: 'ADMIN' })
+    const store = useAuthStore()
+    await store.refreshUser()
+
+    const chatsStore = useChatsStore()
+    chatsStore.chats = [
+      {
+        id: 7,
+        title: 'Impersonated chat',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]
+    chatsStore.setActiveChat(7)
+    expect(localStorage.getItem(ACTIVE_CHAT_STORAGE_KEY)).toBe('7')
+
+    const historyStore = useHistoryStore()
+    historyStore.addMessage('user', [{ partId: 'p1', type: 'text', content: 'target message' }])
+    expect(historyStore.messages.length).toBe(1)
+
+    stopApiMock.mockResolvedValueOnce({ success: true })
+    authServiceModule.__setUser({
+      id: 1,
+      email: 'admin@example.com',
+      level: 'ADMIN',
+      isAdmin: true,
+    })
+    authServiceModule.__setImpersonator(null)
+
+    const result = await store.stopImpersonation()
+
+    expect(result.success).toBe(true)
+    expect(localStorage.getItem(ACTIVE_CHAT_STORAGE_KEY)).toBeNull()
+    expect(chatsStore.activeChatId).toBeNull()
+    expect(chatsStore.chats).toEqual([])
+    expect(historyStore.messages).toEqual([])
   })
 
   it('logout wipes both user and impersonator state', async () => {

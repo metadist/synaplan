@@ -14,6 +14,11 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
 {
     private const FAKE_TOKENS_PER_EMBED = 8;
 
+    public function __construct(
+        private readonly string $uploadDir = '/var/www/backend/var/uploads',
+    ) {
+    }
+
     public function getName(): string
     {
         return 'test';
@@ -200,6 +205,19 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
                     ['id' => 'n1', 'capability' => 'summarize', 'inputs' => ['text' => '$message.text']],
                     ['id' => 'n2', 'capability' => 'translate', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text'], 'params' => ['target' => 'de']],
                     ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n2'], 'inputs' => ['text' => '$n2.text']],
+                ],
+            ], JSON_THROW_ON_ERROR);
+        }
+
+        // web_search + chat plan — used by @webSearch E2E tests.
+        if (str_contains($text, 'websearch:')) {
+            return json_encode([
+                'version' => 1,
+                'language' => 'en',
+                'reply_node' => 'n2',
+                'tasks' => [
+                    ['id' => 'n1', 'capability' => 'web_search', 'inputs' => ['query' => '$message.text']],
+                    ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
                 ],
             ], JSON_THROW_ON_ERROR);
         }
@@ -483,7 +501,21 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     // TextToSpeechProviderInterface
     public function synthesize(string $text, array $options = []): string
     {
-        return '/tmp/test_audio.mp3';
+        // Write a real (silent) MP3 frame into the upload dir root —
+        // AiFacade::moveToUserPath() expects the returned filename to
+        // exist there so it can move it into the user path. Returning a
+        // non-existent path made every voice-reply turn on the test
+        // provider fail silently in the move step (issue #1070 E2E).
+        if (!is_dir($this->uploadDir)) {
+            mkdir($this->uploadDir, 0775, true);
+        }
+
+        $filename = 'tts_test_'.uniqid().'.mp3';
+        // Single silent MPEG-1 Layer III frame (128 kbit/s, 44.1 kHz).
+        $frame = "\xFF\xFB\x90\x64".str_repeat("\x00", 413);
+        file_put_contents($this->uploadDir.'/'.$filename, $frame);
+
+        return $filename;
     }
 
     public function synthesizeStream(string $text, array $options = []): \Generator

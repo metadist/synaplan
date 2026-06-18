@@ -140,6 +140,8 @@ export const selectors = {
     /** Wrapper that contains only the generated answer body (no timestamp, no footer). Use this for asserting reply text. */
     assistantAnswerBody: '[data-testid="section-message-text"]',
     messageText: '[data-testid="message-text"]',
+    /** Audio player section rendered for an `audio` message part (TTS / voice reply / uploads) */
+    messageAudio: '[data-testid="section-message-audio"]',
     /** Present when message topic is ERROR (backend error path); use to assert no error in bubble */
     messageTopicError: '[data-testid="message-topic-error"]',
     // The "Again with… ▾" control is a single button that opens the model
@@ -160,6 +162,8 @@ export const selectors = {
     toolEnhance: '[data-testid="btn-tool-enhance"]',
     enhanceButton: '[data-testid="btn-chat-enhance"]',
     toolSummarizerLink: '[data-testid="link-tool-summarizer"]',
+    /** Sources (N) dropdown toggle — appears on messages that used web search */
+    sourcesToggle: '[data-testid="btn-message-sources-toggle"]',
     knowledgeFolderBtn: '[data-testid="btn-knowledge-folder"]',
     knowledgeFolderPanel: '[data-testid="dropdown-knowledge-folder"]',
     knowledgeFolderNone: '[data-testid="opt-knowledge-folder-none"]',

@@ -690,6 +690,7 @@
     "status_extracted": "Extracted",
     "status_vectorizing": "Indexing…",
     "status_vectorized": "Ready",
+    "status_error": "Error",
     "status_processed": "Processed",
     "attached": "Attached",
     "standalone": "Standalone",
@@ -2831,6 +2832,7 @@
     "title": "Task plan",
     "download": "Download",
     "failedBody": "This step couldn't be completed.",
+    "searchSummary": "Searched the web · {count} {count, plural, one {source} other {sources}}",
     "retryWith": "Retry with {model}",
     "state": {
       "pending": "Queued",

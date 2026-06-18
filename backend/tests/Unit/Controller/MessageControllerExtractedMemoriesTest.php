@@ -9,10 +9,14 @@ use App\Controller\MessageController;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Repository\SearchResultRepository;
+use App\Service\File\DataUrlFixer;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
+use App\Service\File\UserUploadPathBuilder;
 use App\Service\File\VectorizationService;
 use App\Service\Message\AgainHandler;
+use App\Service\Message\MessageApiFormatter;
 use App\Service\MessageEnqueueService;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -73,6 +77,20 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
             $this->createMock(FileStorageService::class),
             $this->createMock(FileProcessor::class),
             $this->createMock(VectorizationService::class),
+            $this->messageRepository,
+            // MessageApiFormatter is `final readonly` and cannot be mocked;
+            // a real instance with mocked collaborators is fine since the
+            // memory-poll endpoint under test never calls format().
+            new MessageApiFormatter(
+                $this->messageRepository,
+                $this->createMock(SearchResultRepository::class),
+                new DataUrlFixer(
+                    $this->em,
+                    new UserUploadPathBuilder(),
+                    '/tmp',
+                    new NullLogger(),
+                ),
+            ),
             new NullLogger(),
         );
 
