@@ -62,6 +62,29 @@ export const useAuthStore = defineStore('auth', () => {
     impersonator.value = authService.getImpersonator().value
   }
 
+  /**
+   * Wipe any per-user client state that would otherwise survive a principal
+   * swap (login, logout, start/stop impersonation).
+   *
+   * Issue #999: `activeChatId` is persisted in localStorage under
+   * `synaplan_active_chat_id`. Without this reset, an admin's last chat id
+   * leaks into the impersonated user's session, ChatView tries to load it,
+   * the backend returns 404 because the impersonated user does not own the
+   * chat, and the UI surfaces "Der Chat existiert nicht mehr".
+   *
+   * Stores are loaded via dynamic import to avoid a circular dependency:
+   * the chats store imports the auth service which is initialised from this
+   * store.
+   */
+  async function resetUserScopedClientState(): Promise<void> {
+    const [{ useChatsStore }, { useHistoryStore }] = await Promise.all([
+      import('./chats'),
+      import('./history'),
+    ])
+    useChatsStore().$reset()
+    useHistoryStore().clear()
+  }
+
   // Actions
   async function login(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
     loading.value = true
@@ -260,6 +283,13 @@ export const useAuthStore = defineStore('auth', () => {
       return { success: false, error: result.error }
     }
 
+    // Drop any chat / message state the admin had loaded before we swap the
+    // principal. The persisted `activeChatId` belongs to the admin and would
+    // 404 against the impersonated user (#999). Doing this before
+    // refreshUser() guarantees that whatever route re-renders next sees a
+    // clean slate.
+    await resetUserScopedClientState()
+
     // Re-fetch /auth/me so user + impersonator + level + isAdmin all reflect
     // the post-swap session in one consistent step. We also reload the config
     // store, since plugin/feature visibility is user-scoped.
@@ -286,6 +316,11 @@ export const useAuthStore = defineStore('auth', () => {
     if (!result.success) {
       return { success: false, error: result.error }
     }
+
+    // Symmetric to startImpersonation: the chat state currently in memory
+    // belongs to the impersonated user and must not bleed back into the
+    // admin's own session (#999).
+    await resetUserScopedClientState()
 
     await refreshUser()
     try {
