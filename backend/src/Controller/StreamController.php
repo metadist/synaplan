@@ -150,6 +150,20 @@ class StreamController extends AbstractController
         description: 'Knowledge-base folder (file group key) to scope this message\'s RAG retrieval to. Use GET /api/v1/files/groups to list available folders.',
         schema: new OA\Schema(type: 'string', example: 'project:helios')
     )]
+    #[OA\Parameter(
+        name: 'quotedText',
+        in: 'query',
+        required: false,
+        description: 'Text the user selected from an earlier message to use as the primary reference point for this request ("Mention in chat"). Injected into the AI system prompt as a quoted-reference context block.',
+        schema: new OA\Schema(type: 'string', example: 'The deployment runs on FrankenPHP.')
+    )]
+    #[OA\Parameter(
+        name: 'quotedMessageId',
+        in: 'query',
+        required: false,
+        description: 'Optional backend id of the message the quoted text was taken from. Must belong to the same chat and user.',
+        schema: new OA\Schema(type: 'integer', example: 456)
+    )]
     #[OA\Response(
         response: 200,
         description: 'SSE stream of AI response chunks',
@@ -295,6 +309,11 @@ class StreamController extends AbstractController
         // and we normalize the empty string to null so "no folder selected"
         // behaves the same as an absent parameter.
         $ragGroupKey = $request->query->getString('ragGroupKey') ?: null;
+        // Quoted reference the user selected from an earlier message ("Mention
+        // in chat"). `getString()` rejects array input with a clean 400, and we
+        // normalize the empty string to null so an absent quote behaves the same.
+        $quotedText = $request->query->getString('quotedText') ?: null;
+        $quotedMessageId = $request->query->get('quotedMessageId');
         $continueMessageId = $request->query->get('continueMessageId');
         // Explicit opt-out from memory loading + extraction (used by public demo via synaplan.com/try-chat)
         $disableMemories = '1' === $request->query->get('disableMemories', '0');
@@ -395,7 +414,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -515,6 +534,20 @@ class StreamController extends AbstractController
                     $messageText = 'Continue your previous response.';
                 }
 
+                // Validate the quoted reference (if any): the source message must
+                // belong to the same chat and user. An invalid id simply drops the
+                // structured back-reference — the quoted text itself is still used.
+                $resolvedQuotedMessageId = null;
+                if ($quotedText && $quotedMessageId) {
+                    $quotedSource = $this->em->getRepository(Message::class)->find((int) $quotedMessageId);
+                    if ($quotedSource
+                        && $quotedSource->getUserId() === $user->getId()
+                        && $quotedSource->getChatId() === (int) $chatId
+                    ) {
+                        $resolvedQuotedMessageId = (int) $quotedMessageId;
+                    }
+                }
+
                 // Create incoming message
                 $incomingMessage = new Message();
                 $incomingMessage->setUserId($user->getId());
@@ -533,6 +566,18 @@ class StreamController extends AbstractController
 
                 $this->em->persist($incomingMessage);
                 $this->em->flush(); // Flush first so message has an ID
+
+                // Persist the quoted reference as message meta so it survives a
+                // reload (rendered as a blockquote in the user bubble). Flushed
+                // here independently of the em->clear() that the file path below
+                // performs, so the meta rows are safe on disk before any detach.
+                if ($quotedText) {
+                    $incomingMessage->setMeta('quoted_text', $quotedText);
+                    if (null !== $resolvedQuotedMessageId) {
+                        $incomingMessage->setMeta('quoted_message_id', (string) $resolvedQuotedMessageId);
+                    }
+                    $this->em->flush();
+                }
 
                 // Attach multiple files if uploaded (NEW: File entities with ManyToMany)
                 if (!empty($fileIdArray)) {
@@ -630,6 +675,15 @@ class StreamController extends AbstractController
                     // location-awareness line appended to the chat system prompt.
                     'client_country' => $clientCountry,
                 ];
+
+                // Quoted reference ("Mention in chat"): ChatHandler injects this
+                // as a dedicated context block in the system prompt.
+                if ($quotedText) {
+                    $processingOptions['quoted_text'] = $quotedText;
+                    if (null !== $resolvedQuotedMessageId) {
+                        $processingOptions['quoted_message_id'] = $resolvedQuotedMessageId;
+                    }
+                }
 
                 if ($isWidgetMode || $isGuestMode || $disableMemories) {
                     $processingOptions['disable_memories'] = true;

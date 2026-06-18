@@ -605,6 +605,11 @@ class ChatController extends AbstractController
             $originalTopic = $m->getMeta('original_topic');
             $originalMediaType = $m->getMeta('original_media_type');
 
+            // Quoted reference the user attached when composing this message
+            // ("Mention in chat"). Stored as message meta so it survives reload.
+            $quotedText = $m->getMeta('quoted_text');
+            $quotedMessageIdMeta = $m->getMeta('quoted_message_id');
+
             return [
                 'id' => $m->getId(),
                 'text' => $m->getText(),
@@ -616,6 +621,8 @@ class ChatController extends AbstractController
                 'originalMediaType' => $originalMediaType,
                 'language' => $m->getLanguage(),
                 'createdAt' => $m->getDateTime(),
+                'quotedText' => $quotedText,
+                'quotedMessageId' => null !== $quotedMessageIdMeta ? (int) $quotedMessageIdMeta : null,
                 'files' => $filesData, // Attached files (user uploads)
                 'aiModels' => !empty($aiModels) ? $aiModels : null, // AI model metadata
                 'webSearch' => $webSearchData, // Web search metadata

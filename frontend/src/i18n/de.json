@@ -62,6 +62,10 @@
   "chat": {
     "title": "Chat",
     "newChat": "Neuer Chat",
+    "quote": {
+      "button": "Im Chat erwähnen",
+      "remove": "Zitat entfernen"
+    },
     "noChats": "Keine Chats vorhanden",
     "timeNow": "jetzt",
     "timeMinutes": "{n}m",

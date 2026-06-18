@@ -94,6 +94,10 @@ export interface Message {
   againData?: AgainData
   originalMessageId?: number
   backendMessageId?: number
+  /** Text the user quoted from an earlier message when composing this one. */
+  quotedText?: string | null
+  /** Backend id of the message the quote was taken from. */
+  quotedMessageId?: number | null
   files?: MessageFile[] // Attached files
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
@@ -233,6 +237,8 @@ interface ApiLoadedMessageRow {
   webSearch?: Message['webSearch']
   searchResults?: Message['searchResults']
   multitask?: boolean
+  quotedText?: string | null
+  quotedMessageId?: number | null
   file?: { path: string; type: string }
   files?: ApiLoadedAttachmentFile[]
 }
@@ -367,7 +373,9 @@ export const useHistoryStore = defineStore('history', () => {
     backendMessageId?: number,
     originalMessageId?: number,
     webSearch?: { enabled?: boolean; query?: string; resultsCount?: number } | null,
-    tool?: { command: string; label: string; icon: string } | null
+    tool?: { command: string; label: string; icon: string } | null,
+    quotedText?: string | null,
+    quotedMessageId?: number | null
   ) => {
     messages.value.push({
       id: crypto.randomUUID(),
@@ -382,6 +390,8 @@ export const useHistoryStore = defineStore('history', () => {
       originalMessageId,
       webSearch,
       tool,
+      quotedText,
+      quotedMessageId,
     })
   }
 
@@ -635,6 +645,8 @@ export const useHistoryStore = defineStore('history', () => {
             originalTopic: m.originalTopic || null,
             originalMediaType: m.originalMediaType ?? m.original_media_type ?? null,
             backendMessageId: m.id,
+            quotedText: m.quotedText ?? null,
+            quotedMessageId: m.quotedMessageId ?? null,
             files: files.length > 0 ? files : undefined,
             aiModels: m.aiModels || null,
             webSearch: m.webSearch || null,

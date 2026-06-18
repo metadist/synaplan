@@ -172,13 +172,26 @@
                   }}
                   · {{ formatMessageTime(message.timestamp) }}
                 </p>
-                <p class="txt-primary text-sm whitespace-pre-wrap">{{ message.text }}</p>
+                <p
+                  class="txt-primary text-sm whitespace-pre-wrap"
+                  data-quotable
+                  :data-message-id="message.id"
+                  :data-message-role="message.direction === 'IN' ? 'visitor' : 'agent'"
+                >
+                  {{ message.text }}
+                </p>
               </div>
             </template>
           </div>
 
           <!-- Input -->
           <div class="p-4 border-t border-light-border/30 dark:border-dark-border/20">
+            <QuoteChip
+              v-if="quoting.pendingQuote.value"
+              :quote="quoting.pendingQuote.value"
+              class="mb-2"
+              @remove="quoting.clearPendingQuote"
+            />
             <div class="flex gap-2">
               <textarea
                 v-model="replyText"
@@ -211,6 +224,12 @@
         </div>
       </div>
     </div>
+
+    <QuoteSelectionButton
+      :visible="quoting.floatingVisible.value"
+      :position="quoting.floatingPosition.value"
+      @quote="quoting.confirmQuote"
+    />
   </MainLayout>
 </template>
 
@@ -229,6 +248,9 @@ import {
   type WidgetSubscription,
 } from '@/services/realtime/widgetOperatorRealtime'
 import ConnectionStatusBadge from '@/components/realtime/ConnectionStatusBadge.vue'
+import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
+import QuoteChip from '@/components/QuoteChip.vue'
+import { useMessageQuoting, formatQuoteAsBlockquote } from '@/composables/useMessageQuoting'
 
 const { t } = useI18n()
 const { formatRelativeTime, formatTime: formatTimeStr } = useDateFormat()
@@ -245,6 +267,7 @@ const activeTab = ref<'waiting' | 'active'>('waiting')
 const replyText = ref('')
 const sending = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
+const quoting = useMessageQuoting(messagesContainer)
 
 let notificationSubscriptions: WidgetSubscription[] = []
 
@@ -328,6 +351,13 @@ const sendReply = async () => {
     selectedWidgetId.value || selectedSession.value.widgetId || widgets.value[0]?.widgetId
   if (!widgetId) return
 
+  // Prepend the quoted excerpt (if any) as a Markdown blockquote so the
+  // visitor sees what part of the conversation the agent is replying to.
+  const quote = quoting.pendingQuote.value
+  const outgoingText = quote
+    ? `${formatQuoteAsBlockquote(quote.text)}\n\n${replyText.value}`
+    : replyText.value
+
   sending.value = true
   try {
     // Take over if not already in human mode
@@ -339,19 +369,20 @@ const sendReply = async () => {
     await widgetSessionsApi.sendHumanMessage(
       widgetId,
       selectedSession.value.sessionId,
-      replyText.value
+      outgoingText
     )
 
     // Add message to local list
     sessionMessages.value.push({
       id: Date.now(),
       direction: 'OUT',
-      text: replyText.value,
+      text: outgoingText,
       timestamp: Math.floor(Date.now() / 1000),
       sender: 'human',
     })
 
     replyText.value = ''
+    quoting.clearPendingQuote()
     await nextTick()
     scrollToBottom()
     success(t('liveSupport.messageSent'))

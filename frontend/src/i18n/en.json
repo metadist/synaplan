@@ -67,6 +67,10 @@
     "config": "AI Config",
     "statistics": "Statistics",
     "newChat": "New Chat",
+    "quote": {
+      "button": "Mention in chat",
+      "remove": "Remove quote"
+    },
     "noChats": "No chats available",
     "timeNow": "now",
     "timeMinutes": "{n}m",

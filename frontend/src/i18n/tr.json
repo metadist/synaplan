@@ -66,6 +66,10 @@
     "config": "AI Yapılandırması",
     "statistics": "İstatistikler",
     "newChat": "Yeni Sohbet",
+    "quote": {
+      "button": "Sohbette belirt",
+      "remove": "Alıntıyı kaldır"
+    },
     "noChats": "Sohbet yok",
     "showMore": "Daha fazla göster",
     "showLess": "Daha az göster",

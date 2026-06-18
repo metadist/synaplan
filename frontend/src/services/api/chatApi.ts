@@ -300,6 +300,8 @@ export const chatApi = {
     isAgain?: boolean
     continueMessageId?: number
     ragGroupKey?: string
+    quotedText?: string
+    quotedMessageId?: number
   }): () => void {
     const paramsObj: Record<string, string> = {
       message: opts.message,
@@ -315,6 +317,8 @@ export const chatApi = {
     if (opts.isAgain) paramsObj.isAgain = '1'
     if (opts.continueMessageId) paramsObj.continueMessageId = opts.continueMessageId.toString()
     if (opts.ragGroupKey) paramsObj.ragGroupKey = opts.ragGroupKey
+    if (opts.quotedText) paramsObj.quotedText = opts.quotedText
+    if (opts.quotedMessageId) paramsObj.quotedMessageId = opts.quotedMessageId.toString()
 
     if (opts.fileIds && opts.fileIds.length > 0) {
       paramsObj.fileIds = opts.fileIds.join(',')
@@ -557,6 +561,8 @@ export const chatApi = {
     chatId: number
     trackId?: number
     onUpdate: (data: StreamUpdatePayload) => void
+    quotedText?: string
+    quotedMessageId?: number
   }): () => void {
     const paramsObj: Record<string, string> = {
       message: opts.message,
@@ -565,6 +571,8 @@ export const chatApi = {
     }
 
     if (opts.trackId) paramsObj.trackId = opts.trackId.toString()
+    if (opts.quotedText) paramsObj.quotedText = opts.quotedText
+    if (opts.quotedMessageId) paramsObj.quotedMessageId = opts.quotedMessageId.toString()
 
     const params = new URLSearchParams(paramsObj)
     const url = `${getApiBaseUrl()}/api/v1/messages/stream?${params}`

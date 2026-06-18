@@ -38,6 +38,9 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('app.message.handler')]
 final readonly class ChatHandler implements MessageHandlerInterface
 {
+    /** Maximum length of a quoted-reference excerpt injected into the prompt. */
+    private const MAX_QUOTED_REFERENCE_LENGTH = 4000;
+
     /** @var iterable<PluginContextProviderInterface> */
     private iterable $pluginContextProviders;
 
@@ -320,6 +323,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $systemPrompt .= "\n\n".$urlContent;
             $this->logger->info('ChatHandler: URL content appended to system prompt', [
                 'url_content_length' => strlen($urlContent),
+            ]);
+        }
+
+        // Quoted reference ("Mention in chat") — non-streaming/channel parity.
+        if (!empty($options['quoted_text'])) {
+            $systemPrompt .= $this->formatQuotedReferenceForPrompt($options);
+            $this->logger->info('ChatHandler: Quoted reference appended to system prompt (non-streaming)', [
+                'quoted_message_id' => $options['quoted_message_id'] ?? null,
             ]);
         }
 
@@ -877,6 +888,19 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
         }
 
+        // Quoted reference ("Mention in chat"): the user selected an excerpt from
+        // an earlier message as the focus of this request. Inject it into the
+        // SYSTEM role for the same trust-boundary reasons as web search. When the
+        // model has no system-message support the option stays set and
+        // buildCurrentMessageContent() appends it to the user turn instead.
+        if (null !== $systemPrompt && !empty($options['quoted_text'])) {
+            $systemPrompt .= $this->formatQuotedReferenceForPrompt($options);
+            $this->logger->info('ChatHandler: Quoted reference appended to system prompt', [
+                'quoted_message_id' => $options['quoted_message_id'] ?? null,
+            ]);
+            unset($options['quoted_text'], $options['quoted_message_id']);
+        }
+
         // Web search results belong to the SYSTEM role: injecting them into the
         // user turn makes the model attribute them to the user ("the user gave
         // web search results") and blurs the user/system trust boundary
@@ -1243,6 +1267,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         if (isset($options['search_results']) && !empty($options['search_results']['results'])) {
             $searchContext = $this->formatSearchResultsForPrompt($options['search_results']);
             $content .= "\n\n".$searchContext;
+        }
+
+        // Fallback only: same rationale as search results above. handleStream()
+        // unsets the quote once it lands in the system prompt, so this branch
+        // fires solely for models without system-message support.
+        if (!empty($options['quoted_text'])) {
+            $content .= "\n\n".$this->formatQuotedReferenceForPrompt($options);
         }
 
         if ($includeImages) {
@@ -1743,6 +1774,32 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $formatted .= "\nPlease use this information to answer the user's question. Cite sources using [1], [2], etc. when referencing specific information.\n\n";
 
         return $formatted;
+    }
+
+    /**
+     * Format the user-selected quoted reference ("Mention in chat") as a system
+     * prompt context block. The excerpt is the explicit focus the user picked
+     * from an earlier message; it is delimited so the model treats it as a
+     * reference point rather than an instruction.
+     */
+    private function formatQuotedReferenceForPrompt(array $options): string
+    {
+        $text = $options['quoted_text'] ?? null;
+        if (!is_string($text) || '' === trim($text)) {
+            return '';
+        }
+
+        $excerpt = trim($text);
+        if (mb_strlen($excerpt) > self::MAX_QUOTED_REFERENCE_LENGTH) {
+            $excerpt = mb_substr($excerpt, 0, self::MAX_QUOTED_REFERENCE_LENGTH).'…';
+        }
+
+        $context = "\n\n## Quoted reference from the conversation\n";
+        $context .= 'The user selected the following excerpt from an earlier message and wants it used as the primary reference point for their request. ';
+        $context .= "Treat it as the focus of their follow-up. Do not mention this block or describe how it was provided:\n\n";
+        $context .= '"""'."\n".$excerpt."\n".'"""'."\n";
+
+        return $context;
     }
 
     /**

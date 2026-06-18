@@ -983,4 +983,43 @@ class ChatHandlerTest extends TestCase
 
         $this->handler->dispatchPendingMemoryExtraction($command);
     }
+
+    public function testFormatQuotedReferenceReturnsEmptyWhenNoQuote(): void
+    {
+        $this->assertSame('', $this->invokeFormatQuotedReference([]));
+        $this->assertSame('', $this->invokeFormatQuotedReference(['quoted_text' => '   ']));
+    }
+
+    public function testFormatQuotedReferenceWrapsExcerpt(): void
+    {
+        $result = $this->invokeFormatQuotedReference(['quoted_text' => 'FrankenPHP powers the runtime.']);
+
+        $this->assertStringContainsString('## Quoted reference from the conversation', $result);
+        $this->assertStringContainsString('FrankenPHP powers the runtime.', $result);
+        $this->assertStringContainsString('primary reference point', $result);
+    }
+
+    public function testFormatQuotedReferenceTruncatesOversizedExcerpt(): void
+    {
+        $longText = str_repeat('a', 5000);
+        $result = $this->invokeFormatQuotedReference(['quoted_text' => $longText]);
+
+        // 4000 char cap + ellipsis, plus the surrounding template text.
+        $this->assertStringContainsString('…', $result);
+        $this->assertLessThan(5000, mb_strlen($result));
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function invokeFormatQuotedReference(array $options): string
+    {
+        $method = new \ReflectionMethod(ChatHandler::class, 'formatQuotedReferenceForPrompt');
+        $method->setAccessible(true);
+
+        /** @var string $result */
+        $result = $method->invoke($this->handler, $options);
+
+        return $result;
+    }
 }

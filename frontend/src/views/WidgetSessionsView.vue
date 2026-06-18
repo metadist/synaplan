@@ -583,6 +583,9 @@
                         ? 'bg-gradient-to-br from-emerald-600 to-emerald-500 text-white rounded-2xl rounded-br-md'
                         : 'bg-white/5 dark:bg-white/5 rounded-2xl rounded-bl-md',
                     ]"
+                    data-quotable
+                    :data-message-id="message.id"
+                    :data-message-role="message.direction === 'OUT' ? 'agent' : 'visitor'"
                   >
                     <MessageText
                       :content="message.text"
@@ -748,6 +751,13 @@
               "
               class="p-4 flex-shrink-0 border-t border-white/5 dark:border-white/5 shadow-[0_-1px_3px_rgba(0,0,0,0.08)]"
             >
+              <!-- Quoted reference chip -->
+              <QuoteChip
+                v-if="quoting.pendingQuote.value"
+                :quote="quoting.pendingQuote.value"
+                class="mb-3"
+                @remove="quoting.clearPendingQuote"
+              />
               <!-- File Preview -->
               <div v-if="selectedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
                 <div
@@ -951,6 +961,12 @@
         @close="showWidgetConfig = false"
         @saved="handleWidgetConfigSaved"
       />
+
+      <QuoteSelectionButton
+        :visible="quoting.floatingVisible.value"
+        :position="quoting.floatingPosition.value"
+        @quote="quoting.confirmQuote"
+      />
     </div>
   </MainLayout>
 </template>
@@ -981,6 +997,9 @@ import type { WidgetTypingHandle } from '@/services/realtime/widgetTypingChannel
 // Centrifugo connection-state badge — reads from the realtime Pinia store
 // that the operator helpers warm up on first subscribe.
 import ConnectionStatusBadge from '@/components/realtime/ConnectionStatusBadge.vue'
+import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
+import QuoteChip from '@/components/QuoteChip.vue'
+import { useMessageQuoting, formatQuoteAsBlockquote } from '@/composables/useMessageQuoting'
 
 const route = useRoute()
 const router = useRouter()
@@ -1017,6 +1036,7 @@ let typingChannel: WidgetTypingHandle | null = null
 // rapid second click.
 let viewSessionToken = 0
 const messagesContainer = ref<HTMLElement | null>(null)
+const quoting = useMessageQuoting(messagesContainer)
 
 // File upload state
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -1845,6 +1865,12 @@ const sendMessage = async () => {
   const targetSession = selectedSession.value
   const targetSessionId = targetSession.sessionId
   const filesToSend = [...selectedFiles.value]
+  // Prepend the quoted excerpt (if any) as a Markdown blockquote so the
+  // visitor sees which part of the conversation the agent is replying to.
+  const quote = quoting.pendingQuote.value
+  const composedText = quote
+    ? `${formatQuoteAsBlockquote(quote.text)}\n\n${messageText.value.trim()}`.trim()
+    : messageText.value.trim()
   try {
     // Upload files first if any
     let fileIds: number[] = []
@@ -1853,9 +1879,9 @@ const sendMessage = async () => {
     }
 
     if (targetSession.mode === 'internal') {
-      await sendInternalMessage(messageText.value.trim(), fileIds)
+      await sendInternalMessage(composedText, fileIds)
     } else {
-      const outgoingText = messageText.value.trim() || t('widgetSessions.fileAttached')
+      const outgoingText = composedText || t('widgetSessions.fileAttached')
       const result = await widgetSessionsApi.sendHumanMessage(
         widgetId.value,
         targetSessionId,
@@ -1915,6 +1941,7 @@ const sendMessage = async () => {
       messageText.value = ''
       selectedFiles.value = []
       uploadedFileIds.value = []
+      quoting.clearPendingQuote()
     }
   } catch (err: unknown) {
     error(err instanceof Error ? err.message : t('widgetSessions.sendFailed'))

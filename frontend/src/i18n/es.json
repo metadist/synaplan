@@ -66,6 +66,10 @@
     "config": "Configuración de IA",
     "statistics": "Estadísticas",
     "newChat": "Nuevo Chat",
+    "quote": {
+      "button": "Mencionar en el chat",
+      "remove": "Quitar cita"
+    },
     "noChats": "No hay chats disponibles",
     "showMore": "Mostrar más",
     "showLess": "Mostrar menos",
