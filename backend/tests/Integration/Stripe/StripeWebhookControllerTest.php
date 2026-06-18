@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Stripe;
 
+use App\Entity\Topup;
 use App\Entity\User;
+use App\Repository\TopupRepository;
 use App\Tests\Integration\Stripe\Mock\StripeMockHttpClient;
 use App\Tests\Integration\Stripe\Mock\StripeSignatureHelper;
 use Doctrine\ORM\EntityManagerInterface;
@@ -87,6 +89,14 @@ class StripeWebhookControllerTest extends WebTestCase
         ApiRequestor::setHttpClient(CurlClient::instance());
 
         if (isset($this->user) && $this->em->isOpen()) {
+            // Remove any top-ups credited during the test first (FK-free, but
+            // keep the table clean and the unique session-id index collision-free
+            // for re-runs).
+            foreach ($this->em->getRepository(Topup::class)->findBy(['userId' => (int) $this->user->getId()]) as $topup) {
+                $this->em->remove($topup);
+            }
+            $this->em->flush();
+
             $managed = $this->em->find(User::class, $this->user->getId());
             if ($managed) {
                 $this->em->remove($managed);
@@ -397,6 +407,129 @@ class StripeWebhookControllerTest extends WebTestCase
         // alone must not promote the user. This protects the upgrade flow:
         // a stray checkout-completed without a paid subscription must not unlock features.
         $this->assertSame('NEW', $this->user->getUserLevel());
+    }
+
+    public function testTopupCheckoutCreditsBudget(): void
+    {
+        // A one-time top-up arrives as checkout.session.completed with
+        // metadata.type=topup and mode=payment. The handler must record a
+        // completed Topup for the referenced user, denominated in EUR.
+        $sessionId = 'cs_topup_'.bin2hex(random_bytes(8));
+        $payload = $this->buildEventPayload('checkout.session.completed', [
+            'id' => $sessionId,
+            'object' => 'checkout.session',
+            'customer' => $this->stripeCustomerId,
+            'client_reference_id' => (string) $this->user->getId(),
+            'mode' => 'payment',
+            'amount_subtotal' => 10000,
+            'metadata' => [
+                'type' => 'topup',
+                'user_id' => (string) $this->user->getId(),
+                'topup_eur' => '100',
+            ],
+        ]);
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $this->assertTrue($body['success']);
+
+        $topups = $this->topupRepo()->findBy(['stripeSessionId' => $sessionId]);
+        $this->assertCount(1, $topups);
+        $this->assertSame('100.00', $topups[0]->getAmount());
+        $this->assertSame('EUR', $topups[0]->getCurrency());
+        $this->assertSame('completed', $topups[0]->getStatus());
+        $this->assertSame((int) $this->user->getId(), $topups[0]->getUserId());
+    }
+
+    public function testTopupCheckoutIsIdempotentOnSessionId(): void
+    {
+        // Two webhooks for the SAME checkout session but DIFFERENT event ids
+        // (so the event-level idempotency cache does not short-circuit the
+        // second one). The DB session-id guard must prevent a double credit.
+        $sessionId = 'cs_topup_idem_'.bin2hex(random_bytes(8));
+        $object = [
+            'id' => $sessionId,
+            'object' => 'checkout.session',
+            'customer' => $this->stripeCustomerId,
+            'client_reference_id' => (string) $this->user->getId(),
+            'mode' => 'payment',
+            'amount_subtotal' => 10000,
+            'metadata' => [
+                'type' => 'topup',
+                'user_id' => (string) $this->user->getId(),
+                'topup_eur' => '100',
+            ],
+        ];
+
+        $first = $this->buildEventPayload('checkout.session.completed', $object);
+        $this->postWebhook($first, StripeSignatureHelper::header($first, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $second = $this->buildEventPayload('checkout.session.completed', $object);
+        $this->postWebhook($second, StripeSignatureHelper::header($second, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $topups = $this->topupRepo()->findBy(['stripeSessionId' => $sessionId]);
+        $this->assertCount(1, $topups, 'A retried session must not be credited twice');
+    }
+
+    public function testTopupCheckoutForUnknownUserIsAcknowledged(): void
+    {
+        // Deterministic failure (the referenced user does not exist): the
+        // handler must ACK with 2xx so Stripe stops retrying, and must NOT
+        // create a stray Topup row.
+        $sessionId = 'cs_topup_nouser_'.bin2hex(random_bytes(8));
+        $payload = $this->buildEventPayload('checkout.session.completed', [
+            'id' => $sessionId,
+            'object' => 'checkout.session',
+            'customer' => $this->stripeCustomerId,
+            'client_reference_id' => '999999999',
+            'mode' => 'payment',
+            'amount_subtotal' => 10000,
+            'metadata' => [
+                'type' => 'topup',
+                'user_id' => '999999999',
+                'topup_eur' => '100',
+            ],
+        ]);
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $this->assertTrue($body['success']);
+
+        $this->assertCount(0, $this->topupRepo()->findBy(['stripeSessionId' => $sessionId]));
+    }
+
+    public function testTopupCheckoutWithNonPositiveAmountIsAcknowledgedWithoutCredit(): void
+    {
+        // A zero/negative top-up cannot be credited; ACK to stop retries and
+        // do not record a Topup.
+        $sessionId = 'cs_topup_zero_'.bin2hex(random_bytes(8));
+        $payload = $this->buildEventPayload('checkout.session.completed', [
+            'id' => $sessionId,
+            'object' => 'checkout.session',
+            'customer' => $this->stripeCustomerId,
+            'client_reference_id' => (string) $this->user->getId(),
+            'mode' => 'payment',
+            'amount_subtotal' => 0,
+            'metadata' => [
+                'type' => 'topup',
+                'user_id' => (string) $this->user->getId(),
+                'topup_eur' => '0',
+            ],
+        ]);
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->assertCount(0, $this->topupRepo()->findBy(['stripeSessionId' => $sessionId]));
+    }
+
+    private function topupRepo(): TopupRepository
+    {
+        /** @var TopupRepository $repo */
+        $repo = $this->client->getContainer()->get(TopupRepository::class);
+
+        return $repo;
     }
 
     public function testSubscriptionUpdatedForOldSubscriptionIdIsIgnored(): void

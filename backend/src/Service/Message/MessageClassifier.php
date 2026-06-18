@@ -205,9 +205,9 @@ final readonly class MessageClassifier
             }
         }
 
-        // 3. Document / audio attachments → FileAnalysisHandler (ANALYZE model), before AI sorting (#595)
-        if ($this->messageHasDocumentOrAudioAttachment($message)) {
-            $this->logger->info('MessageClassifier: Forcing analyzefile route (document or audio attachment)', [
+        // 3. Document / audio / video attachments → FileAnalysisHandler (ANALYZE model), before AI sorting (#595, #722)
+        if ($this->messageHasAnalyzableNonImageAttachment($message)) {
+            $this->logger->info('MessageClassifier: Forcing analyzefile route (document, audio, or video attachment)', [
                 'message_id' => $messageId,
             ]);
 
@@ -433,15 +433,20 @@ final readonly class MessageClassifier
     }
 
     /**
-     * True if the message has at least one attached document or audio file (not images only).
-     * Routes to FileAnalysisHandler so ANALYZE default model is used (#595).
+     * True if the message has at least one attached document, audio, or video
+     * file (i.e. an analyzable non-image attachment). Routes to
+     * FileAnalysisHandler so the ANALYZE default model is used (#595, video
+     * added in #983). Video is included because its audio track is transcribed
+     * to text the chat model can reason about (#722); without this gate a
+     * video-only message fell through to the AI sorter and was answered as a
+     * plain (text-less) chat.
      */
-    private function messageHasDocumentOrAudioAttachment(Message $message): bool
+    private function messageHasAnalyzableNonImageAttachment(Message $message): bool
     {
         $files = $message->getFiles();
         if ($files->count() > 0) {
             foreach ($files as $file) {
-                if ($this->attachedFileIsDocumentOrAudio($file)) {
+                if ($this->attachedFileIsAnalyzableNonImage($file)) {
                     return true;
                 }
             }
@@ -453,13 +458,14 @@ final readonly class MessageClassifier
             $ext = strtolower(pathinfo($message->getFilePath(), PATHINFO_EXTENSION));
 
             return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
-                || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+                || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true)
+                || in_array($ext, MessagePreProcessor::VIDEO_EXTENSIONS, true);
         }
 
         return false;
     }
 
-    private function attachedFileIsDocumentOrAudio(File $file): bool
+    private function attachedFileIsAnalyzableNonImage(File $file): bool
     {
         $fromType = strtolower($file->getFileType() ?: '');
         $fromName = strtolower(pathinfo($file->getFileName(), PATHINFO_EXTENSION));
@@ -470,7 +476,8 @@ final readonly class MessageClassifier
         }
 
         return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
-            || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+            || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true)
+            || in_array($ext, MessagePreProcessor::VIDEO_EXTENSIONS, true);
     }
 
     /**

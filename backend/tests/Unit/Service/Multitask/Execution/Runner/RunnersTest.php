@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
+use App\Repository\SearchResultRepository;
 use App\Service\Calendar\CalendarEventService;
 use App\Service\File\FileStorageService;
 use App\Service\Message\Handler\ChatHandler;
@@ -575,6 +576,60 @@ final class RunnersTest extends TestCase
 
         self::assertTrue($result->isSuccessful());
         self::assertArrayNotHasKey('reused_prefetched', $result->metadata);
+    }
+
+    public function testWebSearchPersistsFreshResultsViaRepository(): void
+    {
+        $rawResults = ['query' => 'AI breakthrough', 'results' => [['title' => 'X', 'url' => 'https://x.com']]];
+
+        $brave = $this->createMock(BraveSearchService::class);
+        $brave->method('isEnabled')->willReturn(true);
+        $brave->method('search')->willReturn($rawResults);
+        $brave->method('formatResultsForAI')->willReturn('formatted');
+
+        $queryGen = $this->createMock(SearchQueryGenerator::class);
+        $queryGen->method('generate')->willReturn('AI breakthrough');
+
+        $repo = $this->createMock(SearchResultRepository::class);
+        $repo->expects(self::once())->method('saveSearchResults');
+
+        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class), $repo);
+        $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'AI breakthrough']);
+
+        $result = $runner->run($node, $this->context($this->message('AI breakthrough')));
+
+        self::assertTrue($result->isSuccessful());
+    }
+
+    public function testWebSearchDoesNotPersistWhenReusing(): void
+    {
+        $preFetched = ['query' => 'AI breakthrough', 'results' => [['title' => 'X']]];
+
+        $brave = $this->createMock(BraveSearchService::class);
+        $brave->method('isEnabled')->willReturn(true);
+        $brave->expects(self::never())->method('search');
+        $brave->method('formatResultsForAI')->willReturn('formatted');
+
+        $queryGen = $this->createMock(SearchQueryGenerator::class);
+        $queryGen->expects(self::never())->method('generate');
+
+        $repo = $this->createMock(SearchResultRepository::class);
+        $repo->expects(self::never())->method('saveSearchResults');
+
+        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class), $repo);
+        $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => '$message.text']);
+
+        $context = new NodeContext(
+            $this->message('AI breakthrough'),
+            [],
+            1,
+            ['language' => 'en'],
+            ['search_results' => $preFetched],
+        );
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertTrue($result->metadata['reused_prefetched'] ?? false);
     }
 
     public function testFileAnalysisAnswersAboutAttachment(): void

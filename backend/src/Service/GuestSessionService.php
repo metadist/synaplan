@@ -18,6 +18,17 @@ final class GuestSessionService
     public const SESSION_EXPIRY_HOURS = 24;
     public const MAX_SESSIONS_PER_IP = 5;
 
+    /**
+     * Hard cap on guest messages per IP across all active sessions.
+     *
+     * Prevents incognito-window resets from granting a fresh quota: the
+     * counter is aggregated over every non-expired session from the same IP.
+     * Aligns with DEFAULT_MAX_MESSAGES so a single guest user gets the same
+     * effective trial whether they reuse one session or spread requests
+     * across many.
+     */
+    public const MAX_MESSAGES_PER_IP = 5;
+
     private ?User $cachedProcessingUser = null;
 
     /**
@@ -45,7 +56,12 @@ final class GuestSessionService
     /**
      * Create a new guest session with the given (server-generated) session ID.
      *
-     * @throws \OverflowException when the IP has exceeded its session limit
+     * The new session's `maxMessages` is capped to the IP's remaining budget
+     * (MAX_MESSAGES_PER_IP minus messages already spent across other active
+     * sessions). When the budget is exhausted, the session is created with
+     * `maxMessages = 0` so the client immediately sees `limitReached = true`.
+     *
+     * @throws \OverflowException when the IP has exceeded its concurrent session limit
      * @throws \LogicException    when the sessionId already exists (should never happen with server UUIDs)
      */
     public function createSession(string $sessionId, Request $request): GuestSession
@@ -71,9 +87,22 @@ final class GuestSessionService
 
         $session = new GuestSession();
         $session->setSessionId($sessionId);
-        $session->setMaxMessages(self::DEFAULT_MAX_MESSAGES);
-
         $session->setIpAddress($ip);
+
+        $maxMessages = self::DEFAULT_MAX_MESSAGES;
+        if ($ip) {
+            $alreadySpent = $this->sessionRepository->sumActiveMessageCountByIp($ip);
+            $ipRemaining = max(0, self::MAX_MESSAGES_PER_IP - $alreadySpent);
+            $maxMessages = min(self::DEFAULT_MAX_MESSAGES, $ipRemaining);
+
+            if (0 === $maxMessages) {
+                $this->logger->info('Guest IP message budget exhausted', [
+                    'ip' => $ip,
+                    'already_spent' => $alreadySpent,
+                ]);
+            }
+        }
+        $session->setMaxMessages($maxMessages);
 
         $country = $request->headers->get('CF-IPCountry');
         $session->setCountry($country);
@@ -84,6 +113,7 @@ final class GuestSessionService
         $this->logger->info('New guest session created', [
             'session_id' => substr($sessionId, 0, 12).'...',
             'country' => $session->getCountry(),
+            'max_messages' => $maxMessages,
         ]);
 
         return $session;
@@ -96,7 +126,12 @@ final class GuestSessionService
 
     public function checkLimit(GuestSession $session): bool
     {
-        return !$session->isLimitReached();
+        return $this->getRemainingMessages($session) > 0;
+    }
+
+    public function isLimitReached(GuestSession $session): bool
+    {
+        return 0 === $this->getRemainingMessages($session);
     }
 
     public function incrementCount(GuestSession $session): void
@@ -105,9 +140,26 @@ final class GuestSessionService
         $this->em->flush();
     }
 
+    /**
+     * Compute the messages a guest session may still send.
+     *
+     * Combines the session's own remaining budget with the per-IP cap so
+     * spinning up new incognito sessions cannot bypass the trial quota:
+     * `min(session_remaining, MAX_MESSAGES_PER_IP - sum(active sessions on same IP))`.
+     */
     public function getRemainingMessages(GuestSession $session): int
     {
-        return $session->getRemainingMessages();
+        $sessionRemaining = $session->getRemainingMessages();
+
+        $ip = $session->getIpAddress();
+        if (!$ip) {
+            return $sessionRemaining;
+        }
+
+        $aggregated = $this->sessionRepository->sumActiveMessageCountByIp($ip, $session->getId());
+        $ipRemaining = max(0, self::MAX_MESSAGES_PER_IP - $aggregated - $session->getMessageCount());
+
+        return min($sessionRemaining, $ipRemaining);
     }
 
     /**

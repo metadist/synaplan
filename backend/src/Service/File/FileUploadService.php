@@ -306,6 +306,18 @@ final readonly class FileUploadService
             );
 
             $file->setFileText($extractedText);
+
+            // For audio/video files an empty transcript means transcription
+            // failed — the file may be silent, in an unsupported codec, or the
+            // STT provider rejected it.  Signal this clearly so the UI can show
+            // a distinct error badge instead of "Extracted (0 chars)".
+            if ('' === trim($extractedText) && FileProcessor::isTranscribableMediaExtension($fileExtension)) {
+                $file->setStatus('error');
+                $this->em->flush();
+
+                return ['success' => false, 'error' => 'Transcription produced no text — the file may be silent or in an unsupported codec.'];
+            }
+
             $file->setStatus('extracted');
             $this->em->flush();
 
@@ -426,6 +438,18 @@ final readonly class FileUploadService
 
         $extractedText = $file->getFileText();
         if ('' === trim($extractedText)) {
+            // Audio/video with no transcript: the STT pipeline returned nothing
+            // (provider rejection, silent file, unsupported codec).  Mark as
+            // error so the UI shows a clear status instead of silently treating
+            // the file as "ready".  Non-media files (blank PDFs, etc.) follow
+            // the old path — a zero-length extraction is legitimate for them.
+            if (FileProcessor::isTranscribableMediaExtension($fileExtension)) {
+                $file->setStatus('error');
+                $this->em->flush();
+
+                return ['success' => false, 'status' => 'error', 'error' => 'Transcription produced no text — the file may be silent or in an unsupported codec.'];
+            }
+
             $file->setStatus('vectorized');
             $this->em->flush();
 

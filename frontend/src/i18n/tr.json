@@ -17,6 +17,7 @@
     "ragSearch": "Arama",
     "configInbound": "Kanallar",
     "configAiModels": "AI Modelleri",
+    "configProviderHiggsfield": "Higgsfield Bağlantısı",
     "configTaskPrompts": "AI Talimatları",
     "configSortingPrompt": "Yönlendirme",
     "configApiKeys": "API Anahtarları",
@@ -1029,6 +1030,7 @@
     "title": "Görev planı",
     "download": "İndir",
     "failedBody": "Bu adım tamamlanamadı.",
+    "searchSummary": "Web arandı · {count} kaynak",
     "retryWith": "{model} ile yeniden dene",
     "state": {
       "pending": "Sırada",
@@ -1227,6 +1229,11 @@
       "support": "Premium destek"
     },
     "upgradeNow": "Şimdi Yükselt",
+    "topup": {
+      "button": "€{amount} bakiye ekle",
+      "amountLabel": "Yükleme tutarı (€{step} adımları)",
+      "error": "Yükleme başlatılamadı. Lütfen tekrar deneyin."
+    },
     "verifyPhone": "Telefon Numarasını Doğrula",
     "footerNote": "Sorularınız mı var? Destek ekibimizle iletişime geçin.",
     "messageBlocked": "Mesaj gönderilemedi",
@@ -1462,6 +1469,7 @@
         "text2pic": "Görsel Oluşturma (Metin → Görsel)",
         "pic2pic": "Görsel Düzenleme (Görsel → Görsel)",
         "text2vid": "Video Oluşturma (Metin → Video)",
+        "img2vid": "Video Animasyonu (Görsel → Video)",
         "sound2text": "Konuşmadan Metne",
         "text2sound": "Metinden Konuşmaya",
         "analyze": "Dosya Analizi"
@@ -1491,6 +1499,39 @@
       "service": "HİZMET",
       "name": "AD",
       "descriptionHeader": "AÇIKLAMA"
+    },
+    "providers": {
+      "higgsfield": {
+        "title": "Higgsfield",
+        "description": "Sinematik görüntü ve video üretimi: Soul ve Reve (metinden görüntüye), ayrıca DoP ve Kling 2.1 (görüntüden videoya). Kimlik doğrulama, Higgsfield hesabınızdan alınan anahtar + gizli anahtar çifti ile yapılır.",
+        "getKeyLink": "API anahtarınızı + gizli anahtarınızı cloud.higgsfield.ai adresinden alın →",
+        "statusTitle": "Mevcut bağlantı",
+        "userKeyLabel": "Anahtarınız",
+        "sourceUser": "Kişisel Higgsfield anahtarınız kullanılıyor",
+        "sourcePlatform": "Platform genelindeki anahtar kullanılıyor",
+        "sourceNone": "Bağlı değil — anahtar yapılandırılmamış",
+        "noCredentialsHint": "Buraya kişisel bir anahtar ekleyene veya platform yöneticisi genel bir HIGGSFIELD_API_KEY / HIGGSFIELD_API_SECRET ayarlayana kadar Higgsfield modelleri gizli kalır.",
+        "connectTitle": "Higgsfield hesabınızı bağlayın",
+        "replaceTitle": "Anahtarınızı değiştirin",
+        "formHint": "Her iki alan da zorunludur. Çift şifreli olarak saklanır ve asla tarayıcınıza geri gönderilmez.",
+        "apiKeyLabel": "API anahtarı",
+        "apiKeyPlaceholder": "hf_pub_…",
+        "apiSecretLabel": "API gizli anahtarı",
+        "apiSecretPlaceholder": "hf_sec_…",
+        "saveButton": "Kaydet",
+        "replaceButton": "Değiştir",
+        "testButton": "Bağlantıyı test et",
+        "clearButton": "Anahtarımı kaldır",
+        "clearConfirm": "Kişisel Higgsfield anahtarınız kaldırılsın mı? Platform anahtarına (varsa) geri dönersiniz.",
+        "clearConfirmTitle": "Kişisel anahtarı kaldır",
+        "saveSuccess": "Higgsfield anahtarı kaydedildi.",
+        "saveError": "Anahtar kaydedilemedi.",
+        "clearSuccess": "Kişisel anahtar kaldırıldı.",
+        "clearError": "Anahtar kaldırılamadı.",
+        "testSuccess": "Higgsfield bağlantısı çalışıyor.",
+        "testError": "Higgsfield'a ulaşılamadı.",
+        "loadError": "Higgsfield bağlantı durumu yüklenemedi."
+      }
     },
     "taskPrompts": {
       "title": "AI Talimatları",

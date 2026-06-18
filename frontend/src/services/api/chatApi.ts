@@ -455,6 +455,18 @@ export const chatApi = {
   },
 
   /**
+   * Issue #1070: fetch a single persisted message in the same row shape as
+   * `getChatMessages`. Called after SSE `complete` to reconcile the
+   * live-streamed state against the authoritative persisted version
+   * (files, media, metadata).
+   */
+  async getMessage(messageId: number): Promise<unknown> {
+    return httpClient(`/api/v1/messages/${messageId}`, {
+      method: 'GET',
+    })
+  },
+
+  /**
    * Phase 2c: poll the backgrounded memory extraction outcome for a message.
    *
    * Returns `{ status: 'pending' | 'empty' | 'complete', saved, delete_suggestions }`.

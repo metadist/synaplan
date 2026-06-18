@@ -443,4 +443,81 @@ class MessagePreProcessorTest extends TestCase
             }
         }
     }
+
+    /**
+     * Issue #983 — MP4 (and other video formats) must be routed through
+     * FileProcessor, which transcribes the audio track and describes a key
+     * frame. Before the fix the preprocessor had no VIDEO_EXTENSIONS branch
+     * so the file was skipped and FileAnalysisHandler reported "unsupported
+     * file type".
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function supportedVideoExtensionsProvider(): iterable
+    {
+        yield 'mp4' => ['mp4'];
+        yield 'mov' => ['mov'];
+        yield 'avi' => ['avi'];
+        yield 'mkv' => ['mkv'];
+    }
+
+    #[DataProvider('supportedVideoExtensionsProvider')]
+    public function testProcessFileEntityAnalyzesVideoViaFileProcessor(string $extension): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_video_'.uniqid().'.'.$extension;
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(77);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn($extension);
+            $file->method('getFileName')->willReturn('clip.'.$extension);
+            $file->method('getFileSize')->willReturn(4096);
+            $file->method('getFileText')->willReturn('');
+            $file->method('getUserId')->willReturn(5);
+
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setFileText')
+                ->with("[Visual description]\nA cat on a sofa.\n\n[Audio transcript]\nHello world.");
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(5);
+
+            $this->fileProcessor
+                ->expects($this->once())
+                ->method('extractText')
+                ->with(basename($tempFile), $extension, 5)
+                ->willReturn([
+                    "[Visual description]\nA cat on a sofa.\n\n[Audio transcript]\nHello world.",
+                    ['strategy' => 'video_transcript_vision'],
+                ]);
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
 }

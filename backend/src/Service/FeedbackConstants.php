@@ -23,7 +23,7 @@ final readonly class FeedbackConstants
     public const MIN_CHAT_FEEDBACK_SCORE = 0.55;
 
     /** Minimum score for memories loaded as chat context. */
-    public const MIN_CHAT_MEMORY_SCORE = 0.4;
+    public const MIN_CHAT_MEMORY_SCORE = 0.55;
 
     /** Minimum score for contradiction detection (slightly lower to catch edge cases). */
     public const MIN_CONTRADICTION_SCORE = 0.4;

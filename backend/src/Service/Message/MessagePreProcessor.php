@@ -36,6 +36,15 @@ final readonly class MessagePreProcessor
     public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr'];
     public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
+    // Issue #722/#983: video uploads (e.g. an MP4 the user wants summarised)
+    // were never converted to text on the chat path, so FileAnalysisHandler
+    // reported "This file type cannot be analyzed". FileProcessor::extractText()
+    // analyses them by transcribing their audio track via Whisper AND describing
+    // a representative key frame via Vision AI, keeping the result in BFILETEXT.
+    // 'webm' deliberately stays in AUDIO_EXTENSIONS (browser/WhatsApp voice notes
+    // use it) — listing it here too would make the membership checks ambiguous.
+    public const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv', 'mpeg', 'mpg'];
+
     private const OFFICE_EXT_TO_MIME = [
         'xls' => 'application/vnd.ms-excel',
         'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -168,7 +177,14 @@ final readonly class MessagePreProcessor
         // Vision AI fallback for low-quality output) is the same strategy
         // the /api/v1/files upload path already uses, so we get one
         // consistent extraction behaviour across upload entry points.
-        if (in_array($fileType, self::DOCUMENT_EXTENSIONS)) {
+        // Documents and video files share the same extraction pipeline:
+        // FileProcessor::extractText() runs Tika for documents and, for video,
+        // transcribes the audio track AND describes a representative key frame
+        // (issues #722 + #983), returning plain text we store in BFILETEXT so
+        // the chat model can reason about it. This is the single canonical
+        // video path — do NOT add a second video branch below.
+        if (in_array($fileType, self::DOCUMENT_EXTENSIONS) || in_array($fileType, self::VIDEO_EXTENSIONS)) {
+            $isVideo = in_array($fileType, self::VIDEO_EXTENSIONS, true);
             $messageFile->setStatus('extracting');
 
             try {
@@ -181,27 +197,27 @@ final readonly class MessagePreProcessor
                 if ('' !== trim((string) $text)) {
                     $messageFile->setFileText($text);
                     $messageFile->setStatus('processed');
-                    $this->logger->info('PreProcessor: Document parsed', [
+                    $this->logger->info($isVideo ? 'PreProcessor: Video transcribed' : 'PreProcessor: Document parsed', [
                         'file_id' => $messageFile->getId(),
                         'text_length' => strlen($text),
                         'strategy' => $extractMeta['strategy'] ?? 'unknown',
                     ]);
                 } else {
                     $messageFile->setStatus('error');
-                    $this->logger->warning('PreProcessor: Document extraction produced empty text', [
+                    $this->logger->warning($isVideo ? 'PreProcessor: Video transcription produced empty text' : 'PreProcessor: Document extraction produced empty text', [
                         'file_id' => $messageFile->getId(),
                         'strategy' => $extractMeta['strategy'] ?? 'unknown',
                     ]);
                 }
             } catch (\Throwable $e) {
                 $messageFile->setStatus('error');
-                $this->logger->error('PreProcessor: Document extraction failed', [
+                $this->logger->error($isVideo ? 'PreProcessor: Video transcription failed' : 'PreProcessor: Document extraction failed', [
                     'file_id' => $messageFile->getId(),
                     'error' => $e->getMessage(),
                 ]);
             }
 
-            $this->billFileAnalysis($messageFile, $message, 'document');
+            $this->billFileAnalysis($messageFile, $message, $isVideo ? 'video' : 'document');
         }
 
         // Audio mit Whisper (or external STT if user configured one)
@@ -415,6 +431,44 @@ final readonly class MessagePreProcessor
                     'error' => $e->getMessage(),
                 ]);
                 // Don't fail the entire process, just skip transcription
+            }
+        }
+
+        // Video: transcribe the audio track AND describe a representative key
+        // frame (issues #722 + #983). FileProcessor::extractText() owns the
+        // combined ffmpeg + Whisper + Vision pipeline, so the legacy single-file
+        // path reuses it instead of duplicating logic. This is the single
+        // canonical video path — do NOT add a second video branch below.
+        if (in_array($fileType, self::VIDEO_EXTENSIONS)) {
+            $this->logger->info('PreProcessor: Transcribing video', [
+                'file' => basename($fullPath),
+                'type' => $fileType,
+            ]);
+
+            try {
+                [$text] = $this->fileProcessor->extractText(
+                    $filePath,
+                    $fileType,
+                    $message->getUserId(),
+                );
+
+                if ('' !== trim((string) $text)) {
+                    $message->setFileText($text);
+
+                    $currentText = $message->getText();
+                    if (empty($currentText) || '[Video message]' === $currentText || '[Video]' === $currentText) {
+                        $message->setText($text);
+                    }
+
+                    $this->logger->info('PreProcessor: Video transcribed successfully', [
+                        'text_length' => strlen($text),
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $this->logger->error('PreProcessor: Video transcription failed', [
+                    'file' => basename($fullPath),
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
 

@@ -153,10 +153,12 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
         );
     }
 
-    public function findSimilar(int $userId, int $sourceChunkId, int $limit = 10, float $minScore = 0.3): array
+    public function findSimilar(int $userId, int|string $sourceChunkId, int $limit = 10, float $minScore = 0.3): array
     {
+        $intChunkId = (int) $sourceChunkId;
+
         // Get source chunk's vector first
-        $sourceDoc = $this->ragRepository->find($sourceChunkId);
+        $sourceDoc = $this->ragRepository->find($intChunkId);
         if (!$sourceDoc) {
             return [];
         }
@@ -175,7 +177,7 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
         // Filter out the source chunk itself
         return array_filter(
             $results,
-            fn (SearchResult $r) => $r->chunkId !== $sourceChunkId
+            fn (SearchResult $r) => $r->chunkId !== $intChunkId
         );
     }
 

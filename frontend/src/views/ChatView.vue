@@ -250,6 +250,7 @@
       :reset-time="limitData?.resetTime"
       :user-level="limitData?.userLevel || 'NEW'"
       :phone-verified="limitData?.phoneVerified || false"
+      :topup-available="limitData?.topupAvailable || false"
       @close="closeLimitModal"
       @upgrade="closeLimitModal"
       @verify-phone="closeLimitModal"
@@ -1198,6 +1199,12 @@ const handleContinueResponse = async (message: Message) => {
 
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
+
+        // Issue #1070: reconcile against the persisted message so files /
+        // media / metadata reflect the authoritative backend state.
+        if (message.backendMessageId) {
+          void historyStore.reconcileMessage(message.id, message.backendMessageId)
+        }
       } else if (data.status === 'error') {
         message.truncated = true
         message.isStreaming = false
@@ -1886,6 +1893,13 @@ const streamAIResponse = async (
               if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
                 card.prompt = data.metadata.prompt
               }
+              // Web search card compact summary — populated by DagExecutor on done.
+              if (typeof data.metadata?.query === 'string' && data.metadata.query) {
+                card.query = data.metadata.query
+              }
+              if (typeof data.metadata?.results_count === 'number') {
+                card.resultsCount = data.metadata.results_count
+              }
             }
           } else if (data.status === 'task_chunk') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -2383,6 +2397,16 @@ const streamAIResponse = async (
 
             historyStore.finishStreamingMessage(messageId)
 
+            // Issue #1070: the streamed state is only a live preview — the
+            // persisted message is the single source of truth for files,
+            // media and metadata. Re-fetch it once so anything the SSE
+            // accumulation missed (e.g. TTS audio in a multitask turn,
+            // where the `audio` event is suppressed while task cards
+            // stream) renders without a page reload.
+            if (data.messageId) {
+              void historyStore.reconcileMessage(messageId, data.messageId)
+            }
+
             // Phase 2c: schedule a couple of polls for backgrounded memory
             // extraction results. The worker writes to the source message
             // metadata; we pick it up here and surface via the same memory
@@ -2501,6 +2525,36 @@ const streamAIResponse = async (
               })
 
               // Clean up streaming resources
+              streamingAbortController = null
+              stopStreamingFn = null
+              currentTrackId = undefined
+              currentStreamingChatId = undefined
+              return
+            }
+
+            // Handle monthly cost-budget exceeded → offer a one-time top-up.
+            // Branch on the stable machine-readable `code` (set by the backend),
+            // not on the human-readable error text which changes with i18n /
+            // rewording. Keep the structured-field check as a defensive fallback.
+            if (
+              data.code === 'COST_BUDGET_EXCEEDED' ||
+              (data.limit_type === 'monthly' && data.topup_available === true)
+            ) {
+              historyStore.removeMessage(messageId)
+
+              checkAndShowLimit({
+                allowed: false,
+                limitType: 'monthly',
+                actionType: data.action_type || 'MESSAGES',
+                used: Number(data.used) || 0,
+                limit: Number(data.limit) || 0,
+                remaining: Number(data.remaining) || 0,
+                resetTime: null,
+                userLevel: data.user_level || authStore.user?.level || 'NEW',
+                phoneVerified: data.phone_verified || false,
+                topupAvailable: data.topup_available === true,
+              })
+
               streamingAbortController = null
               stopStreamingFn = null
               currentTrackId = undefined

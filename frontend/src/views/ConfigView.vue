@@ -13,6 +13,13 @@
           <AIModelsConfiguration />
         </div>
 
+        <div
+          v-else-if="currentPage === 'ai-provider-higgsfield'"
+          data-testid="section-ai-provider-higgsfield"
+        >
+          <HiggsfieldConnection />
+        </div>
+
         <div v-else-if="currentPage === 'task-prompts'" data-testid="section-task-prompts">
           <TaskPromptsConfiguration />
         </div>
@@ -42,6 +49,7 @@ import { useRoute } from 'vue-router'
 import MainLayout from '@/components/MainLayout.vue'
 import InboundConfiguration from '@/components/config/InboundConfiguration.vue'
 import AIModelsConfiguration from '@/components/config/AIModelsConfiguration.vue'
+import HiggsfieldConnection from '@/components/config/HiggsfieldConnection.vue'
 import TaskPromptsConfiguration from '@/components/config/TaskPromptsConfiguration.vue'
 import SortingPromptConfiguration from '@/components/config/SortingPromptConfiguration.vue'
 import APIKeysConfiguration from '@/components/config/APIKeysConfiguration.vue'
@@ -56,6 +64,7 @@ const currentPage = computed(() => {
   if (path.startsWith('/channels/api/docs')) return 'api-documentation'
   if (path.startsWith('/channels/api')) return 'api-keys'
   if (path.startsWith('/channels')) return 'inbound'
+  if (path.startsWith('/ai/providers/higgsfield')) return 'ai-provider-higgsfield'
   if (path.startsWith('/ai/models')) return 'ai-models'
   if (path.startsWith('/ai/instructions')) return 'task-prompts'
   if (path.startsWith('/ai/routing')) return 'sorting-prompt'

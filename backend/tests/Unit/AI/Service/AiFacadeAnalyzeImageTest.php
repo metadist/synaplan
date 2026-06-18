@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Service;
 
+use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Service\AiFacade;
@@ -55,6 +56,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
             $this->createMock(InternalEmailService::class),
             $this->createMock(CacheInterface::class),
             $this->createMock(CacheItemPoolInterface::class),
+            $this->createMock(HiggsfieldCredentialResolver::class),
             '/tmp'
         );
     }

@@ -180,6 +180,50 @@ class SubscriptionControllerEndpointTest extends WebTestCase
         $this->assertNull($body['cancelAt']);
     }
 
+    public function testGetBudgetReturns401WhenUnauthenticated(): void
+    {
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/subscription/budget');
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    public function testGetBudgetReturnsDocumentedShape(): void
+    {
+        $this->client->request(
+            'GET',
+            '/api/v1/subscription/budget',
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->accessToken],
+        );
+
+        $this->assertResponseIsSuccessful();
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+
+        // This is the exact contract the frontend Zod schema
+        // (GetSubscriptionBudgetResponseSchema) validates — keep it in lockstep
+        // with the OpenAPI annotation on SubscriptionController::budget().
+        foreach ([
+            'allowed', 'used_cost', 'raw_cost', 'markup_percent', 'base_budget',
+            'topups', 'budget', 'remaining', 'percent', 'period_start',
+            'period_end', 'gate_enabled', 'topup_step_eur', 'billing_enabled',
+        ] as $key) {
+            $this->assertArrayHasKey($key, $body, "budget response must expose '$key'");
+        }
+
+        $this->assertIsBool($body['allowed']);
+        $this->assertIsBool($body['gate_enabled']);
+        $this->assertIsBool($body['billing_enabled']);
+        $this->assertIsInt($body['topup_step_eur']);
+        $this->assertIsInt($body['period_start']);
+        $this->assertIsInt($body['period_end']);
+        // Money fields are serialised as strings (number_format) so the frontend
+        // never has to worry about float rounding.
+        $this->assertIsString($body['budget']);
+        $this->assertIsString($body['remaining']);
+    }
+
     public function testCheckoutReturns400ForInvalidPlanId(): void
     {
         $this->client->request(

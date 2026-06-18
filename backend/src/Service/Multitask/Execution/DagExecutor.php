@@ -7,6 +7,7 @@ namespace App\Service\Multitask\Execution;
 use App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher;
 use App\Service\Multitask\Execution\Parallel\MediaNodeRequest;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Plan\TaskPlan;
 use Psr\Log\LoggerInterface;
@@ -209,7 +210,10 @@ final readonly class DagExecutor
 
         $context->setResult($node->id, $result);
         $this->emitFilesFor($node, $result, $progressCallback);
-        $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed', $this->failureMetadata($node, $result, $context));
+        $extra = $result->isSuccessful()
+            ? $this->successMetadata($node, $result)
+            : $this->failureMetadata($node, $result, $context);
+        $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed', $extra);
     }
 
     /**
@@ -228,7 +232,10 @@ final readonly class DagExecutor
             unset($inflight[$node->id]);
             $context->setResult($node->id, $result);
             $this->emitFilesFor($node, $result, $progressCallback);
-            $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed', $this->failureMetadata($node, $result, $context));
+            $extra = $result->isSuccessful()
+                ? $this->successMetadata($node, $result)
+                : $this->failureMetadata($node, $result, $context);
+            $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed', $extra);
 
             return;
         }
@@ -410,6 +417,33 @@ final readonly class DagExecutor
             if (null !== $prompt) {
                 $extra['prompt'] = $prompt;
             }
+        }
+
+        return $extra;
+    }
+
+    /**
+     * Extra `task_update` metadata for a successfully completed node.
+     * Currently only web_search nodes carry extra data (query + results_count)
+     * so the live task card shows a compact summary matching the reload state
+     * (QA feedback PR #1076 — search card body parity).
+     *
+     * @return array<string, mixed>
+     */
+    private function successMetadata(TaskNode $node, NodeResult $result): array
+    {
+        if (Capability::WebSearch !== $node->capability) {
+            return [];
+        }
+
+        $extra = [];
+        $query = $result->metadata['query'] ?? null;
+        if (is_string($query) && '' !== $query) {
+            $extra['query'] = $query;
+        }
+        $sr = $result->metadata['search_results'] ?? null;
+        if (is_array($sr) && is_array($sr['results'] ?? null)) {
+            $extra['results_count'] = count($sr['results']);
         }
 
         return $extra;

@@ -15,6 +15,7 @@ export * from './feedbackApi'
 export { legacyApi } from './legacyApi'
 export * from './configApi'
 export * from './apiKeysApi'
+export * from './higgsfieldCredentialsApi'
 export { httpClient, getApiBaseUrl, setApiBaseUrl } from './httpClient'
 
 // Re-export for backward compatibility

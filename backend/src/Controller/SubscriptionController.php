@@ -5,11 +5,13 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\BillingService;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -31,6 +33,12 @@ class SubscriptionController extends AbstractController
     private const CHECKOUT_RATE_LIMIT_WINDOW = 60; // 1 minute
     private const CHECKOUT_RATE_LIMIT_MAX = 20; // max 20 checkout attempts per minute per user
 
+    /** Fixed EUR amount per top-up "step" the user can buy. */
+    public const TOPUP_STEP_EUR = 100;
+
+    /** Max number of EUR-100 steps in a single top-up checkout. */
+    private const TOPUP_MAX_STEPS = 50;
+
     public function __construct(
         private EntityManagerInterface $em,
         private UserRepository $userRepository,
@@ -43,7 +51,10 @@ class SubscriptionController extends AbstractController
         private string $frontendUrl,
         private string $stripePaymentMethods,
         private BillingService $billingService,
+        private RateLimitService $rateLimitService,
         private bool $stripeAutomaticTaxEnabled = false,
+        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
+        private bool $costBudgetGateEnabled = false,
     ) {
     }
 
@@ -310,6 +321,188 @@ class SubscriptionController extends AbstractController
             ]);
 
             return $this->json(['error' => 'Failed to create checkout session'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Current cost-budget status for the signed-in user (markup-aware), so the
+     * UI can show remaining budget and decide whether to offer a top-up.
+     */
+    #[Route('/budget', name: 'subscription_budget', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/subscription/budget',
+        summary: 'Get the signed-in user\'s current cost-budget status (incl. markup + top-ups)',
+        security: [['Bearer' => []]],
+        tags: ['Subscription'],
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Budget status',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'allowed', type: 'boolean'),
+                new OA\Property(property: 'used_cost', type: 'string', example: '0.00'),
+                new OA\Property(property: 'raw_cost', type: 'string', example: '0.00'),
+                new OA\Property(property: 'markup_percent', type: 'number', format: 'float', example: 10.0),
+                new OA\Property(property: 'base_budget', type: 'string', example: '10.00'),
+                new OA\Property(property: 'topups', type: 'string', example: '0.00'),
+                new OA\Property(property: 'budget', type: 'string', example: '10.00'),
+                new OA\Property(property: 'remaining', type: 'string', example: '10.00'),
+                new OA\Property(property: 'percent', type: 'number', format: 'float', example: 0.0),
+                new OA\Property(property: 'period_start', type: 'integer', format: 'int64'),
+                new OA\Property(property: 'period_end', type: 'integer', format: 'int64'),
+                new OA\Property(property: 'gate_enabled', type: 'boolean'),
+                new OA\Property(property: 'topup_step_eur', type: 'integer', example: 100),
+                new OA\Property(property: 'billing_enabled', type: 'boolean'),
+            ],
+        ),
+    )]
+    #[OA\Response(response: 401, description: 'Authentication required')]
+    public function budget(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $status = $this->rateLimitService->checkCostBudget($user);
+
+        return $this->json([
+            ...$status,
+            'gate_enabled' => $this->costBudgetGateEnabled,
+            'topup_step_eur' => self::TOPUP_STEP_EUR,
+            'billing_enabled' => $this->billingService->isEnabled(),
+        ]);
+    }
+
+    /**
+     * Create a Stripe one-time Checkout (mode=payment) to top up the user's
+     * cost budget in fixed EUR-100 steps. The webhook credits a BUSER_TOPUPS row
+     * on completion, which raises the budget for the current period.
+     */
+    #[Route('/topup', name: 'subscription_topup', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/subscription/topup',
+        summary: 'Create a one-time Stripe Checkout to top up the cost budget in EUR 100 steps',
+        security: [['Bearer' => []]],
+        tags: ['Subscription'],
+    )]
+    #[OA\RequestBody(
+        required: false,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'steps', type: 'integer', example: 1, description: 'Number of EUR 100 steps to buy (1-50)'),
+            ],
+        ),
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Checkout session created',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'sessionId', type: 'string'),
+                new OA\Property(property: 'url', type: 'string'),
+                new OA\Property(property: 'steps', type: 'integer', example: 1),
+                new OA\Property(property: 'total_eur', type: 'integer', example: 100),
+            ],
+        ),
+    )]
+    #[OA\Response(response: 429, description: 'Rate limit exceeded')]
+    #[OA\Response(response: 503, description: 'Stripe not configured')]
+    public function createTopupSession(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$this->checkCheckoutRateLimit($user)) {
+            return $this->json([
+                'error' => 'Too many checkout attempts. Please wait a minute and try again.',
+                'code' => 'RATE_LIMIT_EXCEEDED',
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
+        if (!$this->billingService->isEnabled()) {
+            return $this->json([
+                'error' => 'Payment service is currently unavailable. Please contact support.',
+                'code' => 'STRIPE_NOT_CONFIGURED',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $steps = is_array($data) ? (int) ($data['steps'] ?? 1) : 1;
+        $steps = max(1, min(self::TOPUP_MAX_STEPS, $steps));
+        $totalEur = $steps * self::TOPUP_STEP_EUR;
+
+        try {
+            \Stripe\Stripe::setApiKey($this->stripeSecretKey);
+            $customerId = $this->getOrCreateStripeCustomer($user);
+            $paymentMethods = array_filter(array_map('trim', explode(',', $this->stripePaymentMethods)));
+
+            $session = \Stripe\Checkout\Session::create([
+                'customer' => $customerId,
+                'payment_method_types' => $paymentMethods,
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => 'eur',
+                        'product_data' => [
+                            'name' => 'Synaplan usage top-up',
+                            'description' => sprintf('Adds EUR %d to your usage budget for the current period.', $totalEur),
+                        ],
+                        'unit_amount' => self::TOPUP_STEP_EUR * 100, // cents
+                    ],
+                    'quantity' => $steps,
+                ]],
+                'mode' => 'payment',
+                'billing_address_collection' => 'required',
+                'customer_update' => [
+                    'name' => 'auto',
+                    'address' => 'auto',
+                ],
+                'tax_id_collection' => [
+                    'enabled' => true,
+                ],
+                'automatic_tax' => [
+                    'enabled' => $this->stripeAutomaticTaxEnabled,
+                ],
+                'success_url' => $this->frontendUrl.'/subscription/success?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => $this->frontendUrl.'/subscription/cancel',
+                'client_reference_id' => (string) $user->getId(),
+                'metadata' => [
+                    'user_id' => (string) $user->getId(),
+                    'type' => 'topup',
+                    'topup_eur' => (string) $totalEur,
+                ],
+            ]);
+
+            $this->logger->info('Stripe top-up session created', [
+                'user_id' => $user->getId(),
+                'session_id' => $session->id,
+                'steps' => $steps,
+                'total_eur' => $totalEur,
+            ]);
+
+            return $this->json([
+                'sessionId' => $session->id,
+                'url' => $session->url,
+                'steps' => $steps,
+                'total_eur' => $totalEur,
+            ]);
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            $this->logger->error('Stripe API error during top-up checkout', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'Payment service error. Please try again later.'], Response::HTTP_SERVICE_UNAVAILABLE);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to create top-up session', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'Failed to create top-up session'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 

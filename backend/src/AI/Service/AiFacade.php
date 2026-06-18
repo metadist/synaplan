@@ -2,6 +2,7 @@
 
 namespace App\AI\Service;
 
+use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ProviderMetadataInterface;
@@ -49,9 +50,41 @@ class AiFacade
         // distinguish hits from misses WITHOUT triggering one provider call
         // per missing text. Both interfaces target the same Redis keys.
         private CacheItemPoolInterface $cachePool,
+        private HiggsfieldCredentialResolver $higgsfieldCredentials,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private string $embeddingFallbackProvider = '',
     ) {
+    }
+
+    /**
+     * For providers whose credentials may differ per user (currently only
+     * Higgsfield), resolve the right key+secret pair and inject it into the
+     * options array passed down to the provider. No-op for every other
+     * provider — they read their credentials from constructor env values.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function maybeInjectProviderCredentials(string $providerName, ?int $userId, array $options): array
+    {
+        if ('higgsfield' !== strtolower($providerName)) {
+            return $options;
+        }
+
+        if (isset($options['credentials']) && is_array($options['credentials'])) {
+            // Caller supplied explicit credentials — respect them.
+            return $options;
+        }
+
+        $resolved = $this->higgsfieldCredentials->resolve($userId);
+        if (null === $resolved) {
+            return $options;
+        }
+
+        $options['credentials'] = $resolved;
+
+        return $options;
     }
 
     /**
@@ -826,6 +859,7 @@ class AiFacade
         }
 
         $provider = $this->registry->getImageGenerationProvider($providerName);
+        $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
 
         $this->logger->info('AI image generation request', [
             'provider' => $provider->getName(),
@@ -875,6 +909,7 @@ class AiFacade
         }
 
         $provider = $this->registry->getVideoGenerationProvider($providerName);
+        $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
 
         $this->logger->info('AI video generation request', [
             'provider' => $provider->getName(),
@@ -927,6 +962,7 @@ class AiFacade
         }
 
         $provider = $this->registry->getVideoGenerationProvider($providerName);
+        $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
 
         if (!$provider instanceof GoogleProvider) {
             throw new ProviderException('Async video generation is only supported by Google Veo', $provider->getName());

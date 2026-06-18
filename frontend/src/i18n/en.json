@@ -19,6 +19,7 @@
     "ragSearch": "Search",
     "configInbound": "Channels",
     "configAiModels": "AI Models",
+    "configProviderHiggsfield": "Higgsfield Connection",
     "configTaskPrompts": "AI Instructions",
     "configSortingPrompt": "Routing",
     "configApiKeys": "API Keys",
@@ -689,6 +690,7 @@
     "status_extracted": "Extracted",
     "status_vectorizing": "Indexing…",
     "status_vectorized": "Ready",
+    "status_error": "Error",
     "status_processed": "Processed",
     "attached": "Attached",
     "standalone": "Standalone",
@@ -856,6 +858,7 @@
         "text2pic": "Image Generation (Text → Image)",
         "pic2pic": "Image Editing (Image → Image)",
         "text2vid": "Video Generation (Text → Video)",
+        "img2vid": "Video Animation (Image → Video)",
         "sound2text": "Speech-to-Text",
         "text2sound": "Text-to-Speech",
         "analyze": "Text Analytics"
@@ -1036,6 +1039,39 @@
         "completed": "Completed",
         "failed": "Failed",
         "cancelled": "Cancelled"
+      }
+    },
+    "providers": {
+      "higgsfield": {
+        "title": "Higgsfield",
+        "description": "Cinematic image and video generation: Soul and Reve (text-to-image), plus DoP and Kling 2.1 (image-to-video). Authentication uses a key + secret pair from your Higgsfield account.",
+        "getKeyLink": "Get your API key + secret from cloud.higgsfield.ai →",
+        "statusTitle": "Current connection",
+        "userKeyLabel": "Your key",
+        "sourceUser": "Using your personal Higgsfield key",
+        "sourcePlatform": "Using the platform-wide key",
+        "sourceNone": "Not connected — no key configured",
+        "noCredentialsHint": "Higgsfield models will be hidden until either you add a personal key here or the platform operator sets a global HIGGSFIELD_API_KEY / HIGGSFIELD_API_SECRET.",
+        "connectTitle": "Connect your Higgsfield account",
+        "replaceTitle": "Replace your key",
+        "formHint": "Both fields are required. The pair is encrypted at rest and never returned to your browser.",
+        "apiKeyLabel": "API key",
+        "apiKeyPlaceholder": "hf_pub_…",
+        "apiSecretLabel": "API secret",
+        "apiSecretPlaceholder": "hf_sec_…",
+        "saveButton": "Save",
+        "replaceButton": "Replace",
+        "testButton": "Test connection",
+        "clearButton": "Clear my key",
+        "clearConfirm": "Remove your personal Higgsfield key? You will fall back to the platform key (if any).",
+        "clearConfirmTitle": "Remove personal key",
+        "saveSuccess": "Higgsfield key saved.",
+        "saveError": "Could not save the key.",
+        "clearSuccess": "Personal key removed.",
+        "clearError": "Could not remove the key.",
+        "testSuccess": "Higgsfield connection works.",
+        "testError": "Could not reach Higgsfield.",
+        "loadError": "Could not load Higgsfield connection state."
       }
     },
     "taskPrompts": {
@@ -1497,6 +1533,11 @@
       "support": "Premium support"
     },
     "upgradeNow": "Upgrade Now",
+    "topup": {
+      "button": "Add €{amount} budget",
+      "amountLabel": "Top-up amount (€{step} steps)",
+      "error": "Could not start the top-up. Please try again."
+    },
     "verifyPhone": "Verify Phone Number",
     "footerNote": "Questions? Contact our support team.",
     "messageBlocked": "Message could not be sent",
@@ -2791,6 +2832,7 @@
     "title": "Task plan",
     "download": "Download",
     "failedBody": "This step couldn't be completed.",
+    "searchSummary": "Searched the web · {count} {count, plural, one {source} other {sources}}",
     "retryWith": "Retry with {model}",
     "state": {
       "pending": "Queued",

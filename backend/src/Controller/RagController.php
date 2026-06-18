@@ -151,7 +151,7 @@ class RagController extends AbstractController
      */
     #[Route('/similar/{chunkId}', name: 'similar', methods: ['GET'])]
     public function findSimilar(
-        int $chunkId,
+        string $chunkId,
         Request $request,
         #[CurrentUser] ?User $user,
     ): JsonResponse {

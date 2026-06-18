@@ -20,6 +20,8 @@ final readonly class FileStorageService
         'odt', 'ods', 'odp', 'odg', 'odf', 'ics',
         'jpg', 'jpeg', 'png', 'gif', 'webp',
         'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm',
+        // Video formats analysable via audio transcription + key-frame vision (#983)
+        'mov', 'avi', 'mkv',
     ];
     private const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'mkv'];
 
