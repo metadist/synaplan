@@ -245,20 +245,20 @@ final readonly class VectorSearchService
     /**
      * Find similar documents based on a source chunk ID.
      *
-     * @param int|string $sourceMessageId Source chunk to find similar documents for (int for MariaDB, string for Qdrant)
-     * @param int        $userId          User ID for filtering
-     * @param int        $limit           Number of results
+     * @param int|string $sourceChunkId Source chunk to find similar documents for (int for MariaDB, string for Qdrant)
+     * @param int        $userId        User ID for filtering
+     * @param int        $limit         Number of results
      *
      * @return array Similar documents
      */
     public function findSimilar(
-        int|string $sourceMessageId,
+        int|string $sourceChunkId,
         int $userId,
         int $limit = 10,
         float $minScore = 0.3,
     ): array {
         try {
-            $results = $this->vectorStorage->findSimilar($userId, $sourceMessageId, $limit, $minScore);
+            $results = $this->vectorStorage->findSimilar($userId, $sourceChunkId, $limit, $minScore);
 
             return array_map(function ($result) {
                 return [
@@ -272,7 +272,7 @@ final readonly class VectorSearchService
         } catch (\Throwable $e) {
             $this->logger->error('VectorSearchService: Find similar failed', [
                 'error' => $e->getMessage(),
-                'source_mid' => $sourceMessageId,
+                'source_chunk_id' => $sourceChunkId,
                 'user_id' => $userId,
             ]);
 

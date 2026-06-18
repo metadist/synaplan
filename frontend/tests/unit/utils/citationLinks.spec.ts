@@ -63,9 +63,11 @@ describe('replaceCitationMarkers', () => {
     expect(replaceCitationMarkers(text, 5)).toBe(text)
   })
 
-  it('anchor includes href="#" and onclick prevention', () => {
+  it('anchor includes href="#" but no inline event handler', () => {
     const result = replaceCitationMarkers('[1]', 1)
     expect(result).toContain('href="#"')
-    expect(result).toContain('onclick="event.preventDefault()"')
+    // No inline onclick: DOMPurify strips event-handler attributes, so the
+    // default navigation is prevented in the Vue click handler instead.
+    expect(result).not.toContain('onclick')
   })
 })

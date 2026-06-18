@@ -1536,7 +1536,12 @@ const handleReferenceClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement
 
   // Handle source references [1], [2], etc.
+  // The anchor carries href="#" so it stays keyboard-focusable, but we must
+  // stop the browser from jumping to the top / mutating the URL hash. The
+  // inline onclick is intentionally NOT used because DOMPurify strips event
+  // handler attributes from the sanitized markdown output.
   if (target.classList.contains('source-ref')) {
+    event.preventDefault()
     const index = parseInt(target.dataset.sourceIndex || '-1')
     if (index >= 0 && props.searchResults && index < props.searchResults.length) {
       focusSource(index)

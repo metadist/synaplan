@@ -17,7 +17,7 @@ export function replaceCitationMarkers(content: string, sourceCount: number): st
   return content.replace(/\[(\d+)(?:[†↑‡][^\]]*)?\]/g, (match, num: string) => {
     const index = parseInt(num) - 1
     if (index >= 0 && index < sourceCount) {
-      return `<a href="#" class="${SOURCE_REF_CLASSES}" data-source-index="${index}" onclick="event.preventDefault()">${num}</a>`
+      return `<a href="#" class="${SOURCE_REF_CLASSES}" data-source-index="${index}">${num}</a>`
     }
     return match
   })
