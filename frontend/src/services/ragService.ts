@@ -13,7 +13,7 @@ export interface RagSearchRequest {
 }
 
 export interface RagSearchResult {
-  chunk_id: number
+  chunk_id: number | string
   message_id: number
   text: string
   score: number
@@ -68,7 +68,7 @@ export const getStats = async (): Promise<{ success: boolean; stats: RagStats }>
  * Find similar documents to a given document
  */
 export const findSimilar = async (
-  chunkId: number,
+  chunkId: number | string,
   limit: number = 5
 ): Promise<{ success: boolean; results: RagSearchResult[] }> => {
   const response = await api.get<{ success: boolean; results: RagSearchResult[] }>(

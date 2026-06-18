@@ -1033,6 +1033,7 @@
     "title": "Görev planı",
     "download": "İndir",
     "failedBody": "Bu adım tamamlanamadı.",
+    "searchSummary": "Web arandı · {count} kaynak",
     "retryWith": "{model} ile yeniden dene",
     "state": {
       "pending": "Sırada",

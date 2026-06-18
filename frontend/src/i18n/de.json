@@ -850,6 +850,7 @@
     "title": "Aufgabenplan",
     "download": "Herunterladen",
     "failedBody": "Dieser Schritt konnte nicht abgeschlossen werden.",
+    "searchSummary": "Web durchsucht · {count} {count, plural, one {Quelle} other {Quellen}}",
     "retryWith": "Nochmal mit {model}",
     "state": {
       "pending": "Wartet",
@@ -1829,6 +1830,7 @@
     "status_extracted": "Extrahiert",
     "status_vectorizing": "Wird indexiert…",
     "status_vectorized": "Bereit",
+    "status_error": "Fehler",
     "status_processed": "Verarbeitet",
     "attached": "Angehängt",
     "standalone": "Eigenständig",

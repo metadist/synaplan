@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution\Runner;
 
+use App\Repository\SearchResultRepository;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -30,6 +31,7 @@ final readonly class WebSearchRunner implements TaskRunner
         private SearchQueryGenerator $queryGenerator,
         private BraveSearchService $braveSearch,
         private LoggerInterface $logger,
+        private ?SearchResultRepository $searchResultRepository = null,
     ) {
     }
 
@@ -91,6 +93,20 @@ final readonly class WebSearchRunner implements TaskRunner
         }
 
         $text = $this->braveSearch->formatResultsForAI($results);
+
+        // Persist the structured results to the DB so MessageApiFormatter can
+        // build the Sources dropdown on reload — mirrors what MessageProcessor
+        // does on the single-task path. The reused_prefetched branch above skips
+        // this because MessageProcessor has already saved the rows.
+        if (null !== $this->searchResultRepository && !empty($results['results'])) {
+            try {
+                $this->searchResultRepository->saveSearchResults($context->message, $results, $query);
+            } catch (\Throwable $e) {
+                $this->logger->warning('WebSearchRunner: failed to persist search results (ignored)', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return NodeResult::ok($text, [], [
             'web_search' => true,

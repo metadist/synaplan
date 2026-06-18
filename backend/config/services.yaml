@@ -737,6 +737,8 @@ services:
 when@dev:
     services:
         App\AI\Provider\TestProvider:
+            arguments:
+                $uploadDir: '%kernel.project_dir%/var/uploads'
             tags:
                 - { name: 'app.ai.chat' }
                 - { name: 'app.ai.embedding' }
@@ -754,6 +756,8 @@ when@test:
             alias: App\Realtime\Publisher\NullPublisher
 
         App\AI\Provider\TestProvider:
+            arguments:
+                $uploadDir: '%kernel.project_dir%/var/uploads'
             tags:
                 - { name: 'app.ai.chat' }
                 - { name: 'app.ai.embedding' }

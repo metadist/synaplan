@@ -292,6 +292,37 @@ class MessageClassifierTest extends TestCase
     }
 
     /**
+     * Issue #983: a video attachment must take the same analyzefile route
+     * as documents and audio (skip the AI sorter, use the ANALYZE model)
+     * so the FileAnalysisHandler actually receives the clip.
+     */
+    public function testVideoAttachmentForcesAnalyzefileRoute(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(11);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('What is in this clip?');
+        $message->method('getLanguage')->willReturn('en');
+
+        $file = $this->createMock(\App\Entity\File::class);
+        $file->method('getFileType')->willReturn('mp4');
+        $file->method('getFileName')->willReturn('clip.mp4');
+        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $message->method('getFiles')->willReturn($files);
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+        $this->assertSame('attachment_document_or_audio', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    /**
      * Phase 1c: short, plain-chat messages should skip the AI sorter when the
      * fast-path BCONFIG flag is enabled (default-on in production). Builds an
      * isolated classifier (without the global "all configs return '0'" mock)

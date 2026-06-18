@@ -36,7 +36,7 @@
       <!-- Single bubble with content + footer -->
       <div
         :class="[
-          'flex flex-col relative group/bubble',
+          'flex flex-col relative group/bubble min-w-0 max-w-full',
           role === 'user' ? 'bubble-user' : 'bubble-ai',
         ]"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
@@ -310,7 +310,7 @@
 
         <!-- Bubble content (only non-thinking parts) -->
         <div
-          class="px-4 py-3 overflow-x-clip overflow-y-visible space-y-3"
+          class="px-4 py-3 overflow-x-auto overflow-y-visible space-y-3 scroll-thin"
           data-quotable
           :data-message-id="backendMessageId"
           :data-message-role="role"
@@ -405,10 +405,10 @@
             on plain text. Falling back to `${type}-${index}` keeps backward
             compatibility for parts without partId (legacy stored messages).
           -->
-          <!-- Multitask routing: live task cards (only while a multi-node plan
-               streams). On reload the turn is flattened to normal parts below. -->
+          <!-- Multitask routing: show task cards when a plan is active (streaming)
+               or when cards exist from a persisted DAG turn (after reload). -->
           <TaskPlanBubble
-            v-if="taskPlan?.active"
+            v-if="taskPlan && taskPlan.cards.length > 0"
             :plan="taskPlan"
             @retry-task="emit('retryTask', $event)"
           />
@@ -963,6 +963,7 @@ import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
+import { replaceCitationMarkers } from '@/utils/citationLinks'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -1191,14 +1192,8 @@ const contentParts = computed(() => {
     if (part.type === 'text' && part.content) {
       let processedContent = part.content
 
-      // Replace [1], [2], etc. with clickable spans for search results
-      processedContent = processedContent.replace(/\[(\d+)\]/g, (match, num) => {
-        const index = parseInt(num) - 1
-        if (index >= 0 && index < props.searchResults!.length) {
-          return `<a href="#" class="source-ref inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-bold hover:bg-[var(--brand)] hover:text-white transition-all mx-0.5 no-underline" data-source-index="${index}" onclick="event.preventDefault()">${num}</a>`
-        }
-        return match
-      })
+      // Replace [1], [2], [1†source], [1↑source], [1‡source], etc. with clickable spans for search results
+      processedContent = replaceCitationMarkers(processedContent, props.searchResults!.length)
 
       return {
         ...part,
@@ -1559,7 +1554,12 @@ const handleReferenceClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement
 
   // Handle source references [1], [2], etc.
+  // The anchor carries href="#" so it stays keyboard-focusable, but we must
+  // stop the browser from jumping to the top / mutating the URL hash. The
+  // inline onclick is intentionally NOT used because DOMPurify strips event
+  // handler attributes from the sanitized markdown output.
   if (target.classList.contains('source-ref')) {
+    event.preventDefault()
     const index = parseInt(target.dataset.sourceIndex || '-1')
     if (index >= 0 && props.searchResults && index < props.searchResults.length) {
       focusSource(index)

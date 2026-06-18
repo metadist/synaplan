@@ -521,6 +521,13 @@ final readonly class SystemConfigService
                 CURLOPT_TIMEOUT => 5,
                 CURLOPT_CONNECTTIMEOUT => 3,
             ]);
+
+            // Send HTTP Basic Auth when Tika is protected (same pattern as TikaClient)
+            $httpUser = $this->getEnvValue('TIKA_HTTP_USER');
+            if (!empty($httpUser)) {
+                curl_setopt($ch, CURLOPT_USERPWD, $httpUser.':'.($this->getEnvValue('TIKA_HTTP_PASS') ?? ''));
+            }
+
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
@@ -918,7 +925,7 @@ final readonly class SystemConfigService
             'MAX_CHAT_MEMORIES' => [
                 'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',
                 'sensitive' => false, 'description' => 'Max memories loaded into chat context',
-                'default' => '10',
+                'default' => '5',
                 'source' => 'database',
             ],
         ];

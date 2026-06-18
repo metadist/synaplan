@@ -44,6 +44,30 @@ class GuestSessionRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * Sum the message counts across all active (non-expired) guest sessions
+     * originating from the given IP address.
+     *
+     * Used to enforce a per-IP message budget so that closing/reopening
+     * incognito windows cannot reset the guest trial quota.
+     */
+    public function sumActiveMessageCountByIp(string $ip, ?int $excludeSessionId = null): int
+    {
+        $qb = $this->createQueryBuilder('gs')
+            ->select('COALESCE(SUM(gs.messageCount), 0)')
+            ->where('gs.ipAddress = :ip')
+            ->andWhere('gs.expires > :now')
+            ->setParameter('ip', $ip)
+            ->setParameter('now', time());
+
+        if (null !== $excludeSessionId) {
+            $qb->andWhere('gs.id != :excludeId')
+                ->setParameter('excludeId', $excludeSessionId);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
     public function deleteExpiredSessions(): int
     {
         return $this->createQueryBuilder('gs')

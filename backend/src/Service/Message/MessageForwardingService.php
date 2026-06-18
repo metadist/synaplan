@@ -61,6 +61,33 @@ final readonly class MessageForwardingService
     }
 
     /**
+     * Forward the operator-entered user prompt to the external channel before AI processing.
+     *
+     * This ensures the full conversation flow (prompt + AI response) is visible on the
+     * originating channel (e.g. WhatsApp). The prompt is forwarded as-is — no think-block
+     * stripping or memory-tag resolution is needed since it is plain user input.
+     *
+     * This is a best-effort operation: failures are logged but never propagated.
+     */
+    public function forwardUserPromptIfNeeded(Chat $chat, string $text): void
+    {
+        if ('whatsapp' !== $chat->getSource()) {
+            return;
+        }
+
+        $text = trim($text);
+        if ('' === $text) {
+            $this->logger->info('Skipping WhatsApp prompt forward: empty text', [
+                'chat_id' => $chat->getId(),
+            ]);
+
+            return;
+        }
+
+        $this->forwardToWhatsApp($chat, $text);
+    }
+
+    /**
      * Replace [Memory:ID] tags with their actual values so external
      * channel users see readable text instead of raw badge markers.
      */

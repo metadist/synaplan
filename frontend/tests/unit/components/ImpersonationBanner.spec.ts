@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -49,6 +49,18 @@ vi.mock('@/stores/config', () => ({
     reload: vi.fn().mockResolvedValue(undefined),
     billing: { enabled: false },
   }),
+}))
+
+// auth.ts dynamically imports chats + history stores on every principal
+// swap (#999) to wipe user-scoped client state. The full modules pull in a
+// lot of unrelated utilities; this banner spec only cares that the reset is
+// invoked and does not throw, so we stub them out to keep the test fast and
+// hermetic.
+vi.mock('@/stores/chats', () => ({
+  useChatsStore: () => ({ $reset: vi.fn() }),
+}))
+vi.mock('@/stores/history', () => ({
+  useHistoryStore: () => ({ clear: vi.fn() }),
 }))
 
 const buildRouter = () =>
@@ -131,8 +143,9 @@ describe('ImpersonationBanner', () => {
 
     const wrapper = await mountBanner()
     await wrapper.find('[data-testid="btn-impersonation-exit"]').trigger('click')
-    // Allow the awaited stop + refreshUser() chain to flush.
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    // Allow the awaited stop + resetUserScopedClientState (dynamic imports of
+    // chats/history) + refreshUser() chain to flush before asserting.
+    await flushPromises()
 
     expect(stopImpersonationMock).toHaveBeenCalledTimes(1)
     expect(successMock).toHaveBeenCalledWith('Admin session restored.')
@@ -151,7 +164,7 @@ describe('ImpersonationBanner', () => {
 
     const wrapper = await mountBanner()
     await wrapper.find('[data-testid="btn-impersonation-exit"]').trigger('click')
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flushPromises()
 
     expect(errorMock).toHaveBeenCalledWith('Impersonation session expired. Please sign in again.')
     expect(successMock).not.toHaveBeenCalled()
