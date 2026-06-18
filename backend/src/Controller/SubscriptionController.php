@@ -335,7 +335,29 @@ class SubscriptionController extends AbstractController
         security: [['Bearer' => []]],
         tags: ['Subscription'],
     )]
-    #[OA\Response(response: 200, description: 'Budget status')]
+    #[OA\Response(
+        response: 200,
+        description: 'Budget status',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'allowed', type: 'boolean'),
+                new OA\Property(property: 'used_cost', type: 'string', example: '0.00'),
+                new OA\Property(property: 'raw_cost', type: 'string', example: '0.00'),
+                new OA\Property(property: 'markup_percent', type: 'number', format: 'float', example: 10.0),
+                new OA\Property(property: 'base_budget', type: 'string', example: '10.00'),
+                new OA\Property(property: 'topups', type: 'string', example: '0.00'),
+                new OA\Property(property: 'budget', type: 'string', example: '10.00'),
+                new OA\Property(property: 'remaining', type: 'string', example: '10.00'),
+                new OA\Property(property: 'percent', type: 'number', format: 'float', example: 0.0),
+                new OA\Property(property: 'period_start', type: 'integer', format: 'int64'),
+                new OA\Property(property: 'period_end', type: 'integer', format: 'int64'),
+                new OA\Property(property: 'gate_enabled', type: 'boolean'),
+                new OA\Property(property: 'topup_step_eur', type: 'integer', example: 100),
+                new OA\Property(property: 'billing_enabled', type: 'boolean'),
+            ],
+        ),
+    )]
+    #[OA\Response(response: 401, description: 'Authentication required')]
     public function budget(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -372,7 +394,18 @@ class SubscriptionController extends AbstractController
             ],
         ),
     )]
-    #[OA\Response(response: 200, description: 'Checkout session created')]
+    #[OA\Response(
+        response: 200,
+        description: 'Checkout session created',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'sessionId', type: 'string'),
+                new OA\Property(property: 'url', type: 'string'),
+                new OA\Property(property: 'steps', type: 'integer', example: 1),
+                new OA\Property(property: 'total_eur', type: 'integer', example: 100),
+            ],
+        ),
+    )]
     #[OA\Response(response: 429, description: 'Rate limit exceeded')]
     #[OA\Response(response: 503, description: 'Stripe not configured')]
     public function createTopupSession(

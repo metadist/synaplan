@@ -418,6 +418,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     return [
                         'metadata' => [
                             'error' => 'cost_budget_exceeded',
+                            'code' => 'COST_BUDGET_EXCEEDED',
                             'limit_type' => 'monthly',
                             'budget' => $budgetCheck['budget'],
                             'used' => $budgetCheck['used_cost'],
@@ -891,11 +892,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     }
 
     /**
-     * Collect absolute paths of image attachments from the message.
-     *
-     * @return string[] Absolute file paths to attached images
-     */
-    /**
      * Publish a locally-stored input image at a public, internet-reachable URL
      * so a remote image-to-video provider can fetch it.
      *
@@ -967,9 +963,12 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     /**
      * Is the configured public base URL (APP_URL) one that a remote AI provider
      * could realistically fetch from? Returns false for an empty value and for
-     * localhost / loopback / private dev hosts. Used to short-circuit
-     * image-to-video requests (whose source frame must be provider-fetchable)
-     * with an actionable message instead of a raw provider 400.
+     * hosts that are not routable from the public internet: loopback,
+     * RFC 1918 / RFC 4193 private ranges, link-local, and non-public TLDs
+     * (.local / .localhost / .internal / .lan / .home / .test). Used to
+     * short-circuit image-to-video requests (whose source frame must be
+     * provider-fetchable) with an actionable message instead of a raw
+     * provider 400 ("invalid_image_url").
      */
     private function isPublicBaseUrlReachable(): bool
     {
@@ -978,9 +977,45 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             return false;
         }
 
-        return 1 !== preg_match('#^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)(:\d+)?#i', $base);
+        $host = parse_url($base, \PHP_URL_HOST);
+        if (!is_string($host) || '' === $host) {
+            return false;
+        }
+
+        // Normalise an IPv6 literal ("[::1]" → "::1") before inspection.
+        $host = trim($host, '[]');
+        $lowerHost = strtolower($host);
+
+        // Obvious local hostnames + non-public TLD suffixes.
+        if ('localhost' === $lowerHost || 'host.docker.internal' === $lowerHost) {
+            return false;
+        }
+        foreach (['.local', '.localhost', '.internal', '.lan', '.home', '.test'] as $suffix) {
+            if (str_ends_with($lowerHost, $suffix)) {
+                return false;
+            }
+        }
+
+        // If the host is an IP literal, reject private + reserved ranges
+        // (covers 10.x, 172.16–31.x, 192.168.x, 169.254.x, 127.x, ::1, fc00::/7, …).
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
+            return false !== filter_var(
+                $host,
+                \FILTER_VALIDATE_IP,
+                \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE,
+            );
+        }
+
+        // A non-IP hostname that isn't one of the local cases above is assumed
+        // to resolve publicly (a real DNS name behind a proxy/tunnel).
+        return true;
     }
 
+    /**
+     * Collect absolute paths of image attachments from the message.
+     *
+     * @return string[] Absolute file paths to attached images
+     */
     private function collectAttachedImagePaths(Message $message): array
     {
         $paths = [];

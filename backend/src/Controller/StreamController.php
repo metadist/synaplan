@@ -368,6 +368,10 @@ class StreamController extends AbstractController
                     $rateLimitError = [
                         'status' => 'error',
                         'error' => 'Cost budget exceeded',
+                        // Stable machine-readable discriminator so the frontend
+                        // does not have to substring-match the human-readable
+                        // (i18n-able) error text. See ChatView error handling.
+                        'code' => 'COST_BUDGET_EXCEEDED',
                         'limit_type' => 'monthly',
                         'action_type' => 'MESSAGES',
                         'limit' => $budgetCheck['budget'],

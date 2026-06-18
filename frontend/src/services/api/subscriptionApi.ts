@@ -1,4 +1,9 @@
 // Subscription API service
+import type { z } from 'zod'
+import {
+  GetSubscriptionBudgetResponseSchema,
+  PostSubscriptionTopupResponseSchema,
+} from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
 export interface SubscriptionPlan {
@@ -47,29 +52,11 @@ export interface PortalSession {
   url: string
 }
 
-export interface TopupSession {
-  sessionId: string
-  url: string
-  steps: number
-  total_eur: number
-}
+// Inferred from the generated Zod schemas (per AGENTS_DEV: never hand-write
+// interfaces for API responses).
+export type TopupSession = z.infer<typeof PostSubscriptionTopupResponseSchema>
 
-export interface BudgetStatus {
-  allowed: boolean
-  used_cost: string
-  raw_cost: string
-  markup_percent: number
-  base_budget: string
-  topups: string
-  budget: string
-  remaining: string
-  percent: number
-  period_start: number
-  period_end: number
-  gate_enabled: boolean
-  topup_step_eur: number
-  billing_enabled: boolean
-}
+export type BudgetStatus = z.infer<typeof GetSubscriptionBudgetResponseSchema>
 
 export const subscriptionApi = {
   async getPlans(): Promise<{ plans: SubscriptionPlan[]; stripeConfigured: boolean }> {
@@ -104,8 +91,9 @@ export const subscriptionApi = {
    * Current cost-budget status (markup-aware, incl. period top-ups).
    */
   async getBudget(): Promise<BudgetStatus> {
-    return httpClient<BudgetStatus>('/api/v1/subscription/budget', {
+    return httpClient('/api/v1/subscription/budget', {
       method: 'GET',
+      schema: GetSubscriptionBudgetResponseSchema,
     })
   },
 
@@ -113,9 +101,10 @@ export const subscriptionApi = {
    * Create a one-time Stripe Checkout to top up the cost budget in EUR-100 steps.
    */
   async createTopupSession(steps = 1): Promise<TopupSession> {
-    return httpClient<TopupSession>('/api/v1/subscription/topup', {
+    return httpClient('/api/v1/subscription/topup', {
       method: 'POST',
       body: JSON.stringify({ steps }),
+      schema: PostSubscriptionTopupResponseSchema,
     })
   },
 

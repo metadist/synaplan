@@ -85,7 +85,7 @@
           </span>
           <input
             v-model="apiKey"
-            type="text"
+            type="password"
             autocomplete="off"
             spellcheck="false"
             :placeholder="
@@ -165,24 +165,6 @@
           {{ $t('config.providers.higgsfield.clearButton') }}
         </button>
       </div>
-
-      <!-- Feedback -->
-      <div
-        v-if="feedback"
-        class="mt-5 p-3 rounded-lg flex items-start gap-2 text-sm"
-        :class="
-          feedback.kind === 'success'
-            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-            : 'bg-red-500/10 text-red-700 dark:text-red-300'
-        "
-        data-testid="alert-higgsfield-feedback"
-      >
-        <Icon
-          :icon="feedback.kind === 'success' ? 'heroicons:check-circle' : 'heroicons:x-circle'"
-          class="w-5 h-5 flex-shrink-0 mt-0.5"
-        />
-        <span>{{ feedback.message }}</span>
-      </div>
     </div>
 
     <div v-if="loading" class="text-center py-12" data-testid="section-higgsfield-loading">
@@ -198,6 +180,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
+import { useDialog } from '@/composables/useDialog'
+import { useNotification } from '@/composables/useNotification'
 import {
   clearHiggsfieldCredentials,
   getHiggsfieldCredentialState,
@@ -207,6 +191,8 @@ import {
 } from '@/services/api/higgsfieldCredentialsApi'
 
 const { t } = useI18n()
+const { confirm } = useDialog()
+const { success, error } = useNotification()
 
 const loading = ref(true)
 const saving = ref(false)
@@ -222,8 +208,6 @@ const state = ref<HiggsfieldCredentialState>({
   user_api_key_masked: '',
   effective_source: 'none',
 })
-
-const feedback = ref<{ kind: 'success' | 'error'; message: string } | null>(null)
 
 const canSave = computed(() => apiKey.value.trim() !== '' && apiSecret.value.trim() !== '')
 
@@ -243,10 +227,7 @@ async function loadState() {
   try {
     state.value = await getHiggsfieldCredentialState()
   } catch (err) {
-    feedback.value = {
-      kind: 'error',
-      message: (err as Error).message || t('config.providers.higgsfield.loadError'),
-    }
+    error((err as Error).message || t('config.providers.higgsfield.loadError'))
   } finally {
     loading.value = false
   }
@@ -255,7 +236,6 @@ async function loadState() {
 async function onSave() {
   if (!canSave.value || saving.value) return
   saving.value = true
-  feedback.value = null
   try {
     await saveHiggsfieldCredentials({
       api_key: apiKey.value.trim(),
@@ -263,16 +243,10 @@ async function onSave() {
     })
     apiKey.value = ''
     apiSecret.value = ''
-    feedback.value = {
-      kind: 'success',
-      message: t('config.providers.higgsfield.saveSuccess'),
-    }
+    success(t('config.providers.higgsfield.saveSuccess'))
     await loadState()
   } catch (err) {
-    feedback.value = {
-      kind: 'error',
-      message: (err as Error).message || t('config.providers.higgsfield.saveError'),
-    }
+    error((err as Error).message || t('config.providers.higgsfield.saveError'))
   } finally {
     saving.value = false
   }
@@ -280,22 +254,22 @@ async function onSave() {
 
 async function onClear() {
   if (clearing.value) return
-  if (!window.confirm(t('config.providers.higgsfield.clearConfirm'))) return
+
+  const confirmed = await confirm({
+    title: t('config.providers.higgsfield.clearConfirmTitle'),
+    message: t('config.providers.higgsfield.clearConfirm'),
+    confirmText: t('config.providers.higgsfield.clearButton'),
+    danger: true,
+  })
+  if (!confirmed) return
 
   clearing.value = true
-  feedback.value = null
   try {
     await clearHiggsfieldCredentials()
-    feedback.value = {
-      kind: 'success',
-      message: t('config.providers.higgsfield.clearSuccess'),
-    }
+    success(t('config.providers.higgsfield.clearSuccess'))
     await loadState()
   } catch (err) {
-    feedback.value = {
-      kind: 'error',
-      message: (err as Error).message || t('config.providers.higgsfield.clearError'),
-    }
+    error((err as Error).message || t('config.providers.higgsfield.clearError'))
   } finally {
     clearing.value = false
   }
@@ -304,18 +278,15 @@ async function onClear() {
 async function onTest() {
   if (testing.value) return
   testing.value = true
-  feedback.value = null
   try {
     const result = await testHiggsfieldCredentials()
-    feedback.value = {
-      kind: result.success ? 'success' : 'error',
-      message: result.message,
+    if (result.success) {
+      success(result.message ?? t('config.providers.higgsfield.testSuccess'))
+    } else {
+      error(result.message ?? t('config.providers.higgsfield.testError'))
     }
   } catch (err) {
-    feedback.value = {
-      kind: 'error',
-      message: (err as Error).message || t('config.providers.higgsfield.testError'),
-    }
+    error((err as Error).message || t('config.providers.higgsfield.testError'))
   } finally {
     testing.value = false
   }

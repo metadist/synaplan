@@ -13,59 +13,70 @@
  *   POST   /api/v1/ai-providers/higgsfield/credentials/test
  */
 
+import type { z } from 'zod'
+import {
+  DeleteApiAiHiggsfieldCredentialsDeleteResponseSchema,
+  GetApiAiHiggsfieldCredentialsGetResponseSchema,
+  PostApiAiHiggsfieldCredentialsTestResponseSchema,
+  PutApiAiHiggsfieldCredentialsPutResponseSchema,
+} from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
+// Response types are inferred from the generated Zod schemas (per AGENTS_DEV:
+// never hand-write interfaces for API responses). The request body type below
+// is NOT an API response, so it stays a plain interface.
 export type HiggsfieldEffectiveSource = 'user' | 'platform' | 'none'
 
-export interface HiggsfieldCredentialState {
-  has_platform_credentials: boolean
-  has_user_credentials: boolean
-  user_api_key_masked: string
-  effective_source: HiggsfieldEffectiveSource
-}
+export type HiggsfieldCredentialState = z.infer<
+  typeof GetApiAiHiggsfieldCredentialsGetResponseSchema
+>
+
+export type SaveHiggsfieldCredentialsResponse = z.infer<
+  typeof PutApiAiHiggsfieldCredentialsPutResponseSchema
+>
+
+export type ClearHiggsfieldCredentialsResponse = z.infer<
+  typeof DeleteApiAiHiggsfieldCredentialsDeleteResponseSchema
+>
+
+export type TestHiggsfieldCredentialsResponse = z.infer<
+  typeof PostApiAiHiggsfieldCredentialsTestResponseSchema
+>
 
 export interface SaveHiggsfieldCredentialsRequest {
   api_key: string
   api_secret: string
 }
 
-export interface SaveHiggsfieldCredentialsResponse {
-  success: boolean
-  has_user_credentials: boolean
-  user_api_key_masked: string
-}
-
-export interface ClearHiggsfieldCredentialsResponse {
-  success: boolean
-  has_user_credentials: boolean
-  has_platform_credentials: boolean
-}
-
-export interface TestHiggsfieldCredentialsResponse {
-  success: boolean
-  message: string
-  source: HiggsfieldEffectiveSource
-}
-
 const BASE = '/api/v1/ai-providers/higgsfield/credentials'
 
 export async function getHiggsfieldCredentialState(): Promise<HiggsfieldCredentialState> {
-  return httpClient<HiggsfieldCredentialState>(BASE, { method: 'GET' })
+  return httpClient(BASE, {
+    method: 'GET',
+    schema: GetApiAiHiggsfieldCredentialsGetResponseSchema,
+  })
 }
 
 export async function saveHiggsfieldCredentials(
   data: SaveHiggsfieldCredentialsRequest
 ): Promise<SaveHiggsfieldCredentialsResponse> {
-  return httpClient<SaveHiggsfieldCredentialsResponse>(BASE, {
+  return httpClient(BASE, {
     method: 'PUT',
     body: JSON.stringify(data),
+    schema: PutApiAiHiggsfieldCredentialsPutResponseSchema,
   })
 }
 
 export async function clearHiggsfieldCredentials(): Promise<ClearHiggsfieldCredentialsResponse> {
-  return httpClient<ClearHiggsfieldCredentialsResponse>(BASE, { method: 'DELETE' })
+  return httpClient(BASE, {
+    method: 'DELETE',
+    schema: DeleteApiAiHiggsfieldCredentialsDeleteResponseSchema,
+  })
 }
 
 export async function testHiggsfieldCredentials(): Promise<TestHiggsfieldCredentialsResponse> {
-  return httpClient<TestHiggsfieldCredentialsResponse>(`${BASE}/test`, { method: 'POST' })
+  return httpClient(`${BASE}/test`, {
+    method: 'POST',
+    schema: PostApiAiHiggsfieldCredentialsTestResponseSchema,
+  })
 }

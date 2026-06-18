@@ -1229,6 +1229,7 @@
     "upgradeNow": "Mejorar Ahora",
     "topup": {
       "button": "Añadir €{amount} de saldo",
+      "amountLabel": "Importe de recarga (pasos de €{step})",
       "error": "No se pudo iniciar la recarga. Inténtalo de nuevo."
     },
     "verifyPhone": "Verificar Número de Teléfono",
@@ -1500,7 +1501,7 @@
     "providers": {
       "higgsfield": {
         "title": "Higgsfield",
-        "description": "Generación cinemática de imagen y vídeo: Soul (texto a imagen), DoP, Kling 2.1 Pro, Seedance v1 Pro (imagen a vídeo) y Seedream v4. La autenticación usa un par clave + secreto de tu cuenta de Higgsfield.",
+        "description": "Generación cinemática de imagen y vídeo: Soul y Reve (texto a imagen), además de DoP y Kling 2.1 (imagen a vídeo). La autenticación usa un par clave + secreto de tu cuenta de Higgsfield.",
         "getKeyLink": "Obtén tu API key + secret en cloud.higgsfield.ai →",
         "statusTitle": "Conexión actual",
         "userKeyLabel": "Tu clave",
@@ -1520,10 +1521,12 @@
         "testButton": "Probar conexión",
         "clearButton": "Quitar mi clave",
         "clearConfirm": "¿Quitar tu clave personal de Higgsfield? Volverás a la clave de la plataforma (si la hay).",
+        "clearConfirmTitle": "Quitar clave personal",
         "saveSuccess": "Clave de Higgsfield guardada.",
         "saveError": "No se pudo guardar la clave.",
         "clearSuccess": "Clave personal eliminada.",
         "clearError": "No se pudo eliminar la clave.",
+        "testSuccess": "La conexión con Higgsfield funciona.",
         "testError": "No se pudo conectar con Higgsfield.",
         "loadError": "No se pudo cargar el estado de conexión de Higgsfield."
       }

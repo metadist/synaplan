@@ -1043,7 +1043,7 @@
     "providers": {
       "higgsfield": {
         "title": "Higgsfield",
-        "description": "Cinematic image and video generation: Soul (text-to-image), DoP, Kling 2.1 Pro, Seedance v1 Pro (image-to-video), and Seedream v4. Authentication uses a key + secret pair from your Higgsfield account.",
+        "description": "Cinematic image and video generation: Soul and Reve (text-to-image), plus DoP and Kling 2.1 (image-to-video). Authentication uses a key + secret pair from your Higgsfield account.",
         "getKeyLink": "Get your API key + secret from cloud.higgsfield.ai →",
         "statusTitle": "Current connection",
         "userKeyLabel": "Your key",
@@ -1063,10 +1063,12 @@
         "testButton": "Test connection",
         "clearButton": "Clear my key",
         "clearConfirm": "Remove your personal Higgsfield key? You will fall back to the platform key (if any).",
+        "clearConfirmTitle": "Remove personal key",
         "saveSuccess": "Higgsfield key saved.",
         "saveError": "Could not save the key.",
         "clearSuccess": "Personal key removed.",
         "clearError": "Could not remove the key.",
+        "testSuccess": "Higgsfield connection works.",
         "testError": "Could not reach Higgsfield.",
         "loadError": "Could not load Higgsfield connection state."
       }
@@ -1532,6 +1534,7 @@
     "upgradeNow": "Upgrade Now",
     "topup": {
       "button": "Add €{amount} budget",
+      "amountLabel": "Top-up amount (€{step} steps)",
       "error": "Could not start the top-up. Please try again."
     },
     "verifyPhone": "Verify Phone Number",

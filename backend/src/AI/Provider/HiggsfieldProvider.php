@@ -66,7 +66,8 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         private readonly string $platformApiSecret = '',
         // Injectable so unit tests can poll without real sleeps. Production
         // keeps the 3s default; the value only affects the wait between status
-        // polls during the open SSE stream.
+        // polls while the worker blocks on the synchronous submit→poll loop
+        // (there is no SSE stream here — the worker sleeps between GET polls).
         private readonly int $pollIntervalSeconds = self::POLL_INTERVAL_SECONDS,
     ) {
     }
@@ -110,11 +111,12 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
             ];
         }
 
+        // We intentionally do NOT fabricate latency/error-rate/connection
+        // metrics here: the provider keeps no such counters, so reporting
+        // hard-coded zeros would be misleading on a health dashboard. Only
+        // report what we can actually attest to — that credentials exist.
         return [
             'healthy' => true,
-            'latency_ms' => 0,
-            'error_rate' => 0.0,
-            'active_connections' => 0,
         ];
     }
 

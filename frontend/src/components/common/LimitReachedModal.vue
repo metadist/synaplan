@@ -117,6 +117,37 @@
 
           <!-- Buttons -->
           <div class="flex flex-col gap-3">
+            <!-- Top-up amount selector (monthly cost-budget exceeded) -->
+            <div v-if="topupAvailable" class="flex items-center justify-between gap-3">
+              <span class="text-sm txt-secondary">
+                {{ $t('limitReached.topup.amountLabel', { step: topupStepEur }) }}
+              </span>
+              <div class="flex items-center gap-2">
+                <button
+                  class="w-8 h-8 rounded-lg surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                  :disabled="topupSteps <= 1 || topupLoading"
+                  data-testid="btn-topup-decrement"
+                  @click="topupSteps = Math.max(1, topupSteps - 1)"
+                >
+                  −
+                </button>
+                <span
+                  class="min-w-[2ch] text-center font-semibold txt-primary"
+                  data-testid="topup-steps"
+                >
+                  {{ topupSteps }}
+                </span>
+                <button
+                  class="w-8 h-8 rounded-lg surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                  :disabled="topupSteps >= TOPUP_MAX_STEPS || topupLoading"
+                  data-testid="btn-topup-increment"
+                  @click="topupSteps = Math.min(TOPUP_MAX_STEPS, topupSteps + 1)"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
             <!-- Top-up Button (monthly cost-budget exceeded) -->
             <button
               v-if="topupAvailable"
@@ -146,7 +177,7 @@
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-              {{ $t('limitReached.topup.button', { amount: topupStepEur }) }}
+              {{ $t('limitReached.topup.button', { amount: topupTotalEur }) }}
             </button>
 
             <p v-if="topupError" class="text-xs text-red-500 text-center" data-testid="topup-error">
@@ -252,15 +283,22 @@ const props = withDefaults(defineProps<Props>(), {
   topupStepEur: 100,
 })
 
+// Max number of €-step bundles per top-up checkout. Mirrors the backend cap
+// in SubscriptionController::TOPUP_MAX_STEPS.
+const TOPUP_MAX_STEPS = 50
+
 const topupLoading = ref(false)
 const topupError = ref<string | null>(null)
+const topupSteps = ref(1)
+
+const topupTotalEur = computed(() => topupSteps.value * props.topupStepEur)
 
 const handleTopup = async () => {
   if (topupLoading.value) return
   topupLoading.value = true
   topupError.value = null
   try {
-    const session = await subscriptionApi.createTopupSession(1)
+    const session = await subscriptionApi.createTopupSession(topupSteps.value)
     if (session.url) {
       window.location.href = session.url
     } else {

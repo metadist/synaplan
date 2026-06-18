@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
  *   1. Per-user encrypted BCONFIG row (group="higgsfield", setting="api_key"
  *      and "api_secret"). Per-user values are AES-256-CBC encrypted at rest
  *      via {@see EncryptionService} (which derives its key from APP_SECRET).
- *   2. Platform-wide env credentials (HIGGSFIELD_API_KEY / HIGGSFIELD_SECRET)
+ *   2. Platform-wide env credentials (HIGGSFIELD_API_KEY / HIGGSFIELD_API_SECRET)
  *      injected at construction time.
  *
  * A null return value means no credentials are configured for the given user

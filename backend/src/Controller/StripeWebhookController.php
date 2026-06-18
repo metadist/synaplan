@@ -6,10 +6,12 @@ use App\Entity\Topup;
 use App\Entity\User;
 use App\Repository\TopupRepository;
 use App\Repository\UserRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
+use Stripe\StripeObject;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -264,18 +266,22 @@ class StripeWebhookController extends AbstractController
      * Credit a one-time budget top-up. Idempotent on the Stripe session id
      * (DB unique index) so webhook retries never double-credit.
      */
-    private function handleTopupCompleted($session): bool
+    private function handleTopupCompleted(StripeObject $session): bool
     {
         $userId = $session->client_reference_id ?? ($session->metadata->user_id ?? null);
         $user = $userId ? $this->userRepository->find((int) $userId) : null;
 
         if (!$user) {
-            $this->logger->warning('User not found for top-up checkout', [
+            // Deterministic failure: the user referenced by the session does
+            // not exist and never will. Returning `true` ACKs the event so
+            // Stripe stops retrying a webhook that can never succeed (it would
+            // otherwise be redelivered until Stripe's retry budget is spent).
+            $this->logger->warning('User not found for top-up checkout, acknowledging to stop Stripe retries', [
                 'session_id' => $session->id,
                 'user_id' => $userId,
             ]);
 
-            return false;
+            return true;
         }
 
         // Durable idempotency guard (in addition to the event-level cache check).
@@ -295,12 +301,14 @@ class StripeWebhookController extends AbstractController
             : ((int) ($session->amount_subtotal ?? 0)) / 100.0;
 
         if ($amountEur <= 0) {
-            $this->logger->warning('Top-up completed with non-positive amount', [
+            // Also deterministic — a zero/negative amount cannot be credited.
+            // ACK so Stripe does not redeliver forever (see above).
+            $this->logger->warning('Top-up completed with non-positive amount, acknowledging to stop Stripe retries', [
                 'session_id' => $session->id,
                 'user_id' => $user->getId(),
             ]);
 
-            return false;
+            return true;
         }
 
         $topup = new Topup();
@@ -318,8 +326,22 @@ class StripeWebhookController extends AbstractController
             $user->setPaymentDetails($paymentDetails);
         }
 
-        $this->topupRepository->save($topup, false);
-        $this->em->flush();
+        try {
+            $this->topupRepository->save($topup, false);
+            $this->em->flush();
+        } catch (UniqueConstraintViolationException) {
+            // The existsForSession() check above and this flush() are not
+            // atomic: a concurrent webhook retry for the same session can pass
+            // the check and then collide on the BUSER_TOPUPS unique index here.
+            // That collision proves the credit already landed, so treat it as a
+            // successful idempotent no-op instead of bubbling a 500.
+            $this->logger->info('Top-up credit raced a concurrent retry; already credited', [
+                'session_id' => $session->id,
+                'user_id' => $user->getId(),
+            ]);
+
+            return true;
+        }
 
         $this->logger->info('Budget top-up credited', [
             'session_id' => $session->id,

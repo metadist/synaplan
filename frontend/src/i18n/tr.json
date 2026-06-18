@@ -1230,6 +1230,7 @@
     "upgradeNow": "Şimdi Yükselt",
     "topup": {
       "button": "€{amount} bakiye ekle",
+      "amountLabel": "Yükleme tutarı (€{step} adımları)",
       "error": "Yükleme başlatılamadı. Lütfen tekrar deneyin."
     },
     "verifyPhone": "Telefon Numarasını Doğrula",
@@ -1501,7 +1502,7 @@
     "providers": {
       "higgsfield": {
         "title": "Higgsfield",
-        "description": "Sinematik görüntü ve video üretimi: Soul (metinden görüntüye), DoP, Kling 2.1 Pro, Seedance v1 Pro (görüntüden videoya) ve Seedream v4. Kimlik doğrulama, Higgsfield hesabınızdan alınan anahtar + gizli anahtar çifti ile yapılır.",
+        "description": "Sinematik görüntü ve video üretimi: Soul ve Reve (metinden görüntüye), ayrıca DoP ve Kling 2.1 (görüntüden videoya). Kimlik doğrulama, Higgsfield hesabınızdan alınan anahtar + gizli anahtar çifti ile yapılır.",
         "getKeyLink": "API anahtarınızı + gizli anahtarınızı cloud.higgsfield.ai adresinden alın →",
         "statusTitle": "Mevcut bağlantı",
         "userKeyLabel": "Anahtarınız",
@@ -1521,10 +1522,12 @@
         "testButton": "Bağlantıyı test et",
         "clearButton": "Anahtarımı kaldır",
         "clearConfirm": "Kişisel Higgsfield anahtarınız kaldırılsın mı? Platform anahtarına (varsa) geri dönersiniz.",
+        "clearConfirmTitle": "Kişisel anahtarı kaldır",
         "saveSuccess": "Higgsfield anahtarı kaydedildi.",
         "saveError": "Anahtar kaydedilemedi.",
         "clearSuccess": "Kişisel anahtar kaldırıldı.",
         "clearError": "Anahtar kaldırılamadı.",
+        "testSuccess": "Higgsfield bağlantısı çalışıyor.",
         "testError": "Higgsfield'a ulaşılamadı.",
         "loadError": "Higgsfield bağlantı durumu yüklenemedi."
       }

@@ -118,6 +118,7 @@ class MessageController extends AbstractController
             if (!$budgetCheck['allowed']) {
                 return $this->json([
                     'error' => 'Cost budget exceeded',
+                    'code' => 'COST_BUDGET_EXCEEDED',
                     'limit_type' => 'monthly',
                     'action_type' => 'MESSAGES',
                     'limit' => $budgetCheck['budget'],

@@ -1160,7 +1160,7 @@
     "providers": {
       "higgsfield": {
         "title": "Higgsfield",
-        "description": "Cinematische Bild- und Videogenerierung: Soul (Text-zu-Bild), DoP, Kling 2.1 Pro, Seedance v1 Pro (Bild-zu-Video) und Seedream v4. Die Authentifizierung erfolgt mit einem Schlüssel-Paar (Key + Secret) aus deinem Higgsfield-Konto.",
+        "description": "Cinematische Bild- und Videogenerierung: Soul und Reve (Text-zu-Bild) sowie DoP und Kling 2.1 (Bild-zu-Video). Die Authentifizierung erfolgt mit einem Schlüssel-Paar (Key + Secret) aus deinem Higgsfield-Konto.",
         "getKeyLink": "Hol dir deinen API-Key + Secret auf cloud.higgsfield.ai →",
         "statusTitle": "Aktuelle Verbindung",
         "userKeyLabel": "Dein Schlüssel",
@@ -1180,10 +1180,12 @@
         "testButton": "Verbindung testen",
         "clearButton": "Meinen Schlüssel entfernen",
         "clearConfirm": "Persönlichen Higgsfield-Schlüssel entfernen? Du fällst dann auf den Plattform-Schlüssel zurück (falls vorhanden).",
+        "clearConfirmTitle": "Persönlichen Schlüssel entfernen",
         "saveSuccess": "Higgsfield-Schlüssel gespeichert.",
         "saveError": "Schlüssel konnte nicht gespeichert werden.",
         "clearSuccess": "Persönlicher Schlüssel entfernt.",
         "clearError": "Schlüssel konnte nicht entfernt werden.",
+        "testSuccess": "Higgsfield-Verbindung funktioniert.",
         "testError": "Higgsfield konnte nicht erreicht werden.",
         "loadError": "Higgsfield-Verbindungsstatus konnte nicht geladen werden."
       }
@@ -1629,6 +1631,7 @@
     "upgradeNow": "Jetzt Upgraden",
     "topup": {
       "button": "€{amount} Guthaben aufladen",
+      "amountLabel": "Aufladebetrag (€{step}-Schritte)",
       "error": "Aufladung konnte nicht gestartet werden. Bitte versuche es erneut."
     },
     "verifyPhone": "Telefonnummer Verifizieren",

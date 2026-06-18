@@ -104,7 +104,17 @@ final class HiggsfieldCredentialController extends AbstractController
             required: ['api_key', 'api_secret'],
         ),
     )]
-    #[OA\Response(response: 200, description: 'Credentials saved')]
+    #[OA\Response(
+        response: 200,
+        description: 'Credentials saved',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'has_user_credentials', type: 'boolean', example: true),
+                new OA\Property(property: 'user_api_key_masked', type: 'string', example: 'hf_p****'),
+            ],
+        ),
+    )]
     #[OA\Response(response: 400, description: 'Invalid payload (missing api_key or api_secret)')]
     public function put(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
@@ -156,7 +166,17 @@ final class HiggsfieldCredentialController extends AbstractController
         security: [['Bearer' => []]],
         tags: ['AI Providers'],
     )]
-    #[OA\Response(response: 200, description: 'Per-user credentials cleared')]
+    #[OA\Response(
+        response: 200,
+        description: 'Per-user credentials cleared',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'has_user_credentials', type: 'boolean', example: false),
+                new OA\Property(property: 'has_platform_credentials', type: 'boolean', example: true),
+            ],
+        ),
+    )]
     public function delete(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {

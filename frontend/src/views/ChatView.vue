@@ -2510,8 +2510,11 @@ const streamAIResponse = async (
             }
 
             // Handle monthly cost-budget exceeded → offer a one-time top-up.
+            // Branch on the stable machine-readable `code` (set by the backend),
+            // not on the human-readable error text which changes with i18n /
+            // rewording. Keep the structured-field check as a defensive fallback.
             if (
-              errorMsg.toLowerCase().includes('cost budget') ||
+              data.code === 'COST_BUDGET_EXCEEDED' ||
               (data.limit_type === 'monthly' && data.topup_available === true)
             ) {
               historyStore.removeMessage(messageId)
