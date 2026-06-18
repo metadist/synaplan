@@ -6,11 +6,13 @@ use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Repository\MessageRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\AgainHandler;
 use App\Service\Message\EnhanceOutputGuard;
+use App\Service\Message\MessageApiFormatter;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\MessageEnqueueService;
 use App\Service\ModelConfigService;
@@ -41,6 +43,8 @@ class MessageController extends AbstractController
         private FileStorageService $fileStorageService,
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
+        private MessageRepository $messageRepository,
+        private MessageApiFormatter $messageApiFormatter,
         private LoggerInterface $logger,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
@@ -374,6 +378,133 @@ class MessageController extends AbstractController
         return $this->json([
             'success' => true,
             'messages' => array_reverse($result), // Oldest first
+        ]);
+    }
+
+    /**
+     * Get a single persisted message in the canonical history row shape.
+     *
+     * Issue #1070: after SSE `complete` the frontend re-fetches the
+     * finalized message here and treats it as the authoritative source
+     * for files/media/metadata, so live streaming and page reload can
+     * never diverge. Serialization is shared with
+     * GET /api/v1/chats/{id}/messages via MessageApiFormatter.
+     */
+    #[Route('/{messageId}', name: 'get', methods: ['GET'], requirements: ['messageId' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/messages/{messageId}',
+        summary: 'Get a single message in the same shape as the chat history endpoint',
+        description: 'Returns the persisted, finalized state of one message. Used by the frontend after SSE `complete` to reconcile the streamed state against the authoritative persisted version (files, media, metadata).',
+        security: [['Bearer' => []]],
+        tags: ['Messages'],
+        parameters: [
+            new OA\Parameter(name: 'messageId', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'The persisted message',
+                content: new OA\JsonContent(
+                    required: ['success', 'message'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'message',
+                            type: 'object',
+                            required: ['id', 'text', 'direction', 'timestamp'],
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 123),
+                                new OA\Property(property: 'text', type: 'string'),
+                                new OA\Property(property: 'direction', type: 'string', enum: ['IN', 'OUT']),
+                                new OA\Property(property: 'timestamp', type: 'integer', example: 1765600000),
+                                new OA\Property(property: 'provider', type: 'string', nullable: true),
+                                new OA\Property(property: 'topic', type: 'string', nullable: true),
+                                new OA\Property(property: 'originalTopic', type: 'string', nullable: true),
+                                new OA\Property(property: 'originalMediaType', type: 'string', nullable: true),
+                                new OA\Property(property: 'language', type: 'string', nullable: true),
+                                new OA\Property(property: 'createdAt', type: 'string', nullable: true),
+                                new OA\Property(
+                                    property: 'files',
+                                    type: 'array',
+                                    description: 'Attached files (user uploads)',
+                                    items: new OA\Items(
+                                        properties: [
+                                            new OA\Property(property: 'id', type: 'integer'),
+                                            new OA\Property(property: 'filename', type: 'string'),
+                                            new OA\Property(property: 'fileType', type: 'string'),
+                                            new OA\Property(property: 'filePath', type: 'string'),
+                                            new OA\Property(property: 'fileSize', type: 'integer', nullable: true),
+                                            new OA\Property(property: 'fileMime', type: 'string', nullable: true),
+                                        ],
+                                        type: 'object'
+                                    )
+                                ),
+                                new OA\Property(property: 'aiModels', type: 'object', nullable: true, description: 'AI model metadata (chat/sorting/audio)'),
+                                new OA\Property(property: 'webSearch', type: 'object', nullable: true),
+                                new OA\Property(property: 'searchResults', type: 'array', nullable: true, items: new OA\Items(type: 'object')),
+                                new OA\Property(property: 'multitask', type: 'boolean'),
+                                new OA\Property(
+                                    property: 'taskPlan',
+                                    type: 'object',
+                                    nullable: true,
+                                    description: 'Per-node render state for DAG turns (null for non-DAG messages). Enables task cards to be rebuilt on reload.',
+                                    properties: [
+                                        new OA\Property(property: 'reply_node', type: 'string'),
+                                        new OA\Property(
+                                            property: 'cards',
+                                            type: 'array',
+                                            items: new OA\Items(
+                                                type: 'object',
+                                                properties: [
+                                                    new OA\Property(property: 'nodeId', type: 'string'),
+                                                    new OA\Property(property: 'capability', type: 'string'),
+                                                    new OA\Property(property: 'kind', type: 'string'),
+                                                    new OA\Property(property: 'state', type: 'string'),
+                                                    new OA\Property(property: 'text', type: 'string', nullable: true),
+                                                    new OA\Property(property: 'url', type: 'string', nullable: true),
+                                                    new OA\Property(property: 'type', type: 'string', nullable: true),
+                                                    new OA\Property(property: 'error', type: 'string', nullable: true),
+                                                ]
+                                            )
+                                        ),
+                                    ]
+                                ),
+                                new OA\Property(
+                                    property: 'file',
+                                    type: 'object',
+                                    nullable: true,
+                                    description: 'Generated content (image, video, audio from AI)',
+                                    properties: [
+                                        new OA\Property(property: 'path', type: 'string'),
+                                        new OA\Property(property: 'type', type: 'string'),
+                                    ]
+                                ),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Message not found'),
+        ]
+    )]
+    public function getMessage(
+        int $messageId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $message = $this->messageRepository->find($messageId);
+
+        if (!$message || $message->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json([
+            'success' => true,
+            'message' => $this->messageApiFormatter->format($message),
         ]);
     }
 

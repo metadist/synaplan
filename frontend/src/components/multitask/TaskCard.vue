@@ -53,6 +53,11 @@ const showSkeleton = computed(
 // where markdown is unnecessary, so we keep the plain text path for them.
 const isProseKind = computed(() => ['text', 'extract'].includes(props.card.kind))
 
+// Search cards show a compact summary (query + source count) instead of the
+// raw full-text dump produced by BraveSearchService.formatResultsForAI().
+// The full results are available via the Sources dropdown on the message body.
+const isSearchKind = computed(() => props.card.kind === 'search')
+
 // Model tag matching this card's media kind — the pool the retry button picks from.
 const retryTag = computed((): Capability | null => {
   switch (props.card.kind) {
@@ -169,8 +174,21 @@ const handleRetry = () => {
     </div>
 
     <template v-else>
-      <!-- Streaming / final text -->
-      <div v-if="card.text" class="task-card__body text-sm txt-primary break-words">
+      <!-- Search card: compact summary (query + source count). The full results
+           are shown in the Sources dropdown on the message body, so the card only
+           needs a one-liner — QA feedback PR #1076 points 2 & 4. -->
+      <div v-if="isSearchKind && card.state === 'done'" class="task-card__body text-sm txt-muted">
+        <span v-if="card.query && card.resultsCount">
+          {{ $t('taskPlan.searchSummary', { query: card.query, count: card.resultsCount }) }}
+        </span>
+        <span v-else-if="card.query">{{ card.query }}</span>
+      </div>
+
+      <!-- Streaming / final text (prose and non-search kinds) -->
+      <div
+        v-else-if="!isSearchKind && card.text"
+        class="task-card__body text-sm txt-primary break-words"
+      >
         <MessageText
           v-if="isProseKind"
           :content="card.text"
