@@ -435,10 +435,11 @@ final readonly class MessageClassifier
     /**
      * True if the message has at least one attached document, audio, or video
      * file (i.e. an analyzable non-image attachment). Routes to
-     * FileAnalysisHandler so the ANALYZE default model is used (#595). Video is
-     * included because its audio track is transcribed to text the chat model
-     * can reason about (#722); without this gate a video-only message fell
-     * through to the AI sorter and was answered as a plain (text-less) chat.
+     * FileAnalysisHandler so the ANALYZE default model is used (#595, video
+     * added in #983). Video is included because its audio track is transcribed
+     * to text the chat model can reason about (#722); without this gate a
+     * video-only message fell through to the AI sorter and was answered as a
+     * plain (text-less) chat.
      */
     private function messageHasAnalyzableNonImageAttachment(Message $message): bool
     {

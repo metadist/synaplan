@@ -48,11 +48,16 @@ final readonly class FileProcessor
     ];
 
     /**
-     * Video container formats that must always have their audio track stripped
-     * before being sent to an external STT API — even though some containers
-     * (mp4, mkv) appear in API_SUPPORTED_AUDIO_FORMATS. A full video file can
-     * easily be 40+ MB while the extracted audio-only payload is a few MB;
-     * every hosted Whisper endpoint enforces a ~25 MB ceiling.
+     * Video container formats. They get both audio-track transcription AND a
+     * visual key-frame description (issue #983), and their audio track is
+     * always stripped before being sent to an external STT API — even though
+     * some containers (mp4, mkv) appear in API_SUPPORTED_AUDIO_FORMATS. A full
+     * video file can easily be 40+ MB while the extracted audio-only payload is
+     * a few MB; every hosted Whisper endpoint enforces a ~25 MB ceiling.
+     *
+     * `webm` is deliberately excluded: browser/WhatsApp voice notes are
+     * recorded as audio/webm, so it stays on the audio-only transcription path
+     * to avoid a needless vision call.
      */
     private const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv', 'mpeg', 'mpg'];
 
@@ -86,6 +91,7 @@ final readonly class FileProcessor
         private TextCleaner $textCleaner,
         private AiFacade $aiFacade,
         private WhisperService $whisperService,
+        private VideoAnalysisService $videoAnalysisService,
         private LoggerInterface $logger,
         private string $uploadDir,
         private int $tikaMinLength,
@@ -138,6 +144,12 @@ final readonly class FileProcessor
 
         // Strategy 3: Audio/Video files -> Whisper transcription
         if ($this->isTranscribableMedia($ext)) {
+            // Real videos additionally get a visual key-frame description so
+            // silent or mostly-visual clips still produce usable content.
+            if ($this->isVideo($ext)) {
+                return $this->extractFromVideo($relativePath, $absolutePath, $meta, $userId);
+            }
+
             return $this->extractFromAudio($absolutePath, $meta, $userId);
         }
 
@@ -383,6 +395,166 @@ final readonly class FileProcessor
     }
 
     /**
+     * Check if the extension is a video format that should also receive a
+     * visual key-frame description on top of audio transcription.
+     */
+    private function isVideo(string $ext): bool
+    {
+        return in_array($ext, self::VIDEO_EXTENSIONS, true);
+    }
+
+    /**
+     * Extract text from a video file: transcribe its audio track (reusing
+     * the full local/external speech-to-text pipeline) AND describe a
+     * representative key frame via Vision AI (issue #983).
+     *
+     * Audio is stripped from the video container before being sent to any
+     * external STT API. This prevents external providers (Groq, OpenAI) from
+     * rejecting the request with "file too large" — a WhatsApp video is
+     * typically 30–80 MB while its audio-only track is 2–4 MB (issue #983).
+     *
+     * The two results are merged into one labelled block so the chat model
+     * can both "read" what was said and "see" what was shown. Either part
+     * may be empty (a silent clip yields visual-only; a video the vision
+     * provider cannot read yields transcript-only); only when BOTH are
+     * empty does extraction count as failed.
+     *
+     * @param string   $relativePath relative path from the upload dir (for Vision AI)
+     * @param string   $absolutePath resolved absolute path (for audio extraction)
+     * @param array    $baseMeta     base metadata for logging
+     * @param int|null $userId       owner used for provider selection
+     *
+     * @return array [extractedText, meta]
+     */
+    private function extractFromVideo(string $relativePath, string $absolutePath, array $baseMeta, ?int $userId = null): array
+    {
+        // 1. Strip video stream before calling the STT pipeline so that external
+        //    APIs never receive the full container file (issue #983).
+        $audioOnlyPath = $this->extractAudioTrack($absolutePath);
+        $audioInputPath = $audioOnlyPath ?? $absolutePath;
+
+        $audioMeta = [];
+
+        try {
+            [$transcript, $audioMeta] = $this->extractFromAudio($audioInputPath, $baseMeta, $userId);
+        } finally {
+            if (null !== $audioOnlyPath && file_exists($audioOnlyPath)) {
+                @unlink($audioOnlyPath);
+            }
+        }
+
+        $transcript = trim((string) $transcript);
+
+        // 2. Representative frame -> visual description (fault tolerant).
+        $visual = trim((string) $this->videoAnalysisService->describeKeyFrame($relativePath, $userId));
+
+        $parts = [];
+        if ('' !== $visual) {
+            $parts[] = "[Visual description]\n".$visual;
+        }
+        if ('' !== $transcript) {
+            $parts[] = "[Audio transcript]\n".$transcript;
+        }
+
+        $combined = trim(implode("\n\n", $parts));
+
+        $strategy = match (true) {
+            '' !== $visual && '' !== $transcript => 'video_transcript_vision',
+            '' !== $transcript => 'video_transcript',
+            '' !== $visual => 'video_vision',
+            default => 'video_failed',
+        };
+
+        $meta = [
+            'strategy' => $strategy,
+            'has_transcript' => '' !== $transcript,
+            'has_visual' => '' !== $visual,
+            'audio_strategy' => $audioMeta['strategy'] ?? null,
+        ] + $baseMeta;
+
+        if ('' === $combined) {
+            $this->logger->warning('FileProcessor: Video produced neither transcript nor visual description', $baseMeta);
+        } else {
+            $this->logger->info('FileProcessor: Video extraction complete', [
+                'strategy' => $strategy,
+                'bytes' => strlen($combined),
+            ] + $baseMeta);
+        }
+
+        return [$combined, $meta];
+    }
+
+    /**
+     * Extract audio track from a video file into a compact MP3 for STT.
+     *
+     * Runs ffmpeg with -vn to strip the video stream so that external STT
+     * providers never receive the full container (issue #983: WhatsApp videos
+     * are typically 30–80 MB but the audio-only track is 2–4 MB).
+     *
+     * @return string|null absolute path to temp MP3, or null when ffmpeg is
+     *                     unavailable or the extraction fails (caller falls
+     *                     back to the original video path)
+     */
+    private function extractAudioTrack(string $videoPath): ?string
+    {
+        if (!file_exists($this->ffmpegBinary) || !is_executable($this->ffmpegBinary)) {
+            $this->logger->debug('FileProcessor: FFmpeg unavailable, skipping audio-track extraction', [
+                'video' => basename($videoPath),
+            ]);
+
+            return null;
+        }
+
+        $tempPath = sys_get_temp_dir().'/audio_track_'.uniqid().'.mp3';
+
+        $process = new Process([
+            $this->ffmpegBinary,
+            '-i', $videoPath,
+            '-vn',          // strip video stream
+            '-ar', '16000', // 16 kHz (optimal for speech recognition)
+            '-ac', '1',     // mono
+            '-b:a', '64k',  // 64 kbps (good balance of size and speech quality)
+            '-f', 'mp3',
+            '-y',
+            $tempPath,
+        ]);
+        $process->setTimeout(120);
+
+        try {
+            $process->run();
+
+            if (!$process->isSuccessful() || !file_exists($tempPath) || filesize($tempPath) < 100) {
+                if (file_exists($tempPath)) {
+                    @unlink($tempPath);
+                }
+                $this->logger->warning('FileProcessor: Audio track extraction failed', [
+                    'video' => basename($videoPath),
+                    'exit_code' => $process->getExitCode(),
+                ]);
+
+                return null;
+            }
+
+            $this->logger->info('FileProcessor: Extracted audio track from video', [
+                'video' => basename($videoPath),
+                'video_size' => filesize($videoPath),
+                'audio_size' => filesize($tempPath),
+            ]);
+
+            return $tempPath;
+        } catch (\Throwable $e) {
+            if (file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
+            $this->logger->warning('FileProcessor: Audio track extraction exception', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * Public static variant used by FileUploadService to distinguish a
      * transcription failure (audio/video → empty result is an error) from a
      * legitimate no-content result (e.g. a blank PDF has no extractable text).
@@ -397,14 +569,17 @@ final readonly class FileProcessor
      *
      * Strategy when an external STT provider is configured:
      *   1. External provider (faster, handles many languages)
-     *   2. Local Whisper.cpp if external returns empty or fails (fallback)
+     *   2. Local Whisper.cpp if external returns empty or fails (fallback) — this
+     *      also rescues oversized files already reduced by extractAudioTrack()
+     *      whose audio the external provider still could not handle (issue #983)
      *
      * Strategy when no external provider is configured:
      *   1. Local Whisper.cpp (free, no network dependency)
      *   2. External provider as last resort
      *
-     * @param string $absolutePath Full path to the audio/video file
-     * @param array  $baseMeta     Base metadata for logging
+     * @param string   $absolutePath Full path to the audio/video file
+     * @param array    $baseMeta     Base metadata for logging
+     * @param int|null $userId       User ID for provider selection
      *
      * @return array [extractedText, meta]
      */
@@ -419,7 +594,7 @@ final readonly class FileProcessor
             }
 
             // External returned empty (provider error, file too large, etc.) —
-            // fall back to local Whisper before giving up.
+            // fall back to local Whisper before giving up (issue #983).
             $this->logger->info('FileProcessor: External STT returned empty, falling back to local Whisper', $baseMeta);
             $localResult = $this->transcribeLocally($absolutePath, $baseMeta);
             if (null !== $localResult) {
@@ -560,6 +735,11 @@ final readonly class FileProcessor
      * WhatsApp and other sources may send audio in formats not supported
      * by OpenAI/Groq Whisper APIs (e.g., AMR, 3GP). This method converts
      * unsupported formats to MP3 using FFmpeg.
+     *
+     * Note: video files (.mp4 etc.) reach this method only in the pure-audio
+     * path (no video extension). For video files the audio track is stripped
+     * earlier in extractAudioTrack(), so by the time we arrive here the input
+     * is already a compact MP3, and this method is a no-op.
      *
      * @param string $absolutePath Full path to the audio file
      *

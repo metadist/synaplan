@@ -36,14 +36,13 @@ final readonly class MessagePreProcessor
     public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr'];
     public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
-    // Issue #722: video uploads (e.g. an MP4 the user wants summarised) were
-    // never converted to text on the chat path, so FileAnalysisHandler reported
-    // "This file type cannot be analyzed". FileProcessor::extractText() already
-    // extracts the audio track and transcribes it via Whisper, so we route
-    // video files through the same extraction pipeline as documents and keep
-    // the resulting transcript in BFILETEXT. 'webm' deliberately stays in
-    // AUDIO_EXTENSIONS (WhatsApp voice notes use it) — listing it here too
-    // would make the membership checks ambiguous.
+    // Issue #722/#983: video uploads (e.g. an MP4 the user wants summarised)
+    // were never converted to text on the chat path, so FileAnalysisHandler
+    // reported "This file type cannot be analyzed". FileProcessor::extractText()
+    // analyses them by transcribing their audio track via Whisper AND describing
+    // a representative key frame via Vision AI, keeping the result in BFILETEXT.
+    // 'webm' deliberately stays in AUDIO_EXTENSIONS (browser/WhatsApp voice notes
+    // use it) — listing it here too would make the membership checks ambiguous.
     public const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv', 'mpeg', 'mpg'];
 
     private const OFFICE_EXT_TO_MIME = [
@@ -179,10 +178,11 @@ final readonly class MessagePreProcessor
         // the /api/v1/files upload path already uses, so we get one
         // consistent extraction behaviour across upload entry points.
         // Documents and video files share the same extraction pipeline:
-        // FileProcessor::extractText() runs Tika for documents and Whisper
-        // (after extracting the audio track) for video, returning plain text
-        // we store in BFILETEXT so the chat model can reason about it
-        // (issue #722).
+        // FileProcessor::extractText() runs Tika for documents and, for video,
+        // transcribes the audio track AND describes a representative key frame
+        // (issues #722 + #983), returning plain text we store in BFILETEXT so
+        // the chat model can reason about it. This is the single canonical
+        // video path — do NOT add a second video branch below.
         if (in_array($fileType, self::DOCUMENT_EXTENSIONS) || in_array($fileType, self::VIDEO_EXTENSIONS)) {
             $isVideo = in_array($fileType, self::VIDEO_EXTENSIONS, true);
             $messageFile->setStatus('extracting');
@@ -434,9 +434,11 @@ final readonly class MessagePreProcessor
             }
         }
 
-        // Video: extract the audio track and transcribe it (issue #722).
-        // FileProcessor::extractText() owns the ffmpeg + Whisper pipeline, so
-        // the legacy single-file path reuses it instead of duplicating logic.
+        // Video: transcribe the audio track AND describe a representative key
+        // frame (issues #722 + #983). FileProcessor::extractText() owns the
+        // combined ffmpeg + Whisper + Vision pipeline, so the legacy single-file
+        // path reuses it instead of duplicating logic. This is the single
+        // canonical video path — do NOT add a second video branch below.
         if (in_array($fileType, self::VIDEO_EXTENSIONS)) {
             $this->logger->info('PreProcessor: Transcribing video', [
                 'file' => basename($fullPath),

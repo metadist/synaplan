@@ -534,6 +534,14 @@ class StreamController extends AbstractController
                 $this->em->persist($incomingMessage);
                 $this->em->flush(); // Flush first so message has an ID
 
+                // Issue #1024: relay the operator prompt to WhatsApp before AI processing so
+                // the full conversation flow (prompt + response) is visible on the WhatsApp side.
+                // Guards: widget/guest users are not platform operators; continue-messages use a
+                // synthetic prompt that must not be forwarded; isAgain would re-send the same prompt.
+                if (!$isWidgetMode && !$isGuestMode && !$continueMessageId && !$isAgain) {
+                    $this->messageForwardingService->forwardUserPromptIfNeeded($chat, $messageText);
+                }
+
                 // Attach multiple files if uploaded (NEW: File entities with ManyToMany)
                 if (!empty($fileIdArray)) {
                     $fileCount = 0;

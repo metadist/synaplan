@@ -10,6 +10,7 @@ use App\Service\File\FileProcessor;
 use App\Service\File\PdfRasterizer;
 use App\Service\File\TextCleaner;
 use App\Service\File\TikaClient;
+use App\Service\File\VideoAnalysisService;
 use App\Service\WhisperService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -43,6 +44,7 @@ final class FileProcessorAudioFallbackTest extends TestCase
             new TextCleaner(),
             $this->aiFacade,
             $this->whisperService,
+            $this->createStub(VideoAnalysisService::class),
             new NullLogger(),
             sys_get_temp_dir(),
             100,

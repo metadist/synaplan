@@ -70,14 +70,14 @@ interface VectorStorageInterface
     /**
      * Find chunks similar to a source chunk.
      *
-     * @param int   $userId        User ID
-     * @param int   $sourceChunkId ID of the source chunk
-     * @param int   $limit         Max results
-     * @param float $minScore      Minimum similarity score
+     * @param int        $userId        User ID
+     * @param int|string $sourceChunkId ID of the source chunk (int for MariaDB, string for Qdrant)
+     * @param int        $limit         Max results
+     * @param float      $minScore      Minimum similarity score
      *
      * @return SearchResult[]
      */
-    public function findSimilar(int $userId, int $sourceChunkId, int $limit = 10, float $minScore = 0.3): array;
+    public function findSimilar(int $userId, int|string $sourceChunkId, int $limit = 10, float $minScore = 0.3): array;
 
     /**
      * Get storage statistics for a user.

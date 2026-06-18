@@ -235,6 +235,64 @@ class MessageForwardingServiceTest extends TestCase
         $this->service->forwardIfNeeded($chat, '<think>only internal reasoning, stream cut off');
     }
 
+    // -------------------------------------------------------------------------
+    // forwardUserPromptIfNeeded
+    // -------------------------------------------------------------------------
+
+    public function testPromptForwardSkipsNonWhatsAppChats(): void
+    {
+        $chat = $this->createChatWithSource('web');
+
+        $this->whatsAppService->expects($this->never())->method('sendMessage');
+        $this->messageRepository->expects($this->never())->method('findLatestInboundByChannel');
+
+        $this->service->forwardUserPromptIfNeeded($chat, 'Hello');
+    }
+
+    public function testPromptForwardSkipsEmptyText(): void
+    {
+        $chat = $this->createChatWithSource('whatsapp');
+
+        $this->whatsAppService->expects($this->never())->method('sendMessage');
+        $this->messageRepository->expects($this->never())->method('findLatestInboundByChannel');
+
+        $this->service->forwardUserPromptIfNeeded($chat, '   ');
+    }
+
+    public function testPromptForwardSendsToWhatsApp(): void
+    {
+        $chat = $this->createChatWithSource('whatsapp');
+        $inbound = $this->createInboundMessageWithMeta('+491234567890', 'phone-number-id-123');
+
+        $this->whatsAppService->method('isAvailable')->willReturn(true);
+        $this->messageRepository->method('findLatestInboundByChannel')
+            ->with($chat->getId(), 'whatsapp')
+            ->willReturn($inbound);
+
+        $this->whatsAppService->expects($this->once())
+            ->method('sendMessage')
+            ->with('+491234567890', 'What is the weather today?', 'phone-number-id-123')
+            ->willReturn(['success' => true, 'message_id' => 'wa_prompt_123']);
+
+        $this->service->forwardUserPromptIfNeeded($chat, 'What is the weather today?');
+    }
+
+    public function testPromptForwardTrimsWhitespace(): void
+    {
+        $chat = $this->createChatWithSource('whatsapp');
+        $inbound = $this->createInboundMessageWithMeta('+491234567890', 'phone-id');
+
+        $this->whatsAppService->method('isAvailable')->willReturn(true);
+        $this->messageRepository->method('findLatestInboundByChannel')->willReturn($inbound);
+
+        $this->whatsAppService->expects($this->once())
+            ->method('sendMessage')
+            ->with('+491234567890', 'Hello', 'phone-id')
+            ->willReturn(['success' => true, 'message_id' => 'wa_prompt_456']);
+
+        $this->service->forwardUserPromptIfNeeded($chat, '  Hello  ');
+    }
+
     public function testStripsMemoryTagsWhenUserNotFound(): void
     {
         $chat = $this->createChatWithSource('whatsapp');

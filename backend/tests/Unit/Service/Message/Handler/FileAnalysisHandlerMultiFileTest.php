@@ -476,6 +476,118 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
     }
 
     /**
+     * Issue #983: a single video is analysed via the document/chat path
+     * because the preprocessor already merged its transcript + visual
+     * description into one block of text. The combined content must reach
+     * the chat model.
+     */
+    public function testVideoIsAnalyzedAsDocumentWithCombinedText(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(
+                id: 1,
+                name: 'demo.mp4',
+                type: 'mp4',
+                path: '13/000/demo.mp4',
+                text: "[Visual description]\nA dog runs across a lawn.\n\n[Audio transcript]\nGood boy!",
+            ),
+        ], text: 'What happens in this video?');
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$captured) {
+                $captured = $messages;
+
+                return ['content' => 'A dog is playing.', 'provider' => 'openai', 'model' => 'gpt-4'];
+            });
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertNotNull($captured);
+        $system = $captured[0]['content'];
+
+        $this->assertStringContainsString('Filename: demo.mp4', $system);
+        $this->assertStringContainsString('A dog runs across a lawn.', $system);
+        $this->assertStringContainsString('Good boy!', $system);
+        $this->assertSame('What happens in this video?', $captured[1]['content']);
+        $this->assertSame('chat_with_extracted_text', $result['metadata']['analysis_type']);
+    }
+
+    /**
+     * Issue #983: a video bundled with a document must be analysed
+     * together with it (both blocks of text reach the model), reusing the
+     * #978 multi-file document path.
+     */
+    public function testVideoPlusDocumentAreBundledTogether(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'brief.pdf', type: 'pdf', path: '13/000/brief.pdf', text: 'Launch on Friday.'),
+            $this->buildFile(id: 2, name: 'teaser.mp4', type: 'mp4', path: '13/000/teaser.mp4', text: "[Visual description]\nA product reveal.\n\n[Audio transcript]\nComing soon."),
+        ], text: 'Does the video match the brief?');
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$captured) {
+                $captured = $messages;
+
+                return ['content' => 'Yes, they align.', 'provider' => 'openai', 'model' => 'gpt-4'];
+            });
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertNotNull($captured);
+        $system = $captured[0]['content'];
+
+        $this->assertStringContainsString('analyzing 2 documents', $system);
+        $this->assertStringContainsString('Launch on Friday.', $system);
+        $this->assertStringContainsString('A product reveal.', $system);
+        $this->assertStringContainsString('Coming soon.', $system);
+        $this->assertSame(2, $result['metadata']['analyzed_file_count']);
+    }
+
+    /**
+     * Issue #983: the exact screenshot scenario — image + video in one
+     * message. The video is fully analysed and the image (which already
+     * carries extracted text) is folded into the bundle instead of being
+     * silently dropped.
+     */
+    public function testImagePlusVideoBundlesImageTextAndVideo(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'receipt.png', type: 'png', path: '13/000/receipt.png', text: 'TOTAL: 42 EUR'),
+            $this->buildFile(id: 2, name: 'clip.mp4', type: 'mp4', path: '13/000/clip.mp4', text: "[Visual description]\nHands holding a receipt.\n\n[Audio transcript]\nThat is the total."),
+        ], text: 'Summarize what I sent.');
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$captured) {
+                $captured = $messages;
+
+                return ['content' => 'A receipt totalling 42 EUR.', 'provider' => 'openai', 'model' => 'gpt-4'];
+            });
+
+        // Vision must NOT be called: the image rides along as text.
+        $this->aiFacade->expects($this->never())->method('analyzeImage');
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertNotNull($captured);
+        $system = $captured[0]['content'];
+
+        $this->assertStringContainsString('Hands holding a receipt.', $system);
+        $this->assertStringContainsString('TOTAL: 42 EUR', $system);
+        $this->assertStringContainsString('receipt.png (image text)', $system);
+        $this->assertSame(2, $result['metadata']['analyzed_file_count']);
+        $this->assertSame('chat_with_extracted_text', $result['metadata']['analysis_type']);
+    }
+
+    /**
      * Build a Message mock that exposes the given files via getFiles().
      *
      * @param list<File> $files

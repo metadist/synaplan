@@ -1740,7 +1740,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $formatted .= "\n";
         }
 
-        $formatted .= "\nPlease use this information to answer the user's question. Cite sources using [1], [2], etc. when referencing specific information.\n\n";
+        $formatted .= "\nPlease use this information to answer the user's question. Cite sources using bare bracket numbers only, e.g. [1], [2], [3]. Do NOT append any suffix such as †source, ↑source, or ‡source inside the brackets.\n\n";
 
         return $formatted;
     }
@@ -2255,7 +2255,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     $memory['value']
                 );
             }
-            $memoriesContext .= "\nUse these memories to personalize your response.\n";
+            $memoriesContext .= "\nOnly use memories that are directly relevant to the user's current question. Ignore memories that are not clearly related.\n";
             $memoriesContext .= "REFERENCES: Use [Memory:ID] (clickable). Rules:\n";
             $memoriesContext .= "- ONE ID per bracket. Good: [Memory:42] and [Memory:15]. Bad: [Memory:42, 15].\n";
             $memoriesContext .= "- Only use IDs from the list above. Never invent IDs.\n";

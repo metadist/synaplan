@@ -132,7 +132,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ]);
 
                 return [
-                    'content' => 'This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).',
+                    'content' => 'This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), audio files (such as MP3, OGG, WAV), and videos (such as MP4, MOV).',
                     'metadata' => ['error' => 'unsupported_file_type'],
                 ];
         }
@@ -231,7 +231,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     'file_types' => array_map(static fn (array $f): ?string => $f['type'], $filesInfo),
                 ]);
 
-                $streamCallback('This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).');
+                $streamCallback('This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), audio files (such as MP3, OGG, WAV), and videos (such as MP4, MOV).');
 
                 return [
                     'metadata' => ['error' => 'unsupported_file_type'],
@@ -1152,10 +1152,12 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 continue;
             }
 
-            // Issue #722: a video carries its transcript in BFILETEXT after
-            // FileProcessor extracted the audio track and ran Whisper. Treat
-            // it like a document so the user gets a summary/answer rather
-            // than the old "unsupported file type" dead end.
+            // Issue #722/#983: a video carries a combined transcript + visual
+            // key-frame description in BFILETEXT after FileProcessor extracted
+            // the audio track, ran Whisper and described a representative frame.
+            // Bucket it separately so the multi-file routing can surface
+            // "still preparing"/"failed" states for the slow video path before
+            // folding ready videos into the document summary pipeline.
             if ($info['is_video'] ?? false) {
                 if ('' !== trim((string) ($info['text'] ?? ''))) {
                     $videoWithText[] = $info;
@@ -1275,6 +1277,16 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 $documents[] = $this->wrapAudioAsTranscriptDocument($audio);
             }
 
+            // Fold any images that already carry extracted text into the
+            // bundle too, so combinations like image + video (issue #983)
+            // no longer silently drop the image. Images without usable
+            // text stay out — the document path cannot "see" raw pixels.
+            foreach ($images as $image) {
+                if ('' !== trim((string) ($image['text'] ?? ''))) {
+                    $documents[] = $this->wrapImageAsTextDocument($image);
+                }
+            }
+
             return ['kind' => 'documents', 'documents' => $documents];
         }
 
@@ -1337,10 +1349,10 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     /**
      * Treat a transcribed video attachment as a virtual "transcript"
      * document so the chat-model prompt builder summarises/answers from
-     * the spoken content of the video (issue #722). Unlike a voice note
-     * (which is answered conversationally), a video upload is something
-     * the user wants explained, so the document/summary path is the
-     * correct destination.
+     * the spoken content and visual description of the video (issue #722,
+     * #983). Unlike a voice note (which is answered conversationally), a
+     * video upload is something the user wants explained, so the
+     * document/summary path is the correct destination.
      *
      * @param array<string, mixed> $video
      *
@@ -1358,6 +1370,35 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'path' => $video['path'] ?? '',
             'text' => "Video transcript:\n".trim((string) ($video['text'] ?? '')),
             'status' => $video['status'] ?? null,
+            'is_image' => false,
+            'is_audio' => false,
+            'is_document' => true,
+            'is_video' => false,
+        ];
+    }
+
+    /**
+     * Treat an image that already has extracted text (OCR / vision output)
+     * as a virtual document so it can ride along in a mixed bundle (e.g.
+     * image + video, issue #983) instead of being dropped by the
+     * document-priority routing.
+     *
+     * @param array<string, mixed> $image
+     *
+     * @return array<string, mixed>
+     */
+    private function wrapImageAsTextDocument(array $image): array
+    {
+        $name = (string) ($image['name'] ?? 'image');
+        $type = (string) ($image['type'] ?? 'image');
+
+        return [
+            'id' => $image['id'] ?? null,
+            'name' => $name.' (image text)',
+            'type' => $type.' image',
+            'path' => $image['path'] ?? '',
+            'text' => "Text extracted from image:\n".trim((string) ($image['text'] ?? '')),
+            'status' => $image['status'] ?? null,
             'is_image' => false,
             'is_audio' => false,
             'is_document' => true,
