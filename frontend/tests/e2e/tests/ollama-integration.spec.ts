@@ -1,6 +1,5 @@
 import { test, expect } from '../test-setup'
 import { request as playwrightRequest } from '@playwright/test'
-import { selectors } from '../helpers/selectors'
 import { login, getAuthHeaders } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { CREDENTIALS } from '../config/credentials'
@@ -71,12 +70,7 @@ test.describe('@ci @smoke Ollama Integration', () => {
       await chat.startNewChat()
     })
 
-    const previousCount = await chat.conversationBubbles().count()
-
-    await test.step('Act: send message', async () => {
-      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
-      await page.locator(selectors.chat.sendBtn).click()
-    })
+    const previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
 
     const aiText = await chat.waitForAnswer(previousCount)
 
@@ -110,12 +104,7 @@ test.describe('@ci @smoke Ollama Integration', () => {
       await chat.startNewChat()
     })
 
-    const previousCount = await chat.conversationBubbles().count()
-
-    await test.step('Act: send message', async () => {
-      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
-      await page.locator(selectors.chat.sendBtn).click()
-    })
+    const previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
 
     const aiText = await chat.waitForAnswer(previousCount)
 
