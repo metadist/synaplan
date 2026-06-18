@@ -857,6 +857,7 @@
         "text2pic": "Image Generation (Text → Image)",
         "pic2pic": "Image Editing (Image → Image)",
         "text2vid": "Video Generation (Text → Video)",
+        "img2vid": "Video Animation (Image → Video)",
         "sound2text": "Speech-to-Text",
         "text2sound": "Text-to-Speech",
         "analyze": "Text Analytics"

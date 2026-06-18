@@ -480,6 +480,7 @@ const purposeLabels = computed<Record<Capability, string>>(() => ({
   TEXT2PIC: t('config.aiModels.capabilities.text2pic'),
   PIC2PIC: t('config.aiModels.capabilities.pic2pic'),
   TEXT2VID: t('config.aiModels.capabilities.text2vid'),
+  IMG2VID: t('config.aiModels.capabilities.img2vid'),
   SOUND2TEXT: t('config.aiModels.capabilities.sound2text'),
   TEXT2SOUND: t('config.aiModels.capabilities.text2sound'),
 }))
@@ -498,6 +499,7 @@ const defaultConfig = ref<Record<Capability, number | null>>({
   TEXT2PIC: null,
   PIC2PIC: null,
   TEXT2VID: null,
+  IMG2VID: null,
   SOUND2TEXT: null,
   TEXT2SOUND: null,
 })
@@ -546,6 +548,9 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
     PIC2PIC: 'PIC2PIC',
     IMAGE2IMAGE: 'PIC2PIC',
     VIDEO: 'TEXT2VID',
+    IMG2VID: 'IMG2VID',
+    IMAGE2VIDEO: 'IMG2VID',
+    IMAGE_TO_VIDEO: 'IMG2VID',
     TRANSCRIPTION: 'SOUND2TEXT',
     TTS: 'TEXT2SOUND',
     VOICE: 'TEXT2SOUND',

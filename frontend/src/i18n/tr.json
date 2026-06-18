@@ -1467,6 +1467,7 @@
         "text2pic": "Görsel Oluşturma (Metin → Görsel)",
         "pic2pic": "Görsel Düzenleme (Görsel → Görsel)",
         "text2vid": "Video Oluşturma (Metin → Video)",
+        "img2vid": "Video Animasyonu (Görsel → Video)",
         "sound2text": "Konuşmadan Metne",
         "text2sound": "Metinden Konuşmaya",
         "analyze": "Dosya Analizi"

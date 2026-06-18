@@ -1466,6 +1466,7 @@
         "text2pic": "Generación de Imagen (Texto → Imagen)",
         "pic2pic": "Edición de Imagen (Imagen → Imagen)",
         "text2vid": "Generación de Video (Texto → Video)",
+        "img2vid": "Animación de Video (Imagen → Video)",
         "sound2text": "Voz a Texto",
         "text2sound": "Texto a Voz",
         "analyze": "Análisis de Archivos"
