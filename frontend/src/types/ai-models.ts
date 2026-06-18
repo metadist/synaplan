@@ -12,6 +12,8 @@ export type Capability =
   | 'TEXT2PIC'
   | 'PIC2PIC'
   | 'TEXT2VID'
+  /** Image-to-video: animate an attached image. Shares the text2vid BTAG; surfaced as its own default slot (mirrors PIC2PIC over text2pic). */
+  | 'IMG2VID'
   | 'SOUND2TEXT'
   | 'TEXT2SOUND'
   | 'ANALYZE'

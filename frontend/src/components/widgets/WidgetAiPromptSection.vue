@@ -48,6 +48,7 @@ const groupedModels = computed(() => {
     TEXT2PIC: t('config.aiModels.capabilities.text2pic'),
     PIC2PIC: t('config.aiModels.capabilities.pic2pic'),
     TEXT2VID: t('config.aiModels.capabilities.text2vid'),
+    IMG2VID: t('config.aiModels.capabilities.img2vid'),
     TEXT2SOUND: t('config.aiModels.capabilities.text2sound'),
     SOUND2TEXT: t('config.aiModels.capabilities.sound2text'),
     PIC2TEXT: t('config.aiModels.capabilities.pic2text'),

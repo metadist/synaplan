@@ -51,6 +51,8 @@ parameters:
     env(GOOGLE_CLOUD_PROJECT_ID): ''
     env(GOOGLE_VERTEX_ACCESS_TOKEN): ''
     env(THEHIVE_API_KEY): ''
+    env(HIGGSFIELD_API_KEY): ''
+    env(HIGGSFIELD_API_SECRET): ''
     env(HUGGINGFACE_API_KEY): ''
     env(BRAVE_SEARCH_API_KEY): ''
     env(DISCORD_WEBHOOK_URL): ''
@@ -231,6 +233,21 @@ services:
             $apiKey: '%env(THEHIVE_API_KEY)%'
         tags:
             - { name: 'app.ai.image_generation' }
+
+    # Higgsfield credentials: platform-wide env defaults + per-user override
+    # (encrypted in BCONFIG via EncryptionService).
+    App\AI\Credential\HiggsfieldCredentialResolver:
+        arguments:
+            $platformApiKey: '%env(HIGGSFIELD_API_KEY)%'
+            $platformApiSecret: '%env(HIGGSFIELD_API_SECRET)%'
+
+    App\AI\Provider\HiggsfieldProvider:
+        arguments:
+            $platformApiKey: '%env(HIGGSFIELD_API_KEY)%'
+            $platformApiSecret: '%env(HIGGSFIELD_API_SECRET)%'
+        tags:
+            - { name: 'app.ai.image_generation' }
+            - { name: 'app.ai.video_generation' }
 
     App\AI\Provider\PiperProvider:
         arguments:

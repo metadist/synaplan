@@ -46,6 +46,10 @@ final readonly class DefaultModelConfigSeeder
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'modelKey' => 'google:gemini-3.1-flash-image-preview:text2pic'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2PIC',    'modelKey' => 'google:gemini-3.1-flash-image-preview:text2pic'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID',   'modelKey' => 'google:veo-3.1-generate-preview:text2vid'],
+        // IMG2VID (animate an attached image). Defaults to Higgsfield DoP
+        // Standard — an image-to-video model. Shares the text2vid BTAG (see
+        // ModelCatalog::CAPABILITY_TAGS) but has its own default slot.
+        ['group' => 'DEFAULTMODEL', 'setting' => 'IMG2VID',    'modelKey' => 'higgsfield:higgsfield-ai/dop/standard:text2vid'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'modelKey' => 'piper:piper-multi:text2sound'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',   'modelKey' => 'groq:meta-llama/llama-4-scout-17b-16e-instruct:pic2text'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'modelKey' => 'groq:whisper-large-v3:sound2text'],
@@ -85,6 +89,7 @@ final readonly class DefaultModelConfigSeeder
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'value' => '-4'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'PIC2PIC',    'value' => '-4'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID',   'value' => '-5'],
+        ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'IMG2VID',    'value' => '-5'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'value' => '-6'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'value' => '-7'],
 

@@ -122,11 +122,13 @@ class MessageController extends AbstractController
             if (!$budgetCheck['allowed']) {
                 return $this->json([
                     'error' => 'Cost budget exceeded',
+                    'code' => 'COST_BUDGET_EXCEEDED',
                     'limit_type' => 'monthly',
                     'action_type' => 'MESSAGES',
                     'limit' => $budgetCheck['budget'],
                     'used' => $budgetCheck['used_cost'],
                     'remaining' => $budgetCheck['remaining'],
+                    'topup_available' => true,
                     'user_level' => $user->getUserLevel(),
                     'phone_verified' => $user->hasVerifiedPhone(),
                 ], Response::HTTP_TOO_MANY_REQUESTS);

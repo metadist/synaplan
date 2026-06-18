@@ -210,6 +210,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.configAiModels' },
     },
     {
+      path: '/ai/providers/higgsfield',
+      name: 'ai-provider-higgsfield',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configProviderHiggsfield' },
+    },
+    {
       path: '/ai/instructions',
       name: 'ai-instructions',
       component: () => import('@/views/ConfigView.vue'),

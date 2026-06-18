@@ -250,6 +250,7 @@
       :reset-time="limitData?.resetTime"
       :user-level="limitData?.userLevel || 'NEW'"
       :phone-verified="limitData?.phoneVerified || false"
+      :topup-available="limitData?.topupAvailable || false"
       @close="closeLimitModal"
       @upgrade="closeLimitModal"
       @verify-phone="closeLimitModal"
@@ -2524,6 +2525,36 @@ const streamAIResponse = async (
               })
 
               // Clean up streaming resources
+              streamingAbortController = null
+              stopStreamingFn = null
+              currentTrackId = undefined
+              currentStreamingChatId = undefined
+              return
+            }
+
+            // Handle monthly cost-budget exceeded → offer a one-time top-up.
+            // Branch on the stable machine-readable `code` (set by the backend),
+            // not on the human-readable error text which changes with i18n /
+            // rewording. Keep the structured-field check as a defensive fallback.
+            if (
+              data.code === 'COST_BUDGET_EXCEEDED' ||
+              (data.limit_type === 'monthly' && data.topup_available === true)
+            ) {
+              historyStore.removeMessage(messageId)
+
+              checkAndShowLimit({
+                allowed: false,
+                limitType: 'monthly',
+                actionType: data.action_type || 'MESSAGES',
+                used: Number(data.used) || 0,
+                limit: Number(data.limit) || 0,
+                remaining: Number(data.remaining) || 0,
+                resetTime: null,
+                userLevel: data.user_level || authStore.user?.level || 'NEW',
+                phoneVerified: data.phone_verified || false,
+                topupAvailable: data.topup_available === true,
+              })
+
               streamingAbortController = null
               stopStreamingFn = null
               currentTrackId = undefined

@@ -469,6 +469,7 @@ class ConfigController extends AbstractController
             'TEXT2PIC' => [],
             'PIC2PIC' => [],
             'TEXT2VID' => [],
+            'IMG2VID' => [],
             'SOUND2TEXT' => [],
             'TEXT2SOUND' => [],
             'ANALYZE' => [],
@@ -512,7 +513,19 @@ class ConfigController extends AbstractController
                     break;
                 case 'VIDEO':
                 case 'TEXT2VID':
-                    $grouped['TEXT2VID'][] = $model;
+                    // Image-to-video models share the text2vid BTAG but CANNOT
+                    // generate a clip from text alone — they require a reference
+                    // image. Surface them ONLY in the dedicated IMG2VID slot
+                    // (mirrors PIC2PIC over text2pic), never as a TEXT2VID option.
+                    // Otherwise a user can pick an i2v model as their text-to-video
+                    // default and every text prompt fails at the provider with
+                    // "'image_url' is a required property".
+                    $isImageToVideo = !empty($model['features']) && in_array('image2video', $model['features'], true);
+                    if ($isImageToVideo) {
+                        $grouped['IMG2VID'][] = $model;
+                    } else {
+                        $grouped['TEXT2VID'][] = $model;
+                    }
                     break;
                 case 'AUDIO':
                 case 'SOUND2TEXT':
@@ -568,6 +581,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'TEXT2PIC', type: 'integer', nullable: true, example: null),
                         new OA\Property(property: 'PIC2PIC', type: 'integer', nullable: true, example: null),
                         new OA\Property(property: 'TEXT2VID', type: 'integer', nullable: true, example: null),
+                        new OA\Property(property: 'IMG2VID', type: 'integer', nullable: true, example: null),
                         new OA\Property(property: 'SOUND2TEXT', type: 'integer', nullable: true, example: null),
                         new OA\Property(property: 'TEXT2SOUND', type: 'integer', nullable: true, example: null),
                         new OA\Property(property: 'ANALYZE', type: 'integer', nullable: true, example: 53),
@@ -584,7 +598,7 @@ class ConfigController extends AbstractController
         }
 
         $userId = $user->getId();
-        $capabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $capabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         $defaults = [];
 
@@ -732,7 +746,7 @@ class ConfigController extends AbstractController
         }
 
         $ownerId = $global ? 0 : $user->getId();
-        $validCapabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $validCapabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         // Premium gate for VECTORIZE: switching the embedding model is
         // a paid feature even at the per-user scope, because every

@@ -1,4 +1,9 @@
 // Subscription API service
+import type { z } from 'zod'
+import {
+  GetSubscriptionBudgetResponseSchema,
+  PostSubscriptionTopupResponseSchema,
+} from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
 export interface SubscriptionPlan {
@@ -47,6 +52,12 @@ export interface PortalSession {
   url: string
 }
 
+// Inferred from the generated Zod schemas (per AGENTS_DEV: never hand-write
+// interfaces for API responses).
+export type TopupSession = z.infer<typeof PostSubscriptionTopupResponseSchema>
+
+export type BudgetStatus = z.infer<typeof GetSubscriptionBudgetResponseSchema>
+
 export const subscriptionApi = {
   async getPlans(): Promise<{ plans: SubscriptionPlan[]; stripeConfigured: boolean }> {
     return httpClient<{ plans: SubscriptionPlan[]; stripeConfigured: boolean }>(
@@ -73,6 +84,27 @@ export const subscriptionApi = {
   async createPortalSession(): Promise<PortalSession> {
     return httpClient<PortalSession>('/api/v1/subscription/portal', {
       method: 'POST',
+    })
+  },
+
+  /**
+   * Current cost-budget status (markup-aware, incl. period top-ups).
+   */
+  async getBudget(): Promise<BudgetStatus> {
+    return httpClient('/api/v1/subscription/budget', {
+      method: 'GET',
+      schema: GetSubscriptionBudgetResponseSchema,
+    })
+  },
+
+  /**
+   * Create a one-time Stripe Checkout to top up the cost budget in EUR-100 steps.
+   */
+  async createTopupSession(steps = 1): Promise<TopupSession> {
+    return httpClient('/api/v1/subscription/topup', {
+      method: 'POST',
+      body: JSON.stringify({ steps }),
+      schema: PostSubscriptionTopupResponseSchema,
     })
   },
 

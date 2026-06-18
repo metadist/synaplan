@@ -17,6 +17,7 @@ use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -42,6 +43,15 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private MessageBusInterface $messageBus,
         private PerfPipelineFlag $perfPipelineFlag,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
+        private bool $costBudgetGateEnabled = false,
+        // Public base URL that serves /api/v1/files/uploads/* (same value used
+        // by OgImageService / shared chat pages). Needed for image-to-video:
+        // Higgsfield (and most i2v providers) fetch the source frame from a
+        // public http(s) URL, so the user's attached image must be exposed at
+        // an absolute, internet-reachable URL — not a local filesystem path.
+        #[Autowire('%env(APP_URL)%')]
+        private string $publicBaseUrl = '',
     ) {
     }
 
@@ -191,7 +201,12 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
             if ($isSlashCommand) {
                 if ('video' === $mediaType) {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
+                    // `/vid` with an attached image is an image-to-video request
+                    // (animate the photo) → use the IMG2VID default; otherwise a
+                    // text-to-video request → TEXT2VID.
+                    $modelId = $isPic2Pic
+                        ? $this->modelConfigService->getDefaultModel('IMG2VID', $effectiveUserId)
+                        : $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
                 } elseif ('audio' === $mediaType) {
                     $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $effectiveUserId);
                 } else {
@@ -199,7 +214,21 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 }
                 $this->logger->info('MediaGenerationHandler: Using default model for slash command', [
                     'media_type' => $mediaType,
+                    'is_pic2pic' => $isPic2Pic,
                     'model_id' => $modelId,
+                ]);
+            } elseif ($isPic2Pic && 'video' === $promptMediaType) {
+                // Image-to-video: the user attached an image AND asked for a
+                // video/animation. This MUST win over the pic2pic-image branch
+                // below (attachment presence alone would otherwise force an
+                // image edit). Routes to the IMG2VID default (an image-to-video
+                // model); the attached image is published + passed as image_url
+                // in the video generation block.
+                $modelId = $this->modelConfigService->getDefaultModel('IMG2VID', $effectiveUserId);
+                $mediaType = 'video';
+                $this->logger->info('MediaGenerationHandler: Image-to-video detected, using IMG2VID default model', [
+                    'model_id' => $modelId,
+                    'image_count' => count($attachedImagePaths),
                 ]);
             } elseif ($isPic2Pic) {
                 $modelId = $this->modelConfigService->getDefaultModel('PIC2PIC', $effectiveUserId);
@@ -266,6 +295,69 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $this->logger->warning('MediaGenerationHandler: No model configured, using DALL-E fallback');
         }
 
+        // Guard: a text-to-video request (no attached image) must never be sent
+        // to an image-to-video model. i2v models (Higgsfield DoP/Kling/etc.)
+        // require a reference frame and the provider rejects the request with
+        // "'image_url' is a required property". This happens when an i2v model is
+        // configured as the TEXT2VID default. Return an actionable message
+        // instead of leaking a raw provider 400 to the user.
+        if ('video' === $mediaType && !$isPic2Pic) {
+            $requiresReferenceImage = !empty($modelConfig['requires_reference_image'])
+                || (!empty($modelConfig['features']) && in_array('image2video', $modelConfig['features'], true));
+            if ($requiresReferenceImage) {
+                $this->logger->warning('MediaGenerationHandler: text-to-video routed to an image-to-video model without a reference image', [
+                    'model_id' => $modelId,
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ]);
+
+                $lang = $classification['language'] ?? 'en';
+                $guardMessage = 'de' === $lang
+                    ? sprintf('„%s“ ist ein Bild-zu-Video-Modell und benötigt ein Referenzbild. Hänge ein Bild an, um es zu animieren, oder wähle in den Einstellungen ein Text-zu-Video-Modell (z. B. Veo) als Standard für Video.', $modelName)
+                    : sprintf('"%s" is an image-to-video model and needs a reference image. Attach an image to animate it, or choose a text-to-video model (e.g. Veo) as your video default in Settings.', $modelName);
+                $streamCallback($guardMessage);
+
+                return [
+                    'metadata' => [
+                        'error' => 'text2vid_requires_reference_image',
+                        'provider' => $provider,
+                        'model' => $modelName,
+                    ],
+                ];
+            }
+        }
+
+        // Guard: image-to-video requires the remote provider to FETCH the
+        // attached source frame from a public http(s) URL (we republish it at
+        // APP_URL/api/v1/files/uploads/...). When APP_URL points at a
+        // local/private host — the default in local dev (http://localhost:8000)
+        // — that URL is unreachable from the provider's servers and the request
+        // is rejected with a confusing raw "invalid_image_url" 400. Detect this
+        // up front and return an actionable message instead of burning a
+        // provider call (and credits) on a request that cannot succeed.
+        if ('video' === $mediaType && [] !== $attachedImagePaths && !$this->isPublicBaseUrlReachable()) {
+            $base = rtrim($this->publicBaseUrl, '/');
+            $this->logger->warning('MediaGenerationHandler: image-to-video blocked — APP_URL is not internet-reachable so the provider cannot fetch the source image', [
+                'app_url' => $base,
+                'provider' => $provider,
+                'model' => $modelName,
+            ]);
+
+            $lang = $classification['language'] ?? 'en';
+            $guardMessage = 'de' === $lang
+                ? sprintf('Für Bild-zu-Video muss dein Bild über eine öffentliche URL an den Anbieter gesendet werden. Die öffentliche Adresse dieses Servers (APP_URL = „%s") ist jedoch ein lokaler/privater Host, den der Anbieter nicht erreichen kann. Setze APP_URL auf eine über das Internet erreichbare URL (z. B. einen Tunnel) oder verwende ein Text-zu-Video-Modell ohne angehängtes Bild.', $base)
+                : sprintf('Image-to-video has to send your image to the provider from a public URL, but this server\'s public address (APP_URL = "%s") is a local/private host the provider can\'t reach. Set APP_URL to an internet-reachable URL (e.g. a tunnel), or use a text-to-video model without an attached image.', $base);
+            $streamCallback($guardMessage);
+
+            return [
+                'metadata' => [
+                    'error' => 'i2v_requires_public_app_url',
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ],
+            ];
+        }
+
         // Send detailed status update with provider and media type
         $providerName = ucfirst($provider);
         $mediaTypeLabel = match ($mediaType) {
@@ -310,6 +402,32 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     ],
                 ];
             }
+
+            // Cost-budget backstop: media spend (incl. the +markup) counts toward
+            // the user's monthly budget. Primary enforcement is at the chat entry
+            // (StreamController); this also covers worker/multitask media paths.
+            if ($this->costBudgetGateEnabled) {
+                $budgetCheck = $this->rateLimitService->checkCostBudget($user);
+                if (!$budgetCheck['allowed']) {
+                    $lang = $classification['language'] ?? 'en';
+                    $budgetMessage = 'de' === $lang
+                        ? 'Dein monatliches Nutzungsbudget ist aufgebraucht. Du kannst zusätzliches Guthaben in 100-EUR-Schritten aufladen, um weiterzumachen.'
+                        : 'Your monthly usage budget is used up. You can top up in EUR 100 steps to keep generating.';
+                    $streamCallback($budgetMessage);
+
+                    return [
+                        'metadata' => [
+                            'error' => 'cost_budget_exceeded',
+                            'code' => 'COST_BUDGET_EXCEEDED',
+                            'limit_type' => 'monthly',
+                            'budget' => $budgetCheck['budget'],
+                            'used' => $budgetCheck['used_cost'],
+                            'remaining' => $budgetCheck['remaining'],
+                            'topup_available' => true,
+                        ],
+                    ];
+                }
+            }
         }
 
         try {
@@ -335,21 +453,46 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'resolution' => $resolutionOption,
                 ]);
 
+                $videoOptions = [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'modelConfig' => $modelConfig,
+                    'duration' => $duration,
+                    'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
+                    'resolution' => $resolutionOption,
+                    'progress_callback' => function (array $progress) use ($progressCallback): void {
+                        $elapsed = $progress['elapsed_seconds'] ?? 0;
+                        $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)");
+                    },
+                ];
+
+                // Image-to-video: publish the attached image at a public URL so
+                // the provider (Higgsfield etc.) can fetch it. i2v providers
+                // require a real http(s) image_url — a local path or a base64
+                // data-URI will not work.
+                if ([] !== $attachedImagePaths) {
+                    $publicImageUrl = $this->publishInputImageForRemoteFetch($attachedImagePaths[0], $message->getUserId());
+                    if (null !== $publicImageUrl) {
+                        $videoOptions['image_url'] = $publicImageUrl;
+                        $videoOptions['images'] = [$publicImageUrl];
+                        $this->notify($progressCallback, 'generating', 'Preparing your image for animation...');
+                        $this->logger->info('MediaGenerationHandler: Image-to-video source published', [
+                            'provider' => $provider,
+                            'model' => $modelName,
+                            'image_url' => $publicImageUrl,
+                        ]);
+                    } else {
+                        $this->logger->warning('MediaGenerationHandler: Could not publish input image for image-to-video; proceeding without a reference frame', [
+                            'provider' => $provider,
+                            'model' => $modelName,
+                        ]);
+                    }
+                }
+
                 $result = $this->aiFacade->generateVideo(
                     $prompt,
                     $message->getUserId(),
-                    [
-                        'provider' => $provider,
-                        'model' => $modelName,
-                        'modelConfig' => $modelConfig,
-                        'duration' => $duration,
-                        'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
-                        'resolution' => $resolutionOption,
-                        'progress_callback' => function (array $progress) use ($progressCallback): void {
-                            $elapsed = $progress['elapsed_seconds'] ?? 0;
-                            $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)");
-                        },
-                    ]
+                    $videoOptions
                 );
 
                 $media = $result['videos'] ?? [];
@@ -746,6 +889,126 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
             return null;
         }
+    }
+
+    /**
+     * Publish a locally-stored input image at a public, internet-reachable URL
+     * so a remote image-to-video provider can fetch it.
+     *
+     * The image is copied to an `ai_`-prefixed filename in the user's upload
+     * tree. StaticUploadController serves `ai_*` files without authentication
+     * (the same public bypass already used for AI-generated media), so the
+     * resulting absolute URL is fetchable by the provider. Returns null when
+     * the file can't be read/written or no public base URL is configured.
+     *
+     * @param string $absoluteLocalPath absolute path to the source image on disk
+     * @param int    $userId            owner user id (for the upload sub-tree)
+     *
+     * @return string|null absolute public URL (e.g. https://host/api/v1/files/uploads/...), or null
+     */
+    private function publishInputImageForRemoteFetch(string $absoluteLocalPath, int $userId): ?string
+    {
+        $base = rtrim($this->publicBaseUrl, '/');
+        if ('' === $base) {
+            $this->logger->warning('MediaGenerationHandler: APP_URL not configured; cannot publish input image for image-to-video');
+
+            return null;
+        }
+
+        if (!is_file($absoluteLocalPath)) {
+            $this->logger->warning('MediaGenerationHandler: Input image not found on disk', ['path' => $absoluteLocalPath]);
+
+            return null;
+        }
+
+        // Remote providers can only fetch publicly-resolvable hosts. localhost /
+        // private hosts (typical in dev) will be rejected by the provider — warn
+        // so the failure is diagnosable, but still return the URL so a public
+        // deployment behind a localhost-looking proxy is not blocked here.
+        // (The handler also guards this up front via isPublicBaseUrlReachable().)
+        if (!$this->isPublicBaseUrlReachable()) {
+            $this->logger->warning('MediaGenerationHandler: APP_URL is not internet-reachable; image-to-video providers will not be able to fetch the source image', [
+                'app_url' => $base,
+            ]);
+        }
+
+        $extension = strtolower(pathinfo($absoluteLocalPath, PATHINFO_EXTENSION)) ?: 'jpg';
+        // `ai_` prefix => served without auth by StaticUploadController.
+        $filename = sprintf('ai_i2vsrc_%d_%d_%s.%s', $userId, time(), bin2hex(random_bytes(6)), $extension);
+
+        $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+        $relativePath = $userBase.'/'.date('Y').'/'.date('m').'/'.$filename;
+        $absoluteTarget = $this->uploadDir.'/'.$relativePath;
+
+        if (!FileHelper::ensureParentDirectory($absoluteTarget)) {
+            $this->logger->error('MediaGenerationHandler: Failed to create directory for input image copy', ['dir' => dirname($absoluteTarget)]);
+
+            return null;
+        }
+
+        if (!@copy($absoluteLocalPath, $absoluteTarget)) {
+            $this->logger->error('MediaGenerationHandler: Failed to copy input image to public path', [
+                'source' => $absoluteLocalPath,
+                'target' => $absoluteTarget,
+            ]);
+
+            return null;
+        }
+
+        FileHelper::setFilePermissions($absoluteTarget);
+
+        return $base.'/api/v1/files/uploads/'.$relativePath;
+    }
+
+    /**
+     * Is the configured public base URL (APP_URL) one that a remote AI provider
+     * could realistically fetch from? Returns false for an empty value and for
+     * hosts that are not routable from the public internet: loopback,
+     * RFC 1918 / RFC 4193 private ranges, link-local, and non-public TLDs
+     * (.local / .localhost / .internal / .lan / .home / .test). Used to
+     * short-circuit image-to-video requests (whose source frame must be
+     * provider-fetchable) with an actionable message instead of a raw
+     * provider 400 ("invalid_image_url").
+     */
+    private function isPublicBaseUrlReachable(): bool
+    {
+        $base = rtrim($this->publicBaseUrl, '/');
+        if ('' === $base) {
+            return false;
+        }
+
+        $host = parse_url($base, \PHP_URL_HOST);
+        if (!is_string($host) || '' === $host) {
+            return false;
+        }
+
+        // Normalise an IPv6 literal ("[::1]" → "::1") before inspection.
+        $host = trim($host, '[]');
+        $lowerHost = strtolower($host);
+
+        // Obvious local hostnames + non-public TLD suffixes.
+        if ('localhost' === $lowerHost || 'host.docker.internal' === $lowerHost) {
+            return false;
+        }
+        foreach (['.local', '.localhost', '.internal', '.lan', '.home', '.test'] as $suffix) {
+            if (str_ends_with($lowerHost, $suffix)) {
+                return false;
+            }
+        }
+
+        // If the host is an IP literal, reject private + reserved ranges
+        // (covers 10.x, 172.16–31.x, 192.168.x, 169.254.x, 127.x, ::1, fc00::/7, …).
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
+            return false !== filter_var(
+                $host,
+                \FILTER_VALIDATE_IP,
+                \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE,
+            );
+        }
+
+        // A non-IP hostname that isn't one of the local cases above is assumed
+        // to resolve publicly (a real DNS name behind a proxy/tunnel).
+        return true;
     }
 
     /**
