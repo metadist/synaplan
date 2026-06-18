@@ -45,6 +45,13 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private string $uploadDir = '/var/www/backend/var/uploads',
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
+        // Public base URL that serves /api/v1/files/uploads/* (same value used
+        // by OgImageService / shared chat pages). Needed for image-to-video:
+        // Higgsfield (and most i2v providers) fetch the source frame from a
+        // public http(s) URL, so the user's attached image must be exposed at
+        // an absolute, internet-reachable URL — not a local filesystem path.
+        #[Autowire('%env(APP_URL)%')]
+        private string $publicBaseUrl = '',
     ) {
     }
 
@@ -194,7 +201,12 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
             if ($isSlashCommand) {
                 if ('video' === $mediaType) {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
+                    // `/vid` with an attached image is an image-to-video request
+                    // (animate the photo) → use the IMG2VID default; otherwise a
+                    // text-to-video request → TEXT2VID.
+                    $modelId = $isPic2Pic
+                        ? $this->modelConfigService->getDefaultModel('IMG2VID', $effectiveUserId)
+                        : $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
                 } elseif ('audio' === $mediaType) {
                     $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $effectiveUserId);
                 } else {
@@ -202,7 +214,21 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 }
                 $this->logger->info('MediaGenerationHandler: Using default model for slash command', [
                     'media_type' => $mediaType,
+                    'is_pic2pic' => $isPic2Pic,
                     'model_id' => $modelId,
+                ]);
+            } elseif ($isPic2Pic && 'video' === $promptMediaType) {
+                // Image-to-video: the user attached an image AND asked for a
+                // video/animation. This MUST win over the pic2pic-image branch
+                // below (attachment presence alone would otherwise force an
+                // image edit). Routes to the IMG2VID default (an image-to-video
+                // model); the attached image is published + passed as image_url
+                // in the video generation block.
+                $modelId = $this->modelConfigService->getDefaultModel('IMG2VID', $effectiveUserId);
+                $mediaType = 'video';
+                $this->logger->info('MediaGenerationHandler: Image-to-video detected, using IMG2VID default model', [
+                    'model_id' => $modelId,
+                    'image_count' => count($attachedImagePaths),
                 ]);
             } elseif ($isPic2Pic) {
                 $modelId = $this->modelConfigService->getDefaultModel('PIC2PIC', $effectiveUserId);
@@ -363,21 +389,46 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'resolution' => $resolutionOption,
                 ]);
 
+                $videoOptions = [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'modelConfig' => $modelConfig,
+                    'duration' => $duration,
+                    'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
+                    'resolution' => $resolutionOption,
+                    'progress_callback' => function (array $progress) use ($progressCallback): void {
+                        $elapsed = $progress['elapsed_seconds'] ?? 0;
+                        $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)");
+                    },
+                ];
+
+                // Image-to-video: publish the attached image at a public URL so
+                // the provider (Higgsfield etc.) can fetch it. i2v providers
+                // require a real http(s) image_url — a local path or a base64
+                // data-URI will not work.
+                if ([] !== $attachedImagePaths) {
+                    $publicImageUrl = $this->publishInputImageForRemoteFetch($attachedImagePaths[0], $message->getUserId());
+                    if (null !== $publicImageUrl) {
+                        $videoOptions['image_url'] = $publicImageUrl;
+                        $videoOptions['images'] = [$publicImageUrl];
+                        $this->notify($progressCallback, 'generating', 'Preparing your image for animation...');
+                        $this->logger->info('MediaGenerationHandler: Image-to-video source published', [
+                            'provider' => $provider,
+                            'model' => $modelName,
+                            'image_url' => $publicImageUrl,
+                        ]);
+                    } else {
+                        $this->logger->warning('MediaGenerationHandler: Could not publish input image for image-to-video; proceeding without a reference frame', [
+                            'provider' => $provider,
+                            'model' => $modelName,
+                        ]);
+                    }
+                }
+
                 $result = $this->aiFacade->generateVideo(
                     $prompt,
                     $message->getUserId(),
-                    [
-                        'provider' => $provider,
-                        'model' => $modelName,
-                        'modelConfig' => $modelConfig,
-                        'duration' => $duration,
-                        'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
-                        'resolution' => $resolutionOption,
-                        'progress_callback' => function (array $progress) use ($progressCallback): void {
-                            $elapsed = $progress['elapsed_seconds'] ?? 0;
-                            $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)");
-                        },
-                    ]
+                    $videoOptions
                 );
 
                 $media = $result['videos'] ?? [];
@@ -781,6 +832,74 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
      *
      * @return string[] Absolute file paths to attached images
      */
+    /**
+     * Publish a locally-stored input image at a public, internet-reachable URL
+     * so a remote image-to-video provider can fetch it.
+     *
+     * The image is copied to an `ai_`-prefixed filename in the user's upload
+     * tree. StaticUploadController serves `ai_*` files without authentication
+     * (the same public bypass already used for AI-generated media), so the
+     * resulting absolute URL is fetchable by the provider. Returns null when
+     * the file can't be read/written or no public base URL is configured.
+     *
+     * @param string $absoluteLocalPath absolute path to the source image on disk
+     * @param int    $userId            owner user id (for the upload sub-tree)
+     *
+     * @return string|null absolute public URL (e.g. https://host/api/v1/files/uploads/...), or null
+     */
+    private function publishInputImageForRemoteFetch(string $absoluteLocalPath, int $userId): ?string
+    {
+        $base = rtrim($this->publicBaseUrl, '/');
+        if ('' === $base) {
+            $this->logger->warning('MediaGenerationHandler: APP_URL not configured; cannot publish input image for image-to-video');
+
+            return null;
+        }
+
+        if (!is_file($absoluteLocalPath)) {
+            $this->logger->warning('MediaGenerationHandler: Input image not found on disk', ['path' => $absoluteLocalPath]);
+
+            return null;
+        }
+
+        // Remote providers can only fetch publicly-resolvable hosts. localhost /
+        // private hosts (typical in dev) will be rejected by the provider — warn
+        // so the failure is diagnosable, but still return the URL so a public
+        // deployment behind a localhost-looking proxy is not blocked here.
+        if (preg_match('#^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)(:\d+)?#i', $base)) {
+            $this->logger->warning('MediaGenerationHandler: APP_URL is not internet-reachable; image-to-video providers will not be able to fetch the source image', [
+                'app_url' => $base,
+            ]);
+        }
+
+        $extension = strtolower(pathinfo($absoluteLocalPath, PATHINFO_EXTENSION)) ?: 'jpg';
+        // `ai_` prefix => served without auth by StaticUploadController.
+        $filename = sprintf('ai_i2vsrc_%d_%d_%s.%s', $userId, time(), bin2hex(random_bytes(6)), $extension);
+
+        $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
+        $relativePath = $userBase.'/'.date('Y').'/'.date('m').'/'.$filename;
+        $absoluteTarget = $this->uploadDir.'/'.$relativePath;
+
+        if (!FileHelper::ensureParentDirectory($absoluteTarget)) {
+            $this->logger->error('MediaGenerationHandler: Failed to create directory for input image copy', ['dir' => dirname($absoluteTarget)]);
+
+            return null;
+        }
+
+        if (!@copy($absoluteLocalPath, $absoluteTarget)) {
+            $this->logger->error('MediaGenerationHandler: Failed to copy input image to public path', [
+                'source' => $absoluteLocalPath,
+                'target' => $absoluteTarget,
+            ]);
+
+            return null;
+        }
+
+        FileHelper::setFilePermissions($absoluteTarget);
+
+        return $base.'/api/v1/files/uploads/'.$relativePath;
+    }
+
     private function collectAttachedImagePaths(Message $message): array
     {
         $paths = [];
