@@ -76,10 +76,8 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
 
     await test.step('Act: start a new chat and send a message as impersonated user', async () => {
       await chat.startNewChat()
-      const previousCount = await chat.conversationBubbles().count()
 
-      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
-      await page.locator(selectors.chat.sendBtn).click()
+      const previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
 
       const aiText = await chat.waitForAnswer(previousCount)
       expect(

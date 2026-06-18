@@ -77,12 +77,14 @@ export const useAuthStore = defineStore('auth', () => {
    * store.
    */
   async function resetUserScopedClientState(): Promise<void> {
-    const [{ useChatsStore }, { useHistoryStore }] = await Promise.all([
+    const [{ useChatsStore }, { useHistoryStore }, { clearSseToken }] = await Promise.all([
       import('./chats'),
       import('./history'),
+      import('@/services/api/chatApi'),
     ])
     useChatsStore().$reset()
     useHistoryStore().clear()
+    clearSseToken()
   }
 
   // Actions
