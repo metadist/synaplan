@@ -10,6 +10,9 @@ interface LimitCheckResult {
   resetTime?: number | null
   userLevel: string
   phoneVerified: boolean
+  // When true (monthly cost-budget exceeded), the modal offers a one-time
+  // EUR-100 top-up instead of only a plan upgrade.
+  topupAvailable?: boolean
 }
 
 export function useLimitCheck() {

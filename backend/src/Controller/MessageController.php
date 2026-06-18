@@ -123,6 +123,7 @@ class MessageController extends AbstractController
                     'limit' => $budgetCheck['budget'],
                     'used' => $budgetCheck['used_cost'],
                     'remaining' => $budgetCheck['remaining'],
+                    'topup_available' => true,
                     'user_level' => $user->getUserLevel(),
                     'phone_verified' => $user->hasVerifiedPhone(),
                 ], Response::HTTP_TOO_MANY_REQUESTS);

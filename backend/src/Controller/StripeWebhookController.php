@@ -2,7 +2,9 @@
 
 namespace App\Controller;
 
+use App\Entity\Topup;
 use App\Entity\User;
+use App\Repository\TopupRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -41,6 +43,7 @@ class StripeWebhookController extends AbstractController
         private string $stripePricePro,
         private string $stripePriceTeam,
         private string $stripePriceBusiness,
+        private TopupRepository $topupRepository,
     ) {
     }
 
@@ -217,7 +220,13 @@ class StripeWebhookController extends AbstractController
         $this->logger->info('Checkout session completed', [
             'session_id' => $session->id,
             'customer' => $session->customer,
+            'mode' => $session->mode ?? null,
         ]);
+
+        // One-time budget top-ups (mode=payment) are credited to BUSER_TOPUPS.
+        if ('topup' === ($session->metadata->type ?? null)) {
+            return $this->handleTopupCompleted($session);
+        }
 
         // Get user from client_reference_id (user ID set during checkout creation)
         $userId = $session->client_reference_id ?? null;
@@ -247,6 +256,76 @@ class StripeWebhookController extends AbstractController
         $user->setPaymentDetails($paymentDetails);
 
         $this->em->flush();
+
+        return true;
+    }
+
+    /**
+     * Credit a one-time budget top-up. Idempotent on the Stripe session id
+     * (DB unique index) so webhook retries never double-credit.
+     */
+    private function handleTopupCompleted($session): bool
+    {
+        $userId = $session->client_reference_id ?? ($session->metadata->user_id ?? null);
+        $user = $userId ? $this->userRepository->find((int) $userId) : null;
+
+        if (!$user) {
+            $this->logger->warning('User not found for top-up checkout', [
+                'session_id' => $session->id,
+                'user_id' => $userId,
+            ]);
+
+            return false;
+        }
+
+        // Durable idempotency guard (in addition to the event-level cache check).
+        if ($this->topupRepository->existsForSession($session->id)) {
+            $this->logger->info('Top-up already credited for session', [
+                'session_id' => $session->id,
+                'user_id' => $user->getId(),
+            ]);
+
+            return true;
+        }
+
+        // Net EUR the user bought (excludes any Stripe Tax). Prefer the value we
+        // stamped at checkout; fall back to the pre-tax subtotal.
+        $amountEur = isset($session->metadata->topup_eur)
+            ? (float) $session->metadata->topup_eur
+            : ((int) ($session->amount_subtotal ?? 0)) / 100.0;
+
+        if ($amountEur <= 0) {
+            $this->logger->warning('Top-up completed with non-positive amount', [
+                'session_id' => $session->id,
+                'user_id' => $user->getId(),
+            ]);
+
+            return false;
+        }
+
+        $topup = new Topup();
+        $topup->setUserId((int) $user->getId())
+            ->setAmount(number_format($amountEur, 2, '.', ''))
+            ->setCurrency('EUR')
+            ->setStripeSessionId($session->id)
+            ->setStatus('completed')
+            ->setCreated(time());
+
+        // Persist the customer id too (first purchase may set it).
+        if (!empty($session->customer)) {
+            $paymentDetails = $user->getPaymentDetails();
+            $paymentDetails['stripe_customer_id'] = $session->customer;
+            $user->setPaymentDetails($paymentDetails);
+        }
+
+        $this->topupRepository->save($topup, false);
+        $this->em->flush();
+
+        $this->logger->info('Budget top-up credited', [
+            'session_id' => $session->id,
+            'user_id' => $user->getId(),
+            'amount_eur' => $amountEur,
+        ]);
 
         return true;
     }

@@ -17,6 +17,7 @@ use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -42,6 +43,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private MessageBusInterface $messageBus,
         private PerfPipelineFlag $perfPipelineFlag,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
+        private bool $costBudgetGateEnabled = false,
     ) {
     }
 
@@ -309,6 +312,31 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'limit' => $rateLimitCheck['limit'],
                     ],
                 ];
+            }
+
+            // Cost-budget backstop: media spend (incl. the +markup) counts toward
+            // the user's monthly budget. Primary enforcement is at the chat entry
+            // (StreamController); this also covers worker/multitask media paths.
+            if ($this->costBudgetGateEnabled) {
+                $budgetCheck = $this->rateLimitService->checkCostBudget($user);
+                if (!$budgetCheck['allowed']) {
+                    $lang = $classification['language'] ?? 'en';
+                    $budgetMessage = 'de' === $lang
+                        ? 'Dein monatliches Nutzungsbudget ist aufgebraucht. Du kannst zusätzliches Guthaben in 100-EUR-Schritten aufladen, um weiterzumachen.'
+                        : 'Your monthly usage budget is used up. You can top up in EUR 100 steps to keep generating.';
+                    $streamCallback($budgetMessage);
+
+                    return [
+                        'metadata' => [
+                            'error' => 'cost_budget_exceeded',
+                            'limit_type' => 'monthly',
+                            'budget' => $budgetCheck['budget'],
+                            'used' => $budgetCheck['used_cost'],
+                            'remaining' => $budgetCheck['remaining'],
+                            'topup_available' => true,
+                        ],
+                    ];
+                }
             }
         }
 

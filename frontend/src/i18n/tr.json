@@ -1228,6 +1228,10 @@
       "support": "Premium destek"
     },
     "upgradeNow": "Şimdi Yükselt",
+    "topup": {
+      "button": "€{amount} bakiye ekle",
+      "error": "Yükleme başlatılamadı. Lütfen tekrar deneyin."
+    },
     "verifyPhone": "Telefon Numarasını Doğrula",
     "footerNote": "Sorularınız mı var? Destek ekibimizle iletişime geçin.",
     "messageBlocked": "Mesaj gönderilemedi",

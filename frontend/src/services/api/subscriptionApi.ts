@@ -47,6 +47,30 @@ export interface PortalSession {
   url: string
 }
 
+export interface TopupSession {
+  sessionId: string
+  url: string
+  steps: number
+  total_eur: number
+}
+
+export interface BudgetStatus {
+  allowed: boolean
+  used_cost: string
+  raw_cost: string
+  markup_percent: number
+  base_budget: string
+  topups: string
+  budget: string
+  remaining: string
+  percent: number
+  period_start: number
+  period_end: number
+  gate_enabled: boolean
+  topup_step_eur: number
+  billing_enabled: boolean
+}
+
 export const subscriptionApi = {
   async getPlans(): Promise<{ plans: SubscriptionPlan[]; stripeConfigured: boolean }> {
     return httpClient<{ plans: SubscriptionPlan[]; stripeConfigured: boolean }>(
@@ -73,6 +97,25 @@ export const subscriptionApi = {
   async createPortalSession(): Promise<PortalSession> {
     return httpClient<PortalSession>('/api/v1/subscription/portal', {
       method: 'POST',
+    })
+  },
+
+  /**
+   * Current cost-budget status (markup-aware, incl. period top-ups).
+   */
+  async getBudget(): Promise<BudgetStatus> {
+    return httpClient<BudgetStatus>('/api/v1/subscription/budget', {
+      method: 'GET',
+    })
+  },
+
+  /**
+   * Create a one-time Stripe Checkout to top up the cost budget in EUR-100 steps.
+   */
+  async createTopupSession(steps = 1): Promise<TopupSession> {
+    return httpClient<TopupSession>('/api/v1/subscription/topup', {
+      method: 'POST',
+      body: JSON.stringify({ steps }),
     })
   },
 

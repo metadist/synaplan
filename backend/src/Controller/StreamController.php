@@ -373,6 +373,7 @@ class StreamController extends AbstractController
                         'limit' => $budgetCheck['budget'],
                         'used' => $budgetCheck['used_cost'],
                         'remaining' => $budgetCheck['remaining'],
+                        'topup_available' => true,
                         'user_level' => $user->getUserLevel(),
                         'phone_verified' => $user->hasVerifiedPhone(),
                     ];

@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
+use App\Repository\TopupRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -20,6 +21,17 @@ use Psr\Log\LoggerInterface;
 final class RateLimitService
 {
     private const CACHE_TTL = 300; // 5 minutes cache
+
+    /**
+     * Default usage markup applied to provider cost when evaluating a user's
+     * cost budget. 10 → users are billed 110% of the raw provider cost. Operators
+     * can override via BCONFIG group "BILLING", setting "MARKUP_PERCENT".
+     */
+    private const DEFAULT_MARKUP_PERCENT = 10.0;
+
+    public const MARKUP_CONFIG_GROUP = 'BILLING';
+    public const MARKUP_CONFIG_SETTING = 'MARKUP_PERCENT';
+
     private array $limitsCache = [];
 
     public function __construct(
@@ -29,7 +41,22 @@ final class RateLimitService
         private BillingService $billingService,
         private CostCalculationService $costCalculationService,
         private SubscriptionRepository $subscriptionRepository,
+        private TopupRepository $topupRepository,
     ) {
+    }
+
+    /**
+     * Resolve the configured usage-markup percent (operator-tunable via BCONFIG
+     * BILLING/MARKUP_PERCENT, default 10). Clamped to a sane 0–1000% range.
+     */
+    public function getMarkupPercent(): float
+    {
+        $raw = $this->configRepository->getValue(0, self::MARKUP_CONFIG_GROUP, self::MARKUP_CONFIG_SETTING);
+        if (null === $raw || '' === trim($raw) || !is_numeric($raw)) {
+            return self::DEFAULT_MARKUP_PERCENT;
+        }
+
+        return max(0.0, min(1000.0, (float) $raw));
     }
 
     /**
@@ -385,43 +412,65 @@ final class RateLimitService
      * Budget is read from BSUBSCRIPTIONS regardless of Stripe being configured,
      * since token budgets are an application concern independent of payment processing.
      *
-     * @return array{allowed: bool, used_cost: string, budget: string, remaining: string, percent: float, period_start: int, period_end: int}
+     * `used_cost` is the charged amount (raw provider cost + markup); `raw_cost`
+     * is the underlying provider cost. The effective budget is the tier's monthly
+     * budget plus any one-time top-ups bought within the current period.
+     *
+     * @return array{allowed: bool, used_cost: string, raw_cost: string, markup_percent: float, base_budget: string, topups: string, budget: string, remaining: string, percent: float, period_start: int, period_end: int}
      */
     public function checkCostBudget(User $user): array
     {
+        $markupPercent = $this->getMarkupPercent();
+        $markupMultiplier = 1.0 + ($markupPercent / 100.0);
+
         $subscription = $this->subscriptionRepository->findOneBy(['level' => $user->getRateLimitLevel()]);
-        $budget = $subscription ? (float) $subscription->getCostBudgetMonthly() : 0.0;
+        $baseBudget = $subscription ? (float) $subscription->getCostBudgetMonthly() : 0.0;
 
         [$periodStart, $periodEnd] = $this->getBillingPeriod($user);
 
-        $usedCost = (float) $this->em->getConnection()->fetchOne(
+        // One-time top-ups bought within this period raise the budget.
+        $topups = $this->topupRepository->sumForUserInPeriod((int) $user->getId(), $periodStart, $periodEnd);
+        $budget = $baseBudget + $topups;
+
+        // Raw provider cost incurred this period (true cost, as stored in BUSELOG).
+        $rawCost = (float) $this->em->getConnection()->fetchOne(
             'SELECT COALESCE(SUM(BCOST), 0) FROM BUSELOG WHERE BUSERID = :user_id AND BUNIXTIMES >= :period_start AND BUNIXTIMES <= :period_end',
             ['user_id' => $user->getId(), 'period_start' => $periodStart, 'period_end' => $periodEnd]
         );
 
+        // What the user is actually billed: provider cost + markup.
+        $chargedCost = $rawCost * $markupMultiplier;
+
+        $base = [
+            'used_cost' => number_format($chargedCost, 2, '.', ''),
+            'raw_cost' => number_format($rawCost, 2, '.', ''),
+            'markup_percent' => round($markupPercent, 2),
+            'base_budget' => number_format($baseBudget, 2, '.', ''),
+            'topups' => number_format($topups, 2, '.', ''),
+            'period_start' => $periodStart,
+            'period_end' => $periodEnd,
+        ];
+
+        // No budget configured for this tier (and no top-ups) → unlimited.
         if ($budget <= 0) {
             return [
+                ...$base,
                 'allowed' => true,
-                'used_cost' => number_format($usedCost, 2, '.', ''),
                 'budget' => '0.00',
                 'remaining' => '0.00',
                 'percent' => 0.0,
-                'period_start' => $periodStart,
-                'period_end' => $periodEnd,
             ];
         }
 
-        $remaining = max(0.0, $budget - $usedCost);
-        $percent = min(100.0, ($usedCost / $budget) * 100);
+        $remaining = max(0.0, $budget - $chargedCost);
+        $percent = min(100.0, ($chargedCost / $budget) * 100);
 
         return [
-            'allowed' => $usedCost < $budget,
-            'used_cost' => number_format($usedCost, 2, '.', ''),
+            ...$base,
+            'allowed' => $chargedCost < $budget,
             'budget' => number_format($budget, 2, '.', ''),
             'remaining' => number_format($remaining, 2, '.', ''),
             'percent' => round($percent, 1),
-            'period_start' => $periodStart,
-            'period_end' => $periodEnd,
         ];
     }
 

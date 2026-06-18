@@ -1626,6 +1626,10 @@
       "support": "Premium-Support"
     },
     "upgradeNow": "Jetzt Upgraden",
+    "topup": {
+      "button": "€{amount} Guthaben aufladen",
+      "error": "Aufladung konnte nicht gestartet werden. Bitte versuche es erneut."
+    },
     "verifyPhone": "Telefonnummer Verifizieren",
     "footerNote": "Fragen? Kontaktieren Sie unser Support-Team.",
     "messageBlocked": "Nachricht konnte nicht gesendet werden",

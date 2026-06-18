@@ -1227,6 +1227,10 @@
       "support": "Soporte premium"
     },
     "upgradeNow": "Mejorar Ahora",
+    "topup": {
+      "button": "Añadir €{amount} de saldo",
+      "error": "No se pudo iniciar la recarga. Inténtalo de nuevo."
+    },
     "verifyPhone": "Verificar Número de Teléfono",
     "footerNote": "¿Preguntas? Contacta a nuestro equipo de soporte.",
     "messageBlocked": "No se pudo enviar el mensaje",

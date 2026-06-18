@@ -5,6 +5,7 @@ namespace App\Tests\Service;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
+use App\Repository\TopupRepository;
 use App\Service\BillingService;
 use App\Service\CostCalculationService;
 use App\Service\RateLimitService;
@@ -62,6 +63,7 @@ class RateLimitServiceUnifiedTest extends TestCase
             $billingService,
             $costCalculationService,
             $subscriptionRepository,
+            $this->createMock(TopupRepository::class),
         );
     }
 
@@ -226,6 +228,7 @@ class RateLimitServiceUnifiedTest extends TestCase
             new BillingService('sk_test_valid_key', 'price_1RealProId'),
             $costCalculationService,
             $this->createMock(SubscriptionRepository::class),
+            $this->createMock(TopupRepository::class),
         );
 
         $this->connection->expects($this->once())

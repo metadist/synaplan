@@ -1529,6 +1529,10 @@
       "support": "Premium support"
     },
     "upgradeNow": "Upgrade Now",
+    "topup": {
+      "button": "Add €{amount} budget",
+      "error": "Could not start the top-up. Please try again."
+    },
     "verifyPhone": "Verify Phone Number",
     "footerNote": "Questions? Contact our support team.",
     "messageBlocked": "Message could not be sent",
