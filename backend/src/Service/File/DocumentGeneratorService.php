@@ -10,6 +10,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use PhpOffice\PhpWord\IOFactory as WordIOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\Settings as WordSettings;
 use PhpOffice\PhpWord\Shared\Html as WordHtml;
 use Psr\Log\LoggerInterface;
 
@@ -77,6 +78,9 @@ final readonly class DocumentGeneratorService
     private function writeDocx(string $content, string $absolutePath): void
     {
         $html = (new \Parsedown())->text($content);
+
+        // Ensure special characters (like '&', '<', '>') are escaped in the XML to prevent document corruption.
+        WordSettings::setOutputEscapingEnabled(true);
 
         try {
             $phpWord = new PhpWord();

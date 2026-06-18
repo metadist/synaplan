@@ -513,13 +513,18 @@ class ConfigController extends AbstractController
                     break;
                 case 'VIDEO':
                 case 'TEXT2VID':
-                    $grouped['TEXT2VID'][] = $model;
-                    // Image-to-video models share the text2vid BTAG but are
-                    // surfaced in a dedicated IMG2VID slot (mirrors PIC2PIC over
-                    // text2pic). They animate an attached image rather than
-                    // generating a clip from text alone.
-                    if (!empty($model['features']) && in_array('image2video', $model['features'], true)) {
+                    // Image-to-video models share the text2vid BTAG but CANNOT
+                    // generate a clip from text alone — they require a reference
+                    // image. Surface them ONLY in the dedicated IMG2VID slot
+                    // (mirrors PIC2PIC over text2pic), never as a TEXT2VID option.
+                    // Otherwise a user can pick an i2v model as their text-to-video
+                    // default and every text prompt fails at the provider with
+                    // "'image_url' is a required property".
+                    $isImageToVideo = !empty($model['features']) && in_array('image2video', $model['features'], true);
+                    if ($isImageToVideo) {
                         $grouped['IMG2VID'][] = $model;
+                    } else {
+                        $grouped['TEXT2VID'][] = $model;
                     }
                     break;
                 case 'AUDIO':

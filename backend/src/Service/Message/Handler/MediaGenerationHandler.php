@@ -295,6 +295,69 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $this->logger->warning('MediaGenerationHandler: No model configured, using DALL-E fallback');
         }
 
+        // Guard: a text-to-video request (no attached image) must never be sent
+        // to an image-to-video model. i2v models (Higgsfield DoP/Kling/etc.)
+        // require a reference frame and the provider rejects the request with
+        // "'image_url' is a required property". This happens when an i2v model is
+        // configured as the TEXT2VID default. Return an actionable message
+        // instead of leaking a raw provider 400 to the user.
+        if ('video' === $mediaType && !$isPic2Pic) {
+            $requiresReferenceImage = !empty($modelConfig['requires_reference_image'])
+                || (!empty($modelConfig['features']) && in_array('image2video', $modelConfig['features'], true));
+            if ($requiresReferenceImage) {
+                $this->logger->warning('MediaGenerationHandler: text-to-video routed to an image-to-video model without a reference image', [
+                    'model_id' => $modelId,
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ]);
+
+                $lang = $classification['language'] ?? 'en';
+                $guardMessage = 'de' === $lang
+                    ? sprintf('„%s“ ist ein Bild-zu-Video-Modell und benötigt ein Referenzbild. Hänge ein Bild an, um es zu animieren, oder wähle in den Einstellungen ein Text-zu-Video-Modell (z. B. Veo) als Standard für Video.', $modelName)
+                    : sprintf('"%s" is an image-to-video model and needs a reference image. Attach an image to animate it, or choose a text-to-video model (e.g. Veo) as your video default in Settings.', $modelName);
+                $streamCallback($guardMessage);
+
+                return [
+                    'metadata' => [
+                        'error' => 'text2vid_requires_reference_image',
+                        'provider' => $provider,
+                        'model' => $modelName,
+                    ],
+                ];
+            }
+        }
+
+        // Guard: image-to-video requires the remote provider to FETCH the
+        // attached source frame from a public http(s) URL (we republish it at
+        // APP_URL/api/v1/files/uploads/...). When APP_URL points at a
+        // local/private host — the default in local dev (http://localhost:8000)
+        // — that URL is unreachable from the provider's servers and the request
+        // is rejected with a confusing raw "invalid_image_url" 400. Detect this
+        // up front and return an actionable message instead of burning a
+        // provider call (and credits) on a request that cannot succeed.
+        if ('video' === $mediaType && [] !== $attachedImagePaths && !$this->isPublicBaseUrlReachable()) {
+            $base = rtrim($this->publicBaseUrl, '/');
+            $this->logger->warning('MediaGenerationHandler: image-to-video blocked — APP_URL is not internet-reachable so the provider cannot fetch the source image', [
+                'app_url' => $base,
+                'provider' => $provider,
+                'model' => $modelName,
+            ]);
+
+            $lang = $classification['language'] ?? 'en';
+            $guardMessage = 'de' === $lang
+                ? sprintf('Für Bild-zu-Video muss dein Bild über eine öffentliche URL an den Anbieter gesendet werden. Die öffentliche Adresse dieses Servers (APP_URL = „%s") ist jedoch ein lokaler/privater Host, den der Anbieter nicht erreichen kann. Setze APP_URL auf eine über das Internet erreichbare URL (z. B. einen Tunnel) oder verwende ein Text-zu-Video-Modell ohne angehängtes Bild.', $base)
+                : sprintf('Image-to-video has to send your image to the provider from a public URL, but this server\'s public address (APP_URL = "%s") is a local/private host the provider can\'t reach. Set APP_URL to an internet-reachable URL (e.g. a tunnel), or use a text-to-video model without an attached image.', $base);
+            $streamCallback($guardMessage);
+
+            return [
+                'metadata' => [
+                    'error' => 'i2v_requires_public_app_url',
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ],
+            ];
+        }
+
         // Send detailed status update with provider and media type
         $providerName = ucfirst($provider);
         $mediaTypeLabel = match ($mediaType) {
@@ -866,7 +929,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // private hosts (typical in dev) will be rejected by the provider — warn
         // so the failure is diagnosable, but still return the URL so a public
         // deployment behind a localhost-looking proxy is not blocked here.
-        if (preg_match('#^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)(:\d+)?#i', $base)) {
+        // (The handler also guards this up front via isPublicBaseUrlReachable().)
+        if (!$this->isPublicBaseUrlReachable()) {
             $this->logger->warning('MediaGenerationHandler: APP_URL is not internet-reachable; image-to-video providers will not be able to fetch the source image', [
                 'app_url' => $base,
             ]);
@@ -898,6 +962,23 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         FileHelper::setFilePermissions($absoluteTarget);
 
         return $base.'/api/v1/files/uploads/'.$relativePath;
+    }
+
+    /**
+     * Is the configured public base URL (APP_URL) one that a remote AI provider
+     * could realistically fetch from? Returns false for an empty value and for
+     * localhost / loopback / private dev hosts. Used to short-circuit
+     * image-to-video requests (whose source frame must be provider-fetchable)
+     * with an actionable message instead of a raw provider 400.
+     */
+    private function isPublicBaseUrlReachable(): bool
+    {
+        $base = rtrim($this->publicBaseUrl, '/');
+        if ('' === $base) {
+            return false;
+        }
+
+        return 1 !== preg_match('#^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)(:\d+)?#i', $base);
     }
 
     private function collectAttachedImagePaths(Message $message): array
