@@ -79,6 +79,10 @@ vi.mock('@/services/api/impersonationApi', () => ({
   },
 }))
 
+vi.mock('@/services/api/chatApi', () => ({
+  clearSseToken: vi.fn(),
+}))
+
 describe('useAuthStore — impersonation', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
