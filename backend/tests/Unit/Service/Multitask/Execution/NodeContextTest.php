@@ -129,4 +129,66 @@ final class NodeContextTest extends TestCase
         self::assertSame('the summary', $resolved['text']);
         self::assertSame([['path' => 'a.mp3', 'type' => 'audio']], $resolved['attachments']);
     }
+
+    // -----------------------------------------------------------------------
+    // Prose interpolation (embedded $nX.text tokens — issue #1070 resolver fix)
+    // -----------------------------------------------------------------------
+
+    public function testInterpolatesEmbeddedNodeRef(): void
+    {
+        $ctx = $this->context($this->message());
+        $ctx->setResult('n1', NodeResult::ok('Mein Trainingsplan'));
+
+        // Planner emits prose with an embedded reference — should be resolved.
+        $resolved = $ctx->resolve('Zusammenfassen: $n1.text');
+
+        self::assertSame('Zusammenfassen: Mein Trainingsplan', $resolved);
+    }
+
+    public function testInterpolatesMultipleEmbeddedRefs(): void
+    {
+        $ctx = $this->context($this->message('user input'));
+        $ctx->setResult('n1', NodeResult::ok('Chapter One'));
+        $ctx->setResult('n2', NodeResult::ok('Chapter Two'));
+
+        $resolved = $ctx->resolve('$n1.text and also $n2.text');
+
+        self::assertSame('Chapter One and also Chapter Two', $resolved);
+    }
+
+    public function testInterpolatesEmbeddedMessageText(): void
+    {
+        $ctx = $this->context($this->message('user query'));
+
+        $resolved = $ctx->resolve('Echo: $message.text done');
+
+        self::assertSame('Echo: user query done', $resolved);
+    }
+
+    public function testInterpolatesEmbeddedMessageFileText(): void
+    {
+        $ctx = $this->context($this->message(fileText: 'file body'));
+
+        $resolved = $ctx->resolve('From file: $message.fileText end');
+
+        self::assertSame('From file: file body end', $resolved);
+    }
+
+    public function testUnresolvableEmbeddedRefBecomesEmptyString(): void
+    {
+        $ctx = $this->context($this->message());
+        // $n99 has no result — should replace with empty string, not leave literal.
+
+        $resolved = $ctx->resolve('Prefix $n99.text suffix');
+
+        self::assertSame('Prefix  suffix', $resolved);
+    }
+
+    public function testPureReferenceUnchangedByInterpolation(): void
+    {
+        // Pure refs still return the typed value (string), not interpolated.
+        $ctx = $this->context($this->message('the input'));
+
+        self::assertSame('the input', $ctx->resolve('$message.text'));
+    }
 }

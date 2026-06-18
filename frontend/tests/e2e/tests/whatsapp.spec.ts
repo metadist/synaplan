@@ -151,7 +151,9 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
     })
   })
 
-  test('audio: webhook 2xx, exactly one outbound text message', async ({ request }, testInfo) => {
+  test('audio: webhook 2xx, exactly one outbound message (text or audio)', async ({
+    request,
+  }, testInfo) => {
     const baseUrl = getStubBaseUrl()
     const runId = makeRunId(testInfo.testId)
     const messageId = `smoke-audio-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -162,7 +164,13 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
       await postWebhookAndAssert2xx(request, payload)
     })
 
-    await test.step('Assert: exactly one outbound (text, e.g. transcription error)', async () => {
+    // Voice-only input is answered with a TTS voice note when a
+    // text-to-speech provider is available (WhatsAppService: "AUDIO input
+    // → TTS AUDIO response"), and falls back to a text reply otherwise
+    // (e.g. transcription error or no TTS provider configured). Accept
+    // both, mirroring the image test — the contract under test is "exactly
+    // one well-formed outbound to the sender", not a fixed modality.
+    await test.step('Assert: exactly one outbound (text or audio)', async () => {
       const reqs = await awaitOutboundExactlyOnce(request, baseUrl, { runId })
       assertStubContract(reqs, {
         expectedPathExact: EXPECTED_PATH_MESSAGES,
@@ -172,10 +180,15 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
       const bodies = getPostMessageBodies(reqs)
       expect(bodies.length).toBe(1)
       expect(bodies[0].to).toBe(TEST_FROM)
-      expect(bodies[0].type).toBe('text')
-      const textBody = (bodies[0].text as { body?: string })?.body
-      expect(textBody).toBeDefined()
-      expect(String(textBody).length).toBeGreaterThan(0)
+      const msgType = bodies[0].type as string
+      expect(['text', 'audio']).toContain(msgType)
+      if (msgType === 'text') {
+        const textBody = (bodies[0].text as { body?: string })?.body
+        expect(textBody).toBeDefined()
+        expect(String(textBody).length).toBeGreaterThan(0)
+      } else {
+        expect(bodies[0].audio).toBeDefined()
+      }
     })
   })
 })

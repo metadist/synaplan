@@ -6,9 +6,9 @@ use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
-use App\Repository\SearchResultRepository;
 use App\Service\File\DataUrlFixer;
 use App\Service\File\OgImageService;
+use App\Service\Message\MessageApiFormatter;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -27,10 +27,10 @@ class ChatController extends AbstractController
         private EntityManagerInterface $em,
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
-        private SearchResultRepository $searchResultRepository,
         private WidgetSessionService $widgetSessionService,
         private DataUrlFixer $dataUrlFixer,
         private OgImageService $ogImageService,
+        private MessageApiFormatter $messageApiFormatter,
         private LoggerInterface $logger,
     ) {
     }
@@ -483,151 +483,12 @@ class ChatController extends AbstractController
         $messages = $queryBuilder->getQuery()->getResult();
         $messages = array_reverse($messages);
 
-        $messageData = array_map(function ($m) {
-            $filesData = [];
-            if ($m->hasFiles()) {
-                foreach ($m->getFiles() as $file) {
-                    $filesData[] = [
-                        'id' => $file->getId(),
-                        'filename' => $file->getFileName(),
-                        'fileType' => $file->getFileType(),
-                        'filePath' => $file->getFilePath(),
-                        'fileSize' => $file->getFileSize(),
-                        'fileMime' => $file->getFileMime(),
-                    ];
-                }
-            }
-
-            // Get AI model metadata for assistant messages
-            $aiModels = [];
-            $webSearchData = null;
-            $searchResultsData = [];
-            $wasMultitask = false;
-
-            if ('OUT' === $m->getDirection()) {
-                // Multi-task routing: the turn ran the DAG executor, so the
-                // frontend shows the simple "Again" (full re-plan) control.
-                $wasMultitask = '1' === $m->getMeta('multitask');
-
-                // Chat model (used for generating the response)
-                $chatProvider = $m->getMeta('ai_chat_provider');
-                $chatModel = $m->getMeta('ai_chat_model');
-                $chatModelIdMeta = $m->getMeta('ai_chat_model_id');
-                if ($chatProvider || $chatModel) {
-                    $aiModels['chat'] = [
-                        'provider' => $chatProvider,
-                        'model' => $chatModel,
-                        'model_id' => $chatModelIdMeta ? (int) $chatModelIdMeta : null,
-                    ];
-                }
-
-                // Sorting model (used for classification/routing)
-                $sortingProvider = $m->getMeta('ai_sorting_provider');
-                $sortingModel = $m->getMeta('ai_sorting_model');
-                $sortingModelId = $m->getMeta('ai_sorting_model_id');
-                if ($sortingProvider || $sortingModel) {
-                    $aiModels['sorting'] = [
-                        'provider' => $sortingProvider,
-                        'model' => $sortingModel,
-                        'model_id' => $sortingModelId ? (int) $sortingModelId : null,
-                    ];
-                }
-
-                // Audio model (TTS pipeline used for voice reply, e.g. Piper).
-                // Surfaced separately from `chat` so a page reload also shows
-                // the actual TTS model under the "Audio Model" badge — see
-                // issue #583.
-                $audioProvider = $m->getMeta('ai_audio_provider');
-                $audioModel = $m->getMeta('ai_audio_model');
-                $audioModelId = $m->getMeta('ai_audio_model_id');
-                if ($audioProvider || $audioModel) {
-                    $aiModels['audio'] = [
-                        'provider' => $audioProvider,
-                        'model' => $audioModel,
-                        'model_id' => $audioModelId ? (int) $audioModelId : null,
-                    ];
-                }
-
-                // Web Search metadata
-                $searchQuery = $m->getMeta('web_search_query');
-                $searchResultsCount = $m->getMeta('web_search_results_count');
-                if ($searchQuery || $searchResultsCount) {
-                    $webSearchData = [
-                        'query' => $searchQuery,
-                        'resultsCount' => $searchResultsCount ? (int) $searchResultsCount : 0,
-                    ];
-
-                    // Load actual search results from DB
-                    // Search results are stored on the INCOMING (user) message, but we need to display them
-                    // on the OUTGOING (AI) message. So we need to find the previous incoming message.
-                    $incomingMessage = $this->messageRepository->createQueryBuilder('prev')
-                        ->where('prev.chatId = :chatId')
-                        ->andWhere('prev.direction = :direction')
-                        ->andWhere('prev.unixTimestamp < :timestamp')
-                        ->setParameter('chatId', $m->getChatId())
-                        ->setParameter('direction', 'IN')
-                        ->setParameter('timestamp', $m->getUnixTimestamp())
-                        ->orderBy('prev.unixTimestamp', 'DESC')
-                        ->setMaxResults(1)
-                        ->getQuery()
-                        ->getOneOrNullResult();
-
-                    if ($incomingMessage) {
-                        $searchResults = $this->searchResultRepository->findByMessage($incomingMessage);
-                        foreach ($searchResults as $sr) {
-                            $searchResultsData[] = [
-                                'title' => $sr->getTitle(),
-                                'url' => $sr->getUrl(),
-                                'description' => $sr->getDescription(),
-                                'published' => $sr->getPublished(),
-                                'source' => $sr->getSource(),
-                                'thumbnail' => $sr->getThumbnail(),
-                            ];
-                        }
-                    }
-                }
-            } elseif ('IN' === $m->getDirection()) {
-                // Check if web search was enabled for incoming message
-                $webSearchEnabled = $m->getMeta('web_search_enabled');
-                if ('true' === $webSearchEnabled) {
-                    $webSearchData = [
-                        'enabled' => true,
-                    ];
-                }
-            }
-
-            // Fix data URL to file if needed (legacy migration)
-            $filePath = $m->getFilePath();
-            if ($m->getFile() && $filePath && str_starts_with($filePath, 'data:')) {
-                $filePath = $this->dataUrlFixer->ensureFileOnDisk($m);
-            }
-
-            $originalTopic = $m->getMeta('original_topic');
-            $originalMediaType = $m->getMeta('original_media_type');
-
-            return [
-                'id' => $m->getId(),
-                'text' => $m->getText(),
-                'direction' => $m->getDirection(),
-                'timestamp' => $m->getUnixTimestamp(),
-                'provider' => $m->getProviderIndex(),
-                'topic' => $m->getTopic(),
-                'originalTopic' => $originalTopic,
-                'originalMediaType' => $originalMediaType,
-                'language' => $m->getLanguage(),
-                'createdAt' => $m->getDateTime(),
-                'files' => $filesData, // Attached files (user uploads)
-                'aiModels' => !empty($aiModels) ? $aiModels : null, // AI model metadata
-                'webSearch' => $webSearchData, // Web search metadata
-                'searchResults' => !empty($searchResultsData) ? $searchResultsData : null, // Actual search results
-                'multitask' => $wasMultitask, // True when the turn ran the multi-task DAG
-                // Generated content (images, videos from AI)
-                'file' => ($m->getFile() && $filePath) ? [
-                    'path' => $filePath,
-                    'type' => $m->getFileType(),
-                ] : null,
-            ];
-        }, $messages);
+        // Issue #1070: serialization lives in MessageApiFormatter so this
+        // endpoint and GET /api/v1/messages/{id} can never diverge.
+        $messageData = array_map(
+            fn ($m) => $this->messageApiFormatter->format($m),
+            $messages
+        );
 
         $totalCount = $this->messageRepository->createQueryBuilder('m')
             ->select('COUNT(m.id)')
