@@ -33,12 +33,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
       expect(MULTITASK_PROMPT.length).toBeGreaterThan(280)
     })
 
-    const previousCount = await chat.conversationBubbles().count()
-
-    await test.step('Act: send a multi-task prompt', async () => {
-      await page.locator(selectors.chat.textInput).fill(MULTITASK_PROMPT)
-      await page.locator(selectors.chat.sendBtn).click()
-    })
+    const previousCount = await chat.sendMessage(MULTITASK_PROMPT)
 
     const bubble = chat.conversationBubbles().nth(previousCount)
     await bubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })

@@ -17,12 +17,7 @@ test.describe('@ci @smoke Chat Share', () => {
       await chat.startNewChat()
     })
 
-    const previousCount = await chat.conversationBubbles().count()
-
-    await test.step('Act: send message', async () => {
-      await page.locator(selectors.chat.textInput).fill(uniqueMessage)
-      await page.locator(selectors.chat.sendBtn).click()
-    })
+    const previousCount = await chat.sendMessage(uniqueMessage)
 
     await test.step('Wait for chat terminal state (done or error)', async () => {
       await chat.waitForAnswer(previousCount)
