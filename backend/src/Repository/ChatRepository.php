@@ -23,6 +23,38 @@ class ChatRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Most-recently-updated chats for a user, each paired with its message count,
+     * resolved in a single SQL-limited query.
+     *
+     * Avoids hydrating full message collections just to count them (the N+1 trap
+     * of `getMessages()->count()` when the relation is not EXTRA_LAZY).
+     *
+     * @return list<array{chat: Chat, messageCount: int}>
+     */
+    public function findByUserWithMessageCount(int $userId, int $limit): array
+    {
+        /** @var array<int, array{0: Chat, messageCount: int|string}> $rows */
+        $rows = $this->createQueryBuilder('c')
+            ->select('c', 'COUNT(m.id) AS messageCount')
+            ->leftJoin('c.messages', 'm')
+            ->where('c.userId = :userId')
+            ->setParameter('userId', $userId)
+            ->groupBy('c.id')
+            ->orderBy('c.updatedAt', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        return array_map(
+            static fn (array $row): array => [
+                'chat' => $row[0],
+                'messageCount' => (int) $row['messageCount'],
+            ],
+            $rows,
+        );
+    }
+
     public function findByShareToken(string $token): ?Chat
     {
         return $this->findOneBy(['shareToken' => $token]);

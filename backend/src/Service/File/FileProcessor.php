@@ -48,12 +48,18 @@ final readonly class FileProcessor
     ];
 
     /**
-     * Video formats that get both audio-track transcription AND a visual
-     * key-frame description (issue #983). `webm` is deliberately excluded:
-     * browser voice notes are recorded as audio/webm, so it stays on the
-     * audio-only transcription path to avoid a needless vision call.
+     * Video container formats. They get both audio-track transcription AND a
+     * visual key-frame description (issue #983), and their audio track is
+     * always stripped before being sent to an external STT API — even though
+     * some containers (mp4, mkv) appear in API_SUPPORTED_AUDIO_FORMATS. A full
+     * video file can easily be 40+ MB while the extracted audio-only payload is
+     * a few MB; every hosted Whisper endpoint enforces a ~25 MB ceiling.
+     *
+     * `webm` is deliberately excluded: browser/WhatsApp voice notes are
+     * recorded as audio/webm, so it stays on the audio-only transcription path
+     * to avoid a needless vision call.
      */
-    private const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv'];
+    private const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv', 'mpeg', 'mpg'];
 
     /**
      * Audio formats supported by external APIs (OpenAI/Groq Whisper).
@@ -549,17 +555,29 @@ final readonly class FileProcessor
     }
 
     /**
+     * Public static variant used by FileUploadService to distinguish a
+     * transcription failure (audio/video → empty result is an error) from a
+     * legitimate no-content result (e.g. a blank PDF has no extractable text).
+     */
+    public static function isTranscribableMediaExtension(string $ext): bool
+    {
+        return in_array(strtolower($ext), self::TRANSCRIBABLE_MEDIA_EXTENSIONS, true);
+    }
+
+    /**
      * Extract text from audio/video file using Whisper.cpp with external API fallback.
      *
-     * Strategy order:
-     * 1. External STT (when user configured one): try first; on empty result fall
-     *    through to local Whisper so that oversized files processed by
-     *    extractAudioTrack() still get a transcript via the local path (issue #983).
-     * 2. Local Whisper.cpp: preferred when available and no external configured,
-     *    or as fallback when the external provider returned empty.
-     * 3. External STT (when no external configured and local unavailable/failed).
+     * Strategy when an external STT provider is configured:
+     *   1. External provider (faster, handles many languages)
+     *   2. Local Whisper.cpp if external returns empty or fails (fallback) — this
+     *      also rescues oversized files already reduced by extractAudioTrack()
+     *      whose audio the external provider still could not handle (issue #983)
      *
-     * @param string   $absolutePath Full path to the audio file
+     * Strategy when no external provider is configured:
+     *   1. Local Whisper.cpp (free, no network dependency)
+     *   2. External provider as last resort
+     *
+     * @param string   $absolutePath Full path to the audio/video file
      * @param array    $baseMeta     Base metadata for logging
      * @param int|null $userId       User ID for provider selection
      *
@@ -567,31 +585,27 @@ final readonly class FileProcessor
      */
     private function extractFromAudio(string $absolutePath, array $baseMeta, ?int $userId = null): array
     {
-        // If user has configured an external STT provider, try it first.
-        // Fall through to local Whisper when it returns empty (issue #983).
         if ($this->aiFacade->hasConfiguredSttProvider($userId)) {
-            $this->logger->info('FileProcessor: User has external STT provider configured, trying external API first', $baseMeta);
+            $this->logger->info('FileProcessor: Trying external STT provider first', $baseMeta);
+            $externalResult = $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
 
-            [$text, $extMeta] = $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
-
-            if ('' !== trim((string) $text)) {
-                return [$text, $extMeta];
+            if ('' !== trim((string) ($externalResult[0] ?? ''))) {
+                return $externalResult;
             }
 
-            // External returned empty — try local Whisper as fallback
-            $this->logger->info('FileProcessor: External STT returned empty, trying local Whisper fallback', $baseMeta);
-
-            $localResult = $this->tryLocalWhisper($absolutePath, $baseMeta);
+            // External returned empty (provider error, file too large, etc.) —
+            // fall back to local Whisper before giving up (issue #983).
+            $this->logger->info('FileProcessor: External STT returned empty, falling back to local Whisper', $baseMeta);
+            $localResult = $this->transcribeLocally($absolutePath, $baseMeta);
             if (null !== $localResult) {
                 return $localResult;
             }
 
-            // Both paths exhausted — return external's (empty/error) result
-            return [$text, $extMeta];
+            return $externalResult;
         }
 
-        // No external configured — prefer local Whisper, fall back to external.
-        $localResult = $this->tryLocalWhisper($absolutePath, $baseMeta);
+        // No external provider configured — prefer local Whisper, fall back to external.
+        $localResult = $this->transcribeLocally($absolutePath, $baseMeta);
         if (null !== $localResult) {
             return $localResult;
         }
@@ -600,24 +614,30 @@ final readonly class FileProcessor
     }
 
     /**
-     * Attempt to transcribe audio using local Whisper.cpp.
+     * Attempt transcription with local Whisper.cpp.
      *
-     * @return array|null [text, meta] on non-empty transcript, null when Whisper is
-     *                    unavailable, fails, or returns only silence
+     * Returns the [text, meta] pair on success, or null when Whisper is
+     * unavailable, throws, or produces an empty transcript.  Callers treat
+     * null as "not available — try something else".
+     *
+     * @param string $absolutePath Full path to the audio/video file
+     * @param array  $baseMeta     Base metadata for logging
+     *
+     * @return array{0: string, 1: array<string, mixed>}|null
      */
-    private function tryLocalWhisper(string $absolutePath, array $baseMeta): ?array
+    private function transcribeLocally(string $absolutePath, array $baseMeta): ?array
     {
         if (!$this->whisperService->isAvailable()) {
             return null;
         }
 
-        $this->logger->info('FileProcessor: Transcribing audio with local Whisper', $baseMeta);
+        $this->logger->info('FileProcessor: Transcribing with local Whisper', $baseMeta);
 
         try {
             $result = $this->whisperService->transcribe($absolutePath);
             $text = $this->textCleaner->clean($result['text'] ?? '');
 
-            if (!empty(trim($text))) {
+            if ('' !== trim($text)) {
                 $this->logger->info('FileProcessor: Local Whisper transcription success', [
                     'strategy' => 'whisper_local',
                     'bytes' => strlen($text),
@@ -729,8 +749,16 @@ final readonly class FileProcessor
     {
         $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
 
-        // Check if format is already supported
-        if (in_array($ext, self::API_SUPPORTED_AUDIO_FORMATS, true)) {
+        // Video files must always be converted to an audio-only MP3 even when
+        // their container extension (mp4, mkv…) is listed in
+        // API_SUPPORTED_AUDIO_FORMATS.  The full video stream easily exceeds
+        // the ~25 MB ceiling enforced by Groq, OpenAI, and every other hosted
+        // Whisper endpoint; the extracted audio-only payload is typically just
+        // a few MB.  The -vn flag in the ffmpeg call below strips the video
+        // track so the conversion applies universally to all future providers.
+        $isVideo = in_array($ext, self::VIDEO_EXTENSIONS, true);
+
+        if (!$isVideo && in_array($ext, self::API_SUPPORTED_AUDIO_FORMATS, true)) {
             return $absolutePath;
         }
 

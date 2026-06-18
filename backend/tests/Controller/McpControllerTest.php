@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\ApiKey;
+use App\Entity\Chat;
+use App\Entity\File;
+use App\Entity\Message;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -94,8 +97,194 @@ final class McpControllerTest extends WebTestCase
         self::assertArrayHasKey('tools', $result['result']);
 
         $toolNames = array_map(static fn (array $t): string => $t['name'], $result['result']['tools']);
+        self::assertContains('synaplan_chat', $toolNames);
         self::assertContains('rag_search', $toolNames);
         self::assertContains('memory_search', $toolNames);
+        self::assertContains('memory_add', $toolNames);
+        self::assertContains('file_ingest', $toolNames);
+        self::assertContains('rag_similar', $toolNames);
+        self::assertContains('list_chats', $toolNames);
+        self::assertContains('get_messages', $toolNames);
+        self::assertContains('list_prompts', $toolNames);
+    }
+
+    public function testResourceTemplatesAreListed(): void
+    {
+        $this->client->disableReboot();
+
+        $sessionId = $this->initialize();
+
+        $result = $this->jsonRpc(
+            [
+                'jsonrpc' => '2.0',
+                'id' => 2,
+                'method' => 'resources/templates/list',
+                'params' => new \stdClass(),
+            ],
+            $sessionId,
+        );
+
+        self::assertArrayHasKey('result', $result, json_encode($result));
+        self::assertArrayHasKey('resourceTemplates', $result['result']);
+
+        $uriTemplates = array_map(
+            static fn (array $t): string => $t['uriTemplate'],
+            $result['result']['resourceTemplates'],
+        );
+        self::assertContains('synaplan://file/{id}', $uriTemplates);
+        self::assertContains('synaplan://memory/{id}', $uriTemplates);
+    }
+
+    public function testPromptsListExcludesInternalToolPrompts(): void
+    {
+        $this->client->disableReboot();
+
+        $sessionId = $this->initialize();
+
+        $result = $this->jsonRpc(
+            [
+                'jsonrpc' => '2.0',
+                'id' => 2,
+                'method' => 'prompts/list',
+                'params' => new \stdClass(),
+            ],
+            $sessionId,
+        );
+
+        self::assertArrayHasKey('result', $result, json_encode($result));
+        self::assertArrayHasKey('prompts', $result['result']);
+
+        // Whatever task prompts are exposed, internal `tools:*` prompts must never leak.
+        foreach ($result['result']['prompts'] as $prompt) {
+            self::assertStringStartsNotWith('tools:', (string) $prompt['name']);
+        }
+    }
+
+    public function testGetMessagesAndListChatsReflectSeededConversation(): void
+    {
+        $this->client->disableReboot();
+        $ids = $this->seedConversationAndDocument();
+        $sessionId = $this->initialize();
+
+        $messages = $this->callTool($sessionId, 'get_messages', ['chat_id' => $ids['chatId']], 2);
+        $sc = $messages['result']['structuredContent'] ?? null;
+        self::assertIsArray($sc, json_encode($messages));
+        self::assertTrue($sc['success']);
+        self::assertCount(2, $sc['messages']);
+        self::assertSame('user', $sc['messages'][0]['role']);
+        self::assertSame('assistant', $sc['messages'][1]['role']);
+
+        $chats = $this->callTool($sessionId, 'list_chats', ['limit' => 100], 3);
+        $sc = $chats['result']['structuredContent'] ?? null;
+        self::assertIsArray($sc, json_encode($chats));
+        $match = array_values(array_filter(
+            $sc['chats'],
+            static fn (array $c): bool => $c['id'] === $ids['chatId'],
+        ));
+        self::assertNotEmpty($match, 'seeded chat must appear in list_chats');
+        self::assertSame(2, $match[0]['message_count']);
+    }
+
+    public function testGetMessagesUnknownChatReportsToolError(): void
+    {
+        $this->client->disableReboot();
+        $sessionId = $this->initialize();
+
+        $result = $this->callTool($sessionId, 'get_messages', ['chat_id' => 999999999], 2);
+
+        // Tool-level failures must be reported via the MCP isError flag.
+        self::assertTrue($result['result']['isError'] ?? false, json_encode($result));
+    }
+
+    public function testResourceReadReturnsDocumentText(): void
+    {
+        $this->client->disableReboot();
+        $ids = $this->seedConversationAndDocument();
+        $sessionId = $this->initialize();
+
+        $result = $this->jsonRpc(
+            [
+                'jsonrpc' => '2.0',
+                'id' => 2,
+                'method' => 'resources/read',
+                'params' => ['uri' => 'synaplan://file/'.$ids['fileId']],
+            ],
+            $sessionId,
+        );
+
+        self::assertArrayHasKey('result', $result, json_encode($result));
+        self::assertStringContainsString('PURPLEFOX', (string) $result['result']['contents'][0]['text']);
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     *
+     * @return array<string, mixed>
+     */
+    private function callTool(string $sessionId, string $name, array $arguments, int $id): array
+    {
+        return $this->jsonRpc(
+            [
+                'jsonrpc' => '2.0',
+                'id' => $id,
+                'method' => 'tools/call',
+                'params' => ['name' => $name, 'arguments' => [] === $arguments ? new \stdClass() : $arguments],
+            ],
+            $sessionId,
+        );
+    }
+
+    /**
+     * Seed a chat (with one user + one assistant message) and a document for the
+     * test user, all within the rolled-back test transaction.
+     *
+     * @return array{chatId: int, fileId: int}
+     */
+    private function seedConversationAndDocument(): array
+    {
+        $user = $this->em->getRepository(User::class)->findOneBy(['mail' => 'mcp-test@synaplan.internal']);
+        self::assertInstanceOf(User::class, $user);
+        $userId = (int) $user->getId();
+        $trackingId = time();
+
+        $chat = (new Chat())
+            ->setUserId($userId)
+            ->setSource('mcp')
+            ->setTitle('MCP Test Chat');
+        $this->em->persist($chat);
+        $this->em->flush();
+
+        foreach ([['IN', 'Hello from the user'], ['OUT', 'Hello from the assistant']] as [$direction, $text]) {
+            $message = (new Message())
+                ->setUserId($userId)
+                ->setChat($chat)
+                ->setTrackingId($trackingId)
+                ->setProviderIndex('MCP')
+                ->setUnixTimestamp(time())
+                ->setDateTime(date('YmdHis'))
+                ->setMessageType('API')
+                ->setFile(0)
+                ->setTopic('CHAT')
+                ->setLanguage('en')
+                ->setText($text)
+                ->setDirection($direction)
+                ->setStatus('complete');
+            $this->em->persist($message);
+        }
+
+        $file = (new File())
+            ->setUserId($userId)
+            ->setFilePath('mcp-test/doc.txt')
+            ->setFileType('txt')
+            ->setFileName('MCP Test Doc')
+            ->setFileSize(40)
+            ->setFileMime('text/plain')
+            ->setFileText('The MCP test document mentions PURPLEFOX.')
+            ->setStatus('vectorized');
+        $this->em->persist($file);
+        $this->em->flush();
+
+        return ['chatId' => (int) $chat->getId(), 'fileId' => (int) $file->getId()];
     }
 
     /**

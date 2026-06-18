@@ -20,12 +20,7 @@ test.describe('@ci @smoke Chat Again', () => {
     })
 
     // -- Turn 1: send message, get first AI response --
-    let previousCount = await chat.conversationBubbles().count()
-
-    await test.step('Act: send initial message', async () => {
-      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
-      await page.locator(selectors.chat.sendBtn).click()
-    })
+    let previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
 
     const firstAnswer = await chat.waitForAnswer(previousCount)
 

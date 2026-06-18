@@ -23,6 +23,12 @@ use App\Service\Multitask\Plan\TaskNode;
  *   - "$nX.files"          → upstream node X all file descriptors
  *   - anything else        → literal value (passed through unchanged)
  *   - a list of the above   → resolved element-wise
+ *
+ * When a string is NOT a pure reference (does not start with `$`) but contains
+ * embedded `$nX.text` or `$message.text` tokens, those tokens are interpolated
+ * in-place. This prevents literal placeholder text (e.g. "Summary: $n1.text")
+ * from leaking into the persisted reply when the planner emits prose with
+ * embedded references instead of a pure `"$n1.text"` value.
  */
 final class NodeContext
 {
@@ -123,16 +129,56 @@ final class NodeContext
             return array_map(fn ($item) => $this->resolve($item), $value);
         }
 
-        if (!is_string($value) || !str_starts_with($value, '$')) {
-            return $value; // literal
+        if (!is_string($value)) {
+            return $value; // literal (non-string)
         }
 
-        return match (true) {
-            '$message.text' === $value => $this->message->getText(),
-            '$message.fileText' === $value => $this->message->getFileText() ?: '',
-            '$message.files' === $value => $this->messageFiles(),
-            default => $this->resolveNodeRef($value),
-        };
+        // Pure reference: entire string is exactly one "$message.xxx" or "$nX.field"
+        // token with no surrounding prose — return the typed value as-is (may be null,
+        // a string, or a file list). Must match from ^ to $ so that a multi-token prose
+        // string like "$n1.text and also $n2.text" falls through to interpolateRefs.
+        if (1 === preg_match('/^\$(?:message\.(text|fileText|files)|[A-Za-z0-9_]+\.(text|file|files))$/', $value)) {
+            return match (true) {
+                '$message.text' === $value => $this->message->getText(),
+                '$message.fileText' === $value => $this->message->getFileText() ?: '',
+                '$message.files' === $value => $this->messageFiles(),
+                default => $this->resolveNodeRef($value),
+            };
+        }
+
+        // Prose interpolation: the planner may embed a reference token inside a
+        // larger string (e.g. "Zusammenfassung: $n1.text"). Replace every recognised
+        // token in-place so no literal placeholder leaks into the persisted reply.
+        if (str_contains($value, '$')) {
+            return $this->interpolateRefs($value);
+        }
+
+        return $value; // plain literal
+    }
+
+    /**
+     * Inline-replace every `$nX.text` / `$message.text` / `$message.fileText`
+     * token inside a prose string. Unknown or unresolvable references are
+     * replaced with an empty string so no placeholder leaks to the user.
+     */
+    private function interpolateRefs(string $value): string
+    {
+        return preg_replace_callback(
+            '/\$(?:message\.(text|fileText)|([A-Za-z0-9_]+)\.(text))/',
+            function (array $m): string {
+                // Group 1 is non-empty when the match is $message.text or $message.fileText.
+                if ('' !== $m[1]) {
+                    $resolved = '$message.text' === $m[0]
+                        ? $this->message->getText()
+                        : ($this->message->getFileText() ?: '');
+                } else {
+                    $resolved = $this->resolveNodeRef('$'.$m[2].'.'.$m[3]);
+                }
+
+                return is_string($resolved) ? $resolved : '';
+            },
+            $value
+        ) ?? $value;
     }
 
     private function resolveNodeRef(string $ref): mixed

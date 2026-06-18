@@ -1,5 +1,4 @@
 import { test, expect } from '../test-setup'
-import { selectors } from '../helpers/selectors'
 import { login } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { FIXTURE_PATHS, PROMPTS } from '../config/test-data'
@@ -22,12 +21,7 @@ test.describe('@ci @smoke Chat', () => {
       await chat.startNewChat()
     })
 
-    const previousCount = await chat.conversationBubbles().count()
-
-    await test.step('Act: send smoke test message', async () => {
-      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
-      await page.locator(selectors.chat.sendBtn).click()
-    })
+    const previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
 
     const aiText = await chat.waitForAnswer(previousCount)
 
@@ -50,10 +44,7 @@ test.describe('@noci @nightly Chat — all models', () => {
     await chat.startNewChat()
 
     try {
-      const previousCount = await chat.conversationBubbles().count()
-      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
-      await page.locator(selectors.chat.sendBtn).click()
-
+      const previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
       const aiText = await chat.waitForAnswer(previousCount)
       await expect(aiText, 'Initial model should answer').toContain('success')
     } catch (error) {
@@ -89,10 +80,7 @@ test.describe('@noci @regression Chat — vision', () => {
       buffer: VISION_FIXTURE,
     })
 
-    const previousCount = await chat.conversationBubbles().count()
-    await page.locator(selectors.chat.textInput).fill('What do you see in this image?')
-    await page.locator(selectors.chat.sendBtn).click()
-
+    const previousCount = await chat.sendMessage('What do you see in this image?')
     const aiText = await chat.waitForAnswer(previousCount)
     await expect.soft(aiText.includes('error') || aiText.includes('failed')).toBeFalsy()
 
@@ -114,10 +102,7 @@ test.describe('@noci @regression Chat — image generation', () => {
     await chat.ensureAdvancedMode()
     await chat.startNewChat()
 
-    const previousCount = await chat.conversationBubbles().count()
-    await page.locator(selectors.chat.textInput).fill('draw a tiny blue square')
-    await page.locator(selectors.chat.sendBtn).click()
-
+    const previousCount = await chat.sendMessage('draw a tiny blue square')
     const aiText = await chat.waitForAnswer(previousCount)
     await expect.soft(aiText.includes('error') || aiText.includes('failed')).toBeFalsy()
 
@@ -139,10 +124,7 @@ test.describe('@noci @regression Chat — video generation', () => {
     await chat.ensureAdvancedMode()
     await chat.startNewChat()
 
-    const previousCount = await chat.conversationBubbles().count()
-    await page.locator(selectors.chat.textInput).fill('/vid short demo clip of a robot waving')
-    await page.locator(selectors.chat.sendBtn).click()
-
+    const previousCount = await chat.sendMessage('/vid short demo clip of a robot waving')
     const aiText = await chat.waitForAnswer(previousCount, true)
     await expect.soft(aiText.includes('error') || aiText.includes('failed')).toBeFalsy()
     await chat.runAgainOptions(undefined, failures, 'video generation', true)

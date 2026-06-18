@@ -1251,6 +1251,16 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMeta('multitask', '1');
                 }
 
+                // Persist the per-node render state (capabilities, kinds, states,
+                // texts, urls) so the frontend can rebuild task cards on reload
+                // without relying on the live SSE stream (issue #1070).
+                if (!empty($response['metadata']['task_plan_render'])) {
+                    $outgoingMessage->setMeta(
+                        'task_plan',
+                        (string) json_encode($response['metadata']['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
+                    );
+                }
+
                 $this->persistOriginalMediaMeta(
                     $outgoingMessage,
                     $classification,
@@ -1266,11 +1276,17 @@ class StreamController extends AbstractController
                     $this->logger->info('StreamController: Web search was enabled for this message');
                 }
 
-                // Store if search results were found (will be processed below)
-                $hasSearchResults = isset($result['search_results']) && !empty($result['search_results']['results']);
+                // Store if search results were found (will be processed below).
+                // For DAG turns the results are not in $result['search_results']
+                // (that key only exists when MessageProcessor pre-fetched them on
+                // the single-task path). The ResultAssembler now also propagates
+                // them into $response['metadata']['search_results'] so both paths
+                // are covered by checking both locations.
+                $effectiveSearchResults = $result['search_results'] ?? ($response['metadata']['search_results'] ?? null);
+                $hasSearchResults = is_array($effectiveSearchResults) && !empty($effectiveSearchResults['results']);
                 if ($hasSearchResults) {
-                    $searchQuery = $result['search_results']['query'] ?? '';
-                    $searchCount = count($result['search_results']['results']);
+                    $searchQuery = $effectiveSearchResults['query'] ?? '';
+                    $searchCount = count($effectiveSearchResults['results']);
 
                     $incomingMessage->setMeta('web_search_query', $searchQuery);
                     $incomingMessage->setMeta('web_search_results_count', (string) $searchCount);
@@ -1344,12 +1360,12 @@ class StreamController extends AbstractController
                     }
                 }
 
-                // Get search results if available
-                $searchResults = $this->formatSearchResultsForSse($result['search_results'] ?? null);
+                // Get search results if available (uses the effective source computed above)
+                $searchResults = $this->formatSearchResultsForSse($effectiveSearchResults ?? null);
                 if (null !== $searchResults) {
                     $this->logger->info('StreamController: Including search results', [
                         'results_count' => count($searchResults),
-                        'query' => $result['search_results']['query'],
+                        'query' => $effectiveSearchResults['query'] ?? '',
                     ]);
                 }
 
@@ -1554,7 +1570,7 @@ class StreamController extends AbstractController
                     $this->sendSSE('guest_remaining', [
                         'remaining' => $this->guestSessionService->getRemainingMessages($guestSession),
                         'maxMessages' => $guestSession->getMaxMessages(),
-                        'limitReached' => $guestSession->isLimitReached(),
+                        'limitReached' => $this->guestSessionService->isLimitReached($guestSession),
                     ]);
                 }
 
@@ -1915,14 +1931,26 @@ class StreamController extends AbstractController
                 $outgoingMessage->setMeta('multitask', '1');
             }
 
+            // Mirror the streaming branch: persist per-node render state for reload.
+            if (!empty($metadata['task_plan_render'])) {
+                $outgoingMessage->setMeta(
+                    'task_plan',
+                    (string) json_encode($metadata['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
+                );
+            }
+
             if (!empty($options['web_search'])) {
                 $message->setMeta('web_search_enabled', 'true');
             }
 
-            $hasSearchResults = isset($result['search_results']) && !empty($result['search_results']['results']);
+            // Mirror the streaming path: also check metadata['search_results'] so DAG
+            // turns that searched via WebSearchRunner (not MessageProcessor) get their
+            // web_search_query/count metas set and the Sources dropdown populated.
+            $effectiveSearchResults = $result['search_results'] ?? ($metadata['search_results'] ?? null);
+            $hasSearchResults = is_array($effectiveSearchResults) && !empty($effectiveSearchResults['results']);
             if ($hasSearchResults) {
-                $searchQuery = $result['search_results']['query'] ?? '';
-                $searchCount = count($result['search_results']['results']);
+                $searchQuery = $effectiveSearchResults['query'] ?? '';
+                $searchCount = count($effectiveSearchResults['results']);
 
                 $message->setMeta('web_search_query', $searchQuery);
                 $message->setMeta('web_search_results_count', (string) $searchCount);
@@ -1980,7 +2008,7 @@ class StreamController extends AbstractController
                 'originalTopic' => $nonStreamingOriginalTopic,
                 'originalMediaType' => $nonStreamingOriginalMediaType,
                 'language' => $classification['language'] ?? null,
-                'searchResults' => $this->formatSearchResultsForSse($result['search_results'] ?? null),
+                'searchResults' => $this->formatSearchResultsForSse($effectiveSearchResults ?? null),
                 'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
             ];
 

@@ -19,6 +19,7 @@ use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
+use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
@@ -80,6 +81,7 @@ class ChatHandlerTest extends TestCase
             $this->memoryExtractionDispatcher,
             $this->perfPipelineFlag,
             $this->createMock(DocumentGeneratorService::class),
+            new TimeContextBuilder(),
         );
     }
 

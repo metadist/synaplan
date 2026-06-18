@@ -18,6 +18,7 @@ This section details the plan for integrating the Model Context Protocol (MCP) i
 - **[04-UI-UX-DESIGN.md](./04-UI-UX-DESIGN.md):** Outlines the user interface for managing MCP servers, tools, and prompt mappings.
 - **[05-ENRICHMENT-UI-LOGGING.md](./05-ENRICHMENT-UI-LOGGING.md):** Displaying results in the Chat GUI and structured logging.
 - **[06-TEST-STRATEGY.md](./06-TEST-STRATEGY.md):** Test matrix and strategy for the MCP plugin.
+- **[07-AGENT-SCHEDULING.md](./07-AGENT-SCHEDULING.md):** *(planning target — not implemented)* Agent scheduling & job dispatch: autonomous agents (`brogent`, …) pull a job-description JSON + schedule-update JSON from the MCP server via `agent_checkin`.
 
 ## Authoritative Roadmap
 
