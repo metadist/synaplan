@@ -30,7 +30,7 @@
         "nelmio/api-doc-bundle": ">=5.10.0",
         "nelmio/cors-bundle": "^2.6.1",
         "netflie/whatsapp-cloud-api": "^4.0.0",
-        "openai-php/client": "^0.19.2",
+        "openai-php/client": "^0.20.0",
         "phpdocumentor/reflection-docblock": "^6.0.3",
         "phpoffice/phppresentation": "^1.2",
         "phpoffice/phpspreadsheet": "^4.5.0",
