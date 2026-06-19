@@ -324,8 +324,10 @@ final readonly class MessageProcessor
             $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet, $classifierVote);
-            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $classifierVote, $shouldSearch);
+            $userRequestedSearch = $this->userRequestedSearch($options);
+            $messageText = $message->getText();
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
+            $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
 
             // Consolidated decision log: lets us diagnose "search didn't trigger"
             // reports without correlating multiple log lines from different services.
@@ -334,7 +336,7 @@ final readonly class MessageProcessor
                 'message_id' => $message->getId(),
                 'should_search' => $shouldSearch,
                 'trigger_reason' => $triggerReason,
-                'frontend_flag' => (bool) ($options['web_search'] ?? false),
+                'user_requested_search' => $userRequestedSearch,
                 'prompt_tool_internet' => $promptToolInternet,
                 'classifier_web_search_hint' => $classification['web_search'] ?? null,
                 'classification_source' => $classification['source'] ?? null,
@@ -747,15 +749,17 @@ final readonly class MessageProcessor
             $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet, $classifierVote);
-            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $classifierVote, $shouldSearch);
+            $userRequestedSearch = $this->userRequestedSearch($options);
+            $messageText = $message->getText();
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
+            $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
 
             $braveEnabled = $this->braveSearchService->isEnabled();
             $this->logger->info('MessageProcessor: Web search decision', [
                 'message_id' => $message->getId(),
                 'should_search' => $shouldSearch,
                 'trigger_reason' => $triggerReason,
-                'force_web_search' => (bool) ($options['force_web_search'] ?? false),
+                'user_requested_search' => $userRequestedSearch,
                 'prompt_tool_internet' => $promptToolInternet,
                 'classifier_web_search_hint' => $classification['web_search'] ?? null,
                 'classification_source' => $classification['source'] ?? null,
@@ -961,7 +965,7 @@ final readonly class MessageProcessor
      * so the log line directly explains the decision without a reader
      * having to consult two services.
      */
-    private function triggerReasonFor(?string $topic, ?bool $promptToolInternet, ?bool $classifierVote, bool $shouldSearch): string
+    private function triggerReasonFor(?string $topic, bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $shouldSearch): string
     {
         if (!$shouldSearch) {
             if (true !== $promptToolInternet && WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
@@ -972,7 +976,15 @@ final readonly class MessageProcessor
                 return 'disabled_by_prompt_tool_internet';
             }
 
+            if (true === $classifierVote && WebSearchTopicPolicy::isTrivialConversational($messageText)) {
+                return 'suppressed_trivial_conversation';
+            }
+
             return 'classifier_vote_no_search';
+        }
+
+        if ($userRequestedSearch) {
+            return 'user_requested_search';
         }
 
         if (true === $promptToolInternet) {
@@ -980,6 +992,21 @@ final readonly class MessageProcessor
         }
 
         return 'classifier_vote_search';
+    }
+
+    /**
+     * Resolve the explicit per-message web-search request from the processing
+     * options. The streaming pipeline carries it as `web_search` (the chat
+     * toggle / `/search` command, set by StreamController) while the legacy
+     * non-streaming path uses `force_web_search`; accept either so an explicit
+     * user request reliably forces a search.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function userRequestedSearch(array $options): bool
+    {
+        return (bool) ($options['web_search'] ?? false)
+            || (bool) ($options['force_web_search'] ?? false);
     }
 
     /**

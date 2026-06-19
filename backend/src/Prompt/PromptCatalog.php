@@ -289,13 +289,23 @@ This is the list, use only this:
 
 5. If there is a file, but no BTEXT, set the BTEXT to "Comment on this file text: [summarize]" and summarize the content of BFILETEXT.
 
-6. **Detect if web search is needed (BWEBSEARCH)**: Set BWEBSEARCH to 1 if the user asks for:
-   - Current/recent information (news, prices, weather, events)
-   - Real-time data or today's information
-   - Questions about events after 2023
-   - Specific locations/places (restaurants, stores, services)
-   - Questions that explicitly require internet search
-   Otherwise, set BWEBSEARCH to 0.
+6. **Detect if web search is needed (BWEBSEARCH)**: Be conservative — default to 0. Most messages do NOT need a web search. Set BWEBSEARCH to 1 ONLY when answering correctly requires fresh, real-world information the model cannot know, such as:
+   - Current/recent information (news, prices, stock quotes, weather, sports scores, live events)
+   - Real-time data or "today"/"now"/"latest"/"current" information
+   - Facts about events, releases, or people that changed after 2023
+   - Specific real-world locations/places (restaurants, stores, services, opening hours)
+   - A request that explicitly asks to search the internet / look something up online
+
+   Set BWEBSEARCH to 0 (no search) for everything else, including:
+   - Greetings and smalltalk ("hi", "hello", "hey, wie gehts?", "good morning", "thanks")
+   - Opinions, advice, brainstorming, or recommendations from general knowledge
+   - Coding help, debugging, or technical explanations
+   - Creative writing (stories, poems, emails, jokes)
+   - Math, logic, translations, grammar, or rephrasing
+   - Stable general knowledge (definitions, history, science, "what is the capital of France")
+   - Summarizing, analysing, or answering about text/files the user already provided
+
+   When in doubt and the message is conversational or answerable from general knowledge, set BWEBSEARCH to 0.
 
 7. **Classify image attachments correctly**: When the message has image attachments (BATTACHED_FILES contains image types like jpg, jpeg, png, gif, webp, or BFILETYPE is an image type), you must distinguish between two intents:
 
