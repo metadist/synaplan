@@ -904,6 +904,9 @@ const handleScroll = async () => {
     if (chatContainer.value) {
       const newScrollHeight = chatContainer.value.scrollHeight
       chatContainer.value.scrollTop = newScrollHeight - currentScrollHeight + scrollTop
+      // Keep the guard in sync so this position restore is recognised as a
+      // programmatic scroll and does not toggle autoScroll/stickToBottom.
+      expectedScrollTop = chatContainer.value.scrollTop
     }
   }
 }
