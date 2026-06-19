@@ -32,6 +32,7 @@
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
     "@iconify/vue": "^5.0.0",
+    "@intlify/core-base": "^11.1.12",
     "@types/three": "^0.184.0",
     "centrifuge": "^5.5.3",
     "chart.js": "^4.5.1",
