@@ -73,18 +73,11 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
       expect(targetText).toContain(credentials.user)
     })
 
-    await test.step('Act: send a message and verify stream starts without access error', async () => {
+    await test.step('Act: send a message and receive TestProvider response', async () => {
       await chat.startNewChat()
       const previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
-
-      const bubbles = chat.conversationBubbles()
-      const newBubble = bubbles.nth(previousCount)
-
-      await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-
-      const errorLocator = newBubble.locator(selectors.chat.messageTopicError)
-      const errorVisible = await errorLocator.isVisible().catch(() => false)
-      expect(errorVisible, 'Chat stream must not produce an access-denied error').toBe(false)
+      const aiText = await chat.waitForAnswer(previousCount)
+      expect(aiText.length).toBeGreaterThan(0)
     })
 
     await test.step('Act: exit impersonation', async () => {

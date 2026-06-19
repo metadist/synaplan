@@ -64,7 +64,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Wipe any per-user client state that would otherwise survive a principal
-   * swap (login, logout, start/stop impersonation).
+   * swap (login, logout, start/stop impersonation, auth failure, revoke-all).
    *
    * Issue #999: `activeChatId` is persisted in localStorage under
    * `synaplan_active_chat_id`. Without this reset, an admin's last chat id
@@ -77,13 +77,23 @@ export const useAuthStore = defineStore('auth', () => {
    * store.
    */
   async function resetUserScopedClientState(): Promise<void> {
-    const [{ useChatsStore }, { useHistoryStore }, { clearSseToken }] = await Promise.all([
+    const [
+      { useChatsStore },
+      { useHistoryStore },
+      { clearSseToken },
+      { useMemoriesStore },
+      { useFeedbackStore },
+    ] = await Promise.all([
       import('./chats'),
       import('./history'),
       import('@/services/api/chatApi'),
+      import('./userMemories'),
+      import('./userFeedback'),
     ])
     useChatsStore().$reset()
     useHistoryStore().clear()
+    useMemoriesStore().$reset()
+    useFeedbackStore().$reset()
     clearSseToken()
   }
 
@@ -140,7 +150,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function logout(): Promise<void> {
+  async function logout(silent = false): Promise<void> {
     // Clear user immediately to prevent any auth checks during logout
     user.value = null
     impersonator.value = null
@@ -148,6 +158,9 @@ export const useAuthStore = defineStore('auth', () => {
     // Drop any in-flight deep-link intent so the next login isn't hijacked
     // by a stale entry from this session.
     clearPendingRedirect()
+
+    // Wipe all user-scoped client state (SSE token, chats, memories, etc.)
+    await resetUserScopedClientState()
 
     // Tear down the realtime client before the server-side session is
     // invalidated. Otherwise the client keeps trying to refresh its
@@ -165,7 +178,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
-      await authService.logout()
+      await authService.logout(silent)
     } finally {
       loading.value = false
       error.value = null
@@ -230,6 +243,7 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await authService.handleOAuthCallback()
 
       if (result.success) {
+        await resetUserScopedClientState()
         syncFromAuthService()
         initialized.value = true
         // Also resolve authReady if not already done
@@ -259,6 +273,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const result = await authService.revokeAllSessions()
       if (result.success) {
+        await resetUserScopedClientState()
         user.value = null
         impersonator.value = null
       }

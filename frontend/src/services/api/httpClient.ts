@@ -322,16 +322,12 @@ async function handleAuthFailure(): Promise<never> {
   }
 
   const { useAuthStore } = await import('@/stores/auth')
-  const { useHistoryStore } = await import('@/stores/history')
-  const { useChatsStore } = await import('@/stores/chats')
-
   const authStore = useAuthStore()
-  const historyStore = useHistoryStore()
-  const chatsStore = useChatsStore()
 
-  authStore.$reset()
-  historyStore.clear()
-  chatsStore.$reset()
+  // Logout handles all user-scoped state cleanup (SSE tokens, chats,
+  // memories, feedback, realtime) plus the server-side session teardown.
+  // Using silent=true avoids a network call — the session is already dead.
+  await authStore.logout(true)
 
   // Use Vue Router instead of window.location.href to avoid full page reload loops
   // Support subfolder deployments via BASE_URL (from vite.config base option)

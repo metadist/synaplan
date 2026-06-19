@@ -83,6 +83,14 @@ vi.mock('@/services/api/chatApi', () => ({
   clearSseToken: vi.fn(),
 }))
 
+vi.mock('@/stores/userMemories', () => ({
+  useMemoriesStore: () => ({ $reset: vi.fn() }),
+}))
+
+vi.mock('@/stores/userFeedback', () => ({
+  useFeedbackStore: () => ({ $reset: vi.fn() }),
+}))
+
 describe('useAuthStore — impersonation', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
