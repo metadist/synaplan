@@ -1034,6 +1034,9 @@
     "title": "Plan de tareas",
     "download": "Descargar",
     "failedBody": "Este paso no se pudo completar.",
+    "cancelledBody": "Has detenido este paso.",
+    "stop": "Detener",
+    "rendering": "Renderizando…",
     "searchSummary": "Búsqueda web · {count} {count, plural, one {fuente} other {fuentes}}",
     "retryWith": "Reintentar con {model}",
     "state": {
@@ -1041,7 +1044,8 @@
       "running": "Trabajando…",
       "done": "Hecho",
       "failed": "Fallido",
-      "skipped": "Omitido"
+      "skipped": "Omitido",
+      "cancelled": "Detenido"
     },
     "kind": {
       "text": "Texto",

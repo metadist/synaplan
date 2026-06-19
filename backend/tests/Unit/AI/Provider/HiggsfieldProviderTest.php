@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Provider;
 
+use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\HiggsfieldProvider;
 use PHPUnit\Framework\TestCase;
@@ -153,6 +154,55 @@ class HiggsfieldProviderTest extends TestCase
 
         // image_url must be forwarded in the submit body.
         self::assertSame('https://img.example/dog.jpg', $captured[0]['options']['json']['image_url']);
+    }
+
+    public function testNormalizesUnsupportedDurationToSupportedValueForDop(): void
+    {
+        $captured = [];
+        $provider = $this->makeProvider([
+            ['status' => 202, 'data' => ['status' => 'queued', 'request_id' => 'v', 'status_url' => 'https://platform.higgsfield.ai/requests/v/status']],
+            ['status' => 200, 'data' => ['status' => 'completed', 'request_id' => 'v', 'video' => ['url' => 'https://vid/x.mp4']]],
+        ], $captured);
+
+        // 8s is the generic media-handler default but Higgsfield DoP only renders
+        // 5s clips — the provider must snap it instead of sending an invalid value.
+        $provider->generateVideo('x', [
+            'model' => 'higgsfield-ai/dop/standard',
+            'image_url' => 'https://img/x.jpg',
+            'duration' => 8,
+        ]);
+
+        self::assertSame(5, $captured[0]['options']['json']['duration']);
+    }
+
+    public function testCancelDuringPollThrowsCancelledAndCallsCancelUrl(): void
+    {
+        $captured = [];
+        $provider = $this->makeProvider([
+            ['status' => 202, 'data' => [
+                'status' => 'queued',
+                'request_id' => 'v',
+                'status_url' => 'https://platform.higgsfield.ai/requests/v/status',
+                'cancel_url' => 'https://platform.higgsfield.ai/requests/v/cancel',
+            ]],
+        ], $captured);
+
+        $threw = false;
+        try {
+            $provider->generateVideo('x', [
+                'model' => 'higgsfield-ai/dop/standard',
+                'image_url' => 'https://img/x.jpg',
+                'cancel_check' => static fn (): bool => true,
+            ]);
+        } catch (ProviderCancelledException) {
+            $threw = true;
+        }
+
+        self::assertTrue($threw, 'expected a ProviderCancelledException');
+        // submit POST, then a cancel POST to the provider's cancel_url.
+        self::assertSame('POST', $captured[0]['method']);
+        self::assertSame('POST', $captured[1]['method']);
+        self::assertSame('https://platform.higgsfield.ai/requests/v/cancel', $captured[1]['url']);
     }
 
     public function testFailedStatusThrows(): void

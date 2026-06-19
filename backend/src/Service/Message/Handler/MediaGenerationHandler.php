@@ -2,6 +2,7 @@
 
 namespace App\Service\Message\Handler;
 
+use App\AI\Exception\ProviderCancelledException;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\Entity\Message;
@@ -10,6 +11,7 @@ use App\Message\ExtractMemoriesCommand;
 use App\Service\File\FileHelper;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\MediaCancellationStore;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
@@ -42,6 +44,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private MediaErrorMessageBuilder $errorMessageBuilder,
         private MessageBusInterface $messageBus,
         private PerfPipelineFlag $perfPipelineFlag,
+        private MediaCancellationStore $cancellationStore,
         private string $uploadDir = '/var/www/backend/var/uploads',
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
@@ -439,6 +442,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     $duration = (int) $options['duration'];
                 } elseif (isset($classification['duration'])) {
                     $duration = (int) $classification['duration'];
+                } elseif (isset($modelConfig['default_duration']) && is_numeric($modelConfig['default_duration'])) {
+                    // Model-specific standard length (e.g. Higgsfield DoP = 5s).
+                    // Keeps "make a video" requests at a length the provider
+                    // supports and can render within the time budget.
+                    $duration = (int) $modelConfig['default_duration'];
                 } else {
                     $duration = 8; // Default to 8 seconds
                 }
@@ -460,11 +468,30 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'duration' => $duration,
                     'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
                     'resolution' => $resolutionOption,
+                    // Forward the provider's poll status as a status update. The
+                    // 'message' keeps the legacy single-chat "Generating..." box
+                    // working; the structured metadata lets the multitask card
+                    // render a live progress bar tagged to its node.
                     'progress_callback' => function (array $progress) use ($progressCallback): void {
                         $elapsed = $progress['elapsed_seconds'] ?? 0;
-                        $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)");
+                        $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)", [
+                            'provider_status' => $progress['status'] ?? 'processing',
+                            'elapsed_seconds' => $elapsed,
+                            'percent' => $progress['percent'] ?? null,
+                            'attempt' => $progress['attempt'] ?? null,
+                            'max_attempts' => $progress['max_attempts'] ?? null,
+                        ]);
                     },
                 ];
+
+                // Stop button support: probe the shared cancellation store (set by
+                // the global Stop or a per-card Stop on a different worker) plus a
+                // client-disconnect check, so the provider poll aborts and tells
+                // Higgsfield to cancel instead of finishing an unwanted render.
+                $cancelCheck = $this->buildCancelCheck($options);
+                if (null !== $cancelCheck) {
+                    $videoOptions['cancel_check'] = $cancelCheck;
+                }
 
                 // Image-to-video: publish the attached image at a public URL so
                 // the provider (Higgsfield etc.) can fetch it. i2v providers
@@ -697,6 +724,27 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'path' => $displayUrl,
                         'type' => $mediaType,
                     ],
+                ],
+            ];
+        } catch (ProviderCancelledException $e) {
+            // User pressed Stop — neutral outcome, not a failure. We deliberately
+            // do NOT stream a content marker (it would leak raw into the single
+            // chat bubble and is unhandled by the frontend); the `cancelled`
+            // metadata flag is the signal, and the client already renders the
+            // cancelled card state from its own Stop action.
+            $this->logger->info('MediaGenerationHandler: Generation cancelled by user', [
+                'provider' => $provider,
+                'model' => $modelName,
+                'media_type' => $mediaType,
+            ]);
+
+            return [
+                'metadata' => [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'media_type' => $mediaType,
+                    'cancelled' => true,
+                    'error' => 'cancelled',
                 ],
             ];
         } catch (\Exception $e) {
@@ -1197,6 +1245,40 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     /**
      * Notify progress callback.
      */
+    /**
+     * Build a cancellation probe for the provider poll loop from the processing
+     * options, or null when there is nothing to watch.
+     *
+     * Two triggers, both cheap to check every poll interval:
+     *   - the shared {@see MediaCancellationStore} (set by the Stop button on a
+     *     different worker — track-scoped for global Stop, node-scoped for a
+     *     single multitask step);
+     *   - a client disconnect on the streaming worker.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function buildCancelCheck(array $options): ?callable
+    {
+        $trackId = isset($options['track_id']) && is_scalar($options['track_id'])
+            ? trim((string) $options['track_id'])
+            : '';
+        $nodeId = isset($options['node_id']) && is_scalar($options['node_id'])
+            ? trim((string) $options['node_id'])
+            : null;
+
+        if ('' === $trackId) {
+            return null;
+        }
+
+        return function () use ($trackId, $nodeId): bool {
+            if (\function_exists('connection_aborted') && 1 === connection_aborted()) {
+                return true;
+            }
+
+            return $this->cancellationStore->isCancelled($trackId, '' !== (string) $nodeId ? $nodeId : null);
+        };
+    }
+
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
     {
         if ($callback) {

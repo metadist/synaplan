@@ -72,10 +72,32 @@ final readonly class MediaGenerationRunner implements TaskRunner
             }
         }
 
+        // Live progress: forward the handler's media-generation status updates to
+        // the node's progress sink so the task card renders a moving bar.
+        $progress = function (array $update) use ($context, $node): void {
+            if ('generating' !== ($update['status'] ?? '')) {
+                return;
+            }
+            $meta = is_array($update['metadata'] ?? null) ? $update['metadata'] : [];
+            $context->emitProgress($node->id, array_merge([
+                'capability' => $node->capability->value,
+                'kind' => $node->capability->uiKind(),
+            ], $meta));
+        };
+
+        // Stop button: pass the turn + node identity so the handler can probe the
+        // shared cancellation store and abort the provider poll on demand.
+        $handlerOptions = ['disable_memories' => true];
+        $trackId = $context->options['track_id'] ?? null;
+        if (is_scalar($trackId) && '' !== (string) $trackId) {
+            $handlerOptions['track_id'] = (string) $trackId;
+            $handlerOptions['node_id'] = $node->id;
+        }
+
         try {
             // disable_memories: an intermediate generation node must not trigger
             // memory extraction on the synthetic prompt.
-            $result = $this->handler->handle($synthetic, $context->thread, $classification, null, ['disable_memories' => true]);
+            $result = $this->handler->handle($synthetic, $context->thread, $classification, $progress, $handlerOptions);
         } catch (\Throwable $e) {
             $this->logger->warning('MediaGenerationRunner: handler threw', [
                 'capability' => $node->capability->value,

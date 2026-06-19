@@ -174,7 +174,14 @@ export const TASK_CARD_KINDS = [
 ] as const
 export type TaskCardKind = (typeof TASK_CARD_KINDS)[number]
 
-export const TASK_CARD_STATES = ['pending', 'running', 'done', 'failed', 'skipped'] as const
+export const TASK_CARD_STATES = [
+  'pending',
+  'running',
+  'done',
+  'failed',
+  'skipped',
+  'cancelled',
+] as const
 export type TaskCardState = (typeof TASK_CARD_STATES)[number]
 
 /** Runtime guards for values arriving over SSE — never trust the wire. */
@@ -203,6 +210,12 @@ export interface TaskCard {
   // so the card shows "Searched the web · N sources" instead of the raw dump.
   query?: string
   resultsCount?: number
+  // Live media-generation progress from the `task_progress` SSE event: a 0-100
+  // estimate, the provider's coarse status, and elapsed seconds. Drive a moving
+  // bar instead of a static spinner while a video renders.
+  progressPercent?: number
+  providerStatus?: string
+  elapsedSeconds?: number
 }
 
 export interface TaskPlanState {

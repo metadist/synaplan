@@ -565,6 +565,17 @@ export const chatApi = {
   },
 
   /**
+   * Cancel a single multitask media node (per-card Stop button) without
+   * stopping the rest of the turn.
+   */
+  async cancelTask(trackId: number, nodeId: string): Promise<{ success: boolean }> {
+    return httpClient<{ success: boolean }>('/api/v1/messages/cancel-node', {
+      method: 'POST',
+      body: JSON.stringify({ trackId: String(trackId), nodeId }),
+    })
+  },
+
+  /**
    * Stream a guest message (no auth token, uses guestSession query param).
    */
   streamGuestMessage(opts: {

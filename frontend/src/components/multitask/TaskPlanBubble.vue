@@ -9,6 +9,8 @@ const props = defineProps<{ plan: TaskPlanState }>()
 const emit = defineEmits<{
   /** Bubbled from a failed TaskCard: retry that step with another model. */
   retryTask: [payload: { prompt: string; modelId: number }]
+  /** Bubbled from a running TaskCard: stop that media step. */
+  cancelTask: [nodeId: string]
 }>()
 
 const doneCount = computed(() => props.plan.cards.filter((c) => c.state === 'done').length)
@@ -27,6 +29,7 @@ const doneCount = computed(() => props.plan.cards.filter((c) => c.state === 'don
       :key="card.nodeId"
       :card="card"
       @retry="emit('retryTask', $event)"
+      @cancel="emit('cancelTask', $event)"
     />
   </div>
 </template>

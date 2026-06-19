@@ -68,6 +68,17 @@ final readonly class DagExecutor
                     'timestamp' => time(),
                 ]);
             });
+
+            // Live media progress (e.g. video render status) → task_progress, so
+            // the card shows a moving bar instead of a static spinner.
+            $context->setProgressSink(static function (string $nodeId, array $progress) use ($progressCallback): void {
+                $progressCallback([
+                    'status' => 'task_progress',
+                    'message' => '',
+                    'metadata' => array_merge(['node_id' => $nodeId], $progress),
+                    'timestamp' => time(),
+                ]);
+            });
         }
 
         if ($this->config->isParallelEnabled()) {
