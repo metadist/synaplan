@@ -1,6 +1,6 @@
 interface Env {}
 
-const NO_CACHE_PATHS = ['/sw.js', '/site.webmanifest']
+const NO_CACHE_PATHS = ['/sw.js', '/site.webmanifest', '/widget.js']
 
 /**
  * SSE endpoints. The Worker MUST pass these through with zero header
@@ -42,7 +42,7 @@ function shouldNeverCache(pathname: string): boolean {
 }
 
 function isHashedAsset(pathname: string): boolean {
-  return pathname.startsWith('/assets/')
+  return pathname.startsWith('/assets/') || pathname.startsWith('/chunks/')
 }
 
 function isHtmlNavigation(request: Request, pathname: string): boolean {
@@ -79,7 +79,16 @@ export default {
       return fetch(request)
     }
 
-    const response = await fetch(request)
+    // For never-cache paths (hashless entry points like /widget.js, /sw.js)
+    // bypass Cloudflare's edge cache entirely: `cache: 'no-store'` makes the
+    // runtime skip any cached match AND refuse to store the response. This
+    // self-heals a stale entry already sitting in the edge cache after a
+    // deploy — no manual dashboard purge required (needs compatibility_date
+    // >= 2024-11-11; see wrangler.toml). The origin (Caddy) already sends the
+    // matching no-cache headers, so we always serve the freshest build.
+    const response = shouldNeverCache(pathname)
+      ? await fetch(request, { cache: 'no-store' })
+      : await fetch(request)
     const headers = new Headers(response.headers)
 
     if (shouldNeverCache(pathname)) {
