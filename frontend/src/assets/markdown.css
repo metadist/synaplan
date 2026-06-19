@@ -332,6 +332,18 @@
   background-color: var(--bg-chip, rgba(0, 0, 0, 0.05));
 }
 
+/* Once rendered in place (SVG injected into the <pre>), drop the code-block
+ * chrome so the diagram is not boxed like source code. */
+.markdown-content .mermaid-block.mermaid-rendered {
+  padding: 0;
+  background-color: transparent;
+}
+
+.markdown-content .mermaid-block.mermaid-rendered svg {
+  max-width: 100%;
+  height: auto;
+}
+
 .markdown-content .mermaid-error {
   border: 2px solid #f87171;
   border-radius: 0.5rem;
@@ -364,6 +376,10 @@
 .dark .markdown-content .code-block,
 .dark .markdown-content .mermaid-block {
   background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .markdown-content .mermaid-block.mermaid-rendered {
+  background-color: transparent;
 }
 
 .dark .markdown-content code:not(pre code),
