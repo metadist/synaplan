@@ -133,6 +133,9 @@ final class WebSearchTopicPolicyTest extends TestCase
         yield 'price_query' => ['Bitcoin Preis', false];
         yield 'news_query' => ['latest news', false];
         yield 'year_anchor' => ['olympics 2026', false];
+        // Future-proof: any 20xx year is an actuality signal, not just the
+        // current few — "olympics 2031" must not be vetoed as trivial noise.
+        yield 'future_year_anchor' => ['olympics 2031', false];
 
         // Not trivial: real questions / informative requests.
         yield 'capital_question' => ['What is the capital of France?', false];

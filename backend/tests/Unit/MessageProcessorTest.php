@@ -634,6 +634,52 @@ class MessageProcessorTest extends TestCase
         );
     }
 
+    /**
+     * Non-streaming pipeline parity: the legacy `process()` path honours the
+     * explicit `force_web_search` option. Even with a `false` classifier vote
+     * and an otherwise-trivial message the search must fire — proving the
+     * explicit request rule works on both pipelines, not just streaming.
+     */
+    public function testProcessForcesSearchOnExplicitForceWebSearchOption(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(103);
+        $message->method('getText')->willReturn('hallo');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn(['metadata' => []]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('hallo');
+
+        $this->braveSearchService
+            ->expects($this->once())
+            ->method('search')
+            ->willReturn(['results' => []]);
+
+        $this->router->method('route')->willReturn([
+            'content' => 'Response',
+            'metadata' => ['provider' => 'test', 'model' => 'test'],
+        ]);
+
+        $this->processor->process($message, ['force_web_search' => true]);
+    }
+
     public function testProcessLoadsConversationHistory(): void
     {
         $message = $this->createMock(Message::class);

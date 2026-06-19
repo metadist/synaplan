@@ -60,9 +60,14 @@ final class WebSearchTopicPolicy
         'oggi', 'adesso', 'attuale', 'ultime', 'notizie', 'prezzo', 'meteo',
         // Turkish
         'bugün', 'bugun', 'şimdi', 'simdi', 'güncel', 'guncel', 'haber', 'fiyat',
-        // Year anchors (post knowledge-cutoff content is usually time-sensitive)
-        '2024', '2025', '2026',
     ];
+
+    /**
+     * Matches an explicit four-digit 20xx year token (e.g. "2026", "olympics
+     * 2031"). Treated as an actuality signal so the triviality veto stays
+     * future-proof instead of relying on a hardcoded year list.
+     */
+    private const YEAR_SIGNAL_PATTERN = '/\b20\d{2}\b/';
 
     /**
      * Greeting / smalltalk / acknowledgement phrases. A message that is
@@ -155,6 +160,11 @@ final class WebSearchTopicPolicy
             if (str_contains($lowerRaw, $signal)) {
                 return false;
             }
+        }
+
+        // Any explicit 20xx year is a (future-proof) actuality signal.
+        if (1 === preg_match(self::YEAR_SIGNAL_PATTERN, $lowerRaw)) {
+            return false;
         }
 
         // Collapse every run of non-letters to a single space so the

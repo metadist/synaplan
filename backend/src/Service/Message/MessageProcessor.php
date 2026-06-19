@@ -968,12 +968,14 @@ final readonly class MessageProcessor
     private function triggerReasonFor(?string $topic, bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $shouldSearch): string
     {
         if (!$shouldSearch) {
-            if (true !== $promptToolInternet && WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
-                return 'non_web_search_topic';
-            }
-
+            // Mirror the real precedence in WebSearchTopicPolicy::shouldSearch():
+            // the prompt opt-out is the hard disable and must be reported first.
             if (false === $promptToolInternet) {
                 return 'disabled_by_prompt_tool_internet';
+            }
+
+            if (WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
+                return 'non_web_search_topic';
             }
 
             if (true === $classifierVote && WebSearchTopicPolicy::isTrivialConversational($messageText)) {
