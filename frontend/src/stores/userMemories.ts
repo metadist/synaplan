@@ -348,5 +348,12 @@ export const useMemoriesStore = defineStore('memories', () => {
     selectCategory,
     clearError,
     init,
+    $reset() {
+      memories.value = []
+      categoriesData.value = []
+      loading.value = false
+      error.value = null
+      selectedCategory.value = null
+    },
   }
 })

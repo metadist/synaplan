@@ -245,10 +245,16 @@ export function prefetchSseToken(): void {
 }
 
 /**
- * Clear cached SSE token (call on logout)
+ * Clear cached SSE token and abort any in-flight fetch/refresh.
+ *
+ * Must be called on every principal swap (login, logout, impersonation
+ * start/stop) so the next stream request fetches a fresh token for the
+ * new authenticated user.
  */
 export function clearSseToken(): void {
   cachedSseToken = null
+  tokenFetchPromise = null
+  tokenRefreshPromise = null
   if (tokenExpiryTimer) {
     clearTimeout(tokenExpiryTimer)
     tokenExpiryTimer = null

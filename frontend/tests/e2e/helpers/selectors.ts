@@ -409,6 +409,19 @@ export const selectors = {
     modalRegister: '[data-testid="guest-modal-register"]',
     modalLogin: '[data-testid="guest-modal-login"]',
   },
+  admin: {
+    tabUsers: '[data-testid="tab-users"]',
+    sectionUsers: '[data-testid="section-users"]',
+    userSearch: '[data-testid="input-user-search"]',
+    impersonateUser: (userId: number) => `[data-testid="btn-impersonate-user-${userId}"]`,
+  },
+  impersonation: {
+    banner: '[data-testid="banner-impersonation"]',
+    bannerTarget: '[data-testid="banner-impersonation-target"]',
+    bannerAdmin: '[data-testid="banner-impersonation-admin"]',
+    exitBtn: '[data-testid="btn-impersonation-exit"]',
+    ring: '[data-testid="impersonation-ring"]',
+  },
   mailHandler: {
     list: '[data-testid="comp-mail-handler-list"]',
     config: '[data-testid="comp-mail-handler-config"]',
