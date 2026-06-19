@@ -10,8 +10,25 @@
  * 3. Call renderMermaidBlocks() to convert mermaid code blocks to SVG diagrams
  */
 
+import DOMPurify from 'dompurify'
+
 let mermaidInitialized = false
 let mermaidModule: typeof import('mermaid') | null = null
+
+/**
+ * Sanitize a mermaid-rendered SVG before it is injected via innerHTML.
+ *
+ * Mermaid already sanitizes with `securityLevel: 'strict'`, but assigning the
+ * raw string to innerHTML is flagged by static analysis (CodeQL: "DOM text
+ * reinterpreted as HTML"). This is defense-in-depth: DOMPurify with the SVG
+ * (+ SVG filters + HTML for foreignObject labels) profiles strips scripts and
+ * event handlers while preserving everything mermaid needs to render.
+ */
+function sanitizeSvg(svg: string): string {
+  return DOMPurify.sanitize(svg, {
+    USE_PROFILES: { svg: true, svgFilters: true, html: true },
+  })
+}
 
 /**
  * Lazy-load and initialize mermaid
@@ -147,17 +164,18 @@ export async function renderMermaidBlocks(
       try {
         const id = `mermaid-${Math.random().toString(36).slice(2, 11)}`
         const { svg } = await mermaid.render(id, diagramCode)
+        const safeSvg = sanitizeSvg(svg)
 
         if (inPlace) {
           // Keep the <pre> element (stable identity for morphdom) and swap its
           // code child for the rendered SVG.
           block.classList.add('mermaid-rendered')
-          block.innerHTML = svg
+          block.innerHTML = safeSvg
         } else {
           // Create a container for the rendered diagram
           const diagramContainer = document.createElement('div')
           diagramContainer.className = 'mermaid-diagram my-4 overflow-x-auto'
-          diagramContainer.innerHTML = svg
+          diagramContainer.innerHTML = safeSvg
 
           // Replace the code block with the rendered diagram
           block.replaceWith(diagramContainer)
