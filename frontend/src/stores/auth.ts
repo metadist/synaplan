@@ -160,7 +160,12 @@ export const useAuthStore = defineStore('auth', () => {
     clearPendingRedirect()
 
     // Wipe all user-scoped client state (SSE token, chats, memories, etc.)
-    await resetUserScopedClientState()
+    // Non-fatal: session teardown must proceed even if cleanup fails.
+    try {
+      await resetUserScopedClientState()
+    } catch (cleanupErr) {
+      console.warn('User state cleanup failed during logout', cleanupErr)
+    }
 
     // Tear down the realtime client before the server-side session is
     // invalidated. Otherwise the client keeps trying to refresh its
@@ -243,7 +248,11 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await authService.handleOAuthCallback()
 
       if (result.success) {
-        await resetUserScopedClientState()
+        try {
+          await resetUserScopedClientState()
+        } catch (cleanupErr) {
+          console.warn('User state cleanup failed during OAuth callback', cleanupErr)
+        }
         syncFromAuthService()
         initialized.value = true
         // Also resolve authReady if not already done
@@ -273,7 +282,11 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const result = await authService.revokeAllSessions()
       if (result.success) {
-        await resetUserScopedClientState()
+        try {
+          await resetUserScopedClientState()
+        } catch (cleanupErr) {
+          console.warn('User state cleanup failed during session revocation', cleanupErr)
+        }
         user.value = null
         impersonator.value = null
       }
@@ -306,7 +319,11 @@ export const useAuthStore = defineStore('auth', () => {
     // 404 against the impersonated user (#999). Doing this before
     // refreshUser() guarantees that whatever route re-renders next sees a
     // clean slate.
-    await resetUserScopedClientState()
+    try {
+      await resetUserScopedClientState()
+    } catch (cleanupErr) {
+      console.warn('User state cleanup failed during impersonation start', cleanupErr)
+    }
 
     // Re-fetch /auth/me so user + impersonator + level + isAdmin all reflect
     // the post-swap session in one consistent step. We also reload the config
@@ -338,7 +355,11 @@ export const useAuthStore = defineStore('auth', () => {
     // Symmetric to startImpersonation: the chat state currently in memory
     // belongs to the impersonated user and must not bleed back into the
     // admin's own session (#999).
-    await resetUserScopedClientState()
+    try {
+      await resetUserScopedClientState()
+    } catch (cleanupErr) {
+      console.warn('User state cleanup failed during impersonation stop', cleanupErr)
+    }
 
     await refreshUser()
     try {
