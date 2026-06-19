@@ -420,6 +420,17 @@ const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const quoting = useMessageQuoting(chatContainer)
 const autoScroll = ref(true)
+// While streaming we pin the start of the answer to the top once it grows past
+// the viewport. If the user deliberately scrolls to the very bottom, switch to
+// following the bottom instead (so the freshest text stays visible). Reset to
+// pin mode whenever a new message is sent.
+let stickToBottom = false
+// Tracks the scrollTop value we last set programmatically so handleScroll can
+// tell our own scroll adjustments apart from genuine user scrolling.
+let expectedScrollTop = 0
+// Optical breathing room kept below the container's top edge once a long
+// streaming message gets pinned there.
+const STREAM_TOP_GAP = 12
 const isDragging = ref(false)
 const dragCounter = ref(0)
 const historyStore = useHistoryStore()
@@ -643,9 +654,15 @@ const handleVisibilityChangeForToken = () => {
 }
 
 const handleViewportResize = () => {
-  if (autoScroll.value && chatContainer.value) {
-    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  if (!autoScroll.value || !chatContainer.value) return
+  // While streaming, keep the pin behaviour intact instead of jumping to the
+  // bottom (e.g. when the mobile keyboard resizes the visual viewport).
+  if (historyStore.messages.some((m) => m.isStreaming)) {
+    followStreamingScroll()
+    return
   }
+  chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  expectedScrollTop = chatContainer.value.scrollTop
 }
 
 if (window.visualViewport) {
@@ -783,10 +800,44 @@ const scrollToBottom = (force = false) => {
     nextTick(() => {
       if (chatContainer.value) {
         chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+        // Read the clamped value back so the handleScroll guard recognises
+        // this as a programmatic scroll.
+        expectedScrollTop = chatContainer.value.scrollTop
         autoScroll.value = true
       }
     })
   }
+}
+
+// Follow a growing streaming message, but stop scrolling once its top edge
+// reaches the top of the container. Computed purely from measured DOM offsets
+// so it behaves identically on small and large screens.
+const followStreamingScroll = () => {
+  if (!autoScroll.value || !chatContainer.value) return
+  nextTick(() => {
+    const container = chatContainer.value
+    if (!container) return
+    const bottomMax = container.scrollHeight - container.clientHeight
+    let target = bottomMax
+    // The streaming assistant message is always the last rendered message
+    // (the input is locked while streaming, so nothing can be appended after
+    // it). We measure that node directly instead of relying on attribute
+    // fallthrough, which ChatMessage does not forward to its root element.
+    const messageEls = container.querySelectorAll<HTMLElement>('[data-testid="message-container"]')
+    const el = messageEls[messageEls.length - 1]
+    // When the user has scrolled to the bottom, keep following the bottom
+    // instead of pinning the start to the top.
+    if (!stickToBottom && el) {
+      const messageTop =
+        el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+      // Short message: bottomMax wins (keep following the end). Once the
+      // message grows past the viewport, messageTop stays fixed and wins the
+      // min(), pinning the start at the top edge.
+      target = Math.min(bottomMax, Math.max(0, messageTop - STREAM_TOP_GAP))
+    }
+    container.scrollTop = target
+    expectedScrollTop = container.scrollTop
+  })
 }
 
 // Drag & Drop handlers for file upload
@@ -826,9 +877,17 @@ const handleScroll = async () => {
 
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
 
-  // Check if at bottom for auto-scroll
-  const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50
-  autoScroll.value = isAtBottom
+  // Distinguish our own programmatic scrolls (including the pinned position
+  // that is NOT at the bottom) from real user scrolling. Only the latter may
+  // toggle auto-follow off/on.
+  const isProgrammatic = Math.abs(scrollTop - expectedScrollTop) <= 1
+  if (!isProgrammatic) {
+    const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50
+    autoScroll.value = isAtBottom
+    // Scrolling to the very bottom opts into bottom-following; scrolling up
+    // (anywhere above the bottom) leaves pin mode for the next stream.
+    stickToBottom = isAtBottom
+  }
 
   // Check if at top for loading more messages (Infinite Scroll)
   const isAtTop = scrollTop < 100
@@ -883,7 +942,7 @@ watch(
     return total
   },
   () => {
-    scrollToBottom()
+    followStreamingScroll()
   }
 )
 
@@ -1244,6 +1303,7 @@ const handleSendMessage = async (
   }
 ) => {
   autoScroll.value = true
+  stickToBottom = false
 
   // Prepare files info if fileIds are provided
   let files: import('@/stores/history').MessageFile[] | undefined = undefined
