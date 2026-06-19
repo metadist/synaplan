@@ -1220,6 +1220,13 @@
       "automated": "Automatisch (bestes Modell)",
       "availableTools": "Verfügbare Agents",
       "availableToolsHelp": "Aktivieren Sie Agents, die für diesen Prompt verfügbar sein sollen.",
+      "internetSearch": {
+        "label": "Internetsuche",
+        "help": "Legt fest, wann dieser Prompt im Web sucht. „Automatisch“ überlässt die Entscheidung pro Nachricht dem Klassifizierer; „Immer an“ erzwingt eine Suche; „Immer aus“ deaktiviert sie.",
+        "auto": "Automatisch (Klassifizierer entscheidet)",
+        "on": "Immer an",
+        "off": "Immer aus"
+      },
       "promptContent": "Prompt-Inhalt",
       "contentPlaceholder": "Geben Sie Ihren System-Prompt hier ein...",
       "contentHelp": "Diese System-Nachricht steuert das Verhalten der KI.",

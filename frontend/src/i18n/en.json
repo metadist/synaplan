@@ -1103,6 +1103,13 @@
       "automated": "Automated (Best Model)",
       "availableTools": "Available Agents",
       "availableToolsHelp": "Enable agents that will be available when using this prompt",
+      "internetSearch": {
+        "label": "Internet Search",
+        "help": "Choose when this prompt searches the web. \"Auto\" lets the classifier decide per message; \"Always on\" forces a search; \"Always off\" disables it.",
+        "auto": "Auto (classifier decides)",
+        "on": "Always on",
+        "off": "Always off"
+      },
       "promptContent": "Prompt Content",
       "contentPlaceholder": "Enter your system prompt here...",
       "promptContentPlaceholder": "Enter the system prompt that will guide the AI's behavior for this task...",

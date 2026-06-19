@@ -1552,6 +1552,13 @@
       "automated": "Otomatik (En İyi Model)",
       "availableTools": "Mevcut Araçlar",
       "availableToolsHelp": "Bu promptu kullanırken mevcut olacak araçları etkinleştirin",
+      "internetSearch": {
+        "label": "İnternet Araması",
+        "help": "Bu promptun web'de ne zaman arama yapacağını seçin. \"Otomatik\" kararı her mesaj için sınıflandırıcıya bırakır; \"Her zaman açık\" aramayı zorunlu kılar; \"Her zaman kapalı\" devre dışı bırakır.",
+        "auto": "Otomatik (sınıflandırıcı karar verir)",
+        "on": "Her zaman açık",
+        "off": "Her zaman kapalı"
+      },
       "promptContent": "Prompt İçeriği",
       "contentPlaceholder": "Sistem promptunuzu buraya girin...",
       "promptContentPlaceholder": "Bu görev için AI'ın davranışını yönlendirecek sistem promptunu girin...",
