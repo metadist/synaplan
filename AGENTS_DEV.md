@@ -4,7 +4,7 @@
 
 ### Language
 - **Code & Comments**: ALWAYS English
-- **Chat responses**: ALWAYS German
+- **Chat responses**: ALWAYS in the language the user chooses!
 - **NEVER** write German in code/comments
 
 ### Git Operations
@@ -451,7 +451,7 @@ const eventSource = new EventSource(url)
 
 eventSource.onmessage = (event) => {
   const data = JSON.parse(event.data)
-  
+
   if (data.status === 'token') {
     // Append to streaming message
     message.content += data.content
