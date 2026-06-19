@@ -207,5 +207,11 @@ export const useFeedbackStore = defineStore('feedback', () => {
     selectType,
     clearError,
     getFeedbackById,
+    $reset() {
+      feedbacks.value = []
+      loading.value = false
+      error.value = null
+      selectedType.value = 'all'
+    },
   }
 })

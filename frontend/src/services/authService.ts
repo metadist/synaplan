@@ -12,7 +12,6 @@
 // - Only triggered during OAuth callback flow
 // - Falls back to normal refresh token flow if retries exhausted
 import { ref, type Ref } from 'vue'
-import { clearSseToken } from '@/services/api/chatApi'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { setSessionHint, clearSessionHint, hasSessionHint } from '@/services/sessionHint'
 
@@ -147,7 +146,6 @@ export const authService = {
     } finally {
       user.value = null
       impersonator.value = null
-      clearSseToken()
       clearSessionHint()
       isLoggingOut.value = false
     }

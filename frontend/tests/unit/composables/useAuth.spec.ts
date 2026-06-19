@@ -3,6 +3,38 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useAuth } from '@/composables/useAuth'
 import { useAuthStore } from '@/stores/auth'
 
+vi.mock('@/services/api/httpClient', () => ({
+  httpClient: vi.fn(),
+  getApiBaseUrl: () => 'http://localhost:8000',
+  refreshAccessToken: vi.fn().mockResolvedValue({ success: true }),
+  getConfigSync: () => ({ realtime: { enabled: false, wsUrl: '' } }),
+}))
+
+vi.mock('@/stores/realtime', () => ({
+  useRealtimeStore: () => ({
+    disconnect: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
+vi.mock('@/services/api/chatApi', () => ({
+  clearSseToken: vi.fn(),
+}))
+
+vi.mock('@/stores/userMemories', () => ({
+  useMemoriesStore: () => ({ $reset: vi.fn() }),
+}))
+
+vi.mock('@/stores/userFeedback', () => ({
+  useFeedbackStore: () => ({ $reset: vi.fn() }),
+}))
+
+vi.mock('@/stores/config', () => ({
+  useConfigStore: () => ({
+    reload: vi.fn().mockResolvedValue(undefined),
+    billing: { enabled: false },
+  }),
+}))
+
 describe('useAuth', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
