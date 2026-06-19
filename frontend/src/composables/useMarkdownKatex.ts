@@ -17,6 +17,15 @@
 
 let katexModule: typeof import('katex') | null = null
 
+// Strict inline-math delimiter pattern: `$…$` whose content has NO whitespace
+// directly inside the delimiters (standard remark-math/pandoc rule). This is
+// what keeps currency such as "19 $/Monat … 39 $" from being parsed as a
+// formula. Single-char formulas (`$x$`) are allowed via the alternation; `$$`
+// is excluded by the negative lookaheads. Kept as a source string so both the
+// matcher (global flag) and the detector (`hasMathFormulas`, stateless `.test`)
+// build their own fresh RegExp and never share `lastIndex`.
+const INLINE_MATH_SOURCE = '\\$(?!\\$)((?:[^\\s$][^$\\n]*?[^\\s$]|[^\\s$]))\\$(?!\\$)'
+
 /**
  * Lazy-load KaTeX module and CSS together
  */
@@ -95,8 +104,14 @@ export async function processKatexInMarkdown(markdown: string): Promise<string> 
   }
 
   // Process inline math ($...$) - be careful not to match $$
-  // Avoid lookbehind for Safari compatibility; filter $$ matches manually
-  const inlineMathRegex = /\$(?!\$)([^$\n]+?)\$(?!\$)/g
+  // Avoid lookbehind for Safari compatibility; filter $$ matches manually.
+  //
+  // Currency guard (issue #903): a valid inline formula must NOT have
+  // whitespace directly inside the delimiters (standard remark-math/pandoc
+  // rule). Without this, "19 $/Monat … 39 $" matched as a formula, eating
+  // both `$` and rendering the text between (incl. **bold**) in math italic.
+  // The content therefore must start and end with a non-space, non-`$` char.
+  const inlineMathRegex = new RegExp(INLINE_MATH_SOURCE, 'g')
   const inlineMatches = [...result.matchAll(inlineMathRegex)]
 
   for (const match of inlineMatches.reverse()) {
@@ -126,10 +141,23 @@ export async function processKatexInMarkdown(markdown: string): Promise<string> 
 }
 
 /**
- * Check if content contains math formulas
+ * Check if content contains REAL math formulas.
+ *
+ * Must mirror what `processKatexInMarkdown` actually renders, otherwise the
+ * streaming renderer flags currency-only text ("19 $/Monat") as math and runs
+ * the (formula-mangling, raw-markdown) KaTeX path on it. We therefore require
+ * a complete, well-formed delimiter pair — not just a lone `$`.
  */
 export function hasMathFormulas(content: string): boolean {
-  return content.includes('$') || content.includes('\\(') || content.includes('\\[')
+  if (!content) return false
+  // Block math $$…$$
+  if (/\$\$[\s\S]+?\$\$/.test(content)) return true
+  // LaTeX block \[ … \]
+  if (/\\\[[\s\S]+?\\\]/.test(content)) return true
+  // LaTeX inline \( … \)
+  if (/\\\([\s\S]+?\\\)/.test(content)) return true
+  // Inline $…$ with the strict currency-safe rule
+  return new RegExp(INLINE_MATH_SOURCE).test(content)
 }
 
 /**

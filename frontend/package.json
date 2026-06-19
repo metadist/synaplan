@@ -41,6 +41,7 @@
     "lucide-vue-next": "^1.0.0",
     "marked": "^18.0.0",
     "mermaid": "^11.12.2",
+    "morphdom": "^2.7.8",
     "pinia": "^3.0.3",
     "three": "^0.184.0",
     "vue": "^3.4.38",

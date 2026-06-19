@@ -98,7 +98,13 @@ function isDiagramCodeComplete(code: string): boolean {
  */
 export async function renderMermaidBlocks(
   container: HTMLElement,
-  theme: 'light' | 'dark' = 'light'
+  theme: 'light' | 'dark' = 'light',
+  // When true, the rendered SVG is injected INTO the existing
+  // `<pre class="mermaid-block">` element (which is then marked
+  // `mermaid-rendered`) instead of replacing it with a new node. This keeps
+  // element identity stable so a DOM-morphing renderer (morphdom) can protect
+  // the rendered diagram from being reverted on the next streaming patch.
+  inPlace: boolean = false
 ): Promise<void> {
   const mermaidBlocks = container.querySelectorAll('pre.mermaid-block')
 
@@ -142,13 +148,20 @@ export async function renderMermaidBlocks(
         const id = `mermaid-${Math.random().toString(36).slice(2, 11)}`
         const { svg } = await mermaid.render(id, diagramCode)
 
-        // Create a container for the rendered diagram
-        const diagramContainer = document.createElement('div')
-        diagramContainer.className = 'mermaid-diagram my-4 overflow-x-auto'
-        diagramContainer.innerHTML = svg
+        if (inPlace) {
+          // Keep the <pre> element (stable identity for morphdom) and swap its
+          // code child for the rendered SVG.
+          block.classList.add('mermaid-rendered')
+          block.innerHTML = svg
+        } else {
+          // Create a container for the rendered diagram
+          const diagramContainer = document.createElement('div')
+          diagramContainer.className = 'mermaid-diagram my-4 overflow-x-auto'
+          diagramContainer.innerHTML = svg
 
-        // Replace the code block with the rendered diagram
-        block.replaceWith(diagramContainer)
+          // Replace the code block with the rendered diagram
+          block.replaceWith(diagramContainer)
+        }
       } catch {
         // Mark as error to prevent re-rendering attempts
         block.classList.add('mermaid-error')
