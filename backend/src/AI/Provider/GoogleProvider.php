@@ -2,6 +2,7 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
@@ -899,10 +900,21 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             $operationData = $this->startVideoOperation($prompt, $options);
             $progressCallback = $options['progress_callback'] ?? null;
 
+            // Stop button support (issue #1145): MediaGenerationHandler passes a
+            // `cancel_check` probe that turns true when the user aborts the turn
+            // (global Stop / per-card Stop / client disconnect). Forward it into
+            // the poll loop so we stop waiting AND tell Veo to cancel the
+            // operation — otherwise the render finishes server-side and the
+            // Google AI credits are burned for a video nobody will see.
+            $cancelCheck = isset($options['cancel_check']) && is_callable($options['cancel_check'])
+                ? $options['cancel_check']
+                : null;
+
             $videoUri = $this->pollVideoUntilComplete(
                 $operationData['operationName'],
                 $progressCallback,
                 $operationData['resolution'],
+                $cancelCheck,
             );
 
             $videoDataUrl = $this->downloadVideoContent($videoUri);
@@ -1117,13 +1129,22 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
      *
      * @return string The video URI to download
      */
-    private function pollVideoUntilComplete(string $operationName, ?callable $progressCallback, ?string $resolution = null): string
+    private function pollVideoUntilComplete(string $operationName, ?callable $progressCallback, ?string $resolution = null, ?callable $cancelCheck = null): string
     {
         $timeoutSeconds = $this->resolvePollTimeoutSeconds($resolution);
         $maxAttempts = (int) ceil($timeoutSeconds / self::VEO_POLL_INTERVAL_SECONDS);
         $startTime = time();
 
         for ($attempt = 1; $attempt <= $maxAttempts; ++$attempt) {
+            // Honour a cancellation request as early as possible (issue #1145):
+            // abort the wait and ask Veo to cancel the operation so we stop
+            // burning Google AI credits on an unwanted render.
+            if (null !== $cancelCheck && $cancelCheck()) {
+                $this->cancelVideoOperation($operationName);
+
+                throw new ProviderCancelledException('Google Veo video generation cancelled', 'google', ['operation' => $operationName]);
+            }
+
             sleep(self::VEO_POLL_INTERVAL_SECONDS);
 
             $elapsed = time() - $startTime;
@@ -1161,6 +1182,37 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         }
 
         throw new ProviderException(sprintf('Video generation timed out after %d seconds (resolution: %s)', $timeoutSeconds, $resolution ?? 'unknown'), 'google');
+    }
+
+    /**
+     * Best-effort cancel of an in-flight Veo operation so Google stops the
+     * render (and the billing). The Long-Running-Operations API exposes
+     * `POST {operationName}:cancel` (issue #1145). Never throws — by the time
+     * we call this we have already decided to walk away from the poll, so a
+     * failed cancel must not mask the ProviderCancelledException.
+     */
+    private function cancelVideoOperation(string $operationName): void
+    {
+        if (!$this->apiKey) {
+            return;
+        }
+
+        $cancelUrl = self::API_BASE.'/'.$operationName.':cancel';
+
+        try {
+            $this->httpClient->request('POST', $cancelUrl, [
+                'headers' => ['x-goog-api-key' => $this->apiKey],
+                'timeout' => 30,
+            ]);
+            $this->logger->info('Google Veo: cancel request sent to provider', [
+                'operation' => $operationName,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Google Veo: cancel request failed (already walking away)', [
+                'operation' => $operationName,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

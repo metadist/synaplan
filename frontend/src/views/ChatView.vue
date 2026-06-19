@@ -1948,6 +1948,10 @@ const streamAIResponse = async (
               message.wasMultitask = true
               message.taskPlan = {
                 active: true,
+                // Persist the turn id on the plan so the per-card Stop button can
+                // always reach the backend even if currentTrackId is cleared by a
+                // racing handler (issue #1141).
+                trackId: currentTrackId,
                 replyNode:
                   typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
                 cards: tasks.map((t) => ({
@@ -3029,12 +3033,65 @@ const handleTaskCancel = async (nodeId: string) => {
     card.state = 'cancelled'
   }
 
-  if (currentTrackId === undefined) return
-  try {
-    await chatApi.cancelTask(currentTrackId, nodeId)
-  } catch {
-    // Best-effort: the card already reflects the cancellation locally.
+  // Resolve the turn id reliably: prefer the plan-scoped id captured when the
+  // turn started, falling back to the module-level currentTrackId. Relying on
+  // currentTrackId alone was the root cause of issue #1141 — it can be undefined
+  // (cleared by a racing complete/error handler) so the backend never received
+  // the cancel and the stream stayed open, blocking the input.
+  const trackId = message?.taskPlan?.trackId ?? currentTrackId
+  if (trackId !== undefined) {
+    try {
+      await chatApi.cancelTask(trackId, nodeId)
+    } catch {
+      // Best-effort: the card already reflects the cancellation locally.
+    }
+  } else {
+    console.warn('⚠️ No trackId for per-card cancel - skipping backend notification')
   }
+
+  // If this was the last still-running step, end the turn locally so the input
+  // unblocks immediately (issue #1141): a single-node media turn would otherwise
+  // wait for a backend `complete` that may be delayed by the provider poll. We
+  // close the EventSource and finish the streaming message WITHOUT the global
+  // "cancelled by user" notice, since the cancelled card already conveys it.
+  const remaining = message?.taskPlan?.cards.filter(
+    (c) => c.state === 'pending' || c.state === 'running'
+  )
+  if (!remaining || remaining.length === 0) {
+    finishStreamingTurnLocally()
+  }
+}
+
+// Tear down the active stream and unblock the chat input without injecting the
+// global stop's "cancelled by user" text. Used when a per-card Stop cancels the
+// only running step (issue #1141).
+function finishStreamingTurnLocally() {
+  if (streamingAbortController) {
+    streamingAbortController.abort()
+  }
+  if (stopStreamingFn) {
+    stopStreamingFn()
+    stopStreamingFn = null
+  }
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
+  isAudioStreaming.value = false
+  processingStatus.value = ''
+  processingMetadata.value = {}
+
+  const streamingMessage = historyStore.messages.find((m) => m.isStreaming)
+  if (streamingMessage) {
+    if (streamingMessage.taskPlan) {
+      streamingMessage.taskPlan.active = false
+    }
+    historyStore.finishStreamingMessage(streamingMessage.id)
+  }
+
+  streamingAbortController = null
+  currentTrackId = undefined
+  currentStreamingChatId = undefined
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {

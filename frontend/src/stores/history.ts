@@ -222,6 +222,11 @@ export interface TaskPlanState {
   active: boolean
   replyNode: string
   cards: TaskCard[]
+  // Streaming turn id (Date.now()) captured when the plan starts. The per-card
+  // Stop button needs it to call /cancel-node; reading it from the plan is more
+  // reliable than the mutable module-level currentTrackId, which can be cleared
+  // by a racing complete/error handler (issue #1141).
+  trackId?: number
 }
 
 export const useHistoryStore = defineStore('history', () => {
