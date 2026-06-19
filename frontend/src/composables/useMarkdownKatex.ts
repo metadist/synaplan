@@ -82,7 +82,9 @@ export async function processKatexInMarkdown(markdown: string): Promise<string> 
   let result = markdown
 
   // Process block math ($$...$$) first
-  const blockMathRegex = /\$\$([\s\S]*?)\$\$/g
+  // Require at least one character between delimiters so empty `$$$$` is not
+  // rendered as a formula — keeps this in sync with `hasMathFormulas`.
+  const blockMathRegex = /\$\$([\s\S]+?)\$\$/g
   const blockMatches = [...result.matchAll(blockMathRegex)]
 
   for (const match of blockMatches.reverse()) {
@@ -93,7 +95,7 @@ export async function processKatexInMarkdown(markdown: string): Promise<string> 
   }
 
   // Process LaTeX-style block math (\[...\])
-  const latexBlockRegex = /\\\[([\s\S]*?)\\\]/g
+  const latexBlockRegex = /\\\[([\s\S]+?)\\\]/g
   const latexBlockMatches = [...result.matchAll(latexBlockRegex)]
 
   for (const match of latexBlockMatches.reverse()) {
@@ -127,7 +129,7 @@ export async function processKatexInMarkdown(markdown: string): Promise<string> 
   }
 
   // Process LaTeX-style inline math (\(...\))
-  const latexInlineRegex = /\\\(([\s\S]*?)\\\)/g
+  const latexInlineRegex = /\\\(([\s\S]+?)\\\)/g
   const latexInlineMatches = [...result.matchAll(latexInlineRegex)]
 
   for (const match of latexInlineMatches.reverse()) {

@@ -112,15 +112,15 @@ function isDiagramCodeComplete(code: string): boolean {
  *
  * @param container - The DOM element containing markdown content
  * @param theme - Optional theme ('light' or 'dark')
+ * @param inPlace - When `false` (default) each `<pre class="mermaid-block">` is
+ *   REPLACED by a new `<div>` holding the SVG. When `true` the SVG is injected
+ *   INTO the existing `<pre>` (then marked `mermaid-rendered`), keeping element
+ *   identity stable so a DOM-morphing renderer (morphdom) can protect the
+ *   rendered diagram from being reverted on the next streaming patch.
  */
 export async function renderMermaidBlocks(
   container: HTMLElement,
   theme: 'light' | 'dark' = 'light',
-  // When true, the rendered SVG is injected INTO the existing
-  // `<pre class="mermaid-block">` element (which is then marked
-  // `mermaid-rendered`) instead of replacing it with a new node. This keeps
-  // element identity stable so a DOM-morphing renderer (morphdom) can protect
-  // the rendered diagram from being reverted on the next streaming patch.
   inPlace: boolean = false
 ): Promise<void> {
   const mermaidBlocks = container.querySelectorAll('pre.mermaid-block')

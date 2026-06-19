@@ -42,6 +42,12 @@ describe('hasMathFormulas', () => {
     expect(hasMathFormulas('Einfach nur Text ohne alles')).toBe(false)
     expect(hasMathFormulas('')).toBe(false)
   })
+
+  it('does NOT treat empty delimiters as math (consistent with the renderer)', () => {
+    expect(hasMathFormulas('$$$$')).toBe(false)
+    expect(hasMathFormulas('\\(\\)')).toBe(false)
+    expect(hasMathFormulas('\\[\\]')).toBe(false)
+  })
 })
 
 describe('processKatexInMarkdown', () => {
@@ -51,5 +57,10 @@ describe('processKatexInMarkdown', () => {
     const result = await processKatexInMarkdown(text)
     expect(result).toBe(text)
     expect(result).not.toContain('katex')
+  })
+
+  it('leaves empty delimiters untouched (no empty formula rendered)', async () => {
+    expect(await processKatexInMarkdown('Leeres $$$$ hier')).toBe('Leeres $$$$ hier')
+    expect(await processKatexInMarkdown('Leeres \\(\\) hier')).toBe('Leeres \\(\\) hier')
   })
 })
