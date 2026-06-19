@@ -37,8 +37,16 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Messages')]
 class StreamController extends AbstractController
 {
-    /** Server-side cap for a quoted-reference excerpt ("Mention in chat"). */
-    private const MAX_QUOTED_TEXT_LENGTH = 4000;
+    /**
+     * Server-side cap for a quoted-reference excerpt ("Mention in chat").
+     *
+     * The quote travels as a query parameter on the SSE (GET) stream URL, so an
+     * over-long excerpt could exceed reverse-proxy request limits (e.g. Nginx's
+     * 8 KB default). Kept in sync with the frontend cap (MAX_QUOTE_LENGTH in
+     * useMessageQuoting.ts); 1000 chars is generous for a reference point and
+     * stays URL-safe even worst-case encoded.
+     */
+    private const MAX_QUOTED_TEXT_LENGTH = 1000;
 
     public function __construct(
         private EntityManagerInterface $em,

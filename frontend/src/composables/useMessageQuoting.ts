@@ -22,7 +22,12 @@ export interface FloatingButtonPosition {
 }
 
 const MIN_SELECTION_LENGTH = 2
-const MAX_QUOTE_LENGTH = 4000
+// Kept URL-safe: the quote travels as a query param on the EventSource (GET)
+// stream URL, so an over-long excerpt could blow past reverse-proxy request
+// limits (e.g. Nginx's 8 KB default). 1000 chars is plenty for a reference
+// point and stays well within budget even worst-case URL-encoded. The backend
+// enforces the same cap (StreamController::MAX_QUOTED_TEXT_LENGTH).
+const MAX_QUOTE_LENGTH = 1000
 
 /**
  * Render a quoted reference as a Markdown blockquote prefix for messages that
@@ -117,8 +122,15 @@ export function useMessageQuoting(rootRef: Ref<HTMLElement | null>) {
     const messageIdRaw = quotable.dataset.messageId
     const messageId = messageIdRaw ? Number(messageIdRaw) : undefined
 
+    // Trim over-long selections to the URL-safe budget, appending an ellipsis
+    // so the user can see the quote was shortened (chip + bubble blockquote).
+    // The ellipsis is counted in the budget so the final string never exceeds
+    // MAX_QUOTE_LENGTH and the backend cap can't chop it off.
+    const quoteText =
+      text.length > MAX_QUOTE_LENGTH ? `${text.slice(0, MAX_QUOTE_LENGTH - 1)}…` : text
+
     activeSelection = {
-      text: text.slice(0, MAX_QUOTE_LENGTH),
+      text: quoteText,
       messageId: messageId !== undefined && Number.isFinite(messageId) ? messageId : undefined,
       role: quotable.dataset.messageRole,
     }
