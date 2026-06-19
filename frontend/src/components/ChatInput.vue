@@ -21,7 +21,13 @@
   >
     <div class="max-w-4xl mx-auto px-4 py-2 md:py-4">
       <!-- Active Command and File Display (above input) -->
-      <div v-if="activeCommand || uploadedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
+      <div
+        v-if="activeCommand || uploadedFiles.length > 0 || quote"
+        class="mb-3 flex flex-wrap gap-2"
+      >
+        <!-- Quoted reference chip -->
+        <QuoteChip v-if="quote" :quote="quote" @remove="emit('clearQuote')" />
+
         <!-- Uploaded Files -->
         <div
           v-for="(file, index) in uploadedFiles"
@@ -315,6 +321,8 @@ import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
 import { useAppModeStore } from '@/stores/appMode'
 import { useAuthStore } from '@/stores/auth'
+import QuoteChip from './QuoteChip.vue'
+import type { QuotedReference } from '@/composables/useMessageQuoting'
 
 interface UploadedFile {
   file_id: number
@@ -327,6 +335,7 @@ interface UploadedFile {
 interface Props {
   isStreaming?: boolean
   isGuestMode?: boolean
+  quote?: QuotedReference | null
 }
 
 const props = defineProps<Props>()
@@ -464,10 +473,13 @@ const emit = defineEmits<{
       voiceReply?: boolean
       modelId?: number
       ragGroupKey?: string
+      quotedText?: string
+      quotedMessageId?: number
     },
   ]
   stop: []
   guestFeatureGate: [featureKey: string]
+  clearQuote: []
 }>()
 
 const commandsStore = useCommandsStore()
@@ -652,6 +664,8 @@ const sendMessage = () => {
     voiceReply: voiceReply.value,
     modelId: selectedModelId.value || undefined,
     ragGroupKey: selectedGroupKey.value || undefined,
+    quotedText: props.quote?.text || undefined,
+    quotedMessageId: props.quote?.messageId || undefined,
   }
   emit('send', messageToSend, options)
   message.value = ''
@@ -661,6 +675,7 @@ const sendMessage = () => {
   mentionQuery.value = ''
   activeCommand.value = null
   voiceReply.value = false
+  emit('clearQuote')
   // Reset enhance state after sending
   enhanceEnabled.value = false
   originalMessage.value = ''

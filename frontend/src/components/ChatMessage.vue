@@ -309,7 +309,21 @@
         </div>
 
         <!-- Bubble content (only non-thinking parts) -->
-        <div class="px-4 py-3 overflow-x-auto overflow-y-visible space-y-3 scroll-thin">
+        <div
+          class="px-4 py-3 overflow-x-auto overflow-y-visible space-y-3 scroll-thin"
+          data-quotable
+          :data-message-id="backendMessageId"
+          :data-message-role="role"
+        >
+          <!-- Quoted reference the user attached when sending this message -->
+          <div
+            v-if="quotedText"
+            class="border-l-2 border-[var(--brand)]/60 pl-3 py-0.5 text-sm italic opacity-80 whitespace-pre-wrap break-words"
+            data-testid="message-quote"
+          >
+            {{ quotedText }}
+          </div>
+
           <!-- Combined Badges: Files + Web Search + Tool (NEW) -->
           <div v-if="(files && files.length > 0) || webSearch || tool" class="space-y-2">
             <!-- Show badges with smart collapsing -->
@@ -970,6 +984,10 @@ interface Props {
   originalMediaType?: string | null
   againData?: AgainData
   backendMessageId?: number
+  /** Text the user quoted from an earlier message when composing this one. */
+  quotedText?: string | null
+  /** Backend id of the message the quote was taken from. */
+  quotedMessageId?: number | null
   processingStatus?: string
   processingMetadata?: {
     model_name?: string

@@ -171,6 +171,8 @@ export interface ApiLoadedMessageRow {
   webSearch?: Message['webSearch']
   searchResults?: Message['searchResults']
   multitask?: boolean
+  quotedText?: string | null
+  quotedMessageId?: number | null
   file?: { path: string; type: string }
   files?: ApiLoadedAttachmentFile[]
   /** Per-node render state for DAG turns — present only on OUT messages of DAG turns. */
@@ -376,6 +378,8 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     originalTopic: m.originalTopic || null,
     originalMediaType: m.originalMediaType ?? m.original_media_type ?? null,
     backendMessageId: m.id,
+    quotedText: m.quotedText ?? null,
+    quotedMessageId: m.quotedMessageId ?? null,
     files: files.length > 0 ? files : undefined,
     aiModels: m.aiModels || null,
     webSearch: m.webSearch || null,

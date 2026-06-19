@@ -151,6 +151,8 @@
               :original-media-type="message.originalMediaType"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
+              :quoted-text="message.quotedText"
+              :quoted-message-id="message.quotedMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"
               :processing-metadata="message.isStreaming ? processingMetadata : undefined"
               :files="message.files"
@@ -197,13 +199,21 @@
         @action="handlePromoAction"
       />
 
+      <QuoteSelectionButton
+        :visible="quoting.floatingVisible.value"
+        :position="quoting.floatingPosition.value"
+        @quote="quoting.confirmQuote"
+      />
+
       <ChatInput
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
+        :quote="quoting.pendingQuote.value"
         @send="handleSendMessage"
         @stop="handleStopStreaming"
         @guest-feature-gate="handleGuestFeatureGate"
+        @clear-quote="quoting.clearPendingQuote"
       />
 
       <!--
@@ -336,6 +346,8 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
+import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
+import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
   useHistoryStore,
@@ -406,6 +418,7 @@ const { error: showErrorToast, success: showSuccessToast } = useNotification()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
+const quoting = useMessageQuoting(chatContainer)
 const autoScroll = ref(true)
 const isDragging = ref(false)
 const dragCounter = ref(0)
@@ -1226,6 +1239,8 @@ const handleSendMessage = async (
     fileIds?: number[]
     voiceReply?: boolean
     ragGroupKey?: string
+    quotedText?: string
+    quotedMessageId?: number
   }
 ) => {
   autoScroll.value = true
@@ -1353,7 +1368,9 @@ const handleSendMessage = async (
     undefined, // backendMessageId
     undefined, // originalMessageId
     webSearchData, // webSearch
-    toolData // tool
+    toolData, // tool
+    options?.quotedText ?? null, // quotedText
+    options?.quotedMessageId ?? null // quotedMessageId
   )
 
   // Lift the active chat to the top of the sidebar lists right away so the
@@ -1461,6 +1478,8 @@ const streamAIResponse = async (
     voiceReply?: boolean
     isAgain?: boolean
     ragGroupKey?: string
+    quotedText?: string
+    quotedMessageId?: number
   }
 ) => {
   streamingAbortController = new AbortController()
@@ -1515,6 +1534,8 @@ const streamAIResponse = async (
         message: userMessage,
         chatId: guestChatId,
         trackId,
+        quotedText: options?.quotedText,
+        quotedMessageId: options?.quotedMessageId,
         onUpdate: (data) => {
           if (streamingAbortController?.signal.aborted) return
 
@@ -1735,6 +1756,8 @@ const streamAIResponse = async (
         voiceReply: options?.voiceReply,
         isAgain: options?.isAgain,
         ragGroupKey: options?.ragGroupKey,
+        quotedText: options?.quotedText,
+        quotedMessageId: options?.quotedMessageId,
         onUpdate: (data) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
