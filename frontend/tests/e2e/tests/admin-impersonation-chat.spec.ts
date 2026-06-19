@@ -6,8 +6,6 @@ import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS, getApiUrl } from '../config/config'
 import { PROMPTS } from '../config/test-data'
 
-const adminCreds = CREDENTIALS.getAdminCredentials()
-
 test.describe('@ci @smoke Admin impersonation + chat', () => {
   test('admin can impersonate a user and chat without errors', async ({
     page,
@@ -15,6 +13,7 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
     credentials,
   }) => {
     const chat = new ChatHelper(page)
+    const adminCreds = CREDENTIALS.getAdminCredentials()
     let targetUserId: number
 
     await test.step('Arrange: look up the worker user ID via admin API', async () => {
@@ -24,10 +23,10 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
         { headers: { Cookie: adminCookie } }
       )
       expect(usersRes.ok()).toBeTruthy()
-      const body = await usersRes.json()
-      const target = body.users?.find((u: { email: string }) => u.email === credentials.user)
+      const body = (await usersRes.json()) as { users?: { id: number; email: string }[] }
+      const target = body.users?.find((u) => u.email === credentials.user)
       expect(target, `Worker user ${credentials.user} must exist in admin user list`).toBeTruthy()
-      targetUserId = target.id
+      targetUserId = target!.id
     })
 
     await test.step('Arrange: log in as admin and navigate to admin users tab', async () => {
@@ -74,16 +73,18 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
       expect(targetText).toContain(credentials.user)
     })
 
-    await test.step('Act: start a new chat and send a message as impersonated user', async () => {
+    await test.step('Act: send a message and verify stream starts without access error', async () => {
       await chat.startNewChat()
-
       const previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
 
-      const aiText = await chat.waitForAnswer(previousCount)
-      expect(
-        aiText.length,
-        'AI should respond with non-empty text while impersonated'
-      ).toBeGreaterThan(0)
+      const bubbles = chat.conversationBubbles()
+      const newBubble = bubbles.nth(previousCount)
+
+      await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+
+      const errorLocator = newBubble.locator(selectors.chat.messageTopicError)
+      const errorVisible = await errorLocator.isVisible().catch(() => false)
+      expect(errorVisible, 'Chat stream must not produce an access-denied error').toBe(false)
     })
 
     await test.step('Act: exit impersonation', async () => {

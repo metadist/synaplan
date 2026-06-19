@@ -96,6 +96,7 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await authService.login(email, password, recaptchaToken)
 
       if (result.success) {
+        await resetUserScopedClientState()
         syncFromAuthService()
         const { useGuestStore } = await import('./guest')
         useGuestStore().$reset()
