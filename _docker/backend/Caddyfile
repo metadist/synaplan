@@ -129,6 +129,19 @@
 		file_server
 	}
 
+	# Missing widget assets must NOT fall through to the SPA fallback, which
+	# would serve index.html as HTTP 200 without CORS and break cross-origin
+	# <script type="module"> loads (the post-deploy stale-widget.js failure
+	# mode). Return a clean 404 that still carries CORS, and never cache it.
+	@widget_missing {
+		path /widget.js /chunks/*
+	}
+	handle @widget_missing {
+		header Access-Control-Allow-Origin "*"
+		header Cache-Control "no-store"
+		respond 404
+	}
+
 	# Frontend files second (static files from frontend build)
 	@frontend_file {
 		file {
