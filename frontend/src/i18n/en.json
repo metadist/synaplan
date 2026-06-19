@@ -2836,6 +2836,9 @@
     "title": "Task plan",
     "download": "Download",
     "failedBody": "This step couldn't be completed.",
+    "cancelledBody": "You stopped this step.",
+    "stop": "Stop",
+    "rendering": "Rendering…",
     "searchSummary": "Searched the web · {count} {count, plural, one {source} other {sources}}",
     "retryWith": "Retry with {model}",
     "state": {
@@ -2843,7 +2846,8 @@
       "running": "Working…",
       "done": "Done",
       "failed": "Failed",
-      "skipped": "Skipped"
+      "skipped": "Skipped",
+      "cancelled": "Stopped"
     },
     "kind": {
       "text": "Text",

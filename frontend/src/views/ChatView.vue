@@ -172,6 +172,7 @@
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
               @retry-task="handleTaskRetry"
+              @cancel-task="handleTaskCancel"
               @false-positive="openFalsePositiveModal"
               @click-memory="handleClickMemory"
               @continue="handleContinueResponse(message)"
@@ -1969,7 +1970,12 @@ const streamAIResponse = async (
           } else if (data.status === 'task_update') {
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && isTaskCardState(data.metadata?.state)) {
+            // A user-cancelled step is terminal on the client: ignore the
+            // backend 'failed' that follows the abort so the card stays
+            // 'cancelled' (neutral) instead of flipping to a scary error.
+            if (card && card.state === 'cancelled') {
+              // keep cancelled
+            } else if (card && isTaskCardState(data.metadata?.state)) {
               card.state = data.metadata.state
               // Failure details: specific error text + (for media nodes) the
               // resolved prompt powering the per-task retry button.
@@ -2000,6 +2006,21 @@ const streamAIResponse = async (
               card.url = normalizeMediaUrl(data.metadata.url)
               card.mediaType =
                 typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
+            }
+          } else if (data.status === 'task_progress') {
+            // Live media render progress: feed a moving bar on the running card.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && card.state !== 'cancelled') {
+              if (typeof data.metadata?.percent === 'number') {
+                card.progressPercent = data.metadata.percent
+              }
+              if (typeof data.metadata?.provider_status === 'string') {
+                card.providerStatus = data.metadata.provider_status
+              }
+              if (typeof data.metadata?.elapsed_seconds === 'number') {
+                card.elapsedSeconds = data.metadata.elapsed_seconds
+              }
             }
           } else if (
             data.status === 'data' &&
@@ -2996,6 +3017,24 @@ const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => 
   isAudioStreaming.value = false
 
   await streamAIResponse(payload.prompt, { modelId: payload.modelId, isAgain: true })
+}
+
+// Per-card Stop: cancel one running media step without ending the whole turn.
+// Mark the card cancelled immediately (the user's intent is the source of truth)
+// and signal the backend so the provider poll aborts and stops billing.
+const handleTaskCancel = async (nodeId: string) => {
+  const message = historyStore.messages.find((m) => m.taskPlan?.active)
+  const card = message?.taskPlan?.cards.find((c) => c.nodeId === nodeId)
+  if (card) {
+    card.state = 'cancelled'
+  }
+
+  if (currentTrackId === undefined) return
+  try {
+    await chatApi.cancelTask(currentTrackId, nodeId)
+  } catch {
+    // Best-effort: the card already reflects the cancellation locally.
+  }
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {

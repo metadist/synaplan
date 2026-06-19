@@ -12,6 +12,7 @@ use App\Message\ExtractMemoriesCommand;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
+use App\Service\Media\MediaCancellationStore;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
@@ -64,6 +65,7 @@ class StreamController extends AbstractController
         private MessageForwardingService $messageForwardingService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private DocumentGeneratorService $documentGenerator,
+        private MediaCancellationStore $cancellationStore,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
     ) {
@@ -706,6 +708,10 @@ class StreamController extends AbstractController
                     // Approximate country (Cloudflare CF-IPCountry header) for the
                     // location-awareness line appended to the chat system prompt.
                     'client_country' => $clientCountry,
+                    // Turn id — lets long media generations (Higgsfield video) be
+                    // cancelled from another worker via the Stop button, since the
+                    // cancel request can't reach this blocked streaming worker.
+                    'track_id' => (string) $trackId,
                 ];
 
                 // Quoted reference ("Mention in chat"): ChatHandler injects this
@@ -2816,14 +2822,74 @@ class StreamController extends AbstractController
             'track_id' => $trackId,
         ]);
 
-        // Note: The actual stopping happens via connection_aborted() checks in the streaming loop
-        // This endpoint serves as a signal to the frontend that the stop was acknowledged
-        // The EventSource.close() on the frontend side will trigger connection_aborted() on the backend
+        // Flag the whole turn as cancelled so a blocking media poll (Higgsfield
+        // video) running on another worker sees it and aborts the provider call.
+        // EventSource.close() alone can't interrupt a worker that is busy polling
+        // and produces no output to trip connection_aborted().
+        if (null !== $trackId && '' !== (string) $trackId) {
+            $this->cancellationStore->requestCancel((string) $trackId);
+        }
 
         return $this->json([
             'success' => true,
             'message' => 'Stream stop requested',
         ]);
+    }
+
+    /**
+     * Cancel a single in-flight multitask media node (per-card Stop button)
+     * without stopping the rest of the turn.
+     */
+    #[Route('/cancel-node', name: 'cancel_node', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/messages/cancel-node',
+        summary: 'Cancel a single multitask media node',
+        description: 'Flags one running media-generation step (by track id + node id) for cancellation. The streaming worker aborts that node and tells the provider to cancel, while sibling steps keep running.',
+        security: [['Bearer' => []]],
+        tags: ['Messages']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['trackId', 'nodeId'],
+            properties: [
+                new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
+                new OA\Property(property: 'nodeId', type: 'string', example: 'n2'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Cancellation requested',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+            ]
+        )
+    )]
+    public function cancelNode(Request $request, #[CurrentUser] ?User $user): Response
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $trackId = is_array($data) && isset($data['trackId']) && is_scalar($data['trackId']) ? (string) $data['trackId'] : '';
+        $nodeId = is_array($data) && isset($data['nodeId']) && is_scalar($data['nodeId']) ? (string) $data['nodeId'] : '';
+
+        if ('' === $trackId || '' === $nodeId) {
+            return $this->json(['error' => 'trackId and nodeId are required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->cancellationStore->requestCancel($trackId, $nodeId);
+
+        $this->logger->info('Cancel media node requested', [
+            'user_id' => $user->getId(),
+            'track_id' => $trackId,
+            'node_id' => $nodeId,
+        ]);
+
+        return $this->json(['success' => true]);
     }
 
     /**

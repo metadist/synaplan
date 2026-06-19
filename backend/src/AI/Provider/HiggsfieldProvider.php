@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
@@ -58,6 +59,26 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
 
     /** Log every Nth poll attempt to keep logs readable for long videos. */
     private const POLL_LOG_EVERY = 5;
+
+    /**
+     * Higgsfield video models render fixed-length clips. The DoP family is 5s
+     * only; Kling supports 5s or 10s. The platform rejects unsupported values
+     * (e.g. the generic 8s default that flows down from the media handler), so a
+     * requested length is always normalised to a supported one — keeping clips
+     * short, cheap, and inside the render-time budget instead of being rejected.
+     */
+    private const DEFAULT_VIDEO_DURATION = 5;
+    private const DEFAULT_VIDEO_DURATIONS = [5, 10];
+    private const DOP_VIDEO_DURATIONS = [5];
+
+    /**
+     * Rough render budget (seconds) used only to turn elapsed poll time into a
+     * monotonic progress percentage for the UI. Higgsfield reports a coarse
+     * textual status (queued/in_progress/completed) with no numeric progress, so
+     * this drives a smoothly advancing bar that is capped below 100% until the
+     * real "completed" status arrives.
+     */
+    private const ESTIMATED_VIDEO_SECONDS = 90;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -243,6 +264,7 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
      *   aspect_ratio?: string,
      *   resolution?: string,
      *   progress_callback?: callable,
+     *   cancel_check?: callable,
      *   modelConfig?: array<string, mixed>,
      * } $options
      *
@@ -271,9 +293,7 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
             $body['image_url'] = $imageUrl;
         }
 
-        if (isset($options['duration'])) {
-            $body['duration'] = (int) $options['duration'];
-        }
+        $body['duration'] = $this->durationFromOptions($model, $options);
 
         $aspectRatio = $this->aspectRatioFromOptions($options);
         if (null !== $aspectRatio) {
@@ -288,7 +308,7 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         $this->logger->info('Higgsfield: generateVideo', [
             'model' => $model,
             'prompt_length' => strlen($prompt),
-            'duration' => $body['duration'] ?? null,
+            'duration' => $body['duration'],
             'aspect_ratio' => $body['aspect_ratio'] ?? null,
             'resolution' => $body['resolution'] ?? null,
             'has_reference' => isset($body['image_url']),
@@ -300,6 +320,14 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
             $progressCallback = null;
         }
 
+        // The caller (MediaGenerationHandler) supplies a cancel probe wired to
+        // the Stop button / client disconnect. When it trips mid-poll we ask
+        // Higgsfield to cancel the request (stops billing) and abort.
+        $cancelCheck = $options['cancel_check'] ?? null;
+        if (!is_callable($cancelCheck)) {
+            $cancelCheck = null;
+        }
+
         $submission = $this->submit($model, $body, $credentials);
         $finalPayload = $this->pollUntilTerminal(
             $submission['status_url'],
@@ -308,6 +336,8 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
             self::POLL_MAX_ATTEMPTS_VIDEO,
             'video',
             $progressCallback,
+            $submission['cancel_url'],
+            $cancelCheck,
         );
 
         return $this->parseVideoPayload($finalPayload, $body);
@@ -376,10 +406,20 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         int $maxAttempts,
         string $mediaType,
         ?callable $progressCallback = null,
+        ?string $cancelUrl = null,
+        ?callable $cancelCheck = null,
     ): array {
         $startedAt = time();
 
         for ($attempt = 1; $attempt <= $maxAttempts; ++$attempt) {
+            // Honour a cancellation request as early as possible so we stop
+            // billing instead of finishing a generation nobody is waiting for.
+            if (null !== $cancelCheck && $cancelCheck()) {
+                $this->cancelRemote($cancelUrl, $credentials, $requestId);
+
+                throw new ProviderCancelledException(sprintf('Higgsfield %s generation cancelled', $mediaType), self::PROVIDER_NAME, ['request_id' => $requestId]);
+            }
+
             if ($this->pollIntervalSeconds > 0) {
                 sleep($this->pollIntervalSeconds);
             }
@@ -403,10 +443,13 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
             $status = (string) ($data['status'] ?? 'unknown');
 
             if (null !== $progressCallback) {
+                $elapsed = time() - $startedAt;
                 $progressCallback([
                     'status' => $status,
                     'attempt' => $attempt,
-                    'elapsed_seconds' => time() - $startedAt,
+                    'max_attempts' => $maxAttempts,
+                    'elapsed_seconds' => $elapsed,
+                    'percent' => $this->estimatePercent($status, $elapsed),
                     'request_id' => $requestId,
                 ]);
             }
@@ -444,6 +487,53 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         }
 
         throw new ProviderException(sprintf('Higgsfield %s generation timed out after %d seconds', $mediaType, $this->pollIntervalSeconds * $maxAttempts), self::PROVIDER_NAME, ['request_id' => $requestId]);
+    }
+
+    /**
+     * Best-effort cancel of an in-flight request so Higgsfield stops the render
+     * (and the billing). Never throws — cancellation is a courtesy on top of us
+     * already having walked away from the poll.
+     *
+     * @param array{api_key: string, api_secret: string, source?: string} $credentials
+     */
+    private function cancelRemote(?string $cancelUrl, array $credentials, string $requestId): void
+    {
+        if (null === $cancelUrl || '' === $cancelUrl) {
+            $this->logger->info('Higgsfield: cancellation requested but provider gave no cancel_url', [
+                'request_id' => $requestId,
+            ]);
+
+            return;
+        }
+
+        try {
+            $this->httpClient->request('POST', $cancelUrl, [
+                'headers' => $this->buildAuthHeaders($credentials),
+                'timeout' => self::TIMEOUT_POLL_SECONDS,
+            ]);
+            $this->logger->info('Higgsfield: cancel request sent to provider', ['request_id' => $requestId]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Higgsfield: cancel request failed (already walking away)', [
+                'request_id' => $requestId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Map a coarse provider status + elapsed time onto a 1-100 progress percent
+     * for the UI. Stays below 100% until the provider reports "completed" so the
+     * bar never claims done before the file exists.
+     */
+    private function estimatePercent(string $status, int $elapsed): int
+    {
+        if ('completed' === $status) {
+            return 100;
+        }
+
+        $pct = (int) floor(($elapsed / self::ESTIMATED_VIDEO_SECONDS) * 100);
+
+        return max(1, min(95, $pct));
     }
 
     /**
@@ -657,6 +747,86 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         }
 
         return null;
+    }
+
+    /**
+     * Resolve the clip duration (seconds) to a value Higgsfield supports.
+     *
+     * DoP renders 5s clips; Kling supports 5s or 10s. A request for any other
+     * length (including the generic 8s default that flows down from the media
+     * handler) is snapped to the nearest supported value, defaulting to the
+     * standard 5s clip when the caller didn't ask for a specific length.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function durationFromOptions(string $model, array $options): int
+    {
+        $allowed = $this->allowedDurations($model, $options);
+        sort($allowed);
+
+        $modelConfig = is_array($options['modelConfig'] ?? null) ? $options['modelConfig'] : [];
+        $default = isset($modelConfig['default_duration']) && is_numeric($modelConfig['default_duration'])
+            ? (int) $modelConfig['default_duration']
+            : self::DEFAULT_VIDEO_DURATION;
+        if (!in_array($default, $allowed, true)) {
+            $default = $allowed[0];
+        }
+
+        $requested = isset($options['duration']) && is_numeric($options['duration'])
+            ? (int) $options['duration']
+            : $default;
+
+        if (in_array($requested, $allowed, true)) {
+            return $requested;
+        }
+
+        // Snap to the nearest supported value; ties resolve to the shorter clip.
+        $nearest = $allowed[0];
+        foreach ($allowed as $value) {
+            if (abs($value - $requested) < abs($nearest - $requested)) {
+                $nearest = $value;
+            }
+        }
+
+        $this->logger->info('Higgsfield: normalised requested video duration to a supported length', [
+            'model' => $model,
+            'requested' => $requested,
+            'used' => $nearest,
+            'allowed' => $allowed,
+        ]);
+
+        return $nearest;
+    }
+
+    /**
+     * Supported clip lengths for the model: an explicit modelConfig override if
+     * present, otherwise derived from the model family (DoP = 5s only, everything
+     * else 5s or 10s). The fallback keeps models seeded before durations were
+     * added behaving correctly without a re-seed.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return int[]
+     */
+    private function allowedDurations(string $model, array $options): array
+    {
+        $modelConfig = is_array($options['modelConfig'] ?? null) ? $options['modelConfig'] : [];
+        $configured = $modelConfig['allowed_durations'] ?? null;
+        if (is_array($configured)) {
+            $values = [];
+            foreach ($configured as $value) {
+                if (is_numeric($value) && (int) $value > 0) {
+                    $values[] = (int) $value;
+                }
+            }
+            if ([] !== $values) {
+                return array_values(array_unique($values));
+            }
+        }
+
+        return false !== stripos($model, 'dop')
+            ? self::DOP_VIDEO_DURATIONS
+            : self::DEFAULT_VIDEO_DURATIONS;
     }
 
     private function sizeToAspectRatio(int $width, int $height): string
