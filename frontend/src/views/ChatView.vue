@@ -1828,6 +1828,28 @@ const streamAIResponse = async (
             return
           }
 
+          // [i2v-debug] Temporary multitask/media tracing: a task card stuck at
+          // "Rendering… 95%" gives no clue whether the worker ever finishes. Log
+          // the plan + task lifecycle (progress, terminal state, produced file) so
+          // we can see in the browser console if the closing task_update/task_file
+          // actually reaches the client over the realtime channel.
+          if (
+            typeof data.status === 'string' &&
+            (data.status === 'plan' ||
+              data.status === 'plan_discarded' ||
+              data.status.startsWith('task_'))
+          ) {
+            console.debug('[i2v-debug]', data.status, {
+              node_id: data.metadata?.node_id,
+              state: data.metadata?.state,
+              percent: data.metadata?.percent,
+              provider_status: data.metadata?.provider_status,
+              elapsed_seconds: data.metadata?.elapsed_seconds,
+              url: data.metadata?.url,
+              error: data.metadata?.error,
+            })
+          }
+
           // Handle different status events for UI feedback
           if (data.status === 'started') {
             processingStatus.value = 'started'

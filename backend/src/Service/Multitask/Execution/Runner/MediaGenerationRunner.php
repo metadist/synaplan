@@ -136,6 +136,17 @@ final readonly class MediaGenerationRunner implements TaskRunner
         $metadata = $result['metadata'] ?? [];
         $file = $metadata['file'] ?? null;
         if (!is_array($file) || empty($file['path'])) {
+            // [i2v-debug] The handler returned but carried no usable file. This is
+            // the silent dead-end behind a task card that never leaves "Rendering…":
+            // surface why (provider error vs. empty result) so the cause is visible
+            // in the worker log instead of only an opaque failed node.
+            $this->logger->warning('MediaGenerationRunner: node produced no file', [
+                'capability' => $node->capability->value,
+                'node_id' => $node->id,
+                'metadata_error' => is_scalar($metadata['error'] ?? null) ? $metadata['error'] : null,
+                'metadata_keys' => array_keys($metadata),
+            ]);
+
             return NodeResult::failed($node->capability->value.' produced no file'.(isset($metadata['error']) ? ': '.$metadata['error'] : ''));
         }
 
@@ -144,6 +155,17 @@ final readonly class MediaGenerationRunner implements TaskRunner
             'type' => $file['type'] ?? $mediaType,
             'local_path' => is_string($metadata['local_path'] ?? null) ? $metadata['local_path'] : null,
         ];
+
+        // [i2v-debug] The worker reached terminal success for this media node. If
+        // this line appears but the task card stays at "Rendering… 95%", the
+        // generation worked and the bug is in DELIVERY (the closing
+        // task_update/task_file never reaching the browser), not in generation.
+        $this->logger->info('MediaGenerationRunner: node produced file', [
+            'capability' => $node->capability->value,
+            'node_id' => $node->id,
+            'path' => $file['path'],
+            'type' => $descriptor['type'],
+        ]);
 
         return NodeResult::ok($result['content'] ?? null, [$descriptor], $metadata);
     }
