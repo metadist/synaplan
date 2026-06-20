@@ -712,6 +712,14 @@ class StreamController extends AbstractController
                     // cancelled from another worker via the Stop button, since the
                     // cancel request can't reach this blocked streaming worker.
                     'track_id' => (string) $trackId,
+                    // Issue #1146: have MediaGenerationHandler record IMAGES/VIDEOS/
+                    // AUDIOS cost into BUSELOG the moment the provider bills us
+                    // (success OR cancel), instead of only here after the whole
+                    // stream returns. This closes the billing-bypass window where a
+                    // client disconnect tore down this worker before recordUsage ran.
+                    // The handler sets metadata.usage_recorded so we skip the
+                    // duplicate media recordUsage() below.
+                    'record_media_usage' => true,
                 ];
 
                 // Quoted reference ("Mention in chat"): ChatHandler injects this
@@ -1418,9 +1426,14 @@ class StreamController extends AbstractController
                     'input_text' => $messageText,
                 ]);
 
-                // Record AI-generated media usage (IMAGES, VIDEOS, AUDIOS) separately
+                // Record AI-generated media usage (IMAGES, VIDEOS, AUDIOS) separately.
+                // Issue #1146: MediaGenerationHandler now records this itself (the
+                // instant the provider bills us, so a client disconnect can't skip
+                // it). It flags that via metadata.usage_recorded — when set we must
+                // NOT record again here or we would double-charge the user.
                 $mediaType = $response['metadata']['media_type'] ?? null;
-                if ($mediaType) {
+                $mediaUsageAlreadyRecorded = !empty($response['metadata']['usage_recorded']);
+                if ($mediaType && !$mediaUsageAlreadyRecorded) {
                     $mediaAction = match ($mediaType) {
                         'image' => 'IMAGES',
                         'video' => 'VIDEOS',
@@ -2751,6 +2764,26 @@ class StreamController extends AbstractController
             // Update incoming message status
             $incomingMessage->setStatus('cancelled');
             $this->em->flush();
+
+            // Issue #1146: a cancelled chat response still consumed provider
+            // tokens for whatever was streamed before the user hit Stop. The
+            // normal recordUsage(MESSAGES) call in the streaming callback is
+            // bypassed on cancel, so record a best-effort entry here from the
+            // partial content. Without a model id the cost resolves to 0 but the
+            // token/usage counters still move, so the turn is never completely
+            // free. Media (IMAGES/VIDEOS/AUDIOS) is billed separately and more
+            // precisely inside MediaGenerationHandler.
+            $cancelledModelId = $incomingMessage->getMeta('ai_chat_model_id');
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                'provider' => $chatProvider ?? 'unknown',
+                'model' => $chatModel ?? 'unknown',
+                'model_id' => null !== $cancelledModelId && '' !== $cancelledModelId ? (int) $cancelledModelId : null,
+                'chat_id' => (int) $chatId,
+                'source' => 'WEB',
+                'response_text' => is_string($content) ? $content : '',
+                'input_text' => $incomingMessage->getText(),
+                'status' => 'cancelled',
+            ]);
 
             $this->logger->info('Cancelled message saved', [
                 'user_id' => $user->getId(),
