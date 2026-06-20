@@ -412,6 +412,15 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         $startedAt = time();
 
         for ($attempt = 1; $attempt <= $maxAttempts; ++$attempt) {
+            // A video render legitimately takes minutes, but under the FrankenPHP
+            // runtime the request's max_execution_time is wall-clock and is NOT
+            // disabled by a single set_time_limit(0) at the start of the stream —
+            // so the long sleep()/poll loop below was killed mid-render with
+            // "Maximum execution time of 0 seconds exceeded", leaving the task
+            // card frozen. Re-arm a generous per-iteration budget (set_time_limit
+            // restarts the counter from zero) so a healthy render runs to the end.
+            $this->extendExecutionTime($this->pollIntervalSeconds + self::TIMEOUT_POLL_SECONDS + 30);
+
             // Honour a cancellation request as early as possible so we stop
             // billing instead of finishing a generation nobody is waiting for.
             if (null !== $cancelCheck && $cancelCheck()) {
@@ -850,5 +859,22 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
     private function hasPlatformCredentials(): bool
     {
         return '' !== $this->platformApiKey && '' !== $this->platformApiSecret;
+    }
+
+    /**
+     * Re-arm the PHP execution-time limit for one more poll cycle.
+     *
+     * The synchronous submit→poll loop can legitimately run for several minutes
+     * while a clip renders. Under FrankenPHP the request's max_execution_time is
+     * wall-clock and a one-time set_time_limit(0) does not disable it, so the
+     * loop must restart the timer each iteration (set_time_limit() resets the
+     * counter to zero) to avoid a mid-render "Maximum execution time exceeded".
+     * Guarded by function_exists because set_time_limit can be disabled.
+     */
+    private function extendExecutionTime(int $seconds): void
+    {
+        if (\function_exists('set_time_limit')) {
+            set_time_limit(max(30, $seconds));
+        }
     }
 }

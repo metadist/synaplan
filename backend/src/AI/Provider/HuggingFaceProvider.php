@@ -1056,6 +1056,13 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
     private function pollUntilComplete(string $statusUrl, string $requestId, string $falModelId, ?callable $cancelCheck = null): void
     {
         for ($attempt = 0; $attempt < self::QUEUE_MAX_POLL_ATTEMPTS; ++$attempt) {
+            // A video render legitimately takes minutes; under FrankenPHP the
+            // request's max_execution_time is wall-clock and is not disabled by a
+            // one-time set_time_limit(0), so the long sleep()/poll loop would be
+            // killed mid-render. Re-arm a per-iteration budget (set_time_limit
+            // restarts the counter from zero) so a healthy render completes.
+            $this->extendExecutionTime(self::QUEUE_POLL_INTERVAL_SECONDS + 30);
+
             // Honour a cancellation request as early as possible (issue #1145):
             // abort the wait and ask fal.ai to cancel the queued request so we
             // stop burning credits on a render nobody is waiting for.
@@ -1182,5 +1189,22 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
         }
 
         return $model;
+    }
+
+    /**
+     * Re-arm the PHP execution-time limit for one more poll cycle.
+     *
+     * A video render can run for minutes; under FrankenPHP the request's
+     * max_execution_time is wall-clock and a one-time set_time_limit(0) does not
+     * disable it, so the poll loop restarts the timer each iteration
+     * (set_time_limit() resets the counter to zero) to avoid a mid-render
+     * "Maximum execution time exceeded". Guarded because the function can be
+     * disabled via disable_functions.
+     */
+    private function extendExecutionTime(int $seconds): void
+    {
+        if (\function_exists('set_time_limit')) {
+            set_time_limit(max(30, $seconds));
+        }
     }
 }

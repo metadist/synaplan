@@ -1136,6 +1136,13 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         $startTime = time();
 
         for ($attempt = 1; $attempt <= $maxAttempts; ++$attempt) {
+            // A Veo render legitimately takes minutes (4K longer still); under
+            // FrankenPHP the request's max_execution_time is wall-clock and is not
+            // disabled by a one-time set_time_limit(0), so the long sleep()/poll
+            // loop would be killed mid-render. Re-arm a per-iteration budget
+            // (set_time_limit restarts the counter from zero) so it completes.
+            $this->extendExecutionTime(self::VEO_POLL_INTERVAL_SECONDS + 30);
+
             // Honour a cancellation request as early as possible (issue #1145):
             // abort the wait and ask Veo to cancel the operation so we stop
             // burning Google AI credits on an unwanted render.
@@ -1855,5 +1862,22 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         }
 
         return $contents;
+    }
+
+    /**
+     * Re-arm the PHP execution-time limit for one more poll cycle.
+     *
+     * A Veo render can run for minutes; under FrankenPHP the request's
+     * max_execution_time is wall-clock and a one-time set_time_limit(0) does not
+     * disable it, so the poll loop restarts the timer each iteration
+     * (set_time_limit() resets the counter to zero) to avoid a mid-render
+     * "Maximum execution time exceeded". Guarded because the function can be
+     * disabled via disable_functions.
+     */
+    private function extendExecutionTime(int $seconds): void
+    {
+        if (\function_exists('set_time_limit')) {
+            set_time_limit(max(30, $seconds));
+        }
     }
 }
