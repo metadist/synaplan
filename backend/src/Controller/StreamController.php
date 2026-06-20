@@ -2773,17 +2773,29 @@ class StreamController extends AbstractController
             // token/usage counters still move, so the turn is never completely
             // free. Media (IMAGES/VIDEOS/AUDIOS) is billed separately and more
             // precisely inside MediaGenerationHandler.
-            $cancelledModelId = $incomingMessage->getMeta('ai_chat_model_id');
-            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
-                'provider' => $chatProvider ?? 'unknown',
-                'model' => $chatModel ?? 'unknown',
-                'model_id' => null !== $cancelledModelId && '' !== $cancelledModelId ? (int) $cancelledModelId : null,
-                'chat_id' => (int) $chatId,
-                'source' => 'WEB',
-                'response_text' => is_string($content) ? $content : '',
-                'input_text' => $incomingMessage->getText(),
-                'status' => 'cancelled',
-            ]);
+            // Truly best-effort: the cancelled message is already persisted above,
+            // so a failure to record usage must NOT turn a successful cancellation
+            // into an HTTP 500. Swallow any error here (it is only accounting) and
+            // let the endpoint return success.
+            try {
+                $cancelledModelId = $incomingMessage->getMeta('ai_chat_model_id');
+                $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                    'provider' => $chatProvider ?? 'unknown',
+                    'model' => $chatModel ?? 'unknown',
+                    'model_id' => null !== $cancelledModelId && '' !== $cancelledModelId ? (int) $cancelledModelId : null,
+                    'chat_id' => (int) $chatId,
+                    'source' => 'WEB',
+                    'response_text' => is_string($content) ? $content : '',
+                    'input_text' => $incomingMessage->getText(),
+                    'status' => 'cancelled',
+                ]);
+            } catch (\Throwable $usageError) {
+                $this->logger->warning('Failed to record usage for cancelled chat turn', [
+                    'user_id' => $user->getId(),
+                    'track_id' => $trackId,
+                    'error' => $usageError->getMessage(),
+                ]);
+            }
 
             $this->logger->info('Cancelled message saved', [
                 'user_id' => $user->getId(),

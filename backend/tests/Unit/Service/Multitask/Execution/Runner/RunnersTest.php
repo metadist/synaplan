@@ -358,6 +358,85 @@ final class RunnersTest extends TestCase
         self::assertSame('png', $seenMessage->getFileType());
     }
 
+    /**
+     * Regression for issue #1146: a multitask media node is billed by the
+     * provider, so the runner must ask MediaGenerationHandler to record the
+     * IMAGES/VIDEOS/AUDIOS usage itself (record_media_usage). Without it the DAG
+     * path bypassed the user's cost budget.
+     */
+    public function testMediaGenerationRunnerEnablesMediaUsageRecording(): void
+    {
+        $handler = $this->createMock(MediaGenerationHandler::class);
+        $capturedOptions = null;
+        $handler->method('handle')->willReturnCallback(
+            function ($msg, $thread, $classification, $progress, $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return [
+                    'content' => 'Generated image',
+                    'metadata' => [
+                        'file' => ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
+                        'local_path' => '1/000/dog.png',
+                    ],
+                ];
+            }
+        );
+
+        $runner = new MediaGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::ImageGeneration, [], ['prompt' => 'a happy dog']);
+
+        $result = $runner->run($node, $this->context($this->message('a happy dog')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertIsArray($capturedOptions);
+        self::assertTrue($capturedOptions['record_media_usage'] ?? false);
+    }
+
+    /**
+     * Regression for issue #1144: when a media node depends on an upstream node's
+     * file output (e.g. inputs.image = "$n1.file"), the runner must lift the
+     * resolved file path into reference_image_paths so MediaGenerationHandler can
+     * run IMG2VID / PIC2PIC instead of silently degrading to TEXT2VID / TEXT2PIC.
+     */
+    public function testMediaGenerationRunnerForwardsUpstreamFileAsReference(): void
+    {
+        $handler = $this->createMock(MediaGenerationHandler::class);
+        $capturedOptions = null;
+        $handler->method('handle')->willReturnCallback(
+            function ($msg, $thread, $classification, $progress, $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return [
+                    'content' => 'Generated video',
+                    'metadata' => [
+                        'file' => ['path' => '/api/v1/files/uploads/1/000/dog.mp4', 'type' => 'video'],
+                        'local_path' => '1/000/dog.mp4',
+                    ],
+                ];
+            }
+        );
+
+        $ctx = $this->context($this->message('animate this'));
+        // Upstream image node output (NodeResult file descriptor), referenced via $n1.file.
+        $ctx->setResult('n1', NodeResult::ok(null, [[
+            'path' => '/api/v1/files/uploads/1/000/dog.png',
+            'type' => 'image',
+            'local_path' => '1/000/dog.png',
+        ]]));
+
+        $runner = new MediaGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n2', Capability::VideoGeneration, ['n1'], [
+            'prompt' => 'animate this',
+            'image' => '$n1.file',
+        ]);
+
+        $result = $runner->run($node, $ctx);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertIsArray($capturedOptions);
+        self::assertContains('1/000/dog.png', $capturedOptions['reference_image_paths'] ?? []);
+    }
+
     private function calendarRunner(): CalendarEventRunner
     {
         $storage = $this->createMock(FileStorageService::class);

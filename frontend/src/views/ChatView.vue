@@ -3027,7 +3027,16 @@ const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => 
 // Mark the card cancelled immediately (the user's intent is the source of truth)
 // and signal the backend so the provider poll aborts and stops billing.
 const handleTaskCancel = async (nodeId: string) => {
-  const message = historyStore.messages.find((m) => m.taskPlan?.active)
+  // Resolve the CURRENT turn's task-plan message via the streaming flag, mirroring
+  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …) and
+  // taskPlan.active is only cleared on local teardown (not on a normal/error
+  // completion), so finding the FIRST active plan can match a stale earlier turn and
+  // cancel the wrong card / send the wrong trackId. The streaming message is the
+  // unambiguous active turn; fall back to the active-plan lookup only if none is
+  // currently streaming.
+  const message =
+    historyStore.messages.find((m) => m.isStreaming && m.taskPlan?.active) ??
+    historyStore.messages.find((m) => m.taskPlan?.active)
   const card = message?.taskPlan?.cards.find((c) => c.nodeId === nodeId)
   if (card) {
     card.state = 'cancelled'
