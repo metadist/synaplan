@@ -6,6 +6,7 @@ use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
@@ -23,7 +24,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * - Veo 2.0 (Video Generation)
  * - Text-to-Speech with Gemini
  */
-class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, TextToSpeechProviderInterface
+class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo
 {
     private const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
     private const VERTEX_BASE = 'https://{region}-aiplatform.googleapis.com/v1';
@@ -1040,7 +1041,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
      *
      * @return array{done: bool, videoUri: ?string, error: ?string}
      */
-    public function pollVideoOperationOnce(string $operationName): array
+    public function pollVideoOperationOnce(string $operationName, array $options = []): array
     {
         if (!$this->apiKey) {
             throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
@@ -1106,7 +1107,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
     /**
      * Download raw video bytes from a Google-provided URI.
      */
-    public function downloadVideoRaw(string $videoUri): string
+    public function downloadVideoRaw(string $videoUri, array $options = []): string
     {
         if (!$this->apiKey) {
             throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
@@ -1136,6 +1137,13 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         $startTime = time();
 
         for ($attempt = 1; $attempt <= $maxAttempts; ++$attempt) {
+            // A Veo render legitimately takes minutes (4K longer still); under
+            // FrankenPHP the request's max_execution_time is wall-clock and is not
+            // disabled by a one-time set_time_limit(0), so the long sleep()/poll
+            // loop would be killed mid-render. Re-arm a per-iteration budget
+            // (set_time_limit restarts the counter from zero) so it completes.
+            $this->extendExecutionTime(self::VEO_POLL_INTERVAL_SECONDS + 30);
+
             // Honour a cancellation request as early as possible (issue #1145):
             // abort the wait and ask Veo to cancel the operation so we stop
             // burning Google AI credits on an unwanted render.
@@ -1191,7 +1199,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
      * we call this we have already decided to walk away from the poll, so a
      * failed cancel must not mask the ProviderCancelledException.
      */
-    private function cancelVideoOperation(string $operationName): void
+    public function cancelVideoOperation(string $operationName, array $options = []): void
     {
         if (!$this->apiKey) {
             return;
@@ -1855,5 +1863,22 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         }
 
         return $contents;
+    }
+
+    /**
+     * Re-arm the PHP execution-time limit for one more poll cycle.
+     *
+     * A Veo render can run for minutes; under FrankenPHP the request's
+     * max_execution_time is wall-clock and a one-time set_time_limit(0) does not
+     * disable it, so the poll loop restarts the timer each iteration
+     * (set_time_limit() resets the counter to zero) to avoid a mid-render
+     * "Maximum execution time exceeded". Guarded because the function can be
+     * disabled via disable_functions.
+     */
+    private function extendExecutionTime(int $seconds): void
+    {
+        if (\function_exists('set_time_limit')) {
+            set_time_limit(max(30, $seconds));
+        }
     }
 }

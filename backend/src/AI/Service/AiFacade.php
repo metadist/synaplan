@@ -6,6 +6,7 @@ use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ProviderMetadataInterface;
+use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Provider\GoogleProvider;
 use App\Service\CircuitBreaker;
 use App\Service\DiscordNotificationService;
@@ -964,8 +965,8 @@ class AiFacade
         $provider = $this->registry->getVideoGenerationProvider($providerName);
         $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
 
-        if (!$provider instanceof GoogleProvider) {
-            throw new ProviderException('Async video generation is only supported by Google Veo', $provider->getName());
+        if (!$provider instanceof SupportsAsyncVideo) {
+            throw new ProviderException('Async video generation is not supported by '.$provider->getName(), $provider->getName());
         }
 
         $this->logger->info('Starting async video generation', [
@@ -984,17 +985,27 @@ class AiFacade
     /**
      * Poll an async video operation once.
      *
-     * @return array{done: bool, videoUri: ?string, error: ?string}
+     * When $userId is given, per-provider credentials are re-injected into
+     * $options so providers that authenticate per-call (e.g. Higgsfield) can
+     * poll statelessly from a background worker. Veo ignores $options.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array{done: bool, videoUri: ?string, error: ?string, status?: ?string, percent?: ?int}
      */
-    public function pollVideoOperation(string $operationName, ?string $providerName = null): array
+    public function pollVideoOperation(string $operationName, ?string $providerName = null, ?int $userId = null, array $options = []): array
     {
         $provider = $this->registry->getVideoGenerationProvider($providerName);
 
-        if (!$provider instanceof GoogleProvider) {
-            throw new ProviderException('Async video polling is only supported by Google Veo', $provider->getName());
+        if (!$provider instanceof SupportsAsyncVideo) {
+            throw new ProviderException('Async video polling is not supported by '.$provider->getName(), $provider->getName());
         }
 
-        return $provider->pollVideoOperationOnce($operationName);
+        if (null !== $userId) {
+            $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
+        }
+
+        return $provider->pollVideoOperationOnce($operationName, $options);
     }
 
     /**
@@ -1013,16 +1024,50 @@ class AiFacade
 
     /**
      * Download raw video bytes from a provider URI (avoids base64 overhead).
+     *
+     * @param array<string, mixed> $options
      */
-    public function downloadVideoRaw(string $videoUri, ?string $providerName = null): string
+    public function downloadVideoRaw(string $videoUri, ?string $providerName = null, ?int $userId = null, array $options = []): string
     {
         $provider = $this->registry->getVideoGenerationProvider($providerName);
 
-        if (!$provider instanceof GoogleProvider) {
-            throw new ProviderException('Async video download is only supported by Google Veo', $provider->getName());
+        if (!$provider instanceof SupportsAsyncVideo) {
+            throw new ProviderException('Async video download is not supported by '.$provider->getName(), $provider->getName());
         }
 
-        return $provider->downloadVideoRaw($videoUri);
+        if (null !== $userId) {
+            $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
+        }
+
+        return $provider->downloadVideoRaw($videoUri, $options);
+    }
+
+    /**
+     * Best-effort cancel of an async video render so we stop billing for output
+     * nobody is waiting for. Never throws.
+     *
+     * @param array<string, mixed> $options
+     */
+    public function cancelVideoOperation(string $operationName, ?string $providerName = null, ?int $userId = null, array $options = []): void
+    {
+        $provider = $this->registry->getVideoGenerationProvider($providerName);
+
+        if (!$provider instanceof SupportsAsyncVideo) {
+            return;
+        }
+
+        if (null !== $userId) {
+            $options = $this->maybeInjectProviderCredentials($provider->getName(), $userId, $options);
+        }
+
+        try {
+            $provider->cancelVideoOperation($operationName, $options);
+        } catch (\Throwable $e) {
+            $this->logger->warning('AiFacade: cancelVideoOperation failed (ignored)', [
+                'provider' => $provider->getName(),
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
