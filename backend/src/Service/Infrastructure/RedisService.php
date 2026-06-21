@@ -273,6 +273,131 @@ final class RedisService
         }
     }
 
+    /**
+     * Add/update a member in a sorted set. Used for time-ordered indexes such
+     * as the "active media jobs" set scored by heartbeat, which the reaper
+     * scans for stale entries.
+     */
+    public function zAdd(string $key, float $score, string $member): bool
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return false;
+        }
+
+        try {
+            $client->zadd($this->prefix($key), [$member => $score]);
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('ZADD', $key, $e);
+
+            return false;
+        }
+    }
+
+    public function zRem(string $key, string $member): bool
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return false;
+        }
+
+        try {
+            $client->zrem($this->prefix($key), $member);
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('ZREM', $key, $e);
+
+            return false;
+        }
+    }
+
+    /**
+     * Range query by score. `$min`/`$max` accept Redis range syntax
+     * ('-inf', '+inf', '(123' for exclusive). Returns the matching members.
+     *
+     * @return list<string>
+     */
+    public function zRangeByScore(string $key, string $min, string $max, ?int $limit = null): array
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return [];
+        }
+
+        try {
+            $options = null === $limit ? [] : ['limit' => [0, $limit]];
+            /** @var array<int, mixed> $members */
+            $members = $client->zrangebyscore($this->prefix($key), $min, $max, $options);
+
+            return array_values(array_map(static fn ($m): string => (string) $m, $members));
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('ZRANGEBYSCORE', $key, $e);
+
+            return [];
+        }
+    }
+
+    public function sAdd(string $key, string $member): bool
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return false;
+        }
+
+        try {
+            $client->sadd($this->prefix($key), [$member]);
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('SADD', $key, $e);
+
+            return false;
+        }
+    }
+
+    public function sRem(string $key, string $member): bool
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return false;
+        }
+
+        try {
+            $client->srem($this->prefix($key), $member);
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('SREM', $key, $e);
+
+            return false;
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function sMembers(string $key): array
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return [];
+        }
+
+        try {
+            /** @var array<int, mixed> $members */
+            $members = $client->smembers($this->prefix($key));
+
+            return array_values(array_map(static fn ($m): string => (string) $m, $members));
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('SMEMBERS', $key, $e);
+
+            return [];
+        }
+    }
+
     public function getLastConnectionError(): ?\Throwable
     {
         return $this->connectionFailure;

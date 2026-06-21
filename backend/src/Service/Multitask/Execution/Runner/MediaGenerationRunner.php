@@ -147,7 +147,9 @@ final readonly class MediaGenerationRunner implements TaskRunner
                 'metadata_keys' => array_keys($metadata),
             ]);
 
-            return NodeResult::failed($node->capability->value.' produced no file'.(isset($metadata['error']) ? ': '.$metadata['error'] : ''));
+            $errorSuffix = is_scalar($metadata['error'] ?? null) ? ': '.(string) $metadata['error'] : '';
+
+            return NodeResult::failed($node->capability->value.' produced no file'.$errorSuffix);
         }
 
         $descriptor = [
@@ -160,7 +162,9 @@ final readonly class MediaGenerationRunner implements TaskRunner
         // this line appears but the task card stays at "Rendering… 95%", the
         // generation worked and the bug is in DELIVERY (the closing
         // task_update/task_file never reaching the browser), not in generation.
-        $this->logger->info('MediaGenerationRunner: node produced file', [
+        // debug level: this fires for every successful media node, so it must
+        // not pollute production info logs (only warning above stays loud).
+        $this->logger->debug('MediaGenerationRunner: node produced file', [
             'capability' => $node->capability->value,
             'node_id' => $node->id,
             'path' => $file['path'],

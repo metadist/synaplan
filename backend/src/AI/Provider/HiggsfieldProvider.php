@@ -7,6 +7,7 @@ namespace App\AI\Provider;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpExceptionInterface;
@@ -37,7 +38,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * @see https://docs.higgsfield.ai/
  */
-final class HiggsfieldProvider implements ImageGenerationProviderInterface, VideoGenerationProviderInterface
+final class HiggsfieldProvider implements ImageGenerationProviderInterface, VideoGenerationProviderInterface, SupportsAsyncVideo
 {
     private const PROVIDER_NAME = 'higgsfield';
     private const DISPLAY_NAME = 'Higgsfield';
@@ -49,6 +50,7 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
 
     private const TIMEOUT_SUBMIT_SECONDS = 30;
     private const TIMEOUT_POLL_SECONDS = 15;
+    private const TIMEOUT_DOWNLOAD_SECONDS = 120;
 
     /** Seconds between status polls. */
     private const POLL_INTERVAL_SECONDS = 3;
@@ -275,35 +277,7 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         $credentials = $this->credentialsFromOptions($options);
         $model = $this->modelFromOptions($options, self::DEFAULT_IMAGE_TO_VIDEO_MODEL);
 
-        $body = [
-            'prompt' => $prompt,
-        ];
-
-        // Most Higgsfield video models are image-to-video; surface the first
-        // attached reference image (if any) as image_url. Pure text-to-video
-        // models simply ignore it.
-        $imageUrl = $options['image_url'] ?? null;
-        if (null === $imageUrl) {
-            $referenceImages = $options['images'] ?? [];
-            if ([] !== $referenceImages) {
-                $imageUrl = (string) reset($referenceImages);
-            }
-        }
-        if (is_string($imageUrl) && '' !== $imageUrl) {
-            $body['image_url'] = $imageUrl;
-        }
-
-        $body['duration'] = $this->durationFromOptions($model, $options);
-
-        $aspectRatio = $this->aspectRatioFromOptions($options);
-        if (null !== $aspectRatio) {
-            $body['aspect_ratio'] = $aspectRatio;
-        }
-
-        $resolution = $this->resolutionFromOptions($options);
-        if (null !== $resolution) {
-            $body['resolution'] = $resolution;
-        }
+        $body = $this->buildVideoRequestBody($prompt, $model, $options);
 
         $this->logger->info('Higgsfield: generateVideo', [
             'model' => $model,
@@ -341,6 +315,233 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         );
 
         return $this->parseVideoPayload($finalPayload, $body);
+    }
+
+    // ==================== ASYNC (JOB-BASED) VIDEO ====================
+
+    /**
+     * Submit a video render and return an opaque handle, without blocking.
+     *
+     * The handle is a JSON blob carrying everything a later stateless
+     * {@see pollVideoOperationOnce()} / {@see cancelVideoOperation()} needs
+     * (queue URLs, request id, the request body for final-payload parsing).
+     * Credentials are NOT baked into the handle — they are re-injected by the
+     * worker on each call so a rotated/per-user key is always honoured.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array{operationName: string, model: string, duration: int, resolution: ?string}
+     */
+    public function startVideoOperation(string $prompt, array $options = []): array
+    {
+        $credentials = $this->credentialsFromOptions($options);
+        $model = $this->modelFromOptions($options, self::DEFAULT_IMAGE_TO_VIDEO_MODEL);
+        $body = $this->buildVideoRequestBody($prompt, $model, $options);
+
+        $this->logger->info('Higgsfield: startVideoOperation', [
+            'model' => $model,
+            'prompt_length' => strlen($prompt),
+            'has_reference' => isset($body['image_url']),
+            'credentials_source' => $credentials['source'],
+        ]);
+
+        $submission = $this->submit($model, $body, $credentials);
+
+        $handle = json_encode([
+            'request_id' => $submission['request_id'],
+            'status_url' => $submission['status_url'],
+            'cancel_url' => $submission['cancel_url'],
+            'model' => $model,
+            'body' => $body,
+        ]);
+
+        return [
+            'operationName' => false === $handle ? '' : $handle,
+            'model' => $model,
+            'duration' => isset($body['duration']) ? (int) $body['duration'] : 0,
+            'resolution' => isset($body['resolution']) && is_string($body['resolution']) ? $body['resolution'] : null,
+        ];
+    }
+
+    /**
+     * Poll a submitted render exactly once. Maps Higgsfield's queue status onto
+     * the provider-agnostic {done, videoUri, error, status, percent} shape. A
+     * terminal failure is returned as `done:true` with an `error` (so the
+     * worker records a user-visible failure) rather than thrown.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array{done: bool, videoUri: ?string, error: ?string, status: string, percent: ?int}
+     */
+    public function pollVideoOperationOnce(string $operationName, array $options = []): array
+    {
+        $handle = $this->decodeOperation($operationName);
+        $credentials = $this->credentialsFromOptions($options);
+
+        try {
+            $response = $this->httpClient->request('GET', $handle['status_url'], [
+                'headers' => $this->buildAuthHeaders($credentials),
+                'timeout' => self::TIMEOUT_POLL_SECONDS,
+            ]);
+            $statusCode = $response->getStatusCode();
+            $data = $response->toArray(false);
+        } catch (HttpExceptionInterface $e) {
+            throw new ProviderException('Higgsfield poll failed: '.$e->getMessage(), self::PROVIDER_NAME, ['request_id' => $handle['request_id']], 0, $e);
+        }
+
+        if ($statusCode >= 400) {
+            $this->handleErrorResponse($statusCode, $data);
+        }
+
+        $status = (string) ($data['status'] ?? 'unknown');
+
+        if ('completed' === $status) {
+            $videos = $this->parseVideoPayload($data, $handle['body']);
+            $url = $videos[0]['url'] ?? null;
+
+            return [
+                'done' => true,
+                'videoUri' => is_string($url) && '' !== $url ? $url : null,
+                'error' => is_string($url) && '' !== $url ? null : 'Higgsfield completed without a media URL',
+                'status' => $status,
+                'percent' => 100,
+            ];
+        }
+
+        if ('failed' === $status) {
+            return [
+                'done' => true,
+                'videoUri' => null,
+                'error' => (string) ($data['error'] ?? 'Higgsfield generation failed'),
+                'status' => $status,
+                'percent' => null,
+            ];
+        }
+
+        if ('nsfw' === $status) {
+            return [
+                'done' => true,
+                'videoUri' => null,
+                'error' => 'Content blocked by provider safety filter (NSFW)',
+                'status' => $status,
+                'percent' => null,
+            ];
+        }
+
+        if ('cancelled' === $status) {
+            return [
+                'done' => true,
+                'videoUri' => null,
+                'error' => 'Higgsfield generation was cancelled',
+                'status' => $status,
+                'percent' => null,
+            ];
+        }
+
+        return [
+            'done' => false,
+            'videoUri' => null,
+            'error' => null,
+            'status' => $status,
+            'percent' => $this->estimatePercent($status, 0),
+        ];
+    }
+
+    /**
+     * Download the produced video. Higgsfield media URLs are public CDN links,
+     * so no auth header is required.
+     *
+     * @param array<string, mixed> $options
+     */
+    public function downloadVideoRaw(string $videoUri, array $options = []): string
+    {
+        try {
+            $response = $this->httpClient->request('GET', $videoUri, [
+                'timeout' => self::TIMEOUT_DOWNLOAD_SECONDS,
+            ]);
+
+            return $response->getContent();
+        } catch (HttpExceptionInterface $e) {
+            throw new ProviderException('Higgsfield video download failed: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function cancelVideoOperation(string $operationName, array $options = []): void
+    {
+        try {
+            $handle = $this->decodeOperation($operationName);
+        } catch (ProviderException) {
+            return; // unparseable handle — nothing to cancel
+        }
+
+        $credentials = $this->credentialsFromOptions($options);
+        $this->cancelRemote($handle['cancel_url'], $credentials, $handle['request_id']);
+    }
+
+    /**
+     * Decode the opaque handle produced by {@see startVideoOperation()}.
+     *
+     * @return array{request_id: string, status_url: string, cancel_url: ?string, model: string, body: array<string, mixed>}
+     */
+    private function decodeOperation(string $operationName): array
+    {
+        $decoded = json_decode($operationName, true);
+        if (!is_array($decoded) || !isset($decoded['status_url']) || !is_string($decoded['status_url']) || '' === $decoded['status_url']) {
+            throw new ProviderException('Invalid Higgsfield operation handle', self::PROVIDER_NAME);
+        }
+
+        return [
+            'request_id' => isset($decoded['request_id']) && is_string($decoded['request_id']) ? $decoded['request_id'] : '',
+            'status_url' => $decoded['status_url'],
+            'cancel_url' => isset($decoded['cancel_url']) && is_string($decoded['cancel_url']) ? $decoded['cancel_url'] : null,
+            'model' => isset($decoded['model']) && is_string($decoded['model']) ? $decoded['model'] : '',
+            'body' => isset($decoded['body']) && is_array($decoded['body']) ? $decoded['body'] : [],
+        ];
+    }
+
+    /**
+     * Build the Higgsfield request body shared by the blocking and async paths.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function buildVideoRequestBody(string $prompt, string $model, array $options): array
+    {
+        $body = [
+            'prompt' => $prompt,
+        ];
+
+        // Most Higgsfield video models are image-to-video; surface the first
+        // attached reference image (if any) as image_url. Pure text-to-video
+        // models simply ignore it.
+        $imageUrl = $options['image_url'] ?? null;
+        if (null === $imageUrl) {
+            $referenceImages = $options['images'] ?? [];
+            if (is_array($referenceImages) && [] !== $referenceImages) {
+                $imageUrl = (string) reset($referenceImages);
+            }
+        }
+        if (is_string($imageUrl) && '' !== $imageUrl) {
+            $body['image_url'] = $imageUrl;
+        }
+
+        $body['duration'] = $this->durationFromOptions($model, $options);
+
+        $aspectRatio = $this->aspectRatioFromOptions($options);
+        if (null !== $aspectRatio) {
+            $body['aspect_ratio'] = $aspectRatio;
+        }
+
+        $resolution = $this->resolutionFromOptions($options);
+        if (null !== $resolution) {
+            $body['resolution'] = $resolution;
+        }
+
+        return $body;
     }
 
     // ==================== HTTP MECHANICS ====================

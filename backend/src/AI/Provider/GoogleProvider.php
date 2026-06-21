@@ -6,6 +6,7 @@ use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
@@ -23,7 +24,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * - Veo 2.0 (Video Generation)
  * - Text-to-Speech with Gemini
  */
-class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, TextToSpeechProviderInterface
+class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo
 {
     private const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
     private const VERTEX_BASE = 'https://{region}-aiplatform.googleapis.com/v1';
@@ -1040,7 +1041,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
      *
      * @return array{done: bool, videoUri: ?string, error: ?string}
      */
-    public function pollVideoOperationOnce(string $operationName): array
+    public function pollVideoOperationOnce(string $operationName, array $options = []): array
     {
         if (!$this->apiKey) {
             throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
@@ -1106,7 +1107,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
     /**
      * Download raw video bytes from a Google-provided URI.
      */
-    public function downloadVideoRaw(string $videoUri): string
+    public function downloadVideoRaw(string $videoUri, array $options = []): string
     {
         if (!$this->apiKey) {
             throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
@@ -1198,7 +1199,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
      * we call this we have already decided to walk away from the poll, so a
      * failed cancel must not mask the ProviderCancelledException.
      */
-    private function cancelVideoOperation(string $operationName): void
+    public function cancelVideoOperation(string $operationName, array $options = []): void
     {
         if (!$this->apiKey) {
             return;

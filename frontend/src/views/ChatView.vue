@@ -1828,26 +1828,35 @@ const streamAIResponse = async (
             return
           }
 
-          // [i2v-debug] Temporary multitask/media tracing: a task card stuck at
+          // [i2v-debug] Opt-in multitask/media tracing: a task card stuck at
           // "Rendering… 95%" gives no clue whether the worker ever finishes. Log
           // the plan + task lifecycle (progress, terminal state, produced file) so
           // we can see in the browser console if the closing task_update/task_file
-          // actually reaches the client over the realtime channel.
-          if (
-            typeof data.status === 'string' &&
-            (data.status === 'plan' ||
-              data.status === 'plan_discarded' ||
-              data.status.startsWith('task_'))
-          ) {
-            console.debug('[i2v-debug]', data.status, {
-              node_id: data.metadata?.node_id,
-              state: data.metadata?.state,
-              percent: data.metadata?.percent,
-              provider_status: data.metadata?.provider_status,
-              elapsed_seconds: data.metadata?.elapsed_seconds,
-              url: data.metadata?.url,
-              error: data.metadata?.error,
-            })
+          // actually reaches the client over the realtime channel. Gated behind
+          // `localStorage.setItem('synaplanDebug', '1')` (same pattern as the
+          // 'perf' tracing) so production consoles stay quiet and no internal
+          // metadata (file URLs/errors) leaks unless a developer opts in.
+          try {
+            if (
+              typeof window !== 'undefined' &&
+              window.localStorage?.getItem('synaplanDebug') &&
+              typeof data.status === 'string' &&
+              (data.status === 'plan' ||
+                data.status === 'plan_discarded' ||
+                data.status.startsWith('task_'))
+            ) {
+              console.debug('[i2v-debug]', data.status, {
+                node_id: data.metadata?.node_id,
+                state: data.metadata?.state,
+                percent: data.metadata?.percent,
+                provider_status: data.metadata?.provider_status,
+                elapsed_seconds: data.metadata?.elapsed_seconds,
+                url: data.metadata?.url,
+                error: data.metadata?.error,
+              })
+            }
+          } catch {
+            // never let debug tracing break the stream handler
           }
 
           // Handle different status events for UI feedback
