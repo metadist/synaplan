@@ -34,6 +34,8 @@
     "@capacitor/app": "^8.1.0",
     "@capacitor/browser": "^8.0.3",
     "@capacitor/core": "^8.4.1",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
     "@heroicons/vue": "^2.2.0",
     "@iconify/vue": "^5.0.0",
     "@intlify/core-base": "^11.1.12",
