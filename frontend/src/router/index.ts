@@ -39,7 +39,17 @@ const guardDevOnlyAdminFeatures = (
   next()
 }
 
+/**
+ * Build-time fallback brand name. The live name comes from the runtime branding
+ * config (`useConfigStore().branding.name`, Epic 4); this constant only covers
+ * the window before config has loaded and the static index.html title.
+ */
 export const APP_NAME = 'Synaplan'
+
+/** Live brand name with a safe fallback before runtime config has loaded. */
+export function brandName(): string {
+  return useConfigStore().branding.name || APP_NAME
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -395,10 +405,10 @@ router.afterEach((to) => {
   if (titleKey) {
     const t = i18n.global.t
     const pageTitle = t(titleKey)
-    document.title = `${pageTitle} | ${APP_NAME}`
+    document.title = `${pageTitle} | ${brandName()}`
   } else {
     // Fallback for routes without titleKey (e.g., shared chat handles its own title)
-    document.title = APP_NAME
+    document.title = brandName()
   }
 })
 

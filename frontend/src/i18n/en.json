@@ -1,4 +1,7 @@
 {
+  "branding": {
+    "poweredBy": "Powered by"
+  },
   "pageTitles": {
     "login": "Login",
     "register": "Register",

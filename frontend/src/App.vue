@@ -34,7 +34,7 @@ import { useI18n } from 'vue-i18n'
 import { useTheme } from './composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
-import { APP_NAME } from '@/router'
+import { brandName } from '@/router'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
@@ -115,7 +115,7 @@ watch(locale, () => {
   const titleKey = route.meta.titleKey as string | undefined
   if (titleKey) {
     const pageTitle = t(titleKey)
-    document.title = `${pageTitle} | ${APP_NAME}`
+    document.title = `${pageTitle} | ${brandName()}`
   }
 })
 

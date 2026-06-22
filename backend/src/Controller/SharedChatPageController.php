@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
+use App\Service\Branding\BrandingService;
 use App\Service\File\OgImageService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -40,8 +41,21 @@ class SharedChatPageController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private OgImageService $ogImageService,
+        private BrandingService $brandingService,
         private string $synaplanUrl,
     ) {
+    }
+
+    /**
+     * Brand name used in titles / og:site_name. Keeps the historical
+     * "Synaplan AI" wording for the default deployment (acceptance: default
+     * looks identical), and uses the configured brand for white-label.
+     */
+    private function titleBrand(): string
+    {
+        $name = $this->brandingService->getBranding()['name'];
+
+        return BrandingService::DEFAULT_NAME === $name ? 'Synaplan AI' : $name;
     }
 
     /**
@@ -116,7 +130,7 @@ class SharedChatPageController extends AbstractController
             // Clean slash commands from chat title
             $cleanTitle = $this->cleanSlashCommands($chatTitle);
             if (!empty(trim($cleanTitle))) {
-                return trim($cleanTitle).' | Synaplan AI';
+                return trim($cleanTitle).' | '.$this->titleBrand();
             }
         }
 
@@ -139,12 +153,12 @@ class SharedChatPageController extends AbstractController
                     $firstSentence = substr($firstSentence, 0, 57).'...';
                 }
                 if (!empty(trim($firstSentence))) {
-                    return trim($firstSentence).' | Synaplan AI';
+                    return trim($firstSentence).' | '.$this->titleBrand();
                 }
             }
         }
 
-        return 'Shared Chat | Synaplan AI';
+        return 'Shared Chat | '.$this->titleBrand();
     }
 
     /**
@@ -279,7 +293,7 @@ class SharedChatPageController extends AbstractController
     <meta property="og:url" content="{$this->escape($canonicalUrl)}">
     <meta property="og:title" content="{$this->escape($title)}">
     <meta property="og:description" content="{$this->escape($description)}">
-    <meta property="og:site_name" content="Synaplan AI">
+    <meta property="og:site_name" content="{$this->escape($this->titleBrand())}">
     <meta property="og:locale" content="{$this->escape($lang)}">
 HTML;
 

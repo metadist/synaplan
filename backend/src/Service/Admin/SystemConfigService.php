@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Admin;
 
 use App\Repository\ConfigRepository;
+use App\Service\Branding\BrandingService;
 use App\Service\FeedbackConstants;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use Psr\Log\LoggerInterface;
@@ -55,6 +56,14 @@ final readonly class SystemConfigService
                 'label' => 'Email',
                 'sections' => [
                     'mailer' => ['label' => 'Primary Mailer', 'fields' => ['MAILER_DSN', 'APP_SENDER_EMAIL', 'APP_SENDER_NAME']],
+                ],
+            ],
+            'branding' => [
+                'label' => 'Branding',
+                'sections' => [
+                    'identity' => ['label' => 'Brand Identity', 'fields' => ['BRAND_NAME', 'BRAND_TAGLINE', 'BRAND_PRIMARY_COLOR', 'BRAND_HOMEPAGE_URL']],
+                    'logos' => ['label' => 'Logos & Icon', 'fields' => ['BRAND_LOGO_URL', 'BRAND_LOGO_DARK_URL', 'BRAND_ICON_URL']],
+                    'attribution' => ['label' => 'Attribution ("Powered by")', 'fields' => ['BRAND_SHOW_POWERED_BY', 'BRAND_POWERED_BY_LABEL', 'BRAND_POWERED_BY_URL']],
                 ],
             ],
             'auth' => [
@@ -651,6 +660,80 @@ final readonly class SystemConfigService
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
             ],
+            // === Branding (database-backed, no restart required) ===
+            // Stored in BCONFIG group BRANDING (ownerId=0) — the rows BrandingService
+            // reads and the public runtime-config endpoint surfaces to the frontend.
+            'BRAND_NAME' => [
+                'tab' => 'branding', 'section' => 'identity', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Displayed brand/product name (document title, auth screens, attribution).',
+                'default' => BrandingService::DEFAULT_NAME,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_NAME,
+            ],
+            'BRAND_TAGLINE' => [
+                'tab' => 'branding', 'section' => 'identity', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Optional short tagline/description shown beside the brand.',
+                'default' => BrandingService::DEFAULT_TAGLINE,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_TAGLINE,
+            ],
+            'BRAND_PRIMARY_COLOR' => [
+                'tab' => 'branding', 'section' => 'identity', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Accent color as a hex value (e.g. #003fc7). Injected into the --brand CSS variables at runtime.',
+                'default' => BrandingService::DEFAULT_PRIMARY_COLOR,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_PRIMARY_COLOR,
+            ],
+            'BRAND_HOMEPAGE_URL' => [
+                'tab' => 'branding', 'section' => 'identity', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Brand homepage link used on auth and footer surfaces.',
+                'default' => BrandingService::DEFAULT_HOMEPAGE_URL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_HOMEPAGE_URL,
+            ],
+            'BRAND_LOGO_URL' => [
+                'tab' => 'branding', 'section' => 'logos', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Light-mode logo URL. Leave empty to use the bundled Synaplan logo.',
+                'default' => '',
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_LOGO_URL,
+            ],
+            'BRAND_LOGO_DARK_URL' => [
+                'tab' => 'branding', 'section' => 'logos', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Dark-mode logo URL. Leave empty to use the bundled Synaplan logo.',
+                'default' => '',
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_LOGO_DARK_URL,
+            ],
+            'BRAND_ICON_URL' => [
+                'tab' => 'branding', 'section' => 'logos', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Brand icon/favicon URL. Leave empty to use the bundled asset (app icons are produced by Epic 6).',
+                'default' => '',
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_ICON_URL,
+            ],
+            'BRAND_SHOW_POWERED_BY' => [
+                'tab' => 'branding', 'section' => 'attribution', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show the "· powered by <label>" attribution across auth, logged-out, shared-chat and widget surfaces.',
+                'default' => BrandingService::DEFAULT_SHOW_POWERED_BY,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_SHOW_POWERED_BY,
+            ],
+            'BRAND_POWERED_BY_LABEL' => [
+                'tab' => 'branding', 'section' => 'attribution', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Attribution label — the platform being credited (e.g. "Synaplan").',
+                'default' => BrandingService::DEFAULT_POWERED_BY_LABEL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_POWERED_BY_LABEL,
+            ],
+            'BRAND_POWERED_BY_URL' => [
+                'tab' => 'branding', 'section' => 'attribution', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Attribution link target for the "powered by" label.',
+                'default' => BrandingService::DEFAULT_POWERED_BY_URL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_POWERED_BY_URL,
+            ],
+
             // === AI Services ===
             'OLLAMA_BASE_URL' => [
                 'tab' => 'ai', 'section' => 'ollama', 'type' => 'url',

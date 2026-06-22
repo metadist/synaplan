@@ -13,6 +13,7 @@ import { installGlobalErrorHandlers } from './utils/installGlobalErrorHandlers'
 import { isNativeApp, getNativeApiBaseUrl } from './services/api/nativeRuntime'
 import { setApiBaseUrl } from './services/api/httpClient'
 import { loadNativeTokens } from './services/api/nativeAuth'
+import { applyBrandingTheme } from './utils/brandingTheme'
 
 // Bootstrap app - load config before mounting.
 // We MUST install global error handlers and mount the app even when bootstrap
@@ -52,6 +53,9 @@ import { loadNativeTokens } from './services/api/nativeAuth'
       stack: err instanceof Error ? (err.stack ?? '') : '',
     })
   }
+
+  // Apply white-label accent color from runtime branding config (Epic 4).
+  applyBrandingTheme()
 
   const recaptchaEnabled = config.recaptcha.enabled
   const recaptchaSiteKey = config.recaptcha.siteKey

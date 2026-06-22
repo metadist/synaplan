@@ -129,6 +129,48 @@ const config = {
   },
 
   /**
+   * White-label branding (Epic 4), loaded from backend at runtime.
+   * Defaults reproduce the historical hardcoded "Synaplan" look so an
+   * unconfigured deployment is visually identical to before.
+   *
+   * Empty-string semantics differ by field on purpose: name/color/links
+   * fall back to a default (|| ), while logo/icon/tagline keep '' so the
+   * consumer can decide to use the bundled asset / render nothing.
+   */
+  branding: {
+    get name(): string {
+      return getConfigSync().branding?.name || 'Synaplan'
+    },
+    get tagline(): string {
+      return getConfigSync().branding?.tagline ?? ''
+    },
+    get primaryColor(): string {
+      return getConfigSync().branding?.primaryColor || '#003fc7'
+    },
+    get logoUrl(): string {
+      return getConfigSync().branding?.logoUrl ?? ''
+    },
+    get logoDarkUrl(): string {
+      return getConfigSync().branding?.logoDarkUrl ?? ''
+    },
+    get iconUrl(): string {
+      return getConfigSync().branding?.iconUrl ?? ''
+    },
+    get homepageUrl(): string {
+      return getConfigSync().branding?.homepageUrl || 'https://www.synaplan.com'
+    },
+    get showPoweredBy(): boolean {
+      return getConfigSync().branding?.showPoweredBy ?? true
+    },
+    get poweredByLabel(): string {
+      return getConfigSync().branding?.poweredByLabel || 'Synaplan'
+    },
+    get poweredByUrl(): string {
+      return getConfigSync().branding?.poweredByUrl || 'https://www.synaplan.com'
+    },
+  },
+
+  /**
    * Installed plugins for the current user
    */
   get plugins(): NonNullable<ReturnType<typeof getConfigSync>['plugins']> {

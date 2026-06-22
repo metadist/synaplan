@@ -1,4 +1,7 @@
 {
+  "branding": {
+    "poweredBy": "Desarrollado por"
+  },
   "pageTitles": {
     "login": "Iniciar sesión",
     "register": "Registrarse",

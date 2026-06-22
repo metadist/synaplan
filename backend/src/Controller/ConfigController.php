@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
+use App\Service\Branding\BrandingService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
@@ -48,6 +49,7 @@ class ConfigController extends AbstractController
         private ModelConfigService $modelConfigService,
         private RedisService $redisService,
         private ClientContextResolver $clientContextResolver,
+        private BrandingService $brandingService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -123,6 +125,23 @@ class ConfigController extends AbstractController
                     properties: [
                         new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
                         new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Qdrant vector database availability'),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'branding',
+                    type: 'object',
+                    description: 'White-label branding (Epic 4). Defaults reproduce the historical Synaplan look. Public — no auth required.',
+                    properties: [
+                        new OA\Property(property: 'name', type: 'string', example: 'Synaplan', description: 'Displayed brand/product name'),
+                        new OA\Property(property: 'tagline', type: 'string', example: '', description: 'Optional short brand description/tagline'),
+                        new OA\Property(property: 'primaryColor', type: 'string', example: '#003fc7', description: 'Accent color injected into the --brand CSS variables at runtime'),
+                        new OA\Property(property: 'logoUrl', type: 'string', example: '', description: 'Light-mode logo URL; empty string falls back to the bundled asset'),
+                        new OA\Property(property: 'logoDarkUrl', type: 'string', example: '', description: 'Dark-mode logo URL; empty string falls back to the bundled asset'),
+                        new OA\Property(property: 'iconUrl', type: 'string', example: '', description: 'Brand icon/favicon URL; empty string falls back to the bundled asset'),
+                        new OA\Property(property: 'homepageUrl', type: 'string', example: 'https://www.synaplan.com', description: 'Brand homepage link used in auth/footer surfaces'),
+                        new OA\Property(property: 'showPoweredBy', type: 'boolean', example: true, description: 'Whether to show the "· powered by <label>" attribution'),
+                        new OA\Property(property: 'poweredByLabel', type: 'string', example: 'Synaplan', description: 'Attribution label (the platform being credited)'),
+                        new OA\Property(property: 'poweredByUrl', type: 'string', example: 'https://www.synaplan.com', description: 'Attribution link target'),
                     ]
                 ),
                 new OA\Property(
@@ -376,6 +395,7 @@ class ConfigController extends AbstractController
                 'enabled' => $this->billingService->isEnabled(),
             ],
             'recaptcha' => $recaptchaConfig,
+            'branding' => $this->brandingService->getBranding(),
             'features' => $features,
             'speech' => $speech,
             'plugins' => $plugins,

@@ -1,4 +1,7 @@
 {
+  "branding": {
+    "poweredBy": "Sunan"
+  },
   "pageTitles": {
     "login": "Giriş",
     "register": "Kayıt Ol",

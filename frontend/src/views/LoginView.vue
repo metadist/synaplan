@@ -338,16 +338,20 @@
       <!-- Footer -->
       <div class="mt-8 flex justify-center">
         <a
-          href="https://www.synaplan.com"
+          :href="config.branding.homepageUrl"
           target="_blank"
           rel="noopener noreferrer"
           class="group inline-flex items-center gap-1.5 opacity-40 hover:opacity-60 transition-all duration-300"
           :data-testid="config.billing.enabled ? 'link-homepage' : 'link-powered-by'"
         >
-          <span class="text-[10px] txt-secondary tracking-wide">Powered by</span>
+          <span
+            v-if="config.branding.showPoweredBy"
+            class="text-[10px] txt-secondary tracking-wide"
+            >{{ $t('branding.poweredBy') }}</span
+          >
           <img
             :src="logoSrc"
-            alt="Synaplan"
+            :alt="config.branding.name"
             class="h-3.5 opacity-70 group-hover:opacity-100 transition-opacity duration-300"
           />
         </a>
@@ -367,6 +371,7 @@ import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
 import { validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
+import { useBrandLogo } from '@/composables/useBrandLogo'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { startNativeOAuth } from '@/services/api/nativeOAuth'
 import { useAuthStore } from '@/stores/auth'
@@ -390,9 +395,7 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const logoSrc = computed(
-  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
-)
+const { logoSrc } = useBrandLogo(isDark)
 const birdSrc = computed(
   () =>
     `${import.meta.env.BASE_URL}${isDark.value ? 'single_bird-light.svg' : 'single_bird-dark.svg'}`
