@@ -2473,5 +2473,11 @@
     "title": "Bloqueada",
     "subtitle": "Desbloquea Synaplan para continuar.",
     "unlock": "Desbloquear"
+  },
+  "forceUpdate": {
+    "title": "Actualización necesaria",
+    "subtitle": "Esta versión de la app ya no es compatible. Actualiza a la última versión para continuar.",
+    "minVersion": "Versión mínima requerida: {version}",
+    "cta": "Actualizar ahora"
   }
 }

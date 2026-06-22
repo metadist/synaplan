@@ -11,6 +11,7 @@ use App\Repository\ModelRepository;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\ClientContextResolver;
+use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
@@ -50,6 +51,7 @@ class ConfigController extends AbstractController
         private RedisService $redisService,
         private ClientContextResolver $clientContextResolver,
         private BrandingService $brandingService,
+        private MobileVersionService $mobileVersionService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -261,6 +263,37 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'mobile',
+                    type: 'object',
+                    description: 'Forced-update gate (Epic 8.2). The operator configures a minimum supported app version; the server compares it against the parsed UA version. Empty minVersion means no gate.',
+                    properties: [
+                        new OA\Property(
+                            property: 'minVersion',
+                            type: 'string',
+                            example: '4.0',
+                            description: 'Minimum supported app version, or empty string when no gate is configured.'
+                        ),
+                        new OA\Property(
+                            property: 'updateRequired',
+                            type: 'boolean',
+                            example: false,
+                            description: 'True when the calling mobile app is older than minVersion and must show a blocking "please update" screen.'
+                        ),
+                        new OA\Property(
+                            property: 'iosAppUrl',
+                            type: 'string',
+                            example: 'https://apps.apple.com/app/id000000000',
+                            description: 'App Store link for the update button (empty when unset).'
+                        ),
+                        new OA\Property(
+                            property: 'androidAppUrl',
+                            type: 'string',
+                            example: 'https://play.google.com/store/apps/details?id=com.synaplan.app',
+                            description: 'Play Store link for the update button (empty when unset).'
+                        ),
+                    ]
+                ),
+                new OA\Property(
                     property: 'unavailableProviders',
                     type: 'array',
                     description: 'AI providers that are disabled due to missing API keys (only for authenticated users)',
@@ -390,6 +423,19 @@ class ConfigController extends AbstractController
             'platform' => $client->platform(),
         ];
 
+        // Forced-update gate (Epic 8.2): the operator configures a minimum
+        // supported app version; the server compares it against the parsed UA
+        // version and tells the app to block with a "please update" screen.
+        // Empty min-version ⇒ no gate (default), so web and unconfigured
+        // deployments are unaffected.
+        $storeUrls = $this->mobileVersionService->getStoreUrls();
+        $mobileConfig = [
+            'minVersion' => $this->mobileVersionService->getMinVersion(),
+            'updateRequired' => $this->mobileVersionService->isUpdateRequired($client),
+            'iosAppUrl' => $storeUrls['ios'],
+            'androidAppUrl' => $storeUrls['android'],
+        ];
+
         $response = [
             'billing' => [
                 'enabled' => $this->billingService->isEnabled(),
@@ -403,6 +449,7 @@ class ConfigController extends AbstractController
             'build' => $buildInfo,
             'realtime' => $realtimeConfig,
             'client' => $clientConfig,
+            'mobile' => $mobileConfig,
         ];
 
         if ($user && !empty($unavailableProviders)) {

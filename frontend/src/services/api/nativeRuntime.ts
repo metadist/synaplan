@@ -44,6 +44,30 @@ export function isNativeApp(): boolean {
 }
 
 /**
+ * Best-effort native platform from the WebView User-Agent.
+ *
+ * Used only for non-security UI choices (e.g. picking the right app-store link
+ * on the forced-update screen, Epic 8.2). Dependency-free on purpose — we do not
+ * pull `@capacitor/core` into the shared web bundle. Returns 'web' when not in
+ * the native shell.
+ */
+export function getNativePlatform(): 'ios' | 'android' | 'web' {
+  if (!isNativeApp()) {
+    return 'web'
+  }
+
+  const ua = navigator.userAgent
+  if (/Android/i.test(ua)) {
+    return 'android'
+  }
+  if (/iPhone|iPad|iPod/i.test(ua)) {
+    return 'ios'
+  }
+
+  return 'web'
+}
+
+/**
  * Resolve the backend base URL for the native shell.
  *
  * Precedence: runtime override (`window.__SYNAPLAN_API_BASE_URL__`) → compiled

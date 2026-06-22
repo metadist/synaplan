@@ -3563,5 +3563,11 @@
     "title": "Locked",
     "subtitle": "Unlock Synaplan to continue.",
     "unlock": "Unlock"
+  },
+  "forceUpdate": {
+    "title": "Update required",
+    "subtitle": "This version of the app is no longer supported. Please update to the latest version to continue.",
+    "minVersion": "Minimum required version: {version}",
+    "cta": "Update now"
   }
 }

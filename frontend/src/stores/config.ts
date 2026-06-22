@@ -213,6 +213,32 @@ const config = {
   },
 
   /**
+   * Forced-update gate (Epic 8.2), server-driven.
+   *
+   * `updateRequired` is computed by the backend (parsed UA version vs the
+   * operator-configured minimum), so the app blocks too-old installs with a
+   * "please update" screen. Defaults are inert (no gate) until config loads.
+   */
+  mobile: {
+    /** Configured minimum supported app version, or '' when no gate is set. */
+    get minVersion(): string {
+      return getConfigSync().mobile?.minVersion ?? ''
+    },
+    /** True when this mobile app is older than minVersion and must update. */
+    get updateRequired(): boolean {
+      return getConfigSync().mobile?.updateRequired ?? false
+    },
+    /** App Store link for the update button ('' when unset). */
+    get iosAppUrl(): string {
+      return getConfigSync().mobile?.iosAppUrl ?? ''
+    },
+    /** Play Store link for the update button ('' when unset). */
+    get androidAppUrl(): string {
+      return getConfigSync().mobile?.androidAppUrl ?? ''
+    },
+  },
+
+  /**
    * Load runtime configuration from backend
    * Call this before accessing config values (e.g., in main.ts)
    *

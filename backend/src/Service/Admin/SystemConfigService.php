@@ -6,6 +6,7 @@ namespace App\Service\Admin;
 
 use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
+use App\Service\Client\MobileVersionService;
 use App\Service\FeedbackConstants;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use Psr\Log\LoggerInterface;
@@ -64,6 +65,12 @@ final readonly class SystemConfigService
                     'identity' => ['label' => 'Brand Identity', 'fields' => ['BRAND_NAME', 'BRAND_TAGLINE', 'BRAND_PRIMARY_COLOR', 'BRAND_HOMEPAGE_URL']],
                     'logos' => ['label' => 'Logos & Icon', 'fields' => ['BRAND_LOGO_URL', 'BRAND_LOGO_DARK_URL', 'BRAND_ICON_URL']],
                     'attribution' => ['label' => 'Attribution ("Powered by")', 'fields' => ['BRAND_SHOW_POWERED_BY', 'BRAND_POWERED_BY_LABEL', 'BRAND_POWERED_BY_URL']],
+                ],
+            ],
+            'mobile' => [
+                'label' => 'Mobile App',
+                'sections' => [
+                    'update' => ['label' => 'Forced Update Gate', 'fields' => ['MIN_APP_VERSION', 'IOS_APP_URL', 'ANDROID_APP_URL']],
                 ],
             ],
             'auth' => [
@@ -732,6 +739,32 @@ final readonly class SystemConfigService
                 'description' => 'Attribution link target for the "powered by" label.',
                 'default' => BrandingService::DEFAULT_POWERED_BY_URL,
                 'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_POWERED_BY_URL,
+            ],
+
+            // === Mobile app forced-update gate (database-backed, no restart required) ===
+            // Stored in BCONFIG group MOBILE (ownerId=0) — read by MobileVersionService
+            // and surfaced in the public runtime config so the native app can block
+            // too-old installs (Epic 8.2).
+            'MIN_APP_VERSION' => [
+                'tab' => 'mobile', 'section' => 'update', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Minimum supported mobile app version (e.g. 4.0 or 4.1.2). Apps older than this are blocked with a "please update" screen. Leave empty to disable the gate.',
+                'default' => MobileVersionService::DEFAULT_MIN_APP_VERSION,
+                'source' => 'database', 'dbGroup' => MobileVersionService::GROUP, 'dbKey' => MobileVersionService::KEY_MIN_APP_VERSION,
+            ],
+            'IOS_APP_URL' => [
+                'tab' => 'mobile', 'section' => 'update', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'App Store link shown on the forced-update screen (iOS).',
+                'default' => MobileVersionService::DEFAULT_IOS_APP_URL,
+                'source' => 'database', 'dbGroup' => MobileVersionService::GROUP, 'dbKey' => MobileVersionService::KEY_IOS_APP_URL,
+            ],
+            'ANDROID_APP_URL' => [
+                'tab' => 'mobile', 'section' => 'update', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Play Store link shown on the forced-update screen (Android).',
+                'default' => MobileVersionService::DEFAULT_ANDROID_APP_URL,
+                'source' => 'database', 'dbGroup' => MobileVersionService::GROUP, 'dbKey' => MobileVersionService::KEY_ANDROID_APP_URL,
             ],
 
             // === AI Services ===

@@ -2474,5 +2474,11 @@
     "title": "Kilitli",
     "subtitle": "Devam etmek için Synaplan'ın kilidini aç.",
     "unlock": "Kilidi aç"
+  },
+  "forceUpdate": {
+    "title": "Güncelleme gerekli",
+    "subtitle": "Uygulamanın bu sürümü artık desteklenmiyor. Devam etmek için lütfen en son sürüme güncelleyin.",
+    "minVersion": "Gerekli en düşük sürüm: {version}",
+    "cta": "Şimdi güncelle"
   }
 }

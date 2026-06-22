@@ -24,6 +24,7 @@
     <Dialog />
     <CookieConsent @consent="handleCookieConsent" />
     <BiometricLockScreen />
+    <ForceUpdateScreen />
   </div>
 </template>
 
@@ -41,6 +42,7 @@ import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
 import OfflineBanner from '@/components/OfflineBanner.vue'
 import BiometricLockScreen from '@/components/BiometricLockScreen.vue'
+import ForceUpdateScreen from '@/components/ForceUpdateScreen.vue'
 import LoadingView from '@/views/LoadingView.vue'
 import CookieConsent from '@/components/CookieConsent.vue'
 import { useGoogleTag } from '@/composables/useGoogleTag'

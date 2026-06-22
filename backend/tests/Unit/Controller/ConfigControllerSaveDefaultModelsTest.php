@@ -14,6 +14,7 @@ use App\Repository\ModelRepository;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\ClientContextResolver;
+use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
@@ -79,6 +80,7 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             new RedisService('', 'test', new NullLogger()),
             new ClientContextResolver(),
             $this->createStub(BrandingService::class),
+            $this->createStub(MobileVersionService::class),
             'http://qdrant.example',
         );
 
