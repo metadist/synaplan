@@ -40,6 +40,7 @@ import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
 import LoadingView from '@/views/LoadingView.vue'
 import CookieConsent from '@/components/CookieConsent.vue'
 import { useGoogleTag } from '@/composables/useGoogleTag'
+import { initNativeLifecycle } from '@/services/nativeLifecycle'
 import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
 useTheme()
@@ -92,6 +93,10 @@ const authStore = useAuthStore()
 authStore.checkAuth().catch((err: unknown) => {
   console.error('Initial auth check failed:', err)
 })
+
+// Native shell only: on resume from background, re-validate the session and
+// reconnect realtime (Epic 7.2). No-op on web.
+void initNativeLifecycle()
 
 // Update page title when language changes
 const route = useRoute()
