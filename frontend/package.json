@@ -38,6 +38,7 @@
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/network": "^8.0.1",
     "@capacitor/share": "^8.0.1",
+    "@capgo/capacitor-updater": "^8.49.7",
     "@heroicons/vue": "^2.2.0",
     "@iconify/vue": "^5.0.0",
     "@intlify/core-base": "^11.1.12",

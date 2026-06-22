@@ -47,6 +47,7 @@ import LoadingView from '@/views/LoadingView.vue'
 import CookieConsent from '@/components/CookieConsent.vue'
 import { useGoogleTag } from '@/composables/useGoogleTag'
 import { initNativeLifecycle } from '@/services/nativeLifecycle'
+import { initOtaUpdates } from '@/services/otaUpdates'
 import { initBiometricLock } from '@/composables/useBiometricLock'
 import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
@@ -104,6 +105,10 @@ authStore.checkAuth().catch((err: unknown) => {
 // Native shell only: on resume from background, re-validate the session and
 // reconnect realtime (Epic 7.2). No-op on web.
 void initNativeLifecycle()
+
+// Native shell only: confirm the active OTA bundle booted OK so Capgo does not
+// roll it back (Epic 8.1). No-op on web. Fire-and-forget — must not block render.
+void initOtaUpdates()
 
 // Native shell only: optional biometric app lock (Epic 7.2). No-op on web or
 // when the user hasn't enabled it.
