@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\ImpersonationService;
+use App\Service\ModelConfigService;
 use App\Service\OAuthStateService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -32,6 +33,7 @@ class GitHubAuthController extends AbstractController
         private TokenService $tokenService,
         private OAuthStateService $oauthStateService,
         private ImpersonationService $impersonationService,
+        private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
         private string $githubClientId,
         private string $githubClientSecret,
@@ -243,6 +245,8 @@ class GitHubAuthController extends AbstractController
             }
         }
 
+        $isNewUser = false;
+
         if ($user) {
             if ($user->isManagedExternally()) {
                 $this->logger->warning('GitHub OAuth blocked for Keycloak-managed user', [
@@ -258,7 +262,7 @@ class GitHubAuthController extends AbstractController
                 'original_provider' => $user->getProviderId(),
             ]);
         } else {
-            // Create new user
+            $isNewUser = true;
             $user = new User();
             $user->setMail($email ?? $githubLogin.'@github.local');
             $user->setType('WEB');
@@ -313,6 +317,10 @@ class GitHubAuthController extends AbstractController
 
         $this->em->persist($user);
         $this->em->flush();
+
+        if ($isNewUser) {
+            $this->modelConfigService->resetUserDefaults($user->getId());
+        }
 
         return $user;
     }

@@ -25,6 +25,7 @@ class OidcUserService
     public function __construct(
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
+        private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
         string $oidcAdminRoles,
         string $oidcRoleClaims,
@@ -51,6 +52,7 @@ class OidcUserService
         }
 
         $user = $this->findBySub($sub) ?? $this->findByEmail($email);
+        $isNewUser = false;
 
         if ($user) {
             // Strict isolation for enterprise users: if an email is already registered
@@ -68,6 +70,7 @@ class OidcUserService
                 'original_provider' => $user->getProviderId(),
             ]);
         } else {
+            $isNewUser = true;
             $user = new User();
             $user->setMail($email ?? $username.'@keycloak.local');
             $user->setType('WEB');
@@ -89,6 +92,10 @@ class OidcUserService
 
         $this->em->persist($user);
         $this->em->flush();
+
+        if ($isNewUser) {
+            $this->modelConfigService->resetUserDefaults($user->getId());
+        }
 
         return $user;
     }
