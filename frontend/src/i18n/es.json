@@ -2454,5 +2454,8 @@
       "disabled": "Las actualizaciones en vivo están desactivadas en este entorno. Recarga la página para ver los datos más recientes.",
       "error": "Falló la conexión en tiempo real: {message}"
     }
+  },
+  "network": {
+    "offline": "Estás sin conexión: comprueba tu red. Nos reconectaremos automáticamente."
   }
 }

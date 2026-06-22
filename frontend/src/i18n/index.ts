@@ -21,13 +21,33 @@ function getInitialLanguage(): SupportedLanguage {
     return urlLang as SupportedLanguage
   }
 
-  // Fall back to localStorage or default
+  // An explicit saved choice always wins.
   const savedLanguage = localStorage.getItem('language')
   if (savedLanguage && supportedLanguages.includes(savedLanguage as SupportedLanguage)) {
     return savedLanguage as SupportedLanguage
   }
 
-  return 'en'
+  // Fall back to the device / browser language (Epic 7.3: in the native shell
+  // navigator.language reflects the OS locale). Not persisted — a manual choice
+  // is what gets stored. Defaults to English when nothing matches.
+  return detectDeviceLanguage() ?? 'en'
+}
+
+// Map the device/browser locale list (e.g. "de-DE", "es-419") onto a supported
+// base language, preferring the user's most-preferred match.
+function detectDeviceLanguage(): SupportedLanguage | null {
+  const candidates = [...(navigator.languages ?? []), navigator.language].filter(
+    (lang): lang is string => 'string' === typeof lang && '' !== lang
+  )
+
+  for (const candidate of candidates) {
+    const base = candidate.toLowerCase().split('-')[0]
+    if (supportedLanguages.includes(base as SupportedLanguage)) {
+      return base as SupportedLanguage
+    }
+  }
+
+  return null
 }
 
 // A message function that ignores the interpolation context and returns the

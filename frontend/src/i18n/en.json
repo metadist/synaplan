@@ -3544,5 +3544,8 @@
       "disabled": "Live updates are turned off in this environment. Refresh to see the latest data.",
       "error": "Realtime connection failed: {message}"
     }
+  },
+  "network": {
+    "offline": "You're offline — check your connection. We'll reconnect automatically."
   }
 }

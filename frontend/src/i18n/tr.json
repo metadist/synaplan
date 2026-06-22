@@ -2455,5 +2455,8 @@
       "disabled": "Bu ortamda canlı güncellemeler kapalı. En güncel verileri görmek için sayfayı yenileyin.",
       "error": "Gerçek zamanlı bağlantı başarısız: {message}"
     }
+  },
+  "network": {
+    "offline": "Çevrimdışısın — bağlantını kontrol et. Otomatik olarak yeniden bağlanacağız."
   }
 }

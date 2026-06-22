@@ -3478,5 +3478,8 @@
       "disabled": "Live-Updates sind in dieser Umgebung deaktiviert. Lade die Seite neu, um die neuesten Daten zu sehen.",
       "error": "Echtzeit-Verbindung fehlgeschlagen: {message}"
     }
+  },
+  "network": {
+    "offline": "Du bist offline – prüfe deine Verbindung. Wir verbinden automatisch neu."
   }
 }

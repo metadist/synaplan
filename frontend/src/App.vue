@@ -9,6 +9,7 @@
       down — the page stays scroll-free.
     -->
     <ImpersonationBanner />
+    <OfflineBanner />
     <ErrorBoundary>
       <Suspense>
         <template #default>
@@ -37,6 +38,7 @@ import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
+import OfflineBanner from '@/components/OfflineBanner.vue'
 import LoadingView from '@/views/LoadingView.vue'
 import CookieConsent from '@/components/CookieConsent.vue'
 import { useGoogleTag } from '@/composables/useGoogleTag'
