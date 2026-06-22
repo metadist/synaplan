@@ -241,7 +241,7 @@ const handleRetry = () => {
            needs a one-liner — QA feedback PR #1076 points 2 & 4. -->
       <div v-if="isSearchKind && card.state === 'done'" class="task-card__body text-sm txt-muted">
         <span v-if="card.query && card.resultsCount">
-          {{ $t('taskPlan.searchSummary', { query: card.query, count: card.resultsCount }) }}
+          {{ $t('taskPlan.searchSummary', { count: card.resultsCount }, card.resultsCount) }}
         </span>
         <span v-else-if="card.query">{{ card.query }}</span>
       </div>

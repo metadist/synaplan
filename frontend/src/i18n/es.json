@@ -1037,7 +1037,7 @@
     "cancelledBody": "Has detenido este paso.",
     "stop": "Detener",
     "rendering": "Renderizando…",
-    "searchSummary": "Búsqueda web · {count} {count, plural, one {fuente} other {fuentes}}",
+    "searchSummary": "Búsqueda web · {count} fuente | Búsqueda web · {count} fuentes",
     "retryWith": "Reintentar con {model}",
     "state": {
       "pending": "En cola",
@@ -1555,6 +1555,13 @@
       "automated": "Automático (Mejor Modelo)",
       "availableTools": "Herramientas Disponibles",
       "availableToolsHelp": "Habilita herramientas que estarán disponibles al usar este prompt",
+      "internetSearch": {
+        "label": "Búsqueda en Internet",
+        "help": "Elige cuándo este prompt busca en la web. «Automático» deja que el clasificador decida por mensaje; «Siempre activado» fuerza la búsqueda; «Siempre desactivado» la desactiva.",
+        "auto": "Automático (decide el clasificador)",
+        "on": "Siempre activado",
+        "off": "Siempre desactivado"
+      },
       "promptContent": "Contenido del Prompt",
       "contentPlaceholder": "Ingresa tu prompt del sistema aquí...",
       "promptContentPlaceholder": "Ingresa el prompt del sistema que guiará el comportamiento de la IA para esta tarea...",

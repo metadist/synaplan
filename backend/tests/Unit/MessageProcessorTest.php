@@ -539,6 +539,147 @@ class MessageProcessorTest extends TestCase
         );
     }
 
+    /**
+     * Triviality veto: an over-eager sorting model that votes BWEBSEARCH=1 on
+     * a plain greeting ("Hey, wie gehts?") must NOT trigger a web search.
+     * This is the core fix for "every message starts a web search".
+     */
+    public function testProcessStreamSkipsSearchForTrivialGreetingDespiteVote(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(101);
+        $message->method('getText')->willReturn('Hey, wie gehts?');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        // Over-eager sorter votes to search even on a trivial greeting.
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => true,
+        ]);
+
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn(['metadata' => []]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+
+        $this->braveSearchService
+            ->expects($this->never())
+            ->method('search');
+
+        $this->router
+            ->method('routeStream')
+            ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
+
+        $this->processor->processStream($message, function (): void {});
+    }
+
+    /**
+     * Explicit per-message request: when the user enables the web-search
+     * toggle / uses `/search` (frontend sends `web_search=true`), the pipeline
+     * must search even if the classifier did NOT vote for it — and even for a
+     * short, otherwise-trivial message.
+     */
+    public function testProcessStreamForcesSearchOnExplicitUserRequest(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(102);
+        $message->method('getText')->willReturn('hallo');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        // Classifier did NOT vote for search — only the explicit user request
+        // can fire it.
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn(['metadata' => []]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('hallo');
+
+        $this->braveSearchService
+            ->expects($this->once())
+            ->method('search')
+            ->willReturn(['results' => []]);
+
+        $this->router
+            ->method('routeStream')
+            ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
+
+        $this->processor->processStream(
+            $message,
+            function (): void {},
+            null,
+            ['web_search' => true],
+        );
+    }
+
+    /**
+     * Non-streaming pipeline parity: the legacy `process()` path honours the
+     * explicit `force_web_search` option. Even with a `false` classifier vote
+     * and an otherwise-trivial message the search must fire — proving the
+     * explicit request rule works on both pipelines, not just streaming.
+     */
+    public function testProcessForcesSearchOnExplicitForceWebSearchOption(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(103);
+        $message->method('getText')->willReturn('hallo');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn(['metadata' => []]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('hallo');
+
+        $this->braveSearchService
+            ->expects($this->once())
+            ->method('search')
+            ->willReturn(['results' => []]);
+
+        $this->router->method('route')->willReturn([
+            'content' => 'Response',
+            'metadata' => ['provider' => 'test', 'model' => 'test'],
+        ]);
+
+        $this->processor->process($message, ['force_web_search' => true]);
+    }
+
     public function testProcessLoadsConversationHistory(): void
     {
         $message = $this->createMock(Message::class);

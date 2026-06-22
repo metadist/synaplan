@@ -519,7 +519,40 @@
                   <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4" />
                   {{ $t('config.taskPrompts.availableTools') }}
                 </label>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+                <!--
+                  Internet search is tri-state (auto / always on / always off).
+                  A checkbox can only express two states, so saving silently
+                  collapsed the "let the classifier decide" default (null) into
+                  "always off" and disabled web search for the prompt (#1138).
+                  A dropdown keeps all three states distinguishable and lets an
+                  admin restore "auto" at any time.
+                -->
+                <div class="mb-3 p-3 rounded-lg surface-chip">
+                  <div class="flex items-center gap-3 mb-2">
+                    <Icon icon="heroicons:magnifying-glass" class="w-5 h-5 txt-secondary" />
+                    <span class="text-sm font-medium txt-primary">{{
+                      $t('config.taskPrompts.internetSearch.label')
+                    }}</span>
+                  </div>
+                  <select
+                    v-model="formData.toolInternet"
+                    class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    data-testid="select-tool-internet"
+                  >
+                    <option value="auto">
+                      {{ $t('config.taskPrompts.internetSearch.auto') }}
+                    </option>
+                    <option value="on">{{ $t('config.taskPrompts.internetSearch.on') }}</option>
+                    <option value="off">{{ $t('config.taskPrompts.internetSearch.off') }}</option>
+                  </select>
+                  <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
+                    <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+                    {{ $t('config.taskPrompts.internetSearch.help') }}
+                  </p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label
                     v-for="tool in availableTools"
                     :key="tool.value"
@@ -1155,6 +1188,11 @@ import {
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
 import { findModelIdByString } from '@/utils/aiModelDefaults'
+import {
+  type InternetSearchMode,
+  internetModeFromMetadata,
+  applyInternetModeToMetadata,
+} from '@/utils/promptInternetSearch'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
@@ -1185,6 +1223,7 @@ interface TaskPrompt extends ApiTaskPrompt {
   rules?: string
   aiModel?: string
   availableTools?: string[]
+  toolInternet?: InternetSearchMode
   content: string
 }
 
@@ -1467,8 +1506,9 @@ const loadingAvailableFiles = ref(false)
 const allModels = ref<Partial<Record<Capability, AIModel[]>>>({})
 const loadingModels = ref(false)
 
+// Internet search is handled separately via a tri-state dropdown (see
+// `InternetSearchMode`); the remaining tools are plain on/off checkboxes.
 const availableTools: ToolOption[] = [
-  { value: 'internet-search', label: 'Internet Search', icon: 'heroicons:magnifying-glass' },
   { value: 'files-search', label: 'Files Search', icon: 'heroicons:document-magnifying-glass' },
   { value: 'url-screenshot', label: 'URL Content', icon: 'heroicons:globe-alt' },
 ]
@@ -1640,7 +1680,6 @@ const loadPrompts = async () => {
       }
 
       const tools: string[] = []
-      if (metadata.tool_internet ?? metadata.tool_internet_search) tools.push('internet-search')
       if (metadata.tool_files ?? metadata.tool_files_search) tools.push('files-search')
       if (metadata.tool_url_screenshot) tools.push('url-screenshot')
 
@@ -1650,6 +1689,7 @@ const loadPrompts = async () => {
         rules: p.selectionRules || '',
         aiModel: aiModelString,
         availableTools: tools,
+        toolInternet: internetModeFromMetadata(metadata),
       }
     })
   } catch (err: unknown) {
@@ -1670,6 +1710,7 @@ const loadPrompt = () => {
       selectionRules: prompt.selectionRules || '',
       aiModel: prompt.aiModel,
       availableTools: prompt.availableTools,
+      toolInternet: prompt.toolInternet ?? 'auto',
       content: prompt.content,
       language: prompt.language || 'en',
     }
@@ -1770,9 +1811,13 @@ const handleSave = saveChanges(async () => {
       metadata.aiModel = findModelIdByString(allModels.value, formData.value.aiModel)
     }
 
-    metadata.tool_internet = (formData.value.availableTools || []).includes('internet-search')
     metadata.tool_files = (formData.value.availableTools || []).includes('files-search')
     metadata.tool_url_screenshot = (formData.value.availableTools || []).includes('url-screenshot')
+
+    // Tri-state internet search (#1138): only persist an explicit boolean for
+    // 'on'/'off'. 'auto' omits the key so the backend keeps the "classifier
+    // decides" default instead of hard-disabling web search.
+    applyInternetModeToMetadata(metadata, formData.value.toolInternet ?? 'auto')
 
     if (currentPrompt.value.isDefault && !currentPrompt.value.isUserOverride && !isAdmin.value) {
       const newPrompt = await promptsApi.createPrompt({
@@ -1909,7 +1954,8 @@ const handleCreateNew = async () => {
     const metadata: PromptMetadata = {}
 
     metadata.aiModel = 0
-    metadata.tool_internet = true
+    // Leave `tool_internet` unset so new prompts default to "auto" (the
+    // classifier decides) instead of hard-forcing web search on every message.
     metadata.tool_files = true
     metadata.tool_url_screenshot = false
 
@@ -1929,7 +1975,8 @@ const handleCreateNew = async () => {
       content: newPrompt.prompt,
       rules: newPrompt.selectionRules || '',
       aiModel: 'default',
-      availableTools: formData.value.availableTools || [],
+      availableTools: ['files-search'],
+      toolInternet: 'auto',
     }
 
     prompts.value.push(mappedPrompt)
@@ -1940,6 +1987,7 @@ const handleCreateNew = async () => {
       selectionRules: mappedPrompt.selectionRules || '',
       aiModel: mappedPrompt.aiModel,
       availableTools: mappedPrompt.availableTools,
+      toolInternet: mappedPrompt.toolInternet,
       content: mappedPrompt.content,
       language: mappedPrompt.language || 'en',
     }
