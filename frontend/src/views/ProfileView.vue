@@ -365,6 +365,45 @@
             </div>
           </section>
 
+          <section
+            v-if="showBiometricSection"
+            class="surface-card rounded-lg p-6"
+            data-testid="section-app-security"
+          >
+            <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
+              <Icon icon="mdi:fingerprint" class="w-5 h-5" />
+              {{ $t('profile.appSecurity.title') }}
+            </h2>
+            <p class="txt-secondary text-sm mb-6">{{ $t('profile.appSecurity.subtitle') }}</p>
+
+            <div class="flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <p class="txt-primary font-medium">{{ $t('profile.appSecurity.biometricLock') }}</p>
+                <p class="txt-secondary text-sm">
+                  {{ $t('profile.appSecurity.biometricLockHint') }}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="biometricLockOn"
+                class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                :class="
+                  biometricLockOn
+                    ? 'bg-[var(--brand)]'
+                    : 'bg-light-border/50 dark:bg-dark-border/50'
+                "
+                data-testid="toggle-biometric-lock"
+                @click="toggleBiometricLock"
+              >
+                <span
+                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                  :class="biometricLockOn ? 'translate-x-6' : 'translate-x-1'"
+                />
+              </button>
+            </div>
+          </section>
+
           <div class="info-box-blue" data-testid="section-privacy-notice">
             <p class="text-sm info-box-blue-text flex items-start gap-2">
               <Icon
@@ -530,6 +569,7 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
@@ -539,15 +579,51 @@ import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { profileApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import {
+  isBiometricAvailable,
+  isBiometricLockEnabled,
+  setBiometricLockEnabled,
+  verifyBiometric,
+} from '@/services/biometricLock'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const config = useConfigStore()
 const { error } = useNotification()
+const { t } = useI18n()
 
 const memoriesSection = ref<HTMLElement | null>(null)
 const shouldHighlight = ref(false)
+
+// Optional biometric app lock (Epic 7.2) — native-only, shown only when the
+// device actually has biometrics enrolled.
+const biometricAvailable = ref(false)
+const biometricLockOn = ref(isBiometricLockEnabled())
+const showBiometricSection = computed(() => isNativeApp() && biometricAvailable.value)
+
+onMounted(async () => {
+  biometricAvailable.value = await isBiometricAvailable()
+})
+
+async function toggleBiometricLock(): Promise<void> {
+  if (biometricLockOn.value) {
+    setBiometricLockEnabled(false)
+    biometricLockOn.value = false
+    return
+  }
+
+  // Require a successful check before enabling so the user can't lock themselves
+  // out with an unusable/unenrolled sensor.
+  const ok = await verifyBiometric(t('profile.appSecurity.verifyReason'))
+  if (!ok) {
+    error(t('profile.appSecurity.enableFailed'))
+    return
+  }
+  setBiometricLockEnabled(true)
+  biometricLockOn.value = true
+}
 
 const formData = ref<UserProfile>({
   email: '',

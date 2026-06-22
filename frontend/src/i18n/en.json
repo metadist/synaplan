@@ -2772,6 +2772,14 @@
       "confirmPasswordPlaceholder": "Confirm new password",
       "confirmPasswordHint": "Must match new password"
     },
+    "appSecurity": {
+      "title": "App Security",
+      "subtitle": "Extra protection for this device",
+      "biometricLock": "Biometric app lock",
+      "biometricLockHint": "Require Face ID, Touch ID or fingerprint to open the app.",
+      "verifyReason": "Enable biometric lock",
+      "enableFailed": "Could not enable the biometric lock. Please try again."
+    },
     "dangerZone": {
       "title": "Danger Zone",
       "subtitle": "Irreversible actions",
@@ -3547,5 +3555,10 @@
   },
   "network": {
     "offline": "You're offline — check your connection. We'll reconnect automatically."
+  },
+  "biometricLock": {
+    "title": "Locked",
+    "subtitle": "Unlock Synaplan to continue.",
+    "unlock": "Unlock"
   }
 }

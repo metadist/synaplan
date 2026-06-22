@@ -23,6 +23,7 @@
     <NotificationContainer />
     <Dialog />
     <CookieConsent @consent="handleCookieConsent" />
+    <BiometricLockScreen />
   </div>
 </template>
 
@@ -39,10 +40,12 @@ import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
 import OfflineBanner from '@/components/OfflineBanner.vue'
+import BiometricLockScreen from '@/components/BiometricLockScreen.vue'
 import LoadingView from '@/views/LoadingView.vue'
 import CookieConsent from '@/components/CookieConsent.vue'
 import { useGoogleTag } from '@/composables/useGoogleTag'
 import { initNativeLifecycle } from '@/services/nativeLifecycle'
+import { initBiometricLock } from '@/composables/useBiometricLock'
 import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
 useTheme()
@@ -99,6 +102,10 @@ authStore.checkAuth().catch((err: unknown) => {
 // Native shell only: on resume from background, re-validate the session and
 // reconnect realtime (Epic 7.2). No-op on web.
 void initNativeLifecycle()
+
+// Native shell only: optional biometric app lock (Epic 7.2). No-op on web or
+// when the user hasn't enabled it.
+void initBiometricLock()
 
 // Update page title when language changes
 const route = useRoute()

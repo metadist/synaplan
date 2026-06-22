@@ -821,6 +821,14 @@
       "confirmPasswordPlaceholder": "Neues Passwort bestätigen",
       "confirmPasswordHint": "Muss mit neuem Passwort übereinstimmen"
     },
+    "appSecurity": {
+      "title": "App-Sicherheit",
+      "subtitle": "Zusätzlicher Schutz für dieses Gerät",
+      "biometricLock": "Biometrische App-Sperre",
+      "biometricLockHint": "Face ID, Touch ID oder Fingerabdruck zum Öffnen der App verlangen.",
+      "verifyReason": "Biometrische Sperre aktivieren",
+      "enableFailed": "Die biometrische Sperre konnte nicht aktiviert werden. Bitte erneut versuchen."
+    },
     "dangerZone": {
       "title": "Gefahrenzone",
       "subtitle": "Irreversible Aktionen",
@@ -3481,5 +3489,10 @@
   },
   "network": {
     "offline": "Du bist offline – prüfe deine Verbindung. Wir verbinden automatisch neu."
+  },
+  "biometricLock": {
+    "title": "Gesperrt",
+    "subtitle": "Entsperre Synaplan, um fortzufahren.",
+    "unlock": "Entsperren"
   }
 }

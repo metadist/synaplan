@@ -963,6 +963,14 @@
       "confirmPasswordPlaceholder": "Yeni şifreyi onaylayın",
       "confirmPasswordHint": "Yeni şifreyle eşleşmeli"
     },
+    "appSecurity": {
+      "title": "Uygulama güvenliği",
+      "subtitle": "Bu cihaz için ek koruma",
+      "biometricLock": "Biyometrik uygulama kilidi",
+      "biometricLockHint": "Uygulamayı açmak için Face ID, Touch ID veya parmak izi iste.",
+      "verifyReason": "Biyometrik kilidi etkinleştir",
+      "enableFailed": "Biyometrik kilit etkinleştirilemedi. Lütfen tekrar deneyin."
+    },
     "dangerZone": {
       "title": "Tehlikeli Bölge",
       "subtitle": "Geri alınamaz işlemler",
@@ -2458,5 +2466,10 @@
   },
   "network": {
     "offline": "Çevrimdışısın — bağlantını kontrol et. Otomatik olarak yeniden bağlanacağız."
+  },
+  "biometricLock": {
+    "title": "Kilitli",
+    "subtitle": "Devam etmek için Synaplan'ın kilidini aç.",
+    "unlock": "Kilidi aç"
   }
 }
