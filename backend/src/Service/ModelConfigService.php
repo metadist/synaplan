@@ -26,6 +26,7 @@ final readonly class ModelConfigService
         private UserRepository $userRepository,
         private CacheItemPoolInterface $cache,
         private ProviderRegistry $providerRegistry,
+        private string $environment = 'prod',
     ) {
     }
 
@@ -503,6 +504,22 @@ final readonly class ModelConfigService
 
         // Default: true (backward compatibility)
         return true;
+    }
+
+    /**
+     * Seed recommended model defaults for a newly registered user.
+     *
+     * Skipped in test environment so E2E/integration tests keep their
+     * global test defaults (negative BIDs → TestProvider) instead of
+     * receiving production model bindings that require real API keys.
+     */
+    public function initializeNewUserDefaults(int $userId): void
+    {
+        if ('test' === $this->environment) {
+            return;
+        }
+
+        $this->resetUserDefaults($userId);
     }
 
     /**

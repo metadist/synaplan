@@ -126,7 +126,7 @@ class AuthController extends AbstractController
         $this->em->persist($user);
         $this->em->flush();
 
-        $this->modelConfigService->resetUserDefaults($user->getId());
+        $this->modelConfigService->initializeNewUserDefaults($user->getId());
 
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h

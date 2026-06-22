@@ -319,7 +319,7 @@ class GitHubAuthController extends AbstractController
         $this->em->flush();
 
         if ($isNewUser) {
-            $this->modelConfigService->resetUserDefaults($user->getId());
+            $this->modelConfigService->initializeNewUserDefaults($user->getId());
         }
 
         return $user;
