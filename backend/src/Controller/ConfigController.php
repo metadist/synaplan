@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
+use App\Service\Client\ClientContextResolver;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
@@ -46,6 +47,7 @@ class ConfigController extends AbstractController
         private EmbeddingMetadataService $embeddingMetadata,
         private ModelConfigService $modelConfigService,
         private RedisService $redisService,
+        private ClientContextResolver $clientContextResolver,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -213,6 +215,33 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'client',
+                    type: 'object',
+                    description: 'Server-confirmed identity of the calling client, derived from the User-Agent. Lets the frontend switch behaviour server-truthfully (e.g. payment channel gating) instead of trusting only the client-side Capacitor.isNativePlatform() flag. Identity hint only — never an auth control.',
+                    properties: [
+                        new OA\Property(
+                            property: 'isMobileApp',
+                            type: 'boolean',
+                            example: false,
+                            description: 'True when the request carries the official "Synaplan Mobile Vx.x" User-Agent token.'
+                        ),
+                        new OA\Property(
+                            property: 'appVersion',
+                            type: 'string',
+                            nullable: true,
+                            example: '4.0',
+                            description: 'Parsed app version (major.minor[.patch]) from the User-Agent, or null for web clients.'
+                        ),
+                        new OA\Property(
+                            property: 'platform',
+                            type: 'string',
+                            enum: ['web', 'mobile'],
+                            example: 'web',
+                            description: 'Resolved client platform.'
+                        ),
+                    ]
+                ),
+                new OA\Property(
                     property: 'unavailableProviders',
                     type: 'array',
                     description: 'AI providers that are disabled due to missing API keys (only for authenticated users)',
@@ -222,7 +251,7 @@ class ConfigController extends AbstractController
             ]
         )
     )]
-    public function getRuntimeConfig(#[CurrentUser] ?User $user): JsonResponse
+    public function getRuntimeConfig(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $recaptchaEnabled = ($_ENV['RECAPTCHA_ENABLED'] ?? 'false') === 'true';
         $recaptchaSiteKey = $_ENV['RECAPTCHA_SITE_KEY'] ?? '';
@@ -331,6 +360,17 @@ class ConfigController extends AbstractController
             'wsUrl' => $realtimeWsUrl,
         ];
 
+        // Client identity (Aspect 1 / mobile app Epic 2): server-confirmed signal derived
+        // from the User-Agent. The frontend uses this for server-truthful behaviour switches
+        // (Epic 5 payment gating) instead of trusting only Capacitor.isNativePlatform().
+        // The parsed version also feeds the forced-update gate (Epic 8).
+        $client = $this->clientContextResolver->fromRequest($request);
+        $clientConfig = [
+            'isMobileApp' => $client->isMobileApp,
+            'appVersion' => $client->appVersion,
+            'platform' => $client->platform(),
+        ];
+
         $response = [
             'billing' => [
                 'enabled' => $this->billingService->isEnabled(),
@@ -342,6 +382,7 @@ class ConfigController extends AbstractController
             'googleTag' => $googleTagConfig,
             'build' => $buildInfo,
             'realtime' => $realtimeConfig,
+            'client' => $clientConfig,
         ];
 
         if ($user && !empty($unavailableProviders)) {

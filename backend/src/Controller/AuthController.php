@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
+use App\Service\Client\ClientContextResolver;
 use App\Service\ImpersonationService;
 use App\Service\InternalEmailService;
 use App\Service\OidcTokenService;
@@ -46,9 +47,34 @@ class AuthController extends AbstractController
         private ValidatorInterface $validator,
         private LoggerInterface $logger,
         private ImpersonationService $impersonationService,
+        private ClientContextResolver $clientContextResolver,
     ) {
         $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
         $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
+    }
+
+    /**
+     * Build the Bearer-token payload returned to the native app in the login /
+     * refresh JSON body.
+     *
+     * Web clients keep authenticating via the HttpOnly cookies that are still
+     * set alongside this — only the native shell (cross-origin WebView, where
+     * cookies are unreliable) consumes these tokens, storing them in secure
+     * native storage to send as `Authorization: Bearer` (Epic 3). Detection is
+     * via the server-confirmed User-Agent (ClientContextResolver); a spoofed UA
+     * only ever receives tokens for the account it already authenticated as, so
+     * there is no privilege gain.
+     *
+     * @return array{accessToken: string, refreshToken: string, tokenType: string, expiresIn: int}
+     */
+    private function nativeTokenPayload(string $accessToken, string $refreshToken): array
+    {
+        return [
+            'accessToken' => $accessToken,
+            'refreshToken' => $refreshToken,
+            'tokenType' => 'Bearer',
+            'expiresIn' => TokenService::ACCESS_TOKEN_TTL,
+        ];
     }
 
     #[Route('/register', name: 'register', methods: ['POST'])]
@@ -244,7 +270,7 @@ class AuthController extends AbstractController
         $this->logger->info('User logged in', ['user_id' => $user->getId()]);
 
         // Create response with cookies
-        $response = new JsonResponse([
+        $responseData = [
             'success' => true,
             'user' => [
                 'id' => $user->getId(),
@@ -254,7 +280,15 @@ class AuthController extends AbstractController
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
             ],
-        ]);
+        ];
+
+        // Native shell can't rely on cross-origin cookies → also hand it the
+        // tokens in the body so it can authenticate via Authorization: Bearer.
+        if ($this->clientContextResolver->fromRequest($request)->isMobileApp) {
+            $responseData['tokens'] = $this->nativeTokenPayload($accessToken, $refreshToken);
+        }
+
+        $response = new JsonResponse($responseData);
 
         // Add HttpOnly cookies. Defensive: also wipe any orphan impersonation
         // stash that survived from a previous user on this browser, so the
@@ -314,6 +348,15 @@ class AuthController extends AbstractController
         // Regular user - use our internal refresh token
         $refreshTokenString = $request->cookies->get(TokenService::REFRESH_COOKIE);
 
+        // Native shell has no cross-origin refresh cookie → it sends the refresh
+        // token (from secure native storage) in the request body instead.
+        if (!$refreshTokenString) {
+            $body = json_decode($request->getContent(), true);
+            if (is_array($body) && isset($body['refreshToken']) && is_string($body['refreshToken'])) {
+                $refreshTokenString = $body['refreshToken'];
+            }
+        }
+
         if (!$refreshTokenString) {
             return $this->json([
                 'error' => 'No refresh token',
@@ -334,7 +377,7 @@ class AuthController extends AbstractController
 
         $this->logger->info('Token refreshed', ['user_id' => $result['user']->getId()]);
 
-        $response = new JsonResponse([
+        $responseData = [
             'success' => true,
             'user' => [
                 'id' => $result['user']->getId(),
@@ -343,7 +386,15 @@ class AuthController extends AbstractController
                 'emailVerified' => $result['user']->isEmailVerified(),
                 'isAdmin' => $result['user']->isAdmin(),
             ],
-        ]);
+        ];
+
+        // Native shell consumes the rotated access token from the body (the
+        // refresh token is unchanged — refreshTokens() does not rotate it).
+        if ($this->clientContextResolver->fromRequest($request)->isMobileApp) {
+            $responseData['tokens'] = $this->nativeTokenPayload($result['access_token'], $refreshTokenString);
+        }
+
+        $response = new JsonResponse($responseData);
 
         $response->headers->setCookie(
             $this->tokenService->createAccessCookie($result['access_token'])

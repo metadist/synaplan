@@ -10,6 +10,8 @@ import App from './App.vue'
 import { useConfigStore } from './stores/config'
 import { useGlobalErrorStore } from './stores/globalError'
 import { installGlobalErrorHandlers } from './utils/installGlobalErrorHandlers'
+import { isNativeApp, getNativeApiBaseUrl } from './services/api/nativeRuntime'
+import { setApiBaseUrl } from './services/api/httpClient'
 
 // Bootstrap app - load config before mounting.
 // We MUST install global error handlers and mount the app even when bootstrap
@@ -25,6 +27,13 @@ import { installGlobalErrorHandlers } from './utils/installGlobalErrorHandlers'
 
   // Pinia is now installed → safe to wire global handlers that depend on stores.
   installGlobalErrorHandlers(app)
+
+  // Native shell runs cross-origin (capacitor://localhost). Point the API client
+  // at the real backend BEFORE the first request (config.init) — otherwise every
+  // call would resolve against the WebView's own localhost origin and fail.
+  if (isNativeApp()) {
+    setApiBaseUrl(getNativeApiBaseUrl())
+  }
 
   const config = useConfigStore()
 

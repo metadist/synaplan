@@ -14,6 +14,7 @@ import {
   reloadConfig,
   getUnavailableProviders,
 } from '@/services/api/httpClient'
+import { isNativeApp, getNativeApiBaseUrl } from '@/services/api/nativeRuntime'
 import { checkMemoryServiceAvailability } from '@/services/api/configApi'
 import { i18n } from '@/i18n'
 import { ref } from 'vue'
@@ -32,9 +33,16 @@ async function loadRuntimeConfig() {
 const config = {
   /**
    * Application base URL - used for building full URLs (OAuth redirects, share links, etc.)
-   * Returns current origin (e.g., https://example.com)
+   * Returns current origin (e.g., https://example.com).
+   *
+   * In the native shell `window.location.origin` is `capacitor://localhost`,
+   * which is useless for OAuth redirects, share links and absolute asset URLs —
+   * so we return the real backend/web origin instead (Epic 3).
    */
   get appBaseUrl(): string {
+    if (isNativeApp()) {
+      return getNativeApiBaseUrl()
+    }
     return window.location.origin
   },
 
@@ -137,6 +145,28 @@ const config = {
     },
     get ip(): string {
       return getConfigSync().build?.ip ?? 'dev'
+    },
+  },
+
+  /**
+   * Client identity (server-confirmed, from the User-Agent).
+   *
+   * Use this for SECURITY-relevant / server-truthful decisions (e.g. payment channel
+   * gating). For pure client-side UI gating prefer Capacitor.isNativePlatform() — but
+   * never trust the client for anything the backend must enforce.
+   */
+  client: {
+    /** True when the backend saw the official "Synaplan Mobile Vx.x" User-Agent. */
+    get isMobileApp(): boolean {
+      return getConfigSync().client?.isMobileApp ?? false
+    },
+    /** Parsed app version (major.minor[.patch]) or null on web. */
+    get appVersion(): string | null {
+      return getConfigSync().client?.appVersion ?? null
+    },
+    /** 'mobile' | 'web' (defaults to 'web' until config loads). */
+    get platform(): string {
+      return getConfigSync().client?.platform ?? 'web'
     },
   },
 

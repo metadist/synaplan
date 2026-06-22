@@ -14,8 +14,50 @@
 import { ref, type Ref } from 'vue'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { setSessionHint, clearSessionHint, hasSessionHint } from '@/services/sessionHint'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import {
+  getNativeAccessToken,
+  getNativeRefreshToken,
+  setNativeTokens,
+  clearNativeTokens,
+  hasNativeTokens,
+} from '@/services/api/nativeAuth'
 
-const API_BASE_URL = getApiBaseUrl()
+/**
+ * Fetch wrapper bridging web (same-origin cookies) and native (cross-origin
+ * Bearer) auth. The base URL is resolved per call (NOT captured at import) so it
+ * reflects the native override main.ts applies before the first request.
+ *
+ * Pass `{ bearer: false }` for public endpoints whose access token may be absent
+ * or expired (login / register / refresh): sending an expired Bearer would make
+ * the stateless API firewall reject the request before the controller runs.
+ */
+function authFetch(
+  path: string,
+  init: RequestInit = {},
+  opts: { bearer?: boolean } = {}
+): Promise<Response> {
+  const native = isNativeApp()
+  const headers = new Headers(init.headers)
+
+  if (native && false !== opts.bearer) {
+    const token = getNativeAccessToken()
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
+  }
+
+  return fetch(`${getApiBaseUrl()}${path}`, {
+    ...init,
+    headers,
+    credentials: native ? 'omit' : 'include',
+  })
+}
+
+/** Native has a session when a Bearer token is stored; web uses the UX hint. */
+function hasAuthHint(): boolean {
+  return isNativeApp() ? hasNativeTokens() : hasSessionHint()
+}
 
 /** User payload from /api/v1/auth/me (in-memory only) */
 export interface AuthUser {
@@ -58,14 +100,15 @@ export const authService = {
     recaptchaToken?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await authFetch(
+        '/api/v1/auth/login',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, recaptchaToken }),
         },
-        credentials: 'include', // Important: include cookies
-        body: JSON.stringify({ email, password, recaptchaToken }),
-      })
+        { bearer: false }
+      )
 
       const data = await response.json()
 
@@ -76,6 +119,9 @@ export const authService = {
       // Store user info only in memory (not localStorage for security)
       user.value = data.user
       impersonator.value = (data.impersonator as ImpersonatorInfo | null | undefined) ?? null
+      // Native: persist the Bearer tokens from the body (no-op on web, which has
+      // no `tokens` field and authenticates via the HttpOnly cookies instead).
+      setNativeTokens(data.tokens)
       setSessionHint()
 
       return { success: true }
@@ -94,14 +140,15 @@ export const authService = {
     recaptchaToken?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await authFetch(
+        '/api/v1/auth/register',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, recaptchaToken }),
         },
-        credentials: 'include',
-        body: JSON.stringify({ email, password, recaptchaToken }),
-      })
+        { bearer: false }
+      )
 
       const data = await response.json()
 
@@ -131,9 +178,8 @@ export const authService = {
 
     try {
       if (!silent) {
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+        const response = await authFetch('/api/v1/auth/logout', {
           method: 'POST',
-          credentials: 'include',
         })
 
         if (response.ok) {
@@ -147,6 +193,7 @@ export const authService = {
       user.value = null
       impersonator.value = null
       clearSessionHint()
+      clearNativeTokens()
       isLoggingOut.value = false
     }
 
@@ -171,14 +218,12 @@ export const authService = {
 
     // Optimization: skip API calls for users who have never logged in.
     // OAuth callbacks pass retries > 0, so always check those.
-    if (!hasSessionHint() && retries === 0) {
+    if (!hasAuthHint() && retries === 0) {
       return null
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-        credentials: 'include',
-      })
+      const response = await authFetch('/api/v1/auth/me')
 
       if (response.status === 401) {
         // Don't try to refresh if already logging out
@@ -200,9 +245,7 @@ export const authService = {
         const refreshed = await this.refreshToken()
         if (refreshed) {
           // Retry getting user (only once, no recursion)
-          const retryResponse = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-            credentials: 'include',
-          })
+          const retryResponse = await authFetch('/api/v1/auth/me')
           if (retryResponse.ok) {
             const data = await retryResponse.json()
             user.value = data.user
@@ -258,10 +301,21 @@ export const authService = {
 
   async _doRefresh(): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-      })
+      const native = isNativeApp()
+      const response = await authFetch(
+        '/api/v1/auth/refresh',
+        {
+          method: 'POST',
+          // Native has no refresh cookie → send the stored refresh token.
+          ...(native
+            ? {
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken: getNativeRefreshToken() }),
+              }
+            : {}),
+        },
+        { bearer: false }
+      )
 
       if (!response.ok) {
         // Refresh token invalid/expired (expected behavior, don't spam console)
@@ -271,6 +325,11 @@ export const authService = {
       }
 
       const data = await response.json()
+
+      // Native: persist the rotated access token returned in the body.
+      if (native) {
+        setNativeTokens(data?.tokens)
+      }
 
       // Update user info if provided (memory only)
       if (data.user) {
@@ -346,9 +405,8 @@ export const authService = {
    */
   async revokeAllSessions(): Promise<{ success: boolean; sessionsRevoked?: number }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/revoke-all`, {
+      const response = await authFetch('/api/v1/auth/revoke-all', {
         method: 'POST',
-        credentials: 'include',
       })
 
       if (!response.ok) {
@@ -361,6 +419,7 @@ export const authService = {
       user.value = null
       impersonator.value = null
       clearSessionHint()
+      clearNativeTokens()
 
       return { success: true, sessionsRevoked: data.sessions_revoked }
     } catch (error) {
