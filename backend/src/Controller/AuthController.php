@@ -11,6 +11,7 @@ use App\Repository\VerificationTokenRepository;
 use App\Service\Client\ClientContextResolver;
 use App\Service\ImpersonationService;
 use App\Service\InternalEmailService;
+use App\Service\NativeAuthHandoffService;
 use App\Service\OidcTokenService;
 use App\Service\RecaptchaService;
 use App\Service\TokenService;
@@ -48,6 +49,7 @@ class AuthController extends AbstractController
         private LoggerInterface $logger,
         private ImpersonationService $impersonationService,
         private ClientContextResolver $clientContextResolver,
+        private NativeAuthHandoffService $handoffService,
     ) {
         $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
         $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
@@ -75,6 +77,65 @@ class AuthController extends AbstractController
             'tokenType' => 'Bearer',
             'expiresIn' => TokenService::ACCESS_TOKEN_TTL,
         ];
+    }
+
+    #[Route('/native/exchange', name: 'native_exchange', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/auth/native/exchange',
+        summary: 'Exchange a native OAuth handoff token for Bearer tokens',
+        description: 'Mobile clients call this after the system-browser OAuth flow returns a short-lived, single-purpose handoff token via the app deep link. Returns access/refresh tokens in the body (no cookies).',
+        tags: ['Authentication']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['handoff'],
+            properties: [
+                new OA\Property(property: 'handoff', type: 'string', description: 'Signed handoff token from the OAuth deep link'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Bearer tokens issued')]
+    #[OA\Response(response: 400, description: 'Missing handoff token')]
+    #[OA\Response(response: 401, description: 'Invalid or expired handoff token')]
+    public function nativeExchange(Request $request): JsonResponse
+    {
+        $body = json_decode($request->getContent(), true);
+        $handoff = is_array($body) && isset($body['handoff']) && is_string($body['handoff'])
+            ? $body['handoff']
+            : null;
+
+        if (null === $handoff || '' === $handoff) {
+            return new JsonResponse(['success' => false, 'error' => 'Missing handoff token'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $userId = $this->handoffService->validate($handoff);
+        if (null === $userId) {
+            return new JsonResponse(['success' => false, 'error' => 'Invalid or expired handoff token'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $user = $this->userRepository->find($userId);
+        if (!$user) {
+            return new JsonResponse(['success' => false, 'error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $accessToken = $this->tokenService->generateAccessToken($user);
+        $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
+
+        $this->logger->info('Native OAuth handoff exchanged', ['user_id' => $user->getId()]);
+
+        return new JsonResponse([
+            'success' => true,
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getMail(),
+                'level' => $user->getUserLevel(),
+                'emailVerified' => $user->isEmailVerified(),
+                'isAdmin' => $user->isAdmin(),
+                'memoriesEnabled' => $user->isMemoriesEnabled(),
+            ],
+            'tokens' => $this->nativeTokenPayload($accessToken, $refreshToken),
+        ]);
     }
 
     #[Route('/register', name: 'register', methods: ['POST'])]

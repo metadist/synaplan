@@ -4,14 +4,12 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
-use App\Service\ImpersonationService;
+use App\Service\OAuthLoginResponder;
 use App\Service\OAuthStateService;
-use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -29,14 +27,12 @@ class GitHubAuthController extends AbstractController
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
-        private TokenService $tokenService,
         private OAuthStateService $oauthStateService,
-        private ImpersonationService $impersonationService,
+        private OAuthLoginResponder $oauthLoginResponder,
         private LoggerInterface $logger,
         private string $githubClientId,
         private string $githubClientSecret,
         private string $appUrl,
-        private string $frontendUrl,
     ) {
     }
 
@@ -50,12 +46,16 @@ class GitHubAuthController extends AbstractController
         response: 302,
         description: 'Redirect to GitHub OAuth authorization'
     )]
-    public function login(): Response
+    public function login(Request $request): Response
     {
         $redirectUri = $this->appUrl.'/api/v1/auth/github/callback';
 
+        // Native (mobile) clients open this in the system browser and need the
+        // result via a deep link — remember that intent in the signed state.
+        $native = $request->query->getBoolean('native');
+
         // Generate signed state token (no session required)
-        $state = $this->oauthStateService->generateState('github');
+        $state = $this->oauthStateService->generateState('github', $native ? ['native' => true] : []);
 
         $params = [
             'client_id' => $this->githubClientId,
@@ -89,26 +89,20 @@ class GitHubAuthController extends AbstractController
         $state = $request->query->get('state');
 
         // Validate signed state token (CSRF protection, no session required)
-        if (!$state || !$this->oauthStateService->validateState($state, 'github')) {
+        $statePayload = $state ? $this->oauthStateService->validateState($state, 'github') : null;
+
+        if (!$statePayload) {
             $this->logger->error('GitHub OAuth state validation failed', [
                 'state_present' => !empty($state),
             ]);
 
-            $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
-                'error' => 'Invalid state parameter',
-                'provider' => 'github',
-            ]);
-
-            return $this->redirect($errorUrl);
+            return $this->oauthLoginResponder->error('github', 'Invalid state parameter', false);
         }
 
-        if (!$code) {
-            $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
-                'error' => 'Authorization code not received',
-                'provider' => 'github',
-            ]);
+        $native = (bool) ($statePayload['native'] ?? false);
 
-            return $this->redirect($errorUrl);
+        if (!$code) {
+            return $this->oauthLoginResponder->error('github', 'Authorization code not received', $native);
         }
 
         try {
@@ -175,44 +169,21 @@ class GitHubAuthController extends AbstractController
             // Find or create user
             $user = $this->findOrCreateUser($userInfo, $email, $githubAccessToken);
 
-            // Generate our tokens
-            $accessToken = $this->tokenService->generateAccessToken($user);
-            $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
-
-            // Create redirect response with cookies
-            $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
-                'success' => 'true',
-                'provider' => 'github',
-            ]);
-
-            $response = new RedirectResponse($callbackUrl);
-
-            // Set fresh auth cookies and defensively wipe any orphan
-            // impersonation stash that survived from a prior session on this
-            // browser. Same rationale as in GoogleAuthController and the
-            // regular login path: a leftover stash must never let the new
-            // signed-in user resurrect a previous admin's session.
-            $this->tokenService->addAuthCookies($response, $accessToken, $refreshToken);
-            $this->impersonationService->attachClearStashCookies($response);
-
-            $this->logger->info('GitHub OAuth successful, redirecting with cookies', [
+            $this->logger->info('GitHub OAuth successful', [
                 'user_id' => $user->getId(),
                 'email' => $user->getMail(),
+                'native' => $native,
             ]);
 
-            return $response;
+            // Web → cookies + SPA redirect; native → deep-link handoff token.
+            return $this->oauthLoginResponder->success($user, $request, 'github', $native);
         } catch (\Exception $e) {
             $this->logger->error('GitHub OAuth callback error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
-                'error' => 'Failed to authenticate with GitHub',
-                'provider' => 'github',
-            ]);
-
-            return $this->redirect($errorUrl);
+            return $this->oauthLoginResponder->error('github', 'Failed to authenticate with GitHub', $native);
         }
     }
 

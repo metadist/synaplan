@@ -43,12 +43,24 @@ class KeycloakAuthControllerTest extends TestCase
         // they were written for.
         $impersonationService = $this->createMock(\App\Service\ImpersonationService::class);
 
+        // OAuthLoginResponder + NativeAuthHandoffService are final — build real
+        // instances (with mocked collaborators) like OAuthStateService above.
+        $handoffService = new \App\Service\NativeAuthHandoffService($this->logger, 'test-secret');
+        $oauthLoginResponder = new \App\Service\OAuthLoginResponder(
+            $this->tokenService,
+            $impersonationService,
+            $handoffService,
+            'https://app.example.com',
+            'com.synaplan.app',
+        );
+
         return new KeycloakAuthController(
             $this->httpClient,
             $this->tokenService,
             $this->oidcTokenService,
             $this->oidcUserService,
             $this->oauthStateService,
+            $oauthLoginResponder,
             $impersonationService,
             $this->logger,
             'test-client-id',

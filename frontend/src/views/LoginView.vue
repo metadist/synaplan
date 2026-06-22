@@ -367,6 +367,9 @@ import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
 import { validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import { startNativeOAuth } from '@/services/api/nativeOAuth'
+import { useAuthStore } from '@/stores/auth'
 import {
   consumePendingRedirect,
   isSafeRedirectPath,
@@ -379,6 +382,7 @@ const { locale } = useI18n()
 const themeStore = useTheme()
 const { getToken: getReCaptchaToken } = useRecaptcha()
 const config = useConfigStore()
+const authStore = useAuthStore()
 
 const isDark = computed(() => {
   if (themeStore.theme.value === 'dark') return true
@@ -416,7 +420,9 @@ const toggleTheme = () => {
 
 const { login, error: authError, loading, clearError } = useAuth()
 const emailError = ref('')
-const error = computed(() => authError.value)
+// Native OAuth errors surface through the same banner as password-login errors.
+const socialError = ref('')
+const error = computed(() => socialError.value || authError.value)
 
 const onEmailBlur = () => {
   focusedField.value = null
@@ -491,11 +497,33 @@ const handleLogin = async () => {
   }
 }
 
-const handleSocialLogin = (provider: string) => {
+const handleSocialLogin = async (provider: string) => {
   // OAuth round-trip strips the SPA's URL state, so stash the intent
   // for OAuthCallback to pick up. setPendingRedirect validates internally.
   const redirect = route.query.redirect as string | undefined
   if (redirect) setPendingRedirect(redirect)
+
+  // Native shell: providers block embedded WebViews, so run OAuth in the system
+  // browser and complete via a deep-link handoff (no full-page redirect).
+  if (isNativeApp()) {
+    socialError.value = ''
+    const result = await startNativeOAuth(provider)
+    if (!result.success) {
+      socialError.value = result.error || 'Login failed'
+      return
+    }
+    // Tokens are stored — verify the session via the store so the reactive
+    // auth state + config (guest → authenticated) update everywhere.
+    const ok = await authStore.handleOAuthCallback()
+    if (ok) {
+      const queryPath = isSafeRedirectPath(redirect) ? redirect : null
+      router.push(queryPath ?? consumePendingRedirect() ?? '/')
+    } else {
+      socialError.value = 'Login failed'
+    }
+    return
+  }
+
   window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
 }
 </script>

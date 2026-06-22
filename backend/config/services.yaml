@@ -19,6 +19,11 @@ parameters:
     # OIDC scopes requested during login (space-separated)
     env(OIDC_SCOPES): 'openid email profile offline_access'
 
+    # Native mobile deep-link scheme used for the OAuth handoff (Epic 3).
+    # Must match the custom URL scheme registered by the Capacitor app
+    # (synaplan-apps). Default matches the production bundle id.
+    env(NATIVE_DEEPLINK_SCHEME): 'com.synaplan.app'
+
     # Realtime (Centrifugo) defaults so the backend boots even when no realtime
     # gateway is configured (bare/custom deployment). With these unset,
     # CentrifugoPublisher short-circuits (enabled=false → no publish, never
@@ -480,14 +485,12 @@ services:
             $googleClientId: '%env(GOOGLE_CLIENT_ID)%'
             $googleClientSecret: '%env(GOOGLE_CLIENT_SECRET)%'
             $appUrl: '%env(APP_URL)%'
-            $frontendUrl: '%env(FRONTEND_URL)%'
 
     App\Controller\GitHubAuthController:
         arguments:
             $githubClientId: '%env(GITHUB_CLIENT_ID)%'
             $githubClientSecret: '%env(GITHUB_CLIENT_SECRET)%'
             $appUrl: '%env(APP_URL)%'
-            $frontendUrl: '%env(FRONTEND_URL)%'
 
     # OIDC Discovery Controller
     App\Controller\OidcController:
@@ -565,6 +568,17 @@ services:
     App\Service\OAuthStateService:
         arguments:
             $appSecret: '%env(APP_SECRET)%'
+
+    # Native OAuth handoff token (signed, short-lived) for the mobile deep-link flow
+    App\Service\NativeAuthHandoffService:
+        arguments:
+            $appSecret: '%env(APP_SECRET)%'
+
+    # OAuth login responder (web cookies vs native deep-link handoff)
+    App\Service\OAuthLoginResponder:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
+            $nativeDeepLinkScheme: '%env(NATIVE_DEEPLINK_SCHEME)%'
 
     # Token Service (Access/Refresh Tokens)
     App\Service\TokenService:

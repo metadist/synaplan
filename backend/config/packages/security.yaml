@@ -80,6 +80,8 @@ security:
         - { path: ^/api/v1/auth/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/resend-verification, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/refresh, roles: PUBLIC_ACCESS }
+        # Native (mobile) OAuth handoff exchange — auth IS the signed handoff token
+        - { path: ^/api/v1/auth/native/exchange, roles: PUBLIC_ACCESS }
 
         # Authenticated auth endpoints
         - { path: ^/api/v1/auth/me, roles: IS_AUTHENTICATED_FULLY }
