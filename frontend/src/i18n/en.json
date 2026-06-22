@@ -2843,7 +2843,7 @@
     "title": "Task plan",
     "download": "Download",
     "failedBody": "This step couldn't be completed.",
-    "searchSummary": "Searched the web · {count} {count, plural, one {source} other {sources}}",
+    "searchSummary": "Searched the web · {count} source | Searched the web · {count} sources",
     "retryWith": "Retry with {model}",
     "state": {
       "pending": "Queued",

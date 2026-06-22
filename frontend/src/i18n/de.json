@@ -852,7 +852,7 @@
     "title": "Aufgabenplan",
     "download": "Herunterladen",
     "failedBody": "Dieser Schritt konnte nicht abgeschlossen werden.",
-    "searchSummary": "Web durchsucht · {count} {count, plural, one {Quelle} other {Quellen}}",
+    "searchSummary": "Web durchsucht · {count} Quelle | Web durchsucht · {count} Quellen",
     "retryWith": "Nochmal mit {model}",
     "state": {
       "pending": "Wartet",
