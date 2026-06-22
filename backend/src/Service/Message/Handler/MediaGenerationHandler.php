@@ -2,6 +2,7 @@
 
 namespace App\Service\Message\Handler;
 
+use App\AI\Exception\ProviderCancelledException;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\Entity\Message;
@@ -10,6 +11,7 @@ use App\Message\ExtractMemoriesCommand;
 use App\Service\File\FileHelper;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\MediaCancellationStore;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
@@ -42,6 +44,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private MediaErrorMessageBuilder $errorMessageBuilder,
         private MessageBusInterface $messageBus,
         private PerfPipelineFlag $perfPipelineFlag,
+        private MediaCancellationStore $cancellationStore,
         private string $uploadDir = '/var/www/backend/var/uploads',
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
@@ -143,8 +146,12 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             throw new \RuntimeException('Unable to determine media prompt text');
         }
 
-        // Collect attached image paths for pic2pic
-        $attachedImagePaths = $this->collectAttachedImagePaths($message);
+        // Collect attached image paths for pic2pic. Besides the message's own
+        // uploads we also accept reference images passed explicitly via options
+        // (issue #1144: multitask media-to-media chains, where an upstream node's
+        // generated image is the reference for this video/edit node).
+        $referenceImagePaths = is_array($options['reference_image_paths'] ?? null) ? $options['reference_image_paths'] : [];
+        $attachedImagePaths = $this->collectAttachedImagePaths($message, $referenceImagePaths);
         $isPic2Pic = !empty($attachedImagePaths);
 
         $this->logger->info('MediaGenerationHandler: Starting media generation', [
@@ -430,6 +437,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             }
         }
 
+        // Holds the provider result once generation succeeds. Initialised here so
+        // the ProviderCancelledException catch can safely inspect it (issue #1146
+        // cancelled-cost recording) even when the abort happens mid-call.
+        $result = null;
+
         try {
             // Generate media based on type
             if ('video' === $mediaType) {
@@ -439,6 +451,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     $duration = (int) $options['duration'];
                 } elseif (isset($classification['duration'])) {
                     $duration = (int) $classification['duration'];
+                } elseif (isset($modelConfig['default_duration']) && is_numeric($modelConfig['default_duration'])) {
+                    // Model-specific standard length (e.g. Higgsfield DoP = 5s).
+                    // Keeps "make a video" requests at a length the provider
+                    // supports and can render within the time budget.
+                    $duration = (int) $modelConfig['default_duration'];
                 } else {
                     $duration = 8; // Default to 8 seconds
                 }
@@ -460,11 +477,30 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'duration' => $duration,
                     'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
                     'resolution' => $resolutionOption,
+                    // Forward the provider's poll status as a status update. The
+                    // 'message' keeps the legacy single-chat "Generating..." box
+                    // working; the structured metadata lets the multitask card
+                    // render a live progress bar tagged to its node.
                     'progress_callback' => function (array $progress) use ($progressCallback): void {
                         $elapsed = $progress['elapsed_seconds'] ?? 0;
-                        $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)");
+                        $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)", [
+                            'provider_status' => $progress['status'] ?? 'processing',
+                            'elapsed_seconds' => $elapsed,
+                            'percent' => $progress['percent'] ?? null,
+                            'attempt' => $progress['attempt'] ?? null,
+                            'max_attempts' => $progress['max_attempts'] ?? null,
+                        ]);
                     },
                 ];
+
+                // Stop button support: probe the shared cancellation store (set by
+                // the global Stop or a per-card Stop on a different worker) plus a
+                // client-disconnect check, so the provider poll aborts and tells
+                // Higgsfield to cancel instead of finishing an unwanted render.
+                $cancelCheck = $this->buildCancelCheck($options);
+                if (null !== $cancelCheck) {
+                    $videoOptions['cancel_check'] = $cancelCheck;
+                }
 
                 // Image-to-video: publish the attached image at a public URL so
                 // the provider (Higgsfield etc.) can fetch it. i2v providers
@@ -537,6 +573,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
                 $this->notify($progressCallback, 'generating', 'Audio generated successfully.');
 
+                $audioMediaUsage = [
+                    'characters' => $result['text_length'] ?? mb_strlen($prompt),
+                ];
+
+                // Issue #1146: record the cost before returning (see image/video
+                // path) so a torn-down worker can't bypass audio billing.
+                $usageRecorded = $this->maybeRecordMediaUsage($user, $options, $mediaAction, $modelId, $result['provider'] ?? $provider, $result['model'] ?? $modelName, $audioMediaUsage);
+
                 return [
                     'metadata' => [
                         'provider' => $result['provider'] ?? $provider,
@@ -545,9 +589,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'local_path' => $relativePath,
                         'media_prompt' => $prompt,
                         'media_type' => $mediaType,
-                        'media_usage' => [
-                            'characters' => $result['text_length'] ?? mb_strlen($prompt),
-                        ],
+                        'media_usage' => $audioMediaUsage,
+                        'usage_recorded' => $usageRecorded,
                         'file' => [
                             'path' => $displayUrl,
                             'type' => $mediaType,
@@ -682,6 +725,13 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 }
             }
 
+            // Issue #1146: record the cost the moment the provider has billed us,
+            // before returning. If the caller owns the cost (record_media_usage),
+            // this guarantees BUSELOG is written even if the streaming worker is
+            // later torn down by a client disconnect — closing the billing-bypass
+            // window. `usage_recorded` tells the caller to skip its own recording.
+            $usageRecorded = $this->maybeRecordMediaUsage($user, $options, $mediaAction, $modelId, $result['provider'] ?? $provider, $result['model'] ?? $modelName, $mediaUsage);
+
             return [
                 'metadata' => [
                     'provider' => $result['provider'] ?? $provider,
@@ -693,10 +743,45 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'media_prompt' => $prompt,
                     'media_type' => $mediaType,
                     'media_usage' => $mediaUsage,
+                    'usage_recorded' => $usageRecorded,
                     'file' => [
                         'path' => $displayUrl,
                         'type' => $mediaType,
                     ],
+                ],
+            ];
+        } catch (ProviderCancelledException $e) {
+            // User pressed Stop — neutral outcome, not a failure. We deliberately
+            // do NOT stream a content marker (it would leak raw into the single
+            // chat bubble and is unhandled by the frontend); the `cancelled`
+            // metadata flag is the signal, and the client already renders the
+            // cancelled card state from its own Stop action.
+            $this->logger->info('MediaGenerationHandler: Generation cancelled by user', [
+                'provider' => $provider,
+                'model' => $modelName,
+                'media_type' => $mediaType,
+            ]);
+
+            // Issue #1146: a cancelled generation is NOT free. Video providers
+            // bill at job submission and image providers bill once the request
+            // is accepted, so the provider already charged us by the time the
+            // poll was aborted. Record that cost against the user's budget so a
+            // Stop-then-restart loop can't be used to bypass billing. The cost
+            // is deterministic from the requested duration/resolution (video) or
+            // a single image, mirroring the success-path media_usage shape.
+            $cancelledMediaUsage = $this->buildCancelledMediaUsage($mediaType, $options, $classification, $result ?? null);
+            $usageRecorded = $this->maybeRecordMediaUsage($user, $options, $mediaAction, $modelId, $provider, $modelName, $cancelledMediaUsage);
+
+            return [
+                'metadata' => [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'model_id' => $modelId,
+                    'media_type' => $mediaType,
+                    'media_usage' => $cancelledMediaUsage,
+                    'cancelled' => true,
+                    'usage_recorded' => $usageRecorded,
+                    'error' => 'cancelled',
                 ],
             ];
         } catch (\Exception $e) {
@@ -1014,9 +1099,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     /**
      * Collect absolute paths of image attachments from the message.
      *
-     * @return string[] Absolute file paths to attached images
+     * @param list<string> $extraImagePaths reference images supplied by the caller
+     *                                      (issue #1144) — relative to the upload
+     *                                      dir, an absolute path, or a public
+     *                                      `/api/v1/files/uploads/...` display URL
+     *
+     * @return list<string> absolute, on-disk image paths to attached images
      */
-    private function collectAttachedImagePaths(Message $message): array
+    private function collectAttachedImagePaths(Message $message, array $extraImagePaths = []): array
     {
         $paths = [];
         $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
@@ -1044,7 +1134,54 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             }
         }
 
+        // Merge caller-supplied reference images (multitask media-to-media chains).
+        // Each candidate is normalised to an absolute on-disk path and filtered by
+        // image extension + existence, exactly like the message's own uploads.
+        foreach ($extraImagePaths as $candidate) {
+            if ('' === $candidate) {
+                continue;
+            }
+            $absolutePath = $this->normalizeReferenceImagePath($candidate);
+            if (null === $absolutePath) {
+                continue;
+            }
+            $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+            if (in_array($ext, $imageExtensions, true) && !in_array($absolutePath, $paths, true)) {
+                $paths[] = $absolutePath;
+            }
+        }
+
         return $paths;
+    }
+
+    /**
+     * Resolve a caller-supplied reference image reference to an absolute on-disk
+     * path (issue #1144). Accepts an absolute path, a path relative to the upload
+     * dir, or a public `/api/v1/files/uploads/...` display URL. Returns null when
+     * the file cannot be found.
+     */
+    private function normalizeReferenceImagePath(string $candidate): ?string
+    {
+        // Strip the public display prefix so a `$nX.file` `path` resolves to the
+        // same relative key the upload dir uses.
+        $relative = preg_replace('#^/?api/v1/files/uploads/#', '', $candidate);
+        $relative = null === $relative ? $candidate : $relative;
+
+        // Already an absolute, existing path.
+        if (str_starts_with($candidate, '/') && file_exists($candidate)) {
+            return $candidate;
+        }
+
+        $absolute = $this->uploadDir.'/'.ltrim($relative, '/');
+        if (file_exists($absolute)) {
+            return $absolute;
+        }
+
+        $this->logger->warning('MediaGenerationHandler: reference image not found on disk', [
+            'candidate' => $candidate,
+        ]);
+
+        return null;
     }
 
     /**
@@ -1197,6 +1334,134 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     /**
      * Notify progress callback.
      */
+    /**
+     * Build a cancellation probe for the provider poll loop from the processing
+     * options, or null when there is nothing to watch.
+     *
+     * Two triggers, both cheap to check every poll interval:
+     *   - the shared {@see MediaCancellationStore} (set by the Stop button on a
+     *     different worker — track-scoped for global Stop, node-scoped for a
+     *     single multitask step);
+     *   - a client disconnect on the streaming worker.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function buildCancelCheck(array $options): ?callable
+    {
+        $trackId = isset($options['track_id']) && is_scalar($options['track_id'])
+            ? trim((string) $options['track_id'])
+            : '';
+        $nodeId = isset($options['node_id']) && is_scalar($options['node_id'])
+            ? trim((string) $options['node_id'])
+            : null;
+
+        if ('' === $trackId) {
+            return null;
+        }
+
+        return function () use ($trackId, $nodeId): bool {
+            if (\function_exists('connection_aborted') && 1 === connection_aborted()) {
+                return true;
+            }
+
+            return $this->cancellationStore->isCancelled($trackId, '' !== (string) $nodeId ? $nodeId : null);
+        };
+    }
+
+    /**
+     * Record media-generation cost into BUSELOG when the caller owns the cost
+     * (issue #1146).
+     *
+     * Gated behind the `record_media_usage` option so ONLY the SSE
+     * StreamController and the multitask MediaGenerationRunner record here —
+     * legacy callers (webhook / WhatsApp / MCP) keep recording at their own
+     * call site and must not pass the flag, which avoids double counting.
+     *
+     * Recording at this point (right after the provider returns / is cancelled)
+     * is the reliable place: the provider has already billed us, so even if the
+     * streaming worker dies on a client disconnect afterwards the cost is
+     * already persisted and counts toward the user's budget.
+     *
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $mediaUsage
+     *
+     * @return bool true when usage was recorded (caller should skip its own recordUsage)
+     */
+    private function maybeRecordMediaUsage(
+        ?User $user,
+        array $options,
+        string $mediaAction,
+        ?int $modelId,
+        ?string $provider,
+        ?string $modelName,
+        array $mediaUsage,
+    ): bool {
+        if (empty($options['record_media_usage']) || !$user instanceof User) {
+            return false;
+        }
+
+        try {
+            $this->rateLimitService->recordUsage($user, $mediaAction, [
+                'provider' => $provider ?? 'unknown',
+                'model' => $modelName ?? 'unknown',
+                'model_id' => $modelId,
+                'media_usage' => $mediaUsage,
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            // Never let a billing-record hiccup take down media generation.
+            $this->logger->error('MediaGenerationHandler: Failed to record media usage', [
+                'action' => $mediaAction,
+                'model_id' => $modelId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Build the media_usage payload to bill for a CANCELLED generation
+     * (issue #1146).
+     *
+     * The provider has already charged us (video at submission, image at
+     * acceptance), so the cost is deterministic from the request parameters even
+     * though we never received the asset. Mirrors the success-path shape so
+     * {@see RateLimitService::recordUsage()} computes the same per-second /
+     * per-image / per-character cost.
+     *
+     * @param array<string, mixed>      $options
+     * @param array<string, mixed>      $classification
+     * @param array<string, mixed>|null $result         provider partial result, if any
+     *
+     * @return array<string, mixed>
+     */
+    private function buildCancelledMediaUsage(string $mediaType, array $options, array $classification, ?array $result): array
+    {
+        if ('video' === $mediaType) {
+            $requestedDuration = $options['duration'] ?? $classification['duration'] ?? 8;
+            $duration = (float) ($result['duration_seconds'] ?? $requestedDuration);
+            $usage = ['duration_seconds' => $duration];
+
+            $resolution = (is_array($result) ? $this->extractVideoResolution($result) : null)
+                ?? (isset($options['resolution']) && is_string($options['resolution']) ? $options['resolution'] : null)
+                ?? (isset($classification['resolution']) && is_string($classification['resolution']) ? $classification['resolution'] : null);
+            if (null !== $resolution) {
+                $usage['resolution'] = $resolution;
+            }
+
+            return $usage;
+        }
+
+        if ('audio' === $mediaType) {
+            return ['characters' => mb_strlen((string) ($classification['media_prompt'] ?? ''))];
+        }
+
+        // Image providers bill per generated image.
+        return ['images' => 1];
+    }
+
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
     {
         if ($callback) {

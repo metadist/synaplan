@@ -1034,6 +1034,9 @@
     "title": "Görev planı",
     "download": "İndir",
     "failedBody": "Bu adım tamamlanamadı.",
+    "cancelledBody": "Bu adımı durdurdunuz.",
+    "stop": "Durdur",
+    "rendering": "Oluşturuluyor…",
     "searchSummary": "Web arandı · {count} kaynak",
     "retryWith": "{model} ile yeniden dene",
     "state": {
@@ -1041,7 +1044,8 @@
       "running": "Çalışıyor…",
       "done": "Tamamlandı",
       "failed": "Başarısız",
-      "skipped": "Atlandı"
+      "skipped": "Atlandı",
+      "cancelled": "Durduruldu"
     },
     "kind": {
       "text": "Metin",

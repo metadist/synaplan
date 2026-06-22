@@ -172,6 +172,7 @@
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
               @retry-task="handleTaskRetry"
+              @cancel-task="handleTaskCancel"
               @false-positive="openFalsePositiveModal"
               @click-memory="handleClickMemory"
               @continue="handleContinueResponse(message)"
@@ -1827,6 +1828,37 @@ const streamAIResponse = async (
             return
           }
 
+          // [i2v-debug] Opt-in multitask/media tracing: a task card stuck at
+          // "Rendering… 95%" gives no clue whether the worker ever finishes. Log
+          // the plan + task lifecycle (progress, terminal state, produced file) so
+          // we can see in the browser console if the closing task_update/task_file
+          // actually reaches the client over the realtime channel. Gated behind
+          // `localStorage.setItem('synaplanDebug', '1')` (same pattern as the
+          // 'perf' tracing) so production consoles stay quiet and no internal
+          // metadata (file URLs/errors) leaks unless a developer opts in.
+          try {
+            if (
+              typeof window !== 'undefined' &&
+              window.localStorage?.getItem('synaplanDebug') &&
+              typeof data.status === 'string' &&
+              (data.status === 'plan' ||
+                data.status === 'plan_discarded' ||
+                data.status.startsWith('task_'))
+            ) {
+              console.debug('[i2v-debug]', data.status, {
+                node_id: data.metadata?.node_id,
+                state: data.metadata?.state,
+                percent: data.metadata?.percent,
+                provider_status: data.metadata?.provider_status,
+                elapsed_seconds: data.metadata?.elapsed_seconds,
+                url: data.metadata?.url,
+                error: data.metadata?.error,
+              })
+            }
+          } catch {
+            // never let debug tracing break the stream handler
+          }
+
           // Handle different status events for UI feedback
           if (data.status === 'started') {
             processingStatus.value = 'started'
@@ -1947,6 +1979,10 @@ const streamAIResponse = async (
               message.wasMultitask = true
               message.taskPlan = {
                 active: true,
+                // Persist the turn id on the plan so the per-card Stop button can
+                // always reach the backend even if currentTrackId is cleared by a
+                // racing handler (issue #1141).
+                trackId: currentTrackId,
                 replyNode:
                   typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
                 cards: tasks.map((t) => ({
@@ -1969,7 +2005,12 @@ const streamAIResponse = async (
           } else if (data.status === 'task_update') {
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && isTaskCardState(data.metadata?.state)) {
+            // A user-cancelled step is terminal on the client: ignore the
+            // backend 'failed' that follows the abort so the card stays
+            // 'cancelled' (neutral) instead of flipping to a scary error.
+            if (card && card.state === 'cancelled') {
+              // keep cancelled
+            } else if (card && isTaskCardState(data.metadata?.state)) {
               card.state = data.metadata.state
               // Failure details: specific error text + (for media nodes) the
               // resolved prompt powering the per-task retry button.
@@ -2000,6 +2041,21 @@ const streamAIResponse = async (
               card.url = normalizeMediaUrl(data.metadata.url)
               card.mediaType =
                 typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
+            }
+          } else if (data.status === 'task_progress') {
+            // Live media render progress: feed a moving bar on the running card.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && card.state !== 'cancelled') {
+              if (typeof data.metadata?.percent === 'number') {
+                card.progressPercent = data.metadata.percent
+              }
+              if (typeof data.metadata?.provider_status === 'string') {
+                card.providerStatus = data.metadata.provider_status
+              }
+              if (typeof data.metadata?.elapsed_seconds === 'number') {
+                card.elapsedSeconds = data.metadata.elapsed_seconds
+              }
             }
           } else if (
             data.status === 'data' &&
@@ -2996,6 +3052,86 @@ const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => 
   isAudioStreaming.value = false
 
   await streamAIResponse(payload.prompt, { modelId: payload.modelId, isAgain: true })
+}
+
+// Per-card Stop: cancel one running media step without ending the whole turn.
+// Mark the card cancelled immediately (the user's intent is the source of truth)
+// and signal the backend so the provider poll aborts and stops billing.
+const handleTaskCancel = async (nodeId: string) => {
+  // Resolve the CURRENT turn's task-plan message via the streaming flag, mirroring
+  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …) and
+  // taskPlan.active is only cleared on local teardown (not on a normal/error
+  // completion), so finding the FIRST active plan can match a stale earlier turn and
+  // cancel the wrong card / send the wrong trackId. The streaming message is the
+  // unambiguous active turn; fall back to the active-plan lookup only if none is
+  // currently streaming.
+  const message =
+    historyStore.messages.find((m) => m.isStreaming && m.taskPlan?.active) ??
+    historyStore.messages.find((m) => m.taskPlan?.active)
+  const card = message?.taskPlan?.cards.find((c) => c.nodeId === nodeId)
+  if (card) {
+    card.state = 'cancelled'
+  }
+
+  // Resolve the turn id reliably: prefer the plan-scoped id captured when the
+  // turn started, falling back to the module-level currentTrackId. Relying on
+  // currentTrackId alone was the root cause of issue #1141 — it can be undefined
+  // (cleared by a racing complete/error handler) so the backend never received
+  // the cancel and the stream stayed open, blocking the input.
+  const trackId = message?.taskPlan?.trackId ?? currentTrackId
+  if (trackId !== undefined) {
+    try {
+      await chatApi.cancelTask(trackId, nodeId)
+    } catch {
+      // Best-effort: the card already reflects the cancellation locally.
+    }
+  } else {
+    console.warn('⚠️ No trackId for per-card cancel - skipping backend notification')
+  }
+
+  // If this was the last still-running step, end the turn locally so the input
+  // unblocks immediately (issue #1141): a single-node media turn would otherwise
+  // wait for a backend `complete` that may be delayed by the provider poll. We
+  // close the EventSource and finish the streaming message WITHOUT the global
+  // "cancelled by user" notice, since the cancelled card already conveys it.
+  const remaining = message?.taskPlan?.cards.filter(
+    (c) => c.state === 'pending' || c.state === 'running'
+  )
+  if (!remaining || remaining.length === 0) {
+    finishStreamingTurnLocally()
+  }
+}
+
+// Tear down the active stream and unblock the chat input without injecting the
+// global stop's "cancelled by user" text. Used when a per-card Stop cancels the
+// only running step (issue #1141).
+function finishStreamingTurnLocally() {
+  if (streamingAbortController) {
+    streamingAbortController.abort()
+  }
+  if (stopStreamingFn) {
+    stopStreamingFn()
+    stopStreamingFn = null
+  }
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
+  isAudioStreaming.value = false
+  processingStatus.value = ''
+  processingMetadata.value = {}
+
+  const streamingMessage = historyStore.messages.find((m) => m.isStreaming)
+  if (streamingMessage) {
+    if (streamingMessage.taskPlan) {
+      streamingMessage.taskPlan.active = false
+    }
+    historyStore.finishStreamingMessage(streamingMessage.id)
+  }
+
+  streamingAbortController = null
+  currentTrackId = undefined
+  currentStreamingChatId = undefined
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {

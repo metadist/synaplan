@@ -38,6 +38,9 @@ final class NodeContext
     /** @var (callable(string, string): void)|null sink for streamed token chunks: (nodeId, chunk) */
     private $chunkSink;
 
+    /** @var (callable(string, array<string, mixed>): void)|null sink for live media progress: (nodeId, progress) */
+    private $progressSink;
+
     private ?string $currentNodeId = null;
 
     /**
@@ -84,6 +87,30 @@ final class NodeContext
     {
         if (null !== $this->chunkSink && null !== $this->currentNodeId && '' !== $chunk) {
             ($this->chunkSink)($this->currentNodeId, $chunk);
+        }
+    }
+
+    /**
+     * Register a sink for live media-generation progress. The executor wires this
+     * to emit `task_progress` SSE events tagged with the node id.
+     *
+     * @param (callable(string, array<string, mixed>): void)|null $sink
+     */
+    public function setProgressSink(?callable $sink): void
+    {
+        $this->progressSink = $sink;
+    }
+
+    /**
+     * Forward a live progress update for a node (e.g. video render status), if a
+     * sink is set.
+     *
+     * @param array<string, mixed> $progress
+     */
+    public function emitProgress(string $nodeId, array $progress): void
+    {
+        if (null !== $this->progressSink && '' !== $nodeId) {
+            ($this->progressSink)($nodeId, $progress);
         }
     }
 

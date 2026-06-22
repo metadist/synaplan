@@ -11,6 +11,8 @@ const props = defineProps<{ card: TaskCard }>()
 const emit = defineEmits<{
   /** Retry a failed media step with another model (new turn via the Again path). */
   retry: [payload: { prompt: string; modelId: number }]
+  /** Stop a running media step (per-card Stop button). */
+  cancel: [nodeId: string]
 }>()
 
 const aiConfigStore = useAiConfigStore()
@@ -42,8 +44,31 @@ const title = computed(() => `taskPlan.capability.${props.card.capability}`)
 const isMediaKind = computed(() => ['image', 'video', 'audio'].includes(props.card.kind))
 
 const showSkeleton = computed(
-  () => isMediaKind.value && !props.card.url && props.card.state !== 'failed'
+  () =>
+    isMediaKind.value &&
+    !props.card.url &&
+    props.card.state !== 'failed' &&
+    props.card.state !== 'cancelled'
 )
+
+// Only media steps run long enough to be worth stopping; the button shows while
+// such a step is in flight.
+const canCancel = computed(() => isMediaKind.value && props.card.state === 'running')
+
+// Live render progress (e.g. Higgsfield video) — a moving bar instead of a
+// static spinner. Only meaningful once the backend has reported a percentage.
+const showProgress = computed(
+  () =>
+    isMediaKind.value && props.card.state === 'running' && props.card.progressPercent !== undefined
+)
+
+const progressPercent = computed(() =>
+  Math.max(0, Math.min(100, Math.round(props.card.progressPercent ?? 0)))
+)
+
+const handleCancel = () => {
+  emit('cancel', props.card.nodeId)
+}
 
 // Render the body as full markdown for text-bearing nodes (chat / summarize /
 // translate / rag_query / file_analysis = kind 'text', plus 'extract'). Without
@@ -108,6 +133,7 @@ const handleRetry = () => {
       'task-card--done': card.state === 'done',
       'task-card--failed': card.state === 'failed',
       'task-card--skipped': card.state === 'skipped',
+      'task-card--cancelled': card.state === 'cancelled',
     }"
     :data-testid="`task-card-${card.nodeId}`"
     :data-state="card.state"
@@ -118,6 +144,17 @@ const handleRetry = () => {
       <span class="text-sm font-medium txt-primary flex-1 truncate">
         {{ $t(title, $t(`taskPlan.kind.${card.kind}`)) }}
       </span>
+
+      <button
+        v-if="canCancel"
+        type="button"
+        class="pill text-xs whitespace-nowrap"
+        data-testid="task-card-stop"
+        @click="handleCancel"
+      >
+        <Icon icon="mdi:stop" class="w-4 h-4" />
+        <span class="font-medium">{{ $t('taskPlan.stop') }}</span>
+      </button>
 
       <span class="flex items-center gap-1 text-xs">
         <Icon
@@ -143,9 +180,25 @@ const handleRetry = () => {
           icon="mdi:minus-circle-outline"
           class="w-4 h-4 txt-muted"
         />
+        <Icon
+          v-else-if="card.state === 'cancelled'"
+          icon="mdi:stop-circle-outline"
+          class="w-4 h-4 txt-muted"
+        />
         <Icon v-else icon="mdi:clock-outline" class="w-4 h-4 txt-muted" />
         <span class="txt-muted">{{ $t(`taskPlan.state.${card.state}`) }}</span>
       </span>
+    </div>
+
+    <!-- Live render progress (video/image) -->
+    <div v-if="showProgress" class="task-card__progress mb-2" data-testid="task-card-progress">
+      <div class="task-card__progress-track">
+        <div class="task-card__progress-fill" :style="{ width: `${progressPercent}%` }" />
+      </div>
+      <div class="flex items-center justify-between text-xs txt-muted mt-1">
+        <span>{{ $t('taskPlan.rendering') }}</span>
+        <span>{{ progressPercent }}%</span>
+      </div>
     </div>
 
     <!-- Body -->
@@ -171,6 +224,15 @@ const handleRetry = () => {
     <!-- Skipped: show the dependency reason when the backend provided one -->
     <div v-else-if="card.state === 'skipped' && card.error" class="text-sm txt-muted break-words">
       {{ card.error }}
+    </div>
+
+    <!-- Cancelled by the user: neutral note, no error styling -->
+    <div
+      v-else-if="card.state === 'cancelled'"
+      class="text-sm txt-muted break-words"
+      data-testid="task-card-cancelled"
+    >
+      {{ $t('taskPlan.cancelledBody') }}
     </div>
 
     <template v-else>
@@ -249,8 +311,23 @@ const handleRetry = () => {
   border-color: var(--danger, #dc2626);
 }
 .task-card--pending,
-.task-card--skipped {
+.task-card--skipped,
+.task-card--cancelled {
   opacity: 0.7;
+}
+
+.task-card__progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: var(--surface-card, rgba(127, 127, 127, 0.18));
+}
+.task-card__progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--brand);
+  transition: width 0.4s ease;
 }
 
 .task-card__cursor {

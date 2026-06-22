@@ -89,7 +89,18 @@ final class Version20260429220000 extends AbstractMigration
     {
         // Skip on installs that never ran the widget feature (fresh provisioning before
         // 20260417 baseline, or a custom deployment that disabled widgets).
-        if (!$schema->hasTable('BWIDGET_SESSIONS') || !$schema->hasTable('BMESSAGES')) {
+        //
+        // Guard via information_schema rather than the injected Schema API: reading
+        // $schema (hasTable/getTable) forces doctrine/migrations' LazySchemaDiffProvider
+        // to introspect and run the DBAL comparator, which on MariaDB throws a spurious
+        // "There is no table with name <x>" (FK identifier-resolution quirk) and aborts
+        // the migration. A plain COUNT(*) on information_schema is comparator-free.
+        $widgetTables = (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME IN ('BWIDGET_SESSIONS', 'BMESSAGES')"
+        );
+        if ($widgetTables < 2) {
             return;
         }
 
