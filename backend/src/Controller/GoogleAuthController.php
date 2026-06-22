@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\ImpersonationService;
+use App\Service\ModelConfigService;
 use App\Service\OAuthStateService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,6 +32,7 @@ class GoogleAuthController extends AbstractController
         private TokenService $tokenService,
         private OAuthStateService $oauthStateService,
         private ImpersonationService $impersonationService,
+        private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
         private string $googleClientId,
         private string $googleClientSecret,
@@ -200,8 +202,8 @@ class GoogleAuthController extends AbstractController
             throw new \Exception('Email not provided by Google');
         }
 
-        // Try to find existing user by email
         $user = $this->userRepository->findOneBy(['mail' => $email]);
+        $isNewUser = false;
 
         if ($user) {
             if ($user->isManagedExternally()) {
@@ -218,7 +220,7 @@ class GoogleAuthController extends AbstractController
                 'original_provider' => $user->getProviderId(),
             ]);
         } else {
-            // Create new user
+            $isNewUser = true;
             $user = new User();
             $user->setMail($email);
             $user->setType('WEB');
@@ -261,6 +263,10 @@ class GoogleAuthController extends AbstractController
 
         $this->em->persist($user);
         $this->em->flush();
+
+        if ($isNewUser) {
+            $this->modelConfigService->initializeNewUserDefaults($user->getId());
+        }
 
         return $user;
     }
