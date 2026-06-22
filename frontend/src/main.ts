@@ -12,6 +12,7 @@ import { useGlobalErrorStore } from './stores/globalError'
 import { installGlobalErrorHandlers } from './utils/installGlobalErrorHandlers'
 import { isNativeApp, getNativeApiBaseUrl } from './services/api/nativeRuntime'
 import { setApiBaseUrl } from './services/api/httpClient'
+import { loadNativeTokens } from './services/api/nativeAuth'
 
 // Bootstrap app - load config before mounting.
 // We MUST install global error handlers and mount the app even when bootstrap
@@ -33,6 +34,9 @@ import { setApiBaseUrl } from './services/api/httpClient'
   // call would resolve against the WebView's own localhost origin and fail.
   if (isNativeApp()) {
     setApiBaseUrl(getNativeApiBaseUrl())
+    // Restore Bearer tokens from secure storage (Keychain/Keystore) before the
+    // first authenticated request so a restarted app keeps its session.
+    await loadNativeTokens()
   }
 
   const config = useConfigStore()
