@@ -188,7 +188,14 @@
 	}
 
 	# Fallback to frontend SPA (index.html)
+	#
+	# The HTML shell must always be revalidated: it references content-hashed
+	# JS/CSS bundles, so a stale shell would point at bundles that no longer
+	# exist after a deploy (the classic stale-SPA / 404-chunk failure). This
+	# header previously lived in the Cloudflare edge Worker; keeping it at the
+	# origin lets us run with CF as a transparent proxy (no Worker required).
 	handle {
+		header Cache-Control "no-cache"
 		root * /var/www/frontend
 		rewrite * /index.html
 		file_server

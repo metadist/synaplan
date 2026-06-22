@@ -152,6 +152,51 @@ final class FileHelper
     }
 
     /**
+     * Extract public image URLs that appear in free text.
+     *
+     * Used to recognise an image a user references by link (e.g.
+     * "make a video from https://…/photo.jpg") so it can be routed to
+     * image-to-video / image-to-image. Only http(s) URLs whose path ends in a
+     * known image extension are returned (query strings are tolerated, e.g.
+     * `…/photo.jpeg?auto=compress`). Trailing sentence punctuation is trimmed so
+     * "…/photo.jpg." resolves cleanly. Order is preserved and duplicates removed.
+     *
+     * @return list<string> public image URLs in first-seen order
+     */
+    public static function extractImageUrls(string $text): array
+    {
+        if ('' === trim($text)) {
+            return [];
+        }
+
+        if (!preg_match_all('#https?://[^\s<>"\'\)\]]+#i', $text, $matches)) {
+            return [];
+        }
+
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        $urls = [];
+
+        foreach ($matches[0] as $url) {
+            $url = rtrim($url, '.,;:!?');
+            if ('' === $url) {
+                continue;
+            }
+
+            $path = parse_url($url, \PHP_URL_PATH);
+            if (!is_string($path) || '' === $path) {
+                continue;
+            }
+
+            $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            if (in_array($ext, $imageExtensions, true) && !in_array($url, $urls, true)) {
+                $urls[] = $url;
+            }
+        }
+
+        return $urls;
+    }
+
+    /**
      * Check if MIME type is text-based (safe to store in DB).
      */
     public static function isTextBasedMimeType(string $mimeType): bool

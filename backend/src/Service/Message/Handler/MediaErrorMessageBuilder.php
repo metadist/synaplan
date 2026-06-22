@@ -26,7 +26,144 @@ class MediaErrorMessageBuilder
             }
         }
 
+        // Map common, recognisable failure modes onto a clear, actionable
+        // message — especially for image-to-video, where "the link to your image
+        // could not be opened" is far more useful than a bare "could not be
+        // generated". We classify from the (internal) exception WITHOUT ever
+        // forwarding its raw text to the user, so no system detail leaks.
+        $category = $this->classifyFailure($e);
+        if (null !== $category) {
+            $explanation = $this->getFailureExplanation($category, $mediaType, $lang);
+            if (null !== $explanation) {
+                return $explanation;
+            }
+        }
+
         return $this->getGenericMediaError($mediaType, $lang);
+    }
+
+    /**
+     * Classify an internal exception into a coarse, user-safe failure category.
+     * Returns null when nothing specific is recognised (caller falls back to the
+     * generic message). The raw message is only inspected here — it is never
+     * shown to the user.
+     */
+    private function classifyFailure(\Exception $e): ?string
+    {
+        $statusCode = null;
+        if ($e instanceof ProviderException) {
+            $ctx = $e->getContext() ?? [];
+            if (isset($ctx['status_code']) && is_numeric($ctx['status_code'])) {
+                $statusCode = (int) $ctx['status_code'];
+            }
+        }
+
+        if (401 === $statusCode || 403 === $statusCode) {
+            return 'auth';
+        }
+        if (402 === $statusCode) {
+            return 'credits';
+        }
+        if (429 === $statusCode) {
+            return 'rate_limit';
+        }
+        if (404 === $statusCode) {
+            return 'model';
+        }
+
+        $message = strtolower($e->getMessage());
+
+        // A failed reference-image fetch is the #1 image-to-video failure: the
+        // provider could not open the URL we handed it (private host, dead link,
+        // a page instead of a direct image file, etc.).
+        if (
+            (str_contains($message, 'image') && (
+                str_contains($message, 'url')
+                || str_contains($message, 'fetch')
+                || str_contains($message, 'download')
+                || str_contains($message, 'invalid')
+                || str_contains($message, 'not found')
+                || str_contains($message, 'unreachable')
+                || str_contains($message, 'access')
+            ))
+            || str_contains($message, 'invalid_image_url')
+        ) {
+            return 'image_access';
+        }
+
+        if (str_contains($message, 'timed out') || str_contains($message, 'timeout')) {
+            return 'timeout';
+        }
+
+        if (str_contains($message, 'api key') || str_contains($message, 'authentication') || str_contains($message, 'unauthorized')) {
+            return 'auth';
+        }
+
+        if (str_contains($message, 'out of credits') || str_contains($message, 'insufficient') || str_contains($message, 'quota')) {
+            return 'credits';
+        }
+
+        if (str_contains($message, 'rate limit')) {
+            return 'rate_limit';
+        }
+
+        return null;
+    }
+
+    /**
+     * Human-friendly, localized explanation for a failure category. Returns null
+     * for an unknown category so the caller can fall back to the generic copy.
+     */
+    private function getFailureExplanation(string $category, string $mediaType, string $lang): ?string
+    {
+        $mediaLabelEn = match ($mediaType) {
+            'audio' => 'audio',
+            'video' => 'video',
+            default => 'image',
+        };
+        $mediaLabelDe = match ($mediaType) {
+            'audio' => 'Audio',
+            'video' => 'Video',
+            default => 'Bild',
+        };
+
+        if ('de' === $lang) {
+            return match ($category) {
+                'image_access' => 'Das von dir verlinkte Bild konnte nicht geöffnet werden. '
+                    .'Bitte stelle sicher, dass der Link direkt auf eine öffentlich erreichbare Bilddatei zeigt '
+                    .'(Endung .jpg, .jpeg, .png, .webp oder .gif) – nicht auf eine Webseite – und versuche es erneut. '
+                    .'Alternativ kannst du das Bild direkt in den Chat hochladen.',
+                'timeout' => "Die Erstellung deines {$mediaLabelDe}s hat zu lange gedauert und wurde abgebrochen. "
+                    .'Bitte versuche es erneut – bei Videos hilft oft ein kürzerer Clip oder eine geringere Auflösung.',
+                'credits' => "Dein {$mediaLabelDe} konnte gerade nicht erstellt werden, da das Guthaben für den Dienst aufgebraucht ist. "
+                    .'Bitte versuche es später erneut oder wende dich an den Support.',
+                'auth' => "Dein {$mediaLabelDe} konnte nicht erstellt werden, weil der Generierungsdienst derzeit nicht korrekt eingerichtet ist. "
+                    .'Bitte versuche es später erneut oder wende dich an den Support.',
+                'rate_limit' => "Der Dienst ist gerade stark ausgelastet, daher konnte dein {$mediaLabelDe} nicht erstellt werden. "
+                    .'Bitte warte einen Moment und versuche es erneut.',
+                'model' => "Dein {$mediaLabelDe} konnte nicht erstellt werden, da das gewählte Modell nicht verfügbar ist. "
+                    .'Bitte wähle in den Einstellungen ein anderes Modell und versuche es erneut.',
+                default => null,
+            };
+        }
+
+        return match ($category) {
+            'image_access' => 'We couldn\'t open the image you linked. '
+                .'Please make sure the link points directly to a publicly accessible image file '
+                .'(ending in .jpg, .jpeg, .png, .webp or .gif) — not to a web page — and try again. '
+                .'You can also upload the image directly in the chat instead.',
+            'timeout' => "Your {$mediaLabelEn} took too long to create and was stopped. "
+                .'Please try again — for videos, a shorter clip or lower resolution often helps.',
+            'credits' => "Your {$mediaLabelEn} couldn't be created right now because the generation service is out of credits. "
+                .'Please try again later or contact support.',
+            'auth' => "Your {$mediaLabelEn} couldn't be created because the generation service isn't set up correctly at the moment. "
+                .'Please try again later or contact support.',
+            'rate_limit' => "The service is very busy right now, so your {$mediaLabelEn} couldn't be created. "
+                .'Please wait a moment and try again.',
+            'model' => "Your {$mediaLabelEn} couldn't be created because the selected model isn't available. "
+                .'Please pick a different model in Settings and try again.',
+            default => null,
+        };
     }
 
     private function buildContentBlockedMessage(string $providerName, string $reason, ?string $textResponse, string $mediaType, string $lang): string

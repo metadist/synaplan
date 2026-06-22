@@ -154,12 +154,36 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $attachedImagePaths = $this->collectAttachedImagePaths($message, $referenceImagePaths);
         $isPic2Pic = !empty($attachedImagePaths);
 
+        // Detect public image URLs the user pasted directly into their message
+        // text. A request like "make a video from https://…/photo.jpg where the
+        // sun sets over the sea" carries NO file attachment, so $isPic2Pic is
+        // false and the request would wrongly route to text-to-video (issue:
+        // public image-URL → Veo text2vid). Treat an image URL in the text as an
+        // image-to-video reference: it is already provider-fetchable, so it is
+        // the ideal i2v source — no republish and no internet-reachable APP_URL
+        // required (unlike a locally-attached file).
+        $imageUrlsInText = FileHelper::extractImageUrls($message->getText());
+
+        // The multitask DAG runner feeds the handler a synthetic message built
+        // from the planner's CLEANED prompt (URL stripped) plus the original
+        // user message's file attachments only. When the image was supplied as a
+        // URL in the original text, it never reaches us via the synthetic
+        // message — so the runner forwards those URLs explicitly here.
+        foreach ($this->referenceImageUrlsFromOptions($options) as $optionImageUrl) {
+            if (!in_array($optionImageUrl, $imageUrlsInText, true)) {
+                $imageUrlsInText[] = $optionImageUrl;
+            }
+        }
+
+        $hasVideoReferenceImage = $isPic2Pic || [] !== $imageUrlsInText;
+
         $this->logger->info('MediaGenerationHandler: Starting media generation', [
             'user_id' => $message->getUserId(),
             'prompt' => substr($prompt, 0, 100),
             'media_hint' => $promptMediaType,
             'is_pic2pic' => $isPic2Pic,
             'attached_images' => count($attachedImagePaths),
+            'image_urls_in_text' => count($imageUrlsInText),
         ]);
 
         // Get media generation model - detect type from model tag if specified
@@ -208,10 +232,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
             if ($isSlashCommand) {
                 if ('video' === $mediaType) {
-                    // `/vid` with an attached image is an image-to-video request
+                    // `/vid` with an image reference is an image-to-video request
                     // (animate the photo) → use the IMG2VID default; otherwise a
-                    // text-to-video request → TEXT2VID.
-                    $modelId = $isPic2Pic
+                    // text-to-video request → TEXT2VID. The reference can be an
+                    // attached file OR a public image URL pasted in the text.
+                    $modelId = $hasVideoReferenceImage
                         ? $this->modelConfigService->getDefaultModel('IMG2VID', $effectiveUserId)
                         : $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
                 } elseif ('audio' === $mediaType) {
@@ -224,18 +249,19 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'is_pic2pic' => $isPic2Pic,
                     'model_id' => $modelId,
                 ]);
-            } elseif ($isPic2Pic && 'video' === $promptMediaType) {
-                // Image-to-video: the user attached an image AND asked for a
-                // video/animation. This MUST win over the pic2pic-image branch
-                // below (attachment presence alone would otherwise force an
-                // image edit). Routes to the IMG2VID default (an image-to-video
-                // model); the attached image is published + passed as image_url
-                // in the video generation block.
+            } elseif ($hasVideoReferenceImage && 'video' === $promptMediaType) {
+                // Image-to-video: the user supplied an image (attached file OR a
+                // public image URL in the text) AND asked for a video/animation.
+                // This MUST win over the pic2pic-image branch below (an image
+                // reference alone would otherwise force an image edit). Routes to
+                // the IMG2VID default (an image-to-video model); the reference is
+                // published/forwarded as image_url in the video generation block.
                 $modelId = $this->modelConfigService->getDefaultModel('IMG2VID', $effectiveUserId);
                 $mediaType = 'video';
                 $this->logger->info('MediaGenerationHandler: Image-to-video detected, using IMG2VID default model', [
                     'model_id' => $modelId,
-                    'image_count' => count($attachedImagePaths),
+                    'attached_images' => count($attachedImagePaths),
+                    'image_urls_in_text' => count($imageUrlsInText),
                 ]);
             } elseif ($isPic2Pic) {
                 $modelId = $this->modelConfigService->getDefaultModel('PIC2PIC', $effectiveUserId);
@@ -308,7 +334,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // "'image_url' is a required property". This happens when an i2v model is
         // configured as the TEXT2VID default. Return an actionable message
         // instead of leaking a raw provider 400 to the user.
-        if ('video' === $mediaType && !$isPic2Pic) {
+        if ('video' === $mediaType && !$hasVideoReferenceImage) {
             $requiresReferenceImage = !empty($modelConfig['requires_reference_image'])
                 || (!empty($modelConfig['features']) && in_array('image2video', $modelConfig['features'], true));
             if ($requiresReferenceImage) {
@@ -342,7 +368,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // is rejected with a confusing raw "invalid_image_url" 400. Detect this
         // up front and return an actionable message instead of burning a
         // provider call (and credits) on a request that cannot succeed.
-        if ('video' === $mediaType && [] !== $attachedImagePaths && !$this->isPublicBaseUrlReachable()) {
+        if ('video' === $mediaType && [] !== $attachedImagePaths && [] === $imageUrlsInText && !$this->isPublicBaseUrlReachable()) {
             $base = rtrim($this->publicBaseUrl, '/');
             $this->logger->warning('MediaGenerationHandler: image-to-video blocked — APP_URL is not internet-reachable so the provider cannot fetch the source image', [
                 'app_url' => $base,
@@ -502,27 +528,39 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     $videoOptions['cancel_check'] = $cancelCheck;
                 }
 
-                // Image-to-video: publish the attached image at a public URL so
-                // the provider (Higgsfield etc.) can fetch it. i2v providers
-                // require a real http(s) image_url — a local path or a base64
-                // data-URI will not work.
-                if ([] !== $attachedImagePaths) {
-                    $publicImageUrl = $this->publishInputImageForRemoteFetch($attachedImagePaths[0], $message->getUserId());
+                // Image-to-video: hand the provider (Higgsfield etc.) a real
+                // http(s) image_url to animate. i2v providers require a fetchable
+                // URL — a local path or base64 data-URI will not work. Two source
+                // types are supported, in priority order:
+                //   1. A public image URL the user pasted in their text — already
+                //      provider-fetchable, so it is forwarded as-is (no republish,
+                //      no internet-reachable APP_URL needed).
+                //   2. An attached local file — copied to a public `ai_`-prefixed
+                //      URL so the provider can fetch it.
+                $referenceImageUrls = $imageUrlsInText;
+
+                foreach ($attachedImagePaths as $attachedImagePath) {
+                    $publicImageUrl = $this->publishInputImageForRemoteFetch($attachedImagePath, $message->getUserId());
                     if (null !== $publicImageUrl) {
-                        $videoOptions['image_url'] = $publicImageUrl;
-                        $videoOptions['images'] = [$publicImageUrl];
-                        $this->notify($progressCallback, 'generating', 'Preparing your image for animation...');
-                        $this->logger->info('MediaGenerationHandler: Image-to-video source published', [
-                            'provider' => $provider,
-                            'model' => $modelName,
-                            'image_url' => $publicImageUrl,
-                        ]);
+                        $referenceImageUrls[] = $publicImageUrl;
                     } else {
-                        $this->logger->warning('MediaGenerationHandler: Could not publish input image for image-to-video; proceeding without a reference frame', [
+                        $this->logger->warning('MediaGenerationHandler: Could not publish input image for image-to-video; skipping that attachment', [
                             'provider' => $provider,
                             'model' => $modelName,
                         ]);
                     }
+                }
+
+                if ([] !== $referenceImageUrls) {
+                    $videoOptions['image_url'] = $referenceImageUrls[0];
+                    $videoOptions['images'] = $referenceImageUrls;
+                    $this->notify($progressCallback, 'generating', 'Preparing your image for animation...');
+                    $this->logger->info('MediaGenerationHandler: Image-to-video source(s) prepared', [
+                        'provider' => $provider,
+                        'model' => $modelName,
+                        'reference_count' => count($referenceImageUrls),
+                        'from_text_url' => [] !== $imageUrlsInText,
+                    ]);
                 }
 
                 $result = $this->aiFacade->generateVideo(
@@ -1152,6 +1190,36 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         }
 
         return $paths;
+    }
+
+    /**
+     * Normalise caller-supplied reference image URLs (multitask path: the URL
+     * lives in the original user message, not the synthetic node prompt). Keeps
+     * only non-empty http(s) image URLs, de-duplicated in order.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return list<string>
+     */
+    private function referenceImageUrlsFromOptions(array $options): array
+    {
+        $candidates = $options['reference_image_urls'] ?? null;
+        if (!is_array($candidates)) {
+            return [];
+        }
+
+        $urls = [];
+        foreach ($candidates as $candidate) {
+            if (!is_string($candidate) || '' === trim($candidate)) {
+                continue;
+            }
+            $candidate = trim($candidate);
+            if (!in_array($candidate, $urls, true)) {
+                $urls[] = $candidate;
+            }
+        }
+
+        return $urls;
     }
 
     /**
