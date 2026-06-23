@@ -411,6 +411,7 @@
             v-if="taskPlan && taskPlan.cards.length > 0"
             :plan="taskPlan"
             @retry-task="emit('retryTask', $event)"
+            @cancel-task="emit('cancelTask', $event)"
           />
 
           <MessagePart
@@ -1336,6 +1337,7 @@ const emit = defineEmits<{
   retry: [messageContent: string]
   /** Bubbled from a failed task card: re-run that step with another model. */
   retryTask: [payload: { prompt: string; modelId: number }]
+  cancelTask: [nodeId: string]
   falsePositive: [text: string, messageId?: number]
   'click-memory': [memory: UserMemory]
   continue: []

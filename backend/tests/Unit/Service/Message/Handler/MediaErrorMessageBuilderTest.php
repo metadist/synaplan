@@ -70,4 +70,77 @@ class MediaErrorMessageBuilderTest extends TestCase
         $this->assertStringContainsString('Anthropic refused to generate the image with code **UNKNOWN_REASON**.', $message);
         $this->assertStringContainsString('The request was blocked for an unknown reason.', $message);
     }
+
+    public function testImageAccessFailureGivesActionableMessageEnglish(): void
+    {
+        $exception = new ProviderException('Higgsfield API error (400): invalid_image_url', 'higgsfield', ['status_code' => 400]);
+
+        $message = $this->builder->buildErrorMessage($exception, 'video', 'en');
+
+        $this->assertStringContainsString('We couldn\'t open the image you linked.', $message);
+        // Must NOT leak the raw provider text / status code.
+        $this->assertStringNotContainsString('invalid_image_url', $message);
+        $this->assertStringNotContainsString('400', $message);
+        $this->assertStringNotContainsString('Higgsfield', $message);
+    }
+
+    public function testImageAccessFailureGivesActionableMessageGerman(): void
+    {
+        $exception = new ProviderException('could not download image from url', 'higgsfield');
+
+        $message = $this->builder->buildErrorMessage($exception, 'video', 'de');
+
+        $this->assertStringContainsString('verlinkte Bild konnte nicht geöffnet werden', $message);
+        $this->assertStringNotContainsString('download image', $message);
+    }
+
+    public function testTimeoutFailureGivesActionableMessage(): void
+    {
+        $exception = new ProviderException('Higgsfield video generation timed out after 720 seconds', 'higgsfield');
+
+        $message = $this->builder->buildErrorMessage($exception, 'video', 'en');
+
+        $this->assertStringContainsString('took too long to create', $message);
+        $this->assertStringNotContainsString('720', $message);
+    }
+
+    public function testCreditsFailureFromStatusCode(): void
+    {
+        $exception = new ProviderException('Higgsfield account is out of credits.', 'higgsfield', ['status_code' => 402]);
+
+        $message = $this->builder->buildErrorMessage($exception, 'video', 'en');
+
+        $this->assertStringContainsString('out of credits', $message);
+        $this->assertStringContainsString('contact support', $message);
+    }
+
+    public function testAuthFailureFromStatusCodeDoesNotLeakDetails(): void
+    {
+        $exception = new ProviderException('Higgsfield authentication error (401): bad key', 'higgsfield', ['status_code' => 401]);
+
+        $message = $this->builder->buildErrorMessage($exception, 'video', 'en');
+
+        $this->assertStringContainsString('isn\'t set up correctly', $message);
+        $this->assertStringNotContainsString('401', $message);
+        $this->assertStringNotContainsString('bad key', $message);
+    }
+
+    public function testRateLimitFailure(): void
+    {
+        $exception = new ProviderException('Higgsfield rate limit exceeded. Please try again later.', 'higgsfield', ['status_code' => 429]);
+
+        $message = $this->builder->buildErrorMessage($exception, 'video', 'en');
+
+        $this->assertStringContainsString('very busy right now', $message);
+    }
+
+    public function testUnrecognisedFailureFallsBackToGeneric(): void
+    {
+        $exception = new \Exception('something completely opaque happened');
+
+        $message = $this->builder->buildErrorMessage($exception, 'video', 'en');
+
+        $this->assertStringContainsString('Sorry, the video could not be generated right now.', $message);
+        $this->assertStringNotContainsString('opaque', $message);
+    }
 }

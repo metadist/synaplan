@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "acbfc5276d1d45ba2040dfc71774c23e",
+    "content-hash": "f210dd1fcf3a3244c29c1899d0afc13b",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -98,16 +98,16 @@
         },
         {
             "name": "api-platform/doctrine-orm",
-            "version": "v4.3.13",
+            "version": "v4.3.14",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/doctrine-orm.git",
-                "reference": "7d8851966a55d2f53e4d86b281ba543fa14e953b"
+                "reference": "6af3eeefc7d483b83e56bcbdbff0dd0dde3c7fc1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/7d8851966a55d2f53e4d86b281ba543fa14e953b",
-                "reference": "7d8851966a55d2f53e4d86b281ba543fa14e953b",
+                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/6af3eeefc7d483b83e56bcbdbff0dd0dde3c7fc1",
+                "reference": "6af3eeefc7d483b83e56bcbdbff0dd0dde3c7fc1",
                 "shasum": ""
             },
             "require": {
@@ -181,9 +181,9 @@
                 "rest"
             ],
             "support": {
-                "source": "https://github.com/api-platform/doctrine-orm/tree/v4.3.13"
+                "source": "https://github.com/api-platform/doctrine-orm/tree/v4.3.14"
             },
-            "time": "2026-06-13T04:46:03+00:00"
+            "time": "2026-06-16T13:14:05+00:00"
         },
         {
             "name": "api-platform/documentation",
@@ -958,16 +958,16 @@
         },
         {
             "name": "api-platform/symfony",
-            "version": "v4.3.13",
+            "version": "v4.3.14",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/symfony.git",
-                "reference": "358668b0de7c4a214d477a30fe83deab2a5da96c"
+                "reference": "8b20ef6262b2d557e2c286df48b78e66e7f8c000"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/symfony/zipball/358668b0de7c4a214d477a30fe83deab2a5da96c",
-                "reference": "358668b0de7c4a214d477a30fe83deab2a5da96c",
+                "url": "https://api.github.com/repos/api-platform/symfony/zipball/8b20ef6262b2d557e2c286df48b78e66e7f8c000",
+                "reference": "8b20ef6262b2d557e2c286df48b78e66e7f8c000",
                 "shasum": ""
             },
             "require": {
@@ -1081,9 +1081,9 @@
                 "symfony"
             ],
             "support": {
-                "source": "https://github.com/api-platform/symfony/tree/v4.3.13"
+                "source": "https://github.com/api-platform/symfony/tree/v4.3.14"
             },
-            "time": "2026-06-13T05:21:29+00:00"
+            "time": "2026-06-17T18:14:46+00:00"
         },
         {
             "name": "api-platform/validator",
@@ -3271,16 +3271,16 @@
         },
         {
             "name": "firebase/php-jwt",
-            "version": "v7.0.5",
+            "version": "v7.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/googleapis/php-jwt.git",
-                "reference": "47ad26bab5e7c70ae8a6f08ed25ff83631121380"
+                "reference": "b374a5d1a4f1f67fadc2165cdb284645945e2fc0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/googleapis/php-jwt/zipball/47ad26bab5e7c70ae8a6f08ed25ff83631121380",
-                "reference": "47ad26bab5e7c70ae8a6f08ed25ff83631121380",
+                "url": "https://api.github.com/repos/googleapis/php-jwt/zipball/b374a5d1a4f1f67fadc2165cdb284645945e2fc0",
+                "reference": "b374a5d1a4f1f67fadc2165cdb284645945e2fc0",
                 "shasum": ""
             },
             "require": {
@@ -3289,6 +3289,7 @@
             "require-dev": {
                 "guzzlehttp/guzzle": "^7.4",
                 "phpfastcache/phpfastcache": "^9.2",
+                "phpseclib/phpseclib": "~3.0",
                 "phpspec/prophecy-phpunit": "^2.0",
                 "phpunit/phpunit": "^9.5",
                 "psr/cache": "^2.0||^3.0",
@@ -3297,7 +3298,8 @@
             },
             "suggest": {
                 "ext-sodium": "Support EdDSA (Ed25519) signatures",
-                "paragonie/sodium_compat": "Support EdDSA (Ed25519) signatures when libsodium is not present"
+                "paragonie/sodium_compat": "Support EdDSA (Ed25519) signatures when libsodium is not present",
+                "phpseclib/phpseclib": "Support PS256 (RSASSA-PSS) signatures"
             },
             "type": "library",
             "autoload": {
@@ -3322,16 +3324,16 @@
                 }
             ],
             "description": "A simple library to encode and decode JSON Web Tokens (JWT) in PHP. Should conform to the current spec.",
-            "homepage": "https://github.com/firebase/php-jwt",
+            "homepage": "https://github.com/googleapis/php-jwt",
             "keywords": [
                 "jwt",
                 "php"
             ],
             "support": {
                 "issues": "https://github.com/googleapis/php-jwt/issues",
-                "source": "https://github.com/googleapis/php-jwt/tree/v7.0.5"
+                "source": "https://github.com/googleapis/php-jwt/tree/v7.1.0"
             },
-            "time": "2026-04-01T20:38:03+00:00"
+            "time": "2026-06-11T17:54:14+00:00"
         },
         {
             "name": "gemini-api-php/client",
@@ -3579,16 +3581,16 @@
         },
         {
             "name": "google/protobuf",
-            "version": "v5.35.0",
+            "version": "v5.35.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/protocolbuffers/protobuf-php.git",
-                "reference": "d96ed77c7edaff3cd576a74173aa0b0655c87b1a"
+                "reference": "55bb4a7d6739b5af0927b96213c1371a3afb7cfb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/protocolbuffers/protobuf-php/zipball/d96ed77c7edaff3cd576a74173aa0b0655c87b1a",
-                "reference": "d96ed77c7edaff3cd576a74173aa0b0655c87b1a",
+                "url": "https://api.github.com/repos/protocolbuffers/protobuf-php/zipball/55bb4a7d6739b5af0927b96213c1371a3afb7cfb",
+                "reference": "55bb4a7d6739b5af0927b96213c1371a3afb7cfb",
                 "shasum": ""
             },
             "require": {
@@ -3617,9 +3619,9 @@
                 "proto"
             ],
             "support": {
-                "source": "https://github.com/protocolbuffers/protobuf-php/tree/v5.35.0"
+                "source": "https://github.com/protocolbuffers/protobuf-php/tree/v5.35.1"
             },
-            "time": "2026-05-19T22:13:40+00:00"
+            "time": "2026-06-11T21:19:23+00:00"
         },
         {
             "name": "google/recaptcha",
@@ -5730,16 +5732,16 @@
         },
         {
             "name": "openai-php/client",
-            "version": "v0.19.2",
+            "version": "v0.20.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/openai-php/client.git",
-                "reference": "12e3513527e22d5657f4f9809796f8fe254fd0a9"
+                "reference": "b5c0e1e0f210e6b9aca5ee048157fcf3039ca91f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/openai-php/client/zipball/12e3513527e22d5657f4f9809796f8fe254fd0a9",
-                "reference": "12e3513527e22d5657f4f9809796f8fe254fd0a9",
+                "url": "https://api.github.com/repos/openai-php/client/zipball/b5c0e1e0f210e6b9aca5ee048157fcf3039ca91f",
+                "reference": "b5c0e1e0f210e6b9aca5ee048157fcf3039ca91f",
                 "shasum": ""
             },
             "require": {
@@ -5801,7 +5803,7 @@
             ],
             "support": {
                 "issues": "https://github.com/openai-php/client/issues",
-                "source": "https://github.com/openai-php/client/tree/v0.19.2"
+                "source": "https://github.com/openai-php/client/tree/v0.20.0"
             },
             "funding": [
                 {
@@ -5817,7 +5819,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-04-19T20:35:01+00:00"
+            "time": "2026-06-13T12:14:23+00:00"
         },
         {
             "name": "opis/json-schema",
@@ -7106,26 +7108,27 @@
         },
         {
             "name": "predis/predis",
-            "version": "v2.4.1",
+            "version": "v3.5.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/predis/predis.git",
-                "reference": "07105e050622ed80bd60808367ced9e379f31530"
+                "reference": "5c996db191ee2d9bafe651f454b1fca16754271b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/predis/predis/zipball/07105e050622ed80bd60808367ced9e379f31530",
-                "reference": "07105e050622ed80bd60808367ced9e379f31530",
+                "url": "https://api.github.com/repos/predis/predis/zipball/5c996db191ee2d9bafe651f454b1fca16754271b",
+                "reference": "5c996db191ee2d9bafe651f454b1fca16754271b",
                 "shasum": ""
             },
             "require": {
-                "php": "^7.2 || ^8.0"
+                "php": "^7.2 || ^8.0",
+                "psr/http-message": "^1.0|^2.0"
             },
             "require-dev": {
                 "friendsofphp/php-cs-fixer": "^3.3",
                 "phpstan/phpstan": "^1.9",
                 "phpunit/phpcov": "^6.0 || ^8.0",
-                "phpunit/phpunit": "^8.0 || ^9.4"
+                "phpunit/phpunit": "^8.0 || ~9.4.4"
             },
             "suggest": {
                 "ext-relay": "Faster connection with in-memory caching (>=0.6.2)"
@@ -7156,7 +7159,7 @@
             ],
             "support": {
                 "issues": "https://github.com/predis/predis/issues",
-                "source": "https://github.com/predis/predis/tree/v2.4.1"
+                "source": "https://github.com/predis/predis/tree/v3.5.1"
             },
             "funding": [
                 {
@@ -7164,7 +7167,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-11-12T18:00:11+00:00"
+            "time": "2026-06-11T16:56:53+00:00"
         },
         {
             "name": "psr/cache",
@@ -8065,16 +8068,16 @@
         },
         {
             "name": "stripe/stripe-php",
-            "version": "v20.2.0",
+            "version": "v20.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/stripe/stripe-php.git",
-                "reference": "38b784dd45b447609032c151c40712d9b3feecb0"
+                "reference": "c628cfa0b3de4ef5110b2c2bfbf881a33a52fdd5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/stripe/stripe-php/zipball/38b784dd45b447609032c151c40712d9b3feecb0",
-                "reference": "38b784dd45b447609032c151c40712d9b3feecb0",
+                "url": "https://api.github.com/repos/stripe/stripe-php/zipball/c628cfa0b3de4ef5110b2c2bfbf881a33a52fdd5",
+                "reference": "c628cfa0b3de4ef5110b2c2bfbf881a33a52fdd5",
                 "shasum": ""
             },
             "require": {
@@ -8121,9 +8124,9 @@
             ],
             "support": {
                 "issues": "https://github.com/stripe/stripe-php/issues",
-                "source": "https://github.com/stripe/stripe-php/tree/v20.2.0"
+                "source": "https://github.com/stripe/stripe-php/tree/v20.2.1"
             },
-            "time": "2026-05-27T20:28:12+00:00"
+            "time": "2026-06-12T22:41:56+00:00"
         },
         {
             "name": "symfony/asset",
@@ -14623,16 +14626,16 @@
         },
         {
             "name": "friendsofphp/php-cs-fixer",
-            "version": "v3.95.8",
+            "version": "v3.95.10",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer.git",
-                "reference": "4140023f552ff02346df9b1329742532166f677f"
+                "reference": "93e1ab3e1f153024bd3ab23c8a349556063c6f17"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHP-CS-Fixer/PHP-CS-Fixer/zipball/4140023f552ff02346df9b1329742532166f677f",
-                "reference": "4140023f552ff02346df9b1329742532166f677f",
+                "url": "https://api.github.com/repos/PHP-CS-Fixer/PHP-CS-Fixer/zipball/93e1ab3e1f153024bd3ab23c8a349556063c6f17",
+                "reference": "93e1ab3e1f153024bd3ab23c8a349556063c6f17",
                 "shasum": ""
             },
             "require": {
@@ -14716,7 +14719,7 @@
             ],
             "support": {
                 "issues": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/issues",
-                "source": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/tree/v3.95.8"
+                "source": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/tree/v3.95.10"
             },
             "funding": [
                 {
@@ -14724,7 +14727,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-06-16T09:52:26+00:00"
+            "time": "2026-06-19T14:45:22+00:00"
         },
         {
             "name": "myclabs/deep-copy",

@@ -4,13 +4,23 @@
     class="prose prose-sm max-w-none txt-primary markdown-content"
     data-testid="section-message-text"
   >
-    <!-- eslint-disable-next-line vue/no-v-html -- content from DOMPurify + markdown pipeline -->
-    <div data-testid="message-text" v-html="renderedContent"></div>
+    <!--
+      Rendered markdown is applied to this container imperatively via morphdom
+      (see `applyHtml`), NOT through v-html. v-html sets innerHTML wholesale,
+      which tears down and rebuilds the entire subtree on every SSE chunk —
+      the cause of the streaming flash. morphdom diffs the existing DOM against
+      the new HTML and only touches the nodes that actually changed, so
+      finished paragraphs keep their DOM nodes and never flicker. Vue does not
+      manage this element's children (the template leaves it empty), so our
+      imperative writes are safe and persistent.
+    -->
+    <div ref="contentRef" data-testid="message-text"></div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import morphdom from 'morphdom'
 import { useI18n } from 'vue-i18n'
 import { useMarkdown } from '@/composables/useMarkdown'
 import { useTheme } from '@/composables/useTheme'
@@ -21,6 +31,7 @@ import { useFeedbackStore } from '@/stores/userFeedback'
 import { useConfigStore } from '@/stores/config'
 import { useNotification } from '@/composables/useNotification'
 import { findStableMarkdownBoundary } from '@/utils/streamingBoundary'
+import { completeInlineMarkdown } from '@/utils/partialMarkdown'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 
 interface Props {
@@ -38,7 +49,43 @@ const { theme } = useTheme()
 const configStore = useConfigStore()
 const { warning } = useNotification()
 const containerRef = ref<HTMLElement | null>(null)
-const renderedContent = ref('')
+// The element that holds the rendered markdown. Written imperatively via
+// `applyHtml` (morphdom), never via v-html — see the template comment.
+const contentRef = ref<HTMLElement | null>(null)
+// Last HTML string applied to the DOM. Tracked so post-render passes
+// (mermaid) can react and so a render that happens before mount can be
+// flushed in onMounted.
+const lastRenderedHtml = ref('')
+
+// Apply a fully-rendered (sanitized) HTML string to the content element by
+// MORPHING the existing DOM toward it instead of replacing innerHTML. This is
+// the core anti-flash mechanism: morphdom keeps untouched nodes (finished
+// paragraphs, already-highlighted code, rendered mermaid) physically identical
+// and only patches the parts that actually changed.
+function applyHtml(html: string): void {
+  lastRenderedHtml.value = html
+  const el = contentRef.value
+  if (!el) return
+
+  morphdom(el, `<div>${html}</div>`, {
+    childrenOnly: true,
+    // Keep rendered mermaid diagrams: their live DOM (SVG inside the <pre>)
+    // diverges from the source `<pre class="mermaid-block">` in the new HTML,
+    // so without this morphdom would revert them on the next patch.
+    skipFromChildren(fromEl) {
+      return fromEl.classList?.contains('mermaid-rendered') === true
+    },
+    onBeforeElUpdated(fromEl, toEl) {
+      if (fromEl.classList?.contains('mermaid-rendered')) return false
+      // Skip deep work on identical subtrees (finished paragraphs / code).
+      if (fromEl.isEqualNode(toEl)) return false
+      return true
+    },
+    onBeforeNodeDiscarded(node) {
+      return !(node instanceof Element && node.classList.contains('mermaid-rendered'))
+    },
+  })
+}
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
 
@@ -521,9 +568,9 @@ function postProcessHtml(html: string): string {
  * Synchronous full-pipeline render. Used for the post-stream final render of
  * non-math content. Critical for E2E tests that read `innerText` immediately
  * after `data-testid="message-done"` becomes visible — anything async here
- * would push the final renderedContent update onto the next microtask, after
- * Vue has already committed `message-done` to the DOM. Tests would then read
- * a stale half-rendered bubble (only the cheap streaming HTML).
+ * would push the final `applyHtml` call onto the next microtask, after Vue has
+ * already committed `message-done` to the DOM. Tests would then read a stale
+ * half-rendered bubble (only the cheap streaming HTML).
  */
 function processContentSync(content: string): string {
   const normalized = normalizeInlineReferences(normalizeContentForRender(content))
@@ -600,34 +647,30 @@ function renderStreamingIncremental(content: string): string {
 
   let tailHtml = ''
   if (trailingTail.length > 0) {
-    tailHtml = renderStreamingFast(trailingTail)
+    tailHtml = renderStreamingTail(trailingTail)
     tailHtml = processFeedbackBadges(processMemoryBadges(tailHtml))
   }
 
+  // Concatenation is fine now: morphdom diffs the combined HTML against the
+  // live DOM, so the unchanged stable prefix produces zero DOM mutations while
+  // only the growing tail is patched. The cache still avoids recomputing the
+  // prefix HTML on every chunk (CPU win).
   return stableHtml + tailHtml
 }
 
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
 /**
- * Cheap streaming-mode renderer. Preserves whitespace, inserts <br> for
- * newlines, leaves a placeholder where an unclosed code fence would have
- * been so long code blocks don't appear as one giant escaped wall of text.
- * Memory/feedback badges still get resolved via `processFeedbackBadges` /
- * `processMemoryBadges` so existing `[Memory:ID]` markers turn into pills
- * in real time.
+ * Renders the in-progress trailing paragraph through the FULL markdown
+ * pipeline (marked + DOMPurify) so already-typed inline formatting
+ * (`**bold**`, `*italic*`, `~~strike~~`, inline code, links) stays rendered
+ * while the user is still typing the rest of the line. Open inline markers are
+ * temporarily balanced via `completeInlineMarkdown` so the token currently
+ * being streamed also shows formatted instead of leaking raw `**`.
+ *
+ * Code fences in the tail keep the cheap, un-highlighted treatment: running
+ * highlight.js on every chunk is expensive and produces a rainbow flash, and
+ * the final post-stream render highlights them properly anyway.
  */
-function renderStreamingFast(content: string): string {
-  // Split on triple-backtick fences. Fenced regions are wrapped in <pre>
-  // (un-highlighted) so visually they look like a code block immediately,
-  // but skipping highlight.js avoids the ~10-50 ms hit per fence per tick.
+function renderStreamingTail(content: string): string {
   const parts: Array<{ kind: 'prose' | 'code'; text: string; lang?: string }> = []
   const fenceRe = /```([a-zA-Z0-9_+-]*)\n([\s\S]*?)(?:```|$)/g
   let lastIdx = 0
@@ -648,11 +691,20 @@ function renderStreamingFast(content: string): string {
       if (p.kind === 'code') {
         return `<pre class="code-block streaming-code-block"><code class="hljs language-${escapeHtml(p.lang ?? 'text')}">${escapeHtml(p.text)}</code></pre>`
       }
-      // For prose, escape HTML and convert newlines to <br>. Memory/feedback
-      // badges still flow through later regex replacement.
-      return escapeHtml(p.text).replace(/\n/g, '<br>')
+      const balanced = completeInlineMarkdown(p.text)
+      const normalized = normalizeInlineReferences(balanced)
+      return render(normalized, { processFileMarkers: false })
     })
     .join('')
+}
+
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 // Update rendered content when props change.
@@ -677,15 +729,21 @@ watch(
     const currentVersion = ++renderVersion
 
     if (props.isStreaming) {
-      // Issue #903: math content keeps the legacy debounced-async path
-      // because KaTeX is genuinely async and we must not show partial
-      // formulas. Plain content uses the incremental renderer so stable
-      // paragraphs do not flicker between raw and rendered markdown.
-      if (hasMathFormulas(newContent)) {
-        let html = renderStreamingFast(newContent)
-        html = processFeedbackBadges(processMemoryBadges(html))
-        renderedContent.value = html
+      // Issue #903: ALWAYS paint formatted markdown immediately (via the
+      // incremental renderer) so inline formatting — **bold**, *italic*,
+      // lists, inline code — never flashes as raw text between chunks.
+      //
+      // Math must NOT fall back to a raw escape pass: a single `$` (prices
+      // like "19 $", shell vars, regexes, …) used to route the WHOLE message
+      // through an un-formatted renderer, which is exactly what made
+      // already-rendered bold briefly revert to literal `**bold**` on every
+      // chunk. Instead we render markdown now and, only for genuine math
+      // content, upgrade the formulas to KaTeX on a debounce (KaTeX is async
+      // and we must not render half-typed formulas). morphdom keeps the
+      // unchanged markdown nodes identical, so only the formula spans update.
+      applyHtml(renderStreamingIncremental(newContent))
 
+      if (hasMathFormulas(newContent)) {
         if (renderDebounceTimer !== null) {
           clearTimeout(renderDebounceTimer)
         }
@@ -695,14 +753,11 @@ watch(
           if (!props.isStreaming) return
           void processContentAsync(newContent, currentVersion).then((result) => {
             if (result !== null) {
-              renderedContent.value = result
+              applyHtml(result)
             }
           })
         }, RENDER_DEBOUNCE_STREAMING_MS)
-        return
       }
-
-      renderedContent.value = renderStreamingIncremental(newContent)
       return
     }
 
@@ -713,11 +768,11 @@ watch(
     if (hasMathFormulas(newContent)) {
       void processContentAsync(newContent, currentVersion).then((result) => {
         if (result !== null) {
-          renderedContent.value = result
+          applyHtml(result)
         }
       })
     } else {
-      renderedContent.value = processContentSync(newContent)
+      applyHtml(processContentSync(newContent))
     }
   },
   { immediate: true }
@@ -744,11 +799,11 @@ watch(
     if (hasMathFormulas(props.content)) {
       void processContentAsync(props.content, currentVersion).then((result) => {
         if (result !== null) {
-          renderedContent.value = result
+          applyHtml(result)
         }
       })
     } else {
-      renderedContent.value = processContentSync(props.content)
+      applyHtml(processContentSync(props.content))
     }
   }
 )
@@ -761,11 +816,13 @@ function getActualTheme(): 'light' | 'dark' {
   return theme.value
 }
 
-// Render mermaid diagrams after content is mounted/updated (debounced)
+// Render mermaid diagrams after content is mounted/updated (debounced).
+// `inPlace: true` keeps the <pre> element identity so the next morphdom patch
+// does not revert the rendered diagram (skipFromChildren in applyHtml).
 async function processMermaidBlocks(): Promise<void> {
   await nextTick()
   if (containerRef.value && hasMermaidBlocks(containerRef.value)) {
-    await renderMermaidBlocks(containerRef.value, getActualTheme())
+    await renderMermaidBlocks(containerRef.value, getActualTheme(), true)
   }
 }
 
@@ -811,6 +868,13 @@ onBeforeUnmount(() => {
 })
 
 onMounted(() => {
+  // Flush the initial render: the content watcher (immediate) ran during setup
+  // before contentRef existed, so the first HTML was computed but not yet
+  // written to the DOM.
+  if (lastRenderedHtml.value) {
+    applyHtml(lastRenderedHtml.value)
+  }
+
   // Setup memory and feedback badge event listeners
   if (containerRef.value) {
     containerRef.value.addEventListener('click', handleMemoryBadgeClick)
@@ -824,7 +888,7 @@ onMounted(() => {
   scheduleMermaidProcessing()
 })
 
-watch(renderedContent, scheduleMermaidProcessing)
+watch(lastRenderedHtml, scheduleMermaidProcessing)
 
 // If config finishes loading and memory service becomes available, ensure we load memories
 watch(
@@ -874,7 +938,7 @@ watch(
       const currentVersion = ++renderVersion
       const result = await processContent(props.content, currentVersion)
       if (result !== null) {
-        renderedContent.value = result
+        applyHtml(result)
       }
     }
   },
@@ -890,7 +954,7 @@ watch(
       const currentVersion = ++renderVersion
       const result = await processContent(props.content, currentVersion)
       if (result !== null) {
-        renderedContent.value = result
+        applyHtml(result)
       }
     }
   },

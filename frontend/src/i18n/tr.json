@@ -1034,6 +1034,9 @@
     "title": "Görev planı",
     "download": "İndir",
     "failedBody": "Bu adım tamamlanamadı.",
+    "cancelledBody": "Bu adımı durdurdunuz.",
+    "stop": "Durdur",
+    "rendering": "Oluşturuluyor…",
     "searchSummary": "Web arandı · {count} kaynak",
     "retryWith": "{model} ile yeniden dene",
     "state": {
@@ -1041,7 +1044,8 @@
       "running": "Çalışıyor…",
       "done": "Tamamlandı",
       "failed": "Başarısız",
-      "skipped": "Atlandı"
+      "skipped": "Atlandı",
+      "cancelled": "Durduruldu"
     },
     "kind": {
       "text": "Metin",
@@ -1552,6 +1556,13 @@
       "automated": "Otomatik (En İyi Model)",
       "availableTools": "Mevcut Araçlar",
       "availableToolsHelp": "Bu promptu kullanırken mevcut olacak araçları etkinleştirin",
+      "internetSearch": {
+        "label": "İnternet Araması",
+        "help": "Bu promptun web'de ne zaman arama yapacağını seçin. \"Otomatik\" kararı her mesaj için sınıflandırıcıya bırakır; \"Her zaman açık\" aramayı zorunlu kılar; \"Her zaman kapalı\" devre dışı bırakır.",
+        "auto": "Otomatik (sınıflandırıcı karar verir)",
+        "on": "Her zaman açık",
+        "off": "Her zaman kapalı"
+      },
       "promptContent": "Prompt İçeriği",
       "contentPlaceholder": "Sistem promptunuzu buraya girin...",
       "promptContentPlaceholder": "Bu görev için AI'ın davranışını yönlendirecek sistem promptunu girin...",

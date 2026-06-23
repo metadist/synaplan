@@ -18,6 +18,8 @@ AI-powered knowledge management with RAG, chat widgets, and multi-channel integr
 - **~9 GB free disk** for the standard install (~5 GB for minimal)
 - Free TCP ports `5173`, `8000`, `8082`, `8025`, `3307`, `6333`, `11435`
 
+> **Apple Silicon (M1–M4) Macs:** Synaplan's container images are published for `linux/amd64`, so they run under emulation on Apple Silicon. In **Docker Desktop → Settings → General**, enable **"Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) for much faster, more stable containers than the default QEMU. Everything works without it — just slower, and the first build takes longer.
+
 ## Quick Start
 
 ```bash

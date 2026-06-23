@@ -172,6 +172,7 @@
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
               @retry-task="handleTaskRetry"
+              @cancel-task="handleTaskCancel"
               @false-positive="openFalsePositiveModal"
               @click-memory="handleClickMemory"
               @continue="handleContinueResponse(message)"
@@ -420,6 +421,17 @@ const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const quoting = useMessageQuoting(chatContainer)
 const autoScroll = ref(true)
+// While streaming we pin the start of the answer to the top once it grows past
+// the viewport. If the user deliberately scrolls to the very bottom, switch to
+// following the bottom instead (so the freshest text stays visible). Reset to
+// pin mode whenever a new message is sent.
+let stickToBottom = false
+// Tracks the scrollTop value we last set programmatically so handleScroll can
+// tell our own scroll adjustments apart from genuine user scrolling.
+let expectedScrollTop = 0
+// Optical breathing room kept below the container's top edge once a long
+// streaming message gets pinned there.
+const STREAM_TOP_GAP = 12
 const isDragging = ref(false)
 const dragCounter = ref(0)
 const historyStore = useHistoryStore()
@@ -643,9 +655,15 @@ const handleVisibilityChangeForToken = () => {
 }
 
 const handleViewportResize = () => {
-  if (autoScroll.value && chatContainer.value) {
-    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  if (!autoScroll.value || !chatContainer.value) return
+  // While streaming, keep the pin behaviour intact instead of jumping to the
+  // bottom (e.g. when the mobile keyboard resizes the visual viewport).
+  if (historyStore.messages.some((m) => m.isStreaming)) {
+    followStreamingScroll()
+    return
   }
+  chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  expectedScrollTop = chatContainer.value.scrollTop
 }
 
 if (window.visualViewport) {
@@ -783,10 +801,44 @@ const scrollToBottom = (force = false) => {
     nextTick(() => {
       if (chatContainer.value) {
         chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+        // Read the clamped value back so the handleScroll guard recognises
+        // this as a programmatic scroll.
+        expectedScrollTop = chatContainer.value.scrollTop
         autoScroll.value = true
       }
     })
   }
+}
+
+// Follow a growing streaming message, but stop scrolling once its top edge
+// reaches the top of the container. Computed purely from measured DOM offsets
+// so it behaves identically on small and large screens.
+const followStreamingScroll = () => {
+  if (!autoScroll.value || !chatContainer.value) return
+  nextTick(() => {
+    const container = chatContainer.value
+    if (!container) return
+    const bottomMax = container.scrollHeight - container.clientHeight
+    let target = bottomMax
+    // The streaming assistant message is always the last rendered message
+    // (the input is locked while streaming, so nothing can be appended after
+    // it). We measure that node directly instead of relying on attribute
+    // fallthrough, which ChatMessage does not forward to its root element.
+    const messageEls = container.querySelectorAll<HTMLElement>('[data-testid="message-container"]')
+    const el = messageEls[messageEls.length - 1]
+    // When the user has scrolled to the bottom, keep following the bottom
+    // instead of pinning the start to the top.
+    if (!stickToBottom && el) {
+      const messageTop =
+        el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+      // Short message: bottomMax wins (keep following the end). Once the
+      // message grows past the viewport, messageTop stays fixed and wins the
+      // min(), pinning the start at the top edge.
+      target = Math.min(bottomMax, Math.max(0, messageTop - STREAM_TOP_GAP))
+    }
+    container.scrollTop = target
+    expectedScrollTop = container.scrollTop
+  })
 }
 
 // Drag & Drop handlers for file upload
@@ -826,9 +878,17 @@ const handleScroll = async () => {
 
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
 
-  // Check if at bottom for auto-scroll
-  const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50
-  autoScroll.value = isAtBottom
+  // Distinguish our own programmatic scrolls (including the pinned position
+  // that is NOT at the bottom) from real user scrolling. Only the latter may
+  // toggle auto-follow off/on.
+  const isProgrammatic = Math.abs(scrollTop - expectedScrollTop) <= 1
+  if (!isProgrammatic) {
+    const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50
+    autoScroll.value = isAtBottom
+    // Scrolling to the very bottom opts into bottom-following; scrolling up
+    // (anywhere above the bottom) leaves pin mode for the next stream.
+    stickToBottom = isAtBottom
+  }
 
   // Check if at top for loading more messages (Infinite Scroll)
   const isAtTop = scrollTop < 100
@@ -845,6 +905,9 @@ const handleScroll = async () => {
     if (chatContainer.value) {
       const newScrollHeight = chatContainer.value.scrollHeight
       chatContainer.value.scrollTop = newScrollHeight - currentScrollHeight + scrollTop
+      // Keep the guard in sync so this position restore is recognised as a
+      // programmatic scroll and does not toggle autoScroll/stickToBottom.
+      expectedScrollTop = chatContainer.value.scrollTop
     }
   }
 }
@@ -883,7 +946,7 @@ watch(
     return total
   },
   () => {
-    scrollToBottom()
+    followStreamingScroll()
   }
 )
 
@@ -1244,6 +1307,7 @@ const handleSendMessage = async (
   }
 ) => {
   autoScroll.value = true
+  stickToBottom = false
 
   // Prepare files info if fileIds are provided
   let files: import('@/stores/history').MessageFile[] | undefined = undefined
@@ -1764,6 +1828,37 @@ const streamAIResponse = async (
             return
           }
 
+          // [i2v-debug] Opt-in multitask/media tracing: a task card stuck at
+          // "Rendering… 95%" gives no clue whether the worker ever finishes. Log
+          // the plan + task lifecycle (progress, terminal state, produced file) so
+          // we can see in the browser console if the closing task_update/task_file
+          // actually reaches the client over the realtime channel. Gated behind
+          // `localStorage.setItem('synaplanDebug', '1')` (same pattern as the
+          // 'perf' tracing) so production consoles stay quiet and no internal
+          // metadata (file URLs/errors) leaks unless a developer opts in.
+          try {
+            if (
+              typeof window !== 'undefined' &&
+              window.localStorage?.getItem('synaplanDebug') &&
+              typeof data.status === 'string' &&
+              (data.status === 'plan' ||
+                data.status === 'plan_discarded' ||
+                data.status.startsWith('task_'))
+            ) {
+              console.debug('[i2v-debug]', data.status, {
+                node_id: data.metadata?.node_id,
+                state: data.metadata?.state,
+                percent: data.metadata?.percent,
+                provider_status: data.metadata?.provider_status,
+                elapsed_seconds: data.metadata?.elapsed_seconds,
+                url: data.metadata?.url,
+                error: data.metadata?.error,
+              })
+            }
+          } catch {
+            // never let debug tracing break the stream handler
+          }
+
           // Handle different status events for UI feedback
           if (data.status === 'started') {
             processingStatus.value = 'started'
@@ -1884,6 +1979,10 @@ const streamAIResponse = async (
               message.wasMultitask = true
               message.taskPlan = {
                 active: true,
+                // Persist the turn id on the plan so the per-card Stop button can
+                // always reach the backend even if currentTrackId is cleared by a
+                // racing handler (issue #1141).
+                trackId: currentTrackId,
                 replyNode:
                   typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
                 cards: tasks.map((t) => ({
@@ -1906,7 +2005,12 @@ const streamAIResponse = async (
           } else if (data.status === 'task_update') {
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && isTaskCardState(data.metadata?.state)) {
+            // A user-cancelled step is terminal on the client: ignore the
+            // backend 'failed' that follows the abort so the card stays
+            // 'cancelled' (neutral) instead of flipping to a scary error.
+            if (card && card.state === 'cancelled') {
+              // keep cancelled
+            } else if (card && isTaskCardState(data.metadata?.state)) {
               card.state = data.metadata.state
               // Failure details: specific error text + (for media nodes) the
               // resolved prompt powering the per-task retry button.
@@ -1937,6 +2041,21 @@ const streamAIResponse = async (
               card.url = normalizeMediaUrl(data.metadata.url)
               card.mediaType =
                 typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
+            }
+          } else if (data.status === 'task_progress') {
+            // Live media render progress: feed a moving bar on the running card.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && card.state !== 'cancelled') {
+              if (typeof data.metadata?.percent === 'number') {
+                card.progressPercent = data.metadata.percent
+              }
+              if (typeof data.metadata?.provider_status === 'string') {
+                card.providerStatus = data.metadata.provider_status
+              }
+              if (typeof data.metadata?.elapsed_seconds === 'number') {
+                card.elapsedSeconds = data.metadata.elapsed_seconds
+              }
             }
           } else if (
             data.status === 'data' &&
@@ -2933,6 +3052,86 @@ const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => 
   isAudioStreaming.value = false
 
   await streamAIResponse(payload.prompt, { modelId: payload.modelId, isAgain: true })
+}
+
+// Per-card Stop: cancel one running media step without ending the whole turn.
+// Mark the card cancelled immediately (the user's intent is the source of truth)
+// and signal the backend so the provider poll aborts and stops billing.
+const handleTaskCancel = async (nodeId: string) => {
+  // Resolve the CURRENT turn's task-plan message via the streaming flag, mirroring
+  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …) and
+  // taskPlan.active is only cleared on local teardown (not on a normal/error
+  // completion), so finding the FIRST active plan can match a stale earlier turn and
+  // cancel the wrong card / send the wrong trackId. The streaming message is the
+  // unambiguous active turn; fall back to the active-plan lookup only if none is
+  // currently streaming.
+  const message =
+    historyStore.messages.find((m) => m.isStreaming && m.taskPlan?.active) ??
+    historyStore.messages.find((m) => m.taskPlan?.active)
+  const card = message?.taskPlan?.cards.find((c) => c.nodeId === nodeId)
+  if (card) {
+    card.state = 'cancelled'
+  }
+
+  // Resolve the turn id reliably: prefer the plan-scoped id captured when the
+  // turn started, falling back to the module-level currentTrackId. Relying on
+  // currentTrackId alone was the root cause of issue #1141 — it can be undefined
+  // (cleared by a racing complete/error handler) so the backend never received
+  // the cancel and the stream stayed open, blocking the input.
+  const trackId = message?.taskPlan?.trackId ?? currentTrackId
+  if (trackId !== undefined) {
+    try {
+      await chatApi.cancelTask(trackId, nodeId)
+    } catch {
+      // Best-effort: the card already reflects the cancellation locally.
+    }
+  } else {
+    console.warn('⚠️ No trackId for per-card cancel - skipping backend notification')
+  }
+
+  // If this was the last still-running step, end the turn locally so the input
+  // unblocks immediately (issue #1141): a single-node media turn would otherwise
+  // wait for a backend `complete` that may be delayed by the provider poll. We
+  // close the EventSource and finish the streaming message WITHOUT the global
+  // "cancelled by user" notice, since the cancelled card already conveys it.
+  const remaining = message?.taskPlan?.cards.filter(
+    (c) => c.state === 'pending' || c.state === 'running'
+  )
+  if (!remaining || remaining.length === 0) {
+    finishStreamingTurnLocally()
+  }
+}
+
+// Tear down the active stream and unblock the chat input without injecting the
+// global stop's "cancelled by user" text. Used when a per-card Stop cancels the
+// only running step (issue #1141).
+function finishStreamingTurnLocally() {
+  if (streamingAbortController) {
+    streamingAbortController.abort()
+  }
+  if (stopStreamingFn) {
+    stopStreamingFn()
+    stopStreamingFn = null
+  }
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
+  isAudioStreaming.value = false
+  processingStatus.value = ''
+  processingMetadata.value = {}
+
+  const streamingMessage = historyStore.messages.find((m) => m.isStreaming)
+  if (streamingMessage) {
+    if (streamingMessage.taskPlan) {
+      streamingMessage.taskPlan.active = false
+    }
+    historyStore.finishStreamingMessage(streamingMessage.id)
+  }
+
+  streamingAbortController = null
+  currentTrackId = undefined
+  currentStreamingChatId = undefined
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {

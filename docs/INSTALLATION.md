@@ -9,6 +9,11 @@ Complete installation instructions for Synaplan.
 - 8GB RAM minimum (16GB recommended for local AI)
 - 20GB disk space (Standard) or 10GB (Minimal)
 
+> **Apple Silicon (M1–M4) Macs:** the images are `linux/amd64` only and run under
+> emulation on Apple Silicon. Enable **Docker Desktop → Settings → General → "Use
+> Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) for a much faster
+> experience than the default QEMU. See [Troubleshooting](#slow-performance-on-apple-silicon-mac).
+
 ## Quick Install
 
 ```bash
@@ -177,6 +182,20 @@ docker compose logs ollama
 # Manually pull model
 docker compose exec ollama ollama pull bge-m3
 ```
+
+### Slow performance on Apple Silicon (Mac)
+
+Synaplan's container images are `linux/amd64` only, so on Apple Silicon (M1–M4)
+they run under emulation. For the best experience:
+
+- Enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64
+  emulation on Apple Silicon"** (macOS 13+). Rosetta is significantly faster than
+  the default QEMU translation.
+- The first `docker compose up -d` is slower because the backend image is built
+  locally under emulation; subsequent restarts are fast.
+- `docker compose` may print a platform-mismatch warning
+  (`requested image's platform (linux/amd64) does not match ...`) — it is expected
+  and safe to ignore.
 
 ### Port conflicts
 Default host ports: 5173 (frontend), 8000 (backend), 3307 (database), 8082 (phpMyAdmin), 8025/1025 (MailHog), 6333 (Qdrant), 11435 (Ollama), 9999 (Tika)

@@ -10,8 +10,25 @@
  * 3. Call renderMermaidBlocks() to convert mermaid code blocks to SVG diagrams
  */
 
+import DOMPurify from 'dompurify'
+
 let mermaidInitialized = false
 let mermaidModule: typeof import('mermaid') | null = null
+
+/**
+ * Sanitize a mermaid-rendered SVG before it is injected via innerHTML.
+ *
+ * Mermaid already sanitizes with `securityLevel: 'strict'`, but assigning the
+ * raw string to innerHTML is flagged by static analysis (CodeQL: "DOM text
+ * reinterpreted as HTML"). This is defense-in-depth: DOMPurify with the SVG
+ * (+ SVG filters + HTML for foreignObject labels) profiles strips scripts and
+ * event handlers while preserving everything mermaid needs to render.
+ */
+function sanitizeSvg(svg: string): string {
+  return DOMPurify.sanitize(svg, {
+    USE_PROFILES: { svg: true, svgFilters: true, html: true },
+  })
+}
 
 /**
  * Lazy-load and initialize mermaid
@@ -95,10 +112,16 @@ function isDiagramCodeComplete(code: string): boolean {
  *
  * @param container - The DOM element containing markdown content
  * @param theme - Optional theme ('light' or 'dark')
+ * @param inPlace - When `false` (default) each `<pre class="mermaid-block">` is
+ *   REPLACED by a new `<div>` holding the SVG. When `true` the SVG is injected
+ *   INTO the existing `<pre>` (then marked `mermaid-rendered`), keeping element
+ *   identity stable so a DOM-morphing renderer (morphdom) can protect the
+ *   rendered diagram from being reverted on the next streaming patch.
  */
 export async function renderMermaidBlocks(
   container: HTMLElement,
-  theme: 'light' | 'dark' = 'light'
+  theme: 'light' | 'dark' = 'light',
+  inPlace: boolean = false
 ): Promise<void> {
   const mermaidBlocks = container.querySelectorAll('pre.mermaid-block')
 
@@ -141,14 +164,22 @@ export async function renderMermaidBlocks(
       try {
         const id = `mermaid-${Math.random().toString(36).slice(2, 11)}`
         const { svg } = await mermaid.render(id, diagramCode)
+        const safeSvg = sanitizeSvg(svg)
 
-        // Create a container for the rendered diagram
-        const diagramContainer = document.createElement('div')
-        diagramContainer.className = 'mermaid-diagram my-4 overflow-x-auto'
-        diagramContainer.innerHTML = svg
+        if (inPlace) {
+          // Keep the <pre> element (stable identity for morphdom) and swap its
+          // code child for the rendered SVG.
+          block.classList.add('mermaid-rendered')
+          block.innerHTML = safeSvg
+        } else {
+          // Create a container for the rendered diagram
+          const diagramContainer = document.createElement('div')
+          diagramContainer.className = 'mermaid-diagram my-4 overflow-x-auto'
+          diagramContainer.innerHTML = safeSvg
 
-        // Replace the code block with the rendered diagram
-        block.replaceWith(diagramContainer)
+          // Replace the code block with the rendered diagram
+          block.replaceWith(diagramContainer)
+        }
       } catch {
         // Mark as error to prevent re-rendering attempts
         block.classList.add('mermaid-error')

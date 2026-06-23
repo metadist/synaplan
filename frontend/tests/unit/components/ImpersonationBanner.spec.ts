@@ -62,6 +62,15 @@ vi.mock('@/stores/chats', () => ({
 vi.mock('@/stores/history', () => ({
   useHistoryStore: () => ({ clear: vi.fn() }),
 }))
+vi.mock('@/services/api/chatApi', () => ({
+  clearSseToken: vi.fn(),
+}))
+vi.mock('@/stores/userMemories', () => ({
+  useMemoriesStore: () => ({ $reset: vi.fn() }),
+}))
+vi.mock('@/stores/userFeedback', () => ({
+  useFeedbackStore: () => ({ $reset: vi.fn() }),
+}))
 
 const buildRouter = () =>
   createRouter({

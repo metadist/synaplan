@@ -292,6 +292,73 @@ describe('TaskPlanBubble', () => {
     expect(wrapper.find('[data-testid="task-card-retry"]').exists()).toBe(false)
   })
 
+  it('offers a Stop button on a running media card and bubbles cancelTask', async () => {
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          { nodeId: 'n2', capability: 'video_generation', kind: 'video', state: 'running' },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    const stop = wrapper.find('[data-testid="task-card-stop"]')
+    expect(stop.exists()).toBe(true)
+
+    await stop.trigger('click')
+
+    expect(wrapper.emitted('cancelTask')).toEqual([['n2']])
+  })
+
+  it('does not offer a Stop button on a running text card', () => {
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([{ nodeId: 'n1', capability: 'summarize', kind: 'text', state: 'running' }]),
+      },
+      ...mountOptions,
+    })
+
+    expect(wrapper.find('[data-testid="task-card-stop"]').exists()).toBe(false)
+  })
+
+  it('shows a progress bar once the render reports a percentage', () => {
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          {
+            nodeId: 'n2',
+            capability: 'video_generation',
+            kind: 'video',
+            state: 'running',
+            progressPercent: 42,
+          },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    const bar = wrapper.find('[data-testid="task-card-progress"]')
+    expect(bar.exists()).toBe(true)
+    expect(wrapper.find('.task-card__progress-fill').attributes('style')).toContain('width: 42%')
+  })
+
+  it('renders a neutral note on a cancelled card without error styling', () => {
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          { nodeId: 'n2', capability: 'video_generation', kind: 'video', state: 'cancelled' },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    const card = wrapper.find('[data-testid="task-card-n2"]')
+    expect(card.attributes('data-state')).toBe('cancelled')
+    expect(wrapper.find('[data-testid="task-card-cancelled"]').exists()).toBe(true)
+    // A cancelled media card must not keep showing the loading skeleton.
+    expect(wrapper.find('.task-card__skeleton').exists()).toBe(false)
+  })
+
   it('renders an email card for the email_me capability', () => {
     const wrapper = mount(TaskPlanBubble, {
       props: {

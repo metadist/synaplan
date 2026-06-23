@@ -289,13 +289,23 @@ This is the list, use only this:
 
 5. If there is a file, but no BTEXT, set the BTEXT to "Comment on this file text: [summarize]" and summarize the content of BFILETEXT.
 
-6. **Detect if web search is needed (BWEBSEARCH)**: Set BWEBSEARCH to 1 if the user asks for:
-   - Current/recent information (news, prices, weather, events)
-   - Real-time data or today's information
-   - Questions about events after 2023
-   - Specific locations/places (restaurants, stores, services)
-   - Questions that explicitly require internet search
-   Otherwise, set BWEBSEARCH to 0.
+6. **Detect if web search is needed (BWEBSEARCH)**: Be conservative — default to 0. Most messages do NOT need a web search. Set BWEBSEARCH to 1 ONLY when answering correctly requires fresh, real-world information the model cannot know, such as:
+   - Current/recent information (news, prices, stock quotes, weather, sports scores, live events)
+   - Real-time data or "today"/"now"/"latest"/"current" information
+   - Facts about events, releases, or people that changed after 2023
+   - Specific real-world locations/places (restaurants, stores, services, opening hours)
+   - A request that explicitly asks to search the internet / look something up online
+
+   Set BWEBSEARCH to 0 (no search) for everything else, including:
+   - Greetings and smalltalk ("hi", "hello", "hey, wie gehts?", "good morning", "thanks")
+   - Opinions, advice, brainstorming, or recommendations from general knowledge
+   - Coding help, debugging, or technical explanations
+   - Creative writing (stories, poems, emails, jokes)
+   - Math, logic, translations, grammar, or rephrasing
+   - Stable general knowledge (definitions, history, science, "what is the capital of France")
+   - Summarizing, analysing, or answering about text/files the user already provided
+
+   When in doubt and the message is conversational or answerable from general knowledge, set BWEBSEARCH to 0.
 
 7. **Classify image attachments correctly**: When the message has image attachments (BATTACHED_FILES contains image types like jpg, jpeg, png, gif, webp, or BFILETYPE is an image type), you must distinguish between two intents:
 
@@ -480,10 +490,19 @@ Allowed topic keys: [KEYLIST]
    `text2sound` node. If the user also asks for content to be generated
    first ("write X and read it"), GENERATE the content in a prior `chat`
    node, then feed `$nX.text` into `text2sound`.
-3. Image generate/edit → `image_generation`.
+3. Image generate/edit → `image_generation`. To EDIT an image produced by an
+   earlier node ("make a logo, then make it blue"), add a second
+   `image_generation` node that depends on the first and references its file:
+   `"depends_on": ["n1"], "inputs": { "prompt": "make it blue", "image": "$n1.file" }`.
+   The `image` input turns it into an image-to-image edit (PIC2PIC).
 4. Video generate → `video_generation`. Put `duration` (4|6|8) and
    `resolution` ("720p"|"1080p"|"4K") in `params` only when the user
-   specified them.
+   specified them. To ANIMATE an image produced by an earlier node ("create a
+   picture of X, then animate it"), add a `video_generation` node that depends
+   on the image node and references its file:
+   `"depends_on": ["n1"], "inputs": { "prompt": "...", "image": "$n1.file" }`.
+   The `image` input makes it an image-to-video render (IMG2VID); without it the
+   node falls back to text-to-video.
 5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
    chat). Real PDFs are NOT supported — say so in a single `chat` node.
 6. Question about an attached document/image (read, describe, extract,
@@ -569,6 +588,25 @@ The `email_me` node is an EXTRA side-channel sink — `compose_reply` does NOT
 depend on it (a failed mail must never kill the chat reply), and `reply_node`
 is still the `compose_reply` node so the chat shows everything. Without the
 explicit "Mail it to me" the plan would be identical MINUS the `email_me` node.
+
+### Image, then animate it (image-to-video chain)
+User: "Create a picture of a sailboat on a lake, then animate it as a short video."
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "A sailboat on a calm lake" } },
+    { "id": "n2", "capability": "video_generation", "depends_on": ["n1"], "inputs": { "prompt": "Animate the sailboat gently moving on the water", "image": "$n1.file" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "Here is your image and the animated video.", "attachments": ["$n1.file","$n2.file"] } }
+  ]
+}
+
+The `image` input on the video node (`$n1.file`) makes it an image-to-video
+render of the generated picture (IMG2VID). Omitting it would animate from text
+only. The same `"image": "$nX.file"` pattern turns a second `image_generation`
+node into an image edit (PIC2PIC).
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
 The event fields go in `params`. Resolve the relative time against the time

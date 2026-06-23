@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
@@ -575,7 +576,15 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                 'status' => $submitData['status'] ?? 'unknown',
             ]);
 
-            $this->pollUntilComplete($submitData['status_url'], $submitData['request_id'], $falModelId);
+            // Stop button support (issue #1145): forward the cancel probe from
+            // MediaGenerationHandler so the queue poll aborts and tells fal.ai
+            // to cancel the request instead of letting it run to completion and
+            // burn credits for a video nobody is waiting for.
+            $cancelCheck = isset($options['cancel_check']) && is_callable($options['cancel_check'])
+                ? $options['cancel_check']
+                : null;
+
+            $this->pollUntilComplete($submitData['status_url'], $submitData['request_id'], $falModelId, $cancelCheck);
 
             $resultResponse = $this->httpClient->request('GET', $submitData['response_url'], [
                 'headers' => $this->buildAuthHeaders(),
@@ -1044,9 +1053,25 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
     /**
      * Poll fal.ai queue status until the request completes or fails.
      */
-    private function pollUntilComplete(string $statusUrl, string $requestId, string $falModelId): void
+    private function pollUntilComplete(string $statusUrl, string $requestId, string $falModelId, ?callable $cancelCheck = null): void
     {
         for ($attempt = 0; $attempt < self::QUEUE_MAX_POLL_ATTEMPTS; ++$attempt) {
+            // A video render legitimately takes minutes; under FrankenPHP the
+            // request's max_execution_time is wall-clock and is not disabled by a
+            // one-time set_time_limit(0), so the long sleep()/poll loop would be
+            // killed mid-render. Re-arm a per-iteration budget (set_time_limit
+            // restarts the counter from zero) so a healthy render completes.
+            $this->extendExecutionTime(self::QUEUE_POLL_INTERVAL_SECONDS + 30);
+
+            // Honour a cancellation request as early as possible (issue #1145):
+            // abort the wait and ask fal.ai to cancel the queued request so we
+            // stop burning credits on a render nobody is waiting for.
+            if (null !== $cancelCheck && $cancelCheck()) {
+                $this->cancelRemote($statusUrl, $requestId);
+
+                throw new ProviderCancelledException('fal.ai video generation cancelled', self::PROVIDER_NAME, ['request_id' => $requestId]);
+            }
+
             sleep(self::QUEUE_POLL_INTERVAL_SECONDS);
 
             $statusResponse = $this->httpClient->request('GET', $statusUrl, [
@@ -1082,6 +1107,38 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
         }
 
         throw new ProviderException(sprintf('fal.ai video generation timed out after %d seconds', self::QUEUE_POLL_INTERVAL_SECONDS * self::QUEUE_MAX_POLL_ATTEMPTS), self::PROVIDER_NAME);
+    }
+
+    /**
+     * Best-effort cancel of an in-flight fal.ai queue request (issue #1145).
+     * fal.ai exposes `PUT {request_url}/cancel`; we derive it from the status
+     * URL the submit returned (`.../requests/{id}/status` → `.../requests/{id}/cancel`).
+     * Never throws — cancellation is a courtesy after we have already decided to
+     * stop polling, so a failed cancel must not mask the cancellation result.
+     */
+    private function cancelRemote(string $statusUrl, string $requestId): void
+    {
+        // Status URLs end in `/status` (optionally with a query string). Swap the
+        // trailing segment for `/cancel` to hit the queue cancel endpoint.
+        $cancelUrl = preg_replace('#/status(\?.*)?$#', '/cancel', $statusUrl);
+        if (null === $cancelUrl || $cancelUrl === $statusUrl) {
+            $cancelUrl = rtrim($statusUrl, '/').'/cancel';
+        }
+
+        try {
+            $this->httpClient->request('PUT', $cancelUrl, [
+                'headers' => $this->buildAuthHeaders(),
+                'timeout' => self::TIMEOUT_VIDEO_POLL_SECONDS,
+            ]);
+            $this->logger->info('HuggingFace: fal.ai cancel request sent', [
+                'request_id' => $requestId,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('HuggingFace: fal.ai cancel request failed (already walking away)', [
+                'request_id' => $requestId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -1132,5 +1189,22 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
         }
 
         return $model;
+    }
+
+    /**
+     * Re-arm the PHP execution-time limit for one more poll cycle.
+     *
+     * A video render can run for minutes; under FrankenPHP the request's
+     * max_execution_time is wall-clock and a one-time set_time_limit(0) does not
+     * disable it, so the poll loop restarts the timer each iteration
+     * (set_time_limit() resets the counter to zero) to avoid a mid-render
+     * "Maximum execution time exceeded". Guarded because the function can be
+     * disabled via disable_functions.
+     */
+    private function extendExecutionTime(int $seconds): void
+    {
+        if (\function_exists('set_time_limit')) {
+            set_time_limit(max(30, $seconds));
+        }
     }
 }

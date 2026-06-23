@@ -6,6 +6,7 @@ namespace App\Tests\Unit;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\ModelConfigService;
 use App\Service\OidcUserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
@@ -19,11 +20,13 @@ class OidcUserServiceTest extends TestCase
 {
     private UserRepository&MockObject $userRepository;
     private EntityManagerInterface&MockObject $em;
+    private ModelConfigService&MockObject $modelConfigService;
 
     protected function setUp(): void
     {
         $this->userRepository = $this->createMock(UserRepository::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
+        $this->modelConfigService = $this->createMock(ModelConfigService::class);
     }
 
     private function createService(
@@ -34,6 +37,7 @@ class OidcUserServiceTest extends TestCase
         return new OidcUserService(
             $this->userRepository,
             $this->em,
+            $this->modelConfigService,
             new NullLogger(),
             $oidcAdminRoles,
             $oidcRoleClaims,

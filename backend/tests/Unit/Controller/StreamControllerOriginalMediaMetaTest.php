@@ -10,6 +10,7 @@ use App\Entity\Message;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
+use App\Service\Media\MediaCancellationStore;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
@@ -54,6 +55,7 @@ class StreamControllerOriginalMediaMetaTest extends TestCase
             $this->createMock(MessageForwardingService::class),
             $this->createMock(MemoryExtractionDispatcher::class),
             $this->createMock(DocumentGeneratorService::class),
+            $this->createMock(MediaCancellationStore::class),
         );
     }
 

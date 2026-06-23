@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpExceptionInterface;
@@ -36,7 +38,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * @see https://docs.higgsfield.ai/
  */
-final class HiggsfieldProvider implements ImageGenerationProviderInterface, VideoGenerationProviderInterface
+final class HiggsfieldProvider implements ImageGenerationProviderInterface, VideoGenerationProviderInterface, SupportsAsyncVideo
 {
     private const PROVIDER_NAME = 'higgsfield';
     private const DISPLAY_NAME = 'Higgsfield';
@@ -48,6 +50,7 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
 
     private const TIMEOUT_SUBMIT_SECONDS = 30;
     private const TIMEOUT_POLL_SECONDS = 15;
+    private const TIMEOUT_DOWNLOAD_SECONDS = 120;
 
     /** Seconds between status polls. */
     private const POLL_INTERVAL_SECONDS = 3;
@@ -58,6 +61,26 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
 
     /** Log every Nth poll attempt to keep logs readable for long videos. */
     private const POLL_LOG_EVERY = 5;
+
+    /**
+     * Higgsfield video models render fixed-length clips. The DoP family is 5s
+     * only; Kling supports 5s or 10s. The platform rejects unsupported values
+     * (e.g. the generic 8s default that flows down from the media handler), so a
+     * requested length is always normalised to a supported one — keeping clips
+     * short, cheap, and inside the render-time budget instead of being rejected.
+     */
+    private const DEFAULT_VIDEO_DURATION = 5;
+    private const DEFAULT_VIDEO_DURATIONS = [5, 10];
+    private const DOP_VIDEO_DURATIONS = [5];
+
+    /**
+     * Rough render budget (seconds) used only to turn elapsed poll time into a
+     * monotonic progress percentage for the UI. Higgsfield reports a coarse
+     * textual status (queued/in_progress/completed) with no numeric progress, so
+     * this drives a smoothly advancing bar that is capped below 100% until the
+     * real "completed" status arrives.
+     */
+    private const ESTIMATED_VIDEO_SECONDS = 90;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -243,6 +266,7 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
      *   aspect_ratio?: string,
      *   resolution?: string,
      *   progress_callback?: callable,
+     *   cancel_check?: callable,
      *   modelConfig?: array<string, mixed>,
      * } $options
      *
@@ -253,42 +277,12 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         $credentials = $this->credentialsFromOptions($options);
         $model = $this->modelFromOptions($options, self::DEFAULT_IMAGE_TO_VIDEO_MODEL);
 
-        $body = [
-            'prompt' => $prompt,
-        ];
-
-        // Most Higgsfield video models are image-to-video; surface the first
-        // attached reference image (if any) as image_url. Pure text-to-video
-        // models simply ignore it.
-        $imageUrl = $options['image_url'] ?? null;
-        if (null === $imageUrl) {
-            $referenceImages = $options['images'] ?? [];
-            if ([] !== $referenceImages) {
-                $imageUrl = (string) reset($referenceImages);
-            }
-        }
-        if (is_string($imageUrl) && '' !== $imageUrl) {
-            $body['image_url'] = $imageUrl;
-        }
-
-        if (isset($options['duration'])) {
-            $body['duration'] = (int) $options['duration'];
-        }
-
-        $aspectRatio = $this->aspectRatioFromOptions($options);
-        if (null !== $aspectRatio) {
-            $body['aspect_ratio'] = $aspectRatio;
-        }
-
-        $resolution = $this->resolutionFromOptions($options);
-        if (null !== $resolution) {
-            $body['resolution'] = $resolution;
-        }
+        $body = $this->buildVideoRequestBody($prompt, $model, $options);
 
         $this->logger->info('Higgsfield: generateVideo', [
             'model' => $model,
             'prompt_length' => strlen($prompt),
-            'duration' => $body['duration'] ?? null,
+            'duration' => $body['duration'],
             'aspect_ratio' => $body['aspect_ratio'] ?? null,
             'resolution' => $body['resolution'] ?? null,
             'has_reference' => isset($body['image_url']),
@@ -300,6 +294,14 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
             $progressCallback = null;
         }
 
+        // The caller (MediaGenerationHandler) supplies a cancel probe wired to
+        // the Stop button / client disconnect. When it trips mid-poll we ask
+        // Higgsfield to cancel the request (stops billing) and abort.
+        $cancelCheck = $options['cancel_check'] ?? null;
+        if (!is_callable($cancelCheck)) {
+            $cancelCheck = null;
+        }
+
         $submission = $this->submit($model, $body, $credentials);
         $finalPayload = $this->pollUntilTerminal(
             $submission['status_url'],
@@ -308,9 +310,238 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
             self::POLL_MAX_ATTEMPTS_VIDEO,
             'video',
             $progressCallback,
+            $submission['cancel_url'],
+            $cancelCheck,
         );
 
         return $this->parseVideoPayload($finalPayload, $body);
+    }
+
+    // ==================== ASYNC (JOB-BASED) VIDEO ====================
+
+    /**
+     * Submit a video render and return an opaque handle, without blocking.
+     *
+     * The handle is a JSON blob carrying everything a later stateless
+     * {@see pollVideoOperationOnce()} / {@see cancelVideoOperation()} needs
+     * (queue URLs, request id, the request body for final-payload parsing).
+     * Credentials are NOT baked into the handle — they are re-injected by the
+     * worker on each call so a rotated/per-user key is always honoured.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array{operationName: string, model: string, duration: int, resolution: ?string}
+     */
+    public function startVideoOperation(string $prompt, array $options = []): array
+    {
+        $credentials = $this->credentialsFromOptions($options);
+        $model = $this->modelFromOptions($options, self::DEFAULT_IMAGE_TO_VIDEO_MODEL);
+        $body = $this->buildVideoRequestBody($prompt, $model, $options);
+
+        $this->logger->info('Higgsfield: startVideoOperation', [
+            'model' => $model,
+            'prompt_length' => strlen($prompt),
+            'has_reference' => isset($body['image_url']),
+            'credentials_source' => $credentials['source'],
+        ]);
+
+        $submission = $this->submit($model, $body, $credentials);
+
+        $handle = json_encode([
+            'request_id' => $submission['request_id'],
+            'status_url' => $submission['status_url'],
+            'cancel_url' => $submission['cancel_url'],
+            'model' => $model,
+            'body' => $body,
+        ]);
+
+        return [
+            'operationName' => false === $handle ? '' : $handle,
+            'model' => $model,
+            'duration' => isset($body['duration']) ? (int) $body['duration'] : 0,
+            'resolution' => isset($body['resolution']) && is_string($body['resolution']) ? $body['resolution'] : null,
+        ];
+    }
+
+    /**
+     * Poll a submitted render exactly once. Maps Higgsfield's queue status onto
+     * the provider-agnostic {done, videoUri, error, status, percent} shape. A
+     * terminal failure is returned as `done:true` with an `error` (so the
+     * worker records a user-visible failure) rather than thrown.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array{done: bool, videoUri: ?string, error: ?string, status: string, percent: ?int}
+     */
+    public function pollVideoOperationOnce(string $operationName, array $options = []): array
+    {
+        $handle = $this->decodeOperation($operationName);
+        $credentials = $this->credentialsFromOptions($options);
+
+        try {
+            $response = $this->httpClient->request('GET', $handle['status_url'], [
+                'headers' => $this->buildAuthHeaders($credentials),
+                'timeout' => self::TIMEOUT_POLL_SECONDS,
+            ]);
+            $statusCode = $response->getStatusCode();
+            $data = $response->toArray(false);
+        } catch (HttpExceptionInterface $e) {
+            throw new ProviderException('Higgsfield poll failed: '.$e->getMessage(), self::PROVIDER_NAME, ['request_id' => $handle['request_id']], 0, $e);
+        }
+
+        if ($statusCode >= 400) {
+            $this->handleErrorResponse($statusCode, $data);
+        }
+
+        $status = (string) ($data['status'] ?? 'unknown');
+
+        if ('completed' === $status) {
+            $videos = $this->parseVideoPayload($data, $handle['body']);
+            $url = $videos[0]['url'] ?? null;
+
+            return [
+                'done' => true,
+                'videoUri' => is_string($url) && '' !== $url ? $url : null,
+                'error' => is_string($url) && '' !== $url ? null : 'Higgsfield completed without a media URL',
+                'status' => $status,
+                'percent' => 100,
+            ];
+        }
+
+        if ('failed' === $status) {
+            return [
+                'done' => true,
+                'videoUri' => null,
+                'error' => (string) ($data['error'] ?? 'Higgsfield generation failed'),
+                'status' => $status,
+                'percent' => null,
+            ];
+        }
+
+        if ('nsfw' === $status) {
+            return [
+                'done' => true,
+                'videoUri' => null,
+                'error' => 'Content blocked by provider safety filter (NSFW)',
+                'status' => $status,
+                'percent' => null,
+            ];
+        }
+
+        if ('cancelled' === $status) {
+            return [
+                'done' => true,
+                'videoUri' => null,
+                'error' => 'Higgsfield generation was cancelled',
+                'status' => $status,
+                'percent' => null,
+            ];
+        }
+
+        return [
+            'done' => false,
+            'videoUri' => null,
+            'error' => null,
+            'status' => $status,
+            'percent' => $this->estimatePercent($status, 0),
+        ];
+    }
+
+    /**
+     * Download the produced video. Higgsfield media URLs are public CDN links,
+     * so no auth header is required.
+     *
+     * @param array<string, mixed> $options
+     */
+    public function downloadVideoRaw(string $videoUri, array $options = []): string
+    {
+        try {
+            $response = $this->httpClient->request('GET', $videoUri, [
+                'timeout' => self::TIMEOUT_DOWNLOAD_SECONDS,
+            ]);
+
+            return $response->getContent();
+        } catch (HttpExceptionInterface $e) {
+            throw new ProviderException('Higgsfield video download failed: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function cancelVideoOperation(string $operationName, array $options = []): void
+    {
+        try {
+            $handle = $this->decodeOperation($operationName);
+        } catch (ProviderException) {
+            return; // unparseable handle — nothing to cancel
+        }
+
+        $credentials = $this->credentialsFromOptions($options);
+        $this->cancelRemote($handle['cancel_url'], $credentials, $handle['request_id']);
+    }
+
+    /**
+     * Decode the opaque handle produced by {@see startVideoOperation()}.
+     *
+     * @return array{request_id: string, status_url: string, cancel_url: ?string, model: string, body: array<string, mixed>}
+     */
+    private function decodeOperation(string $operationName): array
+    {
+        $decoded = json_decode($operationName, true);
+        if (!is_array($decoded) || !isset($decoded['status_url']) || !is_string($decoded['status_url']) || '' === $decoded['status_url']) {
+            throw new ProviderException('Invalid Higgsfield operation handle', self::PROVIDER_NAME);
+        }
+
+        return [
+            'request_id' => isset($decoded['request_id']) && is_string($decoded['request_id']) ? $decoded['request_id'] : '',
+            'status_url' => $decoded['status_url'],
+            'cancel_url' => isset($decoded['cancel_url']) && is_string($decoded['cancel_url']) ? $decoded['cancel_url'] : null,
+            'model' => isset($decoded['model']) && is_string($decoded['model']) ? $decoded['model'] : '',
+            'body' => isset($decoded['body']) && is_array($decoded['body']) ? $decoded['body'] : [],
+        ];
+    }
+
+    /**
+     * Build the Higgsfield request body shared by the blocking and async paths.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function buildVideoRequestBody(string $prompt, string $model, array $options): array
+    {
+        $body = [
+            'prompt' => $prompt,
+        ];
+
+        // Most Higgsfield video models are image-to-video; surface the first
+        // attached reference image (if any) as image_url. Pure text-to-video
+        // models simply ignore it.
+        $imageUrl = $options['image_url'] ?? null;
+        if (null === $imageUrl) {
+            $referenceImages = $options['images'] ?? [];
+            if (is_array($referenceImages) && [] !== $referenceImages) {
+                $imageUrl = (string) reset($referenceImages);
+            }
+        }
+        if (is_string($imageUrl) && '' !== $imageUrl) {
+            $body['image_url'] = $imageUrl;
+        }
+
+        $body['duration'] = $this->durationFromOptions($model, $options);
+
+        $aspectRatio = $this->aspectRatioFromOptions($options);
+        if (null !== $aspectRatio) {
+            $body['aspect_ratio'] = $aspectRatio;
+        }
+
+        $resolution = $this->resolutionFromOptions($options);
+        if (null !== $resolution) {
+            $body['resolution'] = $resolution;
+        }
+
+        return $body;
     }
 
     // ==================== HTTP MECHANICS ====================
@@ -376,10 +607,29 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         int $maxAttempts,
         string $mediaType,
         ?callable $progressCallback = null,
+        ?string $cancelUrl = null,
+        ?callable $cancelCheck = null,
     ): array {
         $startedAt = time();
 
         for ($attempt = 1; $attempt <= $maxAttempts; ++$attempt) {
+            // A video render legitimately takes minutes, but under the FrankenPHP
+            // runtime the request's max_execution_time is wall-clock and is NOT
+            // disabled by a single set_time_limit(0) at the start of the stream —
+            // so the long sleep()/poll loop below was killed mid-render with
+            // "Maximum execution time of 0 seconds exceeded", leaving the task
+            // card frozen. Re-arm a generous per-iteration budget (set_time_limit
+            // restarts the counter from zero) so a healthy render runs to the end.
+            $this->extendExecutionTime($this->pollIntervalSeconds + self::TIMEOUT_POLL_SECONDS + 30);
+
+            // Honour a cancellation request as early as possible so we stop
+            // billing instead of finishing a generation nobody is waiting for.
+            if (null !== $cancelCheck && $cancelCheck()) {
+                $this->cancelRemote($cancelUrl, $credentials, $requestId);
+
+                throw new ProviderCancelledException(sprintf('Higgsfield %s generation cancelled', $mediaType), self::PROVIDER_NAME, ['request_id' => $requestId]);
+            }
+
             if ($this->pollIntervalSeconds > 0) {
                 sleep($this->pollIntervalSeconds);
             }
@@ -403,10 +653,13 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
             $status = (string) ($data['status'] ?? 'unknown');
 
             if (null !== $progressCallback) {
+                $elapsed = time() - $startedAt;
                 $progressCallback([
                     'status' => $status,
                     'attempt' => $attempt,
-                    'elapsed_seconds' => time() - $startedAt,
+                    'max_attempts' => $maxAttempts,
+                    'elapsed_seconds' => $elapsed,
+                    'percent' => $this->estimatePercent($status, $elapsed),
                     'request_id' => $requestId,
                 ]);
             }
@@ -444,6 +697,53 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         }
 
         throw new ProviderException(sprintf('Higgsfield %s generation timed out after %d seconds', $mediaType, $this->pollIntervalSeconds * $maxAttempts), self::PROVIDER_NAME, ['request_id' => $requestId]);
+    }
+
+    /**
+     * Best-effort cancel of an in-flight request so Higgsfield stops the render
+     * (and the billing). Never throws — cancellation is a courtesy on top of us
+     * already having walked away from the poll.
+     *
+     * @param array{api_key: string, api_secret: string, source?: string} $credentials
+     */
+    private function cancelRemote(?string $cancelUrl, array $credentials, string $requestId): void
+    {
+        if (null === $cancelUrl || '' === $cancelUrl) {
+            $this->logger->info('Higgsfield: cancellation requested but provider gave no cancel_url', [
+                'request_id' => $requestId,
+            ]);
+
+            return;
+        }
+
+        try {
+            $this->httpClient->request('POST', $cancelUrl, [
+                'headers' => $this->buildAuthHeaders($credentials),
+                'timeout' => self::TIMEOUT_POLL_SECONDS,
+            ]);
+            $this->logger->info('Higgsfield: cancel request sent to provider', ['request_id' => $requestId]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Higgsfield: cancel request failed (already walking away)', [
+                'request_id' => $requestId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Map a coarse provider status + elapsed time onto a 1-100 progress percent
+     * for the UI. Stays below 100% until the provider reports "completed" so the
+     * bar never claims done before the file exists.
+     */
+    private function estimatePercent(string $status, int $elapsed): int
+    {
+        if ('completed' === $status) {
+            return 100;
+        }
+
+        $pct = (int) floor(($elapsed / self::ESTIMATED_VIDEO_SECONDS) * 100);
+
+        return max(1, min(95, $pct));
     }
 
     /**
@@ -659,6 +959,86 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         return null;
     }
 
+    /**
+     * Resolve the clip duration (seconds) to a value Higgsfield supports.
+     *
+     * DoP renders 5s clips; Kling supports 5s or 10s. A request for any other
+     * length (including the generic 8s default that flows down from the media
+     * handler) is snapped to the nearest supported value, defaulting to the
+     * standard 5s clip when the caller didn't ask for a specific length.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function durationFromOptions(string $model, array $options): int
+    {
+        $allowed = $this->allowedDurations($model, $options);
+        sort($allowed);
+
+        $modelConfig = is_array($options['modelConfig'] ?? null) ? $options['modelConfig'] : [];
+        $default = isset($modelConfig['default_duration']) && is_numeric($modelConfig['default_duration'])
+            ? (int) $modelConfig['default_duration']
+            : self::DEFAULT_VIDEO_DURATION;
+        if (!in_array($default, $allowed, true)) {
+            $default = $allowed[0];
+        }
+
+        $requested = isset($options['duration']) && is_numeric($options['duration'])
+            ? (int) $options['duration']
+            : $default;
+
+        if (in_array($requested, $allowed, true)) {
+            return $requested;
+        }
+
+        // Snap to the nearest supported value; ties resolve to the shorter clip.
+        $nearest = $allowed[0];
+        foreach ($allowed as $value) {
+            if (abs($value - $requested) < abs($nearest - $requested)) {
+                $nearest = $value;
+            }
+        }
+
+        $this->logger->info('Higgsfield: normalised requested video duration to a supported length', [
+            'model' => $model,
+            'requested' => $requested,
+            'used' => $nearest,
+            'allowed' => $allowed,
+        ]);
+
+        return $nearest;
+    }
+
+    /**
+     * Supported clip lengths for the model: an explicit modelConfig override if
+     * present, otherwise derived from the model family (DoP = 5s only, everything
+     * else 5s or 10s). The fallback keeps models seeded before durations were
+     * added behaving correctly without a re-seed.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return int[]
+     */
+    private function allowedDurations(string $model, array $options): array
+    {
+        $modelConfig = is_array($options['modelConfig'] ?? null) ? $options['modelConfig'] : [];
+        $configured = $modelConfig['allowed_durations'] ?? null;
+        if (is_array($configured)) {
+            $values = [];
+            foreach ($configured as $value) {
+                if (is_numeric($value) && (int) $value > 0) {
+                    $values[] = (int) $value;
+                }
+            }
+            if ([] !== $values) {
+                return array_values(array_unique($values));
+            }
+        }
+
+        return false !== stripos($model, 'dop')
+            ? self::DOP_VIDEO_DURATIONS
+            : self::DEFAULT_VIDEO_DURATIONS;
+    }
+
     private function sizeToAspectRatio(int $width, int $height): string
     {
         if ($width <= 0 || $height <= 0) {
@@ -680,5 +1060,22 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
     private function hasPlatformCredentials(): bool
     {
         return '' !== $this->platformApiKey && '' !== $this->platformApiSecret;
+    }
+
+    /**
+     * Re-arm the PHP execution-time limit for one more poll cycle.
+     *
+     * The synchronous submit→poll loop can legitimately run for several minutes
+     * while a clip renders. Under FrankenPHP the request's max_execution_time is
+     * wall-clock and a one-time set_time_limit(0) does not disable it, so the
+     * loop must restart the timer each iteration (set_time_limit() resets the
+     * counter to zero) to avoid a mid-render "Maximum execution time exceeded".
+     * Guarded by function_exists because set_time_limit can be disabled.
+     */
+    private function extendExecutionTime(int $seconds): void
+    {
+        if (\function_exists('set_time_limit')) {
+            set_time_limit(max(30, $seconds));
+        }
     }
 }

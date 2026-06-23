@@ -81,6 +81,15 @@ export interface StreamEventMetadata {
   state?: string
   kind?: string
   chunk?: string
+  capability?: string
+  /** Live media progress (status === 'task_progress'). */
+  provider_status?: string
+  elapsed_seconds?: number
+  percent?: number | null
+  attempt?: number | null
+  max_attempts?: number | null
+  /** True on a task_update for a step that was cancelled by the user. */
+  cancelled?: boolean
   /** Failure details on task_update (failed/skipped): error text + retry payload. */
   error?: string
   prompt?: string
