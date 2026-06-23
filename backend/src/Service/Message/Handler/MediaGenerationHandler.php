@@ -1194,8 +1194,12 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
     /**
      * Normalise caller-supplied reference image URLs (multitask path: the URL
-     * lives in the original user message, not the synthetic node prompt). Keeps
-     * only non-empty http(s) image URLs, de-duplicated in order.
+     * lives in the original user message, not the synthetic node prompt). Each
+     * candidate is run through the same allowlist as
+     * {@see FileHelper::extractImageUrls()}, so only http(s) URLs ending in a
+     * known image extension survive — these values are handed to providers as
+     * `image_url`/`images`, so a non-image / non-http(s) target must never pass.
+     * De-duplicated in first-seen order.
      *
      * @param array<string, mixed> $options
      *
@@ -1210,12 +1214,13 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
         $urls = [];
         foreach ($candidates as $candidate) {
-            if (!is_string($candidate) || '' === trim($candidate)) {
+            if (!is_string($candidate)) {
                 continue;
             }
-            $candidate = trim($candidate);
-            if (!in_array($candidate, $urls, true)) {
-                $urls[] = $candidate;
+            foreach (FileHelper::extractImageUrls($candidate) as $url) {
+                if (!in_array($url, $urls, true)) {
+                    $urls[] = $url;
+                }
             }
         }
 
