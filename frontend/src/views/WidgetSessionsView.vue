@@ -1191,7 +1191,7 @@ const totalSessions = computed(
 )
 
 const goBack = () => {
-  router.push({ name: 'tools-chat-widget' })
+  router.push({ name: 'channels-widgets' })
 }
 
 const loadWidget = async () => {
