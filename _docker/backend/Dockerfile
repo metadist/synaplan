@@ -1,4 +1,4 @@
-# synaplan-base-php 1.0.0 ships fully-tuned PHP ini files under
+# synaplan-base-php 1.0.2 ships fully-tuned PHP ini files under
 # /usr/local/etc/php/conf.d/ (10-runtime, 20-opcache+JIT, 25-realpath,
 # 27-grpc, 28-apcu, 30-errors, 40-security) and an entrypoint shim at
 # /usr/local/bin/synaplan-php-configure that handles APP_ENV=dev override
@@ -20,11 +20,21 @@ WORKDIR /var/www/backend
 # (`symfony/redis-messenger`). Cache, Sessions, and the platform RedisService all
 # use Predis (pure PHP) and do NOT need this extension, but the messenger
 # CONSUMER must speak the binary protocol via phpredis.
-RUN apt-get update && apt-get install -y --no-install-recommends $PHPIZE_DEPS \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
-    && rm -rf /var/lib/apt/lists/*
+#
+# ext-redis is now baked into synaplan-base-php (its install-php-extensions list
+# includes `redis`). The guard below keeps this build working against an OLDER
+# pinned base by compiling phpredis via pecl ONLY when the base doesn't already
+# ship it; it becomes a fast no-op once the FROM digest above is bumped to a
+# redis-bearing base — at which point this whole RUN can be deleted.
+RUN if php -r 'exit(extension_loaded("redis") ? 0 : 1);'; then \
+        echo "ext-redis already provided by base image — skipping pecl build"; \
+    else \
+        apt-get update && apt-get install -y --no-install-recommends $PHPIZE_DEPS \
+        && pecl install redis \
+        && docker-php-ext-enable redis \
+        && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
+        && rm -rf /var/lib/apt/lists/* ; \
+    fi
 
 # Set default environment variables for paths and constants
 # These are baked into the image since they reference local filesystem paths
