@@ -2739,13 +2739,16 @@ const streamAIResponse = async (
               displayError += '*' + t('aiProvider.error.restartNote') + '*'
             }
 
-            // Always show error as message (not in streaming message, but as new assistant message)
+            // Show error in the streaming message bubble
             const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && message.parts.length > 0) {
-              // If there's already content, finish it and create a new error message
+            const hasContent = message?.parts.some(
+              (p) => p.type === 'text' && p.content && p.content.trim() !== ''
+            )
+            if (message && hasContent) {
+              // Already has meaningful content (partial response streamed before error)
               historyStore.finishStreamingMessage(messageId)
             } else {
-              // No content yet, replace with error message
+              // No visible content yet — display the error message
               historyStore.updateStreamingMessage(messageId, displayError)
               historyStore.finishStreamingMessage(messageId)
             }

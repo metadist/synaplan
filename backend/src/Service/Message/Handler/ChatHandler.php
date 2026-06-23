@@ -1871,7 +1871,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $filename = trim($jsonData['BFILEPATH']);
                 $fileContent = $jsonData['BFILETEXT'];
 
-                if (empty($filename) || empty($fileContent)) {
+                if (empty($filename) || !is_string($fileContent) || '' === trim($fileContent)) {
                     return null;
                 }
 
