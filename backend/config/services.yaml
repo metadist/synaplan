@@ -451,6 +451,7 @@ services:
     App\Service\ModelConfigService:
         arguments:
             $cache: '@cache.model_config'
+            $environment: '%kernel.environment%'
 
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\InternalEmailService: ~

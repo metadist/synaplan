@@ -69,9 +69,9 @@ jobs:
           --health-retries=5
 
       # Redis backs cache.app, the lock + rate-limiter components and the
-      # Messenger Redis Streams transport. PHPUnit needs a live instance so the
-      # HealthController Redis probe and any transport-backed tests pass instead
-      # of failing on a refused connection. `.env.test` points REDIS_DSN at
+      # Messenger Redis Streams transport. PHPUnit needs a live instance for the
+      # RedisIntegrationTest smoke suite that verifies connectivity, CRUD, and
+      # version reporting against real Redis. `.env.test` points REDIS_DSN at
       # 127.0.0.1:6379. Digest pinned to match docker-compose.yml for parity
       # (Redis 7.4 — see docker-compose.yml for the Centrifugo pub/sub rationale).
       redis:
