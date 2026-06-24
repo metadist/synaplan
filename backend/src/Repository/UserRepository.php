@@ -36,6 +36,29 @@ class UserRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * MOBILE-APP SEAM (Epic 5.4): find the user who owns an IAP purchase, by
+     * its stable per-subscription id (Apple `original_transaction_id` or Google
+     * `purchase_token`) stored inside `BPAYMENTDETAILS.subscription`.
+     *
+     * Migration-free, mirroring {@see findByStripeCustomerId()}: a LIKE over the
+     * JSON column. The id is store-issued (digits / URL-safe token), so it
+     * cannot inject JSON-structural characters; we still match the quoted
+     * key:value pair to avoid accidental substring hits. Powers replay
+     * protection (one receipt → one user) and notification → user matching.
+     */
+    public function findByIapPurchaseId(string $purchaseId): ?User
+    {
+        return $this->createQueryBuilder('u')
+            ->where('u.paymentDetails LIKE :appleId')
+            ->orWhere('u.paymentDetails LIKE :googleToken')
+            ->setParameter('appleId', '%"original_transaction_id":"'.$purchaseId.'"%')
+            ->setParameter('googleToken', '%"purchase_token":"'.$purchaseId.'"%')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function save(User $user): void
     {
         $this->getEntityManager()->persist($user);

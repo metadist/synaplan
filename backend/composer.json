@@ -23,6 +23,7 @@
         "google/protobuf": "^5.34.1",
         "google/recaptcha": "^1.5.0",
         "grpc/grpc": "^1.80",
+        "hoels/app-store-server-library-php": "^2.0",
         "jumbojett/openid-connect-php": "^1.0.2",
         "league/flysystem-aws-s3-v3": "^3.32.0",
         "lucianotonet/groq-php": "^1.3",

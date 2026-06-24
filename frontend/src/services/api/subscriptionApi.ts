@@ -78,6 +78,21 @@ export interface PortalSession {
   url: string
 }
 
+/**
+ * MOBILE-APP SEAM (Epic 5.4): result of server-side IAP receipt validation.
+ * The server is the single source of truth — the app shows the outcome but
+ * never grants a tier itself.
+ */
+export interface IapVerifyResult {
+  /** A paid tier was granted (active/grace). */
+  granted: boolean
+  /** Purchase accepted but still PENDING (Google deferred/SCA) — not unlocked yet. */
+  pending: boolean
+  tier: string
+  source: 'apple' | 'google'
+  status: string
+}
+
 // Inferred from the generated Zod schemas (per AGENTS_DEV: never hand-write
 // interfaces for API responses).
 export type TopupSession = z.infer<typeof PostSubscriptionTopupResponseSchema>
@@ -115,6 +130,22 @@ export const subscriptionApi = {
   async createPortalSession(): Promise<PortalSession> {
     return httpClient<PortalSession>('/api/v1/subscription/portal', {
       method: 'POST',
+    })
+  },
+
+  /**
+   * MOBILE-APP SEAM (Epic 5.4): validate a native in-app purchase server-side
+   * and (if valid) grant the tier. Called from the IAP plugin's validator hook;
+   * `receipt` is the Apple signed-transaction JWS or the Google purchase token.
+   */
+  async verifyIapPurchase(input: {
+    platform: 'apple' | 'google'
+    receipt: string
+    productId?: string
+  }): Promise<IapVerifyResult> {
+    return httpClient<IapVerifyResult>('/api/v1/iap/verify', {
+      method: 'POST',
+      body: JSON.stringify(input),
     })
   },
 

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f210dd1fcf3a3244c29c1899d0afc13b",
+    "content-hash": "11b71dc350e149aa87bad7ce9db53f9e",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -4107,6 +4107,104 @@
                 }
             ],
             "time": "2026-03-10T16:41:02+00:00"
+        },
+        {
+            "name": "hoels/app-store-server-library-php",
+            "version": "2.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/hoels/app-store-server-library-php.git",
+                "reference": "a47a74bbd298ee372324ce75108e06e824ec8ad4"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/hoels/app-store-server-library-php/zipball/a47a74bbd298ee372324ce75108e06e824ec8ad4",
+                "reference": "a47a74bbd298ee372324ce75108e06e824ec8ad4",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "ext-mbstring": "*",
+                "ext-openssl": "*",
+                "firebase/php-jwt": "^7.0",
+                "guzzlehttp/guzzle": "^7.8",
+                "hoels/ocsp-php": "^0.1",
+                "php": ">=8.1",
+                "phpseclib/phpseclib": "^3.0"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^13.0",
+                "squizlabs/php_codesniffer": "^4.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "AppStoreServerLibrary\\": "src/AppStoreServerLibrary/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Kai Hölscher"
+                }
+            ],
+            "description": "The PHP server library for the App Store Server API and App Store Server Notifications.",
+            "support": {
+                "issues": "https://github.com/hoels/app-store-server-library-php/issues",
+                "source": "https://github.com/hoels/app-store-server-library-php/tree/2.0.0"
+            },
+            "time": "2026-03-01T15:30:51+00:00"
+        },
+        {
+            "name": "hoels/ocsp-php",
+            "version": "0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/hoels/ocsp-php.git",
+                "reference": "e1ebf23205956b1637c5cc259f4f50b5f3f9dcff"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/hoels/ocsp-php/zipball/e1ebf23205956b1637c5cc259f4f50b5f3f9dcff",
+                "reference": "e1ebf23205956b1637c5cc259f4f50b5f3f9dcff",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.1",
+                "phpseclib/phpseclib": "^3.0"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^1.10",
+                "phpunit/phpunit": "^10.5",
+                "squizlabs/php_codesniffer": "^3.8"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "OCSP\\": [
+                        "src"
+                    ]
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Kai Hölscher"
+                }
+            ],
+            "description": "OCSP library for PHP",
+            "support": {
+                "issues": "https://github.com/hoels/ocsp-php/issues",
+                "source": "https://github.com/hoels/ocsp-php/tree/0.1.0"
+            },
+            "time": "2024-12-26T21:48:43+00:00"
         },
         {
             "name": "illuminate/collections",

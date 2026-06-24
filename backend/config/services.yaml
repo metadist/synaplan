@@ -542,6 +542,25 @@ services:
             $iapProductTeam: '%env(IAP_PRODUCT_TEAM)%'
             $iapProductBusiness: '%env(IAP_PRODUCT_BUSINESS)%'
 
+    # Native IAP server-side receipt validation (Epic 5.4). Both verifiers are
+    # no-ops until store credentials are configured (isConfigured() === false),
+    # so web-only / open-source deployments keep working.
+    App\Service\Iap\AppleStoreKitVerifier:
+        arguments:
+            $bundleId: '%env(default::IAP_APPLE_BUNDLE_ID)%'
+            $appAppleId: '%env(default::int:IAP_APPLE_APP_APPLE_ID)%'
+            $environment: '%env(default::string:IAP_APPLE_ENVIRONMENT)%'
+            $rootCertsDir: '%env(default::IAP_APPLE_ROOT_CERTS_DIR)%'
+    App\Service\Iap\AppleReceiptVerifierInterface:
+        alias: App\Service\Iap\AppleStoreKitVerifier
+
+    App\Service\Iap\GooglePlayVerifier:
+        arguments:
+            $packageName: '%env(default::IAP_GOOGLE_PACKAGE_NAME)%'
+            $serviceAccountJsonPath: '%env(default::IAP_GOOGLE_SERVICE_ACCOUNT_JSON)%'
+    App\Service\Iap\GooglePlayVerifierInterface:
+        alias: App\Service\Iap\GooglePlayVerifier
+
     # Stripe Payment Controllers (with rate limiting via cache)
     App\Controller\SubscriptionController:
         arguments:
