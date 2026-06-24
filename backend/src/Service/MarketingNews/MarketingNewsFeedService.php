@@ -102,6 +102,8 @@ final readonly class MarketingNewsFeedService
             }
 
             $headers = $response->getHeaders(false);
+
+            // Fast reject when the server advertises an oversized payload.
             $contentLength = isset($headers['content-length'][0]) ? (int) $headers['content-length'][0] : 0;
             if ($contentLength > self::MAX_IMAGE_BYTES) {
                 return null;
@@ -112,9 +114,17 @@ final readonly class MarketingNewsFeedService
                 return null;
             }
 
-            $content = $response->getContent(false);
-            if (\strlen($content) > self::MAX_IMAGE_BYTES) {
-                return null;
+            // Stream the body and abort as soon as the cap is exceeded, so a
+            // missing/forged Content-Length cannot make us buffer an unbounded
+            // payload into memory (DoS guard).
+            $content = '';
+            foreach ($this->httpClient->stream($response) as $chunk) {
+                $content .= $chunk->getContent();
+                if (\strlen($content) > self::MAX_IMAGE_BYTES) {
+                    $response->cancel();
+
+                    return null;
+                }
             }
 
             return ['content' => $content, 'contentType' => $contentType];

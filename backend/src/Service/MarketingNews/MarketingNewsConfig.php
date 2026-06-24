@@ -134,7 +134,49 @@ final readonly class MarketingNewsConfig
         }
 
         $scheme = parse_url($url, \PHP_URL_SCHEME);
+        if (!\in_array($scheme, ['http', 'https'], true)) {
+            return false;
+        }
 
-        return \in_array($scheme, ['http', 'https'], true);
+        $host = parse_url($url, \PHP_URL_HOST);
+        if (!\is_string($host) || '' === $host) {
+            return false;
+        }
+
+        // SSRF guard: the feed fetch and the PUBLIC image proxy both fetch these
+        // hosts server-side, so reject hosts that are not routable from the
+        // public internet (loopback, RFC 1918 / RFC 4193, link-local, and
+        // non-public TLDs). Mirrors MediaGenerationHandler::isPublicBaseUrlReachable().
+        return $this->isPubliclyRoutableHost($host);
+    }
+
+    private function isPubliclyRoutableHost(string $host): bool
+    {
+        // Normalise an IPv6 literal ("[::1]" → "::1") before inspection.
+        $host = trim($host, '[]');
+        $lowerHost = strtolower($host);
+
+        if ('localhost' === $lowerHost || 'host.docker.internal' === $lowerHost) {
+            return false;
+        }
+        foreach (['.local', '.localhost', '.internal', '.lan', '.home', '.test'] as $suffix) {
+            if (str_ends_with($lowerHost, $suffix)) {
+                return false;
+            }
+        }
+
+        // IP literal: reject private + reserved ranges (10.x, 172.16–31.x,
+        // 192.168.x, 169.254.x, 127.x, ::1, fc00::/7, …).
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
+            return false !== filter_var(
+                $host,
+                \FILTER_VALIDATE_IP,
+                \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE,
+            );
+        }
+
+        // A non-IP hostname that isn't one of the local cases above is assumed
+        // to resolve publicly (a real DNS name behind a proxy/CDN).
+        return true;
     }
 }

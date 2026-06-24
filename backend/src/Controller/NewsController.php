@@ -16,8 +16,6 @@ use Symfony\Component\Routing\Attribute\Route;
 #[OA\Tag(name: 'News')]
 final class NewsController extends AbstractController
 {
-    private const ALLOWED_LOCALES = ['de', 'en', 'es', 'tr'];
-
     public function __construct(
         private readonly MarketingNewsFeedService $feedService,
     ) {
@@ -70,8 +68,14 @@ final class NewsController extends AbstractController
     )]
     public function landing(Request $request): JsonResponse
     {
+        // Sanitise to a short ASCII locale token (e.g. "de", "en", "pt-br"); we
+        // do NOT force it to a fixed allowlist so unknown locales correctly fall
+        // through to FEED_URL_DEFAULT inside the resolver (matches the OpenAPI
+        // description). The resolver itself only branches on de/en/else.
         $lang = strtolower((string) $request->query->get('lang', 'en'));
-        if (!\in_array($lang, self::ALLOWED_LOCALES, true)) {
+        $lang = preg_replace('/[^a-z-]/', '', $lang) ?? '';
+        $lang = substr($lang, 0, 5);
+        if ('' === $lang) {
             $lang = 'en';
         }
 

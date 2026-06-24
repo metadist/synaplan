@@ -52,7 +52,7 @@ final class MarketingNewsConfigTest extends TestCase
     {
         // ENABLED row is the only one consulted; it is off → no URL resolved.
         $this->configRepository->method('getValue')
-            ->willReturnCallback(static function (int $ownerId, string $group, string $setting): ?string {
+            ->willReturnCallback(static function (int $ownerId, string $group, string $setting): string {
                 return MarketingNewsConfig::KEY_ENABLED === $setting ? '0' : 'https://example.com/feed.xml';
             });
 
@@ -93,7 +93,7 @@ final class MarketingNewsConfigTest extends TestCase
     public function testResolveFeedUrlRejectsNonHttpUrl(): void
     {
         $this->configRepository->method('getValue')
-            ->willReturnCallback(static function (int $ownerId, string $group, string $setting): ?string {
+            ->willReturnCallback(static function (int $ownerId, string $group, string $setting): string {
                 return match ($setting) {
                     MarketingNewsConfig::KEY_ENABLED => '1',
                     default => 'file:///etc/passwd',
@@ -101,5 +101,38 @@ final class MarketingNewsConfigTest extends TestCase
             });
 
         self::assertNull($this->config->resolveFeedUrl('en'));
+    }
+
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function privateHostProvider(): iterable
+    {
+        yield 'loopback ipv4' => ['http://127.0.0.1/feed.xml'];
+        yield 'rfc1918' => ['http://192.168.1.10/feed.xml'];
+        yield 'rfc1918 172' => ['http://172.16.0.5/feed.xml'];
+        yield 'link-local' => ['http://169.254.169.254/latest/meta-data'];
+        yield 'ipv6 loopback' => ['http://[::1]/feed.xml'];
+        yield 'localhost' => ['http://localhost/feed.xml'];
+        yield 'docker internal' => ['http://host.docker.internal/feed.xml'];
+        yield 'dot-local' => ['http://intranet.local/feed.xml'];
+    }
+
+    /**
+     * SSRF guard: the public image proxy must never resolve a feed/image URL that
+     * targets a non-publicly-routable host.
+     *
+     * @dataProvider privateHostProvider
+     */
+    #[DataProvider('privateHostProvider')]
+    public function testResolveFeedUrlRejectsPrivateHosts(string $privateUrl): void
+    {
+        $this->configRepository->method('getValue')
+            ->willReturnCallback(static function (int $ownerId, string $group, string $setting) use ($privateUrl): string {
+                return MarketingNewsConfig::KEY_ENABLED === $setting ? '1' : $privateUrl;
+            });
+
+        self::assertNull($this->config->resolveFeedUrl('en'));
+        self::assertFalse($this->config->isAllowedImageUrl($privateUrl));
     }
 }
