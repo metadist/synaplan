@@ -11,6 +11,7 @@ use App\Repository\VerificationTokenRepository;
 use App\Service\Client\ClientContextResolver;
 use App\Service\ImpersonationService;
 use App\Service\InternalEmailService;
+use App\Service\ModelConfigService;
 use App\Service\NativeAuthHandoffService;
 use App\Service\OidcTokenService;
 use App\Service\RecaptchaService;
@@ -50,6 +51,7 @@ class AuthController extends AbstractController
         private ImpersonationService $impersonationService,
         private ClientContextResolver $clientContextResolver,
         private NativeAuthHandoffService $handoffService,
+        private ModelConfigService $modelConfigService,
     ) {
         $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
         $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
@@ -210,6 +212,8 @@ class AuthController extends AbstractController
 
         $this->em->persist($user);
         $this->em->flush();
+
+        $this->modelConfigService->initializeNewUserDefaults($user->getId());
 
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h

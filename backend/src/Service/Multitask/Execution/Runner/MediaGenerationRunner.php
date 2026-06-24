@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask\Execution\Runner;
 
 use App\Entity\Message;
+use App\Service\File\FileHelper;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -117,6 +118,27 @@ final readonly class MediaGenerationRunner implements TaskRunner
                 'capability' => $node->capability->value,
                 'node_id' => $node->id,
                 'reference_count' => count($referenceImagePaths),
+            ]);
+        }
+
+        // Image-by-URL (e.g. "make a video from https://…/photo.jpg"): the
+        // synthetic message carries the planner's CLEANED prompt and only file
+        // attachments, so a URL pasted in the ORIGINAL user message would be
+        // lost and the request would degrade to TEXT2VID. Surface those URLs
+        // explicitly so the handler can route to IMG2VID and hand the provider a
+        // ready-to-fetch reference frame.
+        $referenceImageUrls = FileHelper::extractImageUrls((string) $context->message->getText());
+        foreach (FileHelper::extractImageUrls($prompt) as $promptImageUrl) {
+            if (!in_array($promptImageUrl, $referenceImageUrls, true)) {
+                $referenceImageUrls[] = $promptImageUrl;
+            }
+        }
+        if ([] !== $referenceImageUrls) {
+            $handlerOptions['reference_image_urls'] = $referenceImageUrls;
+            $this->logger->info('MediaGenerationRunner: forwarding image URL(s) from user text as media reference', [
+                'capability' => $node->capability->value,
+                'node_id' => $node->id,
+                'reference_count' => count($referenceImageUrls),
             ]);
         }
 

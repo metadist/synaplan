@@ -1,4 +1,4 @@
-# synaplan-base-php 1.0.0 ships fully-tuned PHP ini files under
+# synaplan-base-php 1.1.0 ships fully-tuned PHP ini files under
 # /usr/local/etc/php/conf.d/ (10-runtime, 20-opcache+JIT, 25-realpath,
 # 27-grpc, 28-apcu, 30-errors, 40-security) and an entrypoint shim at
 # /usr/local/bin/synaplan-php-configure that handles APP_ENV=dev override
@@ -12,19 +12,15 @@
 # moving floating tag. To bump:
 #   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:latest
 # and replace the @sha256:... below.
-FROM ghcr.io/metadist/synaplan-base-php:1.0.2@sha256:e5d52125b95862bc6f544f09f2ba15b6f7607f870b7149695ab64dbcf8dc4d51 AS dev
+FROM ghcr.io/metadist/synaplan-base-php:1.1.0@sha256:6378ce497415579b9a8ded6395bc497e5589110a1b9bbb7544d1d490b1d3e1da AS dev
 
 WORKDIR /var/www/backend
 
-# phpredis (ext-redis) — required by Symfony Messenger's Redis Streams transport
-# (`symfony/redis-messenger`). Cache, Sessions, and the platform RedisService all
-# use Predis (pure PHP) and do NOT need this extension, but the messenger
-# CONSUMER must speak the binary protocol via phpredis.
-RUN apt-get update && apt-get install -y --no-install-recommends $PHPIZE_DEPS \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
-    && rm -rf /var/lib/apt/lists/*
+# ext-redis (phpredis) is provided by the base image (synaplan-base-php >= 1.1.0)
+# for Symfony Messenger's Redis Streams transport (`symfony/redis-messenger`),
+# which the worker's `messenger:consume` speaks via the binary protocol. Cache,
+# Sessions, and the platform RedisService use Predis (pure PHP) and don't need
+# it. No downstream build step required — it ships in the base.
 
 # Set default environment variables for paths and constants
 # These are baked into the image since they reference local filesystem paths
@@ -58,7 +54,7 @@ EXPOSE 80
 ENTRYPOINT ["docker-entrypoint.sh"]
 
 # ---------------------------------------------------------------------------
-# `dev` target ends here: base image + phpredis + ENV defaults + entrypoint.
+# `dev` target ends here: base image (phpredis included) + ENV defaults + entrypoint.
 # Everything below builds the self-contained `prod` image and is skipped for
 # dev/worker containers (they bind-mount code/vendor via docker-compose).
 # `prod` inherits EXPOSE and ENTRYPOINT from `dev`.
