@@ -121,6 +121,15 @@ const config = {
   },
 
   /**
+   * Guest-landing marketing news master switch (admin-controlled, off by default)
+   */
+  marketingNews: {
+    get enabled(): boolean {
+      return getConfigSync().marketingNews?.enabled ?? false
+    },
+  },
+
+  /**
    * Installed plugins for the current user
    */
   get plugins(): NonNullable<ReturnType<typeof getConfigSync>['plugins']> {

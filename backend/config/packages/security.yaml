@@ -72,6 +72,9 @@ security:
         - { path: ^/api/v1/config/runtime, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/config/memory-service/check, roles: PUBLIC_ACCESS }
 
+        # Public marketing news for the anonymous guest landing (feed + image proxy)
+        - { path: ^/api/v1/news/, roles: PUBLIC_ACCESS }
+
         # Public auth endpoints
         - { path: ^/api/v1/auth/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/register, roles: PUBLIC_ACCESS }
