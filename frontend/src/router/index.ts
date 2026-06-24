@@ -305,6 +305,14 @@ const router = createRouter({
       component: () => import('@/views/RagSearchView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.ragSearch' },
     },
+    {
+      // Vector storage (Qdrant/MariaDB) inventory: how many files and vectors
+      // are stored for the user, plus a global admin view.
+      path: '/files/vectors',
+      name: 'files-vectors',
+      component: () => import('@/views/VectorStorageView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.vectorStorage' },
+    },
 
     // --- Transitional redirects (old → new, §4.6; keep ≥ 2 releases) ---
     { path: '/rag', redirect: '/files/search' },

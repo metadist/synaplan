@@ -376,21 +376,28 @@ class FileController extends AbstractController
         $result = $this->fileRepository->findByUserPaginated($user->getId(), $groupKey, $offset, $limit, $vectorFileIds, $filters);
         $messageFiles = $result['files'];
 
-        $vectorChunkMap = $this->resolveVectorGroupKeys($user->getId(), $messageFiles);
+        $allChunks = $this->getUserVectorChunks($user->getId());
+        $vectorChunkMap = $this->resolveVectorGroupKeys($messageFiles, $allChunks);
 
-        $files = array_map(fn ($mf) => [
-            'id' => $mf->getId(),
-            'filename' => $mf->getFileName(),
-            'path' => $mf->getFilePath(),
-            'file_type' => $mf->getFileType(),
-            'file_size' => $mf->getFileSize(),
-            'mime' => $mf->getFileMime(),
-            'status' => $mf->getStatus(),
-            'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
-            'uploaded_at' => $mf->getCreatedAt(),
-            'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
-            'group_key' => $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null),
-        ], $messageFiles);
+        $files = array_map(function ($mf) use ($vectorChunkMap, $allChunks) {
+            $chunkCount = (int) ($allChunks[$mf->getId()]['chunks'] ?? 0);
+
+            return [
+                'id' => $mf->getId(),
+                'filename' => $mf->getFileName(),
+                'path' => $mf->getFilePath(),
+                'file_type' => $mf->getFileType(),
+                'file_size' => $mf->getFileSize(),
+                'mime' => $mf->getFileMime(),
+                'status' => $mf->getStatus(),
+                'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
+                'uploaded_at' => $mf->getCreatedAt(),
+                'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
+                'group_key' => $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null),
+                'chunks' => $chunkCount,
+                'is_vectorized' => $chunkCount > 0,
+            ];
+        }, $messageFiles);
 
         return $this->json([
             'success' => true,
@@ -817,13 +824,31 @@ class FileController extends AbstractController
     }
 
     /**
+     * Fetch the vector chunk map for a user (fileId => ['chunks' => int, 'groupKey' => string|null]).
+     * Returns an empty map if the vector store is unavailable.
+     *
+     * @return array<int, array{chunks: int, groupKey: string|null}>
+     */
+    private function getUserVectorChunks(int $userId): array
+    {
+        try {
+            return $this->vectorStorageFacade->getFilesWithChunks($userId);
+        } catch (\Throwable $e) {
+            $this->logger->warning('FileController: Vector store chunk lookup failed', ['error' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    /**
      * Resolve group keys from vector store for legacy files missing DB column.
      *
-     * @param File[] $files
+     * @param File[]                                                $files
+     * @param array<int, array{chunks: int, groupKey: string|null}> $allChunks
      *
      * @return array<int, string>
      */
-    private function resolveVectorGroupKeys(int $userId, array $files): array
+    private function resolveVectorGroupKeys(array $files, array $allChunks): array
     {
         $legacyFileIds = array_filter(
             array_map(fn ($mf) => null === $mf->getGroupKey() ? $mf->getId() : null, $files)
@@ -834,15 +859,10 @@ class FileController extends AbstractController
         }
 
         $vectorChunkMap = [];
-        try {
-            $allChunks = $this->vectorStorageFacade->getFilesWithChunks($userId);
-            foreach ($legacyFileIds as $fid) {
-                if (isset($allChunks[$fid]) && !empty($allChunks[$fid]['groupKey'])) {
-                    $vectorChunkMap[$fid] = $allChunks[$fid]['groupKey'];
-                }
+        foreach ($legacyFileIds as $fid) {
+            if (isset($allChunks[$fid]) && !empty($allChunks[$fid]['groupKey'])) {
+                $vectorChunkMap[$fid] = $allChunks[$fid]['groupKey'];
             }
-        } catch (\Throwable $e) {
-            $this->logger->warning('FileController: Vector store chunk lookup failed', ['error' => $e->getMessage()]);
         }
 
         if (!empty($vectorChunkMap)) {

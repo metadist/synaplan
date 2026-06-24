@@ -722,6 +722,10 @@
                         <span class="text-[10px] txt-secondary shrink-0">{{
                           formatFileSize(file.file_size)
                         }}</span>
+                        <span class="text-[10px] txt-secondary shrink-0">·</span>
+                        <span class="text-[10px] txt-secondary truncate">{{
+                          vectorStatusLabel(file)
+                        }}</span>
                         <button
                           v-if="file.group_key"
                           class="inline-flex items-center gap-0.5 text-[10px] text-[var(--brand)]/70 min-w-0"
@@ -817,6 +821,12 @@
                           </div>
                           <div class="flex flex-col gap-0.5 min-w-0">
                             <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
+                            <span
+                              class="text-[10px] txt-secondary truncate"
+                              :title="vectorStatusLabel(file)"
+                            >
+                              {{ vectorStatusLabel(file) }}
+                            </span>
                             <button
                               v-if="file.group_key"
                               class="inline-flex items-center gap-1 self-start text-[10px] text-[var(--brand)]/70 hover:text-[var(--brand)] transition-colors"
@@ -1038,9 +1048,15 @@
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="text-xs font-medium txt-primary truncate">{{ file.filename }}</p>
-                    <span class="text-[10px] txt-secondary">{{
-                      formatFileSize(file.file_size)
-                    }}</span>
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <span class="text-[10px] txt-secondary shrink-0">{{
+                        formatFileSize(file.file_size)
+                      }}</span>
+                      <span class="text-[10px] txt-secondary shrink-0">·</span>
+                      <span class="text-[10px] txt-secondary truncate">{{
+                        vectorStatusLabel(file)
+                      }}</span>
+                    </div>
                   </div>
                   <div class="flex items-center gap-0 shrink-0">
                     <FolderMoveMenu
@@ -1129,7 +1145,15 @@
                         >
                           <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                         </div>
-                        <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
+                        <div class="flex flex-col gap-0.5 min-w-0">
+                          <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
+                          <span
+                            class="text-[10px] txt-secondary truncate"
+                            :title="vectorStatusLabel(file)"
+                          >
+                            {{ vectorStatusLabel(file) }}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td
@@ -2222,6 +2246,9 @@ const formatFileSize = (bytes: number): string => {
   if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
+
+const vectorStatusLabel = (file: FileItem): string =>
+  file.is_vectorized ? t('files.vectorized', { count: file.chunks ?? 0 }) : t('files.notVectorized')
 
 // Load initial data
 onMounted(async () => {

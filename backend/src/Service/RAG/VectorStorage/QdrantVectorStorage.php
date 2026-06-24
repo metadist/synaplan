@@ -229,6 +229,11 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
         return $this->qdrantClient->getFilesWithChunks($userId);
     }
 
+    public function getGlobalStats(int $topLimit = 10): array
+    {
+        return $this->qdrantClient->getGlobalDocumentStats($topLimit);
+    }
+
     public function isAvailable(): bool
     {
         return $this->qdrantClient->isAvailable();

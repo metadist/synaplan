@@ -178,6 +178,8 @@ export interface FileItem {
   message_id: number | null
   is_attached: boolean
   group_key?: string
+  chunks?: number
+  is_vectorized?: boolean
 }
 
 export interface FileListResponse {
