@@ -28,16 +28,23 @@ final readonly class BrandingConfigSeeder
     {
         $g = BrandingService::GROUP;
         $rows = [
-            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_NAME,            'value' => BrandingService::DEFAULT_NAME],
-            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_TAGLINE,         'value' => BrandingService::DEFAULT_TAGLINE],
-            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_PRIMARY_COLOR,   'value' => BrandingService::DEFAULT_PRIMARY_COLOR],
-            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_LOGO_URL,        'value' => ''],
-            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_LOGO_DARK_URL,   'value' => ''],
-            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_ICON_URL,        'value' => ''],
-            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_HOMEPAGE_URL,    'value' => BrandingService::DEFAULT_HOMEPAGE_URL],
-            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_SHOW_POWERED_BY, 'value' => BrandingService::DEFAULT_SHOW_POWERED_BY],
-            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_POWERED_BY_LABEL, 'value' => BrandingService::DEFAULT_POWERED_BY_LABEL],
-            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_POWERED_BY_URL,  'value' => BrandingService::DEFAULT_POWERED_BY_URL],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_NAME,                'value' => BrandingService::DEFAULT_NAME],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_TAGLINE,             'value' => BrandingService::DEFAULT_TAGLINE],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_PRIMARY_COLOR,       'value' => BrandingService::DEFAULT_PRIMARY_COLOR],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_SECONDARY_COLOR,     'value' => BrandingService::DEFAULT_SECONDARY_COLOR],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_ACCENT_COLOR,        'value' => BrandingService::DEFAULT_ACCENT_COLOR],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_FONT_FAMILY,         'value' => BrandingService::DEFAULT_FONT_FAMILY],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_HEADING_FONT_FAMILY, 'value' => BrandingService::DEFAULT_HEADING_FONT_FAMILY],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_FONT_URL,            'value' => BrandingService::DEFAULT_FONT_URL],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_LOGO_URL,            'value' => ''],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_LOGO_DARK_URL,       'value' => ''],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_ICON_URL,            'value' => ''],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_HOMEPAGE_URL,        'value' => BrandingService::DEFAULT_HOMEPAGE_URL],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_LANDING_PAGE,        'value' => BrandingService::DEFAULT_LANDING_PAGE],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_DEFAULT_ROUTE,       'value' => BrandingService::DEFAULT_DEFAULT_ROUTE],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_SHOW_POWERED_BY,     'value' => BrandingService::DEFAULT_SHOW_POWERED_BY],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_POWERED_BY_LABEL,    'value' => BrandingService::DEFAULT_POWERED_BY_LABEL],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_POWERED_BY_URL,      'value' => BrandingService::DEFAULT_POWERED_BY_URL],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'branding_config', $rows);

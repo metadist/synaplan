@@ -129,7 +129,8 @@ const config = {
   },
 
   /**
-   * White-label branding (Epic 4), loaded from backend at runtime.
+   * MOBILE-APP SEAM (Epic 4): white-label branding, loaded from backend at
+   * runtime (the app reads it from its configured server).
    * Defaults reproduce the historical hardcoded "Synaplan" look so an
    * unconfigured deployment is visually identical to before.
    *
@@ -147,6 +148,21 @@ const config = {
     get primaryColor(): string {
       return getConfigSync().branding?.primaryColor || '#003fc7'
     },
+    get secondaryColor(): string {
+      return getConfigSync().branding?.secondaryColor ?? ''
+    },
+    get accentColor(): string {
+      return getConfigSync().branding?.accentColor ?? ''
+    },
+    get fontFamily(): string {
+      return getConfigSync().branding?.fontFamily ?? ''
+    },
+    get headingFontFamily(): string {
+      return getConfigSync().branding?.headingFontFamily ?? ''
+    },
+    get fontUrl(): string {
+      return getConfigSync().branding?.fontUrl ?? ''
+    },
     get logoUrl(): string {
       return getConfigSync().branding?.logoUrl ?? ''
     },
@@ -158,6 +174,12 @@ const config = {
     },
     get homepageUrl(): string {
       return getConfigSync().branding?.homepageUrl || 'https://www.synaplan.com'
+    },
+    get landingPage(): string {
+      return getConfigSync().branding?.landingPage ?? ''
+    },
+    get defaultRoute(): string {
+      return getConfigSync().branding?.defaultRoute ?? ''
     },
     get showPoweredBy(): boolean {
       return getConfigSync().branding?.showPoweredBy ?? true

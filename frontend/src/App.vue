@@ -122,6 +122,8 @@ watch(locale, () => {
   const titleKey = route.meta.titleKey as string | undefined
   if (titleKey) {
     const pageTitle = t(titleKey)
+    // MOBILE-APP SEAM (Epic 4): document title uses the runtime brand name
+    // (falls back to 'Synaplan' before config loads).
     document.title = `${pageTitle} | ${brandName()}`
   }
 })

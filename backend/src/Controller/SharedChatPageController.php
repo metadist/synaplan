@@ -47,9 +47,10 @@ class SharedChatPageController extends AbstractController
     }
 
     /**
-     * Brand name used in titles / og:site_name. Keeps the historical
-     * "Synaplan AI" wording for the default deployment (acceptance: default
-     * looks identical), and uses the configured brand for white-label.
+     * MOBILE-APP SEAM (Epic 4): brand name used in SSR titles / og:site_name.
+     * Keeps the historical "Synaplan AI" wording for the default deployment
+     * (acceptance: default looks identical), and uses the configured brand for
+     * white-label.
      */
     private function titleBrand(): string
     {

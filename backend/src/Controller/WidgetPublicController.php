@@ -208,9 +208,10 @@ class WidgetPublicController extends AbstractController
             return $domainError;
         }
 
-        // White-label attribution (Epic 4.5). The cross-origin widget cannot read
-        // /api/v1/config/runtime, so we surface the global branding's powered-by
-        // subset here. Defaults keep the historical "powered by synaplan" footer.
+        // MOBILE-APP SEAM (Epic 4.5): white-label attribution. The cross-origin
+        // widget cannot read /api/v1/config/runtime, so we surface the global
+        // branding's powered-by subset here (hide / re-attribute flag). Defaults
+        // keep the historical "powered by synaplan" footer.
         $branding = $this->brandingService->getBranding();
 
         return $this->json([

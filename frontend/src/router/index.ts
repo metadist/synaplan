@@ -20,7 +20,7 @@ const guardSubscription = (
 ) => {
   const configStore = useConfigStore()
   if (!configStore.billing.enabled) {
-    next({ name: 'chat' })
+    next({ name: resolveDefaultRoute() })
   } else {
     next()
   }
@@ -463,6 +463,49 @@ function mapPathToFeatureKey(path: string): string {
   return 'general'
 }
 
+/**
+ * MOBILE-APP SEAM (Epic 4): configurable start page / post-login route.
+ *
+ * A branded deployment (or the app pointed at a branded server) can set
+ * `branding.defaultRoute` (post-login home) and `branding.landingPage`
+ * (logged-out entry). Both are validated against the real route table and fail
+ * SAFE to today's defaults ('chat' / 'login') when unset or unknown — never a
+ * broken navigation.
+ */
+function routeExists(name: string): boolean {
+  return router.getRoutes().some((r) => r.name === name)
+}
+
+function routeIsPublic(name: string): boolean {
+  return router.getRoutes().some((r) => r.name === name && r.meta?.public === true)
+}
+
+/** Post-login home; defaults to 'chat'. Unknown/unsafe values fall back. */
+function resolveDefaultRoute(): string {
+  const configured = useConfigStore().branding.defaultRoute
+  if (
+    configured &&
+    configured !== 'login' &&
+    configured !== 'not-found' &&
+    routeExists(configured)
+  ) {
+    return configured
+  }
+  return 'chat'
+}
+
+/**
+ * Logged-out landing; defaults to 'login'. Must be a PUBLIC route (else a
+ * logged-out visitor would bounce straight back to login). Falls back safely.
+ */
+function resolveLandingRoute(): string {
+  const configured = useConfigStore().branding.landingPage
+  if (configured && configured !== 'not-found' && routeIsPublic(configured)) {
+    return configured
+  }
+  return 'login'
+}
+
 // Global navigation guard for authentication
 // With cookie-based auth, we wait for auth check then verify session
 router.beforeEach(async (to, from, next) => {
@@ -533,15 +576,26 @@ router.beforeEach(async (to, from, next) => {
     })
   } else if (requiresAdminAccess && !isAdmin.value) {
     // Admin route without admin privileges
-    next({ name: 'chat' })
+    next({ name: resolveDefaultRoute() })
+  } else if (
+    to.name === 'chat' &&
+    !authenticated &&
+    !useGuestStore().isGuestMode &&
+    resolveLandingRoute() !== 'login'
+  ) {
+    // A branded deployment configured a custom public logged-out landing:
+    // send first-time, not-signed-in visitors there instead of the home/chat
+    // entry. Default-safe: unconfigured ⇒ resolveLandingRoute() === 'login' ⇒
+    // this branch is skipped and guest/anonymous chat behaves as before.
+    next({ name: resolveLandingRoute() })
   } else if (isPublicRoute && isAuthenticated.value && to.name === 'login') {
     // Already logged in, redirect to home (but check for loops)
-    if (from.name === 'chat' || detectRedirectLoop('/')) {
-      // Prevent ping-pong between login and chat
+    if (from.name === resolveDefaultRoute() || detectRedirectLoop('/')) {
+      // Prevent ping-pong between login and the home route
       next()
       return
     }
-    next({ name: 'chat' })
+    next({ name: resolveDefaultRoute() })
   } else {
     next()
   }

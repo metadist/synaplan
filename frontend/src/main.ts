@@ -54,7 +54,8 @@ import { applyBrandingTheme } from './utils/brandingTheme'
     })
   }
 
-  // Apply white-label accent color from runtime branding config (Epic 4).
+  // MOBILE-APP SEAM (Epic 4): apply white-label color/font from runtime branding
+  // config. No-op for the default brand; re-runs when the app switches servers.
   applyBrandingTheme()
 
   const recaptchaEnabled = config.recaptcha.enabled
