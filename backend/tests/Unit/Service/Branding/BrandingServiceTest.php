@@ -35,6 +35,41 @@ final class BrandingServiceTest extends TestCase
         $this->assertSame('', $branding['logoUrl']);
         $this->assertTrue($branding['showPoweredBy']);
         $this->assertSame('Synaplan', $branding['poweredByLabel']);
+
+        // New revision fields default to empty (= keep current look / no gate).
+        $this->assertSame('', $branding['secondaryColor']);
+        $this->assertSame('', $branding['accentColor']);
+        $this->assertSame('', $branding['fontFamily']);
+        $this->assertSame('', $branding['headingFontFamily']);
+        $this->assertSame('', $branding['fontUrl']);
+        $this->assertSame('', $branding['landingPage']);
+        $this->assertSame('', $branding['defaultRoute']);
+    }
+
+    public function testReadsConfiguredFontsAndRoutes(): void
+    {
+        $this->configRepository->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => match ($setting) {
+                BrandingService::KEY_FONT_FAMILY => 'Inter, sans-serif',
+                BrandingService::KEY_HEADING_FONT_FAMILY => 'Lora, serif',
+                BrandingService::KEY_FONT_URL => 'https://fonts.example/inter.css',
+                BrandingService::KEY_SECONDARY_COLOR => '#112233',
+                BrandingService::KEY_ACCENT_COLOR => '#445566',
+                BrandingService::KEY_LANDING_PAGE => 'login',
+                BrandingService::KEY_DEFAULT_ROUTE => 'chat',
+                default => null,
+            }
+        );
+
+        $branding = $this->service->getBranding();
+
+        $this->assertSame('Inter, sans-serif', $branding['fontFamily']);
+        $this->assertSame('Lora, serif', $branding['headingFontFamily']);
+        $this->assertSame('https://fonts.example/inter.css', $branding['fontUrl']);
+        $this->assertSame('#112233', $branding['secondaryColor']);
+        $this->assertSame('#445566', $branding['accentColor']);
+        $this->assertSame('login', $branding['landingPage']);
+        $this->assertSame('chat', $branding['defaultRoute']);
     }
 
     /**
