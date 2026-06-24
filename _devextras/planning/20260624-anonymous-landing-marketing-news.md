@@ -69,11 +69,12 @@ flowchart LR
 
 | Item | Detail |
 |------|--------|
-| Route | `src/app/feed.xml/route.ts` |
-| URL | `https://www.synaplan.com/feed.xml` (EN), `?lang=de` (DE) |
+| Shared builder | `src/lib/feed.ts` → `buildFeedResponse(locale)` |
+| Routes | `src/app/feed.xml/route.ts` (EN), `src/app/de/feed.xml/route.ts` (DE) |
+| URLs | `https://www.synaplan.com/feed.xml` (EN, default locale), `https://www.synaplan.com/de/feed.xml` (DE) — **locale is in the path**, matching the site's `localePrefix: as-needed`. No `?lang=` query param (one canonical URL per feed). |
 | Format | RSS 2.0 with WordPress-compatible namespaces (`content:`, `dc:`, `media:`) |
 | Query | `status: PUBLISHED`, `locale`, `orderBy publishedAt desc`, `take: 12` |
-| Matcher | Excluded from i18n proxy via `.*\..*` in `src/proxy.ts` |
+| Routing | `de` is a static segment alongside `admin`/`api`/`uploads`; coexists with `[locale]`. Excluded from i18n proxy via `.*\..*` in `src/proxy.ts`. |
 
 ---
 
@@ -85,7 +86,7 @@ flowchart LR
 |---------|---------|----------------|---------------|
 | `ENABLED` | **Master switch** — must be `'1'` for any news to show or fetch | `'0'` | boolean |
 | `FEED_URL_EN` | English feed (used only when enabled) | `https://www.synaplan.com/feed.xml` | url |
-| `FEED_URL_DE` | German feed (used only when enabled) | `https://www.synaplan.com/feed.xml?lang=de` | url |
+| `FEED_URL_DE` | German feed (used only when enabled) | `https://www.synaplan.com/de/feed.xml` | url |
 | `FEED_URL_DEFAULT` | ES/TR fallback (used only when enabled) | `https://www.synaplan.com/feed.xml` | url |
 
 `MarketingNewsConfig::isEnabled()` is checked **first** in every code path (`resolveFeedUrl`, `getLandingItems`, runtime config). If false, downstream layers never run.
