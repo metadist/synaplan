@@ -1,9 +1,15 @@
 #!/usr/bin/env node
 /**
- * Generate PNG icons from SVG for favicon and mobile bookmarks
- * 
- * Run: npm install sharp && node scripts/generate-icons.mjs
- * Or: npx sharp-cli ...
+ * Generate PNG favicon / PWA icons from the brand SVG.
+ *
+ * The generated PNGs (favicon-32, apple-touch-icon, icon-192, icon-512) are
+ * committed to public/ so a clean clone/build is never missing them. Re-run
+ * this only when the brand mark (single_bird.svg) changes:
+ *
+ *   npm install sharp --no-save && npm run icons:generate
+ *
+ * See synaplan-apps/docs/ASSETS.md for the full asset pipeline (incl. native
+ * app icons/splash via @capacitor/assets) and the white-label swap guide.
  */
 
 import sharp from 'sharp';
