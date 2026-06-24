@@ -76,7 +76,7 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 ## Features
 
 - **AI Chat** — Ollama, OpenAI, Anthropic, Groq, Gemini
-- **Multi-Task Routing** — An AI planner decomposes complex requests into a task graph (extract → summarize → generate → reply) and streams live task cards while the steps execute
+- **Multi-Task (DAG) Routing** — An AI planner turns a complex request into a directed acyclic graph of capability steps (extract → summarize → generate → reply), runs them in dependency order, and streams a live task card for each step. [Deep dive ↓](#multi-task-dag-routing)
 - **RAG Search** — Semantic document search with MariaDB VECTOR or Qdrant
 - **Chat Widget** — Embed on any website ([widget guide](https://docs.synaplan.com/index.php/widget))
 - **Live Support** — Realtime WebSocket layer (Centrifugo + Redis): human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md))
@@ -88,6 +88,39 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 - **Feedback System** — Feedback capture and analysis powered by Qdrant
 - **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
 - **MCP Server** *(early access)* — Connect AI clients (Claude, Cursor, …) over the Model Context Protocol; your RAG and memories become tools at `POST /mcp` ([MCP guide](https://docs.synaplan.com/index.php/mcp))
+
+---
+
+## Multi-Task (DAG) Routing
+
+Most assistants answer a complex request with a single model call. Synaplan asks a small **planner model** to turn the request into a **DAG — a directed acyclic graph of tasks**. Each node is a concrete capability (chat, summarize, translate, RAG search, web search, image/video, text-to-speech, document or **calendar `.ics`** generation, …); the edges say which step feeds the next. The graph is validated (known capabilities, no cycles), executed in dependency order — media steps optionally in parallel — and every node streams a **live task card** as it runs.
+
+Ask one thing, get several real outputs. *“Write a short paragraph about DAG routing **and** create a reminder calendar entry for tomorrow at 10am”* becomes a two-node plan — a text **Answer** plus a downloadable **Calendar invite** (`.ics`) — streamed as each step finishes:
+
+```
+                 ┌────────────────────────┐
+user request ──▶ │  TaskPlanner (planner  │
+                 │  model → JSON DAG)     │
+                 └───────────┬────────────┘
+                             ▼
+        ┌────────────── DAG (topological order) ──────────────┐
+        │   n1: chat ──────────────┐                           │
+        │                          ▼                           │
+        │   n2: calendar_event ─▶ compose_reply (reply node)   │
+        └──────────────────────────────────────────────────────┘
+             │  live SSE task cards: plan · task_update · task_chunk · task_file
+             ▼
+        Answer  +  meeting_YYYYMMDD.ics  (one request, multiple files)
+```
+
+Why this matters when you **self-host**:
+
+- **One prompt → multiple real artifacts** — a single request can return several generated files, on any channel (chat, widget, WhatsApp, email, webhook).
+- **Transparent, not magic** — you watch each step start, stream, and finish; nothing happens off-screen on someone else's server.
+- **Yours to extend** — capabilities are a typed registry (a `Capability` enum + tagged `TaskRunner` services), not a hardcoded prompt. New step types are thin adapters over capabilities you already run.
+- **Roadmap: open DAG endpoints** — we're working toward **DAG nodes that hand off to [n8n](https://n8n.io/) and other open-source services**, so the planner can orchestrate the self-hosted stack you already operate — the AI plans, *your* tools execute.
+
+Enabled per user under **Settings → Routing** (existing installs keep the classic single-handler fast path until you switch it on). Full design: **[Multi-Task (DAG) Routing](https://docs.synaplan.com/dag-routing)** · in-repo developer notes: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md#message-routing-multi-task).
 
 ---
 
