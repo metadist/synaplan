@@ -77,6 +77,56 @@ final readonly class MarketingNewsConfig
         return $this->isValidFeedUrl($url) ? $url : null;
     }
 
+    /**
+     * Hosts allowed for the cover-image proxy: the hosts of every configured
+     * feed URL (stored value, or built-in default when unset). Used as an
+     * SSRF allowlist so the proxy can only fetch images from the same origins
+     * we already trust for feeds.
+     *
+     * @return list<string>
+     */
+    public function allowedImageHosts(): array
+    {
+        $settings = [
+            self::KEY_FEED_URL_EN => self::DEFAULT_FEED_URL_EN,
+            self::KEY_FEED_URL_DE => self::DEFAULT_FEED_URL_DE,
+            self::KEY_FEED_URL_DEFAULT => self::DEFAULT_FEED_URL_EN,
+        ];
+
+        $hosts = [];
+        foreach ($settings as $setting => $default) {
+            $raw = $this->configRepository->getValue(0, self::CONFIG_GROUP, $setting);
+            $url = null !== $raw && '' !== trim($raw) ? trim($raw) : $default;
+            $host = parse_url($url, \PHP_URL_HOST);
+            if (\is_string($host) && '' !== $host) {
+                $hosts[] = strtolower($host);
+            }
+        }
+
+        return array_values(array_unique($hosts));
+    }
+
+    /**
+     * Whether the proxy may fetch this image URL: feature enabled, http(s),
+     * and the host is one of the configured feed hosts.
+     */
+    public function isAllowedImageUrl(string $url): bool
+    {
+        if (!$this->isEnabled()) {
+            return false;
+        }
+        if (!$this->isValidFeedUrl($url)) {
+            return false;
+        }
+
+        $host = parse_url($url, \PHP_URL_HOST);
+        if (!\is_string($host) || '' === $host) {
+            return false;
+        }
+
+        return \in_array(strtolower($host), $this->allowedImageHosts(), true);
+    }
+
     private function isValidFeedUrl(string $url): bool
     {
         if (!filter_var($url, \FILTER_VALIDATE_URL)) {

@@ -21,6 +21,8 @@ final readonly class MarketingNewsFeedService
     private const FETCH_TIMEOUT_SECONDS = 5;
     private const DEFAULT_LIMIT = 4;
     private const MAX_LIMIT = 12;
+    private const MAX_IMAGE_BYTES = 10485760; // 10 MB
+    private const IMAGE_PROXY_PATH = '/api/v1/news/image';
 
     public function __construct(
         private MarketingNewsConfig $config,
@@ -60,7 +62,70 @@ final readonly class MarketingNewsFeedService
             return [];
         }
 
-        return \array_slice($items, 0, $safeLimit);
+        $items = \array_slice($items, 0, $safeLimit);
+
+        // Route cover images through our same-origin proxy so cross-origin
+        // CORP/hotlink restrictions on the source never break display. The
+        // cache holds the ORIGINAL url; we rewrite on output only.
+        return array_map(static function (array $item): array {
+            if (\is_string($item['imageUrl']) && '' !== $item['imageUrl']) {
+                $item['imageUrl'] = self::IMAGE_PROXY_PATH.'?u='.rawurlencode($item['imageUrl']);
+            }
+
+            return $item;
+        }, $items);
+    }
+
+    /**
+     * Server-side fetch of a single cover image for the proxy endpoint.
+     * Returns null when the URL is not allowed or the fetch fails.
+     *
+     * @return array{content: string, contentType: string}|null
+     */
+    public function fetchImage(string $url): ?array
+    {
+        if (!$this->config->isAllowedImageUrl($url)) {
+            return null;
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', $url, [
+                'headers' => [
+                    'Accept' => 'image/*',
+                    'User-Agent' => 'Synaplan/1.0 (+https://www.synaplan.com)',
+                ],
+                'timeout' => self::FETCH_TIMEOUT_SECONDS,
+            ]);
+
+            if ($response->getStatusCode() >= 400) {
+                return null;
+            }
+
+            $headers = $response->getHeaders(false);
+            $contentLength = isset($headers['content-length'][0]) ? (int) $headers['content-length'][0] : 0;
+            if ($contentLength > self::MAX_IMAGE_BYTES) {
+                return null;
+            }
+
+            $contentType = strtolower(trim(explode(';', $headers['content-type'][0] ?? '')[0]));
+            if (!str_starts_with($contentType, 'image/')) {
+                return null;
+            }
+
+            $content = $response->getContent(false);
+            if (\strlen($content) > self::MAX_IMAGE_BYTES) {
+                return null;
+            }
+
+            return ['content' => $content, 'contentType' => $contentType];
+        } catch (\Throwable $e) {
+            $this->logger->warning('Marketing news image proxy fetch failed', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**
