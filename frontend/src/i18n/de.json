@@ -832,6 +832,11 @@
       "verifyReason": "Biometrische Sperre aktivieren",
       "enableFailed": "Die biometrische Sperre konnte nicht aktiviert werden. Bitte erneut versuchen."
     },
+    "legal": {
+      "title": "Datenschutz & AGB",
+      "privacy": "Datenschutzerklärung",
+      "terms": "Nutzungsbedingungen"
+    },
     "dangerZone": {
       "title": "Gefahrenzone",
       "subtitle": "Irreversible Aktionen",

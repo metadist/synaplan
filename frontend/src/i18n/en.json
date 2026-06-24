@@ -2788,6 +2788,11 @@
       "verifyReason": "Enable biometric lock",
       "enableFailed": "Could not enable the biometric lock. Please try again."
     },
+    "legal": {
+      "title": "Privacy & Terms",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Use"
+    },
     "dangerZone": {
       "title": "Danger Zone",
       "subtitle": "Irreversible actions",

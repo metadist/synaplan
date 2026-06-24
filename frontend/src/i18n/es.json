@@ -974,6 +974,11 @@
       "verifyReason": "Activar el bloqueo biométrico",
       "enableFailed": "No se pudo activar el bloqueo biométrico. Inténtalo de nuevo."
     },
+    "legal": {
+      "title": "Privacidad y Términos",
+      "privacy": "Política de Privacidad",
+      "terms": "Términos de Uso"
+    },
     "dangerZone": {
       "title": "Zona de Peligro",
       "subtitle": "Acciones irreversibles",

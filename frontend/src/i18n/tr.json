@@ -974,6 +974,11 @@
       "verifyReason": "Biyometrik kilidi etkinleştir",
       "enableFailed": "Biyometrik kilit etkinleştirilemedi. Lütfen tekrar deneyin."
     },
+    "legal": {
+      "title": "Gizlilik ve Şartlar",
+      "privacy": "Gizlilik Politikası",
+      "terms": "Kullanım Koşulları"
+    },
     "dangerZone": {
       "title": "Tehlikeli Bölge",
       "subtitle": "Geri alınamaz işlemler",

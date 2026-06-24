@@ -32,6 +32,8 @@ final class BrandingServiceTest extends TestCase
         $this->assertSame('Synaplan', $branding['name']);
         $this->assertSame('#003fc7', $branding['primaryColor']);
         $this->assertSame('https://www.synaplan.com', $branding['homepageUrl']);
+        $this->assertSame('https://www.synaplan.com/privacy-policy', $branding['privacyUrl']);
+        $this->assertSame('https://www.synaplan.com/terms', $branding['termsUrl']);
         $this->assertSame('', $branding['logoUrl']);
         $this->assertTrue($branding['showPoweredBy']);
         $this->assertSame('Synaplan', $branding['poweredByLabel']);
@@ -57,12 +59,16 @@ final class BrandingServiceTest extends TestCase
                 BrandingService::KEY_ACCENT_COLOR => '#445566',
                 BrandingService::KEY_LANDING_PAGE => 'login',
                 BrandingService::KEY_DEFAULT_ROUTE => 'chat',
+                BrandingService::KEY_PRIVACY_URL => 'https://brand.example/privacy',
+                BrandingService::KEY_TERMS_URL => 'https://brand.example/terms',
                 default => null,
             }
         );
 
         $branding = $this->service->getBranding();
 
+        $this->assertSame('https://brand.example/privacy', $branding['privacyUrl']);
+        $this->assertSame('https://brand.example/terms', $branding['termsUrl']);
         $this->assertSame('Inter, sans-serif', $branding['fontFamily']);
         $this->assertSame('Lora, serif', $branding['headingFontFamily']);
         $this->assertSame('https://fonts.example/inter.css', $branding['fontUrl']);

@@ -288,11 +288,11 @@
           <p>
             <BrandAttribution link-class="text-[var(--brand)] hover:underline font-medium" />
             ·
-            <a href="https://synaplan.com/privacy" target="_blank" class="hover:underline">{{
+            <a :href="config.branding.privacyUrl" target="_blank" class="hover:underline">{{
               $t('shared.privacy')
             }}</a>
             ·
-            <a href="https://synaplan.com/terms" target="_blank" class="hover:underline">{{
+            <a :href="config.branding.termsUrl" target="_blank" class="hover:underline">{{
               $t('shared.terms')
             }}</a>
           </p>

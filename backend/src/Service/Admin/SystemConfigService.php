@@ -66,6 +66,7 @@ final readonly class SystemConfigService
                     'colors' => ['label' => 'Colors', 'fields' => ['BRAND_PRIMARY_COLOR', 'BRAND_SECONDARY_COLOR', 'BRAND_ACCENT_COLOR']],
                     'fonts' => ['label' => 'Fonts', 'fields' => ['BRAND_FONT_FAMILY', 'BRAND_HEADING_FONT_FAMILY', 'BRAND_FONT_URL']],
                     'logos' => ['label' => 'Logos & Icon', 'fields' => ['BRAND_LOGO_URL', 'BRAND_LOGO_DARK_URL', 'BRAND_ICON_URL']],
+                    'legal' => ['label' => 'Legal Links', 'fields' => ['BRAND_PRIVACY_URL', 'BRAND_TERMS_URL']],
                     'navigation' => ['label' => 'Start Page', 'fields' => ['BRAND_LANDING_PAGE', 'BRAND_DEFAULT_ROUTE']],
                     'attribution' => ['label' => 'Attribution ("Powered by")', 'fields' => ['BRAND_SHOW_POWERED_BY', 'BRAND_POWERED_BY_LABEL', 'BRAND_POWERED_BY_URL']],
                 ],
@@ -693,6 +694,20 @@ final readonly class SystemConfigService
                 'description' => 'Brand homepage link used on auth and footer surfaces.',
                 'default' => BrandingService::DEFAULT_HOMEPAGE_URL,
                 'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_HOMEPAGE_URL,
+            ],
+            'BRAND_PRIVACY_URL' => [
+                'tab' => 'branding', 'section' => 'legal', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Privacy-policy link. Reachable in-app (Settings) and used in store metadata; store policy (Apple/Google) requires it. White-label brands point this at their own page.',
+                'default' => BrandingService::DEFAULT_PRIVACY_URL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_PRIVACY_URL,
+            ],
+            'BRAND_TERMS_URL' => [
+                'tab' => 'branding', 'section' => 'legal', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Terms-of-use link. Reachable in-app (Settings) and used in store metadata. White-label brands point this at their own page.',
+                'default' => BrandingService::DEFAULT_TERMS_URL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_TERMS_URL,
             ],
             'BRAND_PRIMARY_COLOR' => [
                 'tab' => 'branding', 'section' => 'colors', 'type' => 'text',

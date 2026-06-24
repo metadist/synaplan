@@ -40,6 +40,8 @@ final readonly class BrandingConfigSeeder
             ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_LOGO_DARK_URL,       'value' => ''],
             ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_ICON_URL,            'value' => ''],
             ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_HOMEPAGE_URL,        'value' => BrandingService::DEFAULT_HOMEPAGE_URL],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_PRIVACY_URL,         'value' => BrandingService::DEFAULT_PRIVACY_URL],
+            ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_TERMS_URL,           'value' => BrandingService::DEFAULT_TERMS_URL],
             ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_LANDING_PAGE,        'value' => BrandingService::DEFAULT_LANDING_PAGE],
             ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_DEFAULT_ROUTE,       'value' => BrandingService::DEFAULT_DEFAULT_ROUTE],
             ['ownerId' => 0, 'group' => $g, 'setting' => BrandingService::KEY_SHOW_POWERED_BY,     'value' => BrandingService::DEFAULT_SHOW_POWERED_BY],

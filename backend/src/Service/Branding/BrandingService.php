@@ -33,6 +33,12 @@ final readonly class BrandingService
     public const KEY_LOGO_DARK_URL = 'BRAND_LOGO_DARK_URL';
     public const KEY_ICON_URL = 'BRAND_ICON_URL';
     public const KEY_HOMEPAGE_URL = 'BRAND_HOMEPAGE_URL';
+    // MOBILE-APP SEAM (Epic 9.3): privacy-policy + terms-of-use links. Store
+    // policy (Apple/Google) requires both reachable in-app and in store metadata;
+    // making them configurable lets white-label brands point at their own legal
+    // pages instead of Synaplan's.
+    public const KEY_PRIVACY_URL = 'BRAND_PRIVACY_URL';
+    public const KEY_TERMS_URL = 'BRAND_TERMS_URL';
     public const KEY_LANDING_PAGE = 'BRAND_LANDING_PAGE';
     public const KEY_DEFAULT_ROUTE = 'BRAND_DEFAULT_ROUTE';
     public const KEY_SHOW_POWERED_BY = 'BRAND_SHOW_POWERED_BY';
@@ -48,6 +54,8 @@ final readonly class BrandingService
     public const DEFAULT_HEADING_FONT_FAMILY = '';
     public const DEFAULT_FONT_URL = '';
     public const DEFAULT_HOMEPAGE_URL = 'https://www.synaplan.com';
+    public const DEFAULT_PRIVACY_URL = 'https://www.synaplan.com/privacy-policy';
+    public const DEFAULT_TERMS_URL = 'https://www.synaplan.com/terms';
     public const DEFAULT_LANDING_PAGE = '';
     public const DEFAULT_DEFAULT_ROUTE = '';
     public const DEFAULT_SHOW_POWERED_BY = '1';
@@ -73,6 +81,8 @@ final readonly class BrandingService
      *     logoDarkUrl: string,
      *     iconUrl: string,
      *     homepageUrl: string,
+     *     privacyUrl: string,
+     *     termsUrl: string,
      *     landingPage: string,
      *     defaultRoute: string,
      *     showPoweredBy: bool,
@@ -95,6 +105,8 @@ final readonly class BrandingService
             'logoDarkUrl' => $this->value(self::KEY_LOGO_DARK_URL, ''),
             'iconUrl' => $this->value(self::KEY_ICON_URL, ''),
             'homepageUrl' => $this->value(self::KEY_HOMEPAGE_URL, self::DEFAULT_HOMEPAGE_URL),
+            'privacyUrl' => $this->value(self::KEY_PRIVACY_URL, self::DEFAULT_PRIVACY_URL),
+            'termsUrl' => $this->value(self::KEY_TERMS_URL, self::DEFAULT_TERMS_URL),
             'landingPage' => $this->value(self::KEY_LANDING_PAGE, self::DEFAULT_LANDING_PAGE),
             'defaultRoute' => $this->value(self::KEY_DEFAULT_ROUTE, self::DEFAULT_DEFAULT_ROUTE),
             'showPoweredBy' => $this->boolValue(self::KEY_SHOW_POWERED_BY, self::DEFAULT_SHOW_POWERED_BY),

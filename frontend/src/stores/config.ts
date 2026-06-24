@@ -175,6 +175,14 @@ const config = {
     get homepageUrl(): string {
       return getConfigSync().branding?.homepageUrl || 'https://www.synaplan.com'
     },
+    // MOBILE-APP SEAM (Epic 9.3): legal links, fail-safe to the default brand
+    // pages so an unconfigured deployment still satisfies store policy.
+    get privacyUrl(): string {
+      return getConfigSync().branding?.privacyUrl || 'https://www.synaplan.com/privacy-policy'
+    },
+    get termsUrl(): string {
+      return getConfigSync().branding?.termsUrl || 'https://www.synaplan.com/terms'
+    },
     get landingPage(): string {
       return getConfigSync().branding?.landingPage ?? ''
     },

@@ -146,6 +146,8 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'logoDarkUrl', type: 'string', example: '', description: 'Dark-mode logo URL; empty string falls back to the bundled asset'),
                         new OA\Property(property: 'iconUrl', type: 'string', example: '', description: 'Brand icon/favicon URL; empty string falls back to the bundled asset'),
                         new OA\Property(property: 'homepageUrl', type: 'string', example: 'https://www.synaplan.com', description: 'Brand homepage link used in auth/footer surfaces'),
+                        new OA\Property(property: 'privacyUrl', type: 'string', example: 'https://www.synaplan.com/privacy-policy', description: 'Privacy-policy link (reachable in-app + store metadata; store-policy mandatory)'),
+                        new OA\Property(property: 'termsUrl', type: 'string', example: 'https://www.synaplan.com/terms', description: 'Terms-of-use link (reachable in-app + store metadata)'),
                         new OA\Property(property: 'landingPage', type: 'string', example: '', description: 'Logged-out landing: route name or free-form path (starts with "/"); empty string keeps the default landing'),
                         new OA\Property(property: 'defaultRoute', type: 'string', example: '', description: 'Post-login default: route name or free-form path (starts with "/"); empty string keeps the default route'),
                         new OA\Property(property: 'showPoweredBy', type: 'boolean', example: true, description: 'Whether to show the "· powered by <label>" attribution'),
