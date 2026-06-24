@@ -3,6 +3,7 @@ import {
   createWebHistory,
   type NavigationGuardNext,
   type RouteLocationNormalized,
+  type RouteLocationRaw,
 } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useConfigStore } from '@/stores/config'
@@ -20,7 +21,7 @@ const guardSubscription = (
 ) => {
   const configStore = useConfigStore()
   if (!configStore.billing.enabled) {
-    next({ name: resolveDefaultRoute() })
+    next(resolveDefaultRoute())
   } else {
     next()
   }
@@ -468,42 +469,75 @@ function mapPathToFeatureKey(path: string): string {
  *
  * A branded deployment (or the app pointed at a branded server) can set
  * `branding.defaultRoute` (post-login home) and `branding.landingPage`
- * (logged-out entry). Both are validated against the real route table and fail
- * SAFE to today's defaults ('chat' / 'login') when unset or unknown — never a
- * broken navigation.
+ * (logged-out entry). Each accepts EITHER a route name (e.g. 'chat') OR a
+ * free-form path (must start with '/', e.g. '/welcome') so a brand can point at
+ * a custom marketing/landing page that isn't a named route.
+ *
+ * Safety net (so a typo can never break navigation):
+ *  - free-form values must start with '/'; otherwise the value is treated as a
+ *    route name and validated by name,
+ *  - the value is resolved against the REAL route table — an unknown path lands
+ *    on the catch-all 404 and is rejected, an unknown name throws and is caught,
+ *  - the logged-out landing must additionally resolve to a PUBLIC route (else a
+ *    not-signed-in visitor would just bounce back to login → loop),
+ *  - callers additionally guard against self-redirects (see beforeEach).
+ * Anything rejected falls back to today's defaults ('chat' / 'login').
  */
-function routeExists(name: string): boolean {
-  return router.getRoutes().some((r) => r.name === name)
-}
-
-function routeIsPublic(name: string): boolean {
-  return router.getRoutes().some((r) => r.name === name && r.meta?.public === true)
-}
-
-/** Post-login home; defaults to 'chat'. Unknown/unsafe values fall back. */
-function resolveDefaultRoute(): string {
-  const configured = useConfigStore().branding.defaultRoute
-  if (
-    configured &&
-    configured !== 'login' &&
-    configured !== 'not-found' &&
-    routeExists(configured)
-  ) {
-    return configured
+function resolveBrandTarget(
+  configured: string,
+  opts: { requirePublic?: boolean; rejectNames?: string[] }
+): RouteLocationRaw | null {
+  if (!configured) {
+    return null
   }
-  return 'chat'
+
+  // A leading '/' means free-form path; anything else is a named route.
+  const target: RouteLocationRaw = configured.startsWith('/') ? configured : { name: configured }
+
+  let resolved
+  try {
+    resolved = router.resolve(target)
+  } catch {
+    // Unknown route name → vue-router throws.
+    return null
+  }
+
+  // Unknown path resolves to the catch-all 404; unknown name has no match.
+  if (resolved.matched.length === 0 || resolved.name === 'not-found') {
+    return null
+  }
+  if (opts.rejectNames?.includes(resolved.name as string)) {
+    return null
+  }
+  if (opts.requirePublic && resolved.meta?.public !== true) {
+    return null
+  }
+
+  return target
+}
+
+/** Post-login home as a navigation target; defaults to 'chat'. */
+function resolveDefaultRoute(): RouteLocationRaw {
+  const configured = useConfigStore().branding.defaultRoute
+  return resolveBrandTarget(configured, { rejectNames: ['login', 'not-found'] }) ?? { name: 'chat' }
 }
 
 /**
- * Logged-out landing; defaults to 'login'. Must be a PUBLIC route (else a
- * logged-out visitor would bounce straight back to login). Falls back safely.
+ * The custom logged-out landing as a navigation target, or `null` when nothing
+ * valid is configured (→ keep today's default behavior, no redirect).
  */
-function resolveLandingRoute(): string {
+function resolveLandingTarget(): RouteLocationRaw | null {
   const configured = useConfigStore().branding.landingPage
-  if (configured && configured !== 'not-found' && routeIsPublic(configured)) {
-    return configured
+  return resolveBrandTarget(configured, { requirePublic: true, rejectNames: ['not-found'] })
+}
+
+/** Resolved path of a navigation target, for self-redirect / loop checks. */
+function targetPath(target: RouteLocationRaw): string {
+  try {
+    return router.resolve(target).path
+  } catch {
+    return ''
   }
-  return 'login'
 }
 
 // Global navigation guard for authentication
@@ -576,26 +610,28 @@ router.beforeEach(async (to, from, next) => {
     })
   } else if (requiresAdminAccess && !isAdmin.value) {
     // Admin route without admin privileges
-    next({ name: resolveDefaultRoute() })
-  } else if (
-    to.name === 'chat' &&
-    !authenticated &&
-    !useGuestStore().isGuestMode &&
-    resolveLandingRoute() !== 'login'
-  ) {
-    // A branded deployment configured a custom public logged-out landing:
-    // send first-time, not-signed-in visitors there instead of the home/chat
-    // entry. Default-safe: unconfigured ⇒ resolveLandingRoute() === 'login' ⇒
-    // this branch is skipped and guest/anonymous chat behaves as before.
-    next({ name: resolveLandingRoute() })
+    next(resolveDefaultRoute())
+  } else if (to.name === 'chat' && !authenticated && !useGuestStore().isGuestMode) {
+    // A branded deployment may configure a custom public logged-out landing
+    // (route name or free-form path): send first-time, not-signed-in visitors
+    // there instead of the home/chat entry. Default-safe: when nothing valid is
+    // configured `landing` is null and we fall through, so guest/anonymous chat
+    // behaves exactly as before. The path check prevents a self-redirect loop.
+    const landing = resolveLandingTarget()
+    if (landing && targetPath(landing) !== to.path) {
+      next(landing)
+    } else {
+      next()
+    }
   } else if (isPublicRoute && isAuthenticated.value && to.name === 'login') {
     // Already logged in, redirect to home (but check for loops)
-    if (from.name === resolveDefaultRoute() || detectRedirectLoop('/')) {
+    const home = resolveDefaultRoute()
+    if (from.path === targetPath(home) || detectRedirectLoop('/')) {
       // Prevent ping-pong between login and the home route
       next()
       return
     }
-    next({ name: resolveDefaultRoute() })
+    next(home)
   } else {
     next()
   }

@@ -760,14 +760,14 @@ final readonly class SystemConfigService
             'BRAND_LANDING_PAGE' => [
                 'tab' => 'branding', 'section' => 'navigation', 'type' => 'text',
                 'sensitive' => false,
-                'description' => 'Logged-out landing route name (e.g. "login"). Leave empty to keep the default landing. Unknown values fail safe to the default.',
+                'description' => 'Logged-out landing: a route name (e.g. "login") or a free-form path starting with "/" (e.g. "/welcome"). Must be a public page. Leave empty to keep the default; unknown/non-public values fail safe to the default.',
                 'default' => BrandingService::DEFAULT_LANDING_PAGE,
                 'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_LANDING_PAGE,
             ],
             'BRAND_DEFAULT_ROUTE' => [
                 'tab' => 'branding', 'section' => 'navigation', 'type' => 'text',
                 'sensitive' => false,
-                'description' => 'Post-login default route name (e.g. "chat"). Leave empty to keep the default route. Unknown values fail safe to the default.',
+                'description' => 'Post-login default: a route name (e.g. "chat") or a free-form path starting with "/" (e.g. "/files"). Leave empty to keep the default; unknown values fail safe to the default.',
                 'default' => BrandingService::DEFAULT_DEFAULT_ROUTE,
                 'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_DEFAULT_ROUTE,
             ],
