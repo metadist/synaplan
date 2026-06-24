@@ -117,7 +117,8 @@ Full design in [`02_async-media-ux.md`](./02_async-media-ux.md).
 | 1 | **Async media generation ("fire & continue")** — backend/architecture | [`01_async-media-jobs.md`](./01_async-media-jobs.md) | P0 | Planned |
 | 1·UX | **Async media UX** — DAG spawn visual, global Jobs tray, actionable toaster, jump-to-card | [`02_async-media-ux.md`](./02_async-media-ux.md) | P0 | Planned |
 | 2 | **File management world** — one home for every file: sources, vectorized status, groups, generated-media gallery | [`03_file-management.md`](./03_file-management.md) | P0 | Planned |
-| 3 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
+| 3 | **Image & first-boot optimization** — multi-arch (arm64) base image, baked dev deps, custom `bge-m3` Ollama image; fast `docker compose up` on Mac | [`04_image-build-optimization.md`](./04_image-build-optimization.md) | P1 | Planned |
+| 4 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
 
 > "We have more things to implement" — this index is the place to add them.
 > Each new 4.0 feature gets a `0N_<slug>.md` and a row here. Candidate backlog
