@@ -121,6 +121,9 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
           enabled: false,
           tagId: '',
         },
+        marketingNews: {
+          enabled: false,
+        },
         build: {
           version: 'unknown',
           ip: 'dev',

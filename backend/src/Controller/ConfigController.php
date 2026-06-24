@@ -13,6 +13,7 @@ use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Infrastructure\RedisService;
+use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
@@ -46,6 +47,7 @@ class ConfigController extends AbstractController
         private EmbeddingMetadataService $embeddingMetadata,
         private ModelConfigService $modelConfigService,
         private RedisService $redisService,
+        private MarketingNewsConfig $marketingNewsConfig,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -213,6 +215,19 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'marketingNews',
+                    type: 'object',
+                    description: 'Guest-landing marketing news master switch. When false, the frontend renders no news section and performs no news fetch.',
+                    properties: [
+                        new OA\Property(
+                            property: 'enabled',
+                            type: 'boolean',
+                            example: false,
+                            description: 'Admin-controlled master switch (off by default). Anonymous visitors only.'
+                        ),
+                    ]
+                ),
+                new OA\Property(
                     property: 'unavailableProviders',
                     type: 'array',
                     description: 'AI providers that are disabled due to missing API keys (only for authenticated users)',
@@ -342,6 +357,9 @@ class ConfigController extends AbstractController
             'googleTag' => $googleTagConfig,
             'build' => $buildInfo,
             'realtime' => $realtimeConfig,
+            'marketingNews' => [
+                'enabled' => $this->marketingNewsConfig->isEnabled(),
+            ],
         ];
 
         if ($user && !empty($unavailableProviders)) {
