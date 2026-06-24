@@ -20,10 +20,30 @@
  *     immediately and persist to secure storage best-effort in the background.
  */
 import { SecureStorage } from '@aparajita/capacitor-secure-storage'
-import { isNativeApp } from '@/services/api/nativeRuntime'
+import { getNativeApiBaseUrl, isNativeApp } from '@/services/api/nativeRuntime'
 
-const ACCESS_TOKEN_KEY = 'syn_native_at'
-const REFRESH_TOKEN_KEY = 'syn_native_rt'
+/**
+ * MOBILE-APP SEAM (Epic 3 §3.0): per-server identity.
+ *
+ * The native shell can point the app at any Synaplan server (the in-app server
+ * switcher lives in `synaplan-apps`). Tokens are stored keyed by the resolved
+ * server URL so server A's Bearer token is NEVER read for server B, and
+ * switching back to A restores A's session. The server is fixed for the
+ * lifetime of a WebView load (changing it reloads the SPA), so the scope is
+ * stable here. Default/web resolves to the production server's scope.
+ */
+function serverScope(): string {
+  // djb2 — tiny, synchronous, stable. Not for security, just key namespacing.
+  const url = getNativeApiBaseUrl()
+  let hash = 5381
+  for (let i = 0; i < url.length; i++) {
+    hash = ((hash << 5) + hash + url.charCodeAt(i)) | 0
+  }
+  return (hash >>> 0).toString(36)
+}
+
+const ACCESS_TOKEN_KEY = `syn_native_at_${serverScope()}`
+const REFRESH_TOKEN_KEY = `syn_native_rt_${serverScope()}`
 
 export interface NativeTokens {
   accessToken: string
