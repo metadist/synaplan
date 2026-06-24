@@ -85,6 +85,11 @@ parameters:
     env(STRIPE_PRICE_TEAM): ''
     env(STRIPE_PRICE_BUSINESS): ''
     env(STRIPE_PAYMENT_METHODS): ''
+    # Native IAP store product IDs (Epic 5.5). Defaults are the documented
+    # placeholder convention so web-only / open-source deployments stay IAP-off.
+    env(IAP_PRODUCT_PRO): 'com.synaplan.app.pro.monthly'
+    env(IAP_PRODUCT_TEAM): 'com.synaplan.app.team.monthly'
+    env(IAP_PRODUCT_BUSINESS): 'com.synaplan.app.business.monthly'
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
     env(CLOUDFLARE_ACCOUNT_ID): ''
@@ -529,6 +534,13 @@ services:
         arguments:
             $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
             $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
+
+    # Native IAP product ↔ tier mapping (Epic 5.5)
+    App\Service\IapPricingService:
+        arguments:
+            $iapProductPro: '%env(IAP_PRODUCT_PRO)%'
+            $iapProductTeam: '%env(IAP_PRODUCT_TEAM)%'
+            $iapProductBusiness: '%env(IAP_PRODUCT_BUSINESS)%'
 
     # Stripe Payment Controllers (with rate limiting via cache)
     App\Controller\SubscriptionController:

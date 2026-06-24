@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\BillingService;
+use App\Service\IapPricingService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -51,6 +52,7 @@ class SubscriptionController extends AbstractController
         private string $frontendUrl,
         private string $stripePaymentMethods,
         private BillingService $billingService,
+        private IapPricingService $iapPricingService,
         private RateLimitService $rateLimitService,
         private bool $stripeAutomaticTaxEnabled = false,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
@@ -76,6 +78,13 @@ class SubscriptionController extends AbstractController
                 properties: [
                     new OA\Property(property: 'id', type: 'string'),
                     new OA\Property(property: 'name', type: 'string'),
+                    new OA\Property(property: 'stripePriceId', type: 'string', nullable: true),
+                    new OA\Property(
+                        property: 'iapProductId',
+                        type: 'string',
+                        nullable: true,
+                        description: 'Native in-app purchase product ID the app buys for this tier (Epic 5.5).',
+                    ),
                     new OA\Property(property: 'price', type: 'number'),
                     new OA\Property(property: 'currency', type: 'string'),
                     new OA\Property(property: 'interval', type: 'string'),
@@ -91,6 +100,8 @@ class SubscriptionController extends AbstractController
                 'id' => 'PRO',
                 'name' => 'Pro',
                 'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePricePro : null,
+                // MOBILE-APP SEAM (Epic 5.5): the store product the app buys for this tier.
+                'iapProductId' => $this->iapPricingService->productIdForTier('PRO'),
                 'price' => 19.95,
                 'currency' => 'EUR',
                 'interval' => 'month',
@@ -106,6 +117,7 @@ class SubscriptionController extends AbstractController
                 'id' => 'TEAM',
                 'name' => 'Team',
                 'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePriceTeam : null,
+                'iapProductId' => $this->iapPricingService->productIdForTier('TEAM'),
                 'price' => 49.95,
                 'currency' => 'EUR',
                 'interval' => 'month',
@@ -122,6 +134,7 @@ class SubscriptionController extends AbstractController
                 'id' => 'BUSINESS',
                 'name' => 'Business',
                 'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePriceBusiness : null,
+                'iapProductId' => $this->iapPricingService->productIdForTier('BUSINESS'),
                 'price' => 99.95,
                 'currency' => 'EUR',
                 'interval' => 'month',
@@ -140,6 +153,9 @@ class SubscriptionController extends AbstractController
         return $this->json([
             'plans' => $plans,
             'stripeConfigured' => $this->billingService->isEnabled(),
+            // MOBILE-APP SEAM (Epic 5.5): lets the app decide whether native IAP
+            // is actually set up for this server before offering a purchase.
+            'iapConfigured' => $this->iapPricingService->isConfigured(),
         ]);
     }
 
@@ -173,6 +189,7 @@ class SubscriptionController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Invalid plan')]
+    #[OA\Response(response: 409, description: 'Subscription already owned by another channel (native IAP)')]
     #[OA\Response(response: 429, description: 'Rate limit exceeded')]
     #[OA\Response(response: 503, description: 'Stripe not configured')]
     public function createCheckoutSession(
@@ -203,6 +220,23 @@ class SubscriptionController extends AbstractController
                 'error' => 'Subscription service is currently unavailable. Please contact support.',
                 'code' => 'STRIPE_NOT_CONFIGURED',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        // MOBILE-APP SEAM (Epic 5.2): block-cross. A subscription may be owned by
+        // exactly one channel. If the user already has an ACTIVE subscription bought
+        // through native IAP (Apple/Google), refuse to start a Stripe web checkout and
+        // point them at the store where they bought it. Server-enforced so neither the
+        // web nor the app can create a second, conflicting subscription.
+        $existingSource = $user->getSubscriptionSource();
+        if ($user->hasActiveSubscription()
+            && null !== $existingSource
+            && BillingService::SOURCE_STRIPE !== $existingSource) {
+            return $this->json([
+                'error' => 'You already have an active subscription managed by the app store. Please manage it there.',
+                'code' => 'SUBSCRIPTION_OWNED_BY_OTHER_CHANNEL',
+                'source' => $existingSource,
+                'manageUrl' => $this->billingService->getManageUrl($existingSource),
+            ], Response::HTTP_CONFLICT);
         }
 
         $data = json_decode($request->getContent(), true);
@@ -522,7 +556,31 @@ class SubscriptionController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'hasSubscription', type: 'boolean'),
+                new OA\Property(
+                    property: 'active',
+                    type: 'boolean',
+                    description: 'Unified entitlement truth: true when any channel has a currently-valid subscription.',
+                ),
                 new OA\Property(property: 'plan', type: 'string'),
+                new OA\Property(property: 'tier', type: 'string', description: 'Alias of `plan` (the entitled tier).'),
+                new OA\Property(
+                    property: 'source',
+                    type: 'string',
+                    enum: ['stripe', 'apple', 'google'],
+                    nullable: true,
+                    description: 'The channel that owns the subscription. Web buys via Stripe; the app via Apple/Google IAP. Legacy Stripe subs report `stripe`.',
+                ),
+                new OA\Property(
+                    property: 'manageUrl',
+                    type: 'string',
+                    nullable: true,
+                    description: 'Where to manage the subscription for IAP channels (Apple/Google system settings). Null for Stripe — use POST /subscription/portal instead.',
+                ),
+                new OA\Property(
+                    property: 'cancelAtPeriodEnd',
+                    type: 'boolean',
+                    description: 'True when the subscription is set to cancel at the end of the current period.',
+                ),
                 new OA\Property(property: 'status', type: 'string'),
                 // `nextBilling` and `cancelAt` come from Stripe webhook
                 // payloads which carry Unix timestamps as integers (seconds
@@ -566,16 +624,31 @@ class SubscriptionController extends AbstractController
         if (!$subscription) {
             return $this->json([
                 'hasSubscription' => false,
+                'active' => false,
                 'plan' => $user->getUserLevel(),
+                'tier' => $user->getUserLevel(),
+                'source' => null,
+                'manageUrl' => null,
             ]);
         }
 
+        // MOBILE-APP SEAM (Epic 5.1): unified ACTIVE truth with an explicit owning
+        // channel (`source`) and a per-channel `manageUrl`. Legacy Stripe subs report
+        // `source: 'stripe'` via backfill-on-read; existing keys are kept unchanged so
+        // the web client and its generated schema stay backward compatible.
+        $source = $user->getSubscriptionSource();
+
         return $this->json([
             'hasSubscription' => true,
+            'active' => $user->hasActiveSubscription(),
             'plan' => $user->getUserLevel(),
+            'tier' => $user->getUserLevel(),
+            'source' => $source,
+            'manageUrl' => $this->billingService->getManageUrl($source),
             'status' => $subscription['status'] ?? 'unknown',
             'nextBilling' => $subscription['subscription_end'] ?? null,
             'cancelAt' => $subscription['cancel_at'] ?? null,
+            'cancelAtPeriodEnd' => $subscription['cancel_at_period_end'] ?? false,
             'stripeSubscriptionId' => $subscription['stripe_subscription_id'] ?? null,
             'paymentFailed' => $subscription['payment_failed'] ?? false,
         ]);
@@ -679,6 +752,7 @@ class SubscriptionController extends AbstractController
             // SubscriptionItem; the values still ship in the API response and are reachable
             // via StripeObject's ArrayAccess, which PHPStan accepts.
             $paymentDetails['subscription'] = [
+                'source' => BillingService::SOURCE_STRIPE,
                 'stripe_subscription_id' => $activeSubscription->id,
                 'status' => $activeSubscription->status,
                 'subscription_start' => $firstItem['current_period_start'] ?? null,

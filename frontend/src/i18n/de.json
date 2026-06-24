@@ -1719,6 +1719,11 @@
       "keepSubscription": "Abonnement behalten",
       "loadingPortal": "Rechnungsportal wird geöffnet..."
     },
+    "native": {
+      "purchaseTitle": "In-App-Kauf",
+      "purchaseComingSoon": "In-App-Käufe für den {plan}-Tarif werden gerade eingerichtet und stehen in einem zukünftigen App-Update zur Verfügung.",
+      "manageInStore": "Abonnement im Store verwalten"
+    },
     "plans": {
       "pro": "Pro",
       "team": "Team",

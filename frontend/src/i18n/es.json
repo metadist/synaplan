@@ -1181,6 +1181,11 @@
       "keepSubscription": "Mantener Suscripción",
       "loadingPortal": "Abriendo portal de facturación..."
     },
+    "native": {
+      "purchaseTitle": "Compra dentro de la app",
+      "purchaseComingSoon": "Las compras dentro de la app para el plan {plan} se están configurando y estarán disponibles en una próxima actualización de la app.",
+      "manageInStore": "Gestionar suscripción en la tienda"
+    },
     "plans": {
       "pro": "Pro",
       "team": "Equipo",

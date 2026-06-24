@@ -376,7 +376,11 @@ class StripeWebhookController extends AbstractController
 
         $paymentDetails = $user->getPaymentDetails();
         $firstItem = $subscription->items->data[0] ?? null;
+        // MOBILE-APP SEAM (Epic 5.1): stamp the owning channel so the unified
+        // status/source model never has to guess. Literal (not the BillingService
+        // constant) to keep this webhook controller free of service coupling.
         $paymentDetails['subscription'] = [
+            'source' => 'stripe',
             'stripe_subscription_id' => $subscription->id,
             'status' => $subscription->status,
             'subscription_start' => $firstItem?->current_period_start,

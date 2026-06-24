@@ -1182,6 +1182,11 @@
       "keepSubscription": "Aboneliği Koru",
       "loadingPortal": "Fatura portalı açılıyor..."
     },
+    "native": {
+      "purchaseTitle": "Uygulama içi satın alma",
+      "purchaseComingSoon": "{plan} planı için uygulama içi satın alma ayarlanıyor ve gelecek bir uygulama güncellemesinde kullanıma sunulacak.",
+      "manageInStore": "Aboneliği mağazada yönet"
+    },
     "plans": {
       "pro": "Pro",
       "team": "Takım",
