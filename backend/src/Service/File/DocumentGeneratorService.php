@@ -77,6 +77,10 @@ final readonly class DocumentGeneratorService
      */
     private function writeDocx(string $content, string $absolutePath): void
     {
+        if ('' === trim($content)) {
+            throw new \RuntimeException('Cannot generate DOCX from empty content');
+        }
+
         $html = (new \Parsedown())->text($content);
 
         // Ensure special characters (like '&', '<', '>') are escaped in the XML to prevent document corruption.

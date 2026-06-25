@@ -8,24 +8,29 @@
    1. CSS Variable Overrides
    ---------------------------------------------------------- */
 
-/* Light + V2 */
+/* Light + V2
+ * Tuned for stronger contrast: a slightly deeper app background so white
+ * surfaces pop, a clearly-defined blue-grey sidebar panel (was a washed-out
+ * 55% white that blended into the page), darker secondary text, and stronger
+ * borders/glow so cards, the rail and dividers keep their "power". */
 .design-v2 {
-  --bg-app: #eef2f7;
-  --bg-sidebar: rgba(255, 255, 255, 0.55);
+  --bg-app: #e4e9f1;
+  --bg-sidebar: rgba(219, 227, 240, 0.92);
   --bg-chat: #eef2f7;
-  --bg-card: rgba(255, 255, 255, 0.92);
-  --bg-chip: rgba(0, 0, 0, 0.03);
-  --border-light: rgba(0, 63, 199, 0.1);
-  --brand-alpha-light: rgba(0, 63, 199, 0.06);
+  --bg-card: rgba(255, 255, 255, 0.96);
+  --bg-chip: rgba(0, 0, 0, 0.05);
+  --txt-secondary: #4b515c;
+  --border-light: rgba(0, 45, 140, 0.18);
+  --brand-alpha-light: rgba(0, 63, 199, 0.09);
 
-  --v2-glow: rgba(0, 63, 199, 0.12);
-  --v2-glow-strong: rgba(0, 63, 199, 0.25);
+  --v2-glow: rgba(0, 63, 199, 0.16);
+  --v2-glow-strong: rgba(0, 63, 199, 0.3);
   --v2-blur-sm: 8px;
   --v2-blur-md: 16px;
   --v2-blur-lg: 24px;
   --v2-radius: 1rem;
-  --v2-border: rgba(0, 63, 199, 0.12);
-  --v2-border-hover: rgba(0, 63, 199, 0.22);
+  --v2-border: rgba(0, 63, 199, 0.22);
+  --v2-border-hover: rgba(0, 63, 199, 0.36);
 }
 
 /* Dark + V2 */
@@ -127,8 +132,8 @@
 .design-v2 .nav-item {
   background: rgba(0, 0, 0, 0.03);
   border-radius: 0.875rem;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  color: #444;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: #2c2c2c;
   box-shadow: none;
   transition: all 0.2s ease;
 }
@@ -190,8 +195,8 @@
 }
 
 .design-v2 .btn-secondary {
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.16);
   transition: all 0.2s ease;
 }
 .design-v2.dark .btn-secondary {
@@ -263,9 +268,9 @@
   backdrop-filter: blur(var(--v2-blur-sm));
   -webkit-backdrop-filter: blur(var(--v2-blur-sm));
   background: rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.16);
   border-radius: 0.75rem;
-  color: #374151;
+  color: #2f3743;
   box-shadow: none;
   transition: all 0.2s ease;
 }

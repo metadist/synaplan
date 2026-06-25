@@ -62,6 +62,10 @@
     "errorIssuanceFailed": "Synaplan no pudo emitir una clave de API para esta cuenta."
   },
   "welcome": "Bienvenido",
+  "marketingNews": {
+    "heading": "Lo último de Synaplan",
+    "readMore": "Leer más"
+  },
   "chat": {
     "title": "Chat",
     "historyLog": "Historial",

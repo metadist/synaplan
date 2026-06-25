@@ -75,6 +75,12 @@ final readonly class DocumentGenerationRunner implements TaskRunner
             return NodeResult::failed('document_generation failed: '.$e->getMessage());
         }
 
+        if (!($result['success'] ?? true)) {
+            $error = is_string($result['error'] ?? null) ? $result['error'] : 'unknown handler error';
+
+            return NodeResult::failed('document_generation failed: '.$error);
+        }
+
         $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];
         $descriptor = $this->fileDescriptor($metadata);
         if (null === $descriptor) {

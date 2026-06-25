@@ -63,6 +63,10 @@
     "errorIssuanceFailed": "Synaplan konnte für dieses Konto keinen API-Schlüssel ausstellen."
   },
   "welcome": "Willkommen bei Synaplan",
+  "marketingNews": {
+    "heading": "Neues von Synaplan",
+    "readMore": "Mehr lesen"
+  },
   "chat": {
     "title": "Chat",
     "newChat": "Neuer Chat",

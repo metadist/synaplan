@@ -14,6 +14,21 @@
   --color-dark-border: rgb(255 255 255);
 }
 
+/*
+ * Register the brand palette as Tailwind color tokens so the `bg-brand`,
+ * `text-brand`, `border-brand` utilities (and their /opacity variants used
+ * across the app, e.g. the guest "sign up" CTA) actually resolve. `inline`
+ * binds them to the runtime --brand* custom properties, so they stay correct
+ * in BOTH the light and dark themes instead of being baked to one value.
+ * Without this, those utilities were undefined no-ops — the CTA rendered as
+ * white text on a transparent pill.
+ */
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-light: var(--brand-light);
+  --color-brand-hover: var(--brand-hover);
+}
+
 /* Mobile floating header button clearance — pushes titles below the button.
    Excluded: ChatView (page-chat) where messages scroll behind the button. */
 @media (max-width: 767px) {

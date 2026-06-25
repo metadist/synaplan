@@ -62,6 +62,10 @@
     "errorIssuanceFailed": "Synaplan bu hesap için bir API anahtarı veremedi."
   },
   "welcome": "Hoş Geldiniz",
+  "marketingNews": {
+    "heading": "Synaplan'dan en yeniler",
+    "readMore": "Devamını oku"
+  },
   "chat": {
     "title": "Sohbet",
     "historyLog": "Geçmiş",

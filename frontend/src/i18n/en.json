@@ -63,6 +63,10 @@
     "errorIssuanceFailed": "Synaplan could not issue an API key for this account."
   },
   "welcome": "Welcome",
+  "marketingNews": {
+    "heading": "Latest from Synaplan",
+    "readMore": "Read more"
+  },
   "chat": {
     "title": "Chat",
     "historyLog": "History Log",

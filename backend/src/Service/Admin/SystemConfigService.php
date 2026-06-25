@@ -8,6 +8,7 @@ use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
 use App\Service\FeedbackConstants;
+use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use Psr\Log\LoggerInterface;
 
@@ -106,6 +107,17 @@ final readonly class SystemConfigService
                 'label' => 'Routing',
                 'sections' => [
                     'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
+                ],
+            ],
+            'guest_landing' => [
+                'label' => 'Guest Landing',
+                'sections' => [
+                    'marketing_news' => ['label' => 'Marketing News', 'fields' => [
+                        'MARKETING_NEWS_ENABLED',
+                        'MARKETING_NEWS_FEED_URL_EN',
+                        'MARKETING_NEWS_FEED_URL_DE',
+                        'MARKETING_NEWS_FEED_URL_DEFAULT',
+                    ]],
                 ],
             ],
             'vectordb' => [
@@ -834,6 +846,45 @@ final readonly class SystemConfigService
                 'source' => 'database', 'dbGroup' => MobileVersionService::GROUP, 'dbKey' => MobileVersionService::KEY_ANDROID_APP_URL,
             ],
 
+            // === Guest Landing — Marketing News (database-backed, no restart) ===
+            // Master switch + per-locale RSS feed URLs in BCONFIG group MARKETING_NEWS.
+            // Seeded OFF; feed URLs have no effect until the master switch is ON.
+            'MARKETING_NEWS_ENABLED' => [
+                'tab' => 'guest_landing', 'section' => 'marketing_news', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show marketing news on the guest landing. When enabled, anonymous visitors see a news card grid on the empty chat screen (fetched from the feed URLs below). When disabled, the landing shows only the welcome text and no feed is fetched. Off by default on every installation.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => MarketingNewsConfig::CONFIG_GROUP,
+                'dbKey' => MarketingNewsConfig::KEY_ENABLED,
+            ],
+            'MARKETING_NEWS_FEED_URL_EN' => [
+                'tab' => 'guest_landing', 'section' => 'marketing_news', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'RSS/WordPress feed URL for English-speaking visitors. Ignored while the master switch is off.',
+                'default' => MarketingNewsConfig::DEFAULT_FEED_URL_EN,
+                'source' => 'database',
+                'dbGroup' => MarketingNewsConfig::CONFIG_GROUP,
+                'dbKey' => MarketingNewsConfig::KEY_FEED_URL_EN,
+            ],
+            'MARKETING_NEWS_FEED_URL_DE' => [
+                'tab' => 'guest_landing', 'section' => 'marketing_news', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'RSS/WordPress feed URL for German-speaking visitors. Ignored while the master switch is off.',
+                'default' => MarketingNewsConfig::DEFAULT_FEED_URL_DE,
+                'source' => 'database',
+                'dbGroup' => MarketingNewsConfig::CONFIG_GROUP,
+                'dbKey' => MarketingNewsConfig::KEY_FEED_URL_DE,
+            ],
+            'MARKETING_NEWS_FEED_URL_DEFAULT' => [
+                'tab' => 'guest_landing', 'section' => 'marketing_news', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Fallback RSS/WordPress feed URL for all other languages (e.g. ES, TR). Ignored while the master switch is off.',
+                'default' => MarketingNewsConfig::DEFAULT_FEED_URL_EN,
+                'source' => 'database',
+                'dbGroup' => MarketingNewsConfig::CONFIG_GROUP,
+                'dbKey' => MarketingNewsConfig::KEY_FEED_URL_DEFAULT,
+            ],
             // === AI Services ===
             'OLLAMA_BASE_URL' => [
                 'tab' => 'ai', 'section' => 'ollama', 'type' => 'url',

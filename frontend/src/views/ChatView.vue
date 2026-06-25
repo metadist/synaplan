@@ -117,7 +117,7 @@
 
           <div
             v-else-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
-            class="flex items-center justify-center h-full px-6"
+            class="flex flex-col items-center justify-center h-full px-6 py-8 gap-8 overflow-y-auto scroll-thin"
             data-testid="state-empty"
           >
             <div class="text-center">
@@ -128,6 +128,8 @@
                 {{ $t('chatInput.placeholder') }}
               </p>
             </div>
+
+            <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
 
           <template v-for="(group, groupIndex) in groupedMessages" :key="groupIndex">
@@ -347,6 +349,7 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
+import MarketingNews from '@/components/MarketingNews.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
@@ -363,6 +366,7 @@ import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useGuestStore } from '@/stores/guest'
+import { useConfigStore } from '@/stores/config'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useLimitCheck } from '@/composables/useLimitCheck'
@@ -440,6 +444,7 @@ const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 const guestStore = useGuestStore()
+const configStore = useConfigStore()
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
 const promoTips = usePromoTips()
@@ -2739,13 +2744,16 @@ const streamAIResponse = async (
               displayError += '*' + t('aiProvider.error.restartNote') + '*'
             }
 
-            // Always show error as message (not in streaming message, but as new assistant message)
+            // Show error in the streaming message bubble
             const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && message.parts.length > 0) {
-              // If there's already content, finish it and create a new error message
+            const hasContent = message?.parts.some(
+              (p) => p.type === 'text' && p.content && p.content.trim() !== ''
+            )
+            if (message && hasContent) {
+              // Already has meaningful content (partial response streamed before error)
               historyStore.finishStreamingMessage(messageId)
             } else {
-              // No content yet, replace with error message
+              // No visible content yet — display the error message
               historyStore.updateStreamingMessage(messageId, displayError)
               historyStore.finishStreamingMessage(messageId)
             }

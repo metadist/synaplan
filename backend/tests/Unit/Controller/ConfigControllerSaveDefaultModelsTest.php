@@ -19,6 +19,7 @@ use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Infrastructure\RedisService;
+use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
@@ -81,6 +82,7 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             new ClientContextResolver(),
             $this->createStub(BrandingService::class),
             $this->createStub(MobileVersionService::class),
+            $this->createStub(MarketingNewsConfig::class),
             'http://qdrant.example',
         );
 
