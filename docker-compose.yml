@@ -189,12 +189,29 @@ services:
       # either the synaplan-memories Qdrant (if running via its own compose) or
       # any other host-bound service without changing backend/.env.
       - "docker-host:host-gateway"
+    # Generous start_period so a slow first boot never blocks the frontend.
+    #
+    # The frontend `depends_on: backend: service_healthy` — it is only created
+    # once this probe passes. On a FRESH checkout the very first `up -d` runs
+    # the backend boot (migrations + app:seed + cache warm) WHILE the machine is
+    # saturated pulling images, building the dev image, and downloading multi-GB
+    # Ollama models (bge-m3 + gpt-oss:20b). On a loaded host the first healthy
+    # /api/health routinely lands well past 10 minutes.
+    #
+    # Docker's healthcheck rule: while inside `start_period`, a FAILING probe
+    # keeps the container in state "starting" (NOT "unhealthy"), so
+    # `depends_on: service_healthy` keeps WAITING instead of aborting the
+    # frontend with "dependency failed to start: container synaplan-backend is
+    # unhealthy". The moment /api/health answers 200 the container flips to
+    # "healthy" — the long start_period is only an upper bound, it does not delay
+    # a backend that boots quickly. (Model downloads themselves are backgrounded
+    # in the entrypoint and never block FrankenPHP from binding port 80.)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 3
-      start_period: 90s
+      retries: 5
+      start_period: 900s
     networks:
       - synaplan-network
 
