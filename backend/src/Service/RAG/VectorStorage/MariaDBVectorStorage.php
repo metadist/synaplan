@@ -332,6 +332,36 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
         return $result;
     }
 
+    public function getGlobalStats(int $topLimit = 10): array
+    {
+        $totals = $this->connection
+            ->executeQuery('SELECT COUNT(*) AS total_chunks, COUNT(DISTINCT BUID) AS total_users, COUNT(DISTINCT BUID, BMID) AS total_files FROM BRAG')
+            ->fetchAssociative();
+
+        $stmt = $this->connection->prepare(<<<'SQL'
+            SELECT BUID AS user_id, COUNT(*) AS chunks, COUNT(DISTINCT BMID) AS files
+            FROM BRAG
+            GROUP BY BUID
+            ORDER BY chunks DESC
+            LIMIT :limit
+        SQL);
+        $stmt->bindValue('limit', max(0, $topLimit), \Doctrine\DBAL\ParameterType::INTEGER);
+        $rows = $stmt->executeQuery()->fetchAllAssociative();
+
+        $topUsers = array_map(fn (array $row) => [
+            'userId' => (int) $row['user_id'],
+            'chunks' => (int) $row['chunks'],
+            'files' => (int) $row['files'],
+        ], $rows);
+
+        return [
+            'totalUsers' => (int) ($totals['total_users'] ?? 0),
+            'totalFiles' => (int) ($totals['total_files'] ?? 0),
+            'totalChunks' => (int) ($totals['total_chunks'] ?? 0),
+            'topUsers' => $topUsers,
+        ];
+    }
+
     public function isAvailable(): bool
     {
         try {

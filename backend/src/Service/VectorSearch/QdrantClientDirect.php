@@ -663,6 +663,53 @@ final class QdrantClientDirect implements QdrantClientInterface
         return array_keys($stats['chunks_by_group'] ?? []);
     }
 
+    public function getGlobalDocumentStats(int $topLimit = 10): array
+    {
+        try {
+            $points = $this->scrollAllDocumentPointsGlobal();
+
+            /** @var array<int, array{chunks: int, files: array<int, bool>}> $byUser */
+            $byUser = [];
+            foreach ($points as $point) {
+                /** @var array<string, mixed> $payload */
+                $payload = $point['payload'];
+                $userId = (int) ($payload['user_id'] ?? 0);
+                $fileId = (int) ($payload['file_id'] ?? 0);
+
+                if (!isset($byUser[$userId])) {
+                    $byUser[$userId] = ['chunks' => 0, 'files' => []];
+                }
+                ++$byUser[$userId]['chunks'];
+                $byUser[$userId]['files'][$fileId] = true;
+            }
+
+            $totalFiles = 0;
+            $topUsers = [];
+            foreach ($byUser as $userId => $data) {
+                $fileCount = count($data['files']);
+                $totalFiles += $fileCount;
+                $topUsers[] = [
+                    'userId' => $userId,
+                    'chunks' => $data['chunks'],
+                    'files' => $fileCount,
+                ];
+            }
+
+            usort($topUsers, fn (array $a, array $b) => $b['chunks'] <=> $a['chunks']);
+
+            return [
+                'totalUsers' => count($byUser),
+                'totalFiles' => $totalFiles,
+                'totalChunks' => count($points),
+                'topUsers' => array_slice($topUsers, 0, max(0, $topLimit)),
+            ];
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to get global document stats', ['error' => $e->getMessage()]);
+
+            return ['totalUsers' => 0, 'totalFiles' => 0, 'totalChunks' => 0, 'topUsers' => []];
+        }
+    }
+
     public function getDocumentFileInfo(int $userId, int $fileId): array
     {
         try {
@@ -1180,6 +1227,45 @@ final class QdrantClientDirect implements QdrantClientInterface
         do {
             $body = [
                 'filter' => ['must' => $must],
+                'limit' => $scrollLimit,
+                'with_payload' => true,
+                'with_vector' => false,
+            ];
+
+            if (null !== $offset) {
+                $body['offset'] = $offset;
+            }
+
+            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/scroll", $body);
+
+            $points = $response['result']['points'] ?? [];
+            foreach ($points as $point) {
+                $allPoints[] = $point;
+            }
+
+            $offset = $response['result']['next_page_offset'] ?? null;
+        } while (null !== $offset && !empty($points));
+
+        return $allPoints;
+    }
+
+    /**
+     * Scroll through ALL document points across ALL users (admin inventory only).
+     *
+     * Deliberately separate from scrollAllDocumentPoints(int $userId) so the
+     * "across all users" mode cannot be triggered accidentally by a caller
+     * that forgets a user id.
+     *
+     * @return array<array{id: string, payload: array}>
+     */
+    private function scrollAllDocumentPointsGlobal(): array
+    {
+        $allPoints = [];
+        $offset = null;
+        $scrollLimit = 250;
+
+        do {
+            $body = [
                 'limit' => $scrollLimit,
                 'with_payload' => true,
                 'with_vector' => false,

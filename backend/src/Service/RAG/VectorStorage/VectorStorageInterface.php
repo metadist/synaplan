@@ -147,6 +147,15 @@ interface VectorStorageInterface
     public function getFilesWithChunks(int $userId): array;
 
     /**
+     * Get global vector storage stats across ALL users (admin only).
+     *
+     * @param int $topLimit Max number of top users (by chunk count) to return
+     *
+     * @return array{totalUsers: int, totalFiles: int, totalChunks: int, topUsers: array<int, array{userId: int, files: int, chunks: int}>}
+     */
+    public function getGlobalStats(int $topLimit = 10): array;
+
+    /**
      * Check if the storage backend is available.
      *
      * @return bool True if backend is operational
