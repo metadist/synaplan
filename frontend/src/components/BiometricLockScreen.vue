@@ -1,5 +1,10 @@
 <template>
-  <Transition name="lock-fade">
+  <Transition
+    enter-active-class="transition-opacity duration-200 ease-out"
+    leave-active-class="transition-opacity duration-200 ease-in"
+    enter-from-class="opacity-0"
+    leave-to-class="opacity-0"
+  >
     <!--
       Privacy lock: while the app is locked it must cover EVERY other overlay
       (dialogs are z-[10000], cookie consent z-[9999]) so no sensitive content
@@ -39,14 +44,3 @@ import { useBiometricLock } from '@/composables/useBiometricLock'
 
 const { locked, unlock } = useBiometricLock()
 </script>
-
-<style scoped>
-.lock-fade-enter-active,
-.lock-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.lock-fade-enter-from,
-.lock-fade-leave-to {
-  opacity: 0;
-}
-</style>

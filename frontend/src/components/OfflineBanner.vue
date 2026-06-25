@@ -1,5 +1,10 @@
 <template>
-  <Transition name="offline-slide">
+  <Transition
+    enter-active-class="transition-transform duration-[250ms] ease-out"
+    leave-active-class="transition-transform duration-[250ms] ease-in"
+    enter-from-class="-translate-y-full"
+    leave-to-class="-translate-y-full"
+  >
     <div
       v-if="!isOnline"
       class="fixed inset-x-0 top-0 z-[1000] flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[var(--status-warning,#b45309)] shadow-md"
@@ -25,14 +30,3 @@ import { useNetworkStatus } from '@/composables/useNetworkStatus'
 
 const { isOnline } = useNetworkStatus()
 </script>
-
-<style scoped>
-.offline-slide-enter-active,
-.offline-slide-leave-active {
-  transition: transform 0.25s ease;
-}
-.offline-slide-enter-from,
-.offline-slide-leave-to {
-  transform: translateY(-100%);
-}
-</style>

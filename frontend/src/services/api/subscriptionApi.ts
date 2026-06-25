@@ -3,13 +3,15 @@ import type { z } from 'zod'
 import {
   GetSubscriptionBudgetResponseSchema,
   PostSubscriptionTopupResponseSchema,
+  PostIapVerifyResponseSchema,
 } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
 export interface SubscriptionPlan {
   id: string
   name: string
-  stripePriceId: string
+  /** Null when billing/Stripe is disabled on this server (OpenAPI: nullable). */
+  stripePriceId: string | null
   /**
    * MOBILE-APP SEAM (Epic 5.5): the native store product ID the app purchases
    * for this tier (Apple/Google). Null/placeholder until the server configures
@@ -81,17 +83,10 @@ export interface PortalSession {
 /**
  * MOBILE-APP SEAM (Epic 5.4): result of server-side IAP receipt validation.
  * The server is the single source of truth — the app shows the outcome but
- * never grants a tier itself.
+ * never grants a tier itself. Inferred from the generated schema (per
+ * AGENTS_DEV: never hand-write interfaces for API responses).
  */
-export interface IapVerifyResult {
-  /** A paid tier was granted (active/grace). */
-  granted: boolean
-  /** Purchase accepted but still PENDING (Google deferred/SCA) — not unlocked yet. */
-  pending: boolean
-  tier: string
-  source: 'apple' | 'google'
-  status: string
-}
+export type IapVerifyResult = z.infer<typeof PostIapVerifyResponseSchema>
 
 // Inferred from the generated Zod schemas (per AGENTS_DEV: never hand-write
 // interfaces for API responses).
@@ -143,9 +138,10 @@ export const subscriptionApi = {
     receipt: string
     productId?: string
   }): Promise<IapVerifyResult> {
-    return httpClient<IapVerifyResult>('/api/v1/iap/verify', {
+    return httpClient('/api/v1/iap/verify', {
       method: 'POST',
       body: JSON.stringify(input),
+      schema: PostIapVerifyResponseSchema,
     })
   },
 

@@ -1,5 +1,10 @@
 <template>
-  <Transition name="force-update-fade">
+  <Transition
+    enter-active-class="transition-opacity duration-200 ease-out"
+    leave-active-class="transition-opacity duration-200 ease-in"
+    enter-from-class="opacity-0"
+    leave-to-class="opacity-0"
+  >
     <!--
       Hard, non-dismissable gate: must sit above EVERY other overlay (dialogs are
       z-[10000], cookie consent z-[9999]) so nothing can be interacted with while
@@ -66,14 +71,3 @@ const storeUrl = computed(() => {
   return config.mobile.iosAppUrl || config.mobile.androidAppUrl || ''
 })
 </script>
-
-<style scoped>
-.force-update-fade-enter-active,
-.force-update-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.force-update-fade-enter-from,
-.force-update-fade-leave-to {
-  opacity: 0;
-}
-</style>

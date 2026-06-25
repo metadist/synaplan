@@ -5,6 +5,7 @@ import de from './de.json'
 import en from './en.json'
 import es from './es.json'
 import tr from './tr.json'
+import { isNativeApp } from '@/services/api/nativeRuntime'
 
 // Supported languages in alphabetical order (EN is default)
 export const supportedLanguages = ['de', 'en', 'es', 'tr'] as const
@@ -27,10 +28,15 @@ function getInitialLanguage(): SupportedLanguage {
     return savedLanguage as SupportedLanguage
   }
 
-  // Fall back to the device / browser language (Epic 7.3: in the native shell
-  // navigator.language reflects the OS locale). Not persisted — a manual choice
-  // is what gets stored. Defaults to English when nothing matches.
-  return detectDeviceLanguage() ?? 'en'
+  // Native shell only (Epic 7.3): fall back to the device/OS language so a fresh
+  // install matches the phone's locale. The web keeps its long-standing default
+  // of English for visitors without an explicit choice — so web behaviour is
+  // unchanged. Not persisted either way; a manual choice is what gets stored.
+  if (isNativeApp()) {
+    return detectDeviceLanguage() ?? 'en'
+  }
+
+  return 'en'
 }
 
 // Map the device/browser locale list (e.g. "de-DE", "es-419") onto a supported
