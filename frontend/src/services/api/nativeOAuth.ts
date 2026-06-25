@@ -25,25 +25,40 @@ import { setNativeTokens } from '@/services/api/nativeAuth'
 export interface NativeOAuthResult {
   success: boolean
   error?: string
+  /** True when the user dismissed the browser without completing OAuth. */
+  cancelled?: boolean
 }
 
 const CALLBACK_MARKER = '://oauth'
 
+// Grace window after the in-app browser reports it closed, to let a
+// near-simultaneous deep-link callback (appUrlOpen) win before we treat the
+// closure as a cancellation. This reconciles the unspecified ordering of the
+// two independent native events — it is not a logic-race workaround.
+const BROWSER_DISMISS_GRACE_MS = 800
+
 export async function startNativeOAuth(provider: string): Promise<NativeOAuthResult> {
   return new Promise<NativeOAuthResult>((resolve) => {
     let settled = false
-    let listenerHandle: { remove: () => Promise<void> } | undefined
+    let urlListener: { remove: () => Promise<void> } | undefined
+    let browserListener: { remove: () => Promise<void> } | undefined
+    let dismissTimer: ReturnType<typeof setTimeout> | undefined
 
     const finish = async (result: NativeOAuthResult): Promise<void> => {
       if (settled) {
         return
       }
       settled = true
-      if (listenerHandle) {
-        try {
-          await listenerHandle.remove()
-        } catch {
-          // Listener already gone — nothing to do.
+      if (dismissTimer) {
+        clearTimeout(dismissTimer)
+      }
+      for (const handle of [urlListener, browserListener]) {
+        if (handle) {
+          try {
+            await handle.remove()
+          } catch {
+            // Listener already gone — nothing to do.
+          }
         }
       }
       try {
@@ -82,8 +97,25 @@ export async function startNativeOAuth(provider: string): Promise<NativeOAuthRes
       }
       void exchangeHandoff(handoff).then(finish)
     }).then((handle) => {
-      listenerHandle = handle
+      urlListener = handle
       // If finish() already ran (extremely fast callback), clean up immediately.
+      if (settled) {
+        void handle.remove()
+      }
+    })
+
+    // If the user closes the system browser without completing OAuth, no callback
+    // ever arrives. Treat that dismissal as a clean cancellation so the login UI
+    // never gets stuck in a loading state.
+    Browser.addListener('browserFinished', () => {
+      if (settled) {
+        return
+      }
+      dismissTimer = setTimeout(() => {
+        void finish({ success: false, cancelled: true })
+      }, BROWSER_DISMISS_GRACE_MS)
+    }).then((handle) => {
+      browserListener = handle
       if (settled) {
         void handle.remove()
       }

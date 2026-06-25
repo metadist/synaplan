@@ -2486,7 +2486,8 @@
   "biometricLock": {
     "title": "Bloqueada",
     "subtitle": "Desbloquea Synaplan para continuar.",
-    "unlock": "Desbloquear"
+    "unlock": "Desbloquear",
+    "reason": "Desbloquear {brand}"
   },
   "forceUpdate": {
     "title": "Actualización necesaria",

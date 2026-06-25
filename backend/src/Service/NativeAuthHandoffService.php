@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\User;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -20,17 +21,21 @@ use Psr\Log\LoggerInterface;
  * `POST /api/v1/auth/native/exchange` for real access/refresh tokens, so the
  * long-lived tokens never travel through the browser/deep-link.
  *
- * Stateless (HMAC over the app secret), mirroring OAuthStateService — no server
- * storage required. NOTE (Epic 7 hardening): make it truly single-use by
- * tracking the nonce in a short-TTL cache to defeat replay within the window.
+ * Signed with HMAC over the app secret (mirroring OAuthStateService). The token
+ * is additionally made single-use: the embedded nonce is recorded in a
+ * short-TTL cache on first successful validation, so a captured handoff URL
+ * cannot be replayed to mint a second set of tokens within the TTL window
+ * (Epic 7 hardening — defends against scheme-squatting apps observing the URL).
  */
 final readonly class NativeAuthHandoffService
 {
     private const TTL = 120;
     private const PURPOSE = 'native_oauth_handoff';
+    private const NONCE_CACHE_PREFIX = 'native_handoff_nonce_';
 
     public function __construct(
         private LoggerInterface $logger,
+        private CacheItemPoolInterface $cache,
         private string $appSecret,
     ) {
     }
@@ -96,7 +101,41 @@ final readonly class NativeAuthHandoffService
         }
 
         $uid = $payload['uid'] ?? null;
+        if (!is_int($uid)) {
+            return null;
+        }
 
-        return is_int($uid) ? $uid : null;
+        // Enforce single-use: reject any token whose nonce we have already seen,
+        // then record it for the remaining lifetime of the token so a replay of
+        // the same handoff URL within the TTL window cannot mint fresh tokens.
+        $nonce = $payload['nonce'] ?? null;
+        if (!is_string($nonce) || '' === $nonce) {
+            return null;
+        }
+        if (!$this->consumeNonce($nonce, $createdAt)) {
+            $this->logger->warning('Native handoff token replay detected');
+
+            return null;
+        }
+
+        return $uid;
+    }
+
+    /**
+     * Atomically claim a nonce. Returns false when it was already consumed.
+     */
+    private function consumeNonce(string $nonce, int $createdAt): bool
+    {
+        $item = $this->cache->getItem(self::NONCE_CACHE_PREFIX.hash('sha256', $nonce));
+        if ($item->isHit()) {
+            return false;
+        }
+
+        // Keep the marker only until the token itself would expire anyway.
+        $remaining = self::TTL - (time() - $createdAt);
+        $item->set(true)->expiresAfter(max(1, $remaining));
+        $this->cache->save($item);
+
+        return true;
     }
 }

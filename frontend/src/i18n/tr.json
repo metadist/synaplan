@@ -2487,7 +2487,8 @@
   "biometricLock": {
     "title": "Kilitli",
     "subtitle": "Devam etmek için Synaplan'ın kilidini aç.",
-    "unlock": "Kilidi aç"
+    "unlock": "Kilidi aç",
+    "reason": "{brand} kilidini aç"
   },
   "forceUpdate": {
     "title": "Güncelleme gerekli",

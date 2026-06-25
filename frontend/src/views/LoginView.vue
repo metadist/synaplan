@@ -512,7 +512,10 @@ const handleSocialLogin = async (provider: string) => {
     socialError.value = ''
     const result = await startNativeOAuth(provider)
     if (!result.success) {
-      socialError.value = result.error || 'Login failed'
+      // A user-dismissed browser is a silent cancellation, not an error.
+      if (!result.cancelled) {
+        socialError.value = result.error || 'Login failed'
+      }
       return
     }
     // Tokens are stored — verify the session via the store so the reactive

@@ -9,6 +9,8 @@
  * Native-only; every function degrades to a safe default on web.
  */
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { i18n } from '@/i18n'
+import config from '@/stores/config'
 
 const ENABLED_KEY = 'biometric_lock_enabled'
 
@@ -38,17 +40,25 @@ export async function isBiometricAvailable(): Promise<boolean> {
   }
 }
 
-/** Prompt the OS biometric dialog. Resolves true on success, false on cancel/fail. */
-export async function verifyBiometric(reason: string): Promise<boolean> {
+/**
+ * Prompt the OS biometric dialog. Resolves true on success, false on cancel/fail.
+ *
+ * `reason` lets a caller supply context-specific prompt text (already localized);
+ * when omitted it defaults to the brand-aware unlock string. Either way the text
+ * and the cancel button come from i18n, never a hardcoded English literal.
+ */
+export async function verifyBiometric(reason?: string): Promise<boolean> {
   if (!isNativeApp()) {
     return true
   }
   try {
     const { BiometricAuth } = await import('@aparajita/capacitor-biometric-auth')
+    const promptReason =
+      reason ?? i18n.global.t('biometricLock.reason', { brand: config.branding.name })
     await BiometricAuth.authenticate({
-      reason,
-      androidTitle: reason,
-      cancelTitle: 'Cancel',
+      reason: promptReason,
+      androidTitle: promptReason,
+      cancelTitle: i18n.global.t('common.cancel'),
       // Allow the device PIN/passcode as a fallback so users can't lock
       // themselves out if biometrics temporarily fail.
       allowDeviceCredential: true,

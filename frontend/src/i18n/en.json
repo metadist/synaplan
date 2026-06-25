@@ -3576,7 +3576,8 @@
   "biometricLock": {
     "title": "Locked",
     "subtitle": "Unlock Synaplan to continue.",
-    "unlock": "Unlock"
+    "unlock": "Unlock",
+    "reason": "Unlock {brand}"
   },
   "forceUpdate": {
     "title": "Update required",

@@ -45,7 +45,11 @@ class KeycloakAuthControllerTest extends TestCase
 
         // OAuthLoginResponder + NativeAuthHandoffService are final — build real
         // instances (with mocked collaborators) like OAuthStateService above.
-        $handoffService = new \App\Service\NativeAuthHandoffService($this->logger, 'test-secret');
+        $handoffService = new \App\Service\NativeAuthHandoffService(
+            $this->logger,
+            new \Symfony\Component\Cache\Adapter\ArrayAdapter(),
+            'test-secret',
+        );
         $oauthLoginResponder = new \App\Service\OAuthLoginResponder(
             $this->tokenService,
             $impersonationService,

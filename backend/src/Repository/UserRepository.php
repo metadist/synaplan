@@ -29,8 +29,8 @@ class UserRepository extends ServiceEntityRepository
     public function findByStripeCustomerId(string $stripeCustomerId): ?User
     {
         return $this->createQueryBuilder('u')
-            ->where('u.paymentDetails LIKE :customerId')
-            ->setParameter('customerId', '%"stripe_customer_id":"'.$stripeCustomerId.'"%')
+            ->where("u.paymentDetails LIKE :customerId ESCAPE '!'")
+            ->setParameter('customerId', '%"stripe_customer_id":"'.$this->escapeLike($stripeCustomerId).'"%')
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -42,21 +42,35 @@ class UserRepository extends ServiceEntityRepository
      * `purchase_token`) stored inside `BPAYMENTDETAILS.subscription`.
      *
      * Migration-free, mirroring {@see findByStripeCustomerId()}: a LIKE over the
-     * JSON column. The id is store-issued (digits / URL-safe token), so it
-     * cannot inject JSON-structural characters; we still match the quoted
-     * key:value pair to avoid accidental substring hits. Powers replay
-     * protection (one receipt → one user) and notification → user matching.
+     * JSON column. Google purchase tokens can contain the SQL LIKE wildcard `_`
+     * (and Apple ids could in theory too), so the id is wildcard-escaped before
+     * being embedded — otherwise `_`/`%` would match the wrong user and weaken
+     * replay protection. We match the quoted key:value pair to avoid accidental
+     * substring hits. Powers replay protection (one receipt → one user) and
+     * notification → user matching.
      */
     public function findByIapPurchaseId(string $purchaseId): ?User
     {
+        $escaped = $this->escapeLike($purchaseId);
+
         return $this->createQueryBuilder('u')
-            ->where('u.paymentDetails LIKE :appleId')
-            ->orWhere('u.paymentDetails LIKE :googleToken')
-            ->setParameter('appleId', '%"original_transaction_id":"'.$purchaseId.'"%')
-            ->setParameter('googleToken', '%"purchase_token":"'.$purchaseId.'"%')
+            ->where("u.paymentDetails LIKE :appleId ESCAPE '!'")
+            ->orWhere("u.paymentDetails LIKE :googleToken ESCAPE '!'")
+            ->setParameter('appleId', '%"original_transaction_id":"'.$escaped.'"%')
+            ->setParameter('googleToken', '%"purchase_token":"'.$escaped.'"%')
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * Escape SQL LIKE wildcards in a value that is embedded verbatim into a LIKE
+     * pattern, using `!` as the escape character (paired with `ESCAPE '!'`).
+     * Without this, `%` and `_` in store-issued ids would act as wildcards.
+     */
+    private function escapeLike(string $value): string
+    {
+        return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $value);
     }
 
     public function save(User $user): void

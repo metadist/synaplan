@@ -3510,7 +3510,8 @@
   "biometricLock": {
     "title": "Gesperrt",
     "subtitle": "Entsperre Synaplan, um fortzufahren.",
-    "unlock": "Entsperren"
+    "unlock": "Entsperren",
+    "reason": "{brand} entsperren"
   },
   "forceUpdate": {
     "title": "Update erforderlich",

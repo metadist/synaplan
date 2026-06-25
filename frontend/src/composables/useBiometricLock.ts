@@ -58,7 +58,7 @@ async function promptUnlock(): Promise<void> {
   }
   verifying = true
   try {
-    const ok = await verifyBiometric('Unlock Synaplan')
+    const ok = await verifyBiometric()
     if (ok) {
       locked.value = false
     }
