@@ -1,4 +1,7 @@
 {
+  "branding": {
+    "poweredBy": "Powered by"
+  },
   "pageTitles": {
     "login": "Login",
     "register": "Register",
@@ -1638,6 +1641,11 @@
       "keepSubscription": "Keep Subscription",
       "loadingPortal": "Opening billing portal..."
     },
+    "native": {
+      "purchaseTitle": "In-app purchase",
+      "purchaseComingSoon": "In-app purchases for the {plan} plan are being set up and will be available in a future app update.",
+      "manageInStore": "Manage subscription in the store"
+    },
     "plans": {
       "pro": "Pro",
       "team": "Team",
@@ -2803,6 +2811,19 @@
       "confirmPasswordPlaceholder": "Confirm new password",
       "confirmPasswordHint": "Must match new password"
     },
+    "appSecurity": {
+      "title": "App Security",
+      "subtitle": "Extra protection for this device",
+      "biometricLock": "Biometric app lock",
+      "biometricLockHint": "Require Face ID, Touch ID or fingerprint to open the app.",
+      "verifyReason": "Enable biometric lock",
+      "enableFailed": "Could not enable the biometric lock. Please try again."
+    },
+    "legal": {
+      "title": "Privacy & Terms",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Use"
+    },
     "dangerZone": {
       "title": "Danger Zone",
       "subtitle": "Irreversible actions",
@@ -3575,5 +3596,20 @@
       "disabled": "Live updates are turned off in this environment. Refresh to see the latest data.",
       "error": "Realtime connection failed: {message}"
     }
+  },
+  "network": {
+    "offline": "You're offline — check your connection. We'll reconnect automatically."
+  },
+  "biometricLock": {
+    "title": "Locked",
+    "subtitle": "Unlock Synaplan to continue.",
+    "unlock": "Unlock",
+    "reason": "Unlock {brand}"
+  },
+  "forceUpdate": {
+    "title": "Update required",
+    "subtitle": "This version of the app is no longer supported. Please update to the latest version to continue.",
+    "minVersion": "Minimum required version: {version}",
+    "cta": "Update now"
   }
 }

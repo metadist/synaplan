@@ -1,4 +1,7 @@
 {
+  "branding": {
+    "poweredBy": "Desarrollado por"
+  },
   "pageTitles": {
     "login": "Iniciar sesión",
     "register": "Registrarse",
@@ -968,6 +971,19 @@
       "confirmPasswordPlaceholder": "Confirma nueva contraseña",
       "confirmPasswordHint": "Debe coincidir con la nueva contraseña"
     },
+    "appSecurity": {
+      "title": "Seguridad de la app",
+      "subtitle": "Protección adicional para este dispositivo",
+      "biometricLock": "Bloqueo biométrico de la app",
+      "biometricLockHint": "Requiere Face ID, Touch ID o huella para abrir la app.",
+      "verifyReason": "Activar el bloqueo biométrico",
+      "enableFailed": "No se pudo activar el bloqueo biométrico. Inténtalo de nuevo."
+    },
+    "legal": {
+      "title": "Privacidad y Términos",
+      "privacy": "Política de Privacidad",
+      "terms": "Términos de Uso"
+    },
     "dangerZone": {
       "title": "Zona de Peligro",
       "subtitle": "Acciones irreversibles",
@@ -1174,6 +1190,11 @@
       "confirmCancel": "Sí, Cancelar Suscripción",
       "keepSubscription": "Mantener Suscripción",
       "loadingPortal": "Abriendo portal de facturación..."
+    },
+    "native": {
+      "purchaseTitle": "Compra dentro de la app",
+      "purchaseComingSoon": "Las compras dentro de la app para el plan {plan} se están configurando y estarán disponibles en una próxima actualización de la app.",
+      "manageInStore": "Gestionar suscripción en la tienda"
     },
     "plans": {
       "pro": "Pro",
@@ -2485,5 +2506,20 @@
       "disabled": "Las actualizaciones en vivo están desactivadas en este entorno. Recarga la página para ver los datos más recientes.",
       "error": "Falló la conexión en tiempo real: {message}"
     }
+  },
+  "network": {
+    "offline": "Estás sin conexión: comprueba tu red. Nos reconectaremos automáticamente."
+  },
+  "biometricLock": {
+    "title": "Bloqueada",
+    "subtitle": "Desbloquea Synaplan para continuar.",
+    "unlock": "Desbloquear",
+    "reason": "Desbloquear {brand}"
+  },
+  "forceUpdate": {
+    "title": "Actualización necesaria",
+    "subtitle": "Esta versión de la app ya no es compatible. Actualiza a la última versión para continuar.",
+    "minVersion": "Versión mínima requerida: {version}",
+    "cta": "Actualizar ahora"
   }
 }

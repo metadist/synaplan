@@ -9,6 +9,7 @@
       down — the page stays scroll-free.
     -->
     <ImpersonationBanner />
+    <OfflineBanner />
     <ErrorBoundary>
       <Suspense>
         <template #default>
@@ -22,6 +23,8 @@
     <NotificationContainer />
     <Dialog />
     <CookieConsent @consent="handleCookieConsent" />
+    <BiometricLockScreen />
+    <ForceUpdateScreen />
   </div>
 </template>
 
@@ -32,14 +35,20 @@ import { useI18n } from 'vue-i18n'
 import { useTheme } from './composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
-import { APP_NAME } from '@/router'
+import { brandName } from '@/router'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
+import OfflineBanner from '@/components/OfflineBanner.vue'
+import BiometricLockScreen from '@/components/BiometricLockScreen.vue'
+import ForceUpdateScreen from '@/components/ForceUpdateScreen.vue'
 import LoadingView from '@/views/LoadingView.vue'
 import CookieConsent from '@/components/CookieConsent.vue'
 import { useGoogleTag } from '@/composables/useGoogleTag'
+import { initNativeLifecycle } from '@/services/nativeLifecycle'
+import { initOtaUpdates } from '@/services/otaUpdates'
+import { initBiometricLock } from '@/composables/useBiometricLock'
 import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
 useTheme()
@@ -93,6 +102,18 @@ authStore.checkAuth().catch((err: unknown) => {
   console.error('Initial auth check failed:', err)
 })
 
+// Native shell only: on resume from background, re-validate the session and
+// reconnect realtime (Epic 7.2). No-op on web.
+void initNativeLifecycle()
+
+// Native shell only: confirm the active OTA bundle booted OK so Capgo does not
+// roll it back (Epic 8.1). No-op on web. Fire-and-forget — must not block render.
+void initOtaUpdates()
+
+// Native shell only: optional biometric app lock (Epic 7.2). No-op on web or
+// when the user hasn't enabled it.
+void initBiometricLock()
+
 // Update page title when language changes
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -101,7 +122,9 @@ watch(locale, () => {
   const titleKey = route.meta.titleKey as string | undefined
   if (titleKey) {
     const pageTitle = t(titleKey)
-    document.title = `${pageTitle} | ${APP_NAME}`
+    // MOBILE-APP SEAM (Epic 4): document title uses the runtime brand name
+    // (falls back to 'Synaplan' before config loads).
+    document.title = `${pageTitle} | ${brandName()}`
   }
 })
 

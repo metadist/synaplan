@@ -1,5 +1,10 @@
 import type { AIModel } from '@/stores/models'
-import { getApiBaseUrl } from '@/services/api/httpClient'
+import {
+  getApiBaseUrl,
+  refreshAccessToken as refreshTokenViaHttpClient,
+} from '@/services/api/httpClient'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import { getNativeAccessToken } from '@/services/api/nativeAuth'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 import type { z } from 'zod'
 
@@ -16,10 +21,32 @@ export interface DefaultModelConfig {
 }
 
 // Base configuration
-const API_BASE_URL = getApiBaseUrl()
 const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 30000
 const API_UPLOAD_TIMEOUT = import.meta.env.VITE_API_UPLOAD_TIMEOUT || 120000
 const CSRF_HEADER = import.meta.env.VITE_CSRF_HEADER_NAME || 'X-CSRF-Token'
+
+// Resolved per call (not captured once): the native shell sets the real backend
+// origin during bootstrap, which may run after this module is first imported.
+function apiBase(): string {
+  return getApiBaseUrl()
+}
+
+// Web authenticates via HttpOnly cookies (credentialed CORS); the native shell
+// is cross-origin against `Access-Control-Allow-Origin: *` where credentialed
+// mode is rejected, so it omits credentials and replays a Bearer token instead.
+function requestCredentials(): RequestCredentials {
+  return isNativeApp() ? 'omit' : 'include'
+}
+
+function withNativeAuth(headers: Record<string, string>): Record<string, string> {
+  if (isNativeApp()) {
+    const token = getNativeAccessToken()
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+  }
+  return headers
+}
 
 // Token refresh stampede protection
 let tokenRefreshPromise: Promise<boolean> | null = null
@@ -51,6 +78,14 @@ function redirectToSessionExpired(): void {
  * just to get an expected 401 back.
  */
 async function refreshAccessToken(): Promise<boolean> {
+  // Native uses Bearer tokens — delegate to the canonical refresh which rotates
+  // the secure-stored tokens. apiService's cookie refresh can't work
+  // cross-origin against `Access-Control-Allow-Origin: *`.
+  if (isNativeApp()) {
+    const result = await refreshTokenViaHttpClient()
+    return result.success
+  }
+
   if (!hasSessionHint()) {
     return false
   }
@@ -61,7 +96,7 @@ async function refreshAccessToken(): Promise<boolean> {
 
   tokenRefreshPromise = (async () => {
     try {
-      const refreshResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      const refreshResponse = await fetch(`${apiBase()}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
       })
@@ -128,16 +163,19 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     headers[CSRF_HEADER] = csrfToken
   }
 
+  // Native shell: attach the Bearer access token (cookies are unavailable).
+  withNativeAuth(headers)
+
   const isUpload = options.body instanceof FormData
   const timeout = isUpload ? API_UPLOAD_TIMEOUT : API_TIMEOUT
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${apiBase()}${endpoint}`, {
       ...requestOptions,
       headers,
-      credentials: 'include', // Use HttpOnly cookies for auth
+      credentials: requestCredentials(),
       signal: controller.signal,
     })
 
@@ -153,10 +191,12 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
         const retryTimeoutId = setTimeout(() => retryController.abort(), timeout)
 
         try {
-          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
+          // Refresh rotated the Bearer token on native — re-attach the new one.
+          withNativeAuth(headers)
+          const retryResponse = await fetch(`${apiBase()}${endpoint}`, {
             ...requestOptions,
             headers,
-            credentials: 'include',
+            credentials: requestCredentials(),
             signal: retryController.signal,
           })
 
@@ -361,7 +401,10 @@ export const apiService = {
     let eventSource: EventSource | null = null
 
     // Get SSE token from auth endpoint (EventSource can't send cookies)
-    fetch(`${API_BASE_URL}/auth/token`, { credentials: 'include' })
+    fetch(`${apiBase()}/auth/token`, {
+      credentials: requestCredentials(),
+      headers: withNativeAuth({}),
+    })
       .then((res) => res.json())
       .then(({ token }) => {
         if (!token) {
@@ -370,7 +413,7 @@ export const apiService = {
         }
 
         eventSource = new EventSource(
-          `${API_BASE_URL}/messages/stream?userId=${userId}&message=${encodeURIComponent(message)}&trackId=${trackId || ''}&token=${token}`
+          `${apiBase()}/messages/stream?userId=${userId}&message=${encodeURIComponent(message)}&trackId=${trackId || ''}&token=${token}`
         )
 
         eventSource.onmessage = (event) => {

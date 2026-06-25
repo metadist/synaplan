@@ -1,5 +1,8 @@
 import { api } from './apiService'
 import { httpClient, getApiBaseUrl, refreshAccessToken } from './api/httpClient'
+import { saveOrDownloadBlob } from './api/nativeDownload'
+import { isNativeApp } from './api/nativeRuntime'
+import { getNativeAccessToken } from './api/nativeAuth'
 
 export type UploadCheckReason =
   | 'rate_limit_exceeded'
@@ -559,7 +562,22 @@ const uploadFilesBatch = async (
       })
 
       xhr.open('POST', `${baseUrl}/api/v1/files/upload`)
-      xhr.withCredentials = true
+
+      // Web authenticates via HttpOnly cookies (credentialed CORS). The native
+      // shell is cross-origin against `Access-Control-Allow-Origin: *`, where
+      // the browser REJECTS credentialed requests outright (the upload would
+      // fail with a bare network error). So on native we omit credentials and
+      // replay the Bearer access token instead — mirroring httpClient (Epic 3,
+      // required by 7.1's cross-origin upload).
+      if (isNativeApp()) {
+        xhr.withCredentials = false
+        const accessToken = getNativeAccessToken()
+        if (accessToken) {
+          xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+        }
+      } else {
+        xhr.withCredentials = true
+      }
 
       const csrfToken = sessionStorage.getItem('csrf_token')
       if (csrfToken) {
@@ -696,15 +714,8 @@ export const downloadFile = async (fileId: number, filename: string): Promise<vo
     responseType: 'blob',
   })
 
-  // Create blob and trigger download
-  const url = window.URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  window.URL.revokeObjectURL(url)
-  document.body.removeChild(a)
+  // Web → anchor download; native → Filesystem + share sheet (Epic 7.1).
+  await saveOrDownloadBlob(blob, filename)
 }
 
 /**

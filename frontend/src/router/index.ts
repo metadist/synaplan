@@ -3,6 +3,7 @@ import {
   createWebHistory,
   type NavigationGuardNext,
   type RouteLocationNormalized,
+  type RouteLocationRaw,
 } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useConfigStore } from '@/stores/config'
@@ -20,7 +21,7 @@ const guardSubscription = (
 ) => {
   const configStore = useConfigStore()
   if (!configStore.billing.enabled) {
-    next({ name: 'chat' })
+    next(resolveDefaultRoute())
   } else {
     next()
   }
@@ -39,7 +40,17 @@ const guardDevOnlyAdminFeatures = (
   next()
 }
 
+/**
+ * Build-time fallback brand name. The live name comes from the runtime branding
+ * config (`useConfigStore().branding.name`, Epic 4); this constant only covers
+ * the window before config has loaded and the static index.html title.
+ */
 export const APP_NAME = 'Synaplan'
+
+/** Live brand name with a safe fallback before runtime config has loaded. */
+export function brandName(): string {
+  return useConfigStore().branding.name || APP_NAME
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -403,10 +414,10 @@ router.afterEach((to) => {
   if (titleKey) {
     const t = i18n.global.t
     const pageTitle = t(titleKey)
-    document.title = `${pageTitle} | ${APP_NAME}`
+    document.title = `${pageTitle} | ${brandName()}`
   } else {
     // Fallback for routes without titleKey (e.g., shared chat handles its own title)
-    document.title = APP_NAME
+    document.title = brandName()
   }
 })
 
@@ -459,6 +470,82 @@ function mapPathToFeatureKey(path: string): string {
     return 'settings'
   if (path.startsWith('/statistics')) return 'statistics'
   return 'general'
+}
+
+/**
+ * MOBILE-APP SEAM (Epic 4): configurable start page / post-login route.
+ *
+ * A branded deployment (or the app pointed at a branded server) can set
+ * `branding.defaultRoute` (post-login home) and `branding.landingPage`
+ * (logged-out entry). Each accepts EITHER a route name (e.g. 'chat') OR a
+ * free-form path (must start with '/', e.g. '/welcome') so a brand can point at
+ * a custom marketing/landing page that isn't a named route.
+ *
+ * Safety net (so a typo can never break navigation):
+ *  - free-form values must start with '/'; otherwise the value is treated as a
+ *    route name and validated by name,
+ *  - the value is resolved against the REAL route table — an unknown path lands
+ *    on the catch-all 404 and is rejected, an unknown name throws and is caught,
+ *  - the logged-out landing must additionally resolve to a PUBLIC route (else a
+ *    not-signed-in visitor would just bounce back to login → loop),
+ *  - callers additionally guard against self-redirects (see beforeEach).
+ * Anything rejected falls back to today's defaults ('chat' / 'login').
+ */
+function resolveBrandTarget(
+  configured: string,
+  opts: { requirePublic?: boolean; rejectNames?: string[] }
+): RouteLocationRaw | null {
+  if (!configured) {
+    return null
+  }
+
+  // A leading '/' means free-form path; anything else is a named route.
+  const target: RouteLocationRaw = configured.startsWith('/') ? configured : { name: configured }
+
+  let resolved
+  try {
+    resolved = router.resolve(target)
+  } catch {
+    // Unknown route name → vue-router throws.
+    return null
+  }
+
+  // Unknown path resolves to the catch-all 404; unknown name has no match.
+  if (resolved.matched.length === 0 || resolved.name === 'not-found') {
+    return null
+  }
+  if (opts.rejectNames?.includes(resolved.name as string)) {
+    return null
+  }
+  if (opts.requirePublic && resolved.meta?.public !== true) {
+    return null
+  }
+
+  return target
+}
+
+/** Post-login home as a navigation target; defaults to 'chat'. */
+function resolveDefaultRoute(): RouteLocationRaw {
+  const configured = useConfigStore().branding.defaultRoute
+  return resolveBrandTarget(configured, { rejectNames: ['login', 'not-found'] }) ?? { name: 'chat' }
+}
+
+/**
+ * The custom logged-out landing as a navigation target, or `null` when nothing
+ * valid is configured (→ keep today's default behavior, no redirect).
+ */
+function resolveLandingTarget(): RouteLocationRaw | null {
+  const configured = useConfigStore().branding.landingPage
+  return resolveBrandTarget(configured, { requirePublic: true, rejectNames: ['not-found'] })
+}
+
+/** Resolved path of a navigation target, for self-redirect / loop checks. */
+function targetPath(target: RouteLocationRaw): string {
+  try {
+    return router.resolve(target).path
+  } catch {
+    return ''
+  }
 }
 
 // Global navigation guard for authentication
@@ -531,15 +618,28 @@ router.beforeEach(async (to, from, next) => {
     })
   } else if (requiresAdminAccess && !isAdmin.value) {
     // Admin route without admin privileges
-    next({ name: 'chat' })
+    next(resolveDefaultRoute())
+  } else if (to.name === 'chat' && !authenticated && !useGuestStore().isGuestMode) {
+    // A branded deployment may configure a custom public logged-out landing
+    // (route name or free-form path): send first-time, not-signed-in visitors
+    // there instead of the home/chat entry. Default-safe: when nothing valid is
+    // configured `landing` is null and we fall through, so guest/anonymous chat
+    // behaves exactly as before. The path check prevents a self-redirect loop.
+    const landing = resolveLandingTarget()
+    if (landing && targetPath(landing) !== to.path) {
+      next(landing)
+    } else {
+      next()
+    }
   } else if (isPublicRoute && isAuthenticated.value && to.name === 'login') {
     // Already logged in, redirect to home (but check for loops)
-    if (from.name === 'chat' || detectRedirectLoop('/')) {
-      // Prevent ping-pong between login and chat
+    const home = resolveDefaultRoute()
+    if (from.path === targetPath(home) || detectRedirectLoop('/')) {
+      // Prevent ping-pong between login and the home route
       next()
       return
     }
-    next({ name: 'chat' })
+    next(home)
   } else {
     next()
   }

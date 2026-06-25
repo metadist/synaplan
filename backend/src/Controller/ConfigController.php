@@ -9,6 +9,9 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
+use App\Service\Branding\BrandingService;
+use App\Service\Client\ClientContextResolver;
+use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
@@ -47,6 +50,9 @@ class ConfigController extends AbstractController
         private EmbeddingMetadataService $embeddingMetadata,
         private ModelConfigService $modelConfigService,
         private RedisService $redisService,
+        private ClientContextResolver $clientContextResolver,
+        private BrandingService $brandingService,
+        private MobileVersionService $mobileVersionService,
         private MarketingNewsConfig $marketingNewsConfig,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
@@ -123,6 +129,32 @@ class ConfigController extends AbstractController
                     properties: [
                         new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
                         new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Qdrant vector database availability'),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'branding',
+                    type: 'object',
+                    description: 'White-label branding (Epic 4). Defaults reproduce the historical Synaplan look. Public — no auth required.',
+                    properties: [
+                        new OA\Property(property: 'name', type: 'string', example: 'Synaplan', description: 'Displayed brand/product name'),
+                        new OA\Property(property: 'tagline', type: 'string', example: '', description: 'Optional short brand description/tagline'),
+                        new OA\Property(property: 'primaryColor', type: 'string', example: '#003fc7', description: 'Accent color injected into the --brand CSS variables at runtime'),
+                        new OA\Property(property: 'secondaryColor', type: 'string', example: '', description: 'Optional secondary color; empty string keeps the default palette'),
+                        new OA\Property(property: 'accentColor', type: 'string', example: '', description: 'Optional accent color; empty string keeps the default palette'),
+                        new OA\Property(property: 'fontFamily', type: 'string', example: '', description: 'Body font-family stack; empty string keeps the default font'),
+                        new OA\Property(property: 'headingFontFamily', type: 'string', example: '', description: 'Heading font-family stack; empty string falls back to fontFamily/default'),
+                        new OA\Property(property: 'fontUrl', type: 'string', example: '', description: 'Optional web-font stylesheet URL; must be CSP-allowed. Empty string = no external font'),
+                        new OA\Property(property: 'logoUrl', type: 'string', example: '', description: 'Light-mode logo URL; empty string falls back to the bundled asset'),
+                        new OA\Property(property: 'logoDarkUrl', type: 'string', example: '', description: 'Dark-mode logo URL; empty string falls back to the bundled asset'),
+                        new OA\Property(property: 'iconUrl', type: 'string', example: '', description: 'Brand icon/favicon URL; empty string falls back to the bundled asset'),
+                        new OA\Property(property: 'homepageUrl', type: 'string', example: 'https://www.synaplan.com', description: 'Brand homepage link used in auth/footer surfaces'),
+                        new OA\Property(property: 'privacyUrl', type: 'string', example: 'https://www.synaplan.com/privacy-policy', description: 'Privacy-policy link (reachable in-app + store metadata; store-policy mandatory)'),
+                        new OA\Property(property: 'termsUrl', type: 'string', example: 'https://www.synaplan.com/terms', description: 'Terms-of-use link (reachable in-app + store metadata)'),
+                        new OA\Property(property: 'landingPage', type: 'string', example: '', description: 'Logged-out landing: route name or free-form path (starts with "/"); empty string keeps the default landing'),
+                        new OA\Property(property: 'defaultRoute', type: 'string', example: '', description: 'Post-login default: route name or free-form path (starts with "/"); empty string keeps the default route'),
+                        new OA\Property(property: 'showPoweredBy', type: 'boolean', example: true, description: 'Whether to show the "· powered by <label>" attribution'),
+                        new OA\Property(property: 'poweredByLabel', type: 'string', example: 'Synaplan', description: 'Attribution label (the platform being credited)'),
+                        new OA\Property(property: 'poweredByUrl', type: 'string', example: 'https://www.synaplan.com', description: 'Attribution link target'),
                     ]
                 ),
                 new OA\Property(
@@ -215,6 +247,64 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'client',
+                    type: 'object',
+                    description: 'Server-confirmed identity of the calling client, derived from the User-Agent. Lets the frontend switch behaviour server-truthfully (e.g. payment channel gating) instead of trusting only the client-side Capacitor.isNativePlatform() flag. Identity hint only — never an auth control.',
+                    properties: [
+                        new OA\Property(
+                            property: 'isMobileApp',
+                            type: 'boolean',
+                            example: false,
+                            description: 'True when the request carries the official "Synaplan Mobile Vx.x" User-Agent token.'
+                        ),
+                        new OA\Property(
+                            property: 'appVersion',
+                            type: 'string',
+                            nullable: true,
+                            example: '4.0',
+                            description: 'Parsed app version (major.minor[.patch]) from the User-Agent, or null for web clients.'
+                        ),
+                        new OA\Property(
+                            property: 'platform',
+                            type: 'string',
+                            enum: ['web', 'mobile'],
+                            example: 'web',
+                            description: 'Resolved client platform.'
+                        ),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'mobile',
+                    type: 'object',
+                    description: 'Forced-update gate (Epic 8.2). The operator configures a minimum supported app version; the server compares it against the parsed UA version. Empty minVersion means no gate.',
+                    properties: [
+                        new OA\Property(
+                            property: 'minVersion',
+                            type: 'string',
+                            example: '4.0',
+                            description: 'Minimum supported app version, or empty string when no gate is configured.'
+                        ),
+                        new OA\Property(
+                            property: 'updateRequired',
+                            type: 'boolean',
+                            example: false,
+                            description: 'True when the calling mobile app is older than minVersion and must show a blocking "please update" screen.'
+                        ),
+                        new OA\Property(
+                            property: 'iosAppUrl',
+                            type: 'string',
+                            example: 'https://apps.apple.com/app/id000000000',
+                            description: 'App Store link for the update button (empty when unset).'
+                        ),
+                        new OA\Property(
+                            property: 'androidAppUrl',
+                            type: 'string',
+                            example: 'https://play.google.com/store/apps/details?id=com.synaplan.app',
+                            description: 'Play Store link for the update button (empty when unset).'
+                        ),
+                    ]
+                ),
+                new OA\Property(
                     property: 'marketingNews',
                     type: 'object',
                     description: 'Guest-landing marketing news master switch. When false, the frontend renders no news section and performs no news fetch.',
@@ -237,7 +327,7 @@ class ConfigController extends AbstractController
             ]
         )
     )]
-    public function getRuntimeConfig(#[CurrentUser] ?User $user): JsonResponse
+    public function getRuntimeConfig(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $recaptchaEnabled = ($_ENV['RECAPTCHA_ENABLED'] ?? 'false') === 'true';
         $recaptchaSiteKey = $_ENV['RECAPTCHA_SITE_KEY'] ?? '';
@@ -346,17 +436,44 @@ class ConfigController extends AbstractController
             'wsUrl' => $realtimeWsUrl,
         ];
 
+        // Client identity (Aspect 1 / mobile app Epic 2): server-confirmed signal derived
+        // from the User-Agent. The frontend uses this for server-truthful behaviour switches
+        // (Epic 5 payment gating) instead of trusting only Capacitor.isNativePlatform().
+        // The parsed version also feeds the forced-update gate (Epic 8).
+        $client = $this->clientContextResolver->fromRequest($request);
+        $clientConfig = [
+            'isMobileApp' => $client->isMobileApp,
+            'appVersion' => $client->appVersion,
+            'platform' => $client->platform(),
+        ];
+
+        // Forced-update gate (Epic 8.2): the operator configures a minimum
+        // supported app version; the server compares it against the parsed UA
+        // version and tells the app to block with a "please update" screen.
+        // Empty min-version ⇒ no gate (default), so web and unconfigured
+        // deployments are unaffected.
+        $storeUrls = $this->mobileVersionService->getStoreUrls();
+        $mobileConfig = [
+            'minVersion' => $this->mobileVersionService->getMinVersion(),
+            'updateRequired' => $this->mobileVersionService->isUpdateRequired($client),
+            'iosAppUrl' => $storeUrls['ios'],
+            'androidAppUrl' => $storeUrls['android'],
+        ];
+
         $response = [
             'billing' => [
                 'enabled' => $this->billingService->isEnabled(),
             ],
             'recaptcha' => $recaptchaConfig,
+            'branding' => $this->brandingService->getBranding(),
             'features' => $features,
             'speech' => $speech,
             'plugins' => $plugins,
             'googleTag' => $googleTagConfig,
             'build' => $buildInfo,
             'realtime' => $realtimeConfig,
+            'client' => $clientConfig,
+            'mobile' => $mobileConfig,
             'marketingNews' => [
                 'enabled' => $this->marketingNewsConfig->isEnabled(),
             ],

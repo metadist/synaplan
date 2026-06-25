@@ -14,6 +14,7 @@ import {
   reloadConfig,
   getUnavailableProviders,
 } from '@/services/api/httpClient'
+import { isNativeApp, getNativeApiBaseUrl } from '@/services/api/nativeRuntime'
 import { checkMemoryServiceAvailability } from '@/services/api/configApi'
 import { i18n } from '@/i18n'
 import { ref } from 'vue'
@@ -32,9 +33,16 @@ async function loadRuntimeConfig() {
 const config = {
   /**
    * Application base URL - used for building full URLs (OAuth redirects, share links, etc.)
-   * Returns current origin (e.g., https://example.com)
+   * Returns current origin (e.g., https://example.com).
+   *
+   * In the native shell `window.location.origin` is `capacitor://localhost`,
+   * which is useless for OAuth redirects, share links and absolute asset URLs —
+   * so we return the real backend/web origin instead (Epic 3).
    */
   get appBaseUrl(): string {
+    if (isNativeApp()) {
+      return getNativeApiBaseUrl()
+    }
     return window.location.origin
   },
 
@@ -121,6 +129,78 @@ const config = {
   },
 
   /**
+   * MOBILE-APP SEAM (Epic 4): white-label branding, loaded from backend at
+   * runtime (the app reads it from its configured server).
+   * Defaults reproduce the historical hardcoded "Synaplan" look so an
+   * unconfigured deployment is visually identical to before.
+   *
+   * Empty-string semantics differ by field on purpose: name/color/links
+   * fall back to a default (|| ), while logo/icon/tagline keep '' so the
+   * consumer can decide to use the bundled asset / render nothing.
+   */
+  branding: {
+    get name(): string {
+      return getConfigSync().branding?.name || 'Synaplan'
+    },
+    get tagline(): string {
+      return getConfigSync().branding?.tagline ?? ''
+    },
+    get primaryColor(): string {
+      return getConfigSync().branding?.primaryColor || '#003fc7'
+    },
+    get secondaryColor(): string {
+      return getConfigSync().branding?.secondaryColor ?? ''
+    },
+    get accentColor(): string {
+      return getConfigSync().branding?.accentColor ?? ''
+    },
+    get fontFamily(): string {
+      return getConfigSync().branding?.fontFamily ?? ''
+    },
+    get headingFontFamily(): string {
+      return getConfigSync().branding?.headingFontFamily ?? ''
+    },
+    get fontUrl(): string {
+      return getConfigSync().branding?.fontUrl ?? ''
+    },
+    get logoUrl(): string {
+      return getConfigSync().branding?.logoUrl ?? ''
+    },
+    get logoDarkUrl(): string {
+      return getConfigSync().branding?.logoDarkUrl ?? ''
+    },
+    get iconUrl(): string {
+      return getConfigSync().branding?.iconUrl ?? ''
+    },
+    get homepageUrl(): string {
+      return getConfigSync().branding?.homepageUrl || 'https://www.synaplan.com'
+    },
+    // MOBILE-APP SEAM (Epic 9.3): legal links, fail-safe to the default brand
+    // pages so an unconfigured deployment still satisfies store policy.
+    get privacyUrl(): string {
+      return getConfigSync().branding?.privacyUrl || 'https://www.synaplan.com/privacy-policy'
+    },
+    get termsUrl(): string {
+      return getConfigSync().branding?.termsUrl || 'https://www.synaplan.com/terms'
+    },
+    get landingPage(): string {
+      return getConfigSync().branding?.landingPage ?? ''
+    },
+    get defaultRoute(): string {
+      return getConfigSync().branding?.defaultRoute ?? ''
+    },
+    get showPoweredBy(): boolean {
+      return getConfigSync().branding?.showPoweredBy ?? true
+    },
+    get poweredByLabel(): string {
+      return getConfigSync().branding?.poweredByLabel || 'Synaplan'
+    },
+    get poweredByUrl(): string {
+      return getConfigSync().branding?.poweredByUrl || 'https://www.synaplan.com'
+    },
+  },
+
+  /**
    * Guest-landing marketing news master switch (admin-controlled, off by default)
    */
   marketingNews: {
@@ -146,6 +226,54 @@ const config = {
     },
     get ip(): string {
       return getConfigSync().build?.ip ?? 'dev'
+    },
+  },
+
+  /**
+   * Client identity (server-confirmed, from the User-Agent).
+   *
+   * Use this for SECURITY-relevant / server-truthful decisions (e.g. payment channel
+   * gating). For pure client-side UI gating prefer Capacitor.isNativePlatform() — but
+   * never trust the client for anything the backend must enforce.
+   */
+  client: {
+    /** True when the backend saw the official "Synaplan Mobile Vx.x" User-Agent. */
+    get isMobileApp(): boolean {
+      return getConfigSync().client?.isMobileApp ?? false
+    },
+    /** Parsed app version (major.minor[.patch]) or null on web. */
+    get appVersion(): string | null {
+      return getConfigSync().client?.appVersion ?? null
+    },
+    /** 'mobile' | 'web' (defaults to 'web' until config loads). */
+    get platform(): string {
+      return getConfigSync().client?.platform ?? 'web'
+    },
+  },
+
+  /**
+   * Forced-update gate (Epic 8.2), server-driven.
+   *
+   * `updateRequired` is computed by the backend (parsed UA version vs the
+   * operator-configured minimum), so the app blocks too-old installs with a
+   * "please update" screen. Defaults are inert (no gate) until config loads.
+   */
+  mobile: {
+    /** Configured minimum supported app version, or '' when no gate is set. */
+    get minVersion(): string {
+      return getConfigSync().mobile?.minVersion ?? ''
+    },
+    /** True when this mobile app is older than minVersion and must update. */
+    get updateRequired(): boolean {
+      return getConfigSync().mobile?.updateRequired ?? false
+    },
+    /** App Store link for the update button ('' when unset). */
+    get iosAppUrl(): string {
+      return getConfigSync().mobile?.iosAppUrl ?? ''
+    },
+    /** Play Store link for the update button ('' when unset). */
+    get androidAppUrl(): string {
+      return getConfigSync().mobile?.androidAppUrl ?? ''
     },
   },
 

@@ -259,6 +259,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useDialog } from '@/composables/useDialog'
+import { isNativeApp } from '@/services/api/nativeRuntime'
 import MainLayout from '@/components/MainLayout.vue'
 
 const { t, te } = useI18n()
@@ -272,6 +273,15 @@ const loading = ref(false)
 const isProcessing = ref(false)
 const stripeConfigured = ref(true)
 const subscriptionStatus = ref<SubscriptionStatus | null>(null)
+
+/**
+ * MOBILE-APP SEAM (Epic 5.2): inside the native shell the Stripe web checkout
+ * and billing portal are forbidden (Apple 3.1.1 / Google Play). The app must
+ * purchase via native IAP (wired in Epic 5.3) and manage via the store. This
+ * flag flips the purchase/manage paths to the native ones and guarantees the
+ * web `window.location.href` redirects can never fire in the app.
+ */
+const isNative = isNativeApp()
 
 const currentLevel = computed(() => authStore.user?.level)
 const hasActivePlan = computed(() => {
@@ -333,6 +343,13 @@ async function loadSubscriptionStatus() {
 }
 
 async function selectPlan(planId: string) {
+  // MOBILE-APP SEAM (Epic 5.2): never open the Stripe web checkout in the app.
+  // Native purchases go through IAP (Epic 5.3 wires the store billing plugin here).
+  if (isNative) {
+    await startNativePurchase(planId)
+    return
+  }
+
   if (!stripeConfigured.value) {
     await dialog.alert({
       title: t('subscription.serviceNotAvailable'),
@@ -369,7 +386,30 @@ async function selectPlan(planId: string) {
   }
 }
 
+/**
+ * MOBILE-APP SEAM (Epic 5.3): start a native in-app purchase for the selected
+ * tier via the store billing plugin. Until that plugin is wired, this never
+ * falls back to the web checkout — it only informs the user. The selected plan
+ * is surfaced so the message is concrete.
+ */
+async function startNativePurchase(planId: string) {
+  await dialog.alert({
+    title: t('subscription.native.purchaseTitle'),
+    message: t('subscription.native.purchaseComingSoon', { plan: planId }),
+  })
+}
+
 async function openBillingPortal() {
+  // MOBILE-APP SEAM (Epic 5.2): the Stripe billing portal is a web redirect and
+  // is not allowed in the app. Send the user to the store's subscription settings.
+  if (isNative) {
+    const url = subscriptionStatus.value?.manageUrl
+    if (url) {
+      window.open(url, '_blank')
+    }
+    return
+  }
+
   if (!stripeConfigured.value) {
     await dialog.alert({
       title: t('subscription.serviceNotAvailable'),

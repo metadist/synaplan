@@ -1,4 +1,7 @@
 {
+  "branding": {
+    "poweredBy": "Bereitgestellt von"
+  },
   "pageTitles": {
     "login": "Anmelden",
     "register": "Registrieren",
@@ -825,6 +828,19 @@
       "confirmPassword": "Passwort bestätigen",
       "confirmPasswordPlaceholder": "Neues Passwort bestätigen",
       "confirmPasswordHint": "Muss mit neuem Passwort übereinstimmen"
+    },
+    "appSecurity": {
+      "title": "App-Sicherheit",
+      "subtitle": "Zusätzlicher Schutz für dieses Gerät",
+      "biometricLock": "Biometrische App-Sperre",
+      "biometricLockHint": "Face ID, Touch ID oder Fingerabdruck zum Öffnen der App verlangen.",
+      "verifyReason": "Biometrische Sperre aktivieren",
+      "enableFailed": "Die biometrische Sperre konnte nicht aktiviert werden. Bitte erneut versuchen."
+    },
+    "legal": {
+      "title": "Datenschutz & AGB",
+      "privacy": "Datenschutzerklärung",
+      "terms": "Nutzungsbedingungen"
     },
     "dangerZone": {
       "title": "Gefahrenzone",
@@ -1712,6 +1728,11 @@
       "confirmCancel": "Ja, Abonnement kündigen",
       "keepSubscription": "Abonnement behalten",
       "loadingPortal": "Rechnungsportal wird geöffnet..."
+    },
+    "native": {
+      "purchaseTitle": "In-App-Kauf",
+      "purchaseComingSoon": "In-App-Käufe für den {plan}-Tarif werden gerade eingerichtet und stehen in einem zukünftigen App-Update zur Verfügung.",
+      "manageInStore": "Abonnement im Store verwalten"
     },
     "plans": {
       "pro": "Pro",
@@ -3509,5 +3530,20 @@
       "disabled": "Live-Updates sind in dieser Umgebung deaktiviert. Lade die Seite neu, um die neuesten Daten zu sehen.",
       "error": "Echtzeit-Verbindung fehlgeschlagen: {message}"
     }
+  },
+  "network": {
+    "offline": "Du bist offline – prüfe deine Verbindung. Wir verbinden automatisch neu."
+  },
+  "biometricLock": {
+    "title": "Gesperrt",
+    "subtitle": "Entsperre Synaplan, um fortzufahren.",
+    "unlock": "Entsperren",
+    "reason": "{brand} entsperren"
+  },
+  "forceUpdate": {
+    "title": "Update erforderlich",
+    "subtitle": "Diese App-Version wird nicht mehr unterstützt. Bitte aktualisiere auf die neueste Version, um fortzufahren.",
+    "minVersion": "Mindestens erforderliche Version: {version}",
+    "cta": "Jetzt aktualisieren"
   }
 }

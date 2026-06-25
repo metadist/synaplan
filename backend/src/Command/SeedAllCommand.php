@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\Seed\BrandingConfigSeeder;
 use App\Seed\DefaultModelConfigSeeder;
 use App\Seed\DemoWidgetConfigSeeder;
 use App\Seed\MarketingNewsConfigSeeder;
+use App\Seed\MobileConfigSeeder;
 use App\Seed\ModelSeeder;
 use App\Seed\MultitaskConfigSeeder;
 use App\Seed\PromptSeeder;
@@ -29,8 +31,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *   4. rate-limits   (BCONFIG: SYSTEM_FLAGS, RATELIMITS_*)
  *   5. subscriptions (BSUBSCRIPTIONS — plan cost budgets)
  *   6. multitask     (BCONFIG: MULTITASK routing flags)
- *   7. marketing-news (BCONFIG: MARKETING_NEWS guest-landing flags, master switch OFF)
- *   8. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *   7. branding      (BCONFIG: BRANDING white-label defaults, ownerId=0)
+ *   8. mobile        (BCONFIG: MOBILE forced-update gate defaults, ownerId=0)
+ *   9. marketing-news (BCONFIG: MARKETING_NEWS guest-landing flags, master switch OFF)
+ *  10. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -49,6 +53,8 @@ final class SeedAllCommand extends Command
         private readonly DemoWidgetConfigSeeder $demoWidgetConfigSeeder,
         private readonly SubscriptionPlanSeeder $subscriptionPlanSeeder,
         private readonly MultitaskConfigSeeder $multitaskConfigSeeder,
+        private readonly BrandingConfigSeeder $brandingConfigSeeder,
+        private readonly MobileConfigSeeder $mobileConfigSeeder,
         private readonly MarketingNewsConfigSeeder $marketingNewsConfigSeeder,
     ) {
         parent::__construct();
@@ -64,8 +70,10 @@ final class SeedAllCommand extends Command
             "  4. app:ratelimit:seed-defaults (BCONFIG, group=RATELIMITS_*/SYSTEM_FLAGS)\n".
             "  5. subscription cost budgets   (BSUBSCRIPTIONS)\n".
             "  6. multitask routing flags     (BCONFIG, group=MULTITASK)\n".
-            "  7. marketing news flags        (BCONFIG, group=MARKETING_NEWS, ownerId=0 — master switch OFF)\n".
-            "  8. demo widget config          (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  7. branding defaults           (BCONFIG, group=BRANDING, ownerId=0)\n".
+            "  8. mobile gate defaults        (BCONFIG, group=MOBILE, ownerId=0)\n".
+            "  9. marketing news flags        (BCONFIG, group=MARKETING_NEWS, ownerId=0 — master switch OFF)\n".
+            "  10. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }
@@ -82,6 +90,8 @@ final class SeedAllCommand extends Command
             ['rate-limits', fn (): SeedResult => $this->rateLimitConfigSeeder->seed()],
             ['subscriptions', fn (): SeedResult => $this->subscriptionPlanSeeder->seed()],
             ['multitask',   fn (): SeedResult => $this->multitaskConfigSeeder->seed()],
+            ['branding',    fn (): SeedResult => $this->brandingConfigSeeder->seed()],
+            ['mobile',      fn (): SeedResult => $this->mobileConfigSeeder->seed()],
             ['marketing-news', fn (): SeedResult => $this->marketingNewsConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];

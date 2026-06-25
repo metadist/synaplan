@@ -5,6 +5,7 @@ import de from './de.json'
 import en from './en.json'
 import es from './es.json'
 import tr from './tr.json'
+import { isNativeApp } from '@/services/api/nativeRuntime'
 
 // Supported languages in alphabetical order (EN is default)
 export const supportedLanguages = ['de', 'en', 'es', 'tr'] as const
@@ -21,13 +22,38 @@ function getInitialLanguage(): SupportedLanguage {
     return urlLang as SupportedLanguage
   }
 
-  // Fall back to localStorage or default
+  // An explicit saved choice always wins.
   const savedLanguage = localStorage.getItem('language')
   if (savedLanguage && supportedLanguages.includes(savedLanguage as SupportedLanguage)) {
     return savedLanguage as SupportedLanguage
   }
 
+  // Native shell only (Epic 7.3): fall back to the device/OS language so a fresh
+  // install matches the phone's locale. The web keeps its long-standing default
+  // of English for visitors without an explicit choice — so web behaviour is
+  // unchanged. Not persisted either way; a manual choice is what gets stored.
+  if (isNativeApp()) {
+    return detectDeviceLanguage() ?? 'en'
+  }
+
   return 'en'
+}
+
+// Map the device/browser locale list (e.g. "de-DE", "es-419") onto a supported
+// base language, preferring the user's most-preferred match.
+function detectDeviceLanguage(): SupportedLanguage | null {
+  const candidates = [...(navigator.languages ?? []), navigator.language].filter(
+    (lang): lang is string => 'string' === typeof lang && '' !== lang
+  )
+
+  for (const candidate of candidates) {
+    const base = candidate.toLowerCase().split('-')[0]
+    if (supportedLanguages.includes(base as SupportedLanguage)) {
+      return base as SupportedLanguage
+    }
+  }
+
+  return null
 }
 
 // A message function that ignores the interpolation context and returns the
