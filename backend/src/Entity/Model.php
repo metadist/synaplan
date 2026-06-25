@@ -305,8 +305,9 @@ class Model
     /**
      * Get max completion tokens from JSON config (the model's technical limit).
      *
-     * The ChatHandler combines this with the user's plan-level cap via
-     * min(plan_limit, model_max) before passing to the provider.
+     * The ChatHandler passes this through as the output limit for authenticated
+     * tiers (full model max); only ANONYMOUS is additionally clamped by a
+     * plan-level cap via min(plan_limit, model_max) before reaching the provider.
      * Returns null when not configured — providers fall back to
      * ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS (4096).
      */
