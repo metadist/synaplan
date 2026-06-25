@@ -49,6 +49,8 @@ import { useGoogleTag } from '@/composables/useGoogleTag'
 import { initNativeLifecycle } from '@/services/nativeLifecycle'
 import { initOtaUpdates } from '@/services/otaUpdates'
 import { initBiometricLock } from '@/composables/useBiometricLock'
+import { initNativeStatusBar } from '@/services/nativeStatusBar'
+import { initNativeBackButton } from '@/services/nativeBackButton'
 import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
 useTheme()
@@ -113,6 +115,11 @@ void initOtaUpdates()
 // Native shell only: optional biometric app lock (Epic 7.2). No-op on web or
 // when the user hasn't enabled it.
 void initBiometricLock()
+
+// Native shell only: keep the OS status bar themed with the app (Epic 9.5) and
+// give Android a sane hardware back-button behavior. Both no-op on web.
+void initNativeStatusBar()
+void initNativeBackButton()
 
 // Update page title when language changes
 const route = useRoute()

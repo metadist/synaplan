@@ -1645,7 +1645,11 @@
     "native": {
       "purchaseTitle": "In-app purchase",
       "purchaseComingSoon": "In-app purchases for the {plan} plan are being set up and will be available in a future app update.",
-      "manageInStore": "Manage subscription in the store"
+      "manageInStore": "Manage in the store",
+      "restoreButton": "Restore Purchases",
+      "restoreTitle": "Restore purchases",
+      "restoreComingSoon": "Restoring purchases will be available in a future app update.",
+      "storeNote": "Purchases and subscriptions are processed and managed through the App Store or Google Play."
     },
     "plans": {
       "pro": "Pro",
@@ -2852,6 +2856,9 @@
     "privacyNotice": "All data is stored securely and used only for invoicing purposes according to German law (DSGVO).",
     "saveChanges": "Save Changes",
     "cancel": "Cancel"
+  },
+  "native": {
+    "exitHint": "Press back again to exit"
   },
   "accountDeletion": {
     "title": "Delete your {brand} account",

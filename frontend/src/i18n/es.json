@@ -1013,6 +1013,9 @@
     "saveChanges": "Guardar Cambios",
     "cancel": "Cancelar"
   },
+  "native": {
+    "exitHint": "Pulsa atrás de nuevo para salir"
+  },
   "accountDeletion": {
     "title": "Eliminar tu cuenta de {brand}",
     "intro": "Puedes eliminar tu cuenta y todos los datos asociados de forma permanente en cualquier momento. Aquí te explicamos cómo funciona y qué se elimina.",
@@ -1221,7 +1224,11 @@
     "native": {
       "purchaseTitle": "Compra dentro de la app",
       "purchaseComingSoon": "Las compras dentro de la app para el plan {plan} se están configurando y estarán disponibles en una próxima actualización de la app.",
-      "manageInStore": "Gestionar suscripción en la tienda"
+      "manageInStore": "Gestionar en la tienda",
+      "restoreButton": "Restaurar compras",
+      "restoreTitle": "Restaurar compras",
+      "restoreComingSoon": "La restauración de compras estará disponible en una próxima actualización de la app.",
+      "storeNote": "Las compras y suscripciones se procesan y gestionan a través de App Store o Google Play."
     },
     "plans": {
       "pro": "Pro",

@@ -1013,6 +1013,9 @@
     "saveChanges": "Değişiklikleri Kaydet",
     "cancel": "İptal"
   },
+  "native": {
+    "exitHint": "Çıkmak için tekrar geri tuşuna basın"
+  },
   "accountDeletion": {
     "title": "{brand} hesabını sil",
     "intro": "Hesabını ve ilişkili tüm verileri istediğin zaman kalıcı olarak silebilirsin. Nasıl çalıştığı ve nelerin silindiği aşağıda açıklanmıştır.",
@@ -1222,7 +1225,11 @@
     "native": {
       "purchaseTitle": "Uygulama içi satın alma",
       "purchaseComingSoon": "{plan} planı için uygulama içi satın alma ayarlanıyor ve gelecek bir uygulama güncellemesinde kullanıma sunulacak.",
-      "manageInStore": "Aboneliği mağazada yönet"
+      "manageInStore": "Mağazada yönet",
+      "restoreButton": "Satın alımları geri yükle",
+      "restoreTitle": "Satın alımları geri yükle",
+      "restoreComingSoon": "Satın alımları geri yükleme, gelecek bir uygulama güncellemesinde kullanıma sunulacak.",
+      "storeNote": "Satın alımlar ve abonelikler App Store veya Google Play üzerinden işlenir ve yönetilir."
     },
     "plans": {
       "pro": "Pro",

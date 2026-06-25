@@ -678,6 +678,9 @@
     "deleteSuccess": "{count} Chat(s) erfolgreich gelöscht",
     "deleteFailed": "Chats konnten nicht gelöscht werden"
   },
+  "native": {
+    "exitHint": "Zum Beenden erneut „Zurück“ drücken"
+  },
   "accountDeletion": {
     "title": "Dein {brand}-Konto löschen",
     "intro": "Du kannst dein Konto und alle zugehörigen Daten jederzeit dauerhaft löschen. So funktioniert es und das wird entfernt.",
@@ -1759,7 +1762,11 @@
     "native": {
       "purchaseTitle": "In-App-Kauf",
       "purchaseComingSoon": "In-App-Käufe für den {plan}-Tarif werden gerade eingerichtet und stehen in einem zukünftigen App-Update zur Verfügung.",
-      "manageInStore": "Abonnement im Store verwalten"
+      "manageInStore": "Im Store verwalten",
+      "restoreButton": "Käufe wiederherstellen",
+      "restoreTitle": "Käufe wiederherstellen",
+      "restoreComingSoon": "Das Wiederherstellen von Käufen steht in einem zukünftigen App-Update zur Verfügung.",
+      "storeNote": "Käufe und Abonnements werden über den App Store oder Google Play abgewickelt und verwaltet."
     },
     "plans": {
       "pro": "Pro",

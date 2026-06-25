@@ -29,7 +29,7 @@
             CTA reuses the existing customer-portal flow.
           -->
           <div
-            v-if="hasActivePlan && showPaymentFailedWarning"
+            v-if="hasActivePlan && showPaymentFailedWarning && !isNative"
             data-testid="section-payment-failed"
             class="alert-warning max-w-2xl mx-auto mb-8"
             role="alert"
@@ -114,7 +114,7 @@
               </div>
               <button
                 v-if="subscriptionStatus?.hasSubscription"
-                :disabled="isProcessing || !stripeConfigured"
+                :disabled="isProcessing || (!isNative && !stripeConfigured)"
                 class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
                 data-testid="btn-open-portal"
                 @click="openBillingPortal"
@@ -124,13 +124,13 @@
                   icon="mdi:loading"
                   class="w-4 h-4 animate-spin inline mr-2"
                 />
-                {{ $t('subscription.manage.openPortal') }}
+                {{ manageLabel }}
               </button>
             </div>
           </div>
 
-          <!-- Stripe Not Configured Warning -->
-          <div v-if="!stripeConfigured" class="alert-warning max-w-2xl mx-auto mb-8">
+          <!-- Stripe Not Configured Warning (web only — native buys via IAP) -->
+          <div v-if="!stripeConfigured && !isNative" class="alert-warning max-w-2xl mx-auto mb-8">
             <div class="flex items-start gap-3">
               <Icon icon="mdi:alert-circle" class="w-6 h-6 flex-shrink-0" />
               <div>
@@ -142,8 +142,8 @@
             </div>
           </div>
 
-          <!-- Plans Grid -->
-          <div v-if="stripeConfigured" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Plans Grid (native always shows them — purchase routes to IAP) -->
+          <div v-if="stripeConfigured || isNative" class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div
               v-for="plan in plans"
               :key="plan.id"
@@ -238,6 +238,28 @@
               </button>
             </div>
           </div>
+
+          <!--
+            MOBILE-APP SEAM (Epic 9.4): store-managed purchases + anti-steering.
+            Apple requires a restore-purchases path; both stores forbid steering
+            to web checkout for digital goods, so the app exposes only native
+            affordances and never a link to the web billing flow.
+          -->
+          <div
+            v-if="isNative"
+            data-testid="section-native-store"
+            class="max-w-2xl mx-auto mt-8 text-center space-y-3"
+          >
+            <button
+              :disabled="isProcessing"
+              class="btn-secondary px-5 py-2.5 rounded-lg text-sm font-medium"
+              data-testid="btn-restore-purchases"
+              @click="restorePurchases"
+            >
+              {{ $t('subscription.native.restoreButton') }}
+            </button>
+            <p class="txt-secondary text-xs">{{ $t('subscription.native.storeNote') }}</p>
+          </div>
         </template>
       </div>
     </div>
@@ -294,6 +316,12 @@ const planHierarchy = ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN']
 const isHighestPlan = computed(() => {
   return currentLevel.value === 'BUSINESS' || currentLevel.value === 'ADMIN'
 })
+
+// MOBILE-APP SEAM (Epic 9.4): in the app, "manage" means the store's own
+// subscription settings (Apple/Google), never the Stripe billing portal.
+const manageLabel = computed(() =>
+  isNative ? t('subscription.native.manageInStore') : t('subscription.manage.openPortal')
+)
 
 /**
  * Surface the dunning warning whenever the backend tells us either that
@@ -396,6 +424,19 @@ async function startNativePurchase(planId: string) {
   await dialog.alert({
     title: t('subscription.native.purchaseTitle'),
     message: t('subscription.native.purchaseComingSoon', { plan: planId }),
+  })
+}
+
+/**
+ * MOBILE-APP SEAM (Epic 9.4): Apple requires a "Restore Purchases" path so a
+ * user who reinstalls or switches devices can recover an active subscription.
+ * The store plugin's restore flow is wired on-device in Epic 5.3; until then we
+ * surface a clear message and never fall back to the web billing flow.
+ */
+async function restorePurchases() {
+  await dialog.alert({
+    title: t('subscription.native.restoreTitle'),
+    message: t('subscription.native.restoreComingSoon'),
   })
 }
 
