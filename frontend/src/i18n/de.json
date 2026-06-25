@@ -43,7 +43,8 @@
     "widgetChats": "Widget-Chats",
     "widgetDetail": "Widget-Detail",
     "liveSupport": "Live-Support",
-    "addinConnect": "Outlook-Add-in verbinden"
+    "addinConnect": "Outlook-Add-in verbinden",
+    "accountDeletion": "Konto löschen"
   },
   "addinConnect": {
     "title": "Mit Synaplan verbinden",
@@ -677,6 +678,31 @@
     "deleteSuccess": "{count} Chat(s) erfolgreich gelöscht",
     "deleteFailed": "Chats konnten nicht gelöscht werden"
   },
+  "accountDeletion": {
+    "title": "Dein {brand}-Konto löschen",
+    "intro": "Du kannst dein Konto und alle zugehörigen Daten jederzeit dauerhaft löschen. So funktioniert es und das wird entfernt.",
+    "howTitle": "So löschst du dein Konto",
+    "steps": [
+      "Melde dich in deinem Konto an.",
+      "Öffne dein Profil und scrolle zum Bereich „Gefahrenzone“.",
+      "Klicke auf „Konto löschen“ und bestätige mit deinem Passwort (oder tippe bei Social-Login-Konten DELETE).",
+      "Dein Konto und deine Daten werden sofort gelöscht und können nicht wiederhergestellt werden."
+    ],
+    "goToProfile": "Zum Profil",
+    "signIn": "Anmelden",
+    "dataTitle": "Was gelöscht wird",
+    "dataItems": [
+      "Alle deine Nachrichten und Chats",
+      "Alle hochgeladenen Dateien und Wissensdatenbank-Dokumente",
+      "Deine persönlichen Daten, Einstellungen und Erinnerungen",
+      "API-Schlüssel, Widgets und Zugangsdaten"
+    ],
+    "retention": "Die Löschung ist endgültig und wirkt sofort. Backups mit verbliebenen Daten werden innerhalb von 30 Tagen rotiert. Gesetzlich aufbewahrungspflichtige Daten (z. B. Rechnungen) werden nur so lange aufbewahrt, wie es das Gesetz verlangt.",
+    "noAccessTitle": "Keine Anmeldung möglich?",
+    "noAccessDesc": "Wenn du keinen Zugriff mehr auf dein Konto hast, kontaktiere uns über unsere Website und wir bearbeiten deine Löschanfrage.",
+    "visitWebsite": "Website besuchen",
+    "privacyPolicy": "Datenschutzerklärung"
+  },
   "notFound": {
     "title": "Seite nicht gefunden",
     "description": "Die gesuchte Seite existiert nicht oder wurde verschoben. Lass uns dich zurück auf den richtigen Weg bringen.",
@@ -840,7 +866,8 @@
     "legal": {
       "title": "Datenschutz & AGB",
       "privacy": "Datenschutzerklärung",
-      "terms": "Nutzungsbedingungen"
+      "terms": "Nutzungsbedingungen",
+      "accountDeletion": "Konto löschen"
     },
     "dangerZone": {
       "title": "Gefahrenzone",

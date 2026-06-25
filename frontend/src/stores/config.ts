@@ -183,6 +183,13 @@ const config = {
     get termsUrl(): string {
       return getConfigSync().branding?.termsUrl || 'https://www.synaplan.com/terms'
     },
+    // MOBILE-APP SEAM (Epic 9.1): account-deletion link (Google Play policy).
+    // Empty config falls back to the app's own public /account-deletion page so
+    // an unconfigured deployment is still store-compliant; white-label brands
+    // may point at their own deletion page.
+    get accountDeletionUrl(): string {
+      return getConfigSync().branding?.accountDeletionUrl || '/account-deletion'
+    },
     get landingPage(): string {
       return getConfigSync().branding?.landingPage ?? ''
     },

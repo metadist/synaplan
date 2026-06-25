@@ -46,6 +46,8 @@ final class BrandingServiceTest extends TestCase
         $this->assertSame('', $branding['fontUrl']);
         $this->assertSame('', $branding['landingPage']);
         $this->assertSame('', $branding['defaultRoute']);
+        // Empty default => frontend falls back to its own /account-deletion page.
+        $this->assertSame('', $branding['accountDeletionUrl']);
     }
 
     public function testReadsConfiguredFontsAndRoutes(): void
@@ -61,6 +63,7 @@ final class BrandingServiceTest extends TestCase
                 BrandingService::KEY_DEFAULT_ROUTE => 'chat',
                 BrandingService::KEY_PRIVACY_URL => 'https://brand.example/privacy',
                 BrandingService::KEY_TERMS_URL => 'https://brand.example/terms',
+                BrandingService::KEY_ACCOUNT_DELETION_URL => 'https://brand.example/delete-me',
                 default => null,
             }
         );
@@ -69,6 +72,7 @@ final class BrandingServiceTest extends TestCase
 
         $this->assertSame('https://brand.example/privacy', $branding['privacyUrl']);
         $this->assertSame('https://brand.example/terms', $branding['termsUrl']);
+        $this->assertSame('https://brand.example/delete-me', $branding['accountDeletionUrl']);
         $this->assertSame('Inter, sans-serif', $branding['fontFamily']);
         $this->assertSame('Lora, serif', $branding['headingFontFamily']);
         $this->assertSame('https://fonts.example/inter.css', $branding['fontUrl']);

@@ -121,6 +121,16 @@ const router = createRouter({
       component: () => import('@/views/LoggedOutView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.loggedOut' },
     },
+    {
+      // MOBILE-APP SEAM (Epic 9.1): public account-deletion info page. Google
+      // Play requires a web URL where users can learn how to delete their
+      // account + data WITHOUT signing in. Default target of
+      // `branding.accountDeletionUrl`; reachable from store metadata too.
+      path: '/account-deletion',
+      name: 'account-deletion',
+      component: () => import('@/views/AccountDeletionView.vue'),
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.accountDeletion' },
+    },
     // Shared chat with optional language parameter for SEO
     // /shared/de/abc123 -> German UI
     // /shared/en/abc123 -> English UI

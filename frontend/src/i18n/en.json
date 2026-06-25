@@ -43,7 +43,8 @@
     "widgetChats": "Widget Chats",
     "widgetDetail": "Widget Detail",
     "liveSupport": "Live Support",
-    "addinConnect": "Connect Outlook Add-in"
+    "addinConnect": "Connect Outlook Add-in",
+    "accountDeletion": "Account Deletion"
   },
   "addinConnect": {
     "title": "Connect to Synaplan",
@@ -2822,7 +2823,8 @@
     "legal": {
       "title": "Privacy & Terms",
       "privacy": "Privacy Policy",
-      "terms": "Terms of Use"
+      "terms": "Terms of Use",
+      "accountDeletion": "Delete your account"
     },
     "dangerZone": {
       "title": "Danger Zone",
@@ -2850,6 +2852,31 @@
     "privacyNotice": "All data is stored securely and used only for invoicing purposes according to German law (DSGVO).",
     "saveChanges": "Save Changes",
     "cancel": "Cancel"
+  },
+  "accountDeletion": {
+    "title": "Delete your {brand} account",
+    "intro": "You can permanently delete your account and all associated data at any time. Here is how it works and what gets removed.",
+    "howTitle": "How to delete your account",
+    "steps": [
+      "Sign in to your account.",
+      "Open your Profile and scroll to the \"Danger Zone\" section.",
+      "Click \"Delete Account\" and confirm with your password (or by typing DELETE for social-login accounts).",
+      "Your account and data are deleted immediately and cannot be recovered."
+    ],
+    "goToProfile": "Go to Profile",
+    "signIn": "Sign in",
+    "dataTitle": "What gets deleted",
+    "dataItems": [
+      "All your messages and chats",
+      "All uploaded files and knowledge-base documents",
+      "Your personal data, settings and memories",
+      "API keys, widgets and credentials"
+    ],
+    "retention": "Deletion is permanent and takes effect immediately. Backups containing residual data are rotated out within 30 days. Data we are legally required to retain (e.g. invoices) is kept only as long as the law requires.",
+    "noAccessTitle": "Can't sign in?",
+    "noAccessDesc": "If you no longer have access to your account, contact us through our website and we will process your deletion request.",
+    "visitWebsite": "Visit website",
+    "privacyPolicy": "Privacy Policy"
   },
   "notFound": {
     "title": "Page Not Found",

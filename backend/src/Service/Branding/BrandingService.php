@@ -39,6 +39,11 @@ final readonly class BrandingService
     // pages instead of Synaplan's.
     public const KEY_PRIVACY_URL = 'BRAND_PRIVACY_URL';
     public const KEY_TERMS_URL = 'BRAND_TERMS_URL';
+    // MOBILE-APP SEAM (Epic 9.1): account-deletion link. Google Play requires a
+    // web URL where users can request account + data deletion WITHOUT signing in
+    // to the app. Empty default lets the frontend fall back to its own public
+    // in-app page (/account-deletion); white-label brands point at their own.
+    public const KEY_ACCOUNT_DELETION_URL = 'BRAND_ACCOUNT_DELETION_URL';
     public const KEY_LANDING_PAGE = 'BRAND_LANDING_PAGE';
     public const KEY_DEFAULT_ROUTE = 'BRAND_DEFAULT_ROUTE';
     public const KEY_SHOW_POWERED_BY = 'BRAND_SHOW_POWERED_BY';
@@ -56,6 +61,7 @@ final readonly class BrandingService
     public const DEFAULT_HOMEPAGE_URL = 'https://www.synaplan.com';
     public const DEFAULT_PRIVACY_URL = 'https://www.synaplan.com/privacy-policy';
     public const DEFAULT_TERMS_URL = 'https://www.synaplan.com/terms';
+    public const DEFAULT_ACCOUNT_DELETION_URL = '';
     public const DEFAULT_LANDING_PAGE = '';
     public const DEFAULT_DEFAULT_ROUTE = '';
     public const DEFAULT_SHOW_POWERED_BY = '1';
@@ -83,6 +89,7 @@ final readonly class BrandingService
      *     homepageUrl: string,
      *     privacyUrl: string,
      *     termsUrl: string,
+     *     accountDeletionUrl: string,
      *     landingPage: string,
      *     defaultRoute: string,
      *     showPoweredBy: bool,
@@ -107,6 +114,7 @@ final readonly class BrandingService
             'homepageUrl' => $this->value(self::KEY_HOMEPAGE_URL, self::DEFAULT_HOMEPAGE_URL),
             'privacyUrl' => $this->value(self::KEY_PRIVACY_URL, self::DEFAULT_PRIVACY_URL),
             'termsUrl' => $this->value(self::KEY_TERMS_URL, self::DEFAULT_TERMS_URL),
+            'accountDeletionUrl' => $this->value(self::KEY_ACCOUNT_DELETION_URL, self::DEFAULT_ACCOUNT_DELETION_URL),
             'landingPage' => $this->value(self::KEY_LANDING_PAGE, self::DEFAULT_LANDING_PAGE),
             'defaultRoute' => $this->value(self::KEY_DEFAULT_ROUTE, self::DEFAULT_DEFAULT_ROUTE),
             'showPoweredBy' => $this->boolValue(self::KEY_SHOW_POWERED_BY, self::DEFAULT_SHOW_POWERED_BY),

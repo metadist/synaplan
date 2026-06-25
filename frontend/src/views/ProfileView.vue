@@ -443,6 +443,29 @@
                 {{ $t('profile.legal.terms') }}
                 <Icon icon="mdi:open-in-new" class="w-4 h-4 txt-secondary" />
               </a>
+              <!-- Account-deletion info (Epic 9.1). Internal default route, or a
+                   brand's external deletion page when configured. -->
+              <a
+                v-if="isExternalDeletionUrl"
+                :href="config.branding.accountDeletionUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
+                data-testid="link-account-deletion"
+              >
+                <Icon icon="mdi:account-remove-outline" class="w-5 h-5" />
+                {{ $t('profile.legal.accountDeletion') }}
+                <Icon icon="mdi:open-in-new" class="w-4 h-4 txt-secondary" />
+              </a>
+              <RouterLink
+                v-else
+                :to="config.branding.accountDeletionUrl"
+                class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
+                data-testid="link-account-deletion"
+              >
+                <Icon icon="mdi:account-remove-outline" class="w-5 h-5" />
+                {{ $t('profile.legal.accountDeletion') }}
+              </RouterLink>
             </div>
           </section>
 
@@ -634,6 +657,12 @@ const shouldHighlight = ref(false)
 const biometricAvailable = ref(false)
 const biometricLockOn = ref(isBiometricLockEnabled())
 const showBiometricSection = computed(() => isNativeApp() && biometricAvailable.value)
+
+// Account-deletion link (Epic 9.1): default is the internal /account-deletion
+// route; a white-label brand may configure an external (http) deletion page.
+const isExternalDeletionUrl = computed(() =>
+  /^https?:\/\//i.test(config.branding.accountDeletionUrl)
+)
 
 onMounted(async () => {
   biometricAvailable.value = await isBiometricAvailable()

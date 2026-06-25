@@ -42,7 +42,8 @@
     "widgetSessions": "Sesiones de Widget",
     "widgetChats": "Chats de Widget",
     "liveSupport": "Soporte en vivo",
-    "addinConnect": "Conectar complemento de Outlook"
+    "addinConnect": "Conectar complemento de Outlook",
+    "accountDeletion": "Eliminación de cuenta"
   },
   "addinConnect": {
     "title": "Conectar a Synaplan",
@@ -982,7 +983,8 @@
     "legal": {
       "title": "Privacidad y Términos",
       "privacy": "Política de Privacidad",
-      "terms": "Términos de Uso"
+      "terms": "Términos de Uso",
+      "accountDeletion": "Eliminar tu cuenta"
     },
     "dangerZone": {
       "title": "Zona de Peligro",
@@ -1010,6 +1012,31 @@
     "privacyNotice": "Todos los datos se almacenan de forma segura y se usan solo para propósitos de facturación según la ley alemana (RGPD).",
     "saveChanges": "Guardar Cambios",
     "cancel": "Cancelar"
+  },
+  "accountDeletion": {
+    "title": "Eliminar tu cuenta de {brand}",
+    "intro": "Puedes eliminar tu cuenta y todos los datos asociados de forma permanente en cualquier momento. Aquí te explicamos cómo funciona y qué se elimina.",
+    "howTitle": "Cómo eliminar tu cuenta",
+    "steps": [
+      "Inicia sesión en tu cuenta.",
+      "Abre tu Perfil y desplázate hasta la sección «Zona de peligro».",
+      "Haz clic en «Eliminar cuenta» y confirma con tu contraseña (o escribiendo DELETE en cuentas con inicio de sesión social).",
+      "Tu cuenta y tus datos se eliminan de inmediato y no se pueden recuperar."
+    ],
+    "goToProfile": "Ir al Perfil",
+    "signIn": "Iniciar sesión",
+    "dataTitle": "Qué se elimina",
+    "dataItems": [
+      "Todos tus mensajes y chats",
+      "Todos los archivos subidos y documentos de la base de conocimiento",
+      "Tus datos personales, ajustes y memorias",
+      "Claves de API, widgets y credenciales"
+    ],
+    "retention": "La eliminación es permanente y surte efecto de inmediato. Las copias de seguridad con datos residuales se rotan en un plazo de 30 días. Los datos que estamos legalmente obligados a conservar (p. ej. facturas) se mantienen solo durante el tiempo que exige la ley.",
+    "noAccessTitle": "¿No puedes iniciar sesión?",
+    "noAccessDesc": "Si ya no tienes acceso a tu cuenta, contáctanos a través de nuestro sitio web y procesaremos tu solicitud de eliminación.",
+    "visitWebsite": "Visitar el sitio web",
+    "privacyPolicy": "Política de Privacidad"
   },
   "notFound": {
     "title": "Página No Encontrada",

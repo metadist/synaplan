@@ -42,7 +42,8 @@
     "widgetSessions": "Widget Oturumları",
     "widgetChats": "Widget Sohbetleri",
     "liveSupport": "Canlı Destek",
-    "addinConnect": "Outlook eklentisini bağla"
+    "addinConnect": "Outlook eklentisini bağla",
+    "accountDeletion": "Hesap Silme"
   },
   "addinConnect": {
     "title": "Synaplan'a bağlan",
@@ -982,7 +983,8 @@
     "legal": {
       "title": "Gizlilik ve Şartlar",
       "privacy": "Gizlilik Politikası",
-      "terms": "Kullanım Koşulları"
+      "terms": "Kullanım Koşulları",
+      "accountDeletion": "Hesabını sil"
     },
     "dangerZone": {
       "title": "Tehlikeli Bölge",
@@ -1010,6 +1012,31 @@
     "privacyNotice": "Tüm veriler güvenli bir şekilde saklanır ve yalnızca Alman yasalarına (GDPR) uygun olarak fatura amaçları için kullanılır.",
     "saveChanges": "Değişiklikleri Kaydet",
     "cancel": "İptal"
+  },
+  "accountDeletion": {
+    "title": "{brand} hesabını sil",
+    "intro": "Hesabını ve ilişkili tüm verileri istediğin zaman kalıcı olarak silebilirsin. Nasıl çalıştığı ve nelerin silindiği aşağıda açıklanmıştır.",
+    "howTitle": "Hesabını nasıl silersin",
+    "steps": [
+      "Hesabına giriş yap.",
+      "Profilini aç ve „Tehlikeli Bölge“ bölümüne in.",
+      "„Hesabı Sil“e tıkla ve şifrenle onayla (sosyal giriş hesaplarında DELETE yazarak).",
+      "Hesabın ve verilerin anında silinir ve geri alınamaz."
+    ],
+    "goToProfile": "Profile Git",
+    "signIn": "Giriş yap",
+    "dataTitle": "Neler silinir",
+    "dataItems": [
+      "Tüm mesajların ve sohbetlerin",
+      "Yüklenen tüm dosyalar ve bilgi tabanı belgeleri",
+      "Kişisel verilerin, ayarların ve anıların",
+      "API anahtarları, widget'lar ve kimlik bilgileri"
+    ],
+    "retention": "Silme işlemi kalıcıdır ve anında geçerli olur. Artık veri içeren yedekler 30 gün içinde döngüden çıkarılır. Yasal olarak saklamakla yükümlü olduğumuz veriler (ör. faturalar) yalnızca yasanın gerektirdiği süre boyunca tutulur.",
+    "noAccessTitle": "Giriş yapamıyor musun?",
+    "noAccessDesc": "Hesabına artık erişemiyorsan, web sitemiz üzerinden bizimle iletişime geç; silme talebini işleme alalım.",
+    "visitWebsite": "Web sitesini ziyaret et",
+    "privacyPolicy": "Gizlilik Politikası"
   },
   "notFound": {
     "title": "Sayfa Bulunamadı",
