@@ -1,8 +1,13 @@
 <template>
   <Transition name="force-update-fade">
+    <!--
+      Hard, non-dismissable gate: must sit above EVERY other overlay (dialogs are
+      z-[10000], cookie consent z-[9999]) so nothing can be interacted with while
+      a forced update is required.
+    -->
     <div
       v-if="show"
-      class="fixed inset-0 z-[3000] flex flex-col items-center justify-center gap-8 bg-app px-6"
+      class="fixed inset-0 z-[10050] flex flex-col items-center justify-center gap-8 bg-app px-6"
       data-testid="force-update"
       role="alertdialog"
       aria-modal="true"

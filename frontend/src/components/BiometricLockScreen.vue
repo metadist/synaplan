@@ -1,8 +1,14 @@
 <template>
   <Transition name="lock-fade">
+    <!--
+      Privacy lock: while the app is locked it must cover EVERY other overlay
+      (dialogs are z-[10000], cookie consent z-[9999]) so no sensitive content
+      stays visible/interactable behind it. Kept just below ForceUpdateScreen
+      (z-[10050]), which is the ultimate gate.
+    -->
     <div
       v-if="locked"
-      class="fixed inset-0 z-[2000] flex flex-col items-center justify-center gap-8 bg-app px-6"
+      class="fixed inset-0 z-[10040] flex flex-col items-center justify-center gap-8 bg-app px-6"
       data-testid="biometric-lock"
     >
       <div class="flex flex-col items-center gap-3 text-center">

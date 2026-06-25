@@ -78,6 +78,24 @@ final class MobileVersionServiceTest extends TestCase
         $this->assertSame('https://play.google.com/store/apps/details?id=com.synaplan.app', $urls['android']);
     }
 
+    public function testStoreUrlsAreTrimmedAndWhitespaceOnlyTreatedAsUnset(): void
+    {
+        $this->configRepository->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => match ($setting) {
+                MobileVersionService::KEY_IOS_APP_URL => "  https://apps.apple.com/app/id1\n",
+                MobileVersionService::KEY_ANDROID_APP_URL => '   ',
+                default => null,
+            }
+        );
+
+        $urls = $this->service->getStoreUrls();
+
+        // Surrounding whitespace is stripped so the frontend href stays valid.
+        $this->assertSame('https://apps.apple.com/app/id1', $urls['ios']);
+        // A whitespace-only value behaves exactly like "unset" (empty default).
+        $this->assertSame('', $urls['android']);
+    }
+
     private function withMinVersion(string $min): void
     {
         $this->configRepository->method('getValue')->willReturnCallback(

@@ -80,7 +80,14 @@ final readonly class MobileVersionService
     private function value(string $setting, string $default): string
     {
         $raw = $this->configRepository->getValue(self::OWNER_ID, self::GROUP, $setting);
+        if (null === $raw) {
+            return $default;
+        }
 
-        return (null === $raw || '' === $raw) ? $default : $raw;
+        // Trim and treat whitespace-only as unset, so an operator pasting a store
+        // URL with stray surrounding whitespace never produces an invalid href.
+        $trimmed = trim($raw);
+
+        return '' === $trimmed ? $default : $trimmed;
     }
 }
