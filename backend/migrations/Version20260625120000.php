@@ -29,7 +29,7 @@ final class Version20260625120000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Remove per-plan MAX_OUTPUT_TOKENS for NEW/PRO/TEAM/BUSINESS so authenticated tiers use the model full max_tokens (ANONYMOUS cap retained).';
+        return "Remove per-plan MAX_OUTPUT_TOKENS for NEW/PRO/TEAM/BUSINESS so authenticated tiers use the model's full max_tokens (ANONYMOUS cap retained).";
     }
 
     public function up(Schema $schema): void

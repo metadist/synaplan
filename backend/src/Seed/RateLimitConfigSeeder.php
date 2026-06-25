@@ -17,10 +17,12 @@ use Doctrine\DBAL\Connection;
  * Operator overrides are preserved (insert-if-missing semantics).
  *
  * MAX_OUTPUT_TOKENS is intentionally seeded ONLY for ANONYMOUS: authenticated
- * tiers get the model's full max_tokens (see {@see \App\Service\Message\Handler\ChatHandler}
- * which clamps to min(requested, plan_limit, model_max) — with plan_limit null for
- * those tiers). Existing installs are migrated by the dedicated migration that
- * deletes the legacy NEW/PRO/TEAM/BUSINESS rows (BCONFIG defaults are bootstrap-only).
+ * tiers get the model's full max_tokens. {@see \App\Service\Message\Handler\ChatHandler}
+ * applies this plan limit as an additional output clamp only when present — i.e.
+ * only for ANONYMOUS; for all other tiers the limit is null, so the model's own
+ * max_tokens is used unchanged. Existing installs are migrated by the dedicated
+ * migration that deletes the legacy NEW/PRO/TEAM/BUSINESS rows (BCONFIG defaults
+ * are bootstrap-only).
  */
 final readonly class RateLimitConfigSeeder
 {
