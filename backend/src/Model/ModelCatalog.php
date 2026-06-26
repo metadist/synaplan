@@ -1898,9 +1898,9 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Claude 4.5 Sonnet - a smart model for complex agents and coding',
-                'max_tokens' => 8192,
+                'max_tokens' => 64000,
                 'params' => ['model' => 'claude-sonnet-4-5-20250929'],
-                'meta' => ['context_window' => '200000', 'max_output' => '8192'],
+                'meta' => ['context_window' => '200000', 'max_output' => '64000'],
             ],
         ],
         [
