@@ -254,7 +254,16 @@ services:
       - ./plugins:/plugins:ro
       - whisper_models:/var/www/backend/var/whisper:ro
     environment:
-      APP_ENV: prod
+      # Worker MUST run in the same APP_ENV as the backend, otherwise the two
+      # halves of the system end up in different Redis namespaces
+      # (RedisService prefixes every key with "synaplan:{env}:"). With backend
+      # in dev and worker in prod, the worker happily consumed
+      # AdvanceMediaJobCommand messages but every findByKey() lookup missed
+      # because the job lived under synaplan:dev:mediajob:* and the worker
+      # looked under synaplan:prod:mediajob:* — silent "job not found",
+      # bubble stuck in queued forever. The synaplan-platform compose
+      # overrides both to prod for production.
+      APP_ENV: ${APP_ENV:-dev}
       APP_DEBUG: "0"
       APP_URL: http://backend
       PLUGINS_DIR: /plugins
@@ -284,6 +293,12 @@ services:
       - |
         set -u
 
+        # Resolve the env once so cache:warmup, dbal:run-sql, and
+        # messenger:consume all agree. APP_ENV is set in the service env
+        # block above (default: dev for local; prod overrides via compose).
+        ENV="$${APP_ENV:-dev}"
+        echo "[worker] APP_ENV=$$ENV"
+
         # Fail-fast diagnostic: a broken bind-mount (the codebase missing from
         # /var/www/backend, leaving only the anonymous var/cache volume) used
         # to make the DB-wait loop below silently hang forever — every retry
@@ -291,14 +306,14 @@ services:
         # suppressed, so messenger:consume never started and every queued
         # AdvanceMediaJobCommand sat unprocessed. Crash loudly instead.
         if [ ! -f bin/console ]; then
-          echo "[worker] FATAL: bin/console missing under $(pwd)." >&2
+          echo "[worker] FATAL: bin/console missing under $$(pwd)." >&2
           echo "[worker] The ./backend bind-mount is broken; restart the worker" >&2
           echo "[worker] container or rebuild the dev stack."                   >&2
           exit 64
         fi
 
-        # Clear the prod cache BEFORE any console command runs. The cache lives
-        # under var/cache/prod/ on the bind-mounted backend volume, so it
+        # Clear the cache BEFORE any console command runs. The cache lives
+        # under var/cache/$$ENV/ on the bind-mounted backend volume, so it
         # otherwise survives across container rebuilds and pins the compiled
         # DI container to whatever code revision happened to boot it first.
         #
@@ -311,9 +326,9 @@ services:
         # symptom as ArgumentCountError / "Too few arguments to function
         # ::__construct()" after service constructor changes. Clearing on boot
         # is a few seconds and matches what every Symfony deploy does anyway.
-        echo "[worker] clearing prod cache..."
-        rm -rf var/cache/prod
-        if ! php bin/console --env=prod cache:warmup; then
+        echo "[worker] clearing $$ENV cache..."
+        rm -rf "var/cache/$$ENV"
+        if ! php bin/console --env="$$ENV" cache:warmup; then
           echo "[worker] FATAL: cache:warmup failed — refusing to start." >&2
           exit 65
         fi
@@ -327,18 +342,18 @@ services:
         # problem instead of letting the worker pretend it is healthy forever.
         attempt=0
         max_attempts=60
-        while ! php bin/console --env=prod dbal:run-sql 'SELECT 1' >/dev/null 2>&1; do
+        while ! php bin/console --env="$$ENV" dbal:run-sql 'SELECT 1' >/dev/null 2>&1; do
           attempt=$$((attempt + 1))
           if [ "$$attempt" -ge "$$max_attempts" ]; then
             echo "[worker] FATAL: db schema not ready after $$((max_attempts * 3))s." >&2
-            php bin/console --env=prod dbal:run-sql 'SELECT 1' >&2 || true
+            php bin/console --env="$$ENV" dbal:run-sql 'SELECT 1' >&2 || true
             exit 66
           fi
           # Echo the underlying error every 10 attempts so a real problem
           # (auth failure, wrong host, broken vendor/) is visible.
           if [ $$((attempt % 10)) -eq 1 ]; then
             echo "[worker] waiting for db schema... (attempt $$attempt/$$max_attempts)" >&2
-            php bin/console --env=prod dbal:run-sql 'SELECT 1' >&2 || true
+            php bin/console --env="$$ENV" dbal:run-sql 'SELECT 1' >&2 || true
           fi
           sleep 3
         done
@@ -349,8 +364,8 @@ services:
         mkdir -p var/worker
         date +%s > var/worker/last_alive
 
-        echo "[worker] db + cache ready, starting messenger:consume"
-        exec php bin/console --env=prod messenger:consume \
+        echo "[worker] db + cache ready, starting messenger:consume (env=$$ENV)"
+        exec php bin/console --env="$$ENV" messenger:consume \
           async_ai_high async_extract async_index \
           --time-limit=3600 --memory-limit=512M -v
     depends_on:
@@ -361,17 +376,17 @@ services:
       backend:
         condition: service_started
     restart: unless-stopped
-    # Worker liveness: the boot script writes var/worker/last_alive once
-    # messenger:consume is about to start, and the consumer would refresh it on
-    # every message. A missing or stale sentinel (>5 min) means the worker is
-    # not actually consuming — surfaces the silent-hang class of failure that
-    # took us hours to diagnose (broken bind mount → infinite "waiting for db
-    # schema..." loop with no consumer ever starting).
+    # Worker liveness: probe that messenger:consume is actually running.
+    # Surfaces the silent-hang class of failure that took us hours to diagnose
+    # (broken bind mount → infinite "waiting for db schema..." loop with no
+    # consumer ever starting; or env-prefix mismatch → consumer running but
+    # every job a no-op). A missing process = unhealthy = visible in
+    # `docker compose ps`.
     healthcheck:
       test:
         - "CMD-SHELL"
-        - "test -f var/worker/last_alive && test $$(( $$(date +%s) - $$(cat var/worker/last_alive) )) -lt 300"
-      interval: 60s
+        - "pgrep -f 'bin/console.*messenger:consume' >/dev/null"
+      interval: 30s
       timeout: 5s
       retries: 3
       start_period: 120s

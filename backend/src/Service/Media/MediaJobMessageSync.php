@@ -11,14 +11,22 @@ use Psr\Log\LoggerInterface;
 /**
  * Keeps the persisted OUT message in sync with a terminal {@see MediaJob}.
  *
- * Without this, reload would still show `state: running` from the initial
- * detach meta even though Redis already knows the job failed or finished.
+ * Two responsibilities:
+ *   1. Update the `media_job` meta blob so a reload of the chat shows the same
+ *      state Redis already knows (without this, a failed/completed job would
+ *      reload as a perpetually "running" banner because the initial detach
+ *      meta is the only record on the DB).
+ *   2. On COMPLETED, register the generated file as a {@see \App\Entity\File}
+ *      and attach it to the message — this is the single channel history
+ *      endpoints serialize (`getFiles()`), so without it a reload shows an
+ *      empty bubble even though the file is on disk and the job is `done`.
  */
 final readonly class MediaJobMessageSync
 {
     public function __construct(
         private MessageRepository $messageRepository,
         private MediaJobService $mediaJobService,
+        private GeneratedFileRegistrar $fileRegistrar,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -62,6 +70,7 @@ final readonly class MediaJobMessageSync
             }
         } elseif (MediaJob::STATUS_COMPLETED === $job->getStatus()) {
             $message->setText('');
+            $this->attachGeneratedFile($job, $message);
         }
 
         $this->em->flush();
@@ -71,5 +80,51 @@ final readonly class MediaJobMessageSync
             'message_id' => $messageId,
             'state' => $status['state'],
         ]);
+    }
+
+    /**
+     * Register the file the worker wrote during finalize as a `File` entity and
+     * link it to the message. Without this, a reload would still show an empty
+     * bubble: the live poll picks up `result.file.url` and adds the part on the
+     * client, but that part is lost on refresh because nothing connects it to
+     * the message row in the DB.
+     */
+    private function attachGeneratedFile(MediaJob $job, \App\Entity\Message $message): void
+    {
+        $result = $job->getResult();
+        $url = is_array($result['file'] ?? null) ? (string) ($result['file']['url'] ?? '') : '';
+        if ('' === $url) {
+            return;
+        }
+
+        // The worker stores the URL as `/api/v1/files/uploads/<relative_path>`;
+        // strip the route prefix to get the path inside the upload directory.
+        $prefix = '/api/v1/files/uploads/';
+        if (!str_starts_with($url, $prefix)) {
+            return;
+        }
+        $relativePath = substr($url, strlen($prefix));
+
+        // Idempotency: if the message already has a generated file at this
+        // path, we're done — avoids creating a duplicate File row on a retried
+        // sync (e.g. the reaper firing on a job the worker already completed).
+        foreach ($message->getFiles() as $existing) {
+            if ($existing->getFilePath() === $relativePath) {
+                return;
+            }
+        }
+
+        $file = $this->fileRegistrar->register($job->getUserId(), $relativePath, $job->getType());
+        if (null === $file) {
+            $this->logger->warning('MediaJobMessageSync: failed to register generated file', [
+                'job_key' => $job->getJobKey(),
+                'message_id' => $message->getId(),
+                'path' => $relativePath,
+            ]);
+
+            return;
+        }
+
+        $message->addFile($file);
     }
 }
