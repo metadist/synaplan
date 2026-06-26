@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Media;
 
 use App\AI\Service\AiFacade;
+use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -28,8 +29,10 @@ final readonly class MediaJobReaper
 {
     public function __construct(
         private MediaJobService $jobService,
+        private MediaJobMessageSync $messageSync,
         private MediaJobConfig $config,
         private AiFacade $aiFacade,
+        private MediaErrorMessageBuilder $errorBuilder,
         private LoggerInterface $logger,
     ) {
     }
@@ -43,22 +46,37 @@ final readonly class MediaJobReaper
     {
         $now = time();
         $cutoff = $now - $this->config->heartbeatStaleSeconds();
-        $stale = $this->jobService->findStale($cutoff, $limit);
+        $candidates = [];
+        foreach ($this->jobService->findStale($cutoff, $limit) as $job) {
+            $candidates[$job->getJobKey()] = $job;
+        }
+        foreach ($this->jobService->findPastDeadline($limit) as $job) {
+            $candidates[$job->getJobKey()] = $job;
+        }
 
         $reaped = 0;
-        foreach ($stale as $job) {
+        foreach ($candidates as $job) {
             // Re-check under the latest view: the store may have returned a job
             // that another process just finished, and terminal states are final.
             if ($job->isTerminal()) {
                 continue;
             }
 
-            $reason = $job->isPastDeadline($now)
-                ? 'Render exceeded its deadline'
-                : 'Render worker stopped responding (heartbeat lost)';
-
             $this->cancelProvider($job);
-            $this->jobService->markTimedOut($job, $reason);
+            $this->jobService->markTimedOut(
+                $job,
+                $job->isPastDeadline($now)
+                    ? $this->errorBuilder->buildTimeoutMessage(
+                        $job->getType(),
+                        $this->jobService->langFromJob($job),
+                    )
+                    : $this->errorBuilder->buildErrorMessage(
+                        new \RuntimeException('Render worker stopped responding'),
+                        $job->getType(),
+                        $this->jobService->langFromJob($job),
+                    ),
+            );
+            $this->messageSync->syncTerminalState($job);
             ++$reaped;
         }
 

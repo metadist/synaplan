@@ -269,6 +269,39 @@ final class MediaJobService
         return self::DEADLINE_SECONDS[$type] ?? self::DEFAULT_DEADLINE_SECONDS;
     }
 
+    /**
+     * Drive an overdue active job to `timed_out`. Returns true when the job
+     * was transitioned (callers should sync the assistant message).
+     */
+    public function enforceDeadline(MediaJob $job, string $userMessage): bool
+    {
+        if ($job->isTerminal() || !$job->isPastDeadline()) {
+            return false;
+        }
+
+        $this->markTimedOut($job, $userMessage);
+
+        return true;
+    }
+
+    /**
+     * Active jobs whose platform deadline has passed — including jobs whose
+     * worker is still heartbeating but the advancer never timed them out.
+     *
+     * @return list<MediaJob>
+     */
+    public function findPastDeadline(int $limit = 100): array
+    {
+        return $this->store->findPastDeadline($limit);
+    }
+
+    public function langFromJob(MediaJob $job): string
+    {
+        $lang = $job->getOptions()['lang'] ?? null;
+
+        return is_string($lang) && '' !== $lang ? $lang : 'en';
+    }
+
     private function clientState(string $status): string
     {
         return match ($status) {

@@ -980,7 +980,14 @@
       "lastChecked": "Zuletzt geprüft vor {seconds}s · nächste Prüfung in ~{interval}s",
       "progress": "{percent} % fertig",
       "pollError": "Status konnte nicht aktualisiert werden — nächster Versuch in Kürze.",
-      "failedTitle": "Videoerstellung fehlgeschlagen",
+      "refreshStatus": "Status jetzt prüfen",
+      "overdueWarning": "Die maximale Wartezeit ist überschritten. Es wird nach einem Endergebnis gesucht…",
+      "jobNotFound": "Dieser Hintergrundauftrag wird nicht mehr verfolgt. Bitte erneut generieren.",
+      "failedTitle": {
+        "video": "Videoerstellung fehlgeschlagen",
+        "image": "Bilderstellung fehlgeschlagen",
+        "audio": "Audioerstellung fehlgeschlagen"
+      },
       "failedBody": "Der Hintergrundauftrag wurde nicht abgeschlossen. Du kannst es mit einem anderen Modell erneut versuchen.",
       "maxWait": {
         "video": "Videos können bis zu {minutes} Minuten dauern.",

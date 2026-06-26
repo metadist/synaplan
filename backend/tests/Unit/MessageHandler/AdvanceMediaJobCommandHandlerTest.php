@@ -49,6 +49,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $this->lock = $this->createMock(SharedLockInterface::class);
 
         $this->config->method('pollIntervalSeconds')->willReturn(3);
+        $this->jobService->method('langFromJob')->willReturn('en');
 
         // By default the advance lock is granted; individual tests override.
         $this->lock->method('acquire')->willReturn(true);

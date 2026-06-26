@@ -25,16 +25,16 @@ Call log:
   2   | import { selectors } from '../helpers/selectors'
   3   | import { TIMEOUTS, getApiUrl } from '../config/config'
   4   | import { CREDENTIALS } from '../config/credentials'
-  5   | 
+  5   |
   6   | /** Base URL for API requests (backend port). Use this for all /api/* calls. */
   7   | function apiBaseUrl(): string {
   8   |   return getApiUrl()
   9   | }
-  10  | 
+  10  |
   11  | const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'http://host.docker.internal:8080'
   12  | const KEYCLOAK_REALM = 'synaplan'
   13  | const KEYCLOAK_TOKEN_ENDPOINT = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
-  14  | 
+  14  |
   15  | /**
   16  |  * Retrieve an OIDC access token via direct access grant (resource owner password).
   17  |  * Used for API-only tests that need an OIDC token without browser interaction.
@@ -55,16 +55,16 @@ Call log:
   32  |       password: options.password,
   33  |     }),
   34  |   })
-  35  | 
+  35  |
   36  |   if (!response.ok) {
   37  |     const body = await response.text()
   38  |     throw new Error(`Failed to retrieve OIDC access token: ${response.status} ${body}`)
   39  |   }
-  40  | 
+  40  |
   41  |   const data = await response.json()
   42  |   return data.access_token
   43  | }
-  44  | 
+  44  |
   45  | /**
   46  |  * Exchange an OIDC token for a different-audience token via RFC 8693 token exchange.
   47  |  */
@@ -89,82 +89,82 @@ Call log:
   66  |       client_secret: options.clientSecret,
   67  |     }),
   68  |   })
-  69  | 
+  69  |
   70  |   if (!response.ok) {
   71  |     const body = await response.text()
   72  |     throw new Error(`Token exchange failed: ${response.status} ${body}`)
   73  |   }
-  74  | 
+  74  |
   75  |   const data = await response.json()
   76  |   return data.access_token
   77  | }
-  78  | 
+  78  |
   79  | interface AdminUserSummary {
   80  |   id: number
   81  |   email: string | null
   82  |   emailVerified: boolean
   83  | }
-  84  | 
+  84  |
   85  | interface AdminUsersResponse {
   86  |   users?: AdminUserSummary[]
   87  | }
-  88  | 
+  88  |
   89  | export async function login(page: Page, credentials?: { user: string; pass: string }) {
   90  |   if (process.env.AUTH_METHOD === 'oidc') {
   91  |     return loginViaOidcButton(page, credentials)
   92  |   }
-  93  | 
+  93  |
   94  |   const creds = CREDENTIALS.getCredentials(credentials)
-  95  | 
+  95  |
 > 96  |   await page.goto('/login')
       |              ^ Error: page.goto: Protocol error (Page.navigate): Cannot navigate to invalid URL
-  97  | 
+  97  |
   98  |   await page.fill(selectors.login.email, creds.user)
   99  |   await page.fill(selectors.login.password, creds.pass)
   100 |   await page.click(selectors.login.submit)
-  101 | 
+  101 |
   102 |   try {
   103 |     await page.waitForSelector(selectors.chat.textInput, { timeout: TIMEOUTS.STANDARD })
   104 |   } catch {
   105 |     throw new Error(`Login failed: current URL is ${page.url()}`)
   106 |   }
   107 | }
-  108 | 
+  108 |
   109 | export async function loginViaOidcButton(page: Page, credentials?: { user: string; pass: string }) {
   110 |   const user = credentials?.user ?? process.env.OIDC_USER ?? 'testuser@synaplan.com'
   111 |   const pass = credentials?.pass ?? process.env.OIDC_PASS ?? 'testpass123'
-  112 | 
+  112 |
   113 |   await page.goto('/login')
   114 |   await page.click(selectors.oidc.keycloakButton)
-  115 | 
+  115 |
   116 |   // Keycloak login form
   117 |   await page.fill(selectors.oidc.keycloakUsername, user)
   118 |   await page.fill(selectors.oidc.keycloakPassword, pass)
   119 |   await page.click(selectors.oidc.keycloakSubmit)
-  120 | 
+  120 |
   121 |   // Wait for redirect back + auth
   122 |   await page.waitForSelector(selectors.chat.textInput, { timeout: 15_000 })
   123 | }
-  124 | 
+  124 |
   125 | export async function loginViaOidcRedirect(
   126 |   page: Page,
   127 |   credentials?: { user: string; pass: string }
   128 | ) {
   129 |   const user = credentials?.user ?? process.env.OIDC_USER ?? 'testuser@synaplan.com'
   130 |   const pass = credentials?.pass ?? process.env.OIDC_PASS ?? 'testpass123'
-  131 | 
+  131 |
   132 |   await page.goto('/login')
-  133 | 
+  133 |
   134 |   // Should auto-redirect to Keycloak - wait for Keycloak login form
   135 |   await page.waitForSelector(selectors.oidc.keycloakSubmit, { timeout: 15_000 })
-  136 | 
+  136 |
   137 |   await page.fill(selectors.oidc.keycloakUsername, user)
   138 |   await page.fill(selectors.oidc.keycloakPassword, pass)
   139 |   await page.click(selectors.oidc.keycloakSubmit)
-  140 | 
+  140 |
   141 |   await page.waitForSelector(selectors.chat.textInput, { timeout: 15_000 })
   142 | }
-  143 | 
+  143 |
   144 | /**
   145 |  * Login via API and return cookie header string for authenticated requests
   146 |  */
@@ -173,18 +173,18 @@ Call log:
   149 |   credentials?: { user?: string; pass?: string }
   150 | ): Promise<string> {
   151 |   const creds = CREDENTIALS.getCredentials(credentials)
-  152 | 
+  152 |
   153 |   const response = await request.post(`${apiBaseUrl()}/api/v1/auth/login`, {
   154 |     data: {
   155 |       email: creds.user,
   156 |       password: creds.pass,
   157 |     },
   158 |   })
-  159 | 
+  159 |
   160 |   if (!response.ok()) {
   161 |     throw new Error(`Login failed with status ${response.status()}`)
   162 |   }
-  163 | 
+  163 |
   164 |   const setCookieHeaders = response.headers()['set-cookie'] || []
   165 |   const cookieHeaders = Array.isArray(setCookieHeaders) ? setCookieHeaders : [setCookieHeaders]
   166 |   const cookies = cookieHeaders
@@ -193,10 +193,10 @@ Call log:
   169 |       return match ? `${match[1]}=${match[2]}` : null
   170 |     })
   171 |     .filter((cookie): cookie is string => cookie !== null)
-  172 | 
+  172 |
   173 |   return cookies.join('; ')
   174 | }
-  175 | 
+  175 |
   176 | /**
   177 |  * Get headers with auth cookie for API requests (e.g. in API-only tests).
   178 |  * Calls loginViaApi and returns { Cookie: '...' } for use with request.get/post etc.
@@ -208,7 +208,7 @@ Call log:
   184 |   const cookie = await loginViaApi(request, credentials)
   185 |   return { Cookie: cookie }
   186 | }
-  187 | 
+  187 |
   188 | /**
   189 |  * Delete user by email via admin API (uses admin credentials for the request)
   190 |  */

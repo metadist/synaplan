@@ -1103,10 +1103,7 @@ function applyMediaJobToMessage(message: Message | undefined, raw: unknown): voi
   }
 }
 
-function handleMediaJobCompleted(
-  message: Message,
-  payload: { url: string; type: string }
-): void {
+function handleMediaJobCompleted(message: Message, payload: { url: string; type: string }): void {
   if (message.mediaJob) {
     message.mediaJob = { ...message.mediaJob, state: 'done' }
   }

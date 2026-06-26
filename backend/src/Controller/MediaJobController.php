@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,6 +28,8 @@ final class MediaJobController extends AbstractController
 {
     public function __construct(
         private readonly MediaJobService $mediaJobService,
+        private readonly MediaJobMessageSync $messageSync,
+        private readonly MediaErrorMessageBuilder $errorBuilder,
     ) {
     }
 
@@ -52,6 +56,18 @@ final class MediaJobController extends AbstractController
         $job = $this->mediaJobService->findForUser($jobKey, $user->getId());
         if (null === $job) {
             return $this->json(['error' => 'Job not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Safety net: if the worker/reaper missed the deadline, the user's poll
+        // must still drive the job to a terminal state they can see.
+        if ($this->mediaJobService->enforceDeadline(
+            $job,
+            $this->errorBuilder->buildTimeoutMessage(
+                $job->getType(),
+                $this->mediaJobService->langFromJob($job),
+            ),
+        )) {
+            $this->messageSync->syncTerminalState($job);
         }
 
         return $this->json([

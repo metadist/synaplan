@@ -1,4 +1,5 @@
 import { ref, watch, onBeforeUnmount, type Ref } from 'vue'
+import { ApiError } from '@/services/api/httpClient'
 import { fetchMediaJobStatus, type MediaJobPollResult } from '@/services/api/mediaJobApi'
 
 /** Client poll cadence — balances freshness vs. server load. */
@@ -15,6 +16,8 @@ export interface MediaJobPollState {
   fetchError: Ref<string | null>
   /** Latest status payload from the server. */
   latest: Ref<MediaJobPollResult | null>
+  /** Trigger an immediate status check (manual refresh). */
+  refreshNow: () => Promise<void>
 }
 
 /**
@@ -24,7 +27,8 @@ export interface MediaJobPollState {
 export function useMediaJobPoll(
   jobId: Ref<string | undefined>,
   enabled: Ref<boolean>,
-  onUpdate: (status: MediaJobPollResult) => void
+  onUpdate: (status: MediaJobPollResult) => void,
+  onJobLost?: () => void
 ): MediaJobPollState {
   const secondsSinceCheck = ref(0)
   const isFetching = ref(false)
@@ -58,6 +62,12 @@ export function useMediaJobPoll(
       fetchError.value = null
       onUpdate(status)
     } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        fetchError.value = null
+        onJobLost?.()
+        stop()
+        return
+      }
       fetchError.value = err instanceof Error ? err.message : 'Poll failed'
     } finally {
       isFetching.value = false
@@ -88,7 +98,7 @@ export function useMediaJobPoll(
 
   onBeforeUnmount(stop)
 
-  return { secondsSinceCheck, isFetching, fetchError, latest }
+  return { secondsSinceCheck, isFetching, fetchError, latest, refreshNow: pollOnce }
 }
 
 export function formatElapsedDuration(totalSeconds: number): string {

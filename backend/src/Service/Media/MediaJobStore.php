@@ -127,4 +127,30 @@ final class MediaJobStore
 
         return $jobs;
     }
+
+    /**
+     * Non-terminal jobs whose {@see MediaJob::isPastDeadline()} is true.
+     * Unlike {@see findStale}, this catches overdue jobs even when a worker
+     * is still heartbeating (advancer/reaper gap).
+     *
+     * @return list<MediaJob>
+     */
+    public function findPastDeadline(int $limit = 100): array
+    {
+        $keys = $this->redis->zRangeByScore(self::ACTIVE_ZSET, '-inf', '+inf', $limit);
+        $jobs = [];
+        foreach ($keys as $key) {
+            $job = $this->find($key);
+            if (null === $job || $job->isTerminal()) {
+                $this->redis->zRem(self::ACTIVE_ZSET, $key);
+                continue;
+            }
+            if (!$job->isPastDeadline()) {
+                continue;
+            }
+            $jobs[] = $job;
+        }
+
+        return $jobs;
+    }
 }

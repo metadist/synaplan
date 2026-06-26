@@ -1153,7 +1153,14 @@
       "lastChecked": "Última comprobación hace {seconds}s · siguiente en ~{interval}s",
       "progress": "{percent} % completado",
       "pollError": "No se pudo actualizar el estado — se reintentará en la próxima comprobación.",
-      "failedTitle": "Error al generar el vídeo",
+      "refreshStatus": "Comprobar estado ahora",
+      "overdueWarning": "Este trabajo superó el tiempo máximo de espera. Comprobando el resultado final…",
+      "jobNotFound": "Este trabajo en segundo plano ya no se rastrea. Inténtalo de nuevo.",
+      "failedTitle": {
+        "video": "Error al generar el vídeo",
+        "image": "Error al generar la imagen",
+        "audio": "Error al generar el audio"
+      },
       "failedBody": "El trabajo en segundo plano no se completó. Puedes intentarlo de nuevo con otro modelo.",
       "maxWait": {
         "video": "Los vídeos pueden tardar hasta {minutes} minutos.",

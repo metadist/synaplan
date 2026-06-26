@@ -248,7 +248,13 @@ final readonly class AdvanceMediaJobCommandHandler
     private function timeOut(MediaJob $job): void
     {
         $this->cancelProvider($job);
-        $this->jobService->markTimedOut($job, 'Render exceeded its deadline');
+        $this->jobService->markTimedOut(
+            $job,
+            $this->errorBuilder->buildTimeoutMessage(
+                $job->getType(),
+                $this->jobService->langFromJob($job),
+            ),
+        );
         $this->messageSync->syncTerminalState($job);
     }
 

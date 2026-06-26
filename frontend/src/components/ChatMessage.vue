@@ -108,9 +108,7 @@
 
         <!-- Processing Status (inside bubble, before content) -->
         <div
-          v-if="
-            isStreaming && processingStatus && role === 'assistant' && !showMediaJobBanner
-          "
+          v-if="isStreaming && processingStatus && role === 'assistant' && !showMediaJobBanner"
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-typing-indicator"
         >

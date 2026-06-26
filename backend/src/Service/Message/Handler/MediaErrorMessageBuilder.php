@@ -7,6 +7,15 @@ use App\AI\Exception\ProviderException;
 class MediaErrorMessageBuilder
 {
     /**
+     * Localized copy when a background job exceeds its platform wait budget.
+     */
+    public function buildTimeoutMessage(string $mediaType, string $lang): string
+    {
+        return $this->getFailureExplanation('timeout', $mediaType, $lang)
+            ?? $this->getGenericMediaError($mediaType, $lang);
+    }
+
+    /**
      * Build a user-friendly, translated error message from the exception.
      */
     public function buildErrorMessage(\Exception $e, string $mediaType, string $lang): string

@@ -87,6 +87,8 @@ export interface MediaJobInfo {
   elapsedSeconds?: number
   maxWaitSeconds?: number
   remainingSeconds?: number
+  /** Poll returned 404 — job snapshot expired from Redis. */
+  lost?: boolean
 }
 
 export interface Message {

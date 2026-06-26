@@ -44,14 +44,27 @@ function applyPollStatus(status: MediaJobPollResult) {
   }
 }
 
-const { secondsSinceCheck, isFetching, fetchError, latest } = useMediaJobPoll(
+function handleJobLost() {
+  live.value = {
+    ...props.mediaJob,
+    state: 'failed',
+    error: undefined,
+    lost: true,
+  }
+}
+
+const { secondsSinceCheck, isFetching, fetchError, latest, refreshNow } = useMediaJobPoll(
   toRef(() => jobId.value),
   pollEnabled,
-  applyPollStatus
+  applyPollStatus,
+  handleJobLost
 )
 
 const isFailed = computed(
-  () => props.mediaJob.state === 'failed' || props.mediaJob.state === 'cancelled'
+  () =>
+    props.mediaJob.state === 'failed' ||
+    props.mediaJob.state === 'cancelled' ||
+    props.mediaJob.lost === true
 )
 
 const iconForType = computed(() => {
@@ -68,7 +81,7 @@ const iconForType = computed(() => {
 })
 
 const titleKey = computed(() => {
-  if (isFailed.value) return 'message.mediaJob.failedTitle'
+  if (isFailed.value) return `message.mediaJob.failedTitle.${props.mediaJob.type}`
   return `message.mediaJob.title.${props.mediaJob.type}`
 })
 
@@ -86,6 +99,19 @@ const maxWaitMinutes = computed(() => {
   return Math.max(1, Math.round(seconds / 60))
 })
 
+const isOverdue = computed(() => {
+  if (isFailed.value) return false
+  const remaining = latest.value?.remaining_seconds ?? props.mediaJob.remainingSeconds
+  if (remaining !== undefined && remaining !== null) {
+    return remaining <= 0
+  }
+  const maxWait = props.mediaJob.maxWaitSeconds ?? latest.value?.max_wait_seconds
+  if (maxWait && elapsedSeconds.value > maxWait) {
+    return true
+  }
+  return false
+})
+
 const progressPercent = computed(() => {
   const raw = latest.value?.percent ?? props.mediaJob.percent
   if (raw === undefined || raw === null) return null
@@ -93,6 +119,13 @@ const progressPercent = computed(() => {
 })
 
 const pollIntervalSeconds = Math.round(MEDIA_JOB_POLL_INTERVAL_MS / 1000)
+
+const failureMessage = computed(() => {
+  if (props.mediaJob.lost) {
+    return undefined
+  }
+  return props.mediaJob.error
+})
 </script>
 
 <template>
@@ -100,6 +133,7 @@ const pollIntervalSeconds = Math.round(MEDIA_JOB_POLL_INTERVAL_MS / 1000)
     class="media-job-status rounded-xl border p-4"
     :class="{
       'media-job-status--failed': isFailed,
+      'media-job-status--overdue': isOverdue,
     }"
     role="status"
     :aria-label="$t(titleKey)"
@@ -122,10 +156,32 @@ const pollIntervalSeconds = Math.round(MEDIA_JOB_POLL_INTERVAL_MS / 1000)
             aria-hidden="true"
           />
           <p class="text-sm font-medium txt-primary">{{ $t(titleKey) }}</p>
+          <button
+            v-if="!isFailed"
+            type="button"
+            class="media-job-status__refresh"
+            :disabled="isFetching"
+            data-testid="media-job-refresh"
+            @click="refreshNow()"
+          >
+            <Icon icon="mdi:refresh" class="w-3.5 h-3.5" aria-hidden="true" />
+            {{ $t('message.mediaJob.refreshStatus') }}
+          </button>
         </div>
 
-        <p v-if="isFailed && mediaJob.error" class="text-sm txt-primary break-words" data-testid="media-job-error">
-          {{ mediaJob.error }}
+        <p
+          v-if="isFailed && failureMessage"
+          class="text-sm txt-primary break-words"
+          data-testid="media-job-error"
+        >
+          {{ failureMessage }}
+        </p>
+        <p
+          v-else-if="isFailed && mediaJob.lost"
+          class="text-sm txt-primary"
+          data-testid="media-job-lost"
+        >
+          {{ $t('message.mediaJob.jobNotFound') }}
         </p>
         <p v-else-if="isFailed" class="text-sm txt-muted">
           {{ $t('message.mediaJob.failedBody') }}
@@ -134,6 +190,15 @@ const pollIntervalSeconds = Math.round(MEDIA_JOB_POLL_INTERVAL_MS / 1000)
         <template v-else>
           <p class="text-sm txt-muted leading-relaxed">
             {{ $t('message.mediaJob.backgroundHint') }}
+          </p>
+
+          <p
+            v-if="isOverdue"
+            class="text-sm"
+            style="color: var(--danger, #dc2626)"
+            data-testid="media-job-overdue"
+          >
+            {{ $t('message.mediaJob.overdueWarning') }}
           </p>
 
           <p class="text-sm txt-primary" data-testid="media-job-elapsed">
@@ -158,7 +223,11 @@ const pollIntervalSeconds = Math.round(MEDIA_JOB_POLL_INTERVAL_MS / 1000)
             {{ $t(`message.mediaJob.maxWait.${mediaJob.type}`, { minutes: maxWaitMinutes }) }}
           </p>
 
-          <div v-if="progressPercent !== null" class="media-job-status__progress" data-testid="media-job-progress">
+          <div
+            v-if="progressPercent !== null"
+            class="media-job-status__progress"
+            data-testid="media-job-progress"
+          >
             <div class="media-job-status__progress-track">
               <div
                 class="media-job-status__progress-fill"
@@ -190,6 +259,30 @@ const pollIntervalSeconds = Math.round(MEDIA_JOB_POLL_INTERVAL_MS / 1000)
 }
 .media-job-status--failed {
   border-color: var(--danger, #dc2626);
+}
+.media-job-status--overdue {
+  border-color: var(--danger, #dc2626);
+}
+.media-job-status__refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  color: var(--brand);
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.25));
+  border-radius: 999px;
+  cursor: pointer;
+}
+.media-job-status__refresh:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.media-job-status__refresh:not(:disabled):hover {
+  background: var(--surface-card, rgba(127, 127, 127, 0.06));
 }
 .media-job-status__progress-track {
   height: 6px;

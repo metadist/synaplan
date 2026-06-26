@@ -7,8 +7,10 @@ namespace App\Tests\Unit\Service\Media;
 use App\AI\Service\AiFacade;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobConfig;
+use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobReaper;
 use App\Service\Media\MediaJobService;
+use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -21,21 +23,27 @@ use Psr\Log\NullLogger;
 final class MediaJobReaperTest extends TestCase
 {
     private MediaJobService&MockObject $jobService;
+    private MediaJobMessageSync&MockObject $messageSync;
     private MediaJobConfig&MockObject $config;
     private AiFacade&MockObject $aiFacade;
+    private MediaErrorMessageBuilder $errorBuilder;
     private MediaJobReaper $reaper;
 
     protected function setUp(): void
     {
         $this->jobService = $this->createMock(MediaJobService::class);
+        $this->messageSync = $this->createMock(MediaJobMessageSync::class);
         $this->config = $this->createMock(MediaJobConfig::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
+        $this->errorBuilder = new MediaErrorMessageBuilder();
         $this->config->method('heartbeatStaleSeconds')->willReturn(90);
 
         $this->reaper = new MediaJobReaper(
             $this->jobService,
+            $this->messageSync,
             $this->config,
             $this->aiFacade,
+            $this->errorBuilder,
             new NullLogger(),
         );
     }
@@ -49,6 +57,8 @@ final class MediaJobReaperTest extends TestCase
             ->setStatus(MediaJob::STATUS_RUNNING);
 
         $this->jobService->method('findStale')->willReturn([$job]);
+        $this->jobService->method('findPastDeadline')->willReturn([]);
+        $this->jobService->method('langFromJob')->willReturn('en');
 
         $this->aiFacade->expects(self::once())
             ->method('cancelVideoOperation')
@@ -56,6 +66,26 @@ final class MediaJobReaperTest extends TestCase
         $this->jobService->expects(self::once())
             ->method('markTimedOut')
             ->with($job, self::isType('string'));
+        $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
+
+        self::assertSame(1, $this->reaper->reap());
+    }
+
+    public function testTimesOutPastDeadlineJobEvenWithFreshHeartbeat(): void
+    {
+        $job = (new MediaJob())
+            ->setUserId(7)
+            ->setProvider('google')
+            ->setProviderRef('op-2')
+            ->setStatus(MediaJob::STATUS_RUNNING)
+            ->setDeadlineAt(time() - 30);
+
+        $this->jobService->method('findStale')->willReturn([]);
+        $this->jobService->method('findPastDeadline')->willReturn([$job]);
+        $this->jobService->method('langFromJob')->willReturn('en');
+
+        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, self::isType('string'));
+        $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
 
         self::assertSame(1, $this->reaper->reap());
     }
@@ -64,7 +94,14 @@ final class MediaJobReaperTest extends TestCase
     {
         $this->config = $this->createMock(MediaJobConfig::class);
         $this->config->method('heartbeatStaleSeconds')->willReturn(120);
-        $reaper = new MediaJobReaper($this->jobService, $this->config, $this->aiFacade, new NullLogger());
+        $reaper = new MediaJobReaper(
+            $this->jobService,
+            $this->messageSync,
+            $this->config,
+            $this->aiFacade,
+            $this->errorBuilder,
+            new NullLogger(),
+        );
 
         $before = time();
         $this->jobService->expects(self::once())
@@ -74,6 +111,7 @@ final class MediaJobReaperTest extends TestCase
                 return $cutoff <= $before - 120 + 1 && $cutoff >= $before - 120 - 2;
             }))
             ->willReturn([]);
+        $this->jobService->method('findPastDeadline')->willReturn([]);
 
         self::assertSame(0, $reaper->reap());
     }
@@ -82,6 +120,7 @@ final class MediaJobReaperTest extends TestCase
     {
         $terminal = (new MediaJob())->setStatus(MediaJob::STATUS_COMPLETED);
         $this->jobService->method('findStale')->willReturn([$terminal]);
+        $this->jobService->method('findPastDeadline')->willReturn([]);
 
         $this->aiFacade->expects(self::never())->method('cancelVideoOperation');
         $this->jobService->expects(self::never())->method('markTimedOut');
@@ -92,6 +131,7 @@ final class MediaJobReaperTest extends TestCase
     public function testNoStaleJobsReturnsZero(): void
     {
         $this->jobService->method('findStale')->willReturn([]);
+        $this->jobService->method('findPastDeadline')->willReturn([]);
 
         $this->jobService->expects(self::never())->method('markTimedOut');
 

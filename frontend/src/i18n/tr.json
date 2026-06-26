@@ -1153,7 +1153,14 @@
       "lastChecked": "Son kontrol {seconds}s önce · sonraki ~{interval}s içinde",
       "progress": "%{percent} tamamlandı",
       "pollError": "Durum yenilenemedi — bir sonraki kontrolde tekrar denenecek.",
-      "failedTitle": "Video oluşturma başarısız",
+      "refreshStatus": "Durumu şimdi kontrol et",
+      "overdueWarning": "Bu iş maksimum bekleme süresini aştı. Son sonuç kontrol ediliyor…",
+      "jobNotFound": "Bu arka plan işi artık izlenmiyor. Lütfen yeniden oluşturmayı deneyin.",
+      "failedTitle": {
+        "video": "Video oluşturma başarısız",
+        "image": "Görsel oluşturma başarısız",
+        "audio": "Ses oluşturma başarısız"
+      },
       "failedBody": "Arka plan işi tamamlanmadı. Farklı bir modelle tekrar deneyebilirsiniz.",
       "maxWait": {
         "video": "Videolar {minutes} dakikaya kadar sürebilir.",
