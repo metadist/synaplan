@@ -128,7 +128,7 @@ final readonly class AdvanceMediaJobCommandHandler
             return;
         }
 
-        $operationName = is_string($operation['operationName'] ?? null) ? $operation['operationName'] : '';
+        $operationName = $operation['operationName'];
         if ('' === $operationName) {
             $this->fail($job, new \RuntimeException('Provider returned no operation handle'));
 
@@ -161,18 +161,18 @@ final readonly class AdvanceMediaJobCommandHandler
             return;
         }
 
-        $percent = isset($result['percent']) && is_numeric($result['percent']) ? (int) $result['percent'] : null;
-        $status = isset($result['status']) && is_string($result['status']) ? $result['status'] : null;
+        $percent = isset($result['percent']) ? (int) $result['percent'] : null;
+        $status = $result['status'] ?? null;
         $this->jobService->updateProgress($job, $percent, $status);
 
-        $error = $result['error'] ?? null;
+        $error = $result['error'];
         if (is_string($error) && '' !== $error) {
             $this->fail($job, new \RuntimeException($error));
 
             return;
         }
 
-        if (true !== ($result['done'] ?? false)) {
+        if (true !== $result['done']) {
             // Still rendering — poll again after the interval.
             $this->dispatcher->dispatch($job, $this->config->pollIntervalSeconds());
 

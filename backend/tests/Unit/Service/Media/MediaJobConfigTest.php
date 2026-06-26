@@ -31,7 +31,7 @@ final class MediaJobConfigTest extends TestCase
     public function testPerUserOverrideWinsOverGlobal(): void
     {
         $this->repo->method('getValue')->willReturnCallback(
-            static fn (int $owner, string $group, string $setting): ?string => 42 === $owner ? '1' : '0'
+            static fn (int $owner, string $group, string $setting): string => 42 === $owner ? '1' : '0'
         );
 
         self::assertTrue($this->config->isAsyncJobsEnabled(42), 'per-user ON must beat global OFF');

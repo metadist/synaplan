@@ -17,7 +17,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Lock\LockFactory;
-use Symfony\Component\Lock\LockInterface;
+use Symfony\Component\Lock\SharedLockInterface;
 
 /**
  * Sprint A acceptance for the async media-job advancer: each invocation does
@@ -32,7 +32,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
     private MediaJobConfig&MockObject $config;
     private AiFacade&MockObject $aiFacade;
     private LockFactory&MockObject $lockFactory;
-    private LockInterface&MockObject $lock;
+    private SharedLockInterface&MockObject $lock;
     private string $uploadDir;
     private AdvanceMediaJobCommandHandler $handler;
 
@@ -43,7 +43,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $this->config = $this->createMock(MediaJobConfig::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->lockFactory = $this->createMock(LockFactory::class);
-        $this->lock = $this->createMock(LockInterface::class);
+        $this->lock = $this->createMock(SharedLockInterface::class);
 
         $this->config->method('pollIntervalSeconds')->willReturn(3);
 
@@ -260,7 +260,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
 
     public function testLockNotAcquiredSkipsWithoutTouchingTheJob(): void
     {
-        $lock = $this->createMock(LockInterface::class);
+        $lock = $this->createMock(SharedLockInterface::class);
         $lock->method('acquire')->willReturn(false);
         $lockFactory = $this->createMock(LockFactory::class);
         $lockFactory->method('createLock')->willReturn($lock);
