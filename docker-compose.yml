@@ -382,10 +382,16 @@ services:
     # consumer ever starting; or env-prefix mismatch → consumer running but
     # every job a no-op). A missing process = unhealthy = visible in
     # `docker compose ps`.
+    #
+    # We scan /proc/*/cmdline rather than using pgrep/ps: the base image is
+    # minimal and ships NEITHER procps nor pgrep, so a pgrep-based check would
+    # report the worker unhealthy forever even while it consumes happily. grep
+    # is always present; cmdline args are NUL-separated, which grep matches as a
+    # plain substring.
     healthcheck:
       test:
         - "CMD-SHELL"
-        - "pgrep -f 'bin/console.*messenger:consume' >/dev/null"
+        - "grep -lq 'messenger:consume' /proc/[0-9]*/cmdline 2>/dev/null"
       interval: 30s
       timeout: 5s
       retries: 3
