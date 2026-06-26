@@ -950,6 +950,27 @@ class AiFacade
     }
 
     /**
+     * Whether the named video provider supports the async submit/poll surface
+     * ({@see SupportsAsyncVideo}). Used by the chat path to decide whether a
+     * render can detach to {@see \App\Service\Media\MediaJobService} or must
+     * stay on the legacy blocking {@see generateVideo()} path.
+     */
+    public function supportsAsyncVideo(?string $providerName): bool
+    {
+        if (null === $providerName || '' === $providerName) {
+            return false;
+        }
+
+        try {
+            $provider = $this->registry->getVideoGenerationProvider($providerName);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $provider instanceof SupportsAsyncVideo;
+    }
+
+    /**
      * Start an async video generation operation (non-blocking).
      *
      * @return array{operationName: string, provider: string, model: string, duration: int, resolution: string}

@@ -216,7 +216,7 @@ final readonly class TaskPlanExecutor
      * @param array<string, mixed> $classification
      * @param array<string, mixed> $options
      *
-     * @return array{content: string, files: list<array<string, mixed>>, metadata: array<string, mixed>, node_statuses: array<string, string>, partial_failure: bool, all_failed: bool}
+     * @return array{content: string, files: list<array<string, mixed>>, metadata: array<string, mixed>, node_statuses: array<string, string>, node_job_keys: array<string, string>, partial_failure: bool, all_failed: bool}
      */
     private function runDag(
         Message $message,
@@ -261,7 +261,14 @@ final readonly class TaskPlanExecutor
         $messageId = $message->getId();
         if (null !== $messageId) {
             try {
-                $this->store->persistWithStatuses($messageId, $plan->plan, $plan->modelId, $assembled['node_statuses']);
+                $this->store->persistWithStatuses(
+                    $messageId,
+                    $plan->plan,
+                    $plan->modelId,
+                    $assembled['node_statuses'],
+                    'pending',
+                    $assembled['node_job_keys'],
+                );
             } catch (\Throwable $e) {
                 $this->logger->warning('TaskPlanExecutor: failed to persist DAG plan (ignored)', [
                     'message_id' => $messageId,

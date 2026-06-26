@@ -1335,6 +1335,12 @@ class StreamController extends AbstractController
                 if (!empty($response['metadata']['media_type'])) {
                     $outgoingMessage->setMeta('media_type', $response['metadata']['media_type']);
                 }
+                if (!empty($response['metadata']['media_job']) && is_array($response['metadata']['media_job'])) {
+                    $outgoingMessage->setMeta(
+                        'media_job',
+                        (string) json_encode($response['metadata']['media_job'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
+                    );
+                }
 
                 // Multi-task routing: mark the OUT message as a DAG turn so the
                 // frontend can offer the simple "Again" (full re-plan) instead of

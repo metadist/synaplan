@@ -38,6 +38,7 @@ final class ResultAssembler
      *     files: list<array<string, mixed>>,
      *     metadata: array<string, mixed>,
      *     node_statuses: array<string, string>,
+     *     node_job_keys: array<string, string>,
      *     partial_failure: bool,
      *     all_failed: bool
      * }
@@ -45,12 +46,19 @@ final class ResultAssembler
     public function assemble(TaskPlan $plan, NodeContext $context): array
     {
         $statuses = [];
+        $jobKeys = [];
         $successCount = 0;
         $failureCount = 0;
         foreach ($plan->nodes as $node) {
             $result = $context->getResult($node->id);
-            $status = null !== $result ? $result->status : NodeStatus::Skipped;
+            $status = null !== $result ? $result->status : NodeStatus::Pending;
             $statuses[$node->id] = $status->value;
+            if (null !== $result) {
+                $mediaJob = $result->metadata['media_job'] ?? null;
+                if (is_array($mediaJob) && is_string($mediaJob['job_id'] ?? null) && '' !== $mediaJob['job_id']) {
+                    $jobKeys[$node->id] = $mediaJob['job_id'];
+                }
+            }
             if (NodeStatus::Done === $status) {
                 ++$successCount;
             } elseif (NodeStatus::Failed === $status) {
@@ -110,7 +118,7 @@ final class ResultAssembler
                 continue;
             }
             $nodeResult = $context->getResult($node->id);
-            $nodeStatus = null !== $nodeResult ? $nodeResult->status->value : 'skipped';
+            $nodeStatus = null !== $nodeResult ? $nodeResult->status->value : 'pending';
             $card = [
                 'nodeId' => $node->id,
                 'capability' => $node->capability->value,
@@ -146,6 +154,10 @@ final class ResultAssembler
                 if (null !== $nodeResult->error && '' !== $nodeResult->error) {
                     $card['error'] = $nodeResult->error;
                 }
+                $mediaJob = $nodeResult->metadata['media_job'] ?? null;
+                if (is_array($mediaJob) && is_string($mediaJob['job_id'] ?? null) && '' !== $mediaJob['job_id']) {
+                    $card['job_id'] = $mediaJob['job_id'];
+                }
             }
             $renderCards[] = $card;
         }
@@ -160,6 +172,7 @@ final class ResultAssembler
             'files' => $files,
             'metadata' => $metadata,
             'node_statuses' => $statuses,
+            'node_job_keys' => $jobKeys,
             'partial_failure' => $partialFailure,
             'all_failed' => $allFailed,
         ];

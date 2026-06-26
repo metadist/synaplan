@@ -12,6 +12,10 @@ use App\Service\File\FileHelper;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\MediaCancellationStore;
+use App\Service\Media\MediaJob;
+use App\Service\Media\MediaJobConfig;
+use App\Service\Media\MediaJobDispatcher;
+use App\Service\Media\MediaJobService;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
@@ -45,6 +49,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private MessageBusInterface $messageBus,
         private PerfPipelineFlag $perfPipelineFlag,
         private MediaCancellationStore $cancellationStore,
+        private MediaJobConfig $mediaJobConfig,
+        private MediaJobService $mediaJobService,
+        private MediaJobDispatcher $mediaJobDispatcher,
         private string $uploadDir = '/var/www/backend/var/uploads',
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
@@ -561,6 +568,22 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'reference_count' => count($referenceImageUrls),
                         'from_text_url' => [] !== $imageUrlsInText,
                     ]);
+                }
+
+                $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+                if ($this->mediaJobConfig->isAsyncJobsEnabled($effectiveUserId)
+                    && $this->aiFacade->supportsAsyncVideo($provider)) {
+                    return $this->detachVideoToAsyncJob(
+                        $message,
+                        $classification,
+                        $options,
+                        $prompt,
+                        $provider,
+                        $modelName,
+                        $modelId,
+                        $videoOptions,
+                        $progressCallback,
+                    );
                 }
 
                 $result = $this->aiFacade->generateVideo(
@@ -1407,6 +1430,97 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     /**
      * Notify progress callback.
      */
+    /**
+     * Stage a video render as a background {@see MediaJob} and return immediately
+     * with a `running` placeholder (Release 4.0 Sprint B). The advancer owns the
+     * provider submit/poll/finalize loop; billing stays on the terminal path (Sprint E).
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $videoOptions   provider options (duration, image_url, …)
+     *
+     * @return array{metadata: array<string, mixed>}
+     */
+    private function detachVideoToAsyncJob(
+        Message $message,
+        array $classification,
+        array $options,
+        string $prompt,
+        string $provider,
+        ?string $modelName,
+        ?int $modelId,
+        array $videoOptions,
+        ?callable $progressCallback,
+    ): array {
+        $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+        $videoOptions['lang'] = is_string($classification['language'] ?? null)
+            ? $classification['language']
+            : ($message->getLanguage() ?: 'en');
+
+        $chatId = null;
+        $chat = $message->getChat();
+        if (null !== $chat) {
+            $chatId = $chat->getId();
+        }
+
+        $nodeId = isset($options['node_id']) && is_scalar($options['node_id'])
+            ? trim((string) $options['node_id'])
+            : null;
+        $trackId = isset($options['track_id']) && is_scalar($options['track_id'])
+            ? trim((string) $options['track_id'])
+            : null;
+
+        $inputRef = isset($videoOptions['image_url']) && is_string($videoOptions['image_url'])
+            ? $videoOptions['image_url']
+            : null;
+
+        $job = $this->mediaJobService->create([
+            'userId' => $effectiveUserId,
+            'type' => MediaJob::TYPE_VIDEO,
+            'provider' => $provider,
+            'prompt' => $prompt,
+            'modelId' => $modelId,
+            'model' => $modelName,
+            'chatId' => $chatId,
+            'messageId' => $message->getId(),
+            'nodeId' => '' !== (string) $nodeId ? $nodeId : null,
+            'trackId' => '' !== $trackId ? $trackId : null,
+            'inputRef' => $inputRef,
+            'options' => $videoOptions,
+        ]);
+
+        $this->mediaJobDispatcher->dispatch($job);
+
+        $mediaJob = [
+            'job_id' => $job->getJobKey(),
+            'type' => MediaJob::TYPE_VIDEO,
+            'state' => 'running',
+        ];
+
+        $this->notify($progressCallback, 'generating', 'Video generation started in the background.', [
+            'media_job' => $mediaJob,
+        ]);
+
+        $this->logger->info('MediaGenerationHandler: Detached video to async job', [
+            'job_key' => $job->getJobKey(),
+            'provider' => $provider,
+            'model' => $modelName,
+            'message_id' => $message->getId(),
+            'node_id' => $nodeId,
+        ]);
+
+        return [
+            'metadata' => [
+                'provider' => $provider,
+                'model' => $modelName,
+                'model_id' => $modelId,
+                'media_prompt' => $prompt,
+                'media_type' => 'video',
+                'media_job' => $mediaJob,
+            ],
+        ];
+    }
+
     /**
      * Build a cancellation probe for the provider poll loop from the processing
      * options, or null when there is nothing to watch.

@@ -123,8 +123,9 @@ final class ResultAssemblerTest extends TestCase
         $plan = $this->plan();
         $ctx = $this->context();
 
-        // n1 succeeds, n2 is skipped (not executed), n3 uses best-effort.
+        // n1 succeeds, n2 is skipped (dependency failed), n3 uses best-effort.
         $ctx->setResult('n1', NodeResult::ok('Summary text'));
+        $ctx->setResult('n2', NodeResult::skipped('dependency failed'));
         $ctx->setResult('n3', NodeResult::ok('Summary text'));
 
         $result = $this->assembler->assemble($plan, $ctx);
