@@ -198,6 +198,8 @@ See [`01_async-media-jobs.md`](./01_async-media-jobs.md).
 - Every AI-generated file (image/video/audio/Word & Office docs/calendar) is
   auto-foldered into the **"AI generated"** library by category, with no manual
   filing (Feature 2 §11).
+- AI-generated files count toward the user's storage quota (shown separately) and
+  are deletable, with deletion always quota-correct (Feature 2 §12).
 - Full gate green; E2E covers "send video request → keep chatting → result
   lands".
 ```

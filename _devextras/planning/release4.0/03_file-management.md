@@ -569,6 +569,9 @@ All annotated with OpenAPI; regenerate frontend schemas (`make -C frontend gener
 - **Every AI-generated file is auto-foldered** into the **"AI generated"** library
   by category (Images / Videos / Audio / Documents / Calendar) with **zero manual
   filing**, including AI-written Word/Office documents (§11).
+- **Generated files count toward the storage quota** (shown separately in the
+  meter) and are deletable; deleting one frees exactly its bytes with no drift
+  (§12).
 - Filter by source/group/type/vectorized state + fast search, on thousands of
   files, feels instant.
 - Share works from the file manager (file-id based), with tests.
@@ -596,8 +599,10 @@ All annotated with OpenAPI; regenerate frontend schemas (`make -C frontend gener
    (separate repos/apps) adopt the `source`+`original_name` upload contract later?
    (Outlook/Synamail already uploads today, so it can adopt the contract
    immediately; Nextcloud/OpenCloud have no inbound sync yet.)
-2. Do generated media count against the storage quota? (Proposal: yes, but shown
-   separately.)
+2. **Decided:** generated media **counts against the storage quota** (one shared
+   budget) but is **shown separately** in the storage meter; generated files are
+   fully deletable and deletion is quota-correct with zero drift. Full design in
+   **§12 (Generated Files & Storage Quota)**.
 3. Retention for generated media — keep forever (until user deletes) vs. auto-
    prune after N days? (Proposal: keep; user-managed.)
 4. Should the Generated gallery be a tab here or also surface on the dashboard?
@@ -698,6 +703,9 @@ The Generated tab (§4.6) renders the virtual tree:
   `BMESSAGEID`), **Delete**. Generated **documents** additionally get **"Make
   searchable by AI"** (assign to a knowledge group → vectorize), which is the
   only RAG-touching action and is fully optional.
+- **Delete frees quota:** because generated files count toward storage, deleting
+  one (single or bulk) immediately frees its bytes and refreshes the storage
+  meter — see **§12 (Generated Files & Storage Quota)**.
 - Empty states per §4.B style: e.g. "Images, videos, audio and documents created
   by the AI are filed here automatically."
 
@@ -854,7 +862,176 @@ parity check (Appendix A.5) covers these too. Glossary terms reuse
 
 ---
 
-## 12. Appendix A — i18n key deck (copy-paste ready, en/de/es/tr)
+## 12. Generated Files & Storage Quota
+
+**Added:** 2026-06-26 · **Scope:** AI-generated files (`BSOURCE=generated`) ·
+**Resolves:** §10 open question #2 · **Builds on:** §3.2 (every generated file is
+a `BFILES` row), §11 (the AI-generated library), Feature 1's `MediaJob` finalize.
+
+> Goal: every file an AI engine produces **counts toward the user's storage
+> quota** (one shared budget, but **shown separately** so users see how much is
+> AI-generated), is **deletable** wherever it appears, and **deletion is always
+> quota-correct** — freeing exactly the file's bytes with **no drift**.
+
+### 12.1 The model that makes this almost free
+
+Storage usage today is **computed live**, not cached:
+`StorageQuotaService::getStorageUsage()` returns
+`SUM(BFILES.fileSize) WHERE BUSERID = :user` — there is **no usage counter** and
+**no exclusion** by status or source (verified). Two consequences drive this
+whole section:
+
+1. **Attribution is automatic.** The moment a generated file exists as a `BFILES`
+   row (guaranteed by §3.2 / §11 AG-1), it is counted like any other file. We do
+   **not** add a parallel accounting system. The *only* requirement is an
+   **accurate `fileSize` at registration**.
+2. **Deletion is drift-proof by construction.** Since usage is a live `SUM`,
+   removing the `BFILES` row makes the next usage read correct **immediately** —
+   there is no counter to decrement and therefore nothing that can drift. The
+   "deletion must be correct in the quota count" requirement is satisfied by the
+   design; we add tests that *prove* it rather than new bookkeeping.
+
+### 12.2 Attribution — accurate size, sync & async
+
+- **Sync** (`GeneratedFileRegistrar`): already sets `fileSize` from `filesize()`
+  of the written artefact. Keep; cover with a test.
+- **Async** (`MediaJob` finalize, Feature 1): after `downloadVideoRaw()` + save,
+  the finalize step **must** record the downloaded artefact's real byte size on
+  the `BFILES` row before/at `markCompleted` — never `0`. This is the one place a
+  generated file could otherwise slip into the registry with a wrong size.
+- No double counting: usage sums `BFILES` only; a file referenced by both a
+  `BFILES` row and `BMESSAGES.BFILEPATH` is counted once.
+
+### 12.3 "Shown separately" (transparency, not a second budget)
+
+Generated media shares the **same** quota, but the UI reveals how much of the
+used space is AI-generated.
+
+- Extend `StorageQuotaService::getStorageStats()` with a generated breakdown:
+  `generated_usage` (+ `generated_usage_formatted`). *(Optional / nice-to-have:
+  per-category bytes `{images, videos, audio, documents, calendar}` from
+  `BSOURCE=generated` + `BORIGINKIND`.)*
+- `GET /api/v1/files/storage-stats` returns the breakdown (additive; OpenAPI +
+  schema regen).
+- `StorageQuotaWidget.vue` shows a secondary line / bar sub-segment, e.g.
+  "incl. {x} AI-generated", consistent with the §4.9 storage-meter help
+  ("AI-generated media counts too, shown separately"). New `storage.*` i18n keys
+  in all four locales.
+- **Performance:** the breakdown query uses the already-planned
+  `(BUSERID, BSOURCE)` index (§3.1); the total uses `idx_file_user`. Both are
+  cheap; no per-row calls.
+
+### 12.4 Deletable everywhere
+
+- The **Delete** action in §4.6 / §11 calls the existing
+  `DELETE /api/v1/files/{id}`, which removes vectors (if any) + the disk file +
+  the `BFILES` row. On success the client calls the already-exposed
+  `StorageQuotaWidget.refresh()` so freed space shows immediately.
+- **Bulk delete** (§4.7) reports a count and refreshes the meter once.
+- Toaster + Undo follow §4.9 D ("Deleted {n} files." + Undo soft window). **Undo
+  semantics:** deletion is a hard delete, so usage drops immediately on delete; if
+  a soft-delete/trash is ever introduced, trashed files must be **excluded** from
+  `getStorageUsage` so the meter still reflects reclaimable space honestly.
+
+### 12.5 Deletion correctness — the invariant (+ edge case E1)
+
+- **Invariant:** `usage = SUM(BFILES.fileSize)`; deleting a generated file's row
+  reduces usage by **exactly** that file's `fileSize`, with no drift and no
+  reconciliation job. Concurrency-safe: a delete and a usage read are independent;
+  no locking needed.
+- **Edge case E1 — dangling chat reference (decided):** a generated file is often
+  also referenced by its originating `BMESSAGES.BFILEPATH` (the chat card). Since
+  delete removes the disk file, the chat card would otherwise 404. **On delete we
+  detach the message media link and render a tasteful "deleted by user"
+  placeholder** in the chat — so deletion is consistent across the manager, the
+  AI-generated library, and chat history. (Alternative considered and rejected:
+  warn-only, which leaves broken cards.)
+
+### 12.6 Backfill grandfathering (important)
+
+When Feature 2 **Sprint B** backfills legacy generated media into `BFILES`,
+existing users' usage will **jump** and some may exceed their limit. Policy:
+
+- **Never retroactively block** existing content. Quota enforcement
+  (`checkStorageLimit`) gates only **new uploads** and **new generations**.
+- An over-limit user sees the meter at 100% + a clean-up / upgrade prompt, but
+  nothing is deleted and existing files remain usable.
+
+### 12.7 Enforcement on generation (decided)
+
+- **Uploads** keep their pre-flight `checkStorageLimit` (unchanged).
+- **AI generation** does **not** hard-block when over quota (it is a billed
+  action and blocking mid-DAG is poor UX). Instead: **warn** when near/over the
+  limit (in chat + the storage meter) and **count** the produced file afterward.
+  Users reclaim space by deleting generated files (§12.4) or upgrading.
+
+### 12.8 i18n (en/de/es/tr)
+
+Additive `storage.*` keys, all four locales, covered by the Sprint H key-parity
+check.
+
+```jsonc
+// merge into "storage": { ... }   // en.json
+"includingGenerated": "incl. {size} AI-generated",
+"generatedBreakdownHelp": "Part of your used space is taken by files the AI created. Delete them anytime to free space.",
+"overLimitGenerateWarning": "You're over your storage limit. New files you create are still saved, but please free up space or upgrade."
+```
+```jsonc
+// de.json
+"includingGenerated": "inkl. {size} KI-erzeugt",
+"generatedBreakdownHelp": "Ein Teil deines belegten Speichers stammt aus KI-erstellten Dateien. Du kannst sie jederzeit löschen, um Platz zu schaffen.",
+"overLimitGenerateWarning": "Du hast dein Speicherlimit überschritten. Neue Dateien werden weiterhin gespeichert – bitte schaffe Platz oder führe ein Upgrade durch."
+```
+```jsonc
+// es.json
+"includingGenerated": "incl. {size} generado por IA",
+"generatedBreakdownHelp": "Parte de tu espacio usado lo ocupan archivos creados por la IA. Puedes eliminarlos cuando quieras para liberar espacio.",
+"overLimitGenerateWarning": "Has superado tu límite de almacenamiento. Los archivos nuevos se siguen guardando, pero libera espacio o mejora tu plan."
+```
+```jsonc
+// tr.json
+"includingGenerated": "{size} yapay zekâ üretimi dahil",
+"generatedBreakdownHelp": "Kullanılan alanınızın bir kısmı yapay zekânın oluşturduğu dosyalara aittir. Yer açmak için istediğiniz zaman silebilirsiniz.",
+"overLimitGenerateWarning": "Depolama sınırınızı aştınız. Yeni dosyalar yine de kaydedilir; lütfen yer açın veya yükseltin."
+```
+
+### 12.9 Sprints (for the future code effort)
+
+Depend on Feature 2 Sprint A/B and §11 AG-1.
+
+- **Q-1 — Accurate size + breakdown.** Ensure sync **and** async registration set
+  a real `fileSize`; extend `getStorageStats()` with `generated_usage`; OpenAPI +
+  schema regen. Test: registering a generated file increases usage by exactly its
+  size.
+- **Q-2 — Deletion correctness + chat detach (E1).** Test that deleting a
+  generated file (single + bulk) drops usage by exactly its bytes; detach the
+  `BMESSAGES` media link + render the "deleted" placeholder; meter refreshes.
+- **Q-3 — "Shown separately" widget + grandfathering + warnings.** Widget
+  sub-segment + copy; enforcement gates only new uploads/generations; over-limit
+  warning on generation; i18n (4 locales). Component/i18n tests.
+
+### 12.10 Risks & mitigations
+
+- **Wrong/zero size at async registration** → usage under-counts. Mitigation:
+  finalize records the downloaded size; Q-1 test asserts it.
+- **Backfill usage spike** → §12.6 grandfathering (never retroactively block).
+- **Broken chat cards after delete** → §12.5 E1 detach + placeholder.
+- **Breakdown query cost at scale** → `(BUSERID, BSOURCE)` index (§3.1).
+
+### 12.11 Definition of done (feature, when built)
+
+- Every generated file (image/video/audio/Word & Office doc/ICS) counts toward
+  the quota with its **real byte size**, sync and async.
+- The storage widget shows **total** usage and the **AI-generated portion**.
+- Deleting a generated file (single or bulk) frees **exactly** its bytes
+  immediately, with **no drift**, and leaves **no dangling chat card** (E1).
+- Backfilling legacy generated media never retroactively blocks existing users;
+  enforcement gates only new uploads/generations.
+- Full gate green + tests for the count and delete invariants.
+
+---
+
+## 13. Appendix A — i18n key deck (copy-paste ready, en/de/es/tr)
 
 These are the **new** keys for the §4.9–4.11 UX layer, ready to merge into
 `frontend/src/i18n/{en,de,es,tr}.json`. They are nested under the **existing**
