@@ -15,6 +15,14 @@ use Doctrine\DBAL\Connection;
  * - RATELIMITS_PRO / TEAM / BUSINESS (hourly + monthly)
  *
  * Operator overrides are preserved (insert-if-missing semantics).
+ *
+ * MAX_OUTPUT_TOKENS is intentionally seeded ONLY for ANONYMOUS: authenticated
+ * tiers get the model's full max_tokens. {@see \App\Service\Message\Handler\ChatHandler}
+ * applies this plan limit as an additional output clamp only when present — i.e.
+ * only for ANONYMOUS; for all other tiers the limit is null, so the model's own
+ * max_tokens is used unchanged. Existing installs are migrated by the dedicated
+ * migration that deletes the legacy NEW/PRO/TEAM/BUSINESS rows (BCONFIG defaults
+ * are bootstrap-only).
  */
 final readonly class RateLimitConfigSeeder
 {
@@ -34,6 +42,10 @@ final readonly class RateLimitConfigSeeder
         ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'FILE_ANALYSIS_TOTAL', 'value' => '3'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'FILE_UPLOADS_TOTAL',  'value' => '3'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'STORAGE_MB',          'value' => '10'],
+        // ANONYMOUS is the ONLY tier with a hard output cap. Authenticated tiers
+        // (NEW/PRO/TEAM/BUSINESS) intentionally have no MAX_OUTPUT_TOKENS so they
+        // receive the selected model's full max_tokens; their spend is bounded by
+        // the cost-budget gate (registered) and message-count limits instead.
         ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'MAX_OUTPUT_TOKENS',   'value' => '2048'],
 
         // NEW (phone-verified — lifetime totals)
@@ -44,7 +56,6 @@ final readonly class RateLimitConfigSeeder
         ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'FILE_ANALYSIS_TOTAL', 'value' => '10'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'FILE_UPLOADS_TOTAL',  'value' => '10'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'STORAGE_MB',          'value' => '100'],
-        ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'MAX_OUTPUT_TOKENS',   'value' => '4096'],
 
         // PRO (hourly + monthly)
         ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'MESSAGES_HOURLY',        'value' => '100'],
@@ -55,7 +66,6 @@ final readonly class RateLimitConfigSeeder
         ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'FILE_ANALYSIS_MONTHLY',  'value' => '200'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'FILE_UPLOADS_MONTHLY',   'value' => '200'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'STORAGE_GB',             'value' => '5'],
-        ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'MAX_OUTPUT_TOKENS',      'value' => '16384'],
 
         // TEAM
         ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'MESSAGES_HOURLY',       'value' => '300'],
@@ -66,7 +76,6 @@ final readonly class RateLimitConfigSeeder
         ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'FILE_ANALYSIS_MONTHLY', 'value' => '1000'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'FILE_UPLOADS_MONTHLY',  'value' => '1000'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'STORAGE_GB',            'value' => '20'],
-        ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'MAX_OUTPUT_TOKENS',     'value' => '32768'],
 
         // BUSINESS
         ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'MESSAGES_HOURLY',       'value' => '1000'],
@@ -77,7 +86,6 @@ final readonly class RateLimitConfigSeeder
         ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'FILE_ANALYSIS_MONTHLY', 'value' => '5000'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'FILE_UPLOADS_MONTHLY',  'value' => '5000'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'STORAGE_GB',            'value' => '100'],
-        ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'MAX_OUTPUT_TOKENS',     'value' => '65536'],
     ];
 
     public function __construct(private Connection $connection)
