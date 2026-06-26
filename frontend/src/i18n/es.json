@@ -1147,7 +1147,19 @@
         "audio": "Generando tu audio…"
       },
       "backgroundHint": "Esto se ejecuta en segundo plano y puede tardar unos minutos. Puedes seguir chateando — este mensaje se actualizará cuando esté listo.",
-      "model": "Usando {model}"
+      "model": "Usando {model}",
+      "stillRunning": "Trabajo en curso · lleva {elapsed}",
+      "checkingNow": "Comprobando estado…",
+      "lastChecked": "Última comprobación hace {seconds}s · siguiente en ~{interval}s",
+      "progress": "{percent} % completado",
+      "pollError": "No se pudo actualizar el estado — se reintentará en la próxima comprobación.",
+      "failedTitle": "Error al generar el vídeo",
+      "failedBody": "El trabajo en segundo plano no se completó. Puedes intentarlo de nuevo con otro modelo.",
+      "maxWait": {
+        "video": "Los vídeos pueden tardar hasta {minutes} minutos.",
+        "image": "Las imágenes suelen estar listas en pocos minutos.",
+        "audio": "El audio suele estar listo en pocos minutos."
+      }
     },
     "cancelledByUser": "⚠️ Cancelado por el usuario",
     "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",

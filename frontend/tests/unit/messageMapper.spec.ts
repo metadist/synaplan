@@ -81,6 +81,25 @@ describe('messageMapper (issue #1070)', () => {
       expect(message.webSearch?.resultsCount).toBe(3)
     })
 
+    it('maps a running background mediaJob from the API row (async video detach)', () => {
+      const message = mapApiMessageRow(
+        baseRow({
+          text: '__VIDEO_GENERATING__',
+          mediaJob: {
+            job_id: 'job-abc',
+            type: 'video',
+            state: 'running',
+          },
+        })
+      )
+
+      expect(message.mediaJob).toEqual({
+        jobId: 'job-abc',
+        type: 'video',
+        state: 'running',
+      })
+    })
+
     it('rebuilds taskPlan cards from persisted render state (DAG reload #1070)', () => {
       const message = mapApiMessageRow(
         baseRow({

@@ -11,6 +11,7 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
+use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use Psr\Log\LoggerInterface;
@@ -59,6 +60,7 @@ final readonly class AdvanceMediaJobCommandHandler
         private MediaJobService $jobService,
         private MediaJobDispatcher $dispatcher,
         private MediaJobConfig $config,
+        private MediaJobMessageSync $messageSync,
         private AiFacade $aiFacade,
         private MediaErrorMessageBuilder $errorBuilder,
         private UserUploadPathBuilder $userUploadPathBuilder,
@@ -236,6 +238,7 @@ final readonly class AdvanceMediaJobCommandHandler
             'provider' => $job->getProvider(),
             'model' => $job->getModel(),
         ]);
+        $this->messageSync->syncTerminalState($job);
     }
 
     /**
@@ -246,6 +249,7 @@ final readonly class AdvanceMediaJobCommandHandler
     {
         $this->cancelProvider($job);
         $this->jobService->markTimedOut($job, 'Render exceeded its deadline');
+        $this->messageSync->syncTerminalState($job);
     }
 
     private function fail(MediaJob $job, \Throwable $e): void
@@ -264,6 +268,7 @@ final readonly class AdvanceMediaJobCommandHandler
         ]);
 
         $this->jobService->markFailed($job, $message);
+        $this->messageSync->syncTerminalState($job);
     }
 
     private function cancelProvider(MediaJob $job): void

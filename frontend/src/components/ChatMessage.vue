@@ -109,7 +109,7 @@
         <!-- Processing Status (inside bubble, before content) -->
         <div
           v-if="
-            isStreaming && processingStatus && role === 'assistant' && !showMediaJobStatus
+            isStreaming && processingStatus && role === 'assistant' && !showMediaJobBanner
           "
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-typing-indicator"
@@ -417,10 +417,12 @@
           />
 
           <!-- Background async media job (Release 4.0 — e.g. detached video render) -->
-          <div v-if="showMediaJobStatus" class="px-4 pt-3">
+          <div v-if="showMediaJobBanner" class="px-4 pt-3">
             <MediaJobStatus
               :media-job="mediaJob!"
               :model-label="mediaJobModelLabel ?? undefined"
+              @update:media-job="emit('mediaJobUpdate', $event)"
+              @completed="emit('mediaJobCompleted', $event)"
             />
           </div>
 
@@ -1196,7 +1198,7 @@ const feedbacks = computed(() => {
 const contentParts = computed(() => {
   let parts = props.parts.filter((p) => p.type !== 'thinking')
 
-  if (showMediaJobStatus.value) {
+  if (showMediaJobBanner.value) {
     parts = parts.filter(
       (p) => !(p.type === 'text' && p.content?.trim() === '__VIDEO_GENERATING__')
     )
@@ -1306,9 +1308,11 @@ const isKnownModelName = (name?: string | null): boolean => {
   return n !== '' && n !== 'unknown'
 }
 
-const showMediaJobStatus = computed(
-  () => props.role === 'assistant' && props.mediaJob?.state === 'running'
-)
+const showMediaJobBanner = computed(() => {
+  if (props.role !== 'assistant' || !props.mediaJob) return false
+  const state = props.mediaJob.state
+  return state === 'running' || state === 'failed' || state === 'cancelled'
+})
 
 const mediaJobModelLabel = computed(() => {
   const fromAiModels = props.aiModels?.chat?.model
@@ -1370,6 +1374,8 @@ const emit = defineEmits<{
   falsePositive: [text: string, messageId?: number]
   'click-memory': [memory: UserMemory]
   continue: []
+  mediaJobUpdate: [job: MediaJobInfo]
+  mediaJobCompleted: [payload: { url: string; type: string }]
 }>()
 
 const router = useRouter()

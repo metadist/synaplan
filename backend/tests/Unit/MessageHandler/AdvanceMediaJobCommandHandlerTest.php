@@ -11,6 +11,7 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
+use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -30,6 +31,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
     private MediaJobService&MockObject $jobService;
     private MediaJobDispatcher&MockObject $dispatcher;
     private MediaJobConfig&MockObject $config;
+    private MediaJobMessageSync&MockObject $messageSync;
     private AiFacade&MockObject $aiFacade;
     private LockFactory&MockObject $lockFactory;
     private SharedLockInterface&MockObject $lock;
@@ -41,6 +43,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $this->jobService = $this->createMock(MediaJobService::class);
         $this->dispatcher = $this->createMock(MediaJobDispatcher::class);
         $this->config = $this->createMock(MediaJobConfig::class);
+        $this->messageSync = $this->createMock(MediaJobMessageSync::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->lockFactory = $this->createMock(LockFactory::class);
         $this->lock = $this->createMock(SharedLockInterface::class);
@@ -57,6 +60,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
             $this->jobService,
             $this->dispatcher,
             $this->config,
+            $this->messageSync,
             $this->aiFacade,
             new MediaErrorMessageBuilder(),
             new UserUploadPathBuilder(),
@@ -269,6 +273,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
             $this->jobService,
             $this->dispatcher,
             $this->config,
+            $this->messageSync,
             $this->aiFacade,
             new MediaErrorMessageBuilder(),
             new UserUploadPathBuilder(),

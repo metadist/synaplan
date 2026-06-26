@@ -1147,7 +1147,19 @@
         "audio": "Sesiniz oluşturuluyor…"
       },
       "backgroundHint": "Bu işlem arka planda çalışır ve birkaç dakika sürebilir. Sohbete devam edebilirsiniz — hazır olduğunda bu mesaj güncellenecek.",
-      "model": "Kullanılan model: {model}"
+      "model": "Kullanılan model: {model}",
+      "stillRunning": "İş hâlâ çalışıyor · süre: {elapsed}",
+      "checkingNow": "Durum kontrol ediliyor…",
+      "lastChecked": "Son kontrol {seconds}s önce · sonraki ~{interval}s içinde",
+      "progress": "%{percent} tamamlandı",
+      "pollError": "Durum yenilenemedi — bir sonraki kontrolde tekrar denenecek.",
+      "failedTitle": "Video oluşturma başarısız",
+      "failedBody": "Arka plan işi tamamlanmadı. Farklı bir modelle tekrar deneyebilirsiniz.",
+      "maxWait": {
+        "video": "Videolar {minutes} dakikaya kadar sürebilir.",
+        "image": "Görseller genelde birkaç dakika içinde hazır olur.",
+        "audio": "Ses genelde birkaç dakika içinde hazır olur."
+      }
     },
     "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
     "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",

@@ -43,10 +43,26 @@ export function parseMediaJobPayload(raw: unknown): MediaJobInfo | null {
   const state = row.state
   if (typeof jobId !== 'string' || jobId === '') return null
   if (typeof type !== 'string' || type === '') return null
+  const error = row.error
+  const percent = row.percent
   return {
     jobId,
     type,
     state: typeof state === 'string' ? state : 'running',
+    error: typeof error === 'string' ? error : undefined,
+    percent: typeof percent === 'number' ? percent : undefined,
+    elapsedSeconds:
+      typeof row.elapsed_seconds === 'number'
+        ? row.elapsed_seconds
+        : typeof row.elapsedSeconds === 'number'
+          ? row.elapsedSeconds
+          : undefined,
+    maxWaitSeconds:
+      typeof row.max_wait_seconds === 'number'
+        ? row.max_wait_seconds
+        : typeof row.maxWaitSeconds === 'number'
+          ? row.maxWaitSeconds
+          : undefined,
   }
 }
 
@@ -215,6 +231,7 @@ export interface ApiLoadedMessageRow {
     job_id: string
     type: string
     state: string
+    error?: string
   } | null
 }
 

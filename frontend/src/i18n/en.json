@@ -2996,7 +2996,19 @@
         "audio": "Generating your audio…"
       },
       "backgroundHint": "This runs in the background and may take a few minutes. You can keep chatting — this message will update when it's ready.",
-      "model": "Using {model}"
+      "model": "Using {model}",
+      "stillRunning": "Job still running · running for {elapsed}",
+      "checkingNow": "Checking status now…",
+      "lastChecked": "Last checked {seconds}s ago · next check in ~{interval}s",
+      "progress": "{percent}% complete",
+      "pollError": "Could not refresh job status — will retry on the next check.",
+      "failedTitle": "Video generation failed",
+      "failedBody": "The background job did not complete. You can try again with a different model.",
+      "maxWait": {
+        "video": "Videos may take up to {minutes} minutes.",
+        "image": "Images usually finish within a few minutes.",
+        "audio": "Audio usually finishes within a few minutes."
+      }
     },
     "cancelledByUser": "⚠️ Cancelled by user",
     "truncated": "This response was cut short because the model reached its token limit.",

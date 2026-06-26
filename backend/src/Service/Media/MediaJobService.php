@@ -232,13 +232,18 @@ final class MediaJobService
      * @return array{
      *     job_id:string, status:string, state:string, type:string,
      *     percent:?int, provider_status:?string, elapsed_seconds:int,
-     *     error:?string, file:?array<string,mixed>, finished:bool
+     *     error:?string, file:?array<string,mixed>, finished:bool,
+     *     created_at:int, updated_at:int, deadline_at:?int,
+     *     max_wait_seconds:int, remaining_seconds:?int
      * }
      */
     public function toStatusArray(MediaJob $job): array
     {
         $result = $job->getResult();
         $file = is_array($result['file'] ?? null) ? $result['file'] : null;
+        $deadlineAt = $job->getDeadlineAt();
+        $now = time();
+        $remainingSeconds = null !== $deadlineAt ? max(0, $deadlineAt - $now) : null;
 
         return [
             'job_id' => $job->getJobKey(),
@@ -251,6 +256,11 @@ final class MediaJobService
             'error' => $job->getError(),
             'file' => $file,
             'finished' => $job->isTerminal(),
+            'created_at' => $job->getCreated(),
+            'updated_at' => $job->getUpdated(),
+            'deadline_at' => $deadlineAt,
+            'max_wait_seconds' => $this->deadlineSecondsFor($job->getType()),
+            'remaining_seconds' => $remainingSeconds,
         ];
     }
 

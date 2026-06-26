@@ -974,7 +974,19 @@
         "audio": "Deine Audioausgabe wird erstellt…"
       },
       "backgroundHint": "Das läuft im Hintergrund und kann einige Minuten dauern. Du kannst weiter chatten — diese Nachricht wird aktualisiert, sobald das Ergebnis fertig ist.",
-      "model": "Modell: {model}"
+      "model": "Modell: {model}",
+      "stillRunning": "Auftrag läuft noch · seit {elapsed}",
+      "checkingNow": "Status wird aktualisiert…",
+      "lastChecked": "Zuletzt geprüft vor {seconds}s · nächste Prüfung in ~{interval}s",
+      "progress": "{percent} % fertig",
+      "pollError": "Status konnte nicht aktualisiert werden — nächster Versuch in Kürze.",
+      "failedTitle": "Videoerstellung fehlgeschlagen",
+      "failedBody": "Der Hintergrundauftrag wurde nicht abgeschlossen. Du kannst es mit einem anderen Modell erneut versuchen.",
+      "maxWait": {
+        "video": "Videos können bis zu {minutes} Minuten dauern.",
+        "image": "Bilder sind meist innerhalb weniger Minuten fertig.",
+        "audio": "Audio ist meist innerhalb weniger Minuten fertig."
+      }
     },
     "cancelledByUser": "⚠️ Vom Benutzer abgebrochen",
     "truncated": "Diese Antwort wurde abgeschnitten, weil das Modell sein Token-Limit erreicht hat.",

@@ -179,6 +179,8 @@
               @false-positive="openFalsePositiveModal"
               @click-memory="handleClickMemory"
               @continue="handleContinueResponse(message)"
+              @media-job-update="message.mediaJob = $event"
+              @media-job-completed="handleMediaJobCompleted(message, $event)"
             />
           </template>
         </div>
@@ -1098,6 +1100,41 @@ function applyMediaJobToMessage(message: Message | undefined, raw: unknown): voi
   const parsed = parseMediaJobPayload(raw)
   if (parsed) {
     message.mediaJob = parsed
+  }
+}
+
+function handleMediaJobCompleted(
+  message: Message,
+  payload: { url: string; type: string }
+): void {
+  if (message.mediaJob) {
+    message.mediaJob = { ...message.mediaJob, state: 'done' }
+  }
+
+  const normalized = normalizeMediaUrl(payload.url)
+  if (payload.type === 'video' && !message.parts.some((p) => p.type === 'video')) {
+    message.parts.push({
+      partId: generatePartId(),
+      type: 'video',
+      url: normalized,
+    })
+  } else if (payload.type === 'image' && !message.parts.some((p) => p.type === 'image')) {
+    message.parts.push({
+      partId: generatePartId(),
+      type: 'image',
+      url: normalized,
+      alt: 'Generated image',
+    })
+  } else if (payload.type === 'audio' && !message.parts.some((p) => p.type === 'audio')) {
+    message.parts.push({
+      partId: generatePartId(),
+      type: 'audio',
+      url: normalized,
+    })
+  }
+
+  if (message.backendMessageId) {
+    void historyStore.reconcileMessage(message.id, message.backendMessageId)
   }
 }
 

@@ -82,6 +82,11 @@ export interface MediaJobInfo {
   jobId: string
   type: string
   state: string
+  error?: string
+  percent?: number
+  elapsedSeconds?: number
+  maxWaitSeconds?: number
+  remainingSeconds?: number
 }
 
 export interface Message {
