@@ -38,6 +38,17 @@ export function useMediaJobPoll(
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let tickTimer: ReturnType<typeof setInterval> | null = null
 
+  // Once we have observed a terminal state (or a 404) for a given job id, that
+  // job is DONE for this client — we must never poll it again, even if some
+  // other code path momentarily flips the reactive state back to `running`.
+  // This is the latch that makes polling idempotent and kills the
+  // poll → reconcile → poll flicker loop. It is keyed by job id so a brand new
+  // job (different id) starts fresh.
+  let settledJobId: string | null = null
+  let watchedJobId: string | null = null
+
+  const TERMINAL_STATES = new Set(['done', 'failed', 'cancelled'])
+
   const stop = () => {
     if (pollTimer !== null) {
       clearInterval(pollTimer)
@@ -52,6 +63,11 @@ export function useMediaJobPoll(
   const pollOnce = async () => {
     const id = jobId.value
     if (!id) return
+    // Never re-poll a job we have already seen reach a terminal state.
+    if (settledJobId === id) {
+      stop()
+      return
+    }
 
     isFetching.value = true
     try {
@@ -60,12 +76,20 @@ export function useMediaJobPoll(
       lastCheckedAt = Date.now()
       secondsSinceCheck.value = 0
       fetchError.value = null
+
+      // Latch + stop BEFORE notifying, so the terminal update can't trigger a
+      // reactive change that re-arms this poller within the same tick.
+      if (TERMINAL_STATES.has(status.state)) {
+        settledJobId = id
+        stop()
+      }
       onUpdate(status)
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         fetchError.value = null
-        onJobLost?.()
+        settledJobId = id
         stop()
+        onJobLost?.()
         return
       }
       fetchError.value = err instanceof Error ? err.message : 'Poll failed'
@@ -80,10 +104,18 @@ export function useMediaJobPoll(
       stop()
       secondsSinceCheck.value = 0
       fetchError.value = null
-      latest.value = null
       lastCheckedAt = null
 
-      if (!active || !id) return
+      // Only reset the terminal latch when the job id actually changes — a mere
+      // toggle of `enabled` (or a transient state flip) for the SAME job must
+      // not resurrect a finished poller.
+      if (id !== watchedJobId) {
+        watchedJobId = id ?? null
+        settledJobId = null
+        latest.value = null
+      }
+
+      if (!active || !id || settledJobId === id) return
 
       void pollOnce()
       pollTimer = setInterval(() => void pollOnce(), MEDIA_JOB_POLL_INTERVAL_MS)

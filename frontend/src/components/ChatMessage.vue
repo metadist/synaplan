@@ -1196,7 +1196,13 @@ const feedbacks = computed(() => {
 const contentParts = computed(() => {
   let parts = props.parts.filter((p) => p.type !== 'thinking')
 
-  if (showMediaJobBanner.value) {
+  // The `__VIDEO_GENERATING__` token is a backend placeholder, never user-facing
+  // text. The dedicated banner (while running/failed) or the finished video part
+  // (when done) is the real surface. Strip the placeholder whenever this message
+  // carries a media job in ANY state — gating it on the banner's visibility
+  // alone made the placeholder reappear next to the video the moment the job
+  // completed, producing the text↔video flicker.
+  if (props.role === 'assistant' && props.mediaJob) {
     parts = parts.filter(
       (p) => !(p.type === 'text' && p.content?.trim() === '__VIDEO_GENERATING__')
     )

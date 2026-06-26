@@ -518,7 +518,19 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   if (persisted.wasMultitask) {
     local.wasMultitask = true
   }
+  // Media job state: a terminal client state is FINAL and must never be
+  // downgraded back to `running` by a stale persisted snapshot. Without this
+  // guard the post-completion reconcile (which can race the worker's message
+  // sync) flips a just-completed job back to `running`, which re-enables
+  // polling, which completes again — an endless flicker between the video and
+  // the "generating" banner. Only apply the persisted state when our local
+  // state is not yet terminal, or when the persisted state is itself terminal.
   if (persisted.mediaJob) {
-    local.mediaJob = persisted.mediaJob
+    const terminal = new Set(['done', 'failed', 'cancelled'])
+    const localTerminal = local.mediaJob ? terminal.has(local.mediaJob.state) : false
+    const persistedTerminal = terminal.has(persisted.mediaJob.state)
+    if (!localTerminal || persistedTerminal) {
+      local.mediaJob = persisted.mediaJob
+    }
   }
 }

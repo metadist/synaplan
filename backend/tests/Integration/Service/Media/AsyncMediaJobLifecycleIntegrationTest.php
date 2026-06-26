@@ -278,6 +278,73 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         self::assertSame('video', $files[0]['fileType'] ?? null);
         self::assertSame('video/mp4', $files[0]['fileMime'] ?? null);
         self::assertStringEndsWith('.mp4', (string) ($files[0]['filename'] ?? ''));
+
+        // The reload also exposes the generated clip through the legacy `file`
+        // field — the channel the frontend mapper actually turns into a `video`
+        // part on a page refresh (it only renders audio from `files[]`). Without
+        // this the bubble would reload empty even though the file is on disk.
+        self::assertIsArray($payload['file'] ?? null, 'Reload must expose the generated clip via the `file` field');
+        self::assertSame('video', $payload['file']['type'] ?? null);
+        self::assertStringEndsWith('.mp4', (string) ($payload['file']['path'] ?? ''));
+    }
+
+    public function testRebindRedirectsCompletionSyncToOutgoingMessage(): void
+    {
+        // Reproduces the live bug: the job is created by the media handler with
+        // the INCOMING user message id (the OUT assistant message doesn't exist
+        // yet). StreamController later rebinds the job to the OUT message. The
+        // worker must then sync the OUT message — not the incoming one.
+        $user = $this->createUser();
+        $incoming = $this->createMessage($user);
+        $outgoing = $this->createMessage($user);
+
+        $job = $this->jobService->create([
+            'userId' => $user->getId(),
+            'type' => MediaJob::TYPE_VIDEO,
+            'provider' => 'google',
+            'prompt' => 'a kite in the wind',
+            'messageId' => $incoming->getId(), // wrong-by-design at creation
+            'options' => ['lang' => 'en'],
+        ]);
+        $this->createdJobKeys[] = $job->getJobKey();
+
+        // StreamController's rebind once the OUT message is persisted.
+        $this->jobService->rebindMessage($job->getJobKey(), $outgoing->getId());
+
+        $this->aiFacade->method('startVideoGeneration')->willReturn([
+            'operationName' => 'op/xyz',
+            'provider' => 'google',
+            'model' => 'veo-3.1-fast-generate-preview',
+            'duration' => 5,
+            'resolution' => '720p',
+        ]);
+        $this->aiFacade->method('pollVideoOperation')->willReturn(
+            ['done' => true, 'videoUri' => 'gs://bucket/v.mp4', 'error' => null, 'percent' => 100, 'status' => 'completed'],
+        );
+        $this->aiFacade->method('downloadVideoRaw')->willReturn($this->fakeMp4Bytes());
+
+        $handler = $this->buildHandler();
+        // submit → running, poll → finalizing, finalize → completed + sync.
+        $handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
+        $handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
+        $handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
+
+        $this->em->refresh($incoming);
+        $this->em->refresh($outgoing);
+
+        // The OUTGOING message is the one that gets the completed state + file.
+        self::assertGreaterThan(0, $outgoing->getFiles()->count(), 'OUT message must receive the generated file');
+        self::assertSame(1, $outgoing->getFile(), 'OUT message legacy file flag must be set');
+        $outMeta = json_decode((string) $outgoing->getMeta('media_job'), true);
+        self::assertSame('done', $outMeta['state'] ?? null);
+
+        // The INCOMING message must be left completely untouched.
+        self::assertSame(0, $incoming->getFiles()->count());
+        self::assertNull($incoming->getMeta('media_job'));
+
+        if ($outgoing->getFiles()->count() > 0) {
+            $this->createdFileIds[] = $outgoing->getFiles()->first()->getId();
+        }
     }
 
     public function testFailurePathPersistsLocalizedErrorOnMessage(): void

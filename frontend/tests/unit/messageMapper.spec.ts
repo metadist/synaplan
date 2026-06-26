@@ -355,6 +355,58 @@ describe('messageMapper (issue #1070)', () => {
       expect(local.files).toHaveLength(1)
     })
 
+    it('does NOT downgrade a terminal mediaJob back to running (anti-flicker)', () => {
+      // The live poll has already observed `done`; a stale persisted snapshot
+      // still says `running`. Reconcile must keep the terminal state, otherwise
+      // the banner reappears, polling re-arms, and the UI flickers endlessly.
+      const local = localStreamedMessage({
+        mediaJob: { jobId: 'job-abc', type: 'video', state: 'done' },
+      })
+      const persisted = mapApiMessageRow(
+        baseRow({
+          text: '__VIDEO_GENERATING__',
+          mediaJob: { job_id: 'job-abc', type: 'video', state: 'running' },
+        })
+      )
+
+      reconcileLocalMessage(local, persisted)
+
+      expect(local.mediaJob?.state).toBe('done')
+    })
+
+    it('applies a running→done mediaJob transition from the persisted row', () => {
+      const local = localStreamedMessage({
+        mediaJob: { jobId: 'job-abc', type: 'video', state: 'running' },
+      })
+      const persisted = mapApiMessageRow(
+        baseRow({
+          file: { path: '13/clip.mp4', type: 'video' },
+          mediaJob: { job_id: 'job-abc', type: 'video', state: 'done' },
+        })
+      )
+
+      reconcileLocalMessage(local, persisted)
+
+      expect(local.mediaJob?.state).toBe('done')
+    })
+
+    it('applies a terminal failure from the persisted row even over a local terminal state', () => {
+      const local = localStreamedMessage({
+        mediaJob: { jobId: 'job-abc', type: 'video', state: 'done' },
+      })
+      const persisted = mapApiMessageRow(
+        baseRow({
+          text: 'Your video took too long to create and was stopped.',
+          mediaJob: { job_id: 'job-abc', type: 'video', state: 'failed' },
+        })
+      )
+
+      reconcileLocalMessage(local, persisted)
+
+      // Terminal→terminal is allowed; a stale running is the only thing blocked.
+      expect(local.mediaJob?.state).toBe('failed')
+    })
+
     it('keeps live taskPlan intact when reconciling (streaming cards must survive)', () => {
       // During live streaming the local message has an active taskPlan;
       // reconcileLocalMessage must not overwrite it with the persisted one.

@@ -110,6 +110,35 @@ final class MediaJobService
         $this->store->save($job);
     }
 
+    /**
+     * Point an active job at the assistant (OUT) message the user actually sees.
+     *
+     * The chat detach path creates the job inside the media handler, which only
+     * has the INCOMING user message — the OUTGOING assistant message (the one
+     * that carries the `media_job` meta and renders the banner) is persisted
+     * later by StreamController. Without rebinding, the worker would sync the
+     * wrong (incoming) message on completion and the visible bubble would stay
+     * stuck on "running" forever. No-op once the job is terminal.
+     */
+    public function rebindMessage(string $jobKey, int $messageId): void
+    {
+        $job = $this->store->find($jobKey);
+        if (null === $job || $job->isTerminal()) {
+            return;
+        }
+        if ($job->getMessageId() === $messageId) {
+            return;
+        }
+
+        $job->setMessageId($messageId);
+        $this->store->save($job);
+
+        $this->logger->info('MediaJob rebound to outgoing message', [
+            'job_key' => $jobKey,
+            'message_id' => $messageId,
+        ]);
+    }
+
     public function markSubmitting(MediaJob $job): void
     {
         if (null === $job->getStartedAt()) {

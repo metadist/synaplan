@@ -126,5 +126,16 @@ final readonly class MediaJobMessageSync
         }
 
         $message->addFile($file);
+
+        // Mirror the synchronous media path (StreamController) by also setting
+        // the legacy file columns. The history formatter exposes generated
+        // media through the `file` field (BFILE/BFILEPATH/BFILETYPE), and the
+        // frontend mapper builds the video/image/audio part from that field —
+        // NOT from the `files[]` relation (which it only renders for audio).
+        // Setting these makes a page reload show the video through the exact
+        // same proven path as a normally-generated clip.
+        $message->setFile(1);
+        $message->setFilePath($relativePath);
+        $message->setFileType($job->getType());
     }
 }
