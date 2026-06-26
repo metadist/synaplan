@@ -2989,6 +2989,15 @@
     "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",
     "fileGenerationFailed": "There was a problem creating the file. Please try again.",
     "audioGenerated": "Here's the audio you requested. You can play or download it below.",
+    "mediaJob": {
+      "title": {
+        "video": "Generating your video…",
+        "image": "Generating your image…",
+        "audio": "Generating your audio…"
+      },
+      "backgroundHint": "This runs in the background and may take a few minutes. You can keep chatting — this message will update when it's ready.",
+      "model": "Using {model}"
+    },
     "cancelledByUser": "⚠️ Cancelled by user",
     "truncated": "This response was cut short because the model reached its token limit.",
     "continueButton": "Continue response"

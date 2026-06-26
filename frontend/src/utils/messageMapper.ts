@@ -1,6 +1,7 @@
 import type {
   Message,
   MessageFile,
+  MediaJobInfo,
   Part,
   TaskPlanState,
   TaskCardKind,
@@ -32,6 +33,22 @@ import {
  * Keep this module side-effect free so it can be unit-tested without
  * mounting the chat view or the Pinia store.
  */
+
+/** Normalize a media_job payload from API rows or SSE metadata. */
+export function parseMediaJobPayload(raw: unknown): MediaJobInfo | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const jobId = row.job_id ?? row.jobId
+  const type = row.type
+  const state = row.state
+  if (typeof jobId !== 'string' || jobId === '') return null
+  if (typeof type !== 'string' || type === '') return null
+  return {
+    jobId,
+    type,
+    state: typeof state === 'string' ? state : 'running',
+  }
+}
 
 /**
  * Parse content to extract thinking blocks, code blocks, and regular text.
@@ -187,10 +204,17 @@ export interface ApiLoadedMessageRow {
       url?: string
       type?: string
       error?: string
+      job_id?: string
       /** Compact web-search summary fields (search cards only) */
       query?: string
       resultsCount?: number
     }>
+  } | null
+  /** Background async media job (Release 4.0). */
+  mediaJob?: {
+    job_id: string
+    type: string
+    state: string
   } | null
 }
 
@@ -309,6 +333,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         error: c.error,
         query: c.query,
         resultsCount: c.resultsCount,
+        jobId: typeof c.job_id === 'string' ? c.job_id : undefined,
       }
     })
     taskPlanState = {
@@ -387,6 +412,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     wasMultitask: m.multitask === true,
     tool: toolData,
     taskPlan: taskPlanState,
+    mediaJob: parseMediaJobPayload(m.mediaJob),
   }
 }
 
@@ -474,5 +500,8 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   }
   if (persisted.wasMultitask) {
     local.wasMultitask = true
+  }
+  if (persisted.mediaJob) {
+    local.mediaJob = persisted.mediaJob
   }
 }

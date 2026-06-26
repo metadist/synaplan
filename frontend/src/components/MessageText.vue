@@ -554,6 +554,9 @@ function normalizeContentForRender(input: string): string {
   if (input === '__AUDIO_GENERATED__') {
     return t('message.audioGenerated')
   }
+  if (input === '__VIDEO_GENERATING__') {
+    return t('message.mediaJob.title.video')
+  }
   return input
 }
 

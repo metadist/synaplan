@@ -967,6 +967,15 @@
     "fileGenerated": "Ich habe die Datei '{filename}' für dich erstellt. Du kannst sie jetzt herunterladen.",
     "fileGenerationFailed": "Es gab ein Problem beim Erstellen der Datei. Bitte versuche es erneut.",
     "audioGenerated": "Hier ist die gewünschte Audioausgabe. Du kannst sie unten abspielen oder herunterladen.",
+    "mediaJob": {
+      "title": {
+        "video": "Dein Video wird erstellt…",
+        "image": "Dein Bild wird erstellt…",
+        "audio": "Deine Audioausgabe wird erstellt…"
+      },
+      "backgroundHint": "Das läuft im Hintergrund und kann einige Minuten dauern. Du kannst weiter chatten — diese Nachricht wird aktualisiert, sobald das Ergebnis fertig ist.",
+      "model": "Modell: {model}"
+    },
     "cancelledByUser": "⚠️ Vom Benutzer abgebrochen",
     "truncated": "Diese Antwort wurde abgeschnitten, weil das Modell sein Token-Limit erreicht hat.",
     "continueButton": "Antwort fortsetzen"

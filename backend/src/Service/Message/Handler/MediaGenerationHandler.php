@@ -582,6 +582,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         $modelName,
                         $modelId,
                         $videoOptions,
+                        $streamCallback,
                         $progressCallback,
                     );
                 }
@@ -1450,6 +1451,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         ?string $modelName,
         ?int $modelId,
         array $videoOptions,
+        callable $streamCallback,
         ?callable $progressCallback,
     ): array {
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
@@ -1496,6 +1498,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             'type' => MediaJob::TYPE_VIDEO,
             'state' => 'running',
         ];
+
+        // Placeholder token — the frontend renders a dedicated background-job
+        // banner (MediaJobStatus) and persists this marker so reloads are not empty.
+        $streamCallback('__VIDEO_GENERATING__');
 
         $this->notify($progressCallback, 'generating', 'Video generation started in the background.', [
             'media_job' => $mediaJob,

@@ -118,6 +118,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         self::assertSame('running', $result['metadata']['media_job']['state'] ?? null);
         self::assertSame('job-detach-1', $result['metadata']['media_job']['job_id'] ?? null);
         self::assertSame('video', $result['metadata']['media_type'] ?? null);
+        self::assertSame('__VIDEO_GENERATING__', $result['content'] ?? null);
     }
 
     public function testAsyncFlagOffKeepsBlockingVideoPath(): void

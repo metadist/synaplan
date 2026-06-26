@@ -1140,6 +1140,15 @@
     "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
     "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
     "audioGenerated": "Aquí está el audio que solicitaste. Puedes reproducirlo o descargarlo abajo.",
+    "mediaJob": {
+      "title": {
+        "video": "Generando tu vídeo…",
+        "image": "Generando tu imagen…",
+        "audio": "Generando tu audio…"
+      },
+      "backgroundHint": "Esto se ejecuta en segundo plano y puede tardar unos minutos. Puedes seguir chateando — este mensaje se actualizará cuando esté listo.",
+      "model": "Usando {model}"
+    },
     "cancelledByUser": "⚠️ Cancelado por el usuario",
     "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
     "continueButton": "Continuar respuesta"

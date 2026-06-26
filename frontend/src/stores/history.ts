@@ -77,6 +77,13 @@ export interface MessageFile {
   fileMime?: string
 }
 
+/** Background async media render (Release 4.0 — video detach). */
+export interface MediaJobInfo {
+  jobId: string
+  type: string
+  state: string
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -156,6 +163,8 @@ export interface Message {
   // Only set when a `plan` SSE event arrives (multi-node turns). On reload the
   // turn is flattened (text + media parts), so this is a streaming-time affordance.
   taskPlan?: TaskPlanState | null
+  /** Background media job — video/image render continues after the stream ends. */
+  mediaJob?: MediaJobInfo | null
   // Multitask routing: true when this assistant turn ran the DAG executor.
   // Persisted server-side (`multitask` meta), so it survives reloads — used to
   // show the simple "Again" (full re-plan) instead of "Again with…".
@@ -216,6 +225,8 @@ export interface TaskCard {
   progressPercent?: number
   providerStatus?: string
   elapsedSeconds?: number
+  /** Async media job key when the node detached to a background worker. */
+  jobId?: string
 }
 
 export interface TaskPlanState {

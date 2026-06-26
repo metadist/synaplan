@@ -168,6 +168,7 @@
               :error-data="message.errorData"
               :truncated="message.truncated"
               :task-plan="message.taskPlan"
+              :media-job="message.mediaJob"
               :was-multitask="message.wasMultitask"
               :is-guest-mode="isGuestMode"
               @regenerate="handleRegenerate(message, $event)"
@@ -382,6 +383,7 @@ import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
+import { parseMediaJobPayload } from '@/utils/messageMapper'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
@@ -1091,6 +1093,14 @@ function schedulePostStreamMemoryPoll(messageId: number): void {
  *     Earlier parts (e.g. a finished code block followed by more streaming
  *     prose) keep their identity instead of being re-created each tick.
  */
+function applyMediaJobToMessage(message: Message | undefined, raw: unknown): void {
+  if (!message) return
+  const parsed = parseMediaJobPayload(raw)
+  if (parsed) {
+    message.mediaJob = parsed
+  }
+}
+
 function renderStreamingContent(content: string, msgId: string): void {
   const trimmedContent = content.trim()
 
@@ -1683,6 +1693,7 @@ const streamAIResponse = async (
               const mname = data.metadata.model_name
               if (typeof prov === 'string') message.provider = prov
               if (typeof mname === 'string') message.modelLabel = mname
+              applyMediaJobToMessage(message, data.metadata)
             }
           } else if (data.status === 'processing') {
             // Processing/routing — no UI update needed
@@ -1725,6 +1736,8 @@ const streamAIResponse = async (
 
             if (fullContent) {
               renderStreamingContent(fullContent, messageId)
+            } else if (data.mediaJob || data.media_job) {
+              renderStreamingContent('__VIDEO_GENERATING__', messageId)
             }
 
             processingStatus.value = ''
@@ -1732,6 +1745,7 @@ const streamAIResponse = async (
 
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
+              applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
               if (
                 data.searchResults &&
                 Array.isArray(data.searchResults) &&
@@ -1943,6 +1957,7 @@ const streamAIResponse = async (
               if (typeof mname === 'string') {
                 message.modelLabel = mname
               }
+              applyMediaJobToMessage(message, data.metadata)
             }
           } else if (data.status === 'processing') {
             // Processing/routing messages - improved logging
@@ -2370,6 +2385,8 @@ const streamAIResponse = async (
 
             if (fullContent) {
               renderStreamingContent(fullContent, messageId)
+            } else if (data.mediaJob || data.media_job) {
+              renderStreamingContent('__VIDEO_GENERATING__', messageId)
             }
 
             if (currentAudioStreamer) {
@@ -2386,6 +2403,8 @@ const streamAIResponse = async (
             // Update message metadata
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
+              applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
+
               // Mark as truncated so the Continue button appears
               if (data.truncated) {
                 message.truncated = true

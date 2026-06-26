@@ -108,7 +108,9 @@
 
         <!-- Processing Status (inside bubble, before content) -->
         <div
-          v-if="isStreaming && processingStatus && role === 'assistant'"
+          v-if="
+            isStreaming && processingStatus && role === 'assistant' && !showMediaJobStatus
+          "
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-typing-indicator"
         >
@@ -413,6 +415,14 @@
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
           />
+
+          <!-- Background async media job (Release 4.0 — e.g. detached video render) -->
+          <div v-if="showMediaJobStatus" class="px-4 pt-3">
+            <MediaJobStatus
+              :media-job="mediaJob!"
+              :model-label="mediaJobModelLabel ?? undefined"
+            />
+          </div>
 
           <MessagePart
             v-for="(part, index) in contentParts"
@@ -959,8 +969,9 @@ import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'
-import type { Part, MessageFile, TaskPlanState } from '@/stores/history'
+import type { Part, MessageFile, MediaJobInfo, TaskPlanState } from '@/stores/history'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
+import MediaJobStatus from '@/components/MediaJobStatus.vue'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
@@ -1042,6 +1053,8 @@ interface Props {
   truncated?: boolean
   // Multitask routing: live task-card state while a multi-node plan streams.
   taskPlan?: TaskPlanState | null
+  /** Background media job — persists after stream ends (async video). */
+  mediaJob?: MediaJobInfo | null
   // Multitask routing: this assistant turn ran the DAG (persisted flag, also
   // true for live plans). Switches "Again with…" to the simple "Again".
   wasMultitask?: boolean
@@ -1181,7 +1194,13 @@ const feedbacks = computed(() => {
 // Process content parts to make reference numbers [1], [2], etc. clickable for search results
 // NOTE: Memory badges ([Memory X]) are handled in MessageText.vue, not here!
 const contentParts = computed(() => {
-  const parts = props.parts.filter((p) => p.type !== 'thinking')
+  let parts = props.parts.filter((p) => p.type !== 'thinking')
+
+  if (showMediaJobStatus.value) {
+    parts = parts.filter(
+      (p) => !(p.type === 'text' && p.content?.trim() === '__VIDEO_GENERATING__')
+    )
+  }
 
   // If no search results, return parts as-is
   if (!props.searchResults || props.searchResults.length === 0) {
@@ -1286,6 +1305,16 @@ const isKnownModelName = (name?: string | null): boolean => {
   const n = (name ?? '').trim().toLowerCase()
   return n !== '' && n !== 'unknown'
 }
+
+const showMediaJobStatus = computed(
+  () => props.role === 'assistant' && props.mediaJob?.state === 'running'
+)
+
+const mediaJobModelLabel = computed(() => {
+  const fromAiModels = props.aiModels?.chat?.model
+  if (fromAiModels && isKnownModelName(fromAiModels)) return fromAiModels
+  return legacyModelLabel.value
+})
 
 const formattedTime = computed(() => formatTime(props.timestamp))
 

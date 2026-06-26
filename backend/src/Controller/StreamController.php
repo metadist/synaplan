@@ -1274,6 +1274,13 @@ class StreamController extends AbstractController
                         }
                     }
 
+                    if ('' === trim($finalText)
+                        && !empty($response['metadata']['media_job'])
+                        && is_array($response['metadata']['media_job'])
+                        && 'running' === ($response['metadata']['media_job']['state'] ?? null)) {
+                        $finalText = '__VIDEO_GENERATING__';
+                    }
+
                     $outgoingMessage->setText($finalText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
@@ -1512,6 +1519,10 @@ class StreamController extends AbstractController
 
                 if ('length' === $finishReason) {
                     $completeData['truncated'] = true;
+                }
+
+                if (!empty($response['metadata']['media_job']) && is_array($response['metadata']['media_job'])) {
+                    $completeData['mediaJob'] = $response['metadata']['media_job'];
                 }
 
                 // Include memories used for this response
