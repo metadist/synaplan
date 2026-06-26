@@ -116,7 +116,7 @@ Full design in [`02_async-media-ux.md`](./02_async-media-ux.md).
 |---|---|---|---|---|
 | 1 | **Async media generation ("fire & continue")** — backend/architecture | [`01_async-media-jobs.md`](./01_async-media-jobs.md) | P0 | Planned |
 | 1·UX | **Async media UX** — DAG spawn visual, global Jobs tray, actionable toaster, jump-to-card | [`02_async-media-ux.md`](./02_async-media-ux.md) | P0 | Planned |
-| 2 | **File management world** — one home for every file: sources, vectorized status, groups, generated-media gallery | [`03_file-management.md`](./03_file-management.md) | P0 | Planned |
+| 2 | **File management world** — one home for every file: sources, vectorized status, groups, generated-media gallery, **auto-foldered "AI generated" library** ([§11](./03_file-management.md#11-ai-generated-files-auto-foldering--categorization)) | [`03_file-management.md`](./03_file-management.md) | P0 | Planned |
 | 3 | **Image & first-boot optimization** — multi-arch (arm64) base image, baked dev deps, custom `bge-m3` Ollama image; fast `docker compose up` on Mac | [`04_image-build-optimization.md`](./04_image-build-optimization.md) | P1 | Planned |
 | 4 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
 
@@ -129,8 +129,11 @@ Full design in [`02_async-media-ux.md`](./02_async-media-ux.md).
 > **Synergy note:** Features 1 and 2 share a seam — when an async `MediaJob`
 > completes, the *same* finalize step both delivers the result to chat/tray AND
 > registers a `BFILES` row, so every generated video/image/audio lands in the
-> File management world's Generated gallery. Build Feature 1 Sprint C/E and
-> Feature 2 Sprint A together.
+> File management world's Generated gallery. That finalize step also stamps the
+> artefact's **origin kind** so it auto-folders into the **"AI generated"**
+> library by category (Images/Videos/Audio/Documents/Calendar — Feature 2
+> [§11](./03_file-management.md#11-ai-generated-files-auto-foldering--categorization)).
+> Build Feature 1 Sprint C/E and Feature 2 Sprint A together.
 
 ---
 
@@ -192,6 +195,9 @@ See [`01_async-media-jobs.md`](./01_async-media-jobs.md).
 - Every job provably terminates (completion, failure, or reaper timeout); no
   stuck cards.
 - The legacy cache-based video-job path is gone (one job system).
+- Every AI-generated file (image/video/audio/Word & Office docs/calendar) is
+  auto-foldered into the **"AI generated"** library by category, with no manual
+  filing (Feature 2 §11).
 - Full gate green; E2E covers "send video request → keep chatting → result
   lands".
 ```

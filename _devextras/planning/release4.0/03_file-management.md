@@ -231,6 +231,10 @@ Driven by `BVECTORSTATE` + `BCHUNKCOUNT` (no per-row network call).
   **Open in chat** (via `BMESSAGEID`), **Delete**.
 - This is where the async-media results live permanently — closes the loop with
   Feature 1 ("saved for the user to find and download again").
+- **The flat gallery becomes a foldered tree** — the **Generated** tab is the
+  surface for the auto-foldered **"AI generated"** library (Images / Videos /
+  Audio / Documents / Calendar). Full design in **§11 (AI-Generated Files:
+  Auto-Foldering & Categorization)**.
 
 ### 4.7 Speed & polish
 
@@ -562,6 +566,9 @@ All annotated with OpenAPI; regenerate frontend schemas (`make -C frontend gener
   and promotable into a group in one click.
 - Generated images/video/audio/calendar are findable and re-downloadable in the
   Generated gallery (and openable back in their chat).
+- **Every AI-generated file is auto-foldered** into the **"AI generated"** library
+  by category (Images / Videos / Audio / Documents / Calendar) with **zero manual
+  filing**, including AI-written Word/Office documents (§11).
 - Filter by source/group/type/vectorized state + fast search, on thousands of
   files, feels instant.
 - Share works from the file manager (file-id based), with tests.
@@ -597,7 +604,257 @@ All annotated with OpenAPI; regenerate frontend schemas (`make -C frontend gener
 
 ---
 
-## 11. Appendix A — i18n key deck (copy-paste ready, en/de/es/tr)
+## 11. AI-Generated Files: Auto-Foldering & Categorization
+
+**Added:** 2026-06-26 · **Scope:** strictly `BSOURCE=generated` (AI engine
+outputs only) · **Builds on:** G1 (§1), §3.2 (generalise the registrar), §4.6
+(the Generated tab), and Feature 1's `MediaJob` finalize.
+
+> Goal: **every file an AI engine produces** — images, video, audio/TTS, the
+> **Word/Office documents** the AI writes, and calendar/ICS — is **taken into the
+> file manager automatically** and **organised, with zero manual filing**, under
+> a single **"AI generated"** library that is split into clear categories
+> (**Images · Videos · Audio · Documents · Calendar**). The user opens "AI
+> generated", sees their AI output grouped by kind, and can preview, download, or
+> jump back to the originating chat in one click.
+
+### 11.1 Why (beyond §4.6)
+
+§4.6 makes generated media *visible* as a single flat "Generated" gallery. That
+answers "where did my last image go?" but not "show me **all** the videos the AI
+made" or "find the **Word document** the assistant wrote last week." It also
+under-serves **generated documents**, which are easy to lose among media. This
+section turns the flat gallery into a **foldered, auto-categorized library** and
+guarantees that **all** engine outputs — not just media — land there correctly.
+
+### 11.2 Scope (decided)
+
+- **In scope:** only files with `BSOURCE=generated` (image, video, audio/TTS,
+  generated document/Office, calendar/ICS).
+- **Out of scope:** user uploads, chat attachments, and integration/incoming
+  pushes — they keep their own source taxonomy and the Incoming flow (§4.5). We
+  do **not** fold other sources by type here.
+
+### 11.3 Folder representation (decided: virtual / derived)
+
+A "folder" in Synaplan today is a `BGROUPKEY` — a **RAG knowledge group**
+(`FileController::getFileGroups`, `FilesView.vue`). Generated media is
+`BVECTORSTATE=not_applicable`, so it must **not** become a real knowledge group
+(that would pollute RAG retrieval).
+
+Therefore the **"AI generated" library is a virtual/derived folder tree**, not a
+stored `BGROUPKEY`:
+
+- Computed from `BSOURCE=generated` + `BORIGINKIND`. **No new columns, no
+  reserved group keys.**
+- Generated **documents** that the user *wants* searchable can still be assigned
+  to a real knowledge group independently — that is the orthogonal "Make
+  searchable by AI" action (§11.6); it never moves them out of the AI-generated
+  library view.
+
+### 11.4 The kind → category classifier (single source of truth)
+
+One classifier maps every engine artefact to exactly one category, and is used by
+**both** `GeneratedFileRegistrar` (sync path) **and** the `MediaJob` finalize
+(async path, Feature 1) so sync and async always agree. It falls back to the file
+extension when the handler's `type` is empty (mirrors the registrar's current
+`mimeForExtension` behaviour).
+
+| `BORIGINKIND` | Category (virtual folder) | Typical extensions |
+|---|---|---|
+| `image` | **Images** | png, jpg, jpeg, webp, gif, svg |
+| `video` | **Videos** | mp4, webm, mov |
+| `audio` | **Audio** | mp3, wav, ogg |
+| `document` | **Documents** (incl. **Word**/Office) | docx, xlsx, pptx, pdf, csv, md, txt, html, json |
+| `calendar` | **Calendar** (its own category) | ics |
+
+- Unknown/empty kind → fall back to extension → default to `document` (never
+  drop a file out of the library).
+- **Guarantee:** the registrar must set `BORIGINKIND` (via this classifier),
+  `BPROVIDER`, `BMESSAGEID`, and `BSOURCE=generated` for **every** generated file.
+  Today the registrar sets *none* of these and has **only one caller**
+  (`WidgetPublicController`), so implementation must route **all** generation
+  paths through it (or the finalize step) — see §11.9 AG-1.
+
+### 11.5 The "AI generated" tree (GUI)
+
+The Generated tab (§4.6) renders the virtual tree:
+
+```
+📁 AI generated (137)
+   ├─ 🖼 Images (54)
+   ├─ 🎬 Videos (12)
+   ├─ 🎵 Audio (31)
+   ├─ 📄 Documents (38)    ← Word / Office / PDF the AI wrote
+   └─ 📅 Calendar (2)
+```
+
+- Clicking a category filters to `source=generated` + `origin_kind=<kind>`.
+- **Media categories** (Images/Videos/Audio) default to the **grid/gallery** with
+  thumbnails/posters + lightbox/player (as §4.6). **Documents** and **Calendar**
+  default to a **list** with a kind icon, provider/prompt, and date.
+- Counts come from the **facets API** (§11.7) — no per-row calls.
+- Per item, keep §4.6 actions: **Preview**, **Download**, **Open in chat** (via
+  `BMESSAGEID`), **Delete**. Generated **documents** additionally get **"Make
+  searchable by AI"** (assign to a knowledge group → vectorize), which is the
+  only RAG-touching action and is fully optional.
+- Empty states per §4.B style: e.g. "Images, videos, audio and documents created
+  by the AI are filed here automatically."
+
+### 11.6 Relationship to RAG (generated documents)
+
+- Generated media: `BVECTORSTATE=not_applicable` — pure organisational foldering.
+- Generated documents: start `BVECTORSTATE=none`; the **"Make searchable by AI"**
+  action vectorizes and assigns a knowledge group. The file stays in **AI
+  generated → Documents** (virtual) *and* gains a real group — the two views are
+  independent and both correct.
+
+### 11.7 API (additive — no new endpoints)
+
+- `GET /api/v1/files` — reuse the **already-planned** `origin_kind` filter
+  (§5) together with `source=generated`.
+- `GET /api/v1/files/facets` — must include the **per-`origin_kind` counts for
+  `source=generated`** so the tree renders category counts in one call. (Already
+  introduced in §5 for source/group/type/vector_state; this just pins the
+  generated-category breakdown as a requirement.)
+- **No new endpoints** are required for this feature — call this out to avoid
+  scope creep.
+
+### 11.8 Backfill & heal
+
+- Extend `app:files:backfill-media` (§3.2 / Sprint B): for legacy
+  `status=generated` rows, set `BORIGINKIND` via the §11.4 classifier (by
+  extension) so existing generated files fold into the right category.
+- Fix-on-read in `ChatController::getMessages` so opened chats heal their old
+  generated files. Idempotent and batched (reuse §8 mitigations).
+
+### 11.9 Sprints (sequencing for the future code effort)
+
+These slot **after/alongside** Feature 2 Sprints A/B/D/F (shared data model +
+Generated tab) and Feature 1 Sprint C (finalize site).
+
+- **AG-1 — Classifier + always-register.** Add the single kind→category
+  classifier; route **all** generation paths through `GeneratedFileRegistrar`;
+  registrar **and** `MediaJob` finalize stamp
+  `BORIGINKIND`/`BPROVIDER`/`BMESSAGEID`/`BSOURCE=generated`. Extend
+  `GeneratedFileRegistrarTest`. *(Depends on Feature 2 Sprint A.)*
+- **AG-2 — Backfill kinds.** Extend `app:files:backfill-media` + fix-on-read to
+  set `BORIGINKIND` on legacy generated rows. Idempotent; tested.
+- **AG-3 — Facets + filter.** Ensure `/facets` returns the generated-category
+  counts; confirm `origin_kind` filter on `/files`. OpenAPI + schema regen.
+- **AG-4 — Folder-tree GUI.** Turn the Generated tab into the "AI generated" tree
+  (categories, counts, grid-for-media / list-for-docs), reuse §4.6 actions, add
+  the generated-document "Make searchable by AI" action. Component + a11y tests.
+- **AG-5 — i18n + polish.** All four locales (§11.11), key-parity check,
+  dark-mode/320px review, E2E ("generate an image / a video / have the AI write a
+  Word doc → each appears under **AI generated → correct category** → download /
+  open in chat").
+
+### 11.10 Risks & mitigations
+
+- **Mis-classification** when `type` is empty/odd → extension fallback + default
+  `document` bucket; unit-test the mapping table.
+- **Duplicate registration** (sync + async both register one artefact) → make
+  registration idempotent keyed on path + `BMESSAGEID`; Feature 1 finalize is the
+  single site for async.
+- **Generated docs that should be RAG-searchable** → the orthogonal "Make
+  searchable" action; foldering never blocks vectorization.
+- **Tree count drift** → derive counts from indexed facets, never per-row.
+
+### 11.11 i18n (en/de/es/tr) — copy-paste ready
+
+Additive keys under the **existing** `files` namespace (do **not** create a new
+top-level namespace). All four locales ship together; the Sprint H locale-key
+parity check (Appendix A.5) covers these too. Glossary terms reuse
+`files.terms.*` where possible (e.g. `@:files.terms.generated`).
+
+```jsonc
+// merge into "files": { ... }
+"aiGenerated": {
+  "folder": "AI generated",
+  "subtitle": "Everything the AI created for you, organised by kind.",
+  "category": {
+    "images": "Images",
+    "videos": "Videos",
+    "audio": "Audio",
+    "documents": "Documents",
+    "calendar": "Calendar"
+  },
+  "empty": "Images, videos, audio and documents created by the AI are filed here automatically.",
+  "makeSearchable": "Make searchable by AI",
+  "makeSearchableHelp": "Add this AI-written document to a knowledge group so the assistant can search it."
+}
+```
+
+```jsonc
+// de.json — merge into "files": { ... }
+"aiGenerated": {
+  "folder": "KI-erzeugt",
+  "subtitle": "Alles, was die KI für dich erstellt hat, nach Art geordnet.",
+  "category": {
+    "images": "Bilder",
+    "videos": "Videos",
+    "audio": "Audio",
+    "documents": "Dokumente",
+    "calendar": "Kalender"
+  },
+  "empty": "Von der KI erstellte Bilder, Videos, Audios und Dokumente werden hier automatisch abgelegt.",
+  "makeSearchable": "KI-durchsuchbar machen",
+  "makeSearchableHelp": "Dieses KI-erstellte Dokument einer Wissensgruppe hinzufügen, damit der Assistent es durchsuchen kann."
+}
+```
+
+```jsonc
+// es.json — merge into "files": { ... }
+"aiGenerated": {
+  "folder": "Generado por IA",
+  "subtitle": "Todo lo que la IA ha creado para ti, organizado por tipo.",
+  "category": {
+    "images": "Imágenes",
+    "videos": "Vídeos",
+    "audio": "Audio",
+    "documents": "Documentos",
+    "calendar": "Calendario"
+  },
+  "empty": "Las imágenes, vídeos, audio y documentos creados por la IA se archivan aquí automáticamente.",
+  "makeSearchable": "Hacer consultable por IA",
+  "makeSearchableHelp": "Añade este documento creado por IA a un grupo de conocimiento para que el asistente pueda consultarlo."
+}
+```
+
+```jsonc
+// tr.json — merge into "files": { ... }
+"aiGenerated": {
+  "folder": "Yapay zekâ üretimi",
+  "subtitle": "Yapay zekânın sizin için oluşturduğu her şey, türüne göre düzenlenmiş.",
+  "category": {
+    "images": "Görseller",
+    "videos": "Videolar",
+    "audio": "Ses",
+    "documents": "Belgeler",
+    "calendar": "Takvim"
+  },
+  "empty": "Yapay zekânın oluşturduğu görseller, videolar, ses ve belgeler buraya otomatik olarak dosyalanır.",
+  "makeSearchable": "Yapay zekâ ile aranabilir yap",
+  "makeSearchableHelp": "Bu yapay zekâ tarafından yazılan belgeyi bir bilgi grubuna ekleyin; böylece asistan onu arayabilir."
+}
+```
+
+### 11.12 Definition of done (for the feature when later built)
+
+- Every AI engine output (image/video/audio/**Word & Office docs**/ICS) appears
+  automatically under **AI generated → <category>** with the correct
+  source/provider/message link, **no manual filing**.
+- Legacy generated files fold into the right category after backfill / on chat
+  open.
+- The category vocabulary is identical in the manager and the attachment picker,
+  in all four locales (parity check green).
+- No new API endpoints; counts driven by facets.
+- Full gate green + the AG-5 E2E.
+
+---
+
+## 12. Appendix A — i18n key deck (copy-paste ready, en/de/es/tr)
 
 These are the **new** keys for the §4.9–4.11 UX layer, ready to merge into
 `frontend/src/i18n/{en,de,es,tr}.json`. They are nested under the **existing**

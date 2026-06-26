@@ -110,7 +110,10 @@ UI. That path is this feature.
    save the file (existing `MediaGenerationHandler` persistence helpers /
    `downloadVideoRaw`), attach it to the originating `BMESSAGES` row, then push
    a Centrifugo event. The persisted file is what makes reload/navigation and
-   cross-channel work.
+   cross-channel work. This same finalize step also registers the `BFILES` row
+   and stamps its **origin kind** (image/video/audio/document/calendar) so the
+   result auto-folders into the **"AI generated"** library (Feature 2
+   [§11](./03_file-management.md#11-ai-generated-files-auto-foldering--categorization)).
 5. **Model resolution stays put.** The job records the already-resolved
    `provider/model/modelId` (the migration principle from multitask routing).
    The advancer never re-derives the model.
