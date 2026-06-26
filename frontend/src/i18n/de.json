@@ -983,6 +983,10 @@
       "refreshStatus": "Status jetzt prüfen",
       "overdueWarning": "Die maximale Wartezeit ist überschritten. Es wird nach einem Endergebnis gesucht…",
       "jobNotFound": "Dieser Hintergrundauftrag wird nicht mehr verfolgt. Bitte erneut generieren.",
+      "stalled": {
+        "workerDown": "Der Hintergrund-Worker hat diesen Auftrag noch nicht angenommen. Wenn das so bleibt, ist der Worker vermutlich offline — bitte den Administrator informieren.",
+        "generic": "Der Auftrag macht noch keinen Fortschritt. Es wird weiter auf den Hintergrund-Worker gewartet…"
+      },
       "failedTitle": {
         "video": "Videoerstellung fehlgeschlagen",
         "image": "Bilderstellung fehlgeschlagen",

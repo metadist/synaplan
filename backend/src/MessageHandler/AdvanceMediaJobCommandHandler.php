@@ -138,7 +138,9 @@ final readonly class AdvanceMediaJobCommandHandler
         }
 
         $this->jobService->markRunning($job, $operationName);
-        $this->dispatcher->dispatch($job, $this->config->pollIntervalSeconds());
+        if (!$this->dispatcher->dispatch($job, $this->config->pollIntervalSeconds())) {
+            $this->fail($job, new \RuntimeException('Queue dispatch rejected — cannot schedule next poll'));
+        }
     }
 
     private function poll(MediaJob $job): void
@@ -176,7 +178,9 @@ final readonly class AdvanceMediaJobCommandHandler
 
         if (true !== $result['done']) {
             // Still rendering — poll again after the interval.
-            $this->dispatcher->dispatch($job, $this->config->pollIntervalSeconds());
+            if (!$this->dispatcher->dispatch($job, $this->config->pollIntervalSeconds())) {
+                $this->fail($job, new \RuntimeException('Queue dispatch rejected — cannot schedule next poll'));
+            }
 
             return;
         }
@@ -197,7 +201,9 @@ final readonly class AdvanceMediaJobCommandHandler
         $this->jobService->markFinalizing($job);
 
         // Finalize immediately — no need to wait a poll interval.
-        $this->dispatcher->dispatch($job, 0);
+        if (!$this->dispatcher->dispatch($job, 0)) {
+            $this->fail($job, new \RuntimeException('Queue dispatch rejected — cannot schedule finalize'));
+        }
     }
 
     private function finalize(MediaJob $job): void

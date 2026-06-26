@@ -15,6 +15,7 @@ use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
+use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
@@ -52,6 +53,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private MediaJobConfig $mediaJobConfig,
         private MediaJobService $mediaJobService,
         private MediaJobDispatcher $mediaJobDispatcher,
+        private MediaJobMessageSync $mediaJobMessageSync,
         private string $uploadDir = '/var/www/backend/var/uploads',
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
@@ -1491,7 +1493,55 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             'options' => $videoOptions,
         ]);
 
-        $this->mediaJobDispatcher->dispatch($job);
+        if (!$this->mediaJobDispatcher->dispatch($job)) {
+            // Transport (Redis) unreachable — fail the job synchronously so the
+            // user gets a clear, localized error in the same turn instead of an
+            // empty bubble that polls forever waiting for a worker that will
+            // never be reached.
+            $lang = is_string($options['lang'] ?? null) ? (string) $options['lang'] : 'en';
+            $errorMessage = $this->errorMessageBuilder->buildErrorMessage(
+                new \RuntimeException('Background queue unreachable'),
+                MediaJob::TYPE_VIDEO,
+                $lang,
+            );
+            $this->mediaJobService->markFailed($job, $errorMessage);
+            $this->mediaJobMessageSync->syncTerminalState($job);
+
+            $streamCallback($errorMessage);
+            $this->notify($progressCallback, 'error', $errorMessage, [
+                'media_job' => [
+                    'job_id' => $job->getJobKey(),
+                    'type' => MediaJob::TYPE_VIDEO,
+                    'state' => 'failed',
+                    'error' => $errorMessage,
+                ],
+            ]);
+
+            $this->logger->error('MediaGenerationHandler: detach failed — queue dispatch rejected', [
+                'job_key' => $job->getJobKey(),
+                'provider' => $provider,
+                'model' => $modelName,
+                'message_id' => $message->getId(),
+            ]);
+
+            return [
+                'text' => $errorMessage,
+                'metadata' => [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'model_id' => $modelId,
+                    'media_prompt' => $prompt,
+                    'media_type' => 'video',
+                    'media_job' => [
+                        'job_id' => $job->getJobKey(),
+                        'type' => MediaJob::TYPE_VIDEO,
+                        'state' => 'failed',
+                        'error' => $errorMessage,
+                    ],
+                    'error' => $errorMessage,
+                ],
+            ];
+        }
 
         $mediaJob = [
             'job_id' => $job->getJobKey(),

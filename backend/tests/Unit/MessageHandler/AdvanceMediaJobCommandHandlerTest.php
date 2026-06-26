@@ -91,7 +91,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
 
         $this->jobService->expects(self::once())->method('markSubmitting')->with($job);
         $this->jobService->expects(self::once())->method('markRunning')->with($job, 'op-1');
-        $this->dispatcher->expects(self::once())->method('dispatch')->with($job, 3);
+        $this->dispatcher->expects(self::once())->method('dispatch')->with($job, 3)->willReturn(true);
 
         // No polling/downloading on the submit step.
         $this->aiFacade->expects(self::never())->method('pollVideoOperation');
@@ -113,7 +113,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
             ->willReturn(['done' => false, 'videoUri' => null, 'error' => null, 'status' => 'in_progress', 'percent' => 42]);
 
         $this->jobService->expects(self::once())->method('updateProgress')->with($job, 42, 'in_progress');
-        $this->dispatcher->expects(self::once())->method('dispatch')->with($job, 3);
+        $this->dispatcher->expects(self::once())->method('dispatch')->with($job, 3)->willReturn(true);
 
         $this->jobService->expects(self::never())->method('markFinalizing');
         $this->jobService->expects(self::never())->method('markCompleted');
@@ -135,7 +135,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $this->jobService->expects(self::once())->method('updateProgress');
         $this->jobService->expects(self::once())->method('markFinalizing')->with($job);
         // Finalize is scheduled with no delay (delay = 0).
-        $this->dispatcher->expects(self::once())->method('dispatch')->with($job, 0);
+        $this->dispatcher->expects(self::once())->method('dispatch')->with($job, 0)->willReturn(true);
 
         $this->aiFacade->expects(self::never())->method('downloadVideoRaw');
         $this->jobService->expects(self::never())->method('markFailed');

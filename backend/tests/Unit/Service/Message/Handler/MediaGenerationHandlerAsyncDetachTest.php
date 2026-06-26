@@ -13,6 +13,7 @@ use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
+use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\Handler\MediaGenerationHandler;
@@ -39,6 +40,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
     private MediaJobConfig&MockObject $mediaJobConfig;
     private MediaJobService&MockObject $mediaJobService;
     private MediaJobDispatcher&MockObject $mediaJobDispatcher;
+    private MediaJobMessageSync&MockObject $mediaJobMessageSync;
     private MediaPromptExtractor&MockObject $promptExtractor;
     private ModelConfigService&MockObject $modelConfigService;
     private EntityManagerInterface&MockObject $em;
@@ -51,6 +53,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         $this->mediaJobConfig = $this->createMock(MediaJobConfig::class);
         $this->mediaJobService = $this->createMock(MediaJobService::class);
         $this->mediaJobDispatcher = $this->createMock(MediaJobDispatcher::class);
+        $this->mediaJobMessageSync = $this->createMock(MediaJobMessageSync::class);
         $this->promptExtractor = $this->createMock(MediaPromptExtractor::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
@@ -72,6 +75,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
             $this->mediaJobConfig,
             $this->mediaJobService,
             $this->mediaJobDispatcher,
+            $this->mediaJobMessageSync,
             sys_get_temp_dir(),
             false,
             'https://app.example.test',
@@ -106,7 +110,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
             }))
             ->willReturn($job);
 
-        $this->mediaJobDispatcher->expects(self::once())->method('dispatch')->with($job);
+        $this->mediaJobDispatcher->expects(self::once())->method('dispatch')->with($job)->willReturn(true);
         $this->aiFacade->expects(self::never())->method('generateVideo');
 
         $result = $this->handler->handle(
@@ -119,6 +123,44 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         self::assertSame('job-detach-1', $result['metadata']['media_job']['job_id'] ?? null);
         self::assertSame('video', $result['metadata']['media_type'] ?? null);
         self::assertSame('__VIDEO_GENERATING__', $result['content'] ?? null);
+    }
+
+    public function testDispatchFailureFailsTheJobSynchronouslyAndSurfacesError(): void
+    {
+        $message = $this->messageStub();
+        $this->bootstrapVideoModel();
+
+        $this->promptExtractor->method('extract')->willReturn([
+            'prompt' => 'a cat surfing',
+            'media_type' => 'video',
+        ]);
+
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->mediaJobConfig->method('isAsyncJobsEnabled')->with(7)->willReturn(true);
+        $this->aiFacade->method('supportsAsyncVideo')->with('higgsfield')->willReturn(true);
+
+        $job = new MediaJob('job-detach-fail');
+        $this->mediaJobService->method('create')->willReturn($job);
+
+        // Dispatcher rejects (Redis unreachable). The handler must mark the
+        // job failed, sync the message, and surface a localized error in the
+        // same turn — no empty bubble, no endless poll.
+        $this->mediaJobDispatcher->expects(self::once())->method('dispatch')->with($job)->willReturn(false);
+        $this->mediaJobService->expects(self::once())->method('markFailed')->with($job, self::isType('string'));
+        $this->mediaJobMessageSync->expects(self::once())->method('syncTerminalState')->with($job);
+        $this->aiFacade->expects(self::never())->method('generateVideo');
+
+        $result = $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'tools:vid', 'language' => 'en'],
+        );
+
+        self::assertSame('failed', $result['metadata']['media_job']['state'] ?? null);
+        self::assertNotEmpty($result['content'] ?? null, 'failure must surface as visible text');
+        self::assertNotEmpty($result['metadata']['error'] ?? null);
     }
 
     public function testAsyncFlagOffKeepsBlockingVideoPath(): void

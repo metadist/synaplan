@@ -37,6 +37,8 @@ function applyPollStatus(status: MediaJobPollResult) {
     elapsedSeconds: status.elapsed_seconds,
     maxWaitSeconds: status.max_wait_seconds,
     remainingSeconds: status.remaining_seconds ?? undefined,
+    stalled: status.stalled ?? undefined,
+    stallReason: status.stall_reason ?? undefined,
   }
 
   if (status.state === 'done' && status.file?.url) {
@@ -199,6 +201,21 @@ const failureMessage = computed(() => {
             data-testid="media-job-overdue"
           >
             {{ $t('message.mediaJob.overdueWarning') }}
+          </p>
+
+          <p
+            v-else-if="mediaJob.stalled"
+            class="text-sm"
+            style="color: var(--warning, #b45309)"
+            data-testid="media-job-stalled"
+          >
+            {{
+              $t(
+                mediaJob.stallReason === 'queue_worker_down'
+                  ? 'message.mediaJob.stalled.workerDown'
+                  : 'message.mediaJob.stalled.generic'
+              )
+            }}
           </p>
 
           <p class="text-sm txt-primary" data-testid="media-job-elapsed">

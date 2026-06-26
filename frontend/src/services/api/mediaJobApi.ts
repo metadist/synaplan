@@ -24,6 +24,8 @@ const MediaJobStatusSchema = z.object({
   deadline_at: z.number().nullable().optional(),
   max_wait_seconds: z.number().optional(),
   remaining_seconds: z.number().nullable().optional(),
+  stalled: z.boolean().optional(),
+  stall_reason: z.string().nullable().optional(),
 })
 
 const MediaJobStatusResponseSchema = z.object({

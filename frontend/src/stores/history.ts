@@ -89,6 +89,10 @@ export interface MediaJobInfo {
   remainingSeconds?: number
   /** Poll returned 404 — job snapshot expired from Redis. */
   lost?: boolean
+  /** Backend hint: job has been queued too long, worker likely down. */
+  stalled?: boolean
+  /** i18n key (e.g. queue_worker_down) for the stall reason. */
+  stallReason?: string
 }
 
 export interface Message {

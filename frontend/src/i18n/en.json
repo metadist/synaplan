@@ -3005,6 +3005,10 @@
       "refreshStatus": "Check status now",
       "overdueWarning": "This job has passed the maximum wait time. Checking for a final result…",
       "jobNotFound": "This background job is no longer tracked. Please try generating again.",
+      "stalled": {
+        "workerDown": "The background worker hasn't picked up this job yet. If this persists, the queue worker may be down — contact your administrator.",
+        "generic": "This job hasn't made progress yet. Still waiting for the background worker…"
+      },
       "failedTitle": {
         "video": "Video generation failed",
         "image": "Image generation failed",

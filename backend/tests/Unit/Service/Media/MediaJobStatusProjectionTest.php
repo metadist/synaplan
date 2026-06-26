@@ -69,4 +69,63 @@ final class MediaJobStatusProjectionTest extends TestCase
 
         self::assertFalse($service->enforceDeadline($job, 'Timed out for test'));
     }
+
+    public function testStalledFlagIsFalseForFreshlyQueuedJob(): void
+    {
+        $store = $this->createStub(MediaJobStore::class);
+        $service = new MediaJobService($store, new NullLogger());
+
+        $job = $service->create([
+            'userId' => 1,
+            'type' => MediaJob::TYPE_VIDEO,
+            'provider' => 'google',
+        ]);
+
+        $status = $service->toStatusArray($job);
+        self::assertFalse($status['stalled']);
+        self::assertNull($status['stall_reason']);
+    }
+
+    public function testStalledFlagFlipsTrueWhenQueuedTooLong(): void
+    {
+        $store = $this->createStub(MediaJobStore::class);
+        $service = new MediaJobService($store, new NullLogger());
+
+        $job = $service->create([
+            'userId' => 1,
+            'type' => MediaJob::TYPE_VIDEO,
+            'provider' => 'google',
+        ]);
+        // Backdate creation past the stall threshold while keeping the job
+        // in queued (no worker ever picked it up).
+        $reflection = new \ReflectionClass($job);
+        $created = $reflection->getProperty('created');
+        $created->setAccessible(true);
+        $created->setValue($job, time() - (MediaJobService::STALL_QUEUED_SECONDS + 5));
+
+        $status = $service->toStatusArray($job);
+        self::assertTrue($status['stalled']);
+        self::assertSame('queue_worker_down', $status['stall_reason']);
+    }
+
+    public function testStalledFlagIsFalseOnceJobIsRunning(): void
+    {
+        $store = $this->createStub(MediaJobStore::class);
+        $service = new MediaJobService($store, new NullLogger());
+
+        $job = $service->create([
+            'userId' => 1,
+            'type' => MediaJob::TYPE_VIDEO,
+            'provider' => 'google',
+        ]);
+        $reflection = new \ReflectionClass($job);
+        $created = $reflection->getProperty('created');
+        $created->setAccessible(true);
+        $created->setValue($job, time() - (MediaJobService::STALL_QUEUED_SECONDS + 5));
+
+        $service->markRunning($job, 'op-1');
+
+        $status = $service->toStatusArray($job);
+        self::assertFalse($status['stalled']);
+    }
 }

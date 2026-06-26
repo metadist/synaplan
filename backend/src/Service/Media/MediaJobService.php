@@ -225,6 +225,13 @@ final class MediaJobService
     }
 
     /**
+     * Seconds an active job may sit `queued`/`submitting` before we surface a
+     * worker-down hint to the UI. Generous enough for cold-start cache warmup,
+     * tight enough that a silent worker outage shows up in well under a minute.
+     */
+    public const STALL_QUEUED_SECONDS = 45;
+
+    /**
      * Map an internal job to the card-friendly state vocabulary the frontend
      * already understands (running/done/failed/cancelled), plus the live
      * progress fields and the produced file when complete.
@@ -234,7 +241,8 @@ final class MediaJobService
      *     percent:?int, provider_status:?string, elapsed_seconds:int,
      *     error:?string, file:?array<string,mixed>, finished:bool,
      *     created_at:int, updated_at:int, deadline_at:?int,
-     *     max_wait_seconds:int, remaining_seconds:?int
+     *     max_wait_seconds:int, remaining_seconds:?int,
+     *     stalled:bool, stall_reason:?string
      * }
      */
     public function toStatusArray(MediaJob $job): array
@@ -244,6 +252,8 @@ final class MediaJobService
         $deadlineAt = $job->getDeadlineAt();
         $now = time();
         $remainingSeconds = null !== $deadlineAt ? max(0, $deadlineAt - $now) : null;
+
+        [$stalled, $stallReason] = $this->detectStall($job, $now);
 
         return [
             'job_id' => $job->getJobKey(),
@@ -261,7 +271,33 @@ final class MediaJobService
             'deadline_at' => $deadlineAt,
             'max_wait_seconds' => $this->deadlineSecondsFor($job->getType()),
             'remaining_seconds' => $remainingSeconds,
+            'stalled' => $stalled,
+            'stall_reason' => $stallReason,
         ];
+    }
+
+    /**
+     * Detect the "worker isn't picking jobs up" signal: a non-terminal job that
+     * has been `queued` or `submitting` for longer than {@see STALL_QUEUED_SECONDS}
+     * without ever transitioning to `running`. Returns [stalled, reason] where
+     * the reason is a short i18n key the frontend maps to localized copy.
+     *
+     * @return array{0:bool, 1:?string}
+     */
+    private function detectStall(MediaJob $job, int $now): array
+    {
+        if ($job->isTerminal()) {
+            return [false, null];
+        }
+
+        if (in_array($job->getStatus(), [MediaJob::STATUS_QUEUED, MediaJob::STATUS_SUBMITTING], true)) {
+            $age = $now - $job->getCreated();
+            if ($age >= self::STALL_QUEUED_SECONDS) {
+                return [true, 'queue_worker_down'];
+            }
+        }
+
+        return [false, null];
     }
 
     public function deadlineSecondsFor(string $type): int
