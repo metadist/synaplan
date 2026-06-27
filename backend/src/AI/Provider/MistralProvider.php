@@ -37,12 +37,26 @@ class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInte
     private const DEFAULT_TRANSCRIBE_MODEL = 'voxtral-mini-latest';
     private const DEFAULT_TTS_MODEL = 'voxtral-mini-tts-2603';
     private const DEFAULT_TTS_FORMAT = 'mp3';
+
+    // Hosted Voxtral TTS has NO implicit default voice (unlike the open-weights
+    // checkpoint): /v1/audio/speech rejects a request that supplies neither
+    // `voice_id` nor `ref_audio`. This documented preset is the last-resort
+    // fallback when the live voices catalog can't be reached.
+    private const DEFAULT_TTS_VOICE = 'fr_marie_neutral';
     private const DEFAULT_VISION_MODEL = 'mistral-medium-latest';
     private const VISION_MAX_TOKENS = 2048;
 
     private const TIMEOUT_AUDIO_SECONDS = 120;
 
     private $client;
+
+    /**
+     * Cached raw preset-voice catalog, used to resolve a default voice when the
+     * caller didn't pick one. `null` until first lookup.
+     *
+     * @var array<int, array<string, mixed>>|null
+     */
+    private ?array $presetVoiceCache = null;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -545,11 +559,17 @@ class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInte
         ];
 
         // voice_id (preset or saved voice) and ref_audio (zero-shot cloning) are
-        // mutually exclusive; pass whichever the caller supplied.
+        // mutually exclusive; pass whichever the caller supplied. When neither is
+        // given we MUST still send a voice — the hosted endpoint 400s otherwise
+        // ("Either ref_audio or voice must be provided.") — so resolve a sensible
+        // preset default instead of letting the request fail.
         if (!empty($options['voice'])) {
             $body['voice_id'] = $options['voice'];
         } elseif (!empty($options['ref_audio'])) {
             $body['ref_audio'] = $options['ref_audio'];
+        } else {
+            $language = is_string($options['language'] ?? null) ? $options['language'] : null;
+            $body['voice_id'] = $this->resolveDefaultVoiceId($language);
         }
 
         if ($stream) {
