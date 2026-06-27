@@ -1,4 +1,30 @@
 {
+  "jobs": {
+    "kind": {
+      "video": "vídeo",
+      "image": "imagen",
+      "audio": "audio"
+    },
+    "toast": {
+      "ready": "Tu {kind} está listo",
+      "failed": "No se pudo crear tu {kind}",
+      "view": "Ver"
+    },
+    "cancel": {
+      "stop": "Detener",
+      "failed": "No se pudo cancelar el trabajo. Inténtalo de nuevo."
+    },
+    "tray": {
+      "title": "Trabajos en segundo plano",
+      "close": "Cerrar",
+      "openLabel": "Trabajos en segundo plano ({count} en curso)",
+      "empty": "No hay trabajos en segundo plano. Los procesos largos como los vídeos aparecen aquí para que puedas seguir trabajando mientras terminan."
+    },
+    "row": {
+      "open": "Abrir",
+      "working": "Procesando…"
+    }
+  },
   "branding": {
     "poweredBy": "Desarrollado por"
   },
@@ -1140,6 +1166,38 @@
     "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
     "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
     "audioGenerated": "Aquí está el audio que solicitaste. Puedes reproducirlo o descargarlo abajo.",
+    "mediaJob": {
+      "title": {
+        "video": "Generando tu vídeo…",
+        "image": "Generando tu imagen…",
+        "audio": "Generando tu audio…"
+      },
+      "backgroundHint": "Esto se ejecuta en segundo plano y puede tardar unos minutos. Puedes seguir chateando — este mensaje se actualizará cuando esté listo.",
+      "model": "Usando {model}",
+      "stillRunning": "Trabajo en curso · lleva {elapsed}",
+      "checkingNow": "Comprobando estado…",
+      "lastChecked": "Última comprobación hace {seconds}s · siguiente en ~{interval}s",
+      "progress": "{percent} % completado",
+      "pollError": "No se pudo actualizar el estado — se reintentará en la próxima comprobación.",
+      "refreshStatus": "Comprobar estado ahora",
+      "overdueWarning": "Este trabajo superó el tiempo máximo de espera. Comprobando el resultado final…",
+      "jobNotFound": "Este trabajo en segundo plano ya no se rastrea. Inténtalo de nuevo.",
+      "stalled": {
+        "workerDown": "El proceso en segundo plano aún no ha aceptado este trabajo. Si continúa así, el worker probablemente esté caído — contacta al administrador.",
+        "generic": "Este trabajo aún no ha avanzado. Seguimos esperando al proceso en segundo plano…"
+      },
+      "failedTitle": {
+        "video": "Error al generar el vídeo",
+        "image": "Error al generar la imagen",
+        "audio": "Error al generar el audio"
+      },
+      "failedBody": "El trabajo en segundo plano no se completó. Puedes intentarlo de nuevo con otro modelo.",
+      "maxWait": {
+        "video": "Los vídeos pueden tardar hasta {minutes} minutos.",
+        "image": "Las imágenes suelen estar listas en pocos minutos.",
+        "audio": "El audio suele estar listo en pocos minutos."
+      }
+    },
     "cancelledByUser": "⚠️ Cancelado por el usuario",
     "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
     "continueButton": "Continuar respuesta"

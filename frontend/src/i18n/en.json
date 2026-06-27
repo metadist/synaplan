@@ -1,4 +1,30 @@
 {
+  "jobs": {
+    "kind": {
+      "video": "video",
+      "image": "image",
+      "audio": "audio"
+    },
+    "toast": {
+      "ready": "Your {kind} is ready",
+      "failed": "Couldn't create your {kind}",
+      "view": "View"
+    },
+    "cancel": {
+      "stop": "Stop",
+      "failed": "Couldn't cancel the job. Please try again."
+    },
+    "tray": {
+      "title": "Background jobs",
+      "close": "Close",
+      "openLabel": "Background jobs ({count} running)",
+      "empty": "No background jobs. Long renders like videos appear here so you can keep working while they finish."
+    },
+    "row": {
+      "open": "Open",
+      "working": "Working…"
+    }
+  },
   "branding": {
     "poweredBy": "Powered by"
   },
@@ -2989,6 +3015,38 @@
     "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",
     "fileGenerationFailed": "There was a problem creating the file. Please try again.",
     "audioGenerated": "Here's the audio you requested. You can play or download it below.",
+    "mediaJob": {
+      "title": {
+        "video": "Generating your video…",
+        "image": "Generating your image…",
+        "audio": "Generating your audio…"
+      },
+      "backgroundHint": "This runs in the background and may take a few minutes. You can keep chatting — this message will update when it's ready.",
+      "model": "Using {model}",
+      "stillRunning": "Job still running · running for {elapsed}",
+      "checkingNow": "Checking status now…",
+      "lastChecked": "Last checked {seconds}s ago · next check in ~{interval}s",
+      "progress": "{percent}% complete",
+      "pollError": "Could not refresh job status — will retry on the next check.",
+      "refreshStatus": "Check status now",
+      "overdueWarning": "This job has passed the maximum wait time. Checking for a final result…",
+      "jobNotFound": "This background job is no longer tracked. Please try generating again.",
+      "stalled": {
+        "workerDown": "The background worker hasn't picked up this job yet. If this persists, the queue worker may be down — contact your administrator.",
+        "generic": "This job hasn't made progress yet. Still waiting for the background worker…"
+      },
+      "failedTitle": {
+        "video": "Video generation failed",
+        "image": "Image generation failed",
+        "audio": "Audio generation failed"
+      },
+      "failedBody": "The background job did not complete. You can try again with a different model.",
+      "maxWait": {
+        "video": "Videos may take up to {minutes} minutes.",
+        "image": "Images usually finish within a few minutes.",
+        "audio": "Audio usually finishes within a few minutes."
+      }
+    },
     "cancelledByUser": "⚠️ Cancelled by user",
     "truncated": "This response was cut short because the model reached its token limit.",
     "continueButton": "Continue response"

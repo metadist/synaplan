@@ -30,6 +30,13 @@ final class MediaJobStore
     private const MSG_PREFIX = 'mediajob:msg:';
     private const ACTIVE_ZSET = 'mediajob:active';
 
+    /**
+     * Per-user index of active job keys: `mediajob:user:{userId}` -> SET.
+     * Backs the global Jobs tray and the per-user concurrency limit in O(jobs
+     * for that user) instead of scanning every active job across all tenants.
+     */
+    private const USER_ACTIVE_PREFIX = 'mediajob:user:';
+
     /** Retention for in-flight jobs — generous enough for the longest render. */
     private const ACTIVE_TTL_SECONDS = 21600; // 6h
 
@@ -46,11 +53,17 @@ final class MediaJobStore
         $terminal = $job->isTerminal();
         $ttl = $terminal ? self::TERMINAL_TTL_SECONDS : self::ACTIVE_TTL_SECONDS;
 
-        $this->redis->set(
-            self::JOB_PREFIX.$job->getJobKey(),
-            (string) json_encode($job->toArray()),
-            $ttl,
-        );
+        // Fail loudly on a serialization error instead of casting `false` to an
+        // empty string and storing it — an empty snapshot makes find() return
+        // null, which silently strands the job. Options are sanitized upstream
+        // (MediaJobService::create), so this should never trigger; it is the
+        // last-line guard that turns a future regression into a visible error.
+        $encoded = json_encode($job->toArray(), \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+        if (false === $encoded) {
+            throw new \RuntimeException(sprintf('MediaJobStore: failed to serialize job %s: %s', $job->getJobKey(), json_last_error_msg()));
+        }
+
+        $this->redis->set(self::JOB_PREFIX.$job->getJobKey(), $encoded, $ttl);
 
         $messageId = $job->getMessageId();
         if (null !== $messageId) {
@@ -62,6 +75,19 @@ final class MediaJobStore
             $this->redis->zRem(self::ACTIVE_ZSET, $job->getJobKey());
         } else {
             $this->redis->zAdd(self::ACTIVE_ZSET, (float) $job->getUpdated(), $job->getJobKey());
+        }
+
+        // Per-user active index: add while in flight, remove once terminal so a
+        // user's tray + concurrency count stay accurate and tenant-isolated.
+        $userId = $job->getUserId();
+        if ($userId > 0) {
+            $userKey = self::USER_ACTIVE_PREFIX.$userId;
+            if ($terminal) {
+                $this->redis->sRem($userKey, $job->getJobKey());
+            } else {
+                $this->redis->sAdd($userKey, $job->getJobKey());
+                $this->redis->expire($userKey, self::ACTIVE_TTL_SECONDS);
+            }
         }
     }
 
@@ -120,6 +146,70 @@ final class MediaJobStore
             $job = $this->find($key);
             if (null === $job || $job->isTerminal()) {
                 $this->redis->zRem(self::ACTIVE_ZSET, $key);
+                continue;
+            }
+            $jobs[] = $job;
+        }
+
+        return $jobs;
+    }
+
+    /**
+     * Active (non-terminal) jobs owned by one user, via the per-user index —
+     * O(that user's jobs), tenant-isolated. Self-heals index entries whose
+     * snapshot expired or already went terminal.
+     *
+     * @return list<MediaJob>
+     */
+    public function findActiveForUser(int $userId, int $limit = 200): array
+    {
+        if ($userId <= 0) {
+            return [];
+        }
+
+        $userKey = self::USER_ACTIVE_PREFIX.$userId;
+        $keys = $this->redis->sMembers($userKey);
+        $jobs = [];
+        foreach ($keys as $key) {
+            $job = $this->find($key);
+            if (null === $job || $job->isTerminal()) {
+                // Snapshot expired or job finished but the index lingered — self-heal.
+                $this->redis->sRem($userKey, $key);
+                continue;
+            }
+            $jobs[] = $job;
+            if (count($jobs) >= $limit) {
+                break;
+            }
+        }
+
+        return $jobs;
+    }
+
+    /** Count a user's active jobs (resolves + self-heals the index). */
+    public function countActiveForUser(int $userId): int
+    {
+        return count($this->findActiveForUser($userId, \PHP_INT_MAX));
+    }
+
+    /**
+     * Non-terminal jobs whose {@see MediaJob::isPastDeadline()} is true.
+     * Unlike {@see findStale}, this catches overdue jobs even when a worker
+     * is still heartbeating (advancer/reaper gap).
+     *
+     * @return list<MediaJob>
+     */
+    public function findPastDeadline(int $limit = 100): array
+    {
+        $keys = $this->redis->zRangeByScore(self::ACTIVE_ZSET, '-inf', '+inf', $limit);
+        $jobs = [];
+        foreach ($keys as $key) {
+            $job = $this->find($key);
+            if (null === $job || $job->isTerminal()) {
+                $this->redis->zRem(self::ACTIVE_ZSET, $key);
+                continue;
+            }
+            if (!$job->isPastDeadline()) {
                 continue;
             }
             $jobs[] = $job;

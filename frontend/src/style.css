@@ -27,6 +27,12 @@
   --color-brand: var(--brand);
   --color-brand-light: var(--brand-light);
   --color-brand-hover: var(--brand-hover);
+  /* Status colors as Tailwind tokens so `text-danger`, `border-danger`,
+   * `text-warning`, `text-success` resolve and stay theme-aware (light/dark)
+   * via the runtime --status-* custom properties — same pattern as brand. */
+  --color-danger: var(--status-error);
+  --color-warning: var(--status-warning);
+  --color-success: var(--status-success);
 }
 
 /* Mobile floating header button clearance — pushes titles below the button.

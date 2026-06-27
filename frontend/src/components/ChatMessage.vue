@@ -108,7 +108,7 @@
 
         <!-- Processing Status (inside bubble, before content) -->
         <div
-          v-if="isStreaming && processingStatus && role === 'assistant'"
+          v-if="isStreaming && processingStatus && role === 'assistant' && !showMediaJobBanner"
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-typing-indicator"
         >
@@ -413,6 +413,17 @@
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
           />
+
+          <!-- Background async media job (Release 4.0 — e.g. detached video render) -->
+          <div v-if="showMediaJobBanner" class="px-4 pt-3">
+            <MediaJobStatus
+              :media-job="mediaJob!"
+              :model-label="mediaJobModelLabel ?? undefined"
+              @update:media-job="emit('mediaJobUpdate', $event)"
+              @completed="emit('mediaJobCompleted', $event)"
+              @cancel="emit('mediaJobCancel', $event)"
+            />
+          </div>
 
           <MessagePart
             v-for="(part, index) in contentParts"
@@ -959,8 +970,9 @@ import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'
-import type { Part, MessageFile, TaskPlanState } from '@/stores/history'
+import type { Part, MessageFile, MediaJobInfo, TaskPlanState } from '@/stores/history'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
+import MediaJobStatus from '@/components/MediaJobStatus.vue'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
@@ -1042,6 +1054,8 @@ interface Props {
   truncated?: boolean
   // Multitask routing: live task-card state while a multi-node plan streams.
   taskPlan?: TaskPlanState | null
+  /** Background media job — persists after stream ends (async video). */
+  mediaJob?: MediaJobInfo | null
   // Multitask routing: this assistant turn ran the DAG (persisted flag, also
   // true for live plans). Switches "Again with…" to the simple "Again".
   wasMultitask?: boolean
@@ -1181,7 +1195,24 @@ const feedbacks = computed(() => {
 // Process content parts to make reference numbers [1], [2], etc. clickable for search results
 // NOTE: Memory badges ([Memory X]) are handled in MessageText.vue, not here!
 const contentParts = computed(() => {
-  const parts = props.parts.filter((p) => p.type !== 'thinking')
+  let parts = props.parts.filter((p) => p.type !== 'thinking')
+
+  // The `__VIDEO_GENERATING__` token is a backend placeholder, never user-facing
+  // text. The dedicated banner (while running/failed) or the finished video part
+  // (when done) is the real surface. Strip the placeholder whenever this message
+  // carries a media job in ANY state — gating it on the banner's visibility
+  // alone made the placeholder reappear next to the video the moment the job
+  // completed, producing the text↔video flicker.
+  if (props.role === 'assistant' && props.mediaJob) {
+    const generatingTokens = [
+      '__VIDEO_GENERATING__',
+      '__IMAGE_GENERATING__',
+      '__AUDIO_GENERATING__',
+    ]
+    parts = parts.filter(
+      (p) => !(p.type === 'text' && generatingTokens.includes(p.content?.trim() ?? ''))
+    )
+  }
 
   // If no search results, return parts as-is
   if (!props.searchResults || props.searchResults.length === 0) {
@@ -1287,6 +1318,18 @@ const isKnownModelName = (name?: string | null): boolean => {
   return n !== '' && n !== 'unknown'
 }
 
+const showMediaJobBanner = computed(() => {
+  if (props.role !== 'assistant' || !props.mediaJob) return false
+  const state = props.mediaJob.state
+  return state === 'running' || state === 'failed' || state === 'cancelled'
+})
+
+const mediaJobModelLabel = computed(() => {
+  const fromAiModels = props.aiModels?.chat?.model
+  if (fromAiModels && isKnownModelName(fromAiModels)) return fromAiModels
+  return legacyModelLabel.value
+})
+
 const formattedTime = computed(() => formatTime(props.timestamp))
 
 // Check if we're in a processing state (hide model info during these states)
@@ -1341,6 +1384,9 @@ const emit = defineEmits<{
   falsePositive: [text: string, messageId?: number]
   'click-memory': [memory: UserMemory]
   continue: []
+  mediaJobUpdate: [job: MediaJobInfo]
+  mediaJobCompleted: [payload: { url: string; type: string }]
+  mediaJobCancel: [jobId: string]
 }>()
 
 const router = useRouter()

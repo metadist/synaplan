@@ -248,6 +248,229 @@ Driven by `BVECTORSTATE` + `BCHUNKCOUNT` (no per-row network call).
   `ShareModal` contract), backed by `BFILES` + share meta; wire `ShareModal` into
   row/bulk actions. Add tests (the current message-id lookup is the bug).
 
+### 4.9 UX helpers, onboarding & feedback — the human layer
+
+This is the part that makes the file world feel *finished* instead of merely
+functional. Today the manager has columns and buttons but almost no explanation;
+a new user cannot tell what "vectorized" means, why a file is in "Incoming", or
+what happens when they click "Move group". 4.0 ships a deliberate, consistent
+help-and-feedback layer across **every** surface (`FilesView.vue`,
+`FilesTabs.vue`, `FileSelectionModal.vue`, `FileMentionPalette.vue`,
+`KnowledgeFolderPicker.vue`, `ShareModal.vue`). All copy is i18n and lands in
+**all four locales** (`en`, `de`, `es`, `tr`) — see §4.11.
+
+#### A. Voice & microcopy principles
+
+1. **Plain words, not jargon.** Say "Searchable by AI" before "Vectorized";
+   keep the technical term as the secondary line/tooltip. Never show a bare
+   internal token (`web_upload`, `not_applicable`, `BGROUPKEY`).
+2. **One sentence, one job.** Every helper answers exactly one question: *what is
+   this?* / *what will this button do?* / *what just happened?*
+3. **Outcome-oriented.** Toasters and tooltips describe the user's result
+   ("Moved 3 files to Contracts"), not the implementation ("PATCH succeeded").
+4. **Consistent vocabulary** with the chat input and the rest of the app:
+   *files*, *knowledge group*, *searchable by AI*, *incoming*, *generated*.
+   Define each once (§4.11 glossary) and reuse the exact term everywhere.
+5. **Quiet by default, helpful on demand.** Persistent inline hints stay short;
+   deeper explanation lives behind a discreet `(?)` help bubble so power users
+   aren't nagged.
+
+#### B. First-run & empty states (every surface gets one)
+
+No surface is ever a blank rectangle. Each empty/zero state explains the purpose
+and offers the primary next action.
+
+| Surface | When empty | Message (intent) | Primary action |
+|---|---|---|---|
+| Browse (no files) | brand-new account | "This is your file library — every upload, chat attachment and AI-generated file lives here, ready to search and reuse." | **Upload your first file** |
+| Browse (filtered to 0) | filters exclude all | "No files match these filters." | **Clear filters** |
+| Incoming (empty) | nothing pushed | "Files sent in from Outlook, Nextcloud or OpenCloud will appear here for you to review before filing." | link: *Set up integrations* |
+| Generated (empty) | no AI media yet | "Images, video and audio you create in chat are saved here so you can find and download them again." | link: *Start a chat* |
+| Group with 0 files | empty knowledge group | "This group has no files yet. Add files to make them searchable together." | **Add files** |
+| Attachment window (no recents) | first attach | "Pick a recent file or upload a new one to use in this chat." | **Upload** |
+
+#### C. Help bubbles & tooltips (discoverable, not noisy)
+
+A small, consistent `(?)` affordance (and native `aria-describedby` tooltips on
+controls) explains each non-obvious element. Each entry below is a single i18n
+key; the bubble copy is the contract.
+
+| Element | Help bubble / tooltip copy (intent) |
+|---|---|
+| **"Searchable by AI" pill** | "When a file is searchable by AI, its contents are added to your knowledge base so the assistant can use it to answer you. Click to see the group it belongs to." |
+| **Group / folder chip** | "Knowledge groups bundle files. When the AI searches a group, it can use every file in it." |
+| **Source badge** | "Where this file came from — an upload, a chat, Outlook, Nextcloud, OpenCloud, WhatsApp, the widget, the API, or AI-generated." |
+| **Incoming tab badge** | "Files other apps pushed in for your knowledge base. Review them, then keep or dismiss." |
+| **Type filter** | "Show only a kind of file — documents, images, video or audio." |
+| **Vectorized filter** | "Filter by whether files are searchable by AI." |
+| **Re-vectorize action** | "Re-read this file and refresh what the AI knows from it. Use after editing or if it failed." |
+| **Move group action** | "Move files into another knowledge group. This changes which group the AI searches them in — it does not delete anything." |
+| **Storage meter** | "How much of your storage you've used. Generated media is counted but shown separately." |
+
+#### D. Toaster catalogue (every action gives feedback)
+
+Built on the existing `useNotification` composable (`success` / `error` /
+`warning` / `info`). Rules: **every** mutating action confirms or explains;
+bulk actions report a **count**; destructive actions offer **Undo** where the
+backend can support a soft window, otherwise a confirm dialog precedes them;
+identical rapid events are **debounced/coalesced** into one toast.
+
+| Action | Type | Toast copy (intent) | Notes |
+|---|---|---|---|
+| Upload complete | success | "Uploaded {name}." / "Uploaded {n} files." | per-batch, not per-file |
+| Upload failed | error | "Couldn't upload {name}. {reason}" | actionable reason |
+| File too large / wrong type | warning | "{name} is too large (max {limit})." / "{type} files aren't supported." | pre-flight, before upload |
+| Vectorize started | info | "Making {name} searchable by AI…" | followed by live pill |
+| Vectorize done | success | "{name} is now searchable by AI." | — |
+| Vectorize failed | error | "Couldn't process {name}. Retry?" | inline Retry + toast |
+| Re-vectorize (bulk) | success | "Refreshed {n} files." | coalesced |
+| Move to group | success | "Moved {n} files to {group}." | **Undo** |
+| Assign group (from No group) | success | "Filed {n} files in {group}." | **Undo** |
+| Delete | success | "Deleted {n} files." | **Undo** (soft window) |
+| Incoming → Keep | success | "Kept {n} files in {group}." | promotes from staging |
+| Incoming → Dismiss | success | "Dismissed {n} files." | **Undo** |
+| Share link created | success | "Share link copied to clipboard." | auto-copies |
+| Share revoked | info | "Sharing turned off for {name}." | — |
+| Download (zip) | info | "Preparing {n} files for download…" | then browser save |
+| Network/permission error | error | "Something went wrong. {reason}" | generic fallback |
+
+#### E. Inline status explainers (in place, no clicking required)
+
+- The **"Searchable by AI" pill** carries its own one-line meaning per state
+  (searchable · processing · not yet · not applicable · failed); the **failed**
+  state shows the reason on hover and a **Retry**.
+- The **group chip** on a searchable file states the retrieval consequence:
+  "AI searches in *{group}* include this file."
+- **Incoming** rows show a short provenance line ("from Outlook · 2h ago") so the
+  user immediately trusts what arrived.
+- A first-visit **dismissible explainer strip** at the top of Browse ("Everything
+  you upload or create lives here…") that can be re-opened from the `(?)` in the
+  header — shown once, remembered per user.
+
+#### F. Confirmations & safety
+
+- **Destructive** (Delete, Dismiss) → confirm dialog **or** instant action with a
+  time-boxed **Undo** toast (preferred for single items; confirm for bulk over a
+  threshold). Copy names the consequence: "Delete 12 files? Their AI-searchable
+  content is removed too."
+- **Reversible** (Move, Assign group, Re-vectorize) → no modal; act + Undo toast.
+- Never a naked "Are you sure?" — always state *what* and *what happens to RAG*.
+
+#### G. Progress & long-running feedback
+
+- Uploads: existing per-file + byte-percent progress, plus a **slow-upload** hint
+  (already in `FileSelectionModal`) — keep and apply the same pattern in the new
+  manager.
+- Vectorization & generated media in flight: the live **pill** updates in place
+  (subscribes to Feature 1's `media_job.update`); no spinner-only dead ends.
+- Skeleton rows/tiles while the list/thumbnails load; never a blank flash.
+
+### 4.10 The file attachment window (chat picker) redesign
+
+The "attachment window" (`FileSelectionModal.vue`) and the inline
+`@`-mention picker (`FileMentionPalette.vue`) are where most users *touch* files,
+yet today they only upload + list. They must become a fast, clear "pick the right
+file" surface that mirrors the manager's vocabulary.
+
+#### 4.10.1 Goals
+
+- Reuse the **same** language, icons, source badges and "searchable by AI"
+  indicator as the manager — one mental model.
+- Make the *right* file findable in seconds: recents, search, and **type filter
+  in the picker itself** (the gap noted earlier — "filtering of file types in
+  selection").
+- Clarify the consequence of attaching: an attached file is sent to the AI for
+  *this* message; a *searchable-by-AI* file is also reusable across chats.
+
+#### 4.10.2 Layout (attachment window)
+
+```
+┌─ Add files to this message ─────────────────────────────── (?) ─ ✕ ─┐
+│  [⬆ Upload new]   or drag & drop          🔍 search your files       │
+│  Type:  All ▾ | 📄 Docs | 🖼 Images | 🎬 Video | 🎵 Audio            │
+│  ───────────────────────────────────────────────────────────────── │
+│  Recent                                                              │
+│   ☐ 📄 contract.pdf   ⬆ upload   ✅ searchable · Contracts   1.2 MB   │
+│   ☐ 🖼 sunset.png     ✨ gen      🚫 n/a                     540 KB   │
+│  All files (filtered)                                    [≣ list ⊞]  │
+│   ☐ 📄 specs.docx     ☁ opencl.  ⚠ failed · retry            90 KB   │
+│  ─────────────────────────────────────────────────────────────────  │
+│  Selected: 2 files          [Cancel]              [Attach 2 files]   │
+└─────────────────────────────────────────────────────────────────────┘
+  Helper line: "Attached files are sent to the AI for this message.
+                Files marked ✅ are also searchable across all your chats."
+```
+
+#### 4.10.3 Behaviours
+
+- **Type filter chips** (Docs / Images / Video / Audio / All) filter the list
+  client- or server-side; honoured for both recents and search results. This is
+  the picker counterpart of the manager's Type filter.
+- **Search** (debounced) over name + original name; empty-result and
+  no-recents states use §4.B copy.
+- **Inline source badge + searchable pill** on every row, identical to the
+  manager — so users learn the icons in one place.
+- **Drag & drop and Upload** preserved (with the existing progress + slow-upload
+  hint), but the destination/consequence is stated in the helper line.
+- **Clear primary CTA** with a live count ("Attach 2 files"); disabled with a
+  tooltip when nothing is selected.
+- **`@`-mention palette** (`FileMentionPalette.vue`): same vocabulary; show the
+  searchable pill + group so the user mentions the *right* document; keyboard-first
+  (↑/↓/Enter), a one-line header hint ("Type to find a file to give the AI").
+
+#### 4.10.4 Accessibility & motion
+
+- Full keyboard path (open → filter → search → select → attach), visible focus
+  ring, `aria-describedby` for every helper/tooltip, `aria-live="polite"` for
+  toasts and result counts.
+- Respect `prefers-reduced-motion`; modal/transition already tokenised — keep
+  dark-mode-safe design tokens, no hardcoded colors.
+- All hit targets ≥ 40px on touch; the window is already bottom-sheet on mobile —
+  keep that and make filter chips horizontally scrollable.
+
+### 4.11 i18n copy deck (en / de / es / tr)
+
+All new strings are **vue-i18n** keys added to `frontend/src/i18n/{en,de,es,tr}.json`
+(registered as `supportedLanguages = ['de','en','es','tr']`). Per the workspace
+rule, **a key missing from one locale silently falls back to English** — so each
+of the strings in §4.9/§4.10 ships in all four at the same time.
+
+#### 4.11.1 Namespacing
+
+- Manager: `files.*` (extend existing); attachment window: `fileSelection.*`
+  (extend existing); mention palette: `fileMention.*`; shared helpers:
+  `files.help.*`; toasts: `files.toast.*`; empty states: `files.empty.*`.
+- Glossary terms defined once under `files.terms.*` and **referenced** by other
+  strings (vue-i18n linked messages) so "searchable by AI" reads identically
+  everywhere and is translated once.
+
+#### 4.11.2 Glossary (translate once, reuse everywhere)
+
+| Concept | en | de | es | tr |
+|---|---|---|---|---|
+| searchable by AI | searchable by AI | KI-durchsuchbar | consultable por IA | yapay zekâ ile aranabilir |
+| knowledge group | knowledge group | Wissensgruppe | grupo de conocimiento | bilgi grubu |
+| incoming | incoming | Eingang | entrantes | gelen |
+| generated | AI-generated | KI-erzeugt | generado por IA | yapay zekâ üretimi |
+
+#### 4.11.3 Representative copy (the bar for quality)
+
+| Key | en | de | es | tr |
+|---|---|---|---|---|
+| `files.empty.browse` | Every upload, chat attachment and AI-generated file lives here. | Jeder Upload, Chat-Anhang und jede KI-erzeugte Datei liegt hier. | Aquí están todas tus subidas, adjuntos de chat y archivos generados por IA. | Tüm yüklemeleriniz, sohbet ekleri ve yapay zekâ dosyaları burada. |
+| `files.toast.moved` | Moved {n} files to {group}. | {n} Dateien nach {group} verschoben. | {n} archivos movidos a {group}. | {n} dosya {group} grubuna taşındı. |
+| `files.help.vectorized` | Its contents are in your knowledge base, so the assistant can use them. | Der Inhalt ist in deiner Wissensbasis und kann vom Assistenten genutzt werden. | Su contenido está en tu base de conocimiento para que el asistente lo use. | İçeriği bilgi tabanınızda; asistan bunu kullanabilir. |
+| `fileSelection.helper` | Attached files are sent to the AI for this message. | Angehängte Dateien werden für diese Nachricht an die KI gesendet. | Los archivos adjuntos se envían a la IA para este mensaje. | Eklenen dosyalar bu mesaj için yapay zekâya gönderilir. |
+
+#### 4.11.4 Quality gates for copy
+
+- **No untranslated keys**: a CI/check (or `make -C frontend ...` script) asserts
+  the four locale files share the same key set; a missing key fails the gate.
+- **Length/overflow**: German strings run ~30% longer — buttons/pills use the
+  longest locale in layout review; verify in dark mode and at 320px.
+- **No hardcoded user-facing text** in any new component (lint rule already
+  favours this); every label/tooltip/toast is a key.
+
 ---
 
 ## 5. API changes (additive)
@@ -263,6 +486,114 @@ Driven by `BVECTORSTATE` + `BCHUNKCOUNT` (no per-row network call).
 | share routes | Repointed to file-id semantics (G5). |
 
 All annotated with OpenAPI; regenerate frontend schemas (`make -C frontend generate-schemas`).
+
+---
+
+## 5.1 UI Engineering & Vibe-Coding Specs
+
+To ensure the AI-assisted generation ("vibecoding") produces robust, responsive, and `AGENTS_DEV.md`-compliant code on the first pass, the frontend implementation must follow these structural and styling constraints.
+
+### 5.1.1 Component Breakdown (Enforcing <300 Lines)
+
+The file manager must be strictly decomposed to avoid component bloat:
+
+*   **`FilesView.vue`** (Root): Manages the active tab (Browse/Incoming/Generated/Search) and holds parent state.
+*   **`components/files/FilesFilterBar.vue`**: Holds the search input, dropdown filters (Source, Group, Type, Vectorized), and View toggles (Grid/List).
+*   **`components/files/FilesTable.vue`**: The list view. Accepts a `files` array and handles sorting/selection.
+*   **`components/files/FilesGrid.vue`**: The gallery view for generated media (thumbnails).
+*   **`components/files/FilesTableRow.vue`**: A single row in the list view. Handles its own hover state, truncation, and row-level actions (Preview/Download/Move).
+*   **`components/files/IncomingInbox.vue`**: The dedicated triage view, rendering `IncomingRow.vue` components with specific Keep/Dismiss CTA buttons.
+*   **`components/files/FileVectorPill.vue`**: The isolated component for the "Searchable by AI" badge, handling its own color variants and hover tooltips.
+
+### 5.1.2 Display Error Prevention (Tailwind Patterns)
+
+**A. Long Filenames & Overflow:**
+Filenames without spaces will blow out CSS grid and flex layouts.
+*   **Rule:** Every filename container MUST use flex-truncation.
+*   **Technique:** Parent needs `min-w-0` (or `overflow-hidden`), text element needs `truncate`.
+    ```html
+    <div class="flex flex-1 min-w-0 items-center gap-3">
+      <Icon icon="mdi:file-document" class="flex-shrink-0 w-6 h-6" />
+      <span class="truncate font-medium text-sm">{{ file.originalName }}</span>
+    </div>
+    ```
+
+**B. Responsive Data Tables:**
+The 6-column table (`Name | Source | Group | Vectorized | Size | Date`) cannot exist on mobile screens.
+*   **Desktop (`md:` and up):** Standard HTML `<table>` or CSS grid row.
+*   **Mobile (default):** Hide non-essential columns using `hidden md:table-cell`. Show only `Name`, `Vectorized Pill`, and a `...` action menu. Move `Size`, `Date`, and `Source` into a subtitle row beneath the name.
+*   **Technique:**
+    ```html
+    <!-- Name column is always visible -->
+    <td class="w-full max-w-0 py-3 pr-3">
+      <div class="truncate">{{ file.name }}</div>
+      <!-- Mobile-only metadata subtitle -->
+      <div class="md:hidden text-xs txt-muted mt-1 truncate">
+        {{ file.size }} · {{ file.group }}
+      </div>
+    </td>
+    <!-- Group column hidden on mobile -->
+    <td class="hidden md:table-cell whitespace-nowrap px-3">{{ file.group }}</td>
+    ```
+
+**C. Loading States (Skeleton UI):**
+Never flash a blank screen or a simple spinner for list views. Use Tailwind's `animate-pulse` to draw skeleton rows that match the expected table structure.
+*   **Technique:**
+    ```html
+    <div v-for="i in 5" :key="i" class="flex items-center gap-4 py-3 animate-pulse">
+      <div class="w-8 h-8 rounded bg-gray-200 dark:bg-gray-700 flex-shrink-0"></div>
+      <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+      <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 ml-auto"></div>
+    </div>
+    ```
+
+### 5.1.3 UX Behaviors & Micro-Interactions
+
+**A. Hover Reveal for Actions:**
+To keep the UI clean, row-level actions (Download, Share, Move) should be hidden by default and revealed on hover, but **always visible on touch devices**.
+*   **Technique:**
+    ```html
+    <div class="opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 flex gap-2">
+      <!-- Action buttons -->
+    </div>
+    ```
+
+**B. The "Vectorized" Pill Variants (Visual Hierarchy):**
+The pill must clearly distinguish its state using standard design tokens, avoiding raw hex colors.
+*   ✅ **Vectorized:** `bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400`
+*   ⏳ **Processing:** `bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400` (with an inline `mdi:loading animate-spin` icon).
+*   ⚠ **Failed:** `bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400`
+*   ⬜ **Not Vectorized:** `bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300`
+
+**C. Thumbnails in Generated Grid (Aspect Ratios):**
+Generated media grids must not have jagged, unaligned heights.
+*   **Rule:** Force a consistent aspect ratio on the image container, using `object-cover` for the image itself.
+*   **Technique:**
+    ```html
+    <div class="aspect-video w-full overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-800 relative">
+      <img :src="file.thumbUrl" class="w-full h-full object-cover transition-transform hover:scale-105" loading="lazy" />
+      <!-- Kind icon overlay (video/audio) -->
+      <div class="absolute bottom-2 right-2 bg-black/60 p-1 rounded backdrop-blur-sm">
+        <Icon icon="mdi:video" class="text-white w-4 h-4" />
+      </div>
+    </div>
+    ```
+
+### 5.1.4 Handling Empty States
+An empty state must be perfectly centered and use standard muted text tokens so it doesn't shout at the user.
+*   **Technique:**
+    ```html
+    <div class="flex flex-col items-center justify-center py-16 px-4 text-center">
+      <div class="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+        <Icon icon="mdi:folder-open-outline" class="w-8 h-8 text-gray-400" />
+      </div>
+      <h3 class="text-lg font-medium txt-primary mb-1">{{ $t('files.empty.browseTitle') }}</h3>
+      <p class="text-sm txt-muted max-w-sm mb-6">{{ $t('files.empty.browseBody') }}</p>
+      <button class="btn-primary">
+        <Icon icon="mdi:upload" /> {{ $t('files.empty.browseAction') }}
+      </button>
+    </div>
+    ```
 
 ---
 
@@ -295,6 +626,13 @@ All annotated with OpenAPI; regenerate frontend schemas (`make -C frontend gener
 - **G — Share fix + polish + perf.** Repoint share to file-id, wire `ShareModal`;
   virtualization; index/perf pass; E2E (Outlook push → appears in Incoming →
   vectorized badge → Keep into a group → find generated video → download).
+- **H — UX helpers, attachment window & copy deck (§4.9–4.11).** Empty/first-run
+  states, `(?)` help bubbles + tooltips, the full toaster catalogue (with Undo on
+  reversible/destructive actions), inline status explainers, and the redesigned
+  attachment window + `@`-mention palette (type filter in the picker, recents,
+  searchable/source badges, helper line). All strings added to **all four
+  locales** (`en`/`de`/`es`/`tr`) with a locale-key-parity check; a11y + dark-mode
+  + 320px review. Component + i18n-parity tests. (Builds on Sprints E/F.)
 
 ---
 
@@ -335,6 +673,18 @@ All annotated with OpenAPI; regenerate frontend schemas (`make -C frontend gener
 - Filter by source/group/type/vectorized state + fast search, on thousands of
   files, feels instant.
 - Share works from the file manager (file-id based), with tests.
+- **Every surface explains itself**: no blank empty states; a `(?)` help bubble or
+  tooltip on every non-obvious control; the "searchable by AI", group, source and
+  incoming concepts are explained in plain words (§4.9).
+- **Every mutating action gives feedback**: a toast per the catalogue (§4.9 D),
+  bulk actions report counts, and reversible/destructive actions offer Undo or a
+  consequence-naming confirm.
+- **Attachment window & `@`-mention picker** match the manager's vocabulary,
+  support a type filter + search + recents, and state the attach consequence
+  (§4.10).
+- **All user-facing strings exist in `en`/`de`/`es`/`tr`** (no English fallbacks),
+  pass the locale-key-parity check, and are verified for overflow in dark mode at
+  320px.
 - Full gate green + E2E for the core flow.
 
 ## 10. Open questions
@@ -352,3 +702,630 @@ All annotated with OpenAPI; regenerate frontend schemas (`make -C frontend gener
 3. Retention for generated media — keep forever (until user deletes) vs. auto-
    prune after N days? (Proposal: keep; user-managed.)
 4. Should the Generated gallery be a tab here or also surface on the dashboard?
+
+---
+
+## 11. Appendix A — i18n key deck (copy-paste ready, en/de/es/tr)
+
+These are the **new** keys for the §4.9–4.11 UX layer, ready to merge into
+`frontend/src/i18n/{en,de,es,tr}.json`. They are nested under the **existing**
+namespaces (`files`, `fileSelection`, `fileMention`) — add the objects below into
+those namespaces; do **not** create new top-level namespaces.
+
+**Implementation notes**
+
+- These are **additive**. A few flat legacy keys already exist (`files.filterTypeAll`,
+  `files.filterTypeImages`, `files.filterTypeAudio`, `files.emptyState.*`,
+  `files.vectorized`, `files.movedSuccess`, `files.reVectorize`). During the
+  Sprint E rebuild, migrate call-sites to the structured keys below
+  (`files.filter.*`, `files.empty.*`, `files.vectorState.*`, `files.toast.*`) and
+  remove the superseded flat ones in the same PR so there is exactly one key per
+  string.
+- Plurals use vue-i18n pipe syntax (`singular | plural`). Turkish has no count
+  plural; both arms are intentionally the same.
+- `{name}`, `{count}`, `{group}`, `{limit}`, `{type}`, `{reason}`, `{source}`,
+  `{time}` are interpolation params — keep them verbatim in every locale.
+- The glossary (`files.terms.*`) is the single source for shared words; prefer
+  vue-i18n linked messages (`@:files.terms.vectorized`) when embedding them in
+  longer strings so the term is translated once.
+- After adding: `make -C frontend lint` + `npm run check:types`, and run the
+  locale-key-parity check (Sprint H) so no locale is missing a key.
+
+### A.1 English — `en.json`
+
+```jsonc
+// merge into "files": { ... }
+"terms": {
+  "vectorized": "searchable by AI",
+  "knowledgeGroup": "knowledge group",
+  "incoming": "incoming",
+  "generated": "AI-generated",
+  "notApplicable": "not applicable"
+},
+"tabBrowse": "Browse",
+"tabIncoming": "Incoming",
+"tabGenerated": "Generated",
+"incomingBadge": "{count} new",
+"source": {
+  "web_upload": "Upload",
+  "chat_attachment": "Chat",
+  "outlook": "Outlook",
+  "nextcloud": "Nextcloud",
+  "opencloud": "OpenCloud",
+  "whatsapp": "WhatsApp",
+  "widget": "Widget",
+  "api": "API",
+  "generated": "AI-generated"
+},
+"vectorState": {
+  "vectorized": "Searchable by AI",
+  "vectorizedDetail": "Searchable by AI · {group} · {count} chunks",
+  "processing": "Processing…",
+  "none": "Not searchable",
+  "notApplicable": "Not applicable",
+  "failed": "Failed"
+},
+"filter": {
+  "source": "Source",
+  "group": "Group",
+  "type": "Type",
+  "vectorized": "Searchable",
+  "date": "Date",
+  "clear": "Clear filters",
+  "typeAll": "All types",
+  "typeDocs": "Documents",
+  "typeImages": "Images",
+  "typeVideo": "Video",
+  "typeAudio": "Audio",
+  "vectorizedYes": "Searchable by AI",
+  "vectorizedNo": "Not searchable",
+  "noGroup": "No group"
+},
+"help": {
+  "vectorized": "When a file is searchable by AI, its contents are added to your knowledge base so the assistant can use them to answer you.",
+  "group": "Knowledge groups bundle files together. When the AI searches a group, it can use every file in it.",
+  "source": "Where this file came from — an upload, a chat, Outlook, Nextcloud, OpenCloud, WhatsApp, the widget, the API, or AI-generated.",
+  "incoming": "Files other apps pushed in for your knowledge base. Review them, then keep or dismiss.",
+  "typeFilter": "Show only one kind of file — documents, images, video or audio.",
+  "vectorizedFilter": "Filter by whether files are searchable by AI.",
+  "reVectorize": "Re-read this file and refresh what the AI knows from it. Use after editing it or if it failed.",
+  "moveGroup": "Move files into another knowledge group. This changes which group the AI searches them in — it doesn't delete anything.",
+  "storage": "How much of your storage you've used. AI-generated media counts too, shown separately."
+},
+"empty": {
+  "browseTitle": "Your file library",
+  "browseBody": "Every upload, chat attachment and AI-generated file lives here, ready to search and reuse.",
+  "browseAction": "Upload your first file",
+  "filteredBody": "No files match these filters.",
+  "filteredAction": "Clear filters",
+  "incomingBody": "Files sent in from Outlook, Nextcloud or OpenCloud appear here for you to review before filing.",
+  "incomingAction": "Set up integrations",
+  "generatedBody": "Images, video and audio you create in chat are saved here so you can find and download them again.",
+  "generatedAction": "Start a chat",
+  "groupBody": "This group has no files yet. Add files to make them searchable together.",
+  "groupAction": "Add files"
+},
+"toast": {
+  "uploaded": "Uploaded {name}. | Uploaded {count} files.",
+  "uploadFailed": "Couldn't upload {name}. {reason}",
+  "tooLarge": "{name} is too large (max {limit}).",
+  "unsupported": "{type} files aren't supported.",
+  "vectorizeStart": "Making {name} searchable by AI…",
+  "vectorizeDone": "{name} is now searchable by AI.",
+  "vectorizeFailed": "Couldn't process {name}.",
+  "revectorizedBulk": "Refreshed {count} files.",
+  "moved": "Moved {count} files to {group}.",
+  "filed": "Filed {count} files in {group}.",
+  "deleted": "Deleted {count} files.",
+  "incomingKept": "Kept {count} files in {group}.",
+  "incomingDismissed": "Dismissed {count} files.",
+  "shareCreated": "Share link copied to clipboard.",
+  "shareRevoked": "Sharing turned off for {name}.",
+  "downloadPreparing": "Preparing {count} files for download…",
+  "genericError": "Something went wrong. {reason}",
+  "undo": "Undo"
+},
+"confirm": {
+  "deleteTitle": "Delete {count} files?",
+  "deleteBody": "Their AI-searchable content is removed too. This can't be undone.",
+  "deleteConfirm": "Delete",
+  "dismissTitle": "Dismiss {count} files?",
+  "dismissBody": "They won't be added to your library. You can re-import them later from the source.",
+  "dismissConfirm": "Dismiss"
+},
+"incoming": {
+  "title": "Incoming",
+  "subtitle": "Files pushed in for your knowledge base — review, then keep or dismiss.",
+  "keep": "Keep",
+  "keepAll": "Keep all",
+  "assignGroup": "Assign group",
+  "dismiss": "Dismiss",
+  "open": "Open",
+  "retry": "Retry",
+  "provenance": "from {source} · {time}"
+},
+"generated": {
+  "title": "Generated",
+  "subtitle": "Images, video and audio created in your chats.",
+  "openInChat": "Open in chat",
+  "download": "Download"
+},
+"explainer": {
+  "text": "Everything you upload or create lives here. Files marked \"searchable by AI\" are added to your knowledge base so the assistant can use them.",
+  "dismiss": "Got it",
+  "reopen": "What is this?"
+}
+```
+
+```jsonc
+// merge into "fileSelection": { ... }
+"helper": "Attached files are sent to the AI for this message. Files marked ✅ are also searchable across all your chats.",
+"searchYourFiles": "Search your files",
+"typeAll": "All",
+"typeDocs": "Docs",
+"typeImages": "Images",
+"typeVideo": "Video",
+"typeAudio": "Audio",
+"recent": "Recent",
+"allFilesFiltered": "All files",
+"attachCount": "Attach {count} file | Attach {count} files",
+"noRecents": "Pick a recent file or upload a new one to use in this chat.",
+"noResults": "No files match. Try another search or upload a new file."
+```
+
+```jsonc
+// merge into "fileMention": { ... }
+"header": "Type to find a file to give the AI"
+```
+
+### A.2 German — `de.json`
+
+```jsonc
+// merge into "files": { ... }
+"terms": {
+  "vectorized": "KI-durchsuchbar",
+  "knowledgeGroup": "Wissensgruppe",
+  "incoming": "Eingang",
+  "generated": "KI-erzeugt",
+  "notApplicable": "nicht zutreffend"
+},
+"tabBrowse": "Durchsuchen",
+"tabIncoming": "Eingang",
+"tabGenerated": "Erzeugt",
+"incomingBadge": "{count} neu",
+"source": {
+  "web_upload": "Upload",
+  "chat_attachment": "Chat",
+  "outlook": "Outlook",
+  "nextcloud": "Nextcloud",
+  "opencloud": "OpenCloud",
+  "whatsapp": "WhatsApp",
+  "widget": "Widget",
+  "api": "API",
+  "generated": "KI-erzeugt"
+},
+"vectorState": {
+  "vectorized": "KI-durchsuchbar",
+  "vectorizedDetail": "KI-durchsuchbar · {group} · {count} Abschnitte",
+  "processing": "Wird verarbeitet…",
+  "none": "Nicht durchsuchbar",
+  "notApplicable": "Nicht zutreffend",
+  "failed": "Fehlgeschlagen"
+},
+"filter": {
+  "source": "Quelle",
+  "group": "Gruppe",
+  "type": "Typ",
+  "vectorized": "Durchsuchbar",
+  "date": "Datum",
+  "clear": "Filter zurücksetzen",
+  "typeAll": "Alle Typen",
+  "typeDocs": "Dokumente",
+  "typeImages": "Bilder",
+  "typeVideo": "Video",
+  "typeAudio": "Audio",
+  "vectorizedYes": "KI-durchsuchbar",
+  "vectorizedNo": "Nicht durchsuchbar",
+  "noGroup": "Keine Gruppe"
+},
+"help": {
+  "vectorized": "Wenn eine Datei KI-durchsuchbar ist, wird ihr Inhalt deiner Wissensbasis hinzugefügt, damit der Assistent ihn für Antworten nutzen kann.",
+  "group": "Wissensgruppen bündeln Dateien. Wenn die KI eine Gruppe durchsucht, kann sie jede Datei darin nutzen.",
+  "source": "Woher diese Datei stammt – Upload, Chat, Outlook, Nextcloud, OpenCloud, WhatsApp, Widget, API oder KI-erzeugt.",
+  "incoming": "Dateien, die andere Apps für deine Wissensbasis eingeliefert haben. Prüfe sie und behalte oder verwirf sie.",
+  "typeFilter": "Nur eine Dateiart anzeigen – Dokumente, Bilder, Video oder Audio.",
+  "vectorizedFilter": "Danach filtern, ob Dateien KI-durchsuchbar sind.",
+  "reVectorize": "Diese Datei neu einlesen und das Wissen der KI daraus auffrischen. Nach Änderungen oder bei Fehlern verwenden.",
+  "moveGroup": "Dateien in eine andere Wissensgruppe verschieben. Das ändert, in welcher Gruppe die KI sie durchsucht – es wird nichts gelöscht.",
+  "storage": "Wie viel deines Speichers belegt ist. KI-erzeugte Medien zählen mit und werden separat angezeigt."
+},
+"empty": {
+  "browseTitle": "Deine Dateibibliothek",
+  "browseBody": "Jeder Upload, Chat-Anhang und jede KI-erzeugte Datei liegt hier – bereit zum Suchen und Wiederverwenden.",
+  "browseAction": "Erste Datei hochladen",
+  "filteredBody": "Keine Dateien passen zu diesen Filtern.",
+  "filteredAction": "Filter zurücksetzen",
+  "incomingBody": "Dateien aus Outlook, Nextcloud oder OpenCloud erscheinen hier, damit du sie vor dem Ablegen prüfen kannst.",
+  "incomingAction": "Integrationen einrichten",
+  "generatedBody": "Bilder, Video und Audio, die du im Chat erstellst, werden hier gespeichert, damit du sie wiederfinden und erneut herunterladen kannst.",
+  "generatedAction": "Chat starten",
+  "groupBody": "Diese Gruppe enthält noch keine Dateien. Füge Dateien hinzu, um sie gemeinsam durchsuchbar zu machen.",
+  "groupAction": "Dateien hinzufügen"
+},
+"toast": {
+  "uploaded": "{name} hochgeladen. | {count} Dateien hochgeladen.",
+  "uploadFailed": "{name} konnte nicht hochgeladen werden. {reason}",
+  "tooLarge": "{name} ist zu groß (max. {limit}).",
+  "unsupported": "{type}-Dateien werden nicht unterstützt.",
+  "vectorizeStart": "{name} wird KI-durchsuchbar gemacht…",
+  "vectorizeDone": "{name} ist jetzt KI-durchsuchbar.",
+  "vectorizeFailed": "{name} konnte nicht verarbeitet werden.",
+  "revectorizedBulk": "{count} Dateien aktualisiert.",
+  "moved": "{count} Dateien nach {group} verschoben.",
+  "filed": "{count} Dateien in {group} abgelegt.",
+  "deleted": "{count} Dateien gelöscht.",
+  "incomingKept": "{count} Dateien in {group} behalten.",
+  "incomingDismissed": "{count} Dateien verworfen.",
+  "shareCreated": "Freigabelink in die Zwischenablage kopiert.",
+  "shareRevoked": "Freigabe für {name} deaktiviert.",
+  "downloadPreparing": "{count} Dateien werden zum Download vorbereitet…",
+  "genericError": "Etwas ist schiefgelaufen. {reason}",
+  "undo": "Rückgängig"
+},
+"confirm": {
+  "deleteTitle": "{count} Dateien löschen?",
+  "deleteBody": "Ihr KI-durchsuchbarer Inhalt wird ebenfalls entfernt. Das kann nicht rückgängig gemacht werden.",
+  "deleteConfirm": "Löschen",
+  "dismissTitle": "{count} Dateien verwerfen?",
+  "dismissBody": "Sie werden nicht zu deiner Bibliothek hinzugefügt. Du kannst sie später erneut aus der Quelle importieren.",
+  "dismissConfirm": "Verwerfen"
+},
+"incoming": {
+  "title": "Eingang",
+  "subtitle": "Dateien, die für deine Wissensbasis eingeliefert wurden – prüfen, dann behalten oder verwerfen.",
+  "keep": "Behalten",
+  "keepAll": "Alle behalten",
+  "assignGroup": "Gruppe zuweisen",
+  "dismiss": "Verwerfen",
+  "open": "Öffnen",
+  "retry": "Erneut versuchen",
+  "provenance": "von {source} · {time}"
+},
+"generated": {
+  "title": "Erzeugt",
+  "subtitle": "Bilder, Video und Audio aus deinen Chats.",
+  "openInChat": "Im Chat öffnen",
+  "download": "Herunterladen"
+},
+"explainer": {
+  "text": "Alles, was du hochlädst oder erstellst, liegt hier. Als „KI-durchsuchbar“ markierte Dateien werden deiner Wissensbasis hinzugefügt, damit der Assistent sie nutzen kann.",
+  "dismiss": "Verstanden",
+  "reopen": "Was ist das?"
+}
+```
+
+```jsonc
+// merge into "fileSelection": { ... }
+"helper": "Angehängte Dateien werden für diese Nachricht an die KI gesendet. Mit ✅ markierte Dateien sind außerdem in all deinen Chats durchsuchbar.",
+"searchYourFiles": "Deine Dateien durchsuchen",
+"typeAll": "Alle",
+"typeDocs": "Dok.",
+"typeImages": "Bilder",
+"typeVideo": "Video",
+"typeAudio": "Audio",
+"recent": "Zuletzt",
+"allFilesFiltered": "Alle Dateien",
+"attachCount": "{count} Datei anhängen | {count} Dateien anhängen",
+"noRecents": "Wähle eine zuletzt verwendete Datei oder lade eine neue für diesen Chat hoch.",
+"noResults": "Keine Dateien gefunden. Andere Suche versuchen oder neue Datei hochladen."
+```
+
+```jsonc
+// merge into "fileMention": { ... }
+"header": "Tippen, um eine Datei für die KI zu finden"
+```
+
+### A.3 Spanish — `es.json`
+
+```jsonc
+// merge into "files": { ... }
+"terms": {
+  "vectorized": "consultable por IA",
+  "knowledgeGroup": "grupo de conocimiento",
+  "incoming": "entrantes",
+  "generated": "generado por IA",
+  "notApplicable": "no aplicable"
+},
+"tabBrowse": "Explorar",
+"tabIncoming": "Entrantes",
+"tabGenerated": "Generados",
+"incomingBadge": "{count} nuevos",
+"source": {
+  "web_upload": "Subida",
+  "chat_attachment": "Chat",
+  "outlook": "Outlook",
+  "nextcloud": "Nextcloud",
+  "opencloud": "OpenCloud",
+  "whatsapp": "WhatsApp",
+  "widget": "Widget",
+  "api": "API",
+  "generated": "Generado por IA"
+},
+"vectorState": {
+  "vectorized": "Consultable por IA",
+  "vectorizedDetail": "Consultable por IA · {group} · {count} fragmentos",
+  "processing": "Procesando…",
+  "none": "No consultable",
+  "notApplicable": "No aplicable",
+  "failed": "Falló"
+},
+"filter": {
+  "source": "Origen",
+  "group": "Grupo",
+  "type": "Tipo",
+  "vectorized": "Consultable",
+  "date": "Fecha",
+  "clear": "Quitar filtros",
+  "typeAll": "Todos los tipos",
+  "typeDocs": "Documentos",
+  "typeImages": "Imágenes",
+  "typeVideo": "Vídeo",
+  "typeAudio": "Audio",
+  "vectorizedYes": "Consultable por IA",
+  "vectorizedNo": "No consultable",
+  "noGroup": "Sin grupo"
+},
+"help": {
+  "vectorized": "Cuando un archivo es consultable por IA, su contenido se añade a tu base de conocimiento para que el asistente pueda usarlo al responderte.",
+  "group": "Los grupos de conocimiento agrupan archivos. Cuando la IA busca en un grupo, puede usar todos sus archivos.",
+  "source": "De dónde viene este archivo: una subida, un chat, Outlook, Nextcloud, OpenCloud, WhatsApp, el widget, la API o generado por IA.",
+  "incoming": "Archivos que otras apps han enviado para tu base de conocimiento. Revísalos y consérvalos o descártalos.",
+  "typeFilter": "Mostrar solo un tipo de archivo: documentos, imágenes, vídeo o audio.",
+  "vectorizedFilter": "Filtrar según si los archivos son consultables por IA.",
+  "reVectorize": "Volver a leer este archivo y actualizar lo que la IA sabe de él. Úsalo tras editarlo o si falló.",
+  "moveGroup": "Mover archivos a otro grupo de conocimiento. Esto cambia en qué grupo los busca la IA; no elimina nada.",
+  "storage": "Cuánto almacenamiento has usado. El contenido generado por IA también cuenta y se muestra por separado."
+},
+"empty": {
+  "browseTitle": "Tu biblioteca de archivos",
+  "browseBody": "Aquí están todas tus subidas, adjuntos de chat y archivos generados por IA, listos para buscar y reutilizar.",
+  "browseAction": "Sube tu primer archivo",
+  "filteredBody": "Ningún archivo coincide con estos filtros.",
+  "filteredAction": "Quitar filtros",
+  "incomingBody": "Los archivos enviados desde Outlook, Nextcloud u OpenCloud aparecen aquí para que los revises antes de archivarlos.",
+  "incomingAction": "Configurar integraciones",
+  "generatedBody": "Las imágenes, el vídeo y el audio que creas en el chat se guardan aquí para que puedas encontrarlos y descargarlos de nuevo.",
+  "generatedAction": "Iniciar un chat",
+  "groupBody": "Este grupo aún no tiene archivos. Añade archivos para hacerlos consultables juntos.",
+  "groupAction": "Añadir archivos"
+},
+"toast": {
+  "uploaded": "{name} subido. | {count} archivos subidos.",
+  "uploadFailed": "No se pudo subir {name}. {reason}",
+  "tooLarge": "{name} es demasiado grande (máx. {limit}).",
+  "unsupported": "Los archivos {type} no son compatibles.",
+  "vectorizeStart": "Haciendo {name} consultable por IA…",
+  "vectorizeDone": "{name} ya es consultable por IA.",
+  "vectorizeFailed": "No se pudo procesar {name}.",
+  "revectorizedBulk": "{count} archivos actualizados.",
+  "moved": "{count} archivos movidos a {group}.",
+  "filed": "{count} archivos archivados en {group}.",
+  "deleted": "{count} archivos eliminados.",
+  "incomingKept": "{count} archivos conservados en {group}.",
+  "incomingDismissed": "{count} archivos descartados.",
+  "shareCreated": "Enlace para compartir copiado al portapapeles.",
+  "shareRevoked": "Se desactivó el uso compartido de {name}.",
+  "downloadPreparing": "Preparando {count} archivos para descargar…",
+  "genericError": "Algo salió mal. {reason}",
+  "undo": "Deshacer"
+},
+"confirm": {
+  "deleteTitle": "¿Eliminar {count} archivos?",
+  "deleteBody": "También se elimina su contenido consultable por IA. Esto no se puede deshacer.",
+  "deleteConfirm": "Eliminar",
+  "dismissTitle": "¿Descartar {count} archivos?",
+  "dismissBody": "No se añadirán a tu biblioteca. Puedes volver a importarlos más tarde desde el origen.",
+  "dismissConfirm": "Descartar"
+},
+"incoming": {
+  "title": "Entrantes",
+  "subtitle": "Archivos enviados para tu base de conocimiento: revísalos y consérvalos o descártalos.",
+  "keep": "Conservar",
+  "keepAll": "Conservar todo",
+  "assignGroup": "Asignar grupo",
+  "dismiss": "Descartar",
+  "open": "Abrir",
+  "retry": "Reintentar",
+  "provenance": "de {source} · {time}"
+},
+"generated": {
+  "title": "Generados",
+  "subtitle": "Imágenes, vídeo y audio creados en tus chats.",
+  "openInChat": "Abrir en el chat",
+  "download": "Descargar"
+},
+"explainer": {
+  "text": "Todo lo que subes o creas está aquí. Los archivos marcados como «consultables por IA» se añaden a tu base de conocimiento para que el asistente pueda usarlos.",
+  "dismiss": "Entendido",
+  "reopen": "¿Qué es esto?"
+}
+```
+
+```jsonc
+// merge into "fileSelection": { ... }
+"helper": "Los archivos adjuntos se envían a la IA para este mensaje. Los archivos marcados con ✅ también son consultables en todos tus chats.",
+"searchYourFiles": "Buscar en tus archivos",
+"typeAll": "Todos",
+"typeDocs": "Doc.",
+"typeImages": "Imágenes",
+"typeVideo": "Vídeo",
+"typeAudio": "Audio",
+"recent": "Recientes",
+"allFilesFiltered": "Todos los archivos",
+"attachCount": "Adjuntar {count} archivo | Adjuntar {count} archivos",
+"noRecents": "Elige un archivo reciente o sube uno nuevo para usar en este chat.",
+"noResults": "No hay archivos. Prueba otra búsqueda o sube uno nuevo."
+```
+
+```jsonc
+// merge into "fileMention": { ... }
+"header": "Escribe para encontrar un archivo que dar a la IA"
+```
+
+### A.4 Turkish — `tr.json`
+
+```jsonc
+// merge into "files": { ... }
+"terms": {
+  "vectorized": "yapay zekâ ile aranabilir",
+  "knowledgeGroup": "bilgi grubu",
+  "incoming": "gelen",
+  "generated": "yapay zekâ üretimi",
+  "notApplicable": "uygulanamaz"
+},
+"tabBrowse": "Gözat",
+"tabIncoming": "Gelen",
+"tabGenerated": "Üretilen",
+"incomingBadge": "{count} yeni",
+"source": {
+  "web_upload": "Yükleme",
+  "chat_attachment": "Sohbet",
+  "outlook": "Outlook",
+  "nextcloud": "Nextcloud",
+  "opencloud": "OpenCloud",
+  "whatsapp": "WhatsApp",
+  "widget": "Widget",
+  "api": "API",
+  "generated": "Yapay zekâ üretimi"
+},
+"vectorState": {
+  "vectorized": "Yapay zekâ ile aranabilir",
+  "vectorizedDetail": "Yapay zekâ ile aranabilir · {group} · {count} parça",
+  "processing": "İşleniyor…",
+  "none": "Aranamaz",
+  "notApplicable": "Uygulanamaz",
+  "failed": "Başarısız"
+},
+"filter": {
+  "source": "Kaynak",
+  "group": "Grup",
+  "type": "Tür",
+  "vectorized": "Aranabilir",
+  "date": "Tarih",
+  "clear": "Filtreleri temizle",
+  "typeAll": "Tüm türler",
+  "typeDocs": "Belgeler",
+  "typeImages": "Görseller",
+  "typeVideo": "Video",
+  "typeAudio": "Ses",
+  "vectorizedYes": "Yapay zekâ ile aranabilir",
+  "vectorizedNo": "Aranamaz",
+  "noGroup": "Grup yok"
+},
+"help": {
+  "vectorized": "Bir dosya yapay zekâ ile aranabilir olduğunda içeriği bilgi tabanınıza eklenir; böylece asistan yanıt verirken bunu kullanabilir.",
+  "group": "Bilgi grupları dosyaları bir araya getirir. Yapay zekâ bir grupta arama yaptığında içindeki tüm dosyaları kullanabilir.",
+  "source": "Bu dosyanın nereden geldiği — yükleme, sohbet, Outlook, Nextcloud, OpenCloud, WhatsApp, widget, API veya yapay zekâ üretimi.",
+  "incoming": "Diğer uygulamaların bilgi tabanınız için gönderdiği dosyalar. İnceleyin, sonra saklayın veya çıkarın.",
+  "typeFilter": "Yalnızca tek bir dosya türünü göster — belgeler, görseller, video veya ses.",
+  "vectorizedFilter": "Dosyaların yapay zekâ ile aranabilir olup olmadığına göre filtrele.",
+  "reVectorize": "Bu dosyayı yeniden okuyup yapay zekânın ondan öğrendiklerini tazele. Düzenledikten sonra veya başarısız olduğunda kullan.",
+  "moveGroup": "Dosyaları başka bir bilgi grubuna taşı. Bu, yapay zekânın onları hangi grupta aradığını değiştirir; hiçbir şey silinmez.",
+  "storage": "Depolamanızın ne kadarını kullandığınız. Yapay zekâ üretimi içerik de sayılır ve ayrı gösterilir."
+},
+"empty": {
+  "browseTitle": "Dosya kitaplığınız",
+  "browseBody": "Her yükleme, sohbet eki ve yapay zekâ üretimi dosya burada; aramaya ve yeniden kullanmaya hazır.",
+  "browseAction": "İlk dosyanızı yükleyin",
+  "filteredBody": "Bu filtrelere uyan dosya yok.",
+  "filteredAction": "Filtreleri temizle",
+  "incomingBody": "Outlook, Nextcloud veya OpenCloud'dan gönderilen dosyalar, dosyalamadan önce incelemeniz için burada görünür.",
+  "incomingAction": "Entegrasyonları ayarla",
+  "generatedBody": "Sohbette oluşturduğunuz görseller, video ve ses, tekrar bulup indirebilmeniz için burada saklanır.",
+  "generatedAction": "Sohbet başlat",
+  "groupBody": "Bu grupta henüz dosya yok. Birlikte aranabilir olmaları için dosya ekleyin.",
+  "groupAction": "Dosya ekle"
+},
+"toast": {
+  "uploaded": "{name} yüklendi. | {count} dosya yüklendi.",
+  "uploadFailed": "{name} yüklenemedi. {reason}",
+  "tooLarge": "{name} çok büyük (en fazla {limit}).",
+  "unsupported": "{type} dosyaları desteklenmiyor.",
+  "vectorizeStart": "{name} yapay zekâ ile aranabilir yapılıyor…",
+  "vectorizeDone": "{name} artık yapay zekâ ile aranabilir.",
+  "vectorizeFailed": "{name} işlenemedi.",
+  "revectorizedBulk": "{count} dosya tazelendi.",
+  "moved": "{count} dosya {group} grubuna taşındı.",
+  "filed": "{count} dosya {group} grubuna eklendi.",
+  "deleted": "{count} dosya silindi.",
+  "incomingKept": "{count} dosya {group} grubunda saklandı.",
+  "incomingDismissed": "{count} dosya çıkarıldı.",
+  "shareCreated": "Paylaşım bağlantısı panoya kopyalandı.",
+  "shareRevoked": "{name} için paylaşım kapatıldı.",
+  "downloadPreparing": "{count} dosya indirme için hazırlanıyor…",
+  "genericError": "Bir şeyler ters gitti. {reason}",
+  "undo": "Geri al"
+},
+"confirm": {
+  "deleteTitle": "{count} dosya silinsin mi?",
+  "deleteBody": "Yapay zekâ ile aranabilir içerikleri de kaldırılır. Bu geri alınamaz.",
+  "deleteConfirm": "Sil",
+  "dismissTitle": "{count} dosya çıkarılsın mı?",
+  "dismissBody": "Kitaplığınıza eklenmezler. Daha sonra kaynaktan yeniden içe aktarabilirsiniz.",
+  "dismissConfirm": "Çıkar"
+},
+"incoming": {
+  "title": "Gelen",
+  "subtitle": "Bilgi tabanınız için gönderilen dosyalar — inceleyin, sonra saklayın veya çıkarın.",
+  "keep": "Sakla",
+  "keepAll": "Tümünü sakla",
+  "assignGroup": "Grup ata",
+  "dismiss": "Çıkar",
+  "open": "Aç",
+  "retry": "Yeniden dene",
+  "provenance": "{source} · {time}"
+},
+"generated": {
+  "title": "Üretilen",
+  "subtitle": "Sohbetlerinizde oluşturulan görseller, video ve ses.",
+  "openInChat": "Sohbette aç",
+  "download": "İndir"
+},
+"explainer": {
+  "text": "Yüklediğiniz veya oluşturduğunuz her şey burada. „Yapay zekâ ile aranabilir“ olarak işaretli dosyalar bilgi tabanınıza eklenir; böylece asistan bunları kullanabilir.",
+  "dismiss": "Anladım",
+  "reopen": "Bu nedir?"
+}
+```
+
+```jsonc
+// merge into "fileSelection": { ... }
+"helper": "Eklenen dosyalar bu mesaj için yapay zekâya gönderilir. ✅ ile işaretli dosyalar ayrıca tüm sohbetlerinizde aranabilir.",
+"searchYourFiles": "Dosyalarınızda ara",
+"typeAll": "Tümü",
+"typeDocs": "Belge",
+"typeImages": "Görsel",
+"typeVideo": "Video",
+"typeAudio": "Ses",
+"recent": "Son kullanılan",
+"allFilesFiltered": "Tüm dosyalar",
+"attachCount": "{count} dosya ekle | {count} dosya ekle",
+"noRecents": "Bu sohbette kullanmak için son kullanılan bir dosya seçin veya yeni bir tane yükleyin.",
+"noResults": "Dosya yok. Başka bir arama deneyin veya yeni dosya yükleyin."
+```
+
+```jsonc
+// merge into "fileMention": { ... }
+"header": "Yapay zekâya verecek bir dosya bulmak için yazın"
+```
+
+### A.5 Key-parity checklist (Sprint H gate)
+
+- Every key in A.1 has a counterpart in A.2–A.4 (same path). The Sprint H
+  locale-parity check fails the build if any path is missing in any locale.
+- No flat legacy duplicate remains for a string that now lives under
+  `files.filter.*` / `files.empty.*` / `files.vectorState.*` / `files.toast.*`.
+- Interpolation params (`{name}`, `{count}`, `{group}`, `{limit}`, `{type}`,
+  `{reason}`, `{source}`, `{time}`) appear identically across all four locales.
+- Plural pipe `|` present in `files.toast.uploaded`, `fileSelection.attachCount`
+  (both arms) in every locale.

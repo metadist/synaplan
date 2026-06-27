@@ -156,6 +156,18 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    # Async media job advancer (Release 4.0): finalize step downloads the
+    # produced render and saves it under the shared uploads dir.
+    App\MessageHandler\AdvanceMediaJobCommandHandler:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    # Synchronous image/audio generation for the async-job worker (Release 4.0,
+    # Sprint B): runs the single-call render and saves it under the uploads dir.
+    App\Service\Media\SyncMediaJobGenerator:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     # Idempotent seeders for production-essential catalog data.
     # Run from docker-entrypoint.sh after migrations (app:seed) and re-runnable from CLI.
     App\Seed\ModelSeeder:

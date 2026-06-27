@@ -7,6 +7,32 @@ use App\AI\Exception\ProviderException;
 class MediaErrorMessageBuilder
 {
     /**
+     * Localized copy when a background job exceeds its platform wait budget.
+     */
+    public function buildTimeoutMessage(string $mediaType, string $lang): string
+    {
+        return $this->getFailureExplanation('timeout', $mediaType, $lang)
+            ?? $this->getGenericMediaError($mediaType, $lang);
+    }
+
+    /**
+     * Localized copy when the user has hit their concurrent-media-jobs ceiling.
+     */
+    public function buildTooManyJobsMessage(string $lang): string
+    {
+        return match ($lang) {
+            'de' => 'Du hast bereits die maximale Anzahl gleichzeitiger Medienaufträge laufen. '
+                .'Bitte warte, bis einer fertig ist, und versuche es dann erneut.',
+            'es' => 'Ya tienes el número máximo de trabajos de medios en curso. '
+                .'Espera a que termine uno e inténtalo de nuevo.',
+            'tr' => 'Aynı anda çalışan en fazla medya işine ulaştın. '
+                .'Lütfen biri bitene kadar bekleyip tekrar dene.',
+            default => 'You already have the maximum number of media jobs running. '
+                .'Please wait for one to finish, then try again.',
+        };
+    }
+
+    /**
      * Build a user-friendly, translated error message from the exception.
      */
     public function buildErrorMessage(\Exception $e, string $mediaType, string $lang): string

@@ -104,6 +104,10 @@ framework:
             'App\Message\ProvisionDefaultUserPluginsMessage': async_index
             'App\Message\CrawlWidgetUrlMessage': async_index
             'App\Message\ReVectorizeMessage': async_index
+            # Async media jobs (Release 4.0): each message advances one render by
+            # a single non-blocking step then re-dispatches itself (DelayStamp)
+            # for the next poll. Short hops, never a worker pinned for minutes.
+            'App\Message\AdvanceMediaJobCommand': async_index
 
 when@test:
     framework:
