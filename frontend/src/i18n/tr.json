@@ -1,4 +1,16 @@
 {
+  "jobs": {
+    "kind": {
+      "video": "video",
+      "image": "görsel",
+      "audio": "ses"
+    },
+    "toast": {
+      "ready": "{kind} hazır",
+      "failed": "{kind} oluşturulamadı",
+      "view": "Görüntüle"
+    }
+  },
   "branding": {
     "poweredBy": "Sunan"
   },

@@ -27,6 +27,7 @@ final readonly class MediaJobMessageSync
         private MessageRepository $messageRepository,
         private MediaJobService $mediaJobService,
         private GeneratedFileRegistrar $fileRegistrar,
+        private MediaJobRealtimeNotifier $realtimeNotifier,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -80,6 +81,11 @@ final readonly class MediaJobMessageSync
             'message_id' => $messageId,
             'state' => $status['state'],
         ]);
+
+        // Push the terminal state to the owner so the banner resolves instantly
+        // (best-effort; the persisted state above + the client poll are the
+        // fallback if realtime is disabled/unreachable).
+        $this->realtimeNotifier->publishUpdate($job);
     }
 
     /**

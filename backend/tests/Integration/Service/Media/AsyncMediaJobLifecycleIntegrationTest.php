@@ -9,11 +9,14 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Message\AdvanceMediaJobCommand;
 use App\MessageHandler\AdvanceMediaJobCommandHandler;
+use App\Realtime\Channel\ChannelInterface;
+use App\Realtime\Publisher\RealtimePublisherInterface;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
+use App\Service\Media\MediaJobRealtimeNotifier;
 use App\Service\Media\MediaJobReaper;
 use App\Service\Media\MediaJobService;
 use App\Service\Media\MediaJobStore;
@@ -64,6 +67,10 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
     private string $uploadDir;
     private MediaErrorMessageBuilder $errorBuilder;
     private MediaJobConfig $config;
+    private RealtimePublisherInterface&MockObject $realtimePublisher;
+
+    /** @var list<array{channel: string, event: string, payload: array<string, mixed>}> */
+    private array $publishedEvents = [];
 
     /** @var list<int> message ids created during the test, cleaned up in tearDown */
     private array $createdMessageIds = [];
@@ -88,10 +95,22 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
 
         $jobLogger = new NullLogger();
         $this->jobService = new MediaJobService($this->store, $jobLogger);
+
+        // Spy publisher: capture every realtime event the terminal sync pushes
+        // so we can assert push-on-completion end to end.
+        $this->publishedEvents = [];
+        $this->realtimePublisher = $this->createMock(RealtimePublisherInterface::class);
+        $this->realtimePublisher->method('publish')->willReturnCallback(
+            function (ChannelInterface $channel, string $event, array $payload): void {
+                $this->publishedEvents[] = ['channel' => $channel->name(), 'event' => $event, 'payload' => $payload];
+            }
+        );
+
         $this->messageSync = new MediaJobMessageSync(
             $container->get(\App\Repository\MessageRepository::class),
             $this->jobService,
             $container->get(GeneratedFileRegistrar::class),
+            new MediaJobRealtimeNotifier($this->realtimePublisher, $this->jobService, $jobLogger),
             $this->em,
             $jobLogger,
         );
@@ -287,6 +306,16 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         self::assertIsArray($payload['file'] ?? null, 'Reload must expose the generated clip via the `file` field');
         self::assertSame('video', $payload['file']['type'] ?? null);
         self::assertStringEndsWith('.mp4', (string) ($payload['file']['path'] ?? ''));
+
+        // Sprint C: completion was pushed to the owner's user channel.
+        $terminalPush = array_values(array_filter(
+            $this->publishedEvents,
+            static fn (array $e): bool => 'media_job.update' === $e['event'] && 'done' === ($e['payload']['state'] ?? null),
+        ));
+        self::assertNotEmpty($terminalPush, 'A media_job.update push must fire on completion');
+        self::assertSame('user:'.$user->getId(), $terminalPush[0]['channel']);
+        self::assertSame($message->getId(), $terminalPush[0]['payload']['message_id']);
+        self::assertIsArray($terminalPush[0]['payload']['file']);
     }
 
     public function testRebindRedirectsCompletionSyncToOutgoingMessage(): void

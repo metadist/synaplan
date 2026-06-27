@@ -70,8 +70,8 @@ cancel, and a11y/i18n goals are all **unchanged** — they simply read from the
 | Poll endpoint + Zod client (`/api/v1/media-jobs/{jobKey}`) | ✅ shipped |
 | Reload contract: file attached to message + `media_job` meta → banner/video survive F5 | ✅ shipped |
 | Advancer hardening: transient-retry, lock re-dispatch, callable-safe Redis serialize, `--recover` | ✅ shipped |
-| Realtime push (Centrifugo), `mediaJobs` store, actionable toaster | ⏳ Sprint C (next) |
-| Global Jobs tray + launcher/badge, jump-to-message, cancel | ⏳ Sprint D |
+| Realtime push (Centrifugo `media_job.update` on `user:{id}`), `mediaJobs` store, actionable completion toaster (Sprint C) | ✅ shipped |
+| Global Jobs tray + launcher/badge, jump-to-message highlight pulse, cancel | ⏳ Sprint D |
 
 ---
 
@@ -354,7 +354,7 @@ All strings in **all four** locales (`en`, `de`, `es`, `tr`) under a new
 | `01` sprint | UX delivered here |
 |---|---|
 | B (detach chat path) | ✅ **Done.** `MediaJobStatus` banner (running/failed/overdue/stalled/lost + elapsed/last-checked/manual-refresh/progress), composer stays free, reload-resilient, image+video+audio. |
-| C (realtime + persist) | `mediaJobs` store + Centrifugo push as the primary update path (banner self-poll becomes fallback), actionable completion toaster, instant in-place resolve, tray-badge pulse. |
+| C (realtime + persist) | ✅ **Done.** `mediaJobs` store + Centrifugo `media_job.update` push as the primary completion path (banner self-poll is the fallback), actionable completion toaster (deep-links to the chat), instant in-place resolve via the shared `applyMediaJobUpdateToMessage` helper. (Tray-badge pulse moves to Sprint D with the tray.) |
 | D (resilience + tray + cancel) | Global Jobs tray + launcher/badge, jump-to-message + highlight pulse, multi-job hydration endpoint, Stop/cancel. |
 | E (cross-channel) | (Web UX stable; WhatsApp/Email delivery is channel-side.) |
 | F (rollout) | Polish pass, reduced-motion/a11y audit, E2E, i18n completeness. |

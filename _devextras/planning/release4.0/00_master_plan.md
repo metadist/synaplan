@@ -116,8 +116,8 @@ Full design in [`02_async-media-ux.md`](./02_async-media-ux.md).
 
 | # | Feature | File | Priority | Status |
 |---|---|---|---|---|
-| 1 | **Async media generation ("fire & continue")** — backend/architecture | [`01_async-media-jobs.md`](./01_async-media-jobs.md) | P0 | Sprint A+B shipped; C next |
-| 1·UX | **Async media UX** — dedicated status banner (Option B), global Jobs tray, actionable toaster, jump-to-message | [`02_async-media-ux.md`](./02_async-media-ux.md) | P0 | Banner shipped; tray/toaster pending |
+| 1 | **Async media generation ("fire & continue")** — backend/architecture | [`01_async-media-jobs.md`](./01_async-media-jobs.md) | P0 | Sprint A+B+C shipped; D next |
+| 1·UX | **Async media UX** — dedicated status banner (Option B), realtime completion + actionable toaster, global Jobs tray, jump-to-message | [`02_async-media-ux.md`](./02_async-media-ux.md) | P0 | Banner + realtime toaster shipped; tray pending (D) |
 | 2 | **File management world** — one home for every file: sources, vectorized status, groups, generated-media gallery | [`03_file-management.md`](./03_file-management.md) | P0 | Planned |
 | 3 | **Image & first-boot optimization** — multi-arch (arm64) base image, baked dev deps, custom `bge-m3` Ollama image; fast `docker compose up` on Mac | [`04_image-build-optimization.md`](./04_image-build-optimization.md) | P1 | Planned |
 | 4 | **AWS Bedrock model interface** (customer-driven) — Bedrock Converse/InvokeModel as a `ProviderRegistry` provider; SigV4 auth. *Research & estimation only.* | [`05_aws-bedrock-research.md`](./05_aws-bedrock-research.md) | P2 | Research |

@@ -34,6 +34,62 @@ import {
  * mounting the chat view or the Pinia store.
  */
 
+/**
+ * A realtime/poll media-job status update, as delivered by the Centrifugo
+ * `media_job.update` event (Sprint C) or the poll endpoint.
+ */
+export interface MediaJobUpdate {
+  job_id: string
+  message_id?: number | null
+  chat_id?: number | null
+  node_id?: string | null
+  type: string
+  state: string
+  percent?: number | null
+  error?: string | null
+  file?: { url: string; type?: string } | null
+}
+
+/**
+ * Apply a media-job update to a loaded message in place: patch `mediaJob` and,
+ * on a terminal `done` with a produced file, append the generated media part
+ * (idempotent — never duplicates an existing media part of that kind).
+ *
+ * Shared by the realtime `mediaJobs` store (push) and ChatView's completion
+ * handler so the push and poll paths can never diverge.
+ */
+export function applyMediaJobUpdateToMessage(message: Message, update: MediaJobUpdate): void {
+  message.mediaJob = {
+    ...(message.mediaJob ?? {}),
+    jobId: update.job_id,
+    type: update.type,
+    state: update.state,
+    ...(update.error != null ? { error: update.error } : {}),
+    ...(update.percent != null ? { percent: update.percent } : {}),
+  }
+
+  if ('done' === update.state && update.file?.url) {
+    appendGeneratedMediaPart(message, update.file.url, update.file.type ?? update.type)
+  }
+}
+
+/** Append a generated media part to a message, once per media kind. */
+function appendGeneratedMediaPart(message: Message, url: string, type: string): void {
+  const normalized = normalizeMediaUrl(url)
+  if ('video' === type && !message.parts.some((p) => 'video' === p.type)) {
+    message.parts.push({ partId: generatePartId(), type: 'video', url: normalized })
+  } else if ('image' === type && !message.parts.some((p) => 'image' === p.type)) {
+    message.parts.push({
+      partId: generatePartId(),
+      type: 'image',
+      url: normalized,
+      alt: 'Generated image',
+    })
+  } else if ('audio' === type && !message.parts.some((p) => 'audio' === p.type)) {
+    message.parts.push({ partId: generatePartId(), type: 'audio', url: normalized })
+  }
+}
+
 /** Normalize a media_job payload from API rows or SSE metadata. */
 export function parseMediaJobPayload(raw: unknown): MediaJobInfo | null {
   if (!raw || typeof raw !== 'object') return null

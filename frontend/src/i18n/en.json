@@ -1,4 +1,16 @@
 {
+  "jobs": {
+    "kind": {
+      "video": "video",
+      "image": "image",
+      "audio": "audio"
+    },
+    "toast": {
+      "ready": "Your {kind} is ready",
+      "failed": "Couldn't create your {kind}",
+      "view": "View"
+    }
+  },
   "branding": {
     "poweredBy": "Powered by"
   },

@@ -368,6 +368,7 @@ import { useChatsStore, isDefaultChatTitle } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
+import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
 import { useMemoriesStore } from '@/stores/userMemories'
@@ -385,7 +386,7 @@ import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
-import { parseMediaJobPayload } from '@/utils/messageMapper'
+import { parseMediaJobPayload, applyMediaJobUpdateToMessage } from '@/utils/messageMapper'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
@@ -447,6 +448,7 @@ const chatsStore = useChatsStore()
 const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
+const mediaJobsStore = useMediaJobsStore()
 const guestStore = useGuestStore()
 const configStore = useConfigStore()
 const memoriesStore = useMemoriesStore()
@@ -555,6 +557,11 @@ const isStreaming = computed(() => {
 
 // Init on mount
 onMounted(async () => {
+  // Subscribe to the per-user realtime channel so finished renders resolve
+  // their banner instantly (push primary). No-op for guests / when realtime is
+  // disabled; the 25s banner poll remains the fallback.
+  void mediaJobsStore.subscribe(authStore.user?.id)
+
   if (!authStore.isAuthenticated) {
     await guestStore.initSession()
 
@@ -702,6 +709,7 @@ const handleOpenFeedbackDialogEvent = (event: Event) => {
 // Cleanup: Stop streaming when component unmounts (user leaves chat)
 onBeforeUnmount(() => {
   isViewUnmounted = true
+  mediaJobsStore.unsubscribe()
   handleStopStreaming()
   if (currentAudioStreamer) {
     currentAudioStreamer.stop()
@@ -1104,31 +1112,14 @@ function applyMediaJobToMessage(message: Message | undefined, raw: unknown): voi
 }
 
 function handleMediaJobCompleted(message: Message, payload: { url: string; type: string }): void {
-  if (message.mediaJob) {
-    message.mediaJob = { ...message.mediaJob, state: 'done' }
-  }
-
-  const normalized = normalizeMediaUrl(payload.url)
-  if (payload.type === 'video' && !message.parts.some((p) => p.type === 'video')) {
-    message.parts.push({
-      partId: generatePartId(),
-      type: 'video',
-      url: normalized,
-    })
-  } else if (payload.type === 'image' && !message.parts.some((p) => p.type === 'image')) {
-    message.parts.push({
-      partId: generatePartId(),
-      type: 'image',
-      url: normalized,
-      alt: 'Generated image',
-    })
-  } else if (payload.type === 'audio' && !message.parts.some((p) => p.type === 'audio')) {
-    message.parts.push({
-      partId: generatePartId(),
-      type: 'audio',
-      url: normalized,
-    })
-  }
+  // Shared with the realtime mediaJobs store so the poll and push completion
+  // paths produce an identical result (state → done + media part appended).
+  applyMediaJobUpdateToMessage(message, {
+    job_id: message.mediaJob?.jobId ?? '',
+    type: payload.type,
+    state: 'done',
+    file: { url: payload.url, type: payload.type },
+  })
 
   if (message.backendMessageId) {
     void historyStore.reconcileMessage(message.id, message.backendMessageId)
