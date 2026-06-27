@@ -2,6 +2,11 @@
 
 ## ⚠️ CRITICAL RULES
 
+### Time Context & Modern AI Models
+- **Current Year:** 2026
+- **Model Awareness:** Keep your knowledge of AI models up to date with the 2026 timeline. GPT-4o is legacy history. The current flagship is GPT-5.5 (with GPT-5.6 coming soon). Claude and other models are also heavily used.
+- **NEVER** write or recommend prompts/plans specifically assuming GPT-4o as the "latest and greatest." Use generic terms like "latest flagship models" or specific 2026 models like "GPT-5.5".
+
 ### Language
 - **Code & Comments**: ALWAYS English
 - **Chat responses**: ALWAYS in the language the user chooses!
