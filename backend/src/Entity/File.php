@@ -15,8 +15,26 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BFILETYPE'], name: 'idx_file_type')]
 #[ORM\Index(columns: ['BSTATUS'], name: 'idx_file_status')]
 #[ORM\Index(columns: ['BGROUPKEY'], name: 'idx_file_groupkey')]
+#[ORM\Index(columns: ['BUSERID', 'BSOURCE'], name: 'idx_file_user_source')]
 class File
 {
+    /**
+     * Allowed provenance values for {@see self::$source}. Keep in sync with the
+     * `source` whitelist in FileController and the file-world plan
+     * (03_file-management.md §3.1).
+     */
+    public const SOURCES = [
+        'web_upload',
+        'chat_attachment',
+        'outlook',
+        'nextcloud',
+        'opencloud',
+        'whatsapp',
+        'widget',
+        'api',
+        'generated',
+    ];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
@@ -55,6 +73,21 @@ class File
 
     #[ORM\Column(name: 'BGROUPKEY', length: 128, nullable: true)]
     private ?string $groupKey = null;
+
+    /**
+     * Provenance: where this file came from. One of {@see self::SOURCES}.
+     * Defaults to web_upload so legacy rows and plain uploads read sanely.
+     */
+    #[ORM\Column(name: 'BSOURCE', length: 32, options: ['default' => 'web_upload'])]
+    private string $source = 'web_upload';
+
+    /**
+     * The file's original name at the source (e.g. the Nextcloud basename or
+     * Outlook attachment name), preserved even if the stored name is
+     * normalised. Null falls back to {@see self::$fileName}.
+     */
+    #[ORM\Column(name: 'BORIGINALNAME', length: 255, nullable: true)]
+    private ?string $originalName = null;
 
     #[ORM\Column(name: 'BCREATEDAT', type: 'bigint')]
     private int $createdAt;
@@ -199,6 +232,31 @@ class File
     public function setUserSessionId(?int $userSessionId): self
     {
         $this->userSessionId = $userSessionId;
+
+        return $this;
+    }
+
+    public function getSource(): string
+    {
+        return $this->source;
+    }
+
+    public function setSource(string $source): self
+    {
+        $this->source = in_array($source, self::SOURCES, true) ? $source : 'web_upload';
+
+        return $this;
+    }
+
+    public function getOriginalName(): ?string
+    {
+        return $this->originalName;
+    }
+
+    public function setOriginalName(?string $originalName): self
+    {
+        $originalName = null !== $originalName ? trim($originalName) : null;
+        $this->originalName = ('' === $originalName) ? null : $originalName;
 
         return $this;
     }

@@ -1,7 +1,8 @@
 # Feature 7 — Share generated files to destinations ("Send to…")
 
 **Release:** 4.0 (Phase A) · later for Phase B/C · **Priority:** P1
-**Status:** Phase A approved (build now) · Phase B/C planned
+**Status:** **Joint provenance sprint shipped (2026-06-27)** — see §A0 · rest of
+Phase A (surfacing generated docs in NC chat) + Phase B/C planned
 **Related:** [`03_file-management.md`](./03_file-management.md) (file world; `BSOURCE`
 incl. `nextcloud`/`opencloud`, the "Incoming inbox" = the *inbound* half of this),
 [`01_async-media-jobs.md`](./01_async-media-jobs.md) (generated media must exist as a
@@ -56,6 +57,44 @@ the user's own storage. Today this is **half-built and media-only**.
 | **G2** | `MediaController::save()` writes everything flat into `Synaplan/`; no per-kind organisation; no calendar-import nicety for ICS. |
 | **G3** | Synaplan has **no generic "destination/share-target" abstraction** — the only outbound concepts are a public `/up/` link and channel-specific sends (WhatsApp, Synamail). Dropbox/SharePoint/OpenCloud have nowhere to plug in. |
 | **G4** | No **standard shareable object** (a portable DTO a receiver can consume); each integration reinvents the shape. |
+
+---
+
+## A0. What the joint "provenance" sprint shipped (2026-06-27)
+
+Done together with [`03_file-management.md`](./03_file-management.md) as one
+cross-repo slice — the `source` provenance model is the seam where the inbound
+(03) and outbound (this doc) halves meet.
+
+**Synaplan backend (`/wwwroot/synaplan`):**
+
+- Migration `Version20260627120000` adds **`BSOURCE`** (default `web_upload`) +
+  **`BORIGINALNAME`** to `BFILES`, plus `idx_file_user_source`.
+- `File` entity: `source`/`originalName` fields, getters/setters, `File::SOURCES`
+  whitelist (`setSource()` falls back to `web_upload` on unknown values).
+- `/api/v1/files/upload` accepts `source` + `original_name` form fields
+  (OpenAPI-documented), threaded through
+  `FileUploadService::uploadBatch → processSingleUpload → createFileEntity`.
+- Unit test `tests/Unit/Entity/FileProvenanceTest.php` (defaults, whitelist,
+  trim/empty→null).
+
+**Nextcloud app (`/wwwroot/synaplan-nextcloud`, v1.3.0):**
+
+- `SynaplanClient::uploadFile()` now sends `source=nextcloud` + `original_name`
+  (the user-relative NC path) on **every** upload (Add-to-Knowledge + the Tika
+  chat-context extraction).
+- `MediaController::save()` is no longer image/video-only: it routes any saved
+  artifact into `Synaplan/<Kind>` sub-folders (Documents/Audio/Calendar/Images/
+  Video; unknown → `Synaplan/`) via a new `ensureFolder()` helper, and returns
+  the `folder` it used. The existing image/video "Save to Nextcloud" button gets
+  the organised folders for free.
+
+**Deliberately deferred (the rest of Phase A):** surfacing generated
+**documents/audio/calendar** in the NC chat with a per-artifact save button. The
+research chat today generates only image/video, and its text stream proxies
+Synaplan's **OpenAI-compatible** endpoint, which emits no generated-file events.
+The save + folder infra is now type-agnostic and ready; wiring the chat to a
+file-event-bearing stream is the follow-up (see §7).
 
 ---
 
@@ -224,11 +263,13 @@ kubectl exec -n opendesk <nc-pod> -- grep '<version>' \
 
 ## 7. Sprints
 
-- **A1 (now)** — NC backend: generalise `save()`, kind→sub-folder routing, verify
-  doc/audio/ICS download auth. Unit tests.
-- **A2 (now)** — NC frontend: detect all generated artifacts in `ResearchChat.vue`,
-  add "Save to Nextcloud" per artifact, toast with path. i18n, version bump,
-  changelog, gate.
+- **A1 (✅ shipped)** — NC backend: generalised `save()` + kind→sub-folder
+  routing (`ensureFolder()`); Synaplan provenance columns + upload contract; NC
+  inbound tagging. See §A0.
+- **A2 (follow-up)** — surface generated **documents/audio/calendar** in
+  `ResearchChat.vue` with a per-artifact "Save to Nextcloud" button. Blocked on
+  the NC chat consuming a file-event-bearing stream (it uses the OpenAI-compatible
+  endpoint today). Verify doc/audio/ICS admin-key download once such files appear.
 - **B (later)** — Synaplan `ShareableFile` DTO + `DestinationProvider` registry +
   `POST /files/{id}/send` (callback model) + Web Share button in main app/widget.
 - **C (later)** — file-world reconciliation (`delivered_to`, round-trip coherence).
