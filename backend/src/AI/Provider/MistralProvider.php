@@ -502,6 +502,110 @@ class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInte
         }
     }
 
+    /**
+     * Resolve a preset voice id for synthesis when the caller didn't pick one.
+     *
+     * Prefers a preset whose language matches the synthesis language, then the
+     * first usable preset, then the documented fallback if the live catalog is
+     * unreachable. Guarantees a non-empty voice so the request never 400s.
+     */
+    private function resolveDefaultVoiceId(?string $language): string
+    {
+        $voices = $this->fetchPresetVoices();
+
+        if (null !== $language) {
+            foreach ($voices as $voice) {
+                $slug = $this->voiceSlug($voice);
+                if (null !== $slug && $this->voiceMatchesLanguage($voice, $language)) {
+                    return $slug;
+                }
+            }
+        }
+
+        foreach ($voices as $voice) {
+            $slug = $this->voiceSlug($voice);
+            if (null !== $slug) {
+                return $slug;
+            }
+        }
+
+        return self::DEFAULT_TTS_VOICE;
+    }
+
+    /**
+     * Fetch (and cache for the instance lifetime) the preset voice catalog. The
+     * hosted API accepts both the human-readable `slug` and the `id` UUID as a
+     * voice identifier; we keep the raw entries so language metadata survives.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchPresetVoices(): array
+    {
+        if (null !== $this->presetVoiceCache) {
+            return $this->presetVoiceCache;
+        }
+
+        $this->presetVoiceCache = [];
+
+        if (!$this->isAvailable()) {
+            return $this->presetVoiceCache;
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', self::VOICES_ENDPOINT, [
+                'auth_bearer' => $this->apiKey,
+                'query' => ['type' => 'preset', 'limit' => 200],
+                'timeout' => 30,
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                return $this->presetVoiceCache;
+            }
+
+            $data = $response->toArray(false);
+            $voices = $data['voices'] ?? (array_is_list($data) ? $data : []);
+            $this->presetVoiceCache = array_values(array_filter($voices, 'is_array'));
+        } catch (\Throwable $e) {
+            $this->logger->warning('Mistral: failed to fetch preset voices for default selection: '.$e->getMessage());
+        }
+
+        return $this->presetVoiceCache;
+    }
+
+    /**
+     * @param array<string, mixed> $voice
+     */
+    private function voiceSlug(array $voice): ?string
+    {
+        $slug = $voice['slug'] ?? ($voice['id'] ?? ($voice['voice_id'] ?? null));
+
+        return is_string($slug) && '' !== $slug ? $slug : null;
+    }
+
+    /**
+     * @param array<string, mixed> $voice
+     */
+    private function voiceMatchesLanguage(array $voice, string $language): bool
+    {
+        $target = strtolower(substr($language, 0, 2));
+        if ('' === $target) {
+            return false;
+        }
+
+        $languages = $voice['languages'] ?? [];
+        if (!is_array($languages)) {
+            return false;
+        }
+
+        foreach ($languages as $lang) {
+            if (is_string($lang) && str_starts_with(strtolower($lang), $target)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // ==================== HELPERS ====================
 
     private function assertChat(array $options): void
