@@ -13,6 +13,16 @@
     "cancel": {
       "stop": "Detener",
       "failed": "No se pudo cancelar el trabajo. Inténtalo de nuevo."
+    },
+    "tray": {
+      "title": "Trabajos en segundo plano",
+      "close": "Cerrar",
+      "openLabel": "Trabajos en segundo plano ({count} en curso)",
+      "empty": "No hay trabajos en segundo plano. Los procesos largos como los vídeos aparecen aquí para que puedas seguir trabajando mientras terminan."
+    },
+    "row": {
+      "open": "Abrir",
+      "working": "Procesando…"
     }
   },
   "branding": {

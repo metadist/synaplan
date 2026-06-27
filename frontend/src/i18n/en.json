@@ -13,6 +13,16 @@
     "cancel": {
       "stop": "Stop",
       "failed": "Couldn't cancel the job. Please try again."
+    },
+    "tray": {
+      "title": "Background jobs",
+      "close": "Close",
+      "openLabel": "Background jobs ({count} running)",
+      "empty": "No background jobs. Long renders like videos appear here so you can keep working while they finish."
+    },
+    "row": {
+      "open": "Open",
+      "working": "Working…"
     }
   },
   "branding": {

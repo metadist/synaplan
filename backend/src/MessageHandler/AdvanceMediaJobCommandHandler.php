@@ -116,6 +116,12 @@ final readonly class AdvanceMediaJobCommandHandler
                 return;
             }
             if ($job->isTerminal()) {
+                // The job is already terminal in Redis. If we are processing an
+                // advance command, a previous attempt failed AFTER marking it
+                // terminal (likely during DB sync or billing). Retry the sync
+                // to close the loophole, then stop advancing.
+                $this->messageSync->syncTerminalState($job);
+
                 return;
             }
             if ($job->isPastDeadline()) {

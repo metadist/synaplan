@@ -562,6 +562,10 @@ onMounted(async () => {
   // their banner instantly (push primary). No-op for guests / when realtime is
   // disabled; the 25s banner poll remains the fallback.
   void mediaJobsStore.subscribe(authStore.user?.id)
+  // Hydrate the global Jobs tray with any renders already running across chats.
+  if (authStore.isAuthenticated) {
+    void mediaJobsStore.loadActive()
+  }
 
   if (!authStore.isAuthenticated) {
     await guestStore.initSession()

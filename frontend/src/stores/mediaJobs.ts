@@ -129,7 +129,7 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
     const kind = t(`jobs.kind.${payload.type}`)
     const action =
       payload.chat_id != null
-        ? { label: t('jobs.toast.view'), onClick: () => navigateToChat(payload.chat_id as number) }
+        ? { label: t('jobs.toast.view'), onClick: () => openChat(payload.chat_id as number) }
         : undefined
 
     if ('done' === payload.state) {
@@ -139,11 +139,12 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
     }
   }
 
-  function navigateToChat(chatId: number): void {
+  /** Deep-link to a chat (toast "View" + tray "Open"). Best-effort, never throws. */
+  function openChat(chatId: number): void {
     try {
       useChatsStore().setActiveChat(chatId)
     } catch {
-      // Best-effort deep link — a toast click must never throw.
+      // Best-effort deep link — a click must never throw.
     }
   }
 
@@ -187,6 +188,7 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
     applyUpdate,
     loadActive,
     cancel,
+    openChat,
     subscribe,
     unsubscribe,
     subscribedUserId,
