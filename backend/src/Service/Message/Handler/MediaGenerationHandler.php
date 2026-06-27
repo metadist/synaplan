@@ -896,7 +896,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             ]);
 
             $lang = $classification['language'] ?? 'en';
-            $userMessage = $this->errorMessageBuilder->buildErrorMessage($e, $mediaType, $lang);
+            // Admins get the raw provider error/cause appended for diagnosis;
+            // regular users only see the clean, non-leaky message.
+            $userMessage = $this->errorMessageBuilder->buildErrorMessage($e, $mediaType, $lang, $user?->isAdmin() ?? false);
             $streamCallback($userMessage);
 
             return [

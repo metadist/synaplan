@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\MessageHandler;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\Entity\User;
 use App\Message\AdvanceMediaJobCommand;
 use App\MessageHandler\AdvanceMediaJobCommandHandler;
+use App\Repository\UserRepository;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobConfig;
@@ -37,6 +40,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
     private SyncMediaJobGenerator&MockObject $syncGenerator;
     private LockFactory&MockObject $lockFactory;
     private SharedLockInterface&MockObject $lock;
+    private UserRepository&MockObject $userRepository;
     private string $uploadDir;
     private AdvanceMediaJobCommandHandler $handler;
 
@@ -50,6 +54,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $this->syncGenerator = $this->createMock(SyncMediaJobGenerator::class);
         $this->lockFactory = $this->createMock(LockFactory::class);
         $this->lock = $this->createMock(SharedLockInterface::class);
+        $this->userRepository = $this->createMock(UserRepository::class);
 
         $this->config->method('pollIntervalSeconds')->willReturn(3);
         $this->jobService->method('langFromJob')->willReturn('en');
@@ -57,6 +62,9 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         // By default the advance lock is granted; individual tests override.
         $this->lock->method('acquire')->willReturn(true);
         $this->lockFactory->method('createLock')->willReturn($this->lock);
+
+        // Default: job owner is not an admin (no diagnostics appended).
+        $this->userRepository->method('find')->willReturn(null);
 
         $this->uploadDir = sys_get_temp_dir().'/synaplan_media_test_'.uniqid('', true);
 
@@ -71,6 +79,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
             $this->syncGenerator,
             $this->lockFactory,
             new NullLogger(),
+            $this->userRepository,
             $this->uploadDir,
         );
     }
@@ -212,6 +221,80 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         self::assertStringContainsStringIgnoringCase('image', $captured);
         // The raw provider token must never leak to the user-facing message.
         self::assertStringNotContainsString('invalid_image_url', $captured);
+    }
+
+    public function testContentBlockedPollFailureFailsImmediatelyWithoutTransientRetry(): void
+    {
+        $job = $this->job(MediaJob::STATUS_RUNNING);
+        $job->setProviderRef('op-1');
+        $this->jobService->method('findByKey')->willReturn($job);
+
+        // A definitive content/safety block from the provider — the operation is
+        // finished and the identical prompt can never succeed.
+        $this->aiFacade->method('pollVideoOperation')
+            ->willThrowException(ProviderException::contentBlocked('google', 'SAFETY', 'real people likeness'));
+
+        $captured = null;
+        $this->jobService->expects(self::once())
+            ->method('markFailed')
+            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): void {
+                $captured = $message;
+            });
+
+        // It must NOT be treated as transient: no heartbeat-retry, no re-dispatch.
+        $this->jobService->expects(self::never())->method('heartbeat');
+        $this->dispatcher->expects(self::never())->method('dispatch');
+        $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
+
+        $this->handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
+
+        self::assertIsString($captured);
+        // The user-facing copy explains the safety block (not a generic "try again").
+        self::assertStringContainsStringIgnoringCase('SAFETY', $captured);
+    }
+
+    public function testAdminUserGetsRawDiagnosticsAppendedToFailureMessage(): void
+    {
+        $job = $this->job(MediaJob::STATUS_RUNNING);
+        $job->setProviderRef('op-1');
+        $job->setUserId(1);
+        $this->jobService->method('findByKey')->willReturn($job);
+
+        $admin = (new User())->setUserLevel('ADMIN');
+        $adminRepo = $this->createMock(UserRepository::class);
+        $adminRepo->method('find')->with(1)->willReturn($admin);
+
+        $handler = new AdvanceMediaJobCommandHandler(
+            $this->jobService,
+            $this->dispatcher,
+            $this->config,
+            $this->messageSync,
+            $this->aiFacade,
+            new MediaErrorMessageBuilder(),
+            new UserUploadPathBuilder(),
+            $this->syncGenerator,
+            $this->lockFactory,
+            new NullLogger(),
+            $adminRepo,
+            $this->uploadDir,
+        );
+
+        $this->aiFacade->method('pollVideoOperation')
+            ->willThrowException(ProviderException::contentBlocked('google', 'SAFETY', 'real people likeness'));
+
+        $captured = null;
+        $this->jobService->expects(self::once())
+            ->method('markFailed')
+            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): void {
+                $captured = $message;
+            });
+
+        $handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
+
+        self::assertIsString($captured);
+        // Admins additionally see the raw diagnostics block (hidden from users).
+        self::assertStringContainsString('Admin diagnostics', $captured);
+        self::assertStringContainsString('Provider: google', $captured);
     }
 
     public function testTransientPollFailureReDispatchesWithBackoffInsteadOfFailing(): void
@@ -360,6 +443,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
             $this->syncGenerator,
             $lockFactory,
             new NullLogger(),
+            $this->userRepository,
             $this->uploadDir,
         );
 
