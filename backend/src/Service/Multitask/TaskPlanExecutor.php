@@ -74,7 +74,7 @@ final readonly class TaskPlanExecutor
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
-        $plan = $this->planForExecution($message, $thread, $classification);
+        $plan = $this->planForExecution($message, $thread, $classification, $options);
 
         if (null === $plan || $this->shouldUseLegacyRouter($plan->plan)) {
             return $this->runSingleNode(
@@ -126,7 +126,7 @@ final readonly class TaskPlanExecutor
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
-        $plan = $this->planForExecution($message, $thread, $classification);
+        $plan = $this->planForExecution($message, $thread, $classification, $options);
 
         if (null === $plan || $this->shouldUseLegacyRouter($plan->plan)) {
             return $this->runSingleNode(
@@ -178,8 +178,9 @@ final readonly class TaskPlanExecutor
      *
      * @param array<int, Message>  $thread
      * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
      */
-    private function planForExecution(Message $message, array $thread, array $classification): ?TaskPlanResult
+    private function planForExecution(Message $message, array $thread, array $classification, array $options = []): ?TaskPlanResult
     {
         // Only AI-sorted messages are candidates for multi-task planning.
         if ('ai_sorting' !== ($classification['source'] ?? null)) {
@@ -198,7 +199,7 @@ final readonly class TaskPlanExecutor
         try {
             $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
-            return $this->planner->plan($message, $thread, $userId);
+            return $this->planner->plan($message, $thread, $userId, $options);
         } catch (\Throwable $e) {
             $this->logger->warning('TaskPlanExecutor: planning failed, using single-node path', [
                 'message_id' => $message->getId(),
