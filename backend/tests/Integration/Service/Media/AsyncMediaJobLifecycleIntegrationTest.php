@@ -21,9 +21,11 @@ use App\Service\Media\MediaJobRealtimeNotifier;
 use App\Service\Media\MediaJobReaper;
 use App\Service\Media\MediaJobService;
 use App\Service\Media\MediaJobStore;
+use App\Service\Media\MediaJobUsageRecorder;
 use App\Service\Media\SyncMediaJobGenerator;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\MessageApiFormatter;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use Psr\Log\NullLogger;
@@ -69,9 +71,13 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
     private MediaErrorMessageBuilder $errorBuilder;
     private MediaJobConfig $config;
     private RealtimePublisherInterface&MockObject $realtimePublisher;
+    private RateLimitService&MockObject $rateLimitService;
 
     /** @var list<array{channel: string, event: string, payload: array<string, mixed>}> */
     private array $publishedEvents = [];
+
+    /** @var list<array{action: string, meta: array<string, mixed>}> */
+    private array $recordedUsage = [];
 
     /** @var list<int> message ids created during the test, cleaned up in tearDown */
     private array $createdMessageIds = [];
@@ -107,11 +113,28 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
             }
         );
 
+        // Spy rate-limiter: capture every usage recording the terminal sync bills.
+        $this->recordedUsage = [];
+        $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->rateLimitService->method('recordUsage')->willReturnCallback(
+            function (object $user, string $action, array $meta): void {
+                $this->recordedUsage[] = ['action' => $action, 'meta' => $meta];
+            }
+        );
+
+        $usageRecorder = new MediaJobUsageRecorder(
+            $this->rateLimitService,
+            $container->get(\App\Repository\UserRepository::class),
+            $this->jobService,
+            $jobLogger,
+        );
+
         $this->messageSync = new MediaJobMessageSync(
             $container->get(\App\Repository\MessageRepository::class),
             $this->jobService,
             $container->get(GeneratedFileRegistrar::class),
             new MediaJobRealtimeNotifier($this->realtimePublisher, $this->jobService, $jobLogger),
+            $usageRecorder,
             $this->em,
             $jobLogger,
         );
@@ -317,6 +340,13 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         self::assertSame('user:'.$user->getId(), $terminalPush[0]['channel']);
         self::assertSame($message->getId(), $terminalPush[0]['payload']['message_id']);
         self::assertIsArray($terminalPush[0]['payload']['file']);
+
+        // Sprint E: a completed render is billed exactly once.
+        $videoBilling = array_values(array_filter(
+            $this->recordedUsage,
+            static fn (array $u): bool => 'VIDEOS' === $u['action'],
+        ));
+        self::assertCount(1, $videoBilling, 'a completed render must record usage exactly once');
     }
 
     public function testRebindRedirectsCompletionSyncToOutgoingMessage(): void
@@ -486,6 +516,30 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
 
         self::assertContains($jobA->getJobKey(), $keys);
         self::assertNotContains($jobB->getJobKey(), $keys, 'must not leak another user\'s jobs');
+    }
+
+    public function testPerUserIndexCountsActiveAndDropsTerminalJobs(): void
+    {
+        $user = $this->createUser();
+
+        $job1 = $this->jobService->create(['userId' => $user->getId(), 'type' => MediaJob::TYPE_VIDEO, 'provider' => 'google']);
+        $this->jobService->markRunning($job1, 'op1');
+        $job2 = $this->jobService->create(['userId' => $user->getId(), 'type' => MediaJob::TYPE_IMAGE, 'provider' => 'openai']);
+        $this->jobService->markRunning($job2, 'op2');
+        $this->createdJobKeys[] = $job1->getJobKey();
+        $this->createdJobKeys[] = $job2->getJobKey();
+
+        self::assertSame(2, $this->jobService->countActiveForUser($user->getId()));
+
+        // Completing one removes it from the per-user index immediately.
+        $this->jobService->markCompleted($job1, ['file' => ['url' => '/x.mp4', 'type' => 'video']]);
+
+        self::assertSame(1, $this->jobService->countActiveForUser($user->getId()));
+        $remaining = array_map(
+            static fn (MediaJob $j): string => $j->getJobKey(),
+            $this->jobService->findActiveForUser($user->getId()),
+        );
+        self::assertSame([$job2->getJobKey()], $remaining);
     }
 
     public function testFailurePathPersistsLocalizedErrorOnMessage(): void

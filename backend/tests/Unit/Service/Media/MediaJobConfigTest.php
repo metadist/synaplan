@@ -54,6 +54,28 @@ final class MediaJobConfigTest extends TestCase
         self::assertSame(3, $this->config->pollIntervalSeconds());
         self::assertSame(1500, $this->config->imageInlineFastMs());
         self::assertSame(90, $this->config->heartbeatStaleSeconds());
+        self::assertSame(16, $this->config->maxActiveJobsPerUser());
+    }
+
+    public function testMaxActiveJobsPerUserIsClamped(): void
+    {
+        $this->repo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => MediaJobConfig::KEY_MAX_ACTIVE_PER_USER === $setting ? '500' : null
+        );
+        self::assertSame(100, $this->config->maxActiveJobsPerUser(), 'clamped to max 100');
+
+        $low = new MediaJobConfig($this->lowRepo());
+        self::assertSame(1, $low->maxActiveJobsPerUser(), 'clamped to min 1');
+    }
+
+    private function lowRepo(): ConfigRepository
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => MediaJobConfig::KEY_MAX_ACTIVE_PER_USER === $setting ? '0' : null
+        );
+
+        return $repo;
     }
 
     public function testNumericSettingsAreClamped(): void

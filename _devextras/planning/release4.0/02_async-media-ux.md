@@ -72,7 +72,10 @@ cancel, and a11y/i18n goals are all **unchanged** — they simply read from the
 | Advancer hardening: transient-retry, lock re-dispatch, callable-safe Redis serialize, `--recover` | ✅ shipped |
 | Realtime push (Centrifugo `media_job.update` on `user:{id}`), `mediaJobs` store, actionable completion toaster (Sprint C) | ✅ shipped |
 | Cancel end-to-end (`POST /media-jobs/{id}/cancel` → `MediaJobCanceller` → mark cancelled + provider stop + push; Stop button on the banner) + active-jobs list endpoint (`GET /media-jobs`) + store data layer (`activeJobs`, `loadActive`, `cancel`) (Sprint D-1) | ✅ shipped |
-| Global Jobs tray **UI** (launcher/badge, slide-over panel, rows) + jump-to-message highlight pulse (Sprint D-2) | ⏳ next |
+| Global Jobs tray **UI** (`JobsTrayLauncher` floating badge + `JobsTray` slide-over + `JobRow` with Open/Stop), mounted in `MainLayout`, hydrated on chat load + push-pruned (Sprint D-2) | ✅ shipped |
+| **Per-user Redis index** (`mediajob:user:{id}` set, maintained in `MediaJobStore::save`): `findActiveForUser`/`countActiveForUser` are now O(that user's jobs) and tenant-isolated — no global active-set scan. (Sprint E) | ✅ shipped |
+| **Per-user concurrency ceiling** (`MEDIA.JOB_MAX_ACTIVE_PER_USER`, default **16**, clamped 1–100): `detachMediaToAsyncJob` rejects past the limit with a localized message (all 4 locales) and never creates a job / calls the provider. (Sprint E) | ✅ shipped |
+| **Async usage billing** (`MediaJobUsageRecorder`, wired into `MediaJobMessageSync::syncTerminalState`): bills **only `completed`** renders, idempotent (`_usage_recorded` flag), `media_usage` stashed on the job at detach so cost matches the inline path. Failed/cancelled/timed-out are never billed (honours provider refunds). (Sprint E, #1146) | ✅ shipped |
 
 ---
 
@@ -356,7 +359,7 @@ All strings in **all four** locales (`en`, `de`, `es`, `tr`) under a new
 |---|---|
 | B (detach chat path) | ✅ **Done.** `MediaJobStatus` banner (running/failed/overdue/stalled/lost + elapsed/last-checked/manual-refresh/progress), composer stays free, reload-resilient, image+video+audio. |
 | C (realtime + persist) | ✅ **Done.** `mediaJobs` store + Centrifugo `media_job.update` push as the primary completion path (banner self-poll is the fallback), actionable completion toaster (deep-links to the chat), instant in-place resolve via the shared `applyMediaJobUpdateToMessage` helper. (Tray-badge pulse moves to Sprint D with the tray.) |
-| D (resilience + tray + cancel) | **D-1 done:** cancel end-to-end (banner Stop + `MediaJobCanceller` + `/media-jobs/{id}/cancel`), active-jobs list endpoint, `mediaJobs` tray data layer. **D-2 next:** Jobs tray UI (launcher/badge, panel, rows) + jump-to-message highlight pulse. (Reload resilience already covered by the persisted-meta banner from B/C.) |
+| D (resilience + tray + cancel) | ✅ **Done.** Cancel end-to-end (banner Stop + `MediaJobCanceller` + `/media-jobs/{id}/cancel`), active-jobs list endpoint, `mediaJobs` tray data layer, and the global Jobs tray UI (`JobsTrayLauncher` floating badge → `JobsTray` slide-over → `JobRow` Open/Stop), mounted in the shell, hydrated on chat load and pruned by realtime push. (Reload resilience was already covered by the persisted-meta banner from B/C. Jump-to-message *highlight pulse* — Open navigates to the chat today; the pulse animation is a deferred polish item for F.) |
 | E (cross-channel) | (Web UX stable; WhatsApp/Email delivery is channel-side.) |
 | F (rollout) | Polish pass, reduced-motion/a11y audit, E2E, i18n completeness. |
 

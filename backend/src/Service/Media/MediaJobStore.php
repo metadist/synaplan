@@ -30,6 +30,13 @@ final class MediaJobStore
     private const MSG_PREFIX = 'mediajob:msg:';
     private const ACTIVE_ZSET = 'mediajob:active';
 
+    /**
+     * Per-user index of active job keys: `mediajob:user:{userId}` -> SET.
+     * Backs the global Jobs tray and the per-user concurrency limit in O(jobs
+     * for that user) instead of scanning every active job across all tenants.
+     */
+    private const USER_ACTIVE_PREFIX = 'mediajob:user:';
+
     /** Retention for in-flight jobs — generous enough for the longest render. */
     private const ACTIVE_TTL_SECONDS = 21600; // 6h
 
@@ -68,6 +75,19 @@ final class MediaJobStore
             $this->redis->zRem(self::ACTIVE_ZSET, $job->getJobKey());
         } else {
             $this->redis->zAdd(self::ACTIVE_ZSET, (float) $job->getUpdated(), $job->getJobKey());
+        }
+
+        // Per-user active index: add while in flight, remove once terminal so a
+        // user's tray + concurrency count stay accurate and tenant-isolated.
+        $userId = $job->getUserId();
+        if ($userId > 0) {
+            $userKey = self::USER_ACTIVE_PREFIX.$userId;
+            if ($terminal) {
+                $this->redis->sRem($userKey, $job->getJobKey());
+            } else {
+                $this->redis->sAdd($userKey, $job->getJobKey());
+                $this->redis->expire($userKey, self::ACTIVE_TTL_SECONDS);
+            }
         }
     }
 
@@ -135,26 +155,41 @@ final class MediaJobStore
     }
 
     /**
-     * All currently-active (non-terminal) jobs. Backs the global Jobs tray
-     * (Sprint D); the caller filters to the requesting user. Self-heals the
-     * active set for entries whose snapshot expired or already went terminal.
+     * Active (non-terminal) jobs owned by one user, via the per-user index —
+     * O(that user's jobs), tenant-isolated. Self-heals index entries whose
+     * snapshot expired or already went terminal.
      *
      * @return list<MediaJob>
      */
-    public function findActive(int $limit = 200): array
+    public function findActiveForUser(int $userId, int $limit = 200): array
     {
-        $keys = $this->redis->zRangeByScore(self::ACTIVE_ZSET, '-inf', '+inf', $limit);
+        if ($userId <= 0) {
+            return [];
+        }
+
+        $userKey = self::USER_ACTIVE_PREFIX.$userId;
+        $keys = $this->redis->sMembers($userKey);
         $jobs = [];
         foreach ($keys as $key) {
             $job = $this->find($key);
             if (null === $job || $job->isTerminal()) {
-                $this->redis->zRem(self::ACTIVE_ZSET, $key);
+                // Snapshot expired or job finished but the index lingered — self-heal.
+                $this->redis->sRem($userKey, $key);
                 continue;
             }
             $jobs[] = $job;
+            if (count($jobs) >= $limit) {
+                break;
+            }
         }
 
         return $jobs;
+    }
+
+    /** Count a user's active jobs (resolves + self-heals the index). */
+    public function countActiveForUser(int $userId): int
+    {
+        return count($this->findActiveForUser($userId, \PHP_INT_MAX));
     }
 
     /**

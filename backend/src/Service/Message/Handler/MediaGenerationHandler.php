@@ -1511,6 +1511,34 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $mediaOptions['lang'] = is_string($classification['language'] ?? null)
             ? $classification['language']
             : ($message->getLanguage() ?: 'en');
+        $lang = (string) $mediaOptions['lang'];
+
+        // Per-user concurrency ceiling: never queue past the limit so one user
+        // can't flood the worker or pile up provider cost. The rate-limit gate
+        // (checkLimit) already ran upstream; this bounds in-flight parallelism.
+        $maxActive = $this->mediaJobConfig->maxActiveJobsPerUser();
+        if ($this->mediaJobService->countActiveForUser($effectiveUserId) >= $maxActive) {
+            $limitMessage = $this->errorMessageBuilder->buildTooManyJobsMessage($lang);
+            $streamCallback($limitMessage);
+            $this->notify($progressCallback, 'error', $limitMessage);
+            $this->logger->info('MediaGenerationHandler: media job rejected — per-user concurrency limit reached', [
+                'user_id' => $effectiveUserId,
+                'limit' => $maxActive,
+                'type' => $type,
+            ]);
+
+            return [
+                'text' => $limitMessage,
+                'metadata' => [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'model_id' => $modelId,
+                    'media_prompt' => $prompt,
+                    'media_type' => $type,
+                    'error' => $limitMessage,
+                ],
+            ];
+        }
 
         $chatId = null;
         $chat = $message->getChat();
@@ -1524,6 +1552,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $trackId = isset($options['track_id']) && is_scalar($options['track_id'])
             ? trim((string) $options['track_id'])
             : null;
+
+        // Stash the billable usage payload so the worker can record it when the
+        // job completes (Sprint E, #1146). Mirrors the inline path's media_usage
+        // shape so RateLimitService computes the identical cost.
+        $mediaOptions['media_usage'] = $this->detachMediaUsage($type, $prompt, $classification, $options);
 
         $job = $this->mediaJobService->create([
             'userId' => $effectiveUserId,
@@ -1667,6 +1700,28 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $streamCallback,
             $progressCallback,
         );
+    }
+
+    /**
+     * Billable usage payload to persist on a detached job, mirroring the
+     * inline success-path `media_usage` shape (see {@see maybeRecordMediaUsage}).
+     * Values are known at request time: image = 1 asset, audio = prompt length,
+     * video = requested duration (the inline path falls back to the same).
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function detachMediaUsage(string $type, string $prompt, array $classification, array $options): array
+    {
+        return match ($type) {
+            MediaJob::TYPE_VIDEO => [
+                'duration_seconds' => (float) ($options['duration'] ?? $classification['duration'] ?? 8),
+            ],
+            MediaJob::TYPE_AUDIO => ['characters' => mb_strlen($prompt)],
+            default => ['images' => 1],
+        };
     }
 
     /**

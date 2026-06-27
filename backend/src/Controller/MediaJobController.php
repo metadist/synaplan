@@ -120,14 +120,23 @@ final class MediaJobController extends AbstractController
 
         // Safety net: if the worker/reaper missed the deadline, the user's poll
         // must still drive the job to a terminal state they can see.
-        if ($this->mediaJobService->enforceDeadline(
+        if (!$job->isTerminal() && $this->mediaJobService->enforceDeadline(
             $job,
             $this->errorBuilder->buildTimeoutMessage(
                 $job->getType(),
                 $this->mediaJobService->langFromJob($job),
             ),
         )) {
+            // enforceDeadline transitioned it to timed_out.
             $this->messageSync->syncTerminalState($job);
+        } elseif ($job->isTerminal()) {
+            // Safety net 2: if the worker/canceller marked it terminal in Redis
+            // but crashed/failed before syncing the DB, the poll will heal the DB.
+            try {
+                $this->messageSync->syncTerminalState($job);
+            } catch (\Throwable) {
+                // Best-effort; do not break the poll response if the DB is down.
+            }
         }
 
         return $this->json([

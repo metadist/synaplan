@@ -59,6 +59,10 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->rateLimitService = $this->createMock(RateLimitService::class);
 
+        // Per-user concurrency ceiling. `countActiveForUser` is left to PHPUnit's
+        // int default (0) for existing detach paths; the limit test overrides it.
+        $this->mediaJobConfig->method('maxActiveJobsPerUser')->willReturn(16);
+
         $this->handler = new MediaGenerationHandler(
             $this->aiFacade,
             $this->modelConfigService,
@@ -123,6 +127,31 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         self::assertSame('job-detach-1', $result['metadata']['media_job']['job_id'] ?? null);
         self::assertSame('video', $result['metadata']['media_type'] ?? null);
         self::assertSame('__VIDEO_GENERATING__', $result['content'] ?? null);
+    }
+
+    public function testRejectsWhenPerUserConcurrencyLimitReached(): void
+    {
+        $message = $this->messageStub();
+        $this->bootstrapVideoModel();
+
+        $this->promptExtractor->method('extract')->willReturn(['prompt' => 'a cat', 'media_type' => 'video']);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->mediaJobConfig->method('isAsyncJobsEnabled')->with(7)->willReturn(true);
+        $this->aiFacade->method('supportsAsyncVideo')->with('higgsfield')->willReturn(true);
+
+        // At the ceiling: no job is created and the provider is never called.
+        $this->mediaJobService->method('countActiveForUser')->with(7)->willReturn(16);
+        $this->mediaJobService->expects(self::never())->method('create');
+        $this->mediaJobDispatcher->expects(self::never())->method('dispatch');
+        $this->aiFacade->expects(self::never())->method('generateVideo');
+
+        $result = $this->handler->handle($message, [], ['topic' => 'tools:vid', 'language' => 'en']);
+
+        self::assertNotEmpty($result['content'] ?? null, 'the limit message must be surfaced to the user');
+        self::assertArrayNotHasKey('media_job', $result['metadata'] ?? []);
+        self::assertNotEmpty($result['metadata']['error'] ?? null);
     }
 
     public function testDispatchFailureFailsTheJobSynchronouslyAndSurfacesError(): void

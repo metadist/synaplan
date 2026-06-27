@@ -38,11 +38,13 @@ final readonly class MediaJobConfig
     public const KEY_POLL_INTERVAL_SECONDS = 'JOB_POLL_INTERVAL_SECONDS';
     public const KEY_IMAGE_INLINE_FAST_MS = 'JOB_IMAGE_INLINE_FAST_MS';
     public const KEY_HEARTBEAT_STALE_SECONDS = 'JOB_HEARTBEAT_STALE_SECONDS';
+    public const KEY_MAX_ACTIVE_PER_USER = 'JOB_MAX_ACTIVE_PER_USER';
 
     private const DEFAULT_ASYNC_JOBS_ENABLED = false;
     private const DEFAULT_POLL_INTERVAL_SECONDS = 3;
     private const DEFAULT_IMAGE_INLINE_FAST_MS = 1500;
     private const DEFAULT_HEARTBEAT_STALE_SECONDS = 90;
+    private const DEFAULT_MAX_ACTIVE_PER_USER = 16;
 
     public function __construct(
         private ConfigRepository $configRepository,
@@ -110,6 +112,19 @@ final readonly class MediaJobConfig
         $n = null !== $value ? (int) $value : self::DEFAULT_HEARTBEAT_STALE_SECONDS;
 
         return max(30, min(1800, $n));
+    }
+
+    /**
+     * Maximum number of concurrent in-flight media jobs a single user may have.
+     * Prevents one user from flooding the worker / piling up provider cost.
+     * Global-only switch; clamped to a sane range (1..100).
+     */
+    public function maxActiveJobsPerUser(): int
+    {
+        $value = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_MAX_ACTIVE_PER_USER);
+        $n = null !== $value ? (int) $value : self::DEFAULT_MAX_ACTIVE_PER_USER;
+
+        return max(1, min(100, $n));
     }
 
     private function toBool(string $value, bool $default): bool

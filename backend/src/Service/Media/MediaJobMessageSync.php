@@ -28,6 +28,7 @@ final readonly class MediaJobMessageSync
         private MediaJobService $mediaJobService,
         private GeneratedFileRegistrar $fileRegistrar,
         private MediaJobRealtimeNotifier $realtimeNotifier,
+        private MediaJobUsageRecorder $usageRecorder,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -81,6 +82,11 @@ final readonly class MediaJobMessageSync
             'message_id' => $messageId,
             'state' => $status['state'],
         ]);
+
+        // Bill the user for a successful render (no-op for non-completed states;
+        // idempotent). Detached jobs never ran the inline billing path, so this
+        // is where async media usage is recorded (Sprint E, #1146).
+        $this->usageRecorder->record($job);
 
         // Push the terminal state to the owner so the banner resolves instantly
         // (best-effort; the persisted state above + the client poll are the

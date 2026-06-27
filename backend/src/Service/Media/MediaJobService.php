@@ -411,19 +411,22 @@ final class MediaJobService
 
     /**
      * Active jobs owned by one user, newest first — backs the global Jobs tray.
+     * O(that user's jobs) via the per-user Redis index.
      *
      * @return list<MediaJob>
      */
     public function findActiveForUser(int $userId, int $limit = 200): array
     {
-        $jobs = array_values(array_filter(
-            $this->store->findActive($limit),
-            static fn (MediaJob $job): bool => $job->getUserId() === $userId,
-        ));
-
+        $jobs = $this->store->findActiveForUser($userId, $limit);
         usort($jobs, static fn (MediaJob $a, MediaJob $b): int => $b->getCreated() <=> $a->getCreated());
 
         return $jobs;
+    }
+
+    /** Number of in-flight jobs a user currently has — backs the concurrency limit. */
+    public function countActiveForUser(int $userId): int
+    {
+        return $this->store->countActiveForUser($userId);
     }
 
     public function langFromJob(MediaJob $job): string
