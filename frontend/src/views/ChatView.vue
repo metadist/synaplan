@@ -181,6 +181,7 @@
               @continue="handleContinueResponse(message)"
               @media-job-update="message.mediaJob = $event"
               @media-job-completed="handleMediaJobCompleted(message, $event)"
+              @media-job-cancel="mediaJobsStore.cancel($event)"
             />
           </template>
         </div>

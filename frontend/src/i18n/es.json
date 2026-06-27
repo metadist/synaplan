@@ -9,6 +9,10 @@
       "ready": "Tu {kind} está listo",
       "failed": "No se pudo crear tu {kind}",
       "view": "Ver"
+    },
+    "cancel": {
+      "stop": "Detener",
+      "failed": "No se pudo cancelar el trabajo. Inténtalo de nuevo."
     }
   },
   "branding": {

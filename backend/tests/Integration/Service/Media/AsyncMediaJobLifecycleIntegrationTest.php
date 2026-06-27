@@ -13,6 +13,7 @@ use App\Realtime\Channel\ChannelInterface;
 use App\Realtime\Publisher\RealtimePublisherInterface;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaJob;
+use App\Service\Media\MediaJobCanceller;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
@@ -428,6 +429,63 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         if ($message->getFiles()->count() > 0) {
             $this->createdFileIds[] = $message->getFiles()->first()->getId();
         }
+    }
+
+    public function testCancelTransitionsJobSyncsMessageAndPushes(): void
+    {
+        $user = $this->createUser();
+        $message = $this->createMessage($user);
+
+        $job = $this->jobService->create([
+            'userId' => $user->getId(),
+            'type' => MediaJob::TYPE_VIDEO,
+            'provider' => 'google',
+            'messageId' => $message->getId(),
+            'options' => ['lang' => 'en'],
+        ]);
+        $job->setStatus(MediaJob::STATUS_RUNNING)->setProviderRef('op-1');
+        $this->store->save($job);
+        $this->createdJobKeys[] = $job->getJobKey();
+
+        $this->aiFacade->expects(self::once())->method('cancelVideoOperation');
+
+        $canceller = new MediaJobCanceller($this->jobService, $this->messageSync, $this->aiFacade, new NullLogger());
+        self::assertTrue($canceller->cancel($job));
+
+        $fresh = $this->store->find($job->getJobKey());
+        self::assertNotNull($fresh);
+        self::assertSame(MediaJob::STATUS_CANCELLED, $fresh->getStatus());
+
+        $this->em->refresh($message);
+        $meta = json_decode((string) $message->getMeta('media_job'), true);
+        self::assertSame('cancelled', $meta['state']);
+
+        $cancelPush = array_values(array_filter(
+            $this->publishedEvents,
+            static fn (array $e): bool => 'media_job.update' === $e['event'] && 'cancelled' === ($e['payload']['state'] ?? null),
+        ));
+        self::assertNotEmpty($cancelPush, 'cancel must push a terminal media_job.update');
+    }
+
+    public function testFindActiveForUserReturnsOnlyOwnActiveJobs(): void
+    {
+        $userA = $this->createUser();
+        $userB = $this->createUser();
+
+        $jobA = $this->jobService->create(['userId' => $userA->getId(), 'type' => MediaJob::TYPE_VIDEO, 'provider' => 'google']);
+        $this->jobService->markRunning($jobA, 'opA');
+        $jobB = $this->jobService->create(['userId' => $userB->getId(), 'type' => MediaJob::TYPE_VIDEO, 'provider' => 'google']);
+        $this->jobService->markRunning($jobB, 'opB');
+        $this->createdJobKeys[] = $jobA->getJobKey();
+        $this->createdJobKeys[] = $jobB->getJobKey();
+
+        $keys = array_map(
+            static fn (MediaJob $j): string => $j->getJobKey(),
+            $this->jobService->findActiveForUser($userA->getId()),
+        );
+
+        self::assertContains($jobA->getJobKey(), $keys);
+        self::assertNotContains($jobB->getJobKey(), $keys, 'must not leak another user\'s jobs');
     }
 
     public function testFailurePathPersistsLocalizedErrorOnMessage(): void

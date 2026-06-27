@@ -421,6 +421,7 @@
               :model-label="mediaJobModelLabel ?? undefined"
               @update:media-job="emit('mediaJobUpdate', $event)"
               @completed="emit('mediaJobCompleted', $event)"
+              @cancel="emit('mediaJobCancel', $event)"
             />
           </div>
 
@@ -1385,6 +1386,7 @@ const emit = defineEmits<{
   continue: []
   mediaJobUpdate: [job: MediaJobInfo]
   mediaJobCompleted: [payload: { url: string; type: string }]
+  mediaJobCancel: [jobId: string]
 }>()
 
 const router = useRouter()

@@ -9,6 +9,10 @@
       "ready": "{kind} hazır",
       "failed": "{kind} oluşturulamadı",
       "view": "Görüntüle"
+    },
+    "cancel": {
+      "stop": "Durdur",
+      "failed": "İş iptal edilemedi. Lütfen tekrar deneyin."
     }
   },
   "branding": {

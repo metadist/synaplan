@@ -409,6 +409,23 @@ final class MediaJobService
         return $this->store->findPastDeadline($limit);
     }
 
+    /**
+     * Active jobs owned by one user, newest first — backs the global Jobs tray.
+     *
+     * @return list<MediaJob>
+     */
+    public function findActiveForUser(int $userId, int $limit = 200): array
+    {
+        $jobs = array_values(array_filter(
+            $this->store->findActive($limit),
+            static fn (MediaJob $job): bool => $job->getUserId() === $userId,
+        ));
+
+        usort($jobs, static fn (MediaJob $a, MediaJob $b): int => $b->getCreated() <=> $a->getCreated());
+
+        return $jobs;
+    }
+
     public function langFromJob(MediaJob $job): string
     {
         $lang = $job->getOptions()['lang'] ?? null;

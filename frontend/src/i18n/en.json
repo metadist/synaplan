@@ -9,6 +9,10 @@
       "ready": "Your {kind} is ready",
       "failed": "Couldn't create your {kind}",
       "view": "View"
+    },
+    "cancel": {
+      "stop": "Stop",
+      "failed": "Couldn't cancel the job. Please try again."
     }
   },
   "branding": {

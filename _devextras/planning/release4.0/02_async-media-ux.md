@@ -71,7 +71,8 @@ cancel, and a11y/i18n goals are all **unchanged** — they simply read from the
 | Reload contract: file attached to message + `media_job` meta → banner/video survive F5 | ✅ shipped |
 | Advancer hardening: transient-retry, lock re-dispatch, callable-safe Redis serialize, `--recover` | ✅ shipped |
 | Realtime push (Centrifugo `media_job.update` on `user:{id}`), `mediaJobs` store, actionable completion toaster (Sprint C) | ✅ shipped |
-| Global Jobs tray + launcher/badge, jump-to-message highlight pulse, cancel | ⏳ Sprint D |
+| Cancel end-to-end (`POST /media-jobs/{id}/cancel` → `MediaJobCanceller` → mark cancelled + provider stop + push; Stop button on the banner) + active-jobs list endpoint (`GET /media-jobs`) + store data layer (`activeJobs`, `loadActive`, `cancel`) (Sprint D-1) | ✅ shipped |
+| Global Jobs tray **UI** (launcher/badge, slide-over panel, rows) + jump-to-message highlight pulse (Sprint D-2) | ⏳ next |
 
 ---
 
@@ -355,7 +356,7 @@ All strings in **all four** locales (`en`, `de`, `es`, `tr`) under a new
 |---|---|
 | B (detach chat path) | ✅ **Done.** `MediaJobStatus` banner (running/failed/overdue/stalled/lost + elapsed/last-checked/manual-refresh/progress), composer stays free, reload-resilient, image+video+audio. |
 | C (realtime + persist) | ✅ **Done.** `mediaJobs` store + Centrifugo `media_job.update` push as the primary completion path (banner self-poll is the fallback), actionable completion toaster (deep-links to the chat), instant in-place resolve via the shared `applyMediaJobUpdateToMessage` helper. (Tray-badge pulse moves to Sprint D with the tray.) |
-| D (resilience + tray + cancel) | Global Jobs tray + launcher/badge, jump-to-message + highlight pulse, multi-job hydration endpoint, Stop/cancel. |
+| D (resilience + tray + cancel) | **D-1 done:** cancel end-to-end (banner Stop + `MediaJobCanceller` + `/media-jobs/{id}/cancel`), active-jobs list endpoint, `mediaJobs` tray data layer. **D-2 next:** Jobs tray UI (launcher/badge, panel, rows) + jump-to-message highlight pulse. (Reload resilience already covered by the persisted-meta banner from B/C.) |
 | E (cross-channel) | (Web UX stable; WhatsApp/Email delivery is channel-side.) |
 | F (rollout) | Polish pass, reduced-motion/a11y audit, E2E, i18n completeness. |
 

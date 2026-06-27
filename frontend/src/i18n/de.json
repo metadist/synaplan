@@ -9,6 +9,10 @@
       "ready": "Dein {kind} ist fertig",
       "failed": "Dein {kind} konnte nicht erstellt werden",
       "view": "Ansehen"
+    },
+    "cancel": {
+      "stop": "Stoppen",
+      "failed": "Auftrag konnte nicht abgebrochen werden. Bitte erneut versuchen."
     }
   },
   "branding": {

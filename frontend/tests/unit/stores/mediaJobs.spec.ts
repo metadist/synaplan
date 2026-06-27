@@ -1,9 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useHistoryStore } from '@/stores/history'
 import { useNotification } from '@/composables/useNotification'
 import type { Message } from '@/stores/history'
+import { fetchActiveMediaJobs, cancelMediaJob } from '@/services/api/mediaJobApi'
+
+vi.mock('@/services/api/mediaJobApi', () => ({
+  fetchActiveMediaJobs: vi.fn(),
+  cancelMediaJob: vi.fn(),
+}))
 
 /**
  * Sprint C: the `mediaJobs` store applies realtime `media_job.update` pushes to
@@ -101,5 +107,96 @@ describe('mediaJobs store · applyUpdate', () => {
 
     expect(message.mediaJob?.percent).toBe(42)
     expect(useNotification().notifications.value).toHaveLength(0)
+  })
+
+  it('upserts a running job into the tray and removes it on terminal', () => {
+    const store = useMediaJobsStore()
+
+    store.applyUpdate({
+      job_id: 'job-1',
+      message_id: 305,
+      chat_id: 7,
+      type: 'video',
+      state: 'running',
+      percent: 10,
+    })
+    expect(store.activeCount).toBe(1)
+    expect(store.activeJobs[0]).toMatchObject({ jobId: 'job-1', state: 'running', percent: 10 })
+
+    store.applyUpdate({
+      job_id: 'job-1',
+      message_id: 305,
+      type: 'video',
+      state: 'done',
+      file: { url: '/x.mp4' },
+    })
+    expect(store.activeCount).toBe(0)
+  })
+})
+
+describe('mediaJobs store · tray data layer', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    useNotification().notifications.value.splice(0)
+    vi.mocked(fetchActiveMediaJobs).mockReset()
+    vi.mocked(cancelMediaJob).mockReset()
+  })
+
+  it('loadActive() populates the tray from the API', async () => {
+    vi.mocked(fetchActiveMediaJobs).mockResolvedValue([
+      {
+        job_id: 'a',
+        status: 'running',
+        state: 'running',
+        type: 'video',
+        elapsed_seconds: 5,
+        finished: false,
+        percent: 30,
+        chat_id: 7,
+        message_id: 305,
+        prompt: 'a cat',
+      },
+    ])
+
+    const store = useMediaJobsStore()
+    await store.loadActive()
+
+    expect(store.activeCount).toBe(1)
+    expect(store.activeJobs[0]).toMatchObject({
+      jobId: 'a',
+      state: 'running',
+      percent: 30,
+      chatId: 7,
+      prompt: 'a cat',
+    })
+  })
+
+  it('cancel() calls the API and drops the job from the tray', async () => {
+    vi.mocked(cancelMediaJob).mockResolvedValue({
+      job_id: 'a',
+      status: 'cancelled',
+      state: 'cancelled',
+      type: 'video',
+      elapsed_seconds: 9,
+      finished: true,
+    })
+
+    const store = useMediaJobsStore()
+    store.applyUpdate({ job_id: 'a', message_id: 305, chat_id: 7, type: 'video', state: 'running' })
+    expect(store.activeCount).toBe(1)
+
+    await store.cancel('a')
+
+    expect(vi.mocked(cancelMediaJob)).toHaveBeenCalledWith('a')
+    expect(store.activeCount).toBe(0)
+  })
+
+  it('cancel() surfaces an error toast when the API fails', async () => {
+    vi.mocked(cancelMediaJob).mockRejectedValue(new Error('boom'))
+
+    const store = useMediaJobsStore()
+    await store.cancel('a')
+
+    expect(useNotification().notifications.value[0].type).toBe('error')
   })
 })

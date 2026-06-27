@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, ref, toRef } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { MediaJobInfo } from '@/stores/history'
 import type { MediaJobPollResult } from '@/services/api/mediaJobApi'
@@ -17,7 +17,16 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:mediaJob': [value: MediaJobInfo]
   completed: [payload: { url: string; type: string }]
+  cancel: [jobId: string]
 }>()
+
+const isCancelling = ref(false)
+
+function requestCancel(): void {
+  if (isCancelling.value) return
+  isCancelling.value = true
+  emit('cancel', props.mediaJob.jobId)
+}
 
 const jobId = computed(() => props.mediaJob.jobId)
 const pollEnabled = computed(() => props.mediaJob.state === 'running')
@@ -164,6 +173,17 @@ const failureMessage = computed(() => {
           >
             <Icon icon="mdi:refresh" class="w-3.5 h-3.5" aria-hidden="true" />
             {{ $t('message.mediaJob.refreshStatus') }}
+          </button>
+          <button
+            v-if="!isFailed"
+            type="button"
+            class="inline-flex items-center gap-1 rounded-full border border-danger px-2 py-0.5 text-xs text-danger hover:bg-black/5 dark:hover:bg-white/5 disabled:cursor-wait disabled:opacity-60"
+            :disabled="isCancelling"
+            data-testid="media-job-cancel"
+            @click="requestCancel()"
+          >
+            <Icon icon="mdi:stop-circle-outline" class="w-3.5 h-3.5" aria-hidden="true" />
+            {{ $t('jobs.cancel.stop') }}
           </button>
         </div>
 

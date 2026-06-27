@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\Media\MediaJob;
+use App\Service\Media\MediaJobCanceller;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
@@ -30,7 +32,65 @@ final class MediaJobController extends AbstractController
         private readonly MediaJobService $mediaJobService,
         private readonly MediaJobMessageSync $messageSync,
         private readonly MediaErrorMessageBuilder $errorBuilder,
+        private readonly MediaJobCanceller $canceller,
     ) {
+    }
+
+    #[Route('', name: 'list', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/media-jobs',
+        summary: "List the current user's active background media jobs (global Jobs tray)",
+        tags: ['Media jobs'],
+        responses: [
+            new OA\Response(response: 200, description: 'Active job snapshots across all chats'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function list(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $jobs = array_map(
+            fn (MediaJob $job): array => $this->toTrayItem($job),
+            $this->mediaJobService->findActiveForUser($user->getId()),
+        );
+
+        return $this->json(['success' => true, 'jobs' => $jobs]);
+    }
+
+    #[Route('/{jobKey}/cancel', name: 'cancel', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/media-jobs/{jobKey}/cancel',
+        summary: 'Cancel a running background media job',
+        tags: ['Media jobs'],
+        parameters: [
+            new OA\Parameter(name: 'jobKey', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Job status after the cancel attempt'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Job not found'),
+        ]
+    )]
+    public function cancel(string $jobKey, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $job = $this->mediaJobService->findForUser($jobKey, $user->getId());
+        if (null === $job) {
+            return $this->json(['error' => 'Job not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $this->canceller->cancel($job);
+
+        return $this->json([
+            'success' => true,
+            'job' => $this->mediaJobService->toStatusArray($job),
+        ]);
     }
 
     #[Route('/{jobKey}', name: 'status', methods: ['GET'])]
@@ -74,5 +134,21 @@ final class MediaJobController extends AbstractController
             'success' => true,
             'job' => $this->mediaJobService->toStatusArray($job),
         ]);
+    }
+
+    /**
+     * Tray list item: the standard status projection plus the chat/message
+     * context and a short prompt the tray row needs to render and link.
+     *
+     * @return array<string, mixed>
+     */
+    private function toTrayItem(MediaJob $job): array
+    {
+        return [
+            ...$this->mediaJobService->toStatusArray($job),
+            'chat_id' => $job->getChatId(),
+            'message_id' => $job->getMessageId(),
+            'prompt' => mb_substr((string) ($job->getPrompt() ?? ''), 0, 140),
+        ];
     }
 }

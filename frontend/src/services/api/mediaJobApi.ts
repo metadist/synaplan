@@ -35,10 +35,38 @@ const MediaJobStatusResponseSchema = z.object({
 
 export type MediaJobPollResult = z.infer<typeof MediaJobStatusSchema>
 
+/** One active job as listed by the global Jobs tray (status + chat context). */
+const MediaJobTrayItemSchema = MediaJobStatusSchema.extend({
+  chat_id: z.number().nullable().optional(),
+  message_id: z.number().nullable().optional(),
+  prompt: z.string().optional(),
+})
+
+const MediaJobListResponseSchema = z.object({
+  success: z.boolean(),
+  jobs: z.array(MediaJobTrayItemSchema),
+})
+
+export type MediaJobTrayItem = z.infer<typeof MediaJobTrayItemSchema>
+
 export async function fetchMediaJobStatus(jobId: string): Promise<MediaJobPollResult> {
   const raw = await httpClient(`/api/v1/media-jobs/${encodeURIComponent(jobId)}`, {
     method: 'GET',
   })
   const parsed = MediaJobStatusResponseSchema.parse(raw)
   return parsed.job
+}
+
+/** List the current user's active background jobs (global Jobs tray). */
+export async function fetchActiveMediaJobs(): Promise<MediaJobTrayItem[]> {
+  const raw = await httpClient('/api/v1/media-jobs', { method: 'GET' })
+  return MediaJobListResponseSchema.parse(raw).jobs
+}
+
+/** Cancel a running background job. Returns the resulting status snapshot. */
+export async function cancelMediaJob(jobId: string): Promise<MediaJobPollResult> {
+  const raw = await httpClient(`/api/v1/media-jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: 'POST',
+  })
+  return MediaJobStatusResponseSchema.parse(raw).job
 }

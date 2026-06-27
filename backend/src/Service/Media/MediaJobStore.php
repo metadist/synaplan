@@ -135,6 +135,29 @@ final class MediaJobStore
     }
 
     /**
+     * All currently-active (non-terminal) jobs. Backs the global Jobs tray
+     * (Sprint D); the caller filters to the requesting user. Self-heals the
+     * active set for entries whose snapshot expired or already went terminal.
+     *
+     * @return list<MediaJob>
+     */
+    public function findActive(int $limit = 200): array
+    {
+        $keys = $this->redis->zRangeByScore(self::ACTIVE_ZSET, '-inf', '+inf', $limit);
+        $jobs = [];
+        foreach ($keys as $key) {
+            $job = $this->find($key);
+            if (null === $job || $job->isTerminal()) {
+                $this->redis->zRem(self::ACTIVE_ZSET, $key);
+                continue;
+            }
+            $jobs[] = $job;
+        }
+
+        return $jobs;
+    }
+
+    /**
      * Non-terminal jobs whose {@see MediaJob::isPastDeadline()} is true.
      * Unlike {@see findStale}, this catches overdue jobs even when a worker
      * is still heartbeating (advancer/reaper gap).

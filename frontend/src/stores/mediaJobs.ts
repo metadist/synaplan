@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useHistoryStore } from '@/stores/history'
 import { useChatsStore } from '@/stores/chats'
 import { useRealtimeStore } from '@/stores/realtime'
@@ -7,7 +7,23 @@ import { useNotification } from '@/composables/useNotification'
 import { getConfigSync } from '@/services/api/httpClient'
 import { i18n } from '@/i18n'
 import { applyMediaJobUpdateToMessage, type MediaJobUpdate } from '@/utils/messageMapper'
+import {
+  fetchActiveMediaJobs,
+  cancelMediaJob,
+  type MediaJobTrayItem,
+} from '@/services/api/mediaJobApi'
 import type { RealtimeRuntimeConfig } from '@/services/realtime/types'
+
+/** One in-flight job as shown in the global Jobs tray. */
+export interface TrayJob {
+  jobId: string
+  type: string
+  state: string
+  percent?: number
+  chatId?: number | null
+  messageId?: number | null
+  prompt?: string
+}
 
 /**
  * Background media jobs — the realtime (push-primary) completion path for
@@ -32,7 +48,11 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
   let handle: { unsubscribe: () => void } | null = null
   const subscribedUserId = ref<number | null>(null)
 
-  /** Apply one realtime/poll update: patch the loaded message + toast on terminal. */
+  /** In-flight jobs across all chats — the global Jobs tray's source of truth. */
+  const activeJobs = ref<TrayJob[]>([])
+  const activeCount = computed(() => activeJobs.value.length)
+
+  /** Apply one realtime/poll update: patch the loaded message + maintain the tray + toast on terminal. */
   function applyUpdate(payload: MediaJobUpdate): void {
     if (payload.message_id != null) {
       const message = useHistoryStore().messages.find(
@@ -44,8 +64,63 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
     }
 
     if (TERMINAL_STATES.has(payload.state)) {
+      removeActive(payload.job_id)
       raiseTerminalToast(payload)
+    } else {
+      upsertActive(payload)
     }
+  }
+
+  /** Fetch the user's active jobs for the tray (best-effort). */
+  async function loadActive(): Promise<void> {
+    try {
+      activeJobs.value = (await fetchActiveMediaJobs()).map(toTrayJob)
+    } catch {
+      // Best-effort: the tray simply shows nothing rather than erroring.
+    }
+  }
+
+  /** Cancel a job, optimistically dropping it from the tray. */
+  async function cancel(jobId: string): Promise<void> {
+    try {
+      await cancelMediaJob(jobId)
+      removeActive(jobId)
+    } catch {
+      useNotification().error(i18n.global.t('jobs.cancel.failed'))
+    }
+  }
+
+  function toTrayJob(item: MediaJobTrayItem): TrayJob {
+    return {
+      jobId: item.job_id,
+      type: item.type,
+      state: item.state,
+      percent: item.percent ?? undefined,
+      chatId: item.chat_id ?? null,
+      messageId: item.message_id ?? null,
+      prompt: item.prompt,
+    }
+  }
+
+  function upsertActive(payload: MediaJobUpdate): void {
+    const next: TrayJob = {
+      jobId: payload.job_id,
+      type: payload.type,
+      state: payload.state,
+      percent: payload.percent ?? undefined,
+      chatId: payload.chat_id ?? null,
+      messageId: payload.message_id ?? null,
+    }
+    const existing = activeJobs.value.find((j) => j.jobId === payload.job_id)
+    if (existing) {
+      Object.assign(existing, next)
+    } else {
+      activeJobs.value.push(next)
+    }
+  }
+
+  function removeActive(jobId: string): void {
+    activeJobs.value = activeJobs.value.filter((j) => j.jobId !== jobId)
   }
 
   function raiseTerminalToast(payload: MediaJobUpdate): void {
@@ -106,5 +181,14 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
     subscribedUserId.value = null
   }
 
-  return { applyUpdate, subscribe, unsubscribe, subscribedUserId }
+  return {
+    activeJobs,
+    activeCount,
+    applyUpdate,
+    loadActive,
+    cancel,
+    subscribe,
+    unsubscribe,
+    subscribedUserId,
+  }
 })
