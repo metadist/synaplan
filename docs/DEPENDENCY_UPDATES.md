@@ -144,3 +144,13 @@ All of the above still require: CI fully green (incl. E2E), no peer dependency c
 - **Frontend lockfile:** `cd frontend && rm -rf node_modules && npm ci` → `make -C frontend lint && docker compose exec -T frontend npm run check:types && make -C frontend test`
 - **Cloudflare lockfile:** `cd cloudflare && rm -rf node_modules && npm ci`
 - **Playwright changes:** `npx playwright install`
+
+## 8. Temporary Pins (revert when upstream releases)
+
+Track dependencies pinned to an untagged/dev branch as a stopgap. Revert each to a
+proper tagged constraint as soon as the upstream release lands (Renovate will open
+the PR — when reviewing it, check this list).
+
+| Package | Current pin | Why | Revert to |
+| --- | --- | --- | --- |
+| `phpoffice/phppresentation` | `dev-master as 1.3.0` | The phpspreadsheet **v5** security upgrade (clears CVE-2025-54370 + 6 others) is blocked by phppresentation 1.2.0, which caps phpspreadsheet at `^4.0`. The fix (allow `^5.0`) is merged on phppresentation `master` but not yet tagged (no 1.3.0 release on Packagist). | `^1.3` once **1.3.0** is released. |

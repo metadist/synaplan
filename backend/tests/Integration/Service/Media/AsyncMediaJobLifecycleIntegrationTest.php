@@ -696,6 +696,7 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
             ),
             $this->lockFactory,
             new NullLogger(),
+            self::getContainer()->get(\App\Repository\UserRepository::class),
             $this->uploadDir,
         );
     }

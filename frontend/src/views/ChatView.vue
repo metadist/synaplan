@@ -1110,9 +1110,40 @@ function schedulePostStreamMemoryPoll(messageId: number): void {
  */
 function applyMediaJobToMessage(message: Message | undefined, raw: unknown): void {
   if (!message) return
-  const parsed = parseMediaJobPayload(raw)
+  // Accept both the bare job payload ({ job_id, type, state }, as sent on the
+  // `complete` event) AND a metadata envelope that nests it under `media_job` /
+  // `mediaJob` (as sent on the `generating` progress event). Attaching the job
+  // as early as the `generating` event lets the MediaJobStatus banner take over
+  // immediately, so the bubble shows ONE in-progress surface instead of
+  // flashing the routing status / inline "generating…" placeholder first.
+  let parsed = parseMediaJobPayload(raw)
+  if (!parsed && raw && typeof raw === 'object') {
+    const envelope = raw as Record<string, unknown>
+    parsed = parseMediaJobPayload(envelope.media_job ?? envelope.mediaJob)
+  }
   if (parsed) {
     message.mediaJob = parsed
+  }
+}
+
+/**
+ * Pick the correct inline "generating…" placeholder token for a media job so a
+ * type-less complete event never mislabels (e.g. showing "Generating your
+ * video…" for an image request). Falls back to video for an unknown type.
+ */
+function generatingTokenForMediaJob(raw: unknown): string {
+  let parsed = parseMediaJobPayload(raw)
+  if (!parsed && raw && typeof raw === 'object') {
+    const envelope = raw as Record<string, unknown>
+    parsed = parseMediaJobPayload(envelope.media_job ?? envelope.mediaJob)
+  }
+  switch (parsed?.type) {
+    case 'image':
+      return '__IMAGE_GENERATING__'
+    case 'audio':
+      return '__AUDIO_GENERATING__'
+    default:
+      return '__VIDEO_GENERATING__'
   }
 }
 
@@ -1767,7 +1798,10 @@ const streamAIResponse = async (
             if (fullContent) {
               renderStreamingContent(fullContent, messageId)
             } else if (data.mediaJob || data.media_job) {
-              renderStreamingContent('__VIDEO_GENERATING__', messageId)
+              renderStreamingContent(
+                generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
+                messageId
+              )
             }
 
             processingStatus.value = ''
@@ -2416,7 +2450,10 @@ const streamAIResponse = async (
             if (fullContent) {
               renderStreamingContent(fullContent, messageId)
             } else if (data.mediaJob || data.media_job) {
-              renderStreamingContent('__VIDEO_GENERATING__', messageId)
+              renderStreamingContent(
+                generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
+                messageId
+              )
             }
 
             if (currentAudioStreamer) {

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\MessageHandler;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Message\AdvanceMediaJobCommand;
+use App\Repository\UserRepository;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\MediaJob;
@@ -86,6 +88,7 @@ final readonly class AdvanceMediaJobCommandHandler
         private SyncMediaJobGenerator $syncGenerator,
         private LockFactory $lockFactory,
         private LoggerInterface $logger,
+        private UserRepository $userRepository,
         private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
@@ -229,6 +232,16 @@ final readonly class AdvanceMediaJobCommandHandler
                 $job->getOptions(),
             );
         } catch (\Throwable $e) {
+            // A definitive provider rejection (content/safety block) is TERMINAL:
+            // the render is finished and the identical prompt can never succeed,
+            // so re-polling is pointless. Fail immediately with the real reason
+            // instead of burning the transient-retry budget on a lost cause.
+            if ($this->isTerminalProviderFailure($e)) {
+                $this->fail($job, $this->toException($e));
+
+                return;
+            }
+
             // Network/transport blip or provider 5xx — the render is very likely
             // still progressing. Retry with backoff instead of failing the job.
             $this->retryTransientOrFail($job, $e, 'poll');
@@ -415,12 +428,70 @@ final readonly class AdvanceMediaJobCommandHandler
         return (int) min($delay, self::MAX_TRANSIENT_BACKOFF_SECONDS);
     }
 
+    /**
+     * Is this throwable a DEFINITIVE provider rejection that must NOT be retried?
+     *
+     * A content/safety block (e.g. Veo's responsible-AI media filter) is a final
+     * decision: the operation has already finished and re-submitting/re-polling
+     * the identical prompt can never produce a different outcome. Treating it as
+     * transient just wastes the retry budget and delays the (now actionable)
+     * failure the user should see. Transport blips and provider 5xx are NOT
+     * terminal and keep their existing retry-with-backoff behaviour.
+     */
+    private function isTerminalProviderFailure(\Throwable $e): bool
+    {
+        if ($e instanceof ProviderException) {
+            $ctx = $e->getContext() ?? [];
+            if (!empty($ctx['block_reason'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function toException(\Throwable $e): \Exception
+    {
+        return $e instanceof \Exception ? $e : new \RuntimeException($e->getMessage(), 0, $e);
+    }
+
+    /**
+     * Resolve whether the job's owner is an admin. Best-effort: a lookup failure
+     * (user gone, DB blip) must never block a job from reaching its terminal
+     * state, so it simply degrades to "not admin" (the safe, non-leaky default).
+     */
+    private function isAdminUser(int $userId): bool
+    {
+        if ($userId <= 0) {
+            return false;
+        }
+
+        try {
+            return $this->userRepository->find($userId)?->isAdmin() ?? false;
+        } catch (\Throwable $e) {
+            $this->logger->warning('MediaJob: failed to resolve admin status for diagnostics', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
     private function fail(MediaJob $job, \Throwable $e): void
     {
         $exception = $e instanceof \Exception ? $e : new \RuntimeException($e->getMessage(), 0, $e);
         $lang = is_string($job->getOptions()['lang'] ?? null) ? (string) $job->getOptions()['lang'] : 'en';
 
-        $message = $this->errorBuilder->buildErrorMessage($exception, $job->getType(), $lang);
+        // Admins get the raw provider error/cause appended (so failures are
+        // diagnosable straight from the chat); regular users only ever see the
+        // clean, non-leaky message.
+        $message = $this->errorBuilder->buildErrorMessage(
+            $exception,
+            $job->getType(),
+            $lang,
+            $this->isAdminUser($job->getUserId()),
+        );
 
         // Persist the raw cause as dev/admin meta (NOT exposed by toStatusArray,
         // so it never reaches the chat client) so failures are diagnosable.

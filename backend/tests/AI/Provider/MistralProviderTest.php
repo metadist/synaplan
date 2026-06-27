@@ -216,6 +216,60 @@ class MistralProviderTest extends TestCase
         $this->assertContains('Authorization: Bearer test-key', $captured['headers']);
     }
 
+    public function testSynthesizeResolvesDefaultVoiceWhenNoneSupplied(): void
+    {
+        $speechBody = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$speechBody): MockResponse {
+            if (str_contains($url, '/audio/voices')) {
+                // The default-voice resolver hits the preset catalog first.
+                $this->assertStringContainsString('type=preset', $url);
+
+                return new MockResponse(json_encode([
+                    'voices' => [
+                        ['slug' => 'fr_marie_neutral', 'languages' => ['fr_fr']],
+                        ['slug' => 'en_emma_neutral', 'languages' => ['en_us']],
+                    ],
+                ]), ['response_headers' => ['content-type' => 'application/json']]);
+            }
+
+            $speechBody = json_decode($opts['body'], true);
+
+            return new MockResponse(json_encode([
+                'audio_data' => base64_encode('AUDIO-BYTES'),
+            ]), ['response_headers' => ['content-type' => 'application/json']]);
+        });
+
+        $filename = $this->makeProvider(httpClient: $client)->synthesize('Hello there', [
+            'language' => 'en',
+        ]);
+
+        $this->assertStringEndsWith('.mp3', $filename);
+        // Must send a voice (language-matched preset) — never an empty body that
+        // the hosted endpoint rejects with "Either ref_audio or voice must be provided."
+        $this->assertSame('en_emma_neutral', $speechBody['voice_id']);
+        $this->assertArrayNotHasKey('ref_audio', $speechBody);
+    }
+
+    public function testSynthesizeFallsBackToDefaultVoiceWhenCatalogUnavailable(): void
+    {
+        $speechBody = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$speechBody): MockResponse {
+            if (str_contains($url, '/audio/voices')) {
+                return new MockResponse('boom', ['http_code' => 500]);
+            }
+
+            $speechBody = json_decode($opts['body'], true);
+
+            return new MockResponse(json_encode([
+                'audio_data' => base64_encode('AUDIO-BYTES'),
+            ]), ['response_headers' => ['content-type' => 'application/json']]);
+        });
+
+        $this->makeProvider(httpClient: $client)->synthesize('Hello there');
+
+        $this->assertNotEmpty($speechBody['voice_id']);
+    }
+
     public function testSynthesizeThrowsWhenNoAudioReturned(): void
     {
         $client = new MockHttpClient(static fn () => new MockResponse(json_encode(['audio_data' => '']), [
