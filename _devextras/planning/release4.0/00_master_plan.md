@@ -121,7 +121,8 @@ Full design in [`02_async-media-ux.md`](./02_async-media-ux.md).
 | 2 | **File management world** — one home for every file: sources, vectorized status, groups, generated-media gallery | [`03_file-management.md`](./03_file-management.md) | P0 | Planned |
 | 3 | **Image & first-boot optimization** — multi-arch (arm64) base image, baked dev deps, custom `bge-m3` Ollama image; fast `docker compose up` on Mac | [`04_image-build-optimization.md`](./04_image-build-optimization.md) | P1 | Planned |
 | 4 | **Frictionless Onboarding & Conversion Flow** — Token wallet, anti-bot guards, seamless trial | [`05_onboarding-conversion-flow.md`](./05_onboarding-conversion-flow.md) | P1 | Planned |
-| 5 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
+| 5 | **Self-Aware Routing** — route product/feature/how-to questions to a `synaplan` topic + curated "About Synaplan" RAG source; registry-derived, multilingual (de/en/es/tr). Includes the shipped meeting-reminder timezone fix. | [`06_self-aware-routing.md`](./06_self-aware-routing.md) | P1 | Planned (timezone fix shipped) |
+| 6 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
 
 > "We have more things to implement" — this index is the place to add them.
 > Each new 4.0 feature gets a `0N_<slug>.md` and a row here. Candidate backlog
