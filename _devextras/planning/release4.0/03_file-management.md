@@ -489,6 +489,114 @@ All annotated with OpenAPI; regenerate frontend schemas (`make -C frontend gener
 
 ---
 
+## 5.1 UI Engineering & Vibe-Coding Specs
+
+To ensure the AI-assisted generation ("vibecoding") produces robust, responsive, and `AGENTS_DEV.md`-compliant code on the first pass, the frontend implementation must follow these structural and styling constraints.
+
+### 5.1.1 Component Breakdown (Enforcing <300 Lines)
+
+The file manager must be strictly decomposed to avoid component bloat:
+
+*   **`FilesView.vue`** (Root): Manages the active tab (Browse/Incoming/Generated/Search) and holds parent state.
+*   **`components/files/FilesFilterBar.vue`**: Holds the search input, dropdown filters (Source, Group, Type, Vectorized), and View toggles (Grid/List).
+*   **`components/files/FilesTable.vue`**: The list view. Accepts a `files` array and handles sorting/selection.
+*   **`components/files/FilesGrid.vue`**: The gallery view for generated media (thumbnails).
+*   **`components/files/FilesTableRow.vue`**: A single row in the list view. Handles its own hover state, truncation, and row-level actions (Preview/Download/Move).
+*   **`components/files/IncomingInbox.vue`**: The dedicated triage view, rendering `IncomingRow.vue` components with specific Keep/Dismiss CTA buttons.
+*   **`components/files/FileVectorPill.vue`**: The isolated component for the "Searchable by AI" badge, handling its own color variants and hover tooltips.
+
+### 5.1.2 Display Error Prevention (Tailwind Patterns)
+
+**A. Long Filenames & Overflow:**
+Filenames without spaces will blow out CSS grid and flex layouts.
+*   **Rule:** Every filename container MUST use flex-truncation.
+*   **Technique:** Parent needs `min-w-0` (or `overflow-hidden`), text element needs `truncate`.
+    ```html
+    <div class="flex flex-1 min-w-0 items-center gap-3">
+      <Icon icon="mdi:file-document" class="flex-shrink-0 w-6 h-6" />
+      <span class="truncate font-medium text-sm">{{ file.originalName }}</span>
+    </div>
+    ```
+
+**B. Responsive Data Tables:**
+The 6-column table (`Name | Source | Group | Vectorized | Size | Date`) cannot exist on mobile screens.
+*   **Desktop (`md:` and up):** Standard HTML `<table>` or CSS grid row.
+*   **Mobile (default):** Hide non-essential columns using `hidden md:table-cell`. Show only `Name`, `Vectorized Pill`, and a `...` action menu. Move `Size`, `Date`, and `Source` into a subtitle row beneath the name.
+*   **Technique:**
+    ```html
+    <!-- Name column is always visible -->
+    <td class="w-full max-w-0 py-3 pr-3">
+      <div class="truncate">{{ file.name }}</div>
+      <!-- Mobile-only metadata subtitle -->
+      <div class="md:hidden text-xs txt-muted mt-1 truncate">
+        {{ file.size }} · {{ file.group }}
+      </div>
+    </td>
+    <!-- Group column hidden on mobile -->
+    <td class="hidden md:table-cell whitespace-nowrap px-3">{{ file.group }}</td>
+    ```
+
+**C. Loading States (Skeleton UI):**
+Never flash a blank screen or a simple spinner for list views. Use Tailwind's `animate-pulse` to draw skeleton rows that match the expected table structure.
+*   **Technique:**
+    ```html
+    <div v-for="i in 5" :key="i" class="flex items-center gap-4 py-3 animate-pulse">
+      <div class="w-8 h-8 rounded bg-gray-200 dark:bg-gray-700 flex-shrink-0"></div>
+      <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+      <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 ml-auto"></div>
+    </div>
+    ```
+
+### 5.1.3 UX Behaviors & Micro-Interactions
+
+**A. Hover Reveal for Actions:**
+To keep the UI clean, row-level actions (Download, Share, Move) should be hidden by default and revealed on hover, but **always visible on touch devices**.
+*   **Technique:**
+    ```html
+    <div class="opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 flex gap-2">
+      <!-- Action buttons -->
+    </div>
+    ```
+
+**B. The "Vectorized" Pill Variants (Visual Hierarchy):**
+The pill must clearly distinguish its state using standard design tokens, avoiding raw hex colors.
+*   ✅ **Vectorized:** `bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400`
+*   ⏳ **Processing:** `bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400` (with an inline `mdi:loading animate-spin` icon).
+*   ⚠ **Failed:** `bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400`
+*   ⬜ **Not Vectorized:** `bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300`
+
+**C. Thumbnails in Generated Grid (Aspect Ratios):**
+Generated media grids must not have jagged, unaligned heights.
+*   **Rule:** Force a consistent aspect ratio on the image container, using `object-cover` for the image itself.
+*   **Technique:**
+    ```html
+    <div class="aspect-video w-full overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-800 relative">
+      <img :src="file.thumbUrl" class="w-full h-full object-cover transition-transform hover:scale-105" loading="lazy" />
+      <!-- Kind icon overlay (video/audio) -->
+      <div class="absolute bottom-2 right-2 bg-black/60 p-1 rounded backdrop-blur-sm">
+        <Icon icon="mdi:video" class="text-white w-4 h-4" />
+      </div>
+    </div>
+    ```
+
+### 5.1.4 Handling Empty States
+An empty state must be perfectly centered and use standard muted text tokens so it doesn't shout at the user.
+*   **Technique:**
+    ```html
+    <div class="flex flex-col items-center justify-center py-16 px-4 text-center">
+      <div class="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+        <Icon icon="mdi:folder-open-outline" class="w-8 h-8 text-gray-400" />
+      </div>
+      <h3 class="text-lg font-medium txt-primary mb-1">{{ $t('files.empty.browseTitle') }}</h3>
+      <p class="text-sm txt-muted max-w-sm mb-6">{{ $t('files.empty.browseBody') }}</p>
+      <button class="btn-primary">
+        <Icon icon="mdi:upload" /> {{ $t('files.empty.browseAction') }}
+      </button>
+    </div>
+    ```
+
+---
+
 ## 6. Sprints
 
 - **A — Data model & registry.** Migration for new `BFILES` columns
