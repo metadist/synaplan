@@ -52,7 +52,13 @@ final class AdvanceMediaJobsCommand extends Command
     {
         $this
             ->addArgument('jobKey', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Job key(s) to advance')
-            ->addOption('all', null, InputOption::VALUE_NONE, 'Re-advance every active job');
+            ->addOption('all', null, InputOption::VALUE_NONE, 'Re-advance every active job')
+            ->addOption(
+                'recover',
+                null,
+                InputOption::VALUE_NONE,
+                'Re-open wrongly-failed video jobs (with a provider operation handle) and re-poll the provider before advancing',
+            );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -62,6 +68,7 @@ final class AdvanceMediaJobsCommand extends Command
         /** @var list<string> $jobKeys */
         $jobKeys = (array) $input->getArgument('jobKey');
         $all = (bool) $input->getOption('all');
+        $recover = (bool) $input->getOption('recover');
 
         if (!$all && [] === $jobKeys) {
             $io->error('Pass at least one job key or use --all.');
@@ -103,9 +110,16 @@ final class AdvanceMediaJobsCommand extends Command
                 continue;
             }
             if ($job->isTerminal()) {
-                $io->writeln(sprintf('Skipping <comment>%s</comment>: already %s.', $jobKey, $job->getStatus()));
-                ++$skipped;
-                continue;
+                // --recover: re-open a wrongly-failed video job (one that still
+                // has a provider operation handle) so the advancer re-polls the
+                // provider and can finalize a render that actually succeeded.
+                if ($recover && $this->jobService->reopenForRecovery($job)) {
+                    $io->writeln(sprintf('Re-opened <info>%s</info> for recovery (was %s).', $jobKey, $job->getStatus()));
+                } else {
+                    $io->writeln(sprintf('Skipping <comment>%s</comment>: already %s.', $jobKey, $job->getStatus()));
+                    ++$skipped;
+                    continue;
+                }
             }
             if (!$this->dispatcher->dispatchKey($jobKey)) {
                 $io->error(sprintf('Failed to dispatch advance for %s (queue down?).', $jobKey));

@@ -13,6 +13,7 @@ use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use App\Service\Media\SyncMediaJobGenerator;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
@@ -56,6 +57,24 @@ final readonly class AdvanceMediaJobCommandHandler
     /** Lock lifetime per advance step — one step is quick; this is just a crash guard. */
     private const ADVANCE_LOCK_TTL_SECONDS = 120;
 
+    /**
+     * How many CONSECUTIVE transient failures (network blip, provider 5xx,
+     * Google INTERNAL/13) a poll/finalize step may hit before we give up and
+     * surface a localized failure. Each retry re-dispatches with backoff; the
+     * per-type deadline is the ultimate bound. The point: a transient provider
+     * hiccup must NOT fail a render the provider is actually completing.
+     */
+    private const MAX_TRANSIENT_FAILURES = 6;
+
+    /** Upper bound on the exponential re-dispatch backoff between transient retries. */
+    private const MAX_TRANSIENT_BACKOFF_SECONDS = 60;
+
+    /** Options key tracking the current consecutive transient-failure streak. */
+    private const OPT_TRANSIENT_FAILURES = '_transientFailures';
+
+    /** Options key holding the last raw provider error (dev/admin diagnostics; never shown to users). */
+    private const OPT_LAST_ERROR = '_lastError';
+
     public function __construct(
         private MediaJobService $jobService,
         private MediaJobDispatcher $dispatcher,
@@ -64,6 +83,7 @@ final readonly class AdvanceMediaJobCommandHandler
         private AiFacade $aiFacade,
         private MediaErrorMessageBuilder $errorBuilder,
         private UserUploadPathBuilder $userUploadPathBuilder,
+        private SyncMediaJobGenerator $syncGenerator,
         private LockFactory $lockFactory,
         private LoggerInterface $logger,
         private string $uploadDir = '/var/www/backend/var/uploads',
@@ -79,6 +99,13 @@ final readonly class AdvanceMediaJobCommandHandler
         // not an error — whoever holds it will re-arm the next step.
         $lock = $this->lockFactory->createLock('media-job-advance.'.$jobKey, self::ADVANCE_LOCK_TTL_SECONDS);
         if (!$lock->acquire()) {
+            // Another advance for this job holds the lock. Do NOT silently drop
+            // this step — re-dispatch after a short delay so the loop is never
+            // lost if the holder fails to re-arm. Idempotent: once the job is
+            // terminal, the re-dispatched step loads it and returns without
+            // scheduling anything further, so this self-terminates.
+            $this->dispatcher->dispatchKey($jobKey, max(1, $this->config->pollIntervalSeconds()));
+
             return;
         }
 
@@ -98,7 +125,7 @@ final readonly class AdvanceMediaJobCommandHandler
             }
 
             match ($job->getStatus()) {
-                MediaJob::STATUS_QUEUED, MediaJob::STATUS_SUBMITTING => $this->submit($job),
+                MediaJob::STATUS_QUEUED, MediaJob::STATUS_SUBMITTING => $this->advanceInitial($job),
                 MediaJob::STATUS_RUNNING => $this->poll($job),
                 MediaJob::STATUS_FINALIZING => $this->finalize($job),
                 default => null,
@@ -106,6 +133,42 @@ final readonly class AdvanceMediaJobCommandHandler
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * First advance step. Video uses the asynchronous submit→poll→finalize loop;
+     * image and audio are a single synchronous provider call, so they render and
+     * complete in this one step (no polling).
+     */
+    private function advanceInitial(MediaJob $job): void
+    {
+        if (MediaJob::TYPE_VIDEO === $job->getType()) {
+            $this->submit($job);
+
+            return;
+        }
+
+        $this->generateSync($job);
+    }
+
+    /**
+     * Synchronous one-step render for image/audio jobs: generate, save, and go
+     * straight to a terminal `completed` state with the produced file.
+     */
+    private function generateSync(MediaJob $job): void
+    {
+        $this->jobService->markSubmitting($job);
+
+        try {
+            $result = $this->syncGenerator->generate($job);
+        } catch (\Throwable $e) {
+            $this->fail($job, $e);
+
+            return;
+        }
+
+        $this->jobService->markCompleted($job, $result);
+        $this->messageSync->syncTerminalState($job);
     }
 
     private function submit(MediaJob $job): void
@@ -160,7 +223,9 @@ final readonly class AdvanceMediaJobCommandHandler
                 $job->getOptions(),
             );
         } catch (\Throwable $e) {
-            $this->fail($job, $e);
+            // Network/transport blip or provider 5xx — the render is very likely
+            // still progressing. Retry with backoff instead of failing the job.
+            $this->retryTransientOrFail($job, $e, 'poll');
 
             return;
         }
@@ -171,10 +236,17 @@ final readonly class AdvanceMediaJobCommandHandler
 
         $error = $result['error'];
         if (is_string($error) && '' !== $error) {
-            $this->fail($job, new \RuntimeException($error));
+            // A provider-reported error string. These are frequently transient
+            // (notably Google Veo INTERNAL/13, which self-recovers), so treat
+            // them as retryable up to the cap/deadline rather than failing a
+            // render the provider may still complete.
+            $this->retryTransientOrFail($job, new \RuntimeException($error), 'poll');
 
             return;
         }
+
+        // Clean poll — reset any transient-failure streak.
+        $this->clearTransientFailures($job);
 
         if (true !== $result['done']) {
             // Still rendering — poll again after the interval.
@@ -224,7 +296,10 @@ final readonly class AdvanceMediaJobCommandHandler
             );
             $relativePath = $this->saveBytes($bytes, $job->getUserId(), $job->getProvider(), $job->getType());
         } catch (\Throwable $e) {
-            $this->fail($job, $e);
+            // The render is DONE at the provider — a download blip must not throw
+            // away a finished video. Retry finalize with backoff (providerRef +
+            // _outputUri are preserved on the job).
+            $this->retryTransientOrFail($job, $e, 'finalize');
 
             return;
         }
@@ -264,6 +339,76 @@ final readonly class AdvanceMediaJobCommandHandler
         $this->messageSync->syncTerminalState($job);
     }
 
+    /**
+     * Retry a transient poll/finalize failure with exponential backoff, only
+     * giving up (localized failure) once the consecutive-failure cap is hit.
+     * The heartbeat is bumped each retry so the reaper does not kill a job that
+     * is actively retrying, and the per-type deadline remains the hard bound.
+     */
+    private function retryTransientOrFail(MediaJob $job, \Throwable $e, string $phase): void
+    {
+        $options = $job->getOptions();
+        $failures = (int) ($options[self::OPT_TRANSIENT_FAILURES] ?? 0) + 1;
+
+        // Raw cause to logs ONLY (never to the user), with full context so a
+        // failure is never opaque.
+        $this->logger->warning('MediaJob transient advance failure', [
+            'job_key' => $job->getJobKey(),
+            'phase' => $phase,
+            'attempt' => $failures,
+            'max_attempts' => self::MAX_TRANSIENT_FAILURES,
+            'provider' => $job->getProvider(),
+            'provider_ref' => $job->getProviderRef(),
+            'status' => $job->getStatus(),
+            'error' => $e->getMessage(),
+            'exception' => $e::class,
+        ]);
+
+        if ($failures >= self::MAX_TRANSIENT_FAILURES) {
+            $this->fail($job, new \RuntimeException(sprintf(
+                '%s failed after %d transient retries: %s',
+                $phase,
+                $failures,
+                $e->getMessage(),
+            ), 0, $e));
+
+            return;
+        }
+
+        $options[self::OPT_TRANSIENT_FAILURES] = $failures;
+        $options[self::OPT_LAST_ERROR] = mb_substr($e->getMessage(), 0, 1000);
+        $job->setOptions($options);
+        // Persist the counter AND refresh the heartbeat so the reaper treats the
+        // job as alive while it retries.
+        $this->jobService->heartbeat($job);
+
+        if (!$this->dispatcher->dispatch($job, $this->backoffSeconds($failures))) {
+            // The queue itself is unreachable — only now is the job truly stuck,
+            // because nothing can advance it. Surface a localized failure.
+            $this->fail($job, new \RuntimeException('Queue dispatch rejected during transient retry', 0, $e));
+        }
+    }
+
+    private function clearTransientFailures(MediaJob $job): void
+    {
+        $options = $job->getOptions();
+        if (!isset($options[self::OPT_TRANSIENT_FAILURES])) {
+            return;
+        }
+
+        unset($options[self::OPT_TRANSIENT_FAILURES]);
+        $job->setOptions($options);
+        $this->jobService->save($job);
+    }
+
+    private function backoffSeconds(int $failures): int
+    {
+        $base = max(1, $this->config->pollIntervalSeconds());
+        $delay = $base * (2 ** min($failures, 4));
+
+        return (int) min($delay, self::MAX_TRANSIENT_BACKOFF_SECONDS);
+    }
+
     private function fail(MediaJob $job, \Throwable $e): void
     {
         $exception = $e instanceof \Exception ? $e : new \RuntimeException($e->getMessage(), 0, $e);
@@ -271,12 +416,21 @@ final readonly class AdvanceMediaJobCommandHandler
 
         $message = $this->errorBuilder->buildErrorMessage($exception, $job->getType(), $lang);
 
-        // Raw cause to logs ONLY — never to the user.
+        // Persist the raw cause as dev/admin meta (NOT exposed by toStatusArray,
+        // so it never reaches the chat client) so failures are diagnosable.
+        $options = $job->getOptions();
+        $options[self::OPT_LAST_ERROR] = mb_substr($e->getMessage(), 0, 1000);
+        $job->setOptions($options);
+
+        // Raw cause + full chain to logs ONLY — never to the user.
         $this->logger->warning('MediaJob advance failed', [
             'job_key' => $job->getJobKey(),
             'status' => $job->getStatus(),
             'provider' => $job->getProvider(),
+            'provider_ref' => $job->getProviderRef(),
             'error' => $e->getMessage(),
+            'exception' => $e::class,
+            'previous' => $e->getPrevious()?->getMessage(),
         ]);
 
         $this->jobService->markFailed($job, $message);

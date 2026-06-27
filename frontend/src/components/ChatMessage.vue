@@ -1203,8 +1203,13 @@ const contentParts = computed(() => {
   // alone made the placeholder reappear next to the video the moment the job
   // completed, producing the text↔video flicker.
   if (props.role === 'assistant' && props.mediaJob) {
+    const generatingTokens = [
+      '__VIDEO_GENERATING__',
+      '__IMAGE_GENERATING__',
+      '__AUDIO_GENERATING__',
+    ]
     parts = parts.filter(
-      (p) => !(p.type === 'text' && p.content?.trim() === '__VIDEO_GENERATING__')
+      (p) => !(p.type === 'text' && generatingTokens.includes(p.content?.trim() ?? ''))
     )
   }
 

@@ -1280,7 +1280,11 @@ class StreamController extends AbstractController
                         && !empty($response['metadata']['media_job'])
                         && is_array($response['metadata']['media_job'])
                         && 'running' === ($response['metadata']['media_job']['state'] ?? null)) {
-                        $finalText = '__VIDEO_GENERATING__';
+                        $finalText = match ($response['metadata']['media_job']['type'] ?? 'video') {
+                            'image' => '__IMAGE_GENERATING__',
+                            'audio' => '__AUDIO_GENERATING__',
+                            default => '__VIDEO_GENERATING__',
+                        };
                     }
 
                     $outgoingMessage->setText($finalText);

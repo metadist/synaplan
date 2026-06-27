@@ -46,11 +46,17 @@ final class MediaJobStore
         $terminal = $job->isTerminal();
         $ttl = $terminal ? self::TERMINAL_TTL_SECONDS : self::ACTIVE_TTL_SECONDS;
 
-        $this->redis->set(
-            self::JOB_PREFIX.$job->getJobKey(),
-            (string) json_encode($job->toArray()),
-            $ttl,
-        );
+        // Fail loudly on a serialization error instead of casting `false` to an
+        // empty string and storing it — an empty snapshot makes find() return
+        // null, which silently strands the job. Options are sanitized upstream
+        // (MediaJobService::create), so this should never trigger; it is the
+        // last-line guard that turns a future regression into a visible error.
+        $encoded = json_encode($job->toArray(), \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+        if (false === $encoded) {
+            throw new \RuntimeException(sprintf('MediaJobStore: failed to serialize job %s: %s', $job->getJobKey(), json_last_error_msg()));
+        }
+
+        $this->redis->set(self::JOB_PREFIX.$job->getJobKey(), $encoded, $ttl);
 
         $messageId = $job->getMessageId();
         if (null !== $messageId) {

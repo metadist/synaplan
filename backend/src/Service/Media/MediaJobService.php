@@ -68,7 +68,13 @@ final class MediaJobService
         if (isset($params['options']) && is_array($params['options'])) {
             /** @var array<string, mixed> $options */
             $options = $params['options'];
-            $job->setOptions($options);
+            // Strip request-scoped callables (progress_callback, cancel_check) and
+            // any other non-JSON-serializable value before the job is persisted to
+            // Redis. Without this a closure reaches json_encode in MediaJobStore,
+            // the snapshot serializes wrong/empty, and find() later returns null —
+            // the job silently vanishes mid-render (observed: "advancer gave up
+            // while the provider succeeded").
+            $job->setOptions($this->sanitizeOptions($options));
         }
 
         $this->store->save($job);
@@ -108,6 +114,49 @@ final class MediaJobService
     public function save(MediaJob $job): void
     {
         $this->store->save($job);
+    }
+
+    /**
+     * Re-open a wrongly-failed video job so the advancer can re-poll its provider
+     * operation and finalize it if the provider actually completed it.
+     *
+     * Recovery for the failure mode where a transient poll error failed the job
+     * while the provider (e.g. Google Veo) kept rendering and succeeded. Only
+     * applies to terminal failed/timed_out jobs that still hold a provider
+     * operation handle ({@see MediaJob::getProviderRef()}); image/audio jobs have
+     * no handle to re-poll and are not eligible. Returns false when not eligible.
+     *
+     * Resets the deadline so the re-poll has a fresh window, clears the error and
+     * the transient-failure streak, and drives the job back to `running`.
+     */
+    public function reopenForRecovery(MediaJob $job): bool
+    {
+        if (!in_array($job->getStatus(), [MediaJob::STATUS_FAILED, MediaJob::STATUS_TIMED_OUT], true)) {
+            return false;
+        }
+
+        $providerRef = $job->getProviderRef();
+        if (null === $providerRef || '' === $providerRef) {
+            return false;
+        }
+
+        $options = $job->getOptions();
+        unset($options['_transientFailures'], $options['_lastError']);
+        $job->setOptions($options);
+
+        $job->setError(null)
+            ->setFinishedAt(null)
+            ->setDeadlineAt(time() + $this->deadlineSecondsFor($job->getType()))
+            ->setStatus(MediaJob::STATUS_RUNNING);
+        $this->store->save($job);
+
+        $this->logger->info('MediaJob re-opened for recovery', [
+            'job_key' => $job->getJobKey(),
+            'provider' => $job->getProvider(),
+            'provider_ref' => $providerRef,
+        ]);
+
+        return true;
     }
 
     /**
@@ -375,6 +424,58 @@ final class MediaJobService
             MediaJob::STATUS_CANCELLED => 'cancelled',
             default => 'running',
         };
+    }
+
+    /**
+     * Recursively drop values that cannot survive a JSON round-trip (closures,
+     * resources, objects), keeping scalars, nulls, and nested arrays of those.
+     * Guarantees the persisted Redis snapshot never corrupts on a stray callable.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function sanitizeOptions(array $options): array
+    {
+        $clean = [];
+        foreach ($options as $key => $value) {
+            if (null === $value) {
+                $clean[$key] = null;
+                continue;
+            }
+            $sanitized = $this->sanitizeValue($value);
+            if (null !== $sanitized) {
+                $clean[$key] = $sanitized;
+            }
+        }
+
+        return $clean;
+    }
+
+    private function sanitizeValue(mixed $value): mixed
+    {
+        if (is_scalar($value)) {
+            return $value;
+        }
+
+        if (is_array($value)) {
+            $clean = [];
+            foreach ($value as $k => $v) {
+                if (null === $v) {
+                    $clean[$k] = null;
+                    continue;
+                }
+                $sanitized = $this->sanitizeValue($v);
+                if (null !== $sanitized) {
+                    $clean[$k] = $sanitized;
+                }
+            }
+
+            return $clean;
+        }
+
+        // Closure, resource, or any object — not JSON-serializable, drop it.
+        return null;
     }
 
     private function truncateError(string $error): string

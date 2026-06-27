@@ -13,6 +13,7 @@ use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use App\Service\Media\SyncMediaJobGenerator;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -33,6 +34,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
     private MediaJobConfig&MockObject $config;
     private MediaJobMessageSync&MockObject $messageSync;
     private AiFacade&MockObject $aiFacade;
+    private SyncMediaJobGenerator&MockObject $syncGenerator;
     private LockFactory&MockObject $lockFactory;
     private SharedLockInterface&MockObject $lock;
     private string $uploadDir;
@@ -45,6 +47,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $this->config = $this->createMock(MediaJobConfig::class);
         $this->messageSync = $this->createMock(MediaJobMessageSync::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
+        $this->syncGenerator = $this->createMock(SyncMediaJobGenerator::class);
         $this->lockFactory = $this->createMock(LockFactory::class);
         $this->lock = $this->createMock(SharedLockInterface::class);
 
@@ -65,6 +68,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
             $this->aiFacade,
             new MediaErrorMessageBuilder(),
             new UserUploadPathBuilder(),
+            $this->syncGenerator,
             $this->lockFactory,
             new NullLogger(),
             $this->uploadDir,
@@ -180,10 +184,13 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         self::assertSame('RAW-MP4-BYTES', file_get_contents($this->uploadDir.'/'.$relative));
     }
 
-    public function testPollErrorMarksFailedWithLocalizedNonLeakyMessage(): void
+    public function testPollErrorRetriesTransientlyThenFailsWithLocalizedNonLeakyMessage(): void
     {
         $job = $this->job(MediaJob::STATUS_RUNNING);
         $job->setProviderRef('op-1');
+        // Already at the last allowed transient attempt, so the next provider
+        // error trips the cap and surfaces a localized failure.
+        $job->setOptions(['_transientFailures' => 5]);
         $this->jobService->method('findByKey')->willReturn($job);
 
         $this->aiFacade->method('pollVideoOperation')
@@ -196,6 +203,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
                 $captured = $message;
             });
 
+        // At the cap, we fail rather than re-dispatch.
         $this->dispatcher->expects(self::never())->method('dispatch');
 
         $this->handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
@@ -204,6 +212,77 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         self::assertStringContainsStringIgnoringCase('image', $captured);
         // The raw provider token must never leak to the user-facing message.
         self::assertStringNotContainsString('invalid_image_url', $captured);
+    }
+
+    public function testTransientPollFailureReDispatchesWithBackoffInsteadOfFailing(): void
+    {
+        $job = $this->job(MediaJob::STATUS_RUNNING);
+        $job->setProviderRef('op-1');
+        $this->jobService->method('findByKey')->willReturn($job);
+
+        // A network/transport blip — NOT a definitive failure.
+        $this->aiFacade->method('pollVideoOperation')
+            ->willThrowException(new \RuntimeException('Connection timed out'));
+
+        // The render must keep going: heartbeat + re-dispatch, never markFailed.
+        $this->jobService->expects(self::atLeastOnce())->method('heartbeat')->with($job);
+        $this->jobService->expects(self::never())->method('markFailed');
+        $this->dispatcher->expects(self::once())
+            ->method('dispatch')
+            ->with($job, self::greaterThan(0))
+            ->willReturn(true);
+
+        $this->handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
+
+        self::assertSame(1, $job->getOptions()['_transientFailures'] ?? null);
+    }
+
+    public function testSyncImageJobGeneratesAndCompletesInOneStep(): void
+    {
+        $job = $this->job(MediaJob::STATUS_QUEUED);
+        $job->setType(MediaJob::TYPE_IMAGE)->setPrompt('a red balloon');
+        $this->jobService->method('findByKey')->willReturn($job);
+
+        $result = [
+            'file' => ['url' => '/api/v1/files/uploads/x.png', 'type' => 'image', 'mimeType' => 'image/png'],
+            'provider' => 'openai',
+            'model' => 'gpt-image-1',
+        ];
+        $this->syncGenerator->expects(self::once())->method('generate')->with($job)->willReturn($result);
+
+        $this->jobService->expects(self::once())->method('markSubmitting')->with($job);
+        $this->jobService->expects(self::once())->method('markCompleted')->with($job, $result);
+        $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
+
+        // Image jobs never touch the video async API and never poll.
+        $this->aiFacade->expects(self::never())->method('startVideoGeneration');
+        $this->aiFacade->expects(self::never())->method('pollVideoOperation');
+        $this->dispatcher->expects(self::never())->method('dispatch');
+        $this->jobService->expects(self::never())->method('markFailed');
+
+        $this->handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
+    }
+
+    public function testSyncImageJobFailureIsLocalizedAndNonLeaky(): void
+    {
+        $job = $this->job(MediaJob::STATUS_QUEUED);
+        $job->setType(MediaJob::TYPE_IMAGE)->setPrompt('a red balloon');
+        $this->jobService->method('findByKey')->willReturn($job);
+
+        $this->syncGenerator->method('generate')
+            ->willThrowException(new \RuntimeException('provider 500: upstream_xyz'));
+
+        $captured = null;
+        $this->jobService->expects(self::once())
+            ->method('markFailed')
+            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): void {
+                $captured = $message;
+            });
+
+        $this->handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
+
+        self::assertIsString($captured);
+        self::assertStringNotContainsString('upstream_xyz', $captured);
     }
 
     public function testProviderExceptionOnSubmitMarksFailedAndDoesNotThrow(): void
@@ -263,7 +342,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $this->handler->__invoke(new AdvanceMediaJobCommand('does-not-exist'));
     }
 
-    public function testLockNotAcquiredSkipsWithoutTouchingTheJob(): void
+    public function testLockNotAcquiredReDispatchesWithoutTouchingTheJob(): void
     {
         $lock = $this->createMock(SharedLockInterface::class);
         $lock->method('acquire')->willReturn(false);
@@ -278,13 +357,18 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
             $this->aiFacade,
             new MediaErrorMessageBuilder(),
             new UserUploadPathBuilder(),
+            $this->syncGenerator,
             $lockFactory,
             new NullLogger(),
             $this->uploadDir,
         );
 
+        // Lock held by a concurrent advance — must NOT touch the job, but must
+        // re-dispatch so the step is never silently lost.
         $this->jobService->expects(self::never())->method('findByKey');
-        $this->dispatcher->expects(self::never())->method('dispatch');
+        $this->dispatcher->expects(self::once())
+            ->method('dispatchKey')
+            ->with('locked', self::greaterThan(0));
 
         $handler->__invoke(new AdvanceMediaJobCommand('locked'));
     }

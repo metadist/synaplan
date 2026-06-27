@@ -604,6 +604,24 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'text_length' => strlen($prompt),
                 ]);
 
+                $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+                if ($this->mediaJobConfig->isAsyncJobsEnabled($effectiveUserId)) {
+                    return $this->detachMediaToAsyncJob(
+                        MediaJob::TYPE_AUDIO,
+                        $message,
+                        $classification,
+                        $options,
+                        $prompt,
+                        $provider,
+                        $modelName,
+                        $modelId,
+                        [],
+                        null,
+                        $streamCallback,
+                        $progressCallback,
+                    );
+                }
+
                 $result = $this->aiFacade->synthesize(
                     $prompt,
                     $message->getUserId(),
@@ -679,6 +697,26 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'provider' => $provider,
                         'model' => $modelName,
                     ]);
+                }
+
+                $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+                if ($this->mediaJobConfig->isAsyncJobsEnabled($effectiveUserId)) {
+                    $inputRef = $attachedImagePaths[0] ?? null;
+
+                    return $this->detachMediaToAsyncJob(
+                        MediaJob::TYPE_IMAGE,
+                        $message,
+                        $classification,
+                        $options,
+                        $prompt,
+                        $provider,
+                        $modelName,
+                        $modelId,
+                        $imageOptions,
+                        is_string($inputRef) ? $inputRef : null,
+                        $streamCallback,
+                        $progressCallback,
+                    );
                 }
 
                 $result = $this->aiFacade->generateImage(
@@ -1440,11 +1478,23 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
      *
      * @param array<string, mixed> $classification
      * @param array<string, mixed> $options
-     * @param array<string, mixed> $videoOptions   provider options (duration, image_url, …)
      *
      * @return array{metadata: array<string, mixed>}
      */
-    private function detachVideoToAsyncJob(
+    /**
+     * Detach a media render (image, video, or audio) to a background job and
+     * return a `running` placeholder immediately. Video runs the async
+     * submit→poll→finalize loop on the worker; image and audio run as a single
+     * synchronous worker step ({@see \App\Service\Media\SyncMediaJobGenerator}).
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $mediaOptions   provider options (image/video/audio specifics)
+     *
+     * @return array{metadata: array<string, mixed>}|array{text: string, metadata: array<string, mixed>}
+     */
+    private function detachMediaToAsyncJob(
+        string $type,
         Message $message,
         array $classification,
         array $options,
@@ -1452,12 +1502,13 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         string $provider,
         ?string $modelName,
         ?int $modelId,
-        array $videoOptions,
+        array $mediaOptions,
+        ?string $inputRef,
         callable $streamCallback,
         ?callable $progressCallback,
     ): array {
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-        $videoOptions['lang'] = is_string($classification['language'] ?? null)
+        $mediaOptions['lang'] = is_string($classification['language'] ?? null)
             ? $classification['language']
             : ($message->getLanguage() ?: 'en');
 
@@ -1474,13 +1525,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             ? trim((string) $options['track_id'])
             : null;
 
-        $inputRef = isset($videoOptions['image_url']) && is_string($videoOptions['image_url'])
-            ? $videoOptions['image_url']
-            : null;
-
         $job = $this->mediaJobService->create([
             'userId' => $effectiveUserId,
-            'type' => MediaJob::TYPE_VIDEO,
+            'type' => $type,
             'provider' => $provider,
             'prompt' => $prompt,
             'modelId' => $modelId,
@@ -1490,7 +1537,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             'nodeId' => '' !== (string) $nodeId ? $nodeId : null,
             'trackId' => '' !== $trackId ? $trackId : null,
             'inputRef' => $inputRef,
-            'options' => $videoOptions,
+            'options' => $mediaOptions,
         ]);
 
         if (!$this->mediaJobDispatcher->dispatch($job)) {
@@ -1498,10 +1545,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // user gets a clear, localized error in the same turn instead of an
             // empty bubble that polls forever waiting for a worker that will
             // never be reached.
-            $lang = is_string($options['lang'] ?? null) ? (string) $options['lang'] : 'en';
+            // $mediaOptions['lang'] is always set at the top of this method.
+            $lang = (string) $mediaOptions['lang'];
             $errorMessage = $this->errorMessageBuilder->buildErrorMessage(
                 new \RuntimeException('Background queue unreachable'),
-                MediaJob::TYPE_VIDEO,
+                $type,
                 $lang,
             );
             $this->mediaJobService->markFailed($job, $errorMessage);
@@ -1511,7 +1559,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $this->notify($progressCallback, 'error', $errorMessage, [
                 'media_job' => [
                     'job_id' => $job->getJobKey(),
-                    'type' => MediaJob::TYPE_VIDEO,
+                    'type' => $type,
                     'state' => 'failed',
                     'error' => $errorMessage,
                 ],
@@ -1522,6 +1570,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'provider' => $provider,
                 'model' => $modelName,
                 'message_id' => $message->getId(),
+                'type' => $type,
             ]);
 
             return [
@@ -1531,10 +1580,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'model' => $modelName,
                     'model_id' => $modelId,
                     'media_prompt' => $prompt,
-                    'media_type' => 'video',
+                    'media_type' => $type,
                     'media_job' => [
                         'job_id' => $job->getJobKey(),
-                        'type' => MediaJob::TYPE_VIDEO,
+                        'type' => $type,
                         'state' => 'failed',
                         'error' => $errorMessage,
                     ],
@@ -1545,20 +1594,21 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
         $mediaJob = [
             'job_id' => $job->getJobKey(),
-            'type' => MediaJob::TYPE_VIDEO,
+            'type' => $type,
             'state' => 'running',
         ];
 
         // Placeholder token — the frontend renders a dedicated background-job
         // banner (MediaJobStatus) and persists this marker so reloads are not empty.
-        $streamCallback('__VIDEO_GENERATING__');
+        $streamCallback($this->generatingTokenFor($type));
 
-        $this->notify($progressCallback, 'generating', 'Video generation started in the background.', [
+        $this->notify($progressCallback, 'generating', 'Media generation started in the background.', [
             'media_job' => $mediaJob,
         ]);
 
-        $this->logger->info('MediaGenerationHandler: Detached video to async job', [
+        $this->logger->info('MediaGenerationHandler: Detached media to async job', [
             'job_key' => $job->getJobKey(),
+            'type' => $type,
             'provider' => $provider,
             'model' => $modelName,
             'message_id' => $message->getId(),
@@ -1571,10 +1621,67 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'model' => $modelName,
                 'model_id' => $modelId,
                 'media_prompt' => $prompt,
-                'media_type' => 'video',
+                'media_type' => $type,
                 'media_job' => $mediaJob,
             ],
         ];
+    }
+
+    /**
+     * Video detach: derives the image-to-video reference (if any) and delegates
+     * to the generic media-detach path.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $videoOptions
+     *
+     * @return array{metadata: array<string, mixed>}|array{text: string, metadata: array<string, mixed>}
+     */
+    private function detachVideoToAsyncJob(
+        Message $message,
+        array $classification,
+        array $options,
+        string $prompt,
+        string $provider,
+        ?string $modelName,
+        ?int $modelId,
+        array $videoOptions,
+        callable $streamCallback,
+        ?callable $progressCallback,
+    ): array {
+        $inputRef = isset($videoOptions['image_url']) && is_string($videoOptions['image_url'])
+            ? $videoOptions['image_url']
+            : null;
+
+        return $this->detachMediaToAsyncJob(
+            MediaJob::TYPE_VIDEO,
+            $message,
+            $classification,
+            $options,
+            $prompt,
+            $provider,
+            $modelName,
+            $modelId,
+            $videoOptions,
+            $inputRef,
+            $streamCallback,
+            $progressCallback,
+        );
+    }
+
+    /**
+     * Frontend placeholder token per media type. The dedicated MediaJobStatus
+     * banner is the real running UI; this token is the streamed/persisted
+     * marker that MessageText maps to a localized "generating…" line so a
+     * reload is never an empty bubble.
+     */
+    private function generatingTokenFor(string $type): string
+    {
+        return match ($type) {
+            MediaJob::TYPE_IMAGE => '__IMAGE_GENERATING__',
+            MediaJob::TYPE_AUDIO => '__AUDIO_GENERATING__',
+            default => '__VIDEO_GENERATING__',
+        };
     }
 
     /**

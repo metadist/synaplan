@@ -162,7 +162,11 @@ final readonly class MessageApiFormatter
         $mediaJob = $this->decodeMediaJobMeta($m);
         $text = $m->getText();
         if ('' === trim((string) $text) && null !== $mediaJob && 'running' === ($mediaJob['state'] ?? null)) {
-            $text = '__VIDEO_GENERATING__';
+            $text = match ($mediaJob['type'] ?? 'video') {
+                'image' => '__IMAGE_GENERATING__',
+                'audio' => '__AUDIO_GENERATING__',
+                default => '__VIDEO_GENERATING__',
+            };
         }
 
         return [

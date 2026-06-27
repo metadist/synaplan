@@ -17,6 +17,7 @@ use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobReaper;
 use App\Service\Media\MediaJobService;
 use App\Service\Media\MediaJobStore;
+use App\Service\Media\SyncMediaJobGenerator;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\MessageApiFormatter;
 use Doctrine\ORM\EntityManagerInterface;
@@ -347,6 +348,59 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         }
     }
 
+    public function testSyncImageJobRendersSavesAndAttachesToMessage(): void
+    {
+        $user = $this->createUser();
+        $message = $this->createMessage($user);
+
+        $job = $this->jobService->create([
+            'userId' => $user->getId(),
+            'type' => MediaJob::TYPE_IMAGE,
+            'provider' => 'openai',
+            'prompt' => 'a red balloon floating up',
+            'model' => 'gpt-image-1',
+            'messageId' => $message->getId(),
+            'options' => ['size' => '1024x1024', 'lang' => 'en'],
+        ]);
+        $this->createdJobKeys[] = $job->getJobKey();
+
+        // 1x1 transparent PNG as a base64 data URL — the generator decodes and
+        // saves it (no network), mirroring how most image providers return data.
+        $pngDataUrl = 'data:image/png;base64,'
+            .'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+        $this->aiFacade->method('generateImage')->willReturn([
+            'images' => [['url' => $pngDataUrl]],
+            'provider' => 'openai',
+            'model' => 'gpt-image-1',
+        ]);
+        $this->aiFacade->expects(self::never())->method('startVideoGeneration');
+        $this->aiFacade->expects(self::never())->method('pollVideoOperation');
+
+        // A single advance step renders, saves, and completes — no polling.
+        $this->buildHandler()->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
+
+        $fresh = $this->store->find($job->getJobKey());
+        self::assertNotNull($fresh);
+        self::assertSame(MediaJob::STATUS_COMPLETED, $fresh->getStatus());
+
+        $result = $fresh->getResult();
+        self::assertIsArray($result);
+        self::assertSame('image', $result['file']['type'] ?? null);
+        $relative = substr((string) $result['file']['url'], strlen('/api/v1/files/uploads/'));
+        self::assertFileExists($this->uploadDir.'/'.$relative);
+
+        // Reload contract: file attached + legacy file field set + state done.
+        $this->em->refresh($message);
+        self::assertGreaterThan(0, $message->getFiles()->count());
+        self::assertSame(1, $message->getFile());
+        $meta = json_decode((string) $message->getMeta('media_job'), true);
+        self::assertSame('done', $meta['state'] ?? null);
+
+        if ($message->getFiles()->count() > 0) {
+            $this->createdFileIds[] = $message->getFiles()->first()->getId();
+        }
+    }
+
     public function testFailurePathPersistsLocalizedErrorOnMessage(): void
     {
         $user = $this->createUser();
@@ -492,6 +546,13 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
             $this->aiFacade,
             $this->errorBuilder,
             new \App\Service\File\UserUploadPathBuilder(),
+            new SyncMediaJobGenerator(
+                $this->aiFacade,
+                new \App\Service\File\UserUploadPathBuilder(),
+                $this->createMock(\Symfony\Contracts\HttpClient\HttpClientInterface::class),
+                new NullLogger(),
+                $this->uploadDir,
+            ),
             $this->lockFactory,
             new NullLogger(),
             $this->uploadDir,
