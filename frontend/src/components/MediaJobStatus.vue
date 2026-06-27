@@ -132,11 +132,8 @@ const failureMessage = computed(() => {
 
 <template>
   <div
-    class="media-job-status rounded-xl border p-4"
-    :class="{
-      'media-job-status--failed': isFailed,
-      'media-job-status--overdue': isOverdue,
-    }"
+    class="surface-card rounded-xl border p-4"
+    :class="isFailed || isOverdue ? 'border-danger' : 'border-brand'"
     role="status"
     :aria-label="$t(titleKey)"
     data-testid="media-job-status"
@@ -145,7 +142,7 @@ const failureMessage = computed(() => {
       <Icon
         :icon="isFailed ? 'mdi:alert-circle-outline' : iconForType"
         class="w-6 h-6 flex-shrink-0"
-        :style="{ color: isFailed ? 'var(--danger, #dc2626)' : 'var(--brand)' }"
+        :class="isFailed ? 'text-danger' : 'text-brand'"
         aria-hidden="true"
       />
       <div class="flex-1 min-w-0 space-y-1.5">
@@ -153,15 +150,14 @@ const failureMessage = computed(() => {
           <Icon
             v-if="!isFailed"
             icon="mdi:loading"
-            class="w-4 h-4 animate-spin flex-shrink-0"
-            style="color: var(--brand)"
+            class="w-4 h-4 animate-spin flex-shrink-0 text-brand"
             aria-hidden="true"
           />
           <p class="text-sm font-medium txt-primary">{{ $t(titleKey) }}</p>
           <button
             v-if="!isFailed"
             type="button"
-            class="media-job-status__refresh"
+            class="ml-auto inline-flex items-center gap-1 rounded-full border border-[var(--border-light)] px-2 py-0.5 text-xs text-brand hover:bg-black/5 dark:hover:bg-white/5 disabled:cursor-wait disabled:opacity-60"
             :disabled="isFetching"
             data-testid="media-job-refresh"
             @click="refreshNow()"
@@ -194,19 +190,13 @@ const failureMessage = computed(() => {
             {{ $t('message.mediaJob.backgroundHint') }}
           </p>
 
-          <p
-            v-if="isOverdue"
-            class="text-sm"
-            style="color: var(--danger, #dc2626)"
-            data-testid="media-job-overdue"
-          >
+          <p v-if="isOverdue" class="text-sm text-danger" data-testid="media-job-overdue">
             {{ $t('message.mediaJob.overdueWarning') }}
           </p>
 
           <p
             v-else-if="mediaJob.stalled"
-            class="text-sm"
-            style="color: var(--warning, #b45309)"
+            class="text-sm text-warning"
             data-testid="media-job-stalled"
           >
             {{
@@ -240,14 +230,10 @@ const failureMessage = computed(() => {
             {{ $t(`message.mediaJob.maxWait.${mediaJob.type}`, { minutes: maxWaitMinutes }) }}
           </p>
 
-          <div
-            v-if="progressPercent !== null"
-            class="media-job-status__progress"
-            data-testid="media-job-progress"
-          >
-            <div class="media-job-status__progress-track">
+          <div v-if="progressPercent !== null" class="mt-0.5" data-testid="media-job-progress">
+            <div class="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-light)]">
               <div
-                class="media-job-status__progress-fill"
+                class="h-full rounded-full bg-brand transition-[width] duration-300 ease-out"
                 :style="{ width: `${progressPercent}%` }"
               />
             </div>
@@ -256,7 +242,7 @@ const failureMessage = computed(() => {
             </p>
           </div>
 
-          <p v-if="fetchError" class="text-xs" style="color: var(--danger, #dc2626)">
+          <p v-if="fetchError" class="text-xs text-danger">
             {{ $t('message.mediaJob.pollError') }}
           </p>
         </template>
@@ -268,49 +254,3 @@ const failureMessage = computed(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.media-job-status {
-  background: var(--surface-card, rgba(127, 127, 127, 0.04));
-  border-color: var(--brand);
-}
-.media-job-status--failed {
-  border-color: var(--danger, #dc2626);
-}
-.media-job-status--overdue {
-  border-color: var(--danger, #dc2626);
-}
-.media-job-status__refresh {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: auto;
-  padding: 0.125rem 0.5rem;
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-  color: var(--brand);
-  background: transparent;
-  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.25));
-  border-radius: 999px;
-  cursor: pointer;
-}
-.media-job-status__refresh:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-.media-job-status__refresh:not(:disabled):hover {
-  background: var(--surface-card, rgba(127, 127, 127, 0.06));
-}
-.media-job-status__progress-track {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--border-color, rgba(127, 127, 127, 0.2));
-  overflow: hidden;
-}
-.media-job-status__progress-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: var(--brand);
-  transition: width 0.4s ease;
-}
-</style>
