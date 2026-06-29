@@ -1,0 +1,10 @@
+# Optional overlay: mount smart-email test scripts into backend.
+#
+# Usage (from repo root):
+#   docker compose -f docker-compose.yml \
+#     -f _devextras/smart-email-test/docker-compose.yml up -d backend
+
+services:
+  backend:
+    volumes:
+      - ./_devextras/smart-email-test:/var/www/smart-email-test:ro
