@@ -60,6 +60,8 @@ class FileController extends AbstractController
                         new OA\Property(property: 'files[]', type: 'array', items: new OA\Items(type: 'string', format: 'binary')),
                         new OA\Property(property: 'group_key', type: 'string', example: 'customer-support'),
                         new OA\Property(property: 'process_level', type: 'string', enum: ['store', 'extract', 'vectorize', 'full'], example: 'vectorize'),
+                        new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'whatsapp', 'widget', 'api', 'generated'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/Outlook) should set this so the file is labelled by source.'),
+                        new OA\Property(property: 'original_name', type: 'string', example: '/Shared/Q3 Report.pdf', description: 'The file name at the source, preserved even when the stored name is normalised. Falls back to the uploaded filename.'),
                     ]
                 )
             )
@@ -82,6 +84,15 @@ class FileController extends AbstractController
         if (!in_array($processLevel, ['store', 'extract', 'vectorize', 'full'], true)) {
             $processLevel = 'vectorize';
         }
+
+        // Provenance (03_file-management.md §3.1): integrations declare where the
+        // file came from + its original name. Web uploads omit these → web_upload.
+        $source = (string) $request->request->get('source', 'web_upload');
+        if (!in_array($source, File::SOURCES, true)) {
+            $source = 'web_upload';
+        }
+        $originalName = $request->request->get('original_name');
+        $originalName = is_string($originalName) && '' !== trim($originalName) ? trim($originalName) : null;
 
         $uploadedFiles = $request->files->get('files', []);
 
@@ -117,7 +128,7 @@ class FileController extends AbstractController
             return $this->json(['error' => 'No files uploaded. Use form-data with files[] field'], Response::HTTP_BAD_REQUEST);
         }
 
-        $result = $this->uploadService->uploadBatch($uploadedFiles, $user, $groupKey, $processLevel);
+        $result = $this->uploadService->uploadBatch($uploadedFiles, $user, $groupKey, $processLevel, $source, $originalName);
 
         return $this->json($result, $result['success'] ? Response::HTTP_OK : Response::HTTP_PARTIAL_CONTENT);
     }

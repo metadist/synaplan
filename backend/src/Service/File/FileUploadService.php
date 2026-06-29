@@ -35,7 +35,7 @@ final readonly class FileUploadService
      *
      * @return array{success: bool, files: array<mixed>, errors: array<mixed>, total_time_ms: int, process_level: string}
      */
-    public function uploadBatch(array $uploadedFiles, User $user, ?string $groupKey, string $processLevel): array
+    public function uploadBatch(array $uploadedFiles, User $user, ?string $groupKey, string $processLevel, string $source = 'web_upload', ?string $originalName = null): array
     {
         $startTime = microtime(true);
         $results = [];
@@ -45,7 +45,7 @@ final readonly class FileUploadService
             $fileStartTime = microtime(true);
 
             try {
-                $result = $this->processSingleUpload($uploadedFile, $user, $groupKey, $processLevel);
+                $result = $this->processSingleUpload($uploadedFile, $user, $groupKey, $processLevel, $source, $originalName);
 
                 if ($result['success']) {
                     $result['processing_time_ms'] = (int) ((microtime(true) - $fileStartTime) * 1000);
@@ -194,6 +194,8 @@ final readonly class FileUploadService
         User $user,
         ?string $groupKey,
         string $processLevel,
+        string $source = 'web_upload',
+        ?string $originalName = null,
     ): array {
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
         if (!$rateLimitCheck['allowed']) {
@@ -223,7 +225,7 @@ final readonly class FileUploadService
         }
 
         $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
-        $file = $this->createFileEntity($uploadedFile, $user, $storageResult, $groupKey);
+        $file = $this->createFileEntity($uploadedFile, $user, $storageResult, $groupKey, $source, $originalName);
 
         $result = [
             'success' => true,
@@ -270,6 +272,8 @@ final readonly class FileUploadService
         User $user,
         array $storageResult,
         ?string $groupKey,
+        string $source = 'web_upload',
+        ?string $originalName = null,
     ): File {
         $file = new File();
         $file->setUserId($user->getId());
@@ -280,6 +284,8 @@ final readonly class FileUploadService
         $file->setFileMime($storageResult['mime']);
         $file->setGroupKey($groupKey);
         $file->setStatus('uploaded');
+        $file->setSource($source);
+        $file->setOriginalName($originalName);
 
         $this->em->persist($file);
         $this->em->flush();

@@ -1,9 +1,23 @@
 # Feature 2 — File Management World ("one home for every file")
 
-**Release:** 4.0 · **Priority:** P0 · **Status:** Planned
+**Release:** 4.0 · **Priority:** P0 · **Status:** Planned (provenance subset
+in progress — see callout below)
 **Related:** [`01_async-media-jobs.md`](./01_async-media-jobs.md) (generated media must
-land here), [File Storage Migration](../file-storage-migration.md),
+land here), [`07_file-sharing-destinations.md`](./07_file-sharing-destinations.md)
+(the *outbound* "Send to…" half; shares the `source` provenance model),
+[File Storage Migration](../file-storage-migration.md),
 [Nextcloud integration](../nextcloud-integration/README.md)
+
+> **Joint sprint progress (2026-06-27).** A cross-repo "file provenance" slice
+> shipped ahead of the full feature, coordinated with
+> [`07_file-sharing-destinations.md`](./07_file-sharing-destinations.md): the
+> **`BSOURCE` + `BORIGINALNAME`** columns (§3.1) now exist (migration
+> `Version20260627120000`) and the **`/files/upload` `source` + `original_name`
+> contract** (§5) is live. The **synaplan-nextcloud** app already adopts it —
+> every knowledge upload is tagged `source=nextcloud` with its original NC path.
+> Still to do for Feature 2: `BINCOMING`/`BSTAGEPATH`, the staging area, the
+> Incoming inbox GUI, generated-media registry, list-API surfacing, and the
+> Outlook/Synamail `source=outlook` adoption.
 
 > Goal: replace today's thin "uploads list" with a **fast, beautiful, complete
 > file manager** that is the single home for *every* file in a user's Synaplan
@@ -65,9 +79,9 @@ and ships a top-notch GUI.
 
 | Column | Type | Purpose |
 |---|---|---|
-| `BSOURCE` | varchar(32) | Origin: `web_upload`, `chat_attachment`, `outlook` (Synamail add-in), `nextcloud`, `opencloud`, `whatsapp`, `widget`, `api`, `generated`. |
+| `BSOURCE` | varchar(32) | Origin: `web_upload`, `chat_attachment`, `outlook` (Synamail add-in), `nextcloud`, `opencloud`, `whatsapp`, `widget`, `api`, `generated`. **✅ Shipped** via the provenance joint sprint (migration `Version20260627120000`, `File::SOURCES`, threaded through `/files/upload`). |
 | `BORIGINKIND` | varchar(24) null | For `generated`: `image`/`video`/`audio`/`calendar`/`document`; else null. |
-| `BORIGINALNAME` | varchar(255) null | The file's **original name at the source** (e.g. the Outlook attachment name, the Nextcloud/OpenCloud path/basename) — preserved even if the stored name is normalised/timestamped. Shown to the user; falls back to `BFILENAME`. |
+| `BORIGINALNAME` | varchar(255) null | The file's **original name at the source** (e.g. the Outlook attachment name, the Nextcloud/OpenCloud path/basename) — preserved even if the stored name is normalised/timestamped. Shown to the user; falls back to `BFILENAME`. **✅ Shipped** with `BSOURCE` (same sprint). |
 | `BINCOMING` | tinyint default 0 | `1` while the file is a freshly-arrived external push **awaiting the user / vectorization** (the "incoming inbox"). Cleared once the user has triaged it (vectorized, assigned a group, or dismissed). |
 | `BSTAGEPATH` | varchar(255) null | Relative path in the **separate incoming/staging area** where external pushes land before promotion to the canonical user tree (see §3.3). Null once promoted. |
 | `BMESSAGEID` | int null | FK-ish link to the originating `BMESSAGES.BID` (generated media + chat attachments). Enables "jump to chat" and reuses async-media linkage. |
@@ -697,6 +711,11 @@ An empty state must be perfectly centered and use standard muted text tokens so 
    (separate repos/apps) adopt the `source`+`original_name` upload contract later?
    (Outlook/Synamail already uploads today, so it can adopt the contract
    immediately; Nextcloud/OpenCloud have no inbound sync yet.)
+   **Update (2026-06-27):** the **Nextcloud app already adopts the
+   `source`+`original_name` upload contract** (knowledge uploads + chat-context
+   extraction now send `source=nextcloud` + the NC path). So the contract side is
+   proven on two integrations; what remains is the Synaplan-side `BINCOMING`
+   staging + Incoming GUI to treat those tagged uploads as a triage inbox.
 2. Do generated media count against the storage quota? (Proposal: yes, but shown
    separately.)
 3. Retention for generated media — keep forever (until user deletes) vs. auto-
