@@ -177,7 +177,9 @@ final readonly class WordPressIntegrationService
         }
 
         $relativePath = $store['path'];
-        $extension = strtolower((string) $file->getClientOriginalExtension());
+        // HEIC uploads are transcoded to JPEG on store; use the final extension.
+        $extension = strtolower((string) ($store['extension'] ?? $file->getClientOriginalExtension()));
+        $displayName = $store['display_name'] ?? $file->getClientOriginalName();
 
         [$extractedText] = $this->fileProcessor->extractText($relativePath, $extension, $userId);
 
@@ -185,15 +187,15 @@ final readonly class WordPressIntegrationService
             ->setUserId($userId)
             ->setFilePath($relativePath)
             ->setFileType($extension ?: 'txt')
-            ->setFileName($file->getClientOriginalName())
+            ->setFileName($displayName)
             ->setFileSize((int) $store['size'])
-            ->setFileMime($store['mime'] ?? 'application/octet-stream')
+            ->setFileMime($store['mime'])
             ->setStatus('processed')
             ->setFileText($extractedText ?? '');
 
         $this->em->persist($fileEntity);
 
-        $message = $this->buildMessageForFile($userId, $relativePath, $extension, $file->getClientOriginalName(), $extractedText ?? '');
+        $message = $this->buildMessageForFile($userId, $relativePath, $extension, $displayName, $extractedText ?? '');
         $this->em->persist($message);
         $this->em->flush();
 

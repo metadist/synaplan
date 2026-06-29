@@ -40,6 +40,10 @@ final readonly class FileProcessor
         'image/png',
         'image/gif',
         'image/webp',
+        // HEIC/HEIF are transcoded to JPEG before being sent to a vision
+        // provider (see extractFromImage) — providers themselves reject HEIC.
+        'image/heic',
+        'image/heif',
     ];
 
     private const TRANSCRIBABLE_MEDIA_EXTENSIONS = [
@@ -92,6 +96,7 @@ final readonly class FileProcessor
         private AiFacade $aiFacade,
         private WhisperService $whisperService,
         private VideoAnalysisService $videoAnalysisService,
+        private HeicConverter $heicConverter,
         private LoggerInterface $logger,
         private string $uploadDir,
         private int $tikaMinLength,
@@ -242,6 +247,20 @@ final readonly class FileProcessor
     {
         $this->logger->info('FileProcessor: Using Vision AI for image');
 
+        // Vision providers reject HEIC/HEIF. Web uploads are already transcoded
+        // to JPEG at store time, but images arriving from other sources (e.g.
+        // email attachments) may still be HEIC here — convert to a throwaway
+        // JPEG so the vision provider can read it.
+        $mime = is_string($baseMeta['mime'] ?? null) ? $baseMeta['mime'] : '';
+        $ext = is_string($baseMeta['ext'] ?? null) ? $baseMeta['ext'] : '';
+        $tempJpegAbsolute = null;
+        if ($this->heicConverter->isHeic($ext, $mime)) {
+            $tempJpegAbsolute = $this->convertHeicForVision($relativePath);
+            if (null !== $tempJpegAbsolute) {
+                $relativePath = $this->absoluteToRelative($tempJpegAbsolute);
+            }
+        }
+
         try {
             // Use Vision AI provider
             $prompt = 'Extract all visible text from this image. '
@@ -268,7 +287,37 @@ final readonly class FileProcessor
             ]);
 
             return ['', ['strategy' => 'vision_failed', 'error' => $e->getMessage()] + $baseMeta];
+        } finally {
+            if (null !== $tempJpegAbsolute && file_exists($tempJpegAbsolute)) {
+                @unlink($tempJpegAbsolute);
+            }
         }
+    }
+
+    /**
+     * Transcode a HEIC/HEIF image to a temporary JPEG inside the upload tree so
+     * it can be handed to a vision provider via a relative path.
+     *
+     * @return string|null absolute path to the temp JPEG, or null on failure
+     */
+    private function convertHeicForVision(string $relativePath): ?string
+    {
+        $sourceAbsolute = $this->resolveAbsolutePath($relativePath);
+        $tempAbsolute = dirname($sourceAbsolute).'/heic_vision_'.uniqid().'.jpg';
+
+        if ($this->heicConverter->convertFileToJpeg($sourceAbsolute, $tempAbsolute)) {
+            $this->logger->info('FileProcessor: Transcoded HEIC to JPEG for vision', [
+                'source' => basename($sourceAbsolute),
+            ]);
+
+            return $tempAbsolute;
+        }
+
+        $this->logger->warning('FileProcessor: HEIC to JPEG conversion failed; sending original to vision', [
+            'source' => basename($sourceAbsolute),
+        ]);
+
+        return null;
     }
 
     /**

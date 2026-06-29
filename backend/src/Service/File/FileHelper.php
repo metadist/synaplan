@@ -135,6 +135,7 @@ final class FileHelper
             'image/jpeg', 'image/jpg' => 'jpg',
             'image/gif' => 'gif',
             'image/webp' => 'webp',
+            'image/heic', 'image/heif' => 'heic',
             'video/mp4' => 'mp4',
             'video/webm' => 'webm',
             'audio/mpeg', 'audio/mp3' => 'mp3',
@@ -306,7 +307,7 @@ final class FileHelper
     {
         return match (strtolower($extension)) {
             'txt', 'md', 'csv' => 0,
-            'jpg', 'jpeg', 'png', 'gif', 'webp' => 1,
+            'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif' => 1,
             'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm' => 2,
             'pdf' => 3,
             'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt' => 4,

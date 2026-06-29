@@ -224,13 +224,16 @@ final readonly class FileUploadService
             return ['success' => false, 'error' => $storageResult['error']];
         }
 
-        $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
+        // After a HEIC->JPEG transcode the stored file is a JPEG, so route
+        // extraction/vectorization on the final stored extension, not the
+        // client's original ".heic".
+        $fileExtension = strtolower($storageResult['extension'] ?? $uploadedFile->getClientOriginalExtension());
         $file = $this->createFileEntity($uploadedFile, $user, $storageResult, $groupKey, $source, $originalName);
 
         $result = [
             'success' => true,
             'id' => $file->getId(),
-            'filename' => $uploadedFile->getClientOriginalName(),
+            'filename' => $file->getFileName(),
             'size' => $storageResult['size'],
             'mime' => $storageResult['mime'],
             'path' => $storageResult['path'],
@@ -275,17 +278,21 @@ final readonly class FileUploadService
         string $source = 'web_upload',
         ?string $originalName = null,
     ): File {
+        $convertedFrom = $storageResult['converted_from'] ?? null;
+
         $file = new File();
         $file->setUserId($user->getId());
         $file->setFilePath($storageResult['path']);
-        $file->setFileType(strtolower($uploadedFile->getClientOriginalExtension()));
-        $file->setFileName($uploadedFile->getClientOriginalName());
+        $file->setFileType(strtolower($storageResult['extension'] ?? $uploadedFile->getClientOriginalExtension()));
+        $file->setFileName($storageResult['display_name'] ?? $uploadedFile->getClientOriginalName());
         $file->setFileSize($storageResult['size']);
         $file->setFileMime($storageResult['mime']);
         $file->setGroupKey($groupKey);
         $file->setStatus('uploaded');
         $file->setSource($source);
-        $file->setOriginalName($originalName);
+        // Preserve the original ".heic" filename for provenance when we
+        // transcoded the upload and the caller didn't supply its own.
+        $file->setOriginalName($originalName ?? (null !== $convertedFrom ? $uploadedFile->getClientOriginalName() : null));
 
         $this->em->persist($file);
         $this->em->flush();

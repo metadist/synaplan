@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\File;
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Service\File\FileProcessor;
+use App\Service\File\HeicConverter;
 use App\Service\File\PdfRasterizer;
 use App\Service\File\TextCleaner;
 use App\Service\File\TikaClient;
@@ -52,6 +53,7 @@ class FileProcessorVideoTest extends TestCase
             $this->aiFacade,
             $this->whisperService,
             $this->videoAnalysisService,
+            new HeicConverter(new NullLogger()),
             new NullLogger(),
             $this->uploadDir,
             tikaMinLength: 32,
@@ -219,6 +221,7 @@ class FileProcessorVideoTest extends TestCase
             $aiFacade,
             $whisperService,
             $videoAnalysisService,
+            new HeicConverter(new NullLogger()),
             new NullLogger(),
             $this->uploadDir,
             tikaMinLength: 32,

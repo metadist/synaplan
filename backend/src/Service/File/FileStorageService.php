@@ -19,6 +19,9 @@ final readonly class FileStorageService
         'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
         'odt', 'ods', 'odp', 'odg', 'odf', 'ics',
         'jpg', 'jpeg', 'png', 'gif', 'webp',
+        // Apple HEIC/HEIF photos — transcoded to JPEG on store so browsers and
+        // vision providers (which reject HEIC) can consume them.
+        'heic', 'heif',
         'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm',
         // Video formats analysable via audio transcription + key-frame vision (#983)
         'mov', 'avi', 'mkv',
@@ -48,16 +51,22 @@ final readonly class FileStorageService
         private LoggerInterface $logger,
         private UserUploadPathBuilder $userUploadPathBuilder,
         private ThumbnailService $thumbnailService,
+        private HeicConverter $heicConverter,
     ) {
     }
 
     /**
      * Store uploaded file.
      *
+     * HEIC/HEIF photos are transcoded to JPEG on store; on success the result
+     * reports the final stored `extension`, a `display_name` whose extension
+     * matches the stored file, and `converted_from` (the original extension, or
+     * null when no transcoding happened).
+     *
      * @param UploadedFile $file   Uploaded file
      * @param int          $userId User ID
      *
-     * @return array ['success' => bool, 'path' => string, 'size' => int, 'mime' => string, 'error' => string|null]
+     * @return array{success: bool, path: string, size: int, mime: string, extension?: string, original_extension?: string, display_name?: string, converted_from?: string|null, error: string|null}
      */
     public function storeUploadedFile(UploadedFile $file, int $userId): array
     {
@@ -107,8 +116,40 @@ final readonly class FileStorageService
             // Skip isValid() check for FrankenPHP compatibility
             // FrankenPHP may delete temp files immediately, so we use getContent() instead
 
+            $originalName = $file->getClientOriginalName();
+            $originalExtension = strtolower($file->getClientOriginalExtension());
+
             // Generate storage path: {last2}/{prev3}/{paddedUserId}/{year}/{month}/{filename}
-            $relativePath = $this->generateStoragePath($userId, $file->getClientOriginalName());
+            $relativePath = $this->generateStoragePath($userId, $originalName);
+
+            $content = $file->getContent();
+            $mime = $file->getMimeType() ?? 'application/octet-stream';
+            $finalExtension = $originalExtension;
+            $convertedFrom = null;
+
+            // Transcode Apple HEIC/HEIF photos to JPEG: browsers can't render
+            // HEIC and the hosted vision providers reject it. Everything stored
+            // downstream is a normal JPEG, so display, RAG, and vision all work.
+            if ($this->heicConverter->isHeic($originalExtension, $mime)) {
+                $jpeg = $this->heicConverter->convertBlobToJpeg($content);
+                if (null === $jpeg) {
+                    return [
+                        'success' => false,
+                        'path' => '',
+                        'size' => 0,
+                        'mime' => '',
+                        'error' => 'Could not process this HEIC photo. Please convert it to JPEG and try again.',
+                    ];
+                }
+
+                $content = $jpeg;
+                $mime = 'image/jpeg';
+                $finalExtension = 'jpg';
+                $convertedFrom = $originalExtension;
+                // Swap the stored file's extension so it is served as a JPEG.
+                $relativePath = preg_replace('/\.[^.\/]+$/', '.jpg', $relativePath) ?? $relativePath;
+            }
+
             $absolutePath = $this->uploadDir.'/'.$relativePath;
 
             // Create directory if not exists
@@ -130,7 +171,6 @@ final readonly class FileStorageService
             // FrankenPHP workaround: Always use getContent() instead of move()
             // This is necessary because FrankenPHP deletes temp files immediately
             $this->logger->info('FileStorage: Using stream copy for FrankenPHP compatibility');
-            $content = $file->getContent();
             if (!file_put_contents($absolutePath, $content)) {
                 throw new \RuntimeException('Failed to write file content to '.$absolutePath);
             }
@@ -139,14 +179,25 @@ final readonly class FileStorageService
                 'user_id' => $userId,
                 'path' => $relativePath,
                 'size' => filesize($absolutePath),
-                'mime' => $file->getMimeType(),
+                'mime' => $mime,
+                'converted_from' => $convertedFrom,
             ]);
+
+            // The user-facing name keeps the original basename but reflects the
+            // stored extension (e.g. "IMG_1234.heic" -> "IMG_1234.jpg").
+            $displayName = null !== $convertedFrom
+                ? pathinfo($originalName, PATHINFO_FILENAME).'.'.$finalExtension
+                : $originalName;
 
             return [
                 'success' => true,
                 'path' => $relativePath,
                 'size' => filesize($absolutePath),
-                'mime' => $file->getMimeType() ?? 'application/octet-stream',
+                'mime' => $mime,
+                'extension' => $finalExtension,
+                'original_extension' => $originalExtension,
+                'display_name' => $displayName,
+                'converted_from' => $convertedFrom,
                 'error' => null,
             ];
         } catch (\Throwable $e) {

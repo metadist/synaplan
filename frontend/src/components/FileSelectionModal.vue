@@ -58,7 +58,7 @@
                 type="file"
                 multiple
                 class="hidden"
-                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
+                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
                 data-testid="input-file-selection-upload"
                 @change="handleFileUpload"
               />

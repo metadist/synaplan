@@ -1428,7 +1428,7 @@
     "newFolderExists": "Ya existe una carpeta llamada \"{name}\"",
     "newFolderInvalid": "Introduce un nombre de carpeta válido",
     "noFileSelected": "Ninguno seleccionado",
-    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, MP3, MP4",
+    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, HEIC, MP3, MP4",
     "autoProcessingTitle": "Procesamiento Automático",
     "autoProcessingInfo": "Todos los archivos se extraen y vectorizan automáticamente para un rendimiento RAG óptimo con búsqueda semántica.",
     "uploadAndProcess": "Subir y Procesar Archivos",

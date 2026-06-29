@@ -44,7 +44,7 @@
             ref="fileInputRef"
             type="file"
             multiple
-            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.mp3,.mp4,.mov,.avi,.mkv,.xlsx,.csv"
+            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.heic,.heif,.mp3,.mp4,.mov,.avi,.mkv,.xlsx,.csv"
             class="hidden"
             data-testid="input-files"
             @change="handleFileSelect"
