@@ -221,7 +221,14 @@ final readonly class FileUploadService
 
         $storageResult = $this->storageService->storeUploadedFile($uploadedFile, $user->getId());
         if (!$storageResult['success']) {
-            return ['success' => false, 'error' => $storageResult['error']];
+            return [
+                'success' => false,
+                'error' => FileHelper::withAdminDiagnostics(
+                    (string) $storageResult['error'],
+                    $user->isAdmin(),
+                    $storageResult['error_detail'] ?? null,
+                ),
+            ];
         }
 
         // After a HEIC->JPEG transcode the stored file is a JPEG, so route

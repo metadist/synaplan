@@ -16,6 +16,22 @@ FROM ghcr.io/metadist/synaplan-base-php:1.1.0@sha256:6378ce497415579b9a8ded6395b
 
 WORKDIR /var/www/backend
 
+# iOS HDR "tmap"/gain-map HEIC photos (newer iPhones) require libheif >= 1.18 to
+# decode. The base image ships Debian bookworm's libheif 1.15, which fails on them
+# with "Failed to read the file", so HEIC->JPEG transcoding of modern iPhone
+# uploads breaks. Pull the newer libheif + decoder plugins from bookworm-backports
+# so ImageMagick/imagick (which loads libheif.so.1 at runtime) can read them.
+# TODO: fold this into the synaplan-base-php base image and drop this layer.
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends -t bookworm-backports \
+        libheif1 \
+        libheif-plugin-libde265 \
+        libheif-plugin-aomenc \
+        libheif-plugin-x265 \
+        libheif-plugin-dav1d \
+    && rm -rf /var/lib/apt/lists/*
+
 # ext-redis (phpredis) is provided by the base image (synaplan-base-php >= 1.1.0)
 # for Symfony Messenger's Redis Streams transport (`symfony/redis-messenger`),
 # which the worker's `messenger:consume` speaks via the binary protocol. Cache,

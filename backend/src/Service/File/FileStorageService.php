@@ -66,7 +66,7 @@ final readonly class FileStorageService
      * @param UploadedFile $file   Uploaded file
      * @param int          $userId User ID
      *
-     * @return array{success: bool, path: string, size: int, mime: string, extension?: string, original_extension?: string, display_name?: string, converted_from?: string|null, error: string|null}
+     * @return array{success: bool, path: string, size: int, mime: string, extension?: string, original_extension?: string, display_name?: string, converted_from?: string|null, error: string|null, error_detail?: string}
      */
     public function storeUploadedFile(UploadedFile $file, int $userId): array
     {
@@ -131,7 +131,8 @@ final readonly class FileStorageService
             // HEIC and the hosted vision providers reject it. Everything stored
             // downstream is a normal JPEG, so display, RAG, and vision all work.
             if ($this->heicConverter->isHeic($originalExtension, $mime)) {
-                $jpeg = $this->heicConverter->convertBlobToJpeg($content);
+                $heicError = null;
+                $jpeg = $this->heicConverter->convertBlobToJpeg($content, $heicError);
                 if (null === $jpeg) {
                     return [
                         'success' => false,
@@ -139,6 +140,7 @@ final readonly class FileStorageService
                         'size' => 0,
                         'mime' => '',
                         'error' => 'Could not process this HEIC photo. Please convert it to JPEG and try again.',
+                        'error_detail' => 'HEIC decode failed: '.($heicError ?? 'unknown error'),
                     ];
                 }
 

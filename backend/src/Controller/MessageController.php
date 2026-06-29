@@ -7,6 +7,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -699,7 +700,11 @@ class MessageController extends AbstractController
 
             if (!$storageResult['success']) {
                 return $this->json([
-                    'error' => 'File storage failed: '.$storageResult['error'],
+                    'error' => FileHelper::withAdminDiagnostics(
+                        'File storage failed: '.$storageResult['error'],
+                        $user->isAdmin(),
+                        $storageResult['error_detail'] ?? null,
+                    ),
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 

@@ -301,6 +301,28 @@ final class FileHelper
     }
 
     /**
+     * Append an admin-only technical diagnostics block to a user-facing error.
+     *
+     * Mirrors the "Admin diagnostics (visible to you only)" convention used for
+     * AI/TTS failures: regular users see only the friendly message, while an
+     * admin additionally gets the raw technical reason to debug the failure.
+     *
+     * @param string      $message friendly, user-facing error message
+     * @param bool        $isAdmin whether the current user is an admin
+     * @param string|null $detail  technical reason (only shown to admins)
+     */
+    public static function withAdminDiagnostics(string $message, bool $isAdmin, ?string $detail): string
+    {
+        if (!$isAdmin || null === $detail || '' === trim($detail)) {
+            return $message;
+        }
+
+        return $message
+            ."\n\n**Admin diagnostics (visible to you only)**\n"
+            ."```\n".trim($detail)."\n```";
+    }
+
+    /**
      * Map file extension to numeric type code for RAG vectorization.
      */
     public static function getFileTypeCode(string $extension): int

@@ -59,19 +59,40 @@ final readonly class HeicConverter
     /**
      * Transcode raw HEIC bytes to JPEG bytes.
      *
+     * The bytes are staged to a temporary `.heic` file and decoded via a file
+     * path with an explicit `heic:` coder hint. Imagick's in-memory
+     * `readImageBlob()` relies on magic-byte sniffing, which fails ("Unable to
+     * read image blob") on real iPhone HEICs (tiled HEVC) even though the
+     * libheif/libde265 delegates are installed — reading from a path is
+     * reliable.
+     *
+     * @param string|null $error Out-param set to a technical failure reason
+     *                           (for admin diagnostics) when conversion fails
+     *
      * @return string|null JPEG bytes, or null when conversion is unavailable or fails
      */
-    public function convertBlobToJpeg(string $heicBytes): ?string
+    public function convertBlobToJpeg(string $heicBytes, ?string &$error = null): ?string
     {
+        $error = null;
+
         if (!$this->isSupported()) {
+            $error = 'imagick extension is not loaded';
             $this->logger->warning('HeicConverter: imagick extension unavailable, cannot convert HEIC');
 
             return null;
         }
 
+        $tempHeic = tempnam(sys_get_temp_dir(), 'heic_').'.heic';
+        if (false === @file_put_contents($tempHeic, $heicBytes)) {
+            $error = 'could not stage HEIC bytes to a temporary file';
+            $this->logger->error('HeicConverter: '.$error);
+            @unlink($tempHeic);
+
+            return null;
+        }
+
         try {
-            $imagick = new \Imagick();
-            $imagick->readImageBlob($heicBytes);
+            $imagick = $this->readHeic($tempHeic);
 
             // A HEIC container may hold several images (depth map, thumbnails,
             // burst frames). Keep only the primary frame for a single JPEG.
@@ -89,6 +110,7 @@ final readonly class HeicConverter
             $imagick->destroy();
 
             if ('' === $jpeg) {
+                $error = 'decoder produced an empty image';
                 $this->logger->error('HeicConverter: conversion produced empty JPEG');
 
                 return null;
@@ -96,11 +118,18 @@ final readonly class HeicConverter
 
             return $jpeg;
         } catch (\Throwable $e) {
+            // "Failed to read the file" here typically means the installed
+            // libheif is too old for the file (e.g. iOS HDR/`tmap` HEICs need
+            // libheif >= 1.18).
+            $error = $e->getMessage();
             $this->logger->error('HeicConverter: HEIC to JPEG conversion failed', [
                 'error' => $e->getMessage(),
+                'bytes' => strlen($heicBytes),
             ]);
 
             return null;
+        } finally {
+            @unlink($tempHeic);
         }
     }
 
@@ -111,24 +140,64 @@ final readonly class HeicConverter
      */
     public function convertFileToJpeg(string $sourcePath, string $destinationPath): bool
     {
-        $bytes = @file_get_contents($sourcePath);
-        if (false === $bytes) {
-            $this->logger->error('HeicConverter: could not read source file', ['path' => $sourcePath]);
+        if (!$this->isSupported()) {
+            $this->logger->warning('HeicConverter: imagick extension unavailable, cannot convert HEIC');
 
             return false;
         }
 
-        $jpeg = $this->convertBlobToJpeg($bytes);
-        if (null === $jpeg) {
+        try {
+            $imagick = $this->readHeic($sourcePath);
+            $imagick->setIteratorIndex(0);
+            $imagick->autoOrient();
+            $imagick->setImageFormat('jpeg');
+            $imagick->setImageCompressionQuality($this->quality);
+            $imagick->stripImage();
+            $jpeg = $imagick->getImageBlob();
+            $imagick->clear();
+            $imagick->destroy();
+
+            if ('' === $jpeg) {
+                $this->logger->error('HeicConverter: conversion produced empty JPEG', ['path' => $sourcePath]);
+
+                return false;
+            }
+
+            if (false === FileHelper::writeFile($destinationPath, $jpeg)) {
+                $this->logger->error('HeicConverter: could not write converted file', ['path' => $destinationPath]);
+
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->logger->error('HeicConverter: HEIC to JPEG conversion failed', [
+                'path' => $sourcePath,
+                'error' => $e->getMessage(),
+            ]);
+
             return false;
         }
+    }
 
-        if (false === FileHelper::writeFile($destinationPath, $jpeg)) {
-            $this->logger->error('HeicConverter: could not write converted file', ['path' => $destinationPath]);
+    /**
+     * Read a HEIC file into an Imagick instance, preferring the explicit
+     * `heic:` coder and falling back to plain path-based detection.
+     */
+    private function readHeic(string $path): \Imagick
+    {
+        try {
+            $imagick = new \Imagick();
+            $imagick->readImage('heic:'.$path);
 
-            return false;
+            return $imagick;
+        } catch (\Throwable) {
+            // Fall back to extension/magic-based detection (handles .heif and
+            // any build where the explicit coder prefix is unavailable).
+            $imagick = new \Imagick();
+            $imagick->readImage($path);
+
+            return $imagick;
         }
-
-        return true;
     }
 }
