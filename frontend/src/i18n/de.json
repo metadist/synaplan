@@ -1945,7 +1945,7 @@
     "newFolderExists": "Ein Ordner mit dem Namen „{name}“ existiert bereits",
     "newFolderInvalid": "Bitte gib einen gültigen Ordnernamen ein",
     "noFileSelected": "Keine ausgewählt",
-    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, MP3, MP4",
+    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, HEIC, MP3, MP4",
     "autoProcessingTitle": "Automatische Verarbeitung",
     "autoProcessingInfo": "Alle Dateien werden automatisch verarbeitet und durchsuchbar gemacht.",
     "uploadAndProcess": "Dateien hochladen",

@@ -1266,7 +1266,6 @@ class WidgetPublicController extends AbstractController
      */
     private function processWidgetFile($uploadedFile, $widget, $widgetSession): array
     {
-        $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
         $owner = $widget->getOwner();
 
         if (!$owner) {
@@ -1283,13 +1282,16 @@ class WidgetPublicController extends AbstractController
         );
 
         $relativePath = $storageResult['path'];
+        // HEIC uploads are stored as JPEG; use the final stored extension/name.
+        $fileExtension = strtolower($storageResult['extension'] ?? $uploadedFile->getClientOriginalExtension());
+        $displayName = $storageResult['display_name'] ?? $uploadedFile->getClientOriginalName();
 
         // Create File entity with BUSERID=0 and BUSERSESSIONID=session_id
         $file = new File();
         $file->setUserId(0); // Anonymous widget user
         $file->setUserSessionId($widgetSession->getId()); // Link to widget session
         $file->setFilePath($relativePath);
-        $file->setFileName($uploadedFile->getClientOriginalName());
+        $file->setFileName($displayName);
         $file->setFileSize($storageResult['size']);
         $file->setFileMime($storageResult['mime']);
         $file->setFileType($this->getFileTypeString($fileExtension));
@@ -1302,7 +1304,7 @@ class WidgetPublicController extends AbstractController
             'success' => true,
             'file' => [
                 'id' => $file->getId(),
-                'filename' => $uploadedFile->getClientOriginalName(),
+                'filename' => $displayName,
                 'size' => $storageResult['size'],
             ],
         ];

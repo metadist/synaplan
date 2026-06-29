@@ -1429,7 +1429,7 @@
     "newFolderExists": "\"{name}\" adlı bir klasör zaten var",
     "newFolderInvalid": "Lütfen geçerli bir klasör adı gir",
     "noFileSelected": "Seçili yok",
-    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, MP3, MP4",
+    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, HEIC, MP3, MP4",
     "autoProcessingTitle": "Otomatik İşleme",
     "autoProcessingInfo": "Tüm dosyalar anlamsal arama ile optimum RAG performansı için otomatik olarak çıkarılır ve vektörleştirilir.",
     "uploadAndProcess": "Dosyaları Yükle ve İşle",

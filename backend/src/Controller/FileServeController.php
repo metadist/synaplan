@@ -189,6 +189,8 @@ class FileServeController extends AbstractController
             'webp' => 'image/webp',
             'bmp' => 'image/bmp',
             'svg' => 'image/svg+xml',
+            'heic' => 'image/heic',
+            'heif' => 'image/heif',
             // Documents
             'pdf' => 'application/pdf',
             'doc' => 'application/msword',

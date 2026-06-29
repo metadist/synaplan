@@ -3,6 +3,7 @@
 namespace App\Tests\Service\File;
 
 use App\Service\File\FileStorageService;
+use App\Service\File\HeicConverter;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
 use PHPUnit\Framework\TestCase;
@@ -11,6 +12,8 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class FileStorageServiceTest extends TestCase
 {
+    use HeicTestSupportTrait;
+
     private FileStorageService $service;
     private string $testUploadDir;
     private LoggerInterface $logger;
@@ -27,7 +30,8 @@ class FileStorageServiceTest extends TestCase
             $this->testUploadDir,
             $this->logger,
             new UserUploadPathBuilder(),
-            $thumbnailService
+            $thumbnailService,
+            new HeicConverter($this->logger)
         );
     }
 
@@ -99,6 +103,39 @@ class FileStorageServiceTest extends TestCase
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('too large', $result['error']);
+    }
+
+    public function testStoreUploadedFileTranscodesHeicToJpeg(): void
+    {
+        // Build a real HEIC sample so the store path exercises a true transcode.
+        // Skip when the environment cannot genuinely encode/decode HEIC (e.g.
+        // CI runners whose imagick lists HEIC but lacks a working libheif).
+        $heicBytes = $this->createHeicSampleOrSkip(64, 64);
+        $this->skipUnlessEnvironmentDecodesHeic($heicBytes);
+
+        $testFile = tempnam(sys_get_temp_dir(), 'synaplan_test_');
+        file_put_contents($testFile, $heicBytes);
+
+        $uploadedFile = new UploadedFile(
+            $testFile,
+            'IMG_1234.heic',
+            'image/heic',
+            null,
+            true
+        );
+
+        $result = $this->service->storeUploadedFile($uploadedFile, 123);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringEndsWith('.jpg', $result['path']);
+        $this->assertEquals('image/jpeg', $result['mime']);
+        $this->assertEquals('jpg', $result['extension']);
+        $this->assertEquals('heic', $result['converted_from']);
+        $this->assertEquals('IMG_1234.jpg', $result['display_name']);
+
+        // Stored file is a real JPEG on disk.
+        $this->assertTrue($this->service->fileExists($result['path']));
+        $this->assertEquals('image/jpeg', mime_content_type($this->service->getAbsolutePath($result['path'])));
     }
 
     public function testFileExistsReturnsTrueForExistingFile(): void

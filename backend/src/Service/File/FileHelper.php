@@ -135,6 +135,7 @@ final class FileHelper
             'image/jpeg', 'image/jpg' => 'jpg',
             'image/gif' => 'gif',
             'image/webp' => 'webp',
+            'image/heic', 'image/heif' => 'heic',
             'video/mp4' => 'mp4',
             'video/webm' => 'webm',
             'audio/mpeg', 'audio/mp3' => 'mp3',
@@ -300,13 +301,35 @@ final class FileHelper
     }
 
     /**
+     * Append an admin-only technical diagnostics block to a user-facing error.
+     *
+     * Mirrors the "Admin diagnostics (visible to you only)" convention used for
+     * AI/TTS failures: regular users see only the friendly message, while an
+     * admin additionally gets the raw technical reason to debug the failure.
+     *
+     * @param string      $message friendly, user-facing error message
+     * @param bool        $isAdmin whether the current user is an admin
+     * @param string|null $detail  technical reason (only shown to admins)
+     */
+    public static function withAdminDiagnostics(string $message, bool $isAdmin, ?string $detail): string
+    {
+        if (!$isAdmin || null === $detail || '' === trim($detail)) {
+            return $message;
+        }
+
+        return $message
+            ."\n\n**Admin diagnostics (visible to you only)**\n"
+            ."```\n".trim($detail)."\n```";
+    }
+
+    /**
      * Map file extension to numeric type code for RAG vectorization.
      */
     public static function getFileTypeCode(string $extension): int
     {
         return match (strtolower($extension)) {
             'txt', 'md', 'csv' => 0,
-            'jpg', 'jpeg', 'png', 'gif', 'webp' => 1,
+            'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif' => 1,
             'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm' => 2,
             'pdf' => 3,
             'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt' => 4,

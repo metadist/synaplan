@@ -707,7 +707,7 @@
     "newFolderExists": "A folder named \"{name}\" already exists",
     "newFolderInvalid": "Please enter a valid folder name",
     "noFileSelected": "None selected",
-    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, MP3, MP4",
+    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, HEIC, MP3, MP4",
     "autoProcessingTitle": "Automatic Processing",
     "autoProcessingInfo": "All files are automatically processed and made searchable.",
     "uploadAndProcess": "Upload Files",
