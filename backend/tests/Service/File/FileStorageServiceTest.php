@@ -12,6 +12,8 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class FileStorageServiceTest extends TestCase
 {
+    use HeicTestSupportTrait;
+
     private FileStorageService $service;
     private string $testUploadDir;
     private LoggerInterface $logger;
@@ -105,16 +107,11 @@ class FileStorageServiceTest extends TestCase
 
     public function testStoreUploadedFileTranscodesHeicToJpeg(): void
     {
-        if (!extension_loaded('imagick') || !in_array('HEIC', \Imagick::queryFormats('HEIC'), true)) {
-            $this->markTestSkipped('imagick with HEIC support is required for this test');
-        }
-
         // Build a real HEIC sample so the store path exercises a true transcode.
-        $imagick = new \Imagick();
-        $imagick->newImage(64, 64, new \ImagickPixel('red'));
-        $imagick->setImageFormat('heic');
-        $heicBytes = $imagick->getImageBlob();
-        $imagick->clear();
+        // Skip when the environment cannot genuinely encode/decode HEIC (e.g.
+        // CI runners whose imagick lists HEIC but lacks a working libheif).
+        $heicBytes = $this->createHeicSampleOrSkip(64, 64);
+        $this->skipUnlessEnvironmentDecodesHeic($heicBytes);
 
         $testFile = tempnam(sys_get_temp_dir(), 'synaplan_test_');
         file_put_contents($testFile, $heicBytes);

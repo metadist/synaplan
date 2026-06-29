@@ -10,6 +10,8 @@ use Psr\Log\NullLogger;
 
 class HeicConverterTest extends TestCase
 {
+    use HeicTestSupportTrait;
+
     private HeicConverter $converter;
 
     protected function setUp(): void
@@ -35,15 +37,8 @@ class HeicConverterTest extends TestCase
 
     public function testConvertBlobToJpegProducesJpeg(): void
     {
-        if (!extension_loaded('imagick') || !in_array('HEIC', \Imagick::queryFormats('HEIC'), true)) {
-            $this->markTestSkipped('imagick with HEIC support is required for this test');
-        }
-
-        $imagick = new \Imagick();
-        $imagick->newImage(32, 32, new \ImagickPixel('blue'));
-        $imagick->setImageFormat('heic');
-        $heicBytes = $imagick->getImageBlob();
-        $imagick->clear();
+        $heicBytes = $this->createHeicSampleOrSkip();
+        $this->skipUnlessEnvironmentDecodesHeic($heicBytes);
 
         $jpeg = $this->converter->convertBlobToJpeg($heicBytes);
 
