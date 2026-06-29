@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\Entity\File;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Service\Exception\NoModelAvailableException;
@@ -107,6 +108,12 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
 
         $mimeType = $this->guessMimeType($localPath, $type);
 
+        // Register a BFILES row so the generated media is resolvable by the
+        // serve route (which requires a DB record) and appears in the file
+        // world with `source=generated`. Without this, the returned
+        // /api/v1/files/uploads/... URL 404s ("File not found in database").
+        $this->registerGeneratedFile($user, $localPath, $mimeType);
+
         $usedResolution = 'video' === $type
             ? ($this->extractResolutionFromResult($result) ?? $resolution)
             : null;
@@ -129,6 +136,46 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         }
 
         return $response;
+    }
+
+    /**
+     * Register a generated media file as a BFILES row so it is (a) resolvable
+     * by {@see \App\Controller\StaticUploadController} (which 404s anything not
+     * in the DB) and (b) visible in the file world with `source=generated`.
+     *
+     * Best-effort: a persistence failure must not break generation — the file
+     * is already on disk and returned to the caller.
+     */
+    private function registerGeneratedFile(User $user, string $localPath, string $mimeType): void
+    {
+        try {
+            if (null !== $this->em->getRepository(File::class)->findOneBy(['filePath' => $localPath])) {
+                return;
+            }
+
+            $absolutePath = $this->uploadDir.'/'.$localPath;
+            $fileSize = is_file($absolutePath) ? (int) filesize($absolutePath) : 0;
+            $extension = strtolower(pathinfo($localPath, PATHINFO_EXTENSION));
+
+            $file = new File();
+            $file->setUserId($user->getId());
+            $file->setFilePath($localPath);
+            $file->setFileType($extension);
+            $file->setFileName(basename($localPath));
+            $file->setFileSize($fileSize);
+            $file->setFileMime($mimeType);
+            $file->setStatus('generated');
+            $file->setSource('generated');
+
+            $this->em->persist($file);
+            $this->em->flush();
+        } catch (\Throwable $e) {
+            $this->logger->warning('Failed to register generated media as a file', [
+                'user_id' => $user->getId(),
+                'path' => $localPath,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function generateFromImages(User $user, string $prompt, array $imagePaths, ?int $modelId = null): array
@@ -185,6 +232,8 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         }
 
         $mimeType = $this->guessMimeType($localPath, 'image');
+
+        $this->registerGeneratedFile($user, $localPath, $mimeType);
 
         $this->recordUsage($user, 'image', $provider, $modelName, $resolvedModelId);
 

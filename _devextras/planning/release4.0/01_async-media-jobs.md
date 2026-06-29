@@ -218,8 +218,14 @@ Each sprint is independently shippable, gate-green, and flagged.
 
 ### Sprint F — Rollout, observability, docs
 
-- Flip `MEDIA_ASYNC_JOBS_ENABLED` default **on** (OSS/new installs); grandfather
-  existing installs with an explicit off-row + switch (mirror multitask rollout).
+- ✅ **Shipped:** flipped `MEDIA.ASYNC_JOBS_ENABLED` built-in default **on**
+  (`MediaJobConfig`), seeded the explicit global ON row (`MediaJobConfigSeeder`,
+  wired into `app:seed`), and grandfathered existing installs to an explicit
+  per-user OFF row via data migration `Version20260629120000` (mirrors the
+  multitask routing rollout `Version20260607000000`). Operators get a UI switch
+  at **Settings → Processing → Async media generation**
+  (`SystemConfigService` `MEDIA_ASYNC_JOBS_ENABLED`), which also clears the
+  acting admin's own grandfather row so the change applies to them immediately.
 - Admin: a simple jobs view (active/stale/failed counts, recent failures) from
   `MediaJobStore`.
 - Metrics/logs: time-in-queue, render duration, timeout rate, failure reasons.
@@ -250,7 +256,7 @@ Each sprint is independently shippable, gate-green, and flagged.
 
 | Flag (`BCONFIG`) | Default | Purpose |
 |---|---|---|
-| `MEDIA_ASYNC_JOBS_ENABLED` | off → on (Sprint F) | Master switch: chat/multitask media (image **+** video + audio) uses jobs vs inline. |
+| `MEDIA_ASYNC_JOBS_ENABLED` | **on** (default; existing installs grandfathered off, Sprint F) | Master switch: chat/multitask media (image **+** video + audio) uses jobs vs inline. |
 | `MEDIA_JOB_POLL_INTERVAL_SECONDS` | 3 | Advance re-dispatch delay. |
 | `MEDIA_JOB_IMAGE_INLINE_FAST_MS` | 1500 | Grace window: if a (fast) image job finishes within this on the first advance, resolve it in the same turn so quick images still feel instant — otherwise it detaches to the tray like any other job. |
 
