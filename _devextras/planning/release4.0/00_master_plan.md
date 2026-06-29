@@ -116,13 +116,14 @@ Full design in [`02_async-media-ux.md`](./02_async-media-ux.md).
 
 | # | Feature | File | Priority | Status |
 |---|---|---|---|---|
-| 1 | **Async media generation ("fire & continue")** — backend/architecture | [`01_async-media-jobs.md`](./01_async-media-jobs.md) | P0 | Sprints A–D shipped; E/F (legacy consolidation, billing, rollout) remain |
+| 1 | **Async media generation ("fire & continue")** — backend/architecture | [`01_async-media-jobs.md`](./01_async-media-jobs.md) | P0 | Sprints A–F shipped (rollout: default ON + grandfather migration + admin switch); legacy consolidation remains |
 | 1·UX | **Async media UX** — dedicated status banner (Option B), realtime completion + actionable toaster, global Jobs tray, cancel | [`02_async-media-ux.md`](./02_async-media-ux.md) | P0 | Banner + toaster + Jobs tray + cancel shipped (A–D) |
 | 2 | **File management world** — one home for every file: sources, vectorized status, groups, generated-media gallery | [`03_file-management.md`](./03_file-management.md) | P0 | Planned |
 | 3 | **Image & first-boot optimization** — multi-arch (arm64) base image, baked dev deps, custom `bge-m3` Ollama image; fast `docker compose up` on Mac | [`04_image-build-optimization.md`](./04_image-build-optimization.md) | P1 | Planned |
 | 4 | **Frictionless Onboarding & Conversion Flow** — Token wallet, anti-bot guards, seamless trial | [`05_onboarding-conversion-flow.md`](./05_onboarding-conversion-flow.md) | P1 | Planned |
 | 5 | **Self-Aware Routing** — route product/feature/how-to questions to a `synaplan` topic + curated "About Synaplan" RAG source; registry-derived, multilingual (de/en/es/tr). Includes the shipped meeting-reminder timezone fix. | [`06_self-aware-routing.md`](./06_self-aware-routing.md) | P1 | Planned (timezone fix shipped) |
-| 6 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
+| 6 | **Share generated files to destinations ("Send to…")** — Phase A: Nextcloud app saves *every* generated file type (Word/PPT/MP3/ICS/…) into `Synaplan/<Kind>` from both NC chat surfaces. Phase B/C: generic `DestinationProvider` registry + standard shareable object + Web Share API. Shares the `source` provenance model with Feature 2. | [`07_file-sharing-destinations.md`](./07_file-sharing-destinations.md) | P1 | Provenance joint sprint shipped (2026-06-27); A2 + B/C planned |
+| 7 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
 
 > "We have more things to implement" — this index is the place to add them.
 > Each new 4.0 feature gets a `0N_<slug>.md` and a row here. Candidate backlog

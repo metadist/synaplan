@@ -76,6 +76,7 @@ cancel, and a11y/i18n goals are all **unchanged** — they simply read from the
 | **Per-user Redis index** (`mediajob:user:{id}` set, maintained in `MediaJobStore::save`): `findActiveForUser`/`countActiveForUser` are now O(that user's jobs) and tenant-isolated — no global active-set scan. (Sprint E) | ✅ shipped |
 | **Per-user concurrency ceiling** (`MEDIA.JOB_MAX_ACTIVE_PER_USER`, default **16**, clamped 1–100): `detachMediaToAsyncJob` rejects past the limit with a localized message (all 4 locales) and never creates a job / calls the provider. (Sprint E) | ✅ shipped |
 | **Async usage billing** (`MediaJobUsageRecorder`, wired into `MediaJobMessageSync::syncTerminalState`): bills **only `completed`** renders, idempotent (`_usage_recorded` flag), `media_usage` stashed on the job at detach so cost matches the inline path. Failed/cancelled/timed-out are never billed (honours provider refunds). (Sprint E, #1146) | ✅ shipped |
+| **Rollout (Sprint F):** built-in default flipped **ON** + global ON row seeded (`MediaJobConfigSeeder` in `app:seed`); existing users grandfathered to per-user OFF (migration `Version20260629120000`); operator UI switch at **Settings → Processing → Async media generation** (`SystemConfigService`). | ✅ shipped |
 
 ---
 
