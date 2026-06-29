@@ -665,8 +665,11 @@ final class RateLimitService
     /**
      * Get max output tokens allowed for a user based on their subscription level.
      *
-     * Returns null when billing is disabled (Open Source Mode) or for admins,
-     * meaning the model's own max_tokens should be used without restriction.
+     * Returns null when billing is disabled (Open Source Mode), for admins, or
+     * when the level has no MAX_OUTPUT_TOKENS configured — meaning the model's
+     * own max_tokens is used without restriction. By design only ANONYMOUS keeps
+     * a hard cap; authenticated tiers (NEW/PRO/TEAM/BUSINESS) return null here
+     * and are bounded by the cost-budget gate and message-count limits instead.
      */
     public function getMaxOutputTokens(User $user): ?int
     {

@@ -12,10 +12,14 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
+use App\Service\Branding\BrandingService;
+use App\Service\Client\ClientContextResolver;
+use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Infrastructure\RedisService;
+use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
@@ -75,6 +79,10 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             // RedisService is final (not stubbable); a real instance with an
             // empty DSN is inert and saveDefaultModels never touches it.
             new RedisService('', 'test', new NullLogger()),
+            new ClientContextResolver(),
+            $this->createStub(BrandingService::class),
+            $this->createStub(MobileVersionService::class),
+            $this->createStub(MarketingNewsConfig::class),
             'http://qdrant.example',
         );
 

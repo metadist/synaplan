@@ -26,17 +26,7 @@
       "matchUpdateTypes": ["minor", "patch"]
     },
     {
-      "description": "QA tools isolated — historically broke CI (#580)",
-      "groupName": "QA & Dev Tools",
-      "matchPackageNames": [
-        "phpunit/phpunit", "phpstan/phpstan", "phpstan/phpstan-doctrine",
-        "friendsofphp/php-cs-fixer", "dg/bypass-finals",
-        "@playwright/test", "vitest", "@vitest/**", "happy-dom"
-      ],
-      "matchUpdateTypes": ["minor", "patch"]
-    },
-    {
-      "description": "Catch-all npm patch/minor FIRST — Frontend Core rule below overrides",
+      "description": "Catch-all npm patch/minor — later rules override for Frontend Core and QA",
       "groupName": "Frontend Dependencies",
       "matchManagers": ["npm"],
       "matchUpdateTypes": ["minor", "patch"]
@@ -50,6 +40,16 @@
         "vite", "@vitejs/**",
         "typescript", "@typescript-eslint/**", "vue-tsc",
         "tailwindcss", "@tailwindcss/**"
+      ],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "QA tools isolated — MUST come after npm catch-all so groupName wins (#580)",
+      "groupName": "QA & Dev Tools",
+      "matchPackageNames": [
+        "phpunit/phpunit", "phpstan/phpstan", "phpstan/phpstan-doctrine",
+        "friendsofphp/php-cs-fixer", "dg/bypass-finals",
+        "@playwright/test", "vitest", "@vitest/**", "happy-dom"
       ],
       "matchUpdateTypes": ["minor", "patch"]
     },

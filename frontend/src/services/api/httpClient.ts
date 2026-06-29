@@ -6,6 +6,28 @@
 import { z } from 'zod'
 import { GetApiConfigRuntimeConfigResponseSchema } from '@/generated/api-schemas'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import {
+  getNativeAccessToken,
+  getNativeRefreshToken,
+  setNativeTokens,
+  clearNativeTokens,
+  hasNativeTokens,
+} from '@/services/api/nativeAuth'
+
+/**
+ * Credentials mode for backend requests.
+ *
+ * Web runs same-origin and authenticates via HttpOnly cookies → `include`.
+ * The native shell runs cross-origin (`capacitor://localhost`) where the
+ * backend's wildcard CORS (`Access-Control-Allow-Origin: *`) is incompatible
+ * with credentialed requests, and third-party cookies are unreliable in the
+ * WebView. Native therefore omits cookies and authenticates via a Bearer token
+ * (Epic 3); public endpoints (runtime config, guest trial) work immediately.
+ */
+function getCredentialsMode(): RequestCredentials {
+  return isNativeApp() ? 'omit' : 'include'
+}
 
 /**
  * Structured error thrown by httpClient on a non-OK response.
@@ -88,7 +110,7 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
       const timeoutId = setTimeout(() => controller.abort(), 2000) // 2 second timeout
 
       const response = await fetch(`${getApiBaseUrl()}/api/v1/config/runtime`, {
-        credentials: 'include',
+        credentials: getCredentialsMode(),
         signal: controller.signal,
       })
 
@@ -120,6 +142,9 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         googleTag: {
           enabled: false,
           tagId: '',
+        },
+        marketingNews: {
+          enabled: false,
         },
         build: {
           version: 'unknown',
@@ -257,7 +282,9 @@ function recordAuthFailure(): void {
  * session in the first place.
  */
 async function refreshAccessToken(): Promise<RefreshResult> {
-  if (!hasSessionHint()) {
+  // Native gates on a stored refresh token (no cookie); web on the UX hint.
+  const native = isNativeApp()
+  if (native ? !hasNativeTokens() : !hasSessionHint()) {
     return { success: false }
   }
 
@@ -270,18 +297,37 @@ async function refreshAccessToken(): Promise<RefreshResult> {
     try {
       const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
-        credentials: 'include',
+        credentials: getCredentialsMode(),
+        // Native has no refresh cookie → send the stored refresh token in the body.
+        ...(native
+          ? {
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refreshToken: getNativeRefreshToken() }),
+            }
+          : {}),
       })
 
       if (response.ok) {
         // Reset failure counter on success
         authFailureCount = 0
+        // Native receives the rotated access token in the body → persist it.
+        if (native) {
+          try {
+            const data = await response.json()
+            setNativeTokens(data?.tokens)
+          } catch {
+            // A missing/!json body must not fail the refresh (web ignores it).
+          }
+        }
         return { success: true }
       }
 
       // Refresh definitively failed - the stored cookie is dead. Clear the
       // hint so future visits don't keep retrying against a closed session.
       clearSessionHint()
+      if (native) {
+        clearNativeTokens()
+      }
 
       // Check if this was an OIDC session expiry (user logged out from Keycloak)
       try {
@@ -402,12 +448,20 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     headers['Content-Type'] = 'application/json'
   }
 
-  // No Authorization header needed - using HttpOnly cookies
+  // Web authenticates via HttpOnly cookies. The native shell is cross-origin
+  // and cookie-less, so it replays the stored access token as a Bearer header
+  // (the backend's CookieTokenAuthenticator accepts both — Epic 3).
+  if (isNativeApp() && !('Authorization' in headers)) {
+    const nativeToken = getNativeAccessToken()
+    if (nativeToken) {
+      headers['Authorization'] = `Bearer ${nativeToken}`
+    }
+  }
 
   const response = await fetch(url, {
     ...fetchOptions,
     headers,
-    credentials: 'include', // Always include cookies
+    credentials: getCredentialsMode(),
   })
 
   if (!response.ok) {

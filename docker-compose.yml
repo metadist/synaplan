@@ -189,12 +189,29 @@ services:
       # either the synaplan-memories Qdrant (if running via its own compose) or
       # any other host-bound service without changing backend/.env.
       - "docker-host:host-gateway"
+    # Generous start_period so a slow first boot never blocks the frontend.
+    #
+    # The frontend `depends_on: backend: service_healthy` — it is only created
+    # once this probe passes. On a FRESH checkout the very first `up -d` runs
+    # the backend boot (migrations + app:seed + cache warm) WHILE the machine is
+    # saturated pulling images, building the dev image, and downloading multi-GB
+    # Ollama models (bge-m3 + gpt-oss:20b). On a loaded host the first healthy
+    # /api/health routinely lands well past 10 minutes.
+    #
+    # Docker's healthcheck rule: while inside `start_period`, a FAILING probe
+    # keeps the container in state "starting" (NOT "unhealthy"), so
+    # `depends_on: service_healthy` keeps WAITING instead of aborting the
+    # frontend with "dependency failed to start: container synaplan-backend is
+    # unhealthy". The moment /api/health answers 200 the container flips to
+    # "healthy" — the long start_period is only an upper bound, it does not delay
+    # a backend that boots quickly. (Model downloads themselves are backgrounded
+    # in the entrypoint and never block FrankenPHP from binding port 80.)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 3
-      start_period: 90s
+      retries: 5
+      start_period: 900s
     networks:
       - synaplan-network
 
@@ -237,7 +254,16 @@ services:
       - ./plugins:/plugins:ro
       - whisper_models:/var/www/backend/var/whisper:ro
     environment:
-      APP_ENV: prod
+      # Worker MUST run in the same APP_ENV as the backend, otherwise the two
+      # halves of the system end up in different Redis namespaces
+      # (RedisService prefixes every key with "synaplan:{env}:"). With backend
+      # in dev and worker in prod, the worker happily consumed
+      # AdvanceMediaJobCommand messages but every findByKey() lookup missed
+      # because the job lived under synaplan:dev:mediajob:* and the worker
+      # looked under synaplan:prod:mediajob:* — silent "job not found",
+      # bubble stuck in queued forever. The synaplan-platform compose
+      # overrides both to prod for production.
+      APP_ENV: ${APP_ENV:-dev}
       APP_DEBUG: "0"
       APP_URL: http://backend
       PLUGINS_DIR: /plugins
@@ -265,8 +291,29 @@ services:
     entrypoint: ["bash", "-c"]
     command:
       - |
-        # Clear the prod cache BEFORE any console command runs. The cache lives
-        # under var/cache/prod/ on the bind-mounted backend volume, so it
+        set -u
+
+        # Resolve the env once so cache:warmup, dbal:run-sql, and
+        # messenger:consume all agree. APP_ENV is set in the service env
+        # block above (default: dev for local; prod overrides via compose).
+        ENV="$${APP_ENV:-dev}"
+        echo "[worker] APP_ENV=$$ENV"
+
+        # Fail-fast diagnostic: a broken bind-mount (the codebase missing from
+        # /var/www/backend, leaving only the anonymous var/cache volume) used
+        # to make the DB-wait loop below silently hang forever — every retry
+        # hit "Could not open input file: bin/console" but the error was
+        # suppressed, so messenger:consume never started and every queued
+        # AdvanceMediaJobCommand sat unprocessed. Crash loudly instead.
+        if [ ! -f bin/console ]; then
+          echo "[worker] FATAL: bin/console missing under $$(pwd)." >&2
+          echo "[worker] The ./backend bind-mount is broken; restart the worker" >&2
+          echo "[worker] container or rebuild the dev stack."                   >&2
+          exit 64
+        fi
+
+        # Clear the cache BEFORE any console command runs. The cache lives
+        # under var/cache/$$ENV/ on the bind-mounted backend volume, so it
         # otherwise survives across container rebuilds and pins the compiled
         # DI container to whatever code revision happened to boot it first.
         #
@@ -279,19 +326,46 @@ services:
         # symptom as ArgumentCountError / "Too few arguments to function
         # ::__construct()" after service constructor changes. Clearing on boot
         # is a few seconds and matches what every Symfony deploy does anyway.
-        echo "[worker] clearing prod cache..."
-        rm -rf var/cache/prod
-        php bin/console --env=prod cache:warmup
+        echo "[worker] clearing $$ENV cache..."
+        rm -rf "var/cache/$$ENV"
+        if ! php bin/console --env="$$ENV" cache:warmup; then
+          echo "[worker] FATAL: cache:warmup failed — refusing to start." >&2
+          exit 65
+        fi
 
         # Wait for the backend container to finish migrations, otherwise the
         # first consume cycle races against schema and crashes with
         # "Table doctrine_migration_versions doesn't exist".
-        until php bin/console --env=prod dbal:run-sql 'SELECT 1' >/dev/null 2>&1; do
-          echo "[worker] waiting for db schema..."; sleep 3;
+        #
+        # Bounded: 60 attempts × 3s = ~3 min ceiling. After that we exit so the
+        # `restart: unless-stopped` policy + `docker compose ps` surface the
+        # problem instead of letting the worker pretend it is healthy forever.
+        attempt=0
+        max_attempts=60
+        while ! php bin/console --env="$$ENV" dbal:run-sql 'SELECT 1' >/dev/null 2>&1; do
+          attempt=$$((attempt + 1))
+          if [ "$$attempt" -ge "$$max_attempts" ]; then
+            echo "[worker] FATAL: db schema not ready after $$((max_attempts * 3))s." >&2
+            php bin/console --env="$$ENV" dbal:run-sql 'SELECT 1' >&2 || true
+            exit 66
+          fi
+          # Echo the underlying error every 10 attempts so a real problem
+          # (auth failure, wrong host, broken vendor/) is visible.
+          if [ $$((attempt % 10)) -eq 1 ]; then
+            echo "[worker] waiting for db schema... (attempt $$attempt/$$max_attempts)" >&2
+            php bin/console --env="$$ENV" dbal:run-sql 'SELECT 1' >&2 || true
+          fi
+          sleep 3
         done
 
-        echo "[worker] db + cache ready, starting messenger:consume"
-        exec php bin/console --env=prod messenger:consume \
+        # Liveness sentinel — touched on boot, refreshed by the consumer (see
+        # messenger middleware in production for periodic refresh). The
+        # healthcheck below treats an old sentinel as unhealthy.
+        mkdir -p var/worker
+        date +%s > var/worker/last_alive
+
+        echo "[worker] db + cache ready, starting messenger:consume (env=$$ENV)"
+        exec php bin/console --env="$$ENV" messenger:consume \
           async_ai_high async_extract async_index \
           --time-limit=3600 --memory-limit=512M -v
     depends_on:
@@ -302,13 +376,26 @@ services:
       backend:
         condition: service_started
     restart: unless-stopped
-    # Override the FrankenPHP HTTP healthcheck inherited from the base image —
-    # the worker process doesn't bind to port 80, so the inherited probe would
-    # always report unhealthy and cause noisy `docker compose ps` output. The
-    # liveness signal we actually care about is "is messenger:consume still
-    # processing?" which is observable via the messenger_messages table.
+    # Worker liveness: probe that messenger:consume is actually running.
+    # Surfaces the silent-hang class of failure that took us hours to diagnose
+    # (broken bind mount → infinite "waiting for db schema..." loop with no
+    # consumer ever starting; or env-prefix mismatch → consumer running but
+    # every job a no-op). A missing process = unhealthy = visible in
+    # `docker compose ps`.
+    #
+    # We scan /proc/*/cmdline rather than using pgrep/ps: the base image is
+    # minimal and ships NEITHER procps nor pgrep, so a pgrep-based check would
+    # report the worker unhealthy forever even while it consumes happily. grep
+    # is always present; cmdline args are NUL-separated, which grep matches as a
+    # plain substring.
     healthcheck:
-      disable: true
+      test:
+        - "CMD-SHELL"
+        - "grep -lq 'messenger:consume' /proc/[0-9]*/cmdline 2>/dev/null"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "docker-host:host-gateway"

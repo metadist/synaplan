@@ -4,15 +4,13 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
-use App\Service\ImpersonationService;
 use App\Service\ModelConfigService;
+use App\Service\OAuthLoginResponder;
 use App\Service\OAuthStateService;
-use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -29,15 +27,13 @@ class GoogleAuthController extends AbstractController
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
-        private TokenService $tokenService,
         private OAuthStateService $oauthStateService,
-        private ImpersonationService $impersonationService,
+        private OAuthLoginResponder $oauthLoginResponder,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
         private string $googleClientId,
         private string $googleClientSecret,
         private string $appUrl,
-        private string $frontendUrl,
     ) {
     }
 
@@ -51,12 +47,17 @@ class GoogleAuthController extends AbstractController
         response: 302,
         description: 'Redirect to Google OAuth consent screen'
     )]
-    public function login(): Response
+    public function login(Request $request): Response
     {
         $redirectUri = $this->appUrl.'/api/v1/auth/google/callback';
 
+        // Native (mobile) clients open this URL in the system browser and need
+        // the result delivered back via a deep link — remember that intent in
+        // the signed state so the callback knows which flow to complete.
+        $native = $request->query->getBoolean('native');
+
         // Generate signed state token (no session required)
-        $state = $this->oauthStateService->generateState('google');
+        $state = $this->oauthStateService->generateState('google', $native ? ['native' => true] : []);
 
         $params = [
             'client_id' => $this->googleClientId,
@@ -93,26 +94,22 @@ class GoogleAuthController extends AbstractController
         $state = $request->query->get('state');
 
         // Validate signed state token (CSRF protection, no session required)
-        if (!$state || !$this->oauthStateService->validateState($state, 'google')) {
+        $statePayload = $state ? $this->oauthStateService->validateState($state, 'google') : null;
+
+        if (!$statePayload) {
             $this->logger->error('Google OAuth state validation failed', [
                 'state_present' => !empty($state),
             ]);
 
-            $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
-                'error' => 'Invalid state parameter',
-                'provider' => 'google',
-            ]);
-
-            return $this->redirect($errorUrl);
+            // Native flag lives inside the (here invalid) state, so default to
+            // the web error page when we cannot trust it.
+            return $this->oauthLoginResponder->error('google', 'Invalid state parameter', false);
         }
 
-        if (!$code) {
-            $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
-                'error' => 'Authorization code not received',
-                'provider' => 'google',
-            ]);
+        $native = (bool) ($statePayload['native'] ?? false);
 
-            return $this->redirect($errorUrl);
+        if (!$code) {
+            return $this->oauthLoginResponder->error('google', 'Authorization code not received', $native);
         }
 
         try {
@@ -152,44 +149,21 @@ class GoogleAuthController extends AbstractController
             // Find or create user
             $user = $this->findOrCreateUser($userInfo, $googleRefreshToken);
 
-            // Generate our tokens
-            $accessToken = $this->tokenService->generateAccessToken($user);
-            $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
-
-            // Create redirect response with cookies
-            $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
-                'success' => 'true',
-                'provider' => 'google',
-            ]);
-
-            $response = new RedirectResponse($callbackUrl);
-
-            // Set fresh auth cookies and defensively wipe any orphan
-            // impersonation stash that survived from a prior session on this
-            // browser. Without this, a user signing in via Google could
-            // inherit a stash pointing at a previous admin's refresh token,
-            // which would let them resurrect that admin session via "Exit".
-            $this->tokenService->addAuthCookies($response, $accessToken, $refreshToken);
-            $this->impersonationService->attachClearStashCookies($response);
-
-            $this->logger->info('Google OAuth successful, redirecting with cookies', [
+            $this->logger->info('Google OAuth successful', [
                 'user_id' => $user->getId(),
                 'email' => $user->getMail(),
+                'native' => $native,
             ]);
 
-            return $response;
+            // Web → cookies + SPA redirect; native → deep-link handoff token.
+            return $this->oauthLoginResponder->success($user, $request, 'google', $native);
         } catch (\Exception $e) {
             $this->logger->error('Google OAuth callback error', [
                 'error' => $e->getMessage(),
                 'trace' => substr($e->getTraceAsString(), 0, 1000),
             ]);
 
-            $errorUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
-                'error' => 'Failed to authenticate with Google',
-                'provider' => 'google',
-            ]);
-
-            return $this->redirect($errorUrl);
+            return $this->oauthLoginResponder->error('google', 'Failed to authenticate with Google', $native);
         }
     }
 

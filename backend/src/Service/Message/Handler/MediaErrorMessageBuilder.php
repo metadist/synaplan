@@ -7,9 +7,55 @@ use App\AI\Exception\ProviderException;
 class MediaErrorMessageBuilder
 {
     /**
-     * Build a user-friendly, translated error message from the exception.
+     * Localized copy when a background job exceeds its platform wait budget.
      */
-    public function buildErrorMessage(\Exception $e, string $mediaType, string $lang): string
+    public function buildTimeoutMessage(string $mediaType, string $lang): string
+    {
+        return $this->getFailureExplanation('timeout', $mediaType, $lang)
+            ?? $this->getGenericMediaError($mediaType, $lang);
+    }
+
+    /**
+     * Localized copy when the user has hit their concurrent-media-jobs ceiling.
+     */
+    public function buildTooManyJobsMessage(string $lang): string
+    {
+        return match ($lang) {
+            'de' => 'Du hast bereits die maximale Anzahl gleichzeitiger Medienaufträge laufen. '
+                .'Bitte warte, bis einer fertig ist, und versuche es dann erneut.',
+            'es' => 'Ya tienes el número máximo de trabajos de medios en curso. '
+                .'Espera a que termine uno e inténtalo de nuevo.',
+            'tr' => 'Aynı anda çalışan en fazla medya işine ulaştın. '
+                .'Lütfen biri bitene kadar bekleyip tekrar dene.',
+            default => 'You already have the maximum number of media jobs running. '
+                .'Please wait for one to finish, then try again.',
+        };
+    }
+
+    /**
+     * Build a user-friendly, translated error message from the exception.
+     *
+     * @param bool $includeDiagnostics when true, append a raw technical
+     *                                 diagnostics block to the message. This is
+     *                                 reserved for ADMIN users so they can see
+     *                                 the underlying provider error/cause that is
+     *                                 deliberately hidden from regular users.
+     */
+    public function buildErrorMessage(\Exception $e, string $mediaType, string $lang, bool $includeDiagnostics = false): string
+    {
+        $message = $this->buildUserFacingMessage($e, $mediaType, $lang);
+
+        if ($includeDiagnostics) {
+            $message .= $this->buildAdminDiagnostics($e, $lang);
+        }
+
+        return $message;
+    }
+
+    /**
+     * The localized, non-leaky message shown to every user.
+     */
+    private function buildUserFacingMessage(\Exception $e, string $mediaType, string $lang): string
     {
         if ($e instanceof ProviderException) {
             $ctx = $e->getContext() ?? [];
@@ -40,6 +86,49 @@ class MediaErrorMessageBuilder
         }
 
         return $this->getGenericMediaError($mediaType, $lang);
+    }
+
+    /**
+     * Raw technical diagnostics appended for ADMIN users only.
+     *
+     * Regular users get a clean, non-leaky message; admins additionally see the
+     * underlying provider, error code, raw message, root cause and any
+     * provider-supplied context so they can diagnose WHY a generation failed
+     * without digging through worker logs.
+     */
+    private function buildAdminDiagnostics(\Exception $e, string $lang): string
+    {
+        $lines = [];
+
+        if ($e instanceof ProviderException) {
+            $lines[] = 'Provider: '.$e->getProviderName();
+        }
+
+        $code = $e->getCode();
+        if (0 !== $code && '' !== (string) $code) {
+            $lines[] = 'Code: '.$code;
+        }
+
+        $lines[] = 'Error: '.$e->getMessage();
+
+        $previous = $e->getPrevious();
+        if (null !== $previous) {
+            $lines[] = 'Cause: '.$previous->getMessage();
+        }
+
+        if ($e instanceof ProviderException) {
+            $ctx = $e->getContext();
+            if (!empty($ctx)) {
+                $encoded = json_encode($ctx, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+                if (false !== $encoded) {
+                    $lines[] = 'Context: '.$encoded;
+                }
+            }
+        }
+
+        $label = 'de' === $lang ? 'Admin-Diagnose (nur für dich sichtbar)' : 'Admin diagnostics (visible to you only)';
+
+        return "\n\n---\n**".$label."**\n```\n".implode("\n", $lines)."\n```";
     }
 
     /**

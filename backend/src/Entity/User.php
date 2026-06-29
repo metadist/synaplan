@@ -321,6 +321,39 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->getSubscriptionData()['subscription_end'] ?? null;
     }
 
+    /**
+     * MOBILE-APP SEAM (Epic 5.1): the channel that owns the current subscription.
+     *
+     * Exactly one channel may own an active subscription at a time (web = Stripe,
+     * app = Apple/Google IAP). The value is read from `BPAYMENTDETAILS.subscription.source`.
+     *
+     * Backfill-on-read keeps this migration-free: a legacy subscription written
+     * before this field existed always came from Stripe (the only pre-IAP channel),
+     * so a subscription that has a `stripe_subscription_id` but no explicit `source`
+     * reports `'stripe'`. Returns null when there is no subscription at all.
+     *
+     * @return 'stripe'|'apple'|'google'|null
+     */
+    public function getSubscriptionSource(): ?string
+    {
+        $sub = $this->getSubscriptionData();
+        if ([] === $sub) {
+            return null;
+        }
+
+        $source = $sub['source'] ?? null;
+        if (in_array($source, ['stripe', 'apple', 'google'], true)) {
+            return $source;
+        }
+
+        // Legacy backfill: any pre-`source` subscription is a Stripe one.
+        if (isset($sub['stripe_subscription_id']) || isset($sub['status'])) {
+            return 'stripe';
+        }
+
+        return null;
+    }
+
     public function getStripeCustomerId(): ?string
     {
         // stripe_customer_id is stored in paymentDetails JSON

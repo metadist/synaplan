@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Service\ImpersonationService;
+use App\Service\OAuthLoginResponder;
 use App\Service\OAuthStateService;
 use App\Service\OidcTokenService;
 use App\Service\OidcUserService;
@@ -40,6 +41,7 @@ class KeycloakAuthController extends AbstractController
         private OidcTokenService $oidcTokenService,
         private OidcUserService $oidcUserService,
         private OAuthStateService $oauthStateService,
+        private OAuthLoginResponder $oauthLoginResponder,
         private ImpersonationService $impersonationService,
         private LoggerInterface $logger,
         private string $oidcClientId,
@@ -59,7 +61,7 @@ class KeycloakAuthController extends AbstractController
         description: 'Initiates OAuth 2.0 Authorization Code Flow with PKCE (RFC 7636) for enhanced security',
         tags: ['Authentication']
     )]
-    public function login(): Response
+    public function login(Request $request): Response
     {
         try {
             $discovery = $this->getDiscoveryConfig();
@@ -70,10 +72,15 @@ class KeycloakAuthController extends AbstractController
             $codeVerifier = $this->generateCodeVerifier();
             $codeChallenge = $this->generateCodeChallenge($codeVerifier);
 
+            // Native (mobile) clients open this in the system browser and need
+            // the result via a deep link — remember that intent in the state.
+            $stateData = ['pkce_verifier' => $codeVerifier];
+            if ($request->query->getBoolean('native')) {
+                $stateData['native'] = true;
+            }
+
             // Generate signed state token with PKCE verifier embedded (no session required)
-            $state = $this->oauthStateService->generateState('keycloak', [
-                'pkce_verifier' => $codeVerifier,
-            ]);
+            $state = $this->oauthStateService->generateState('keycloak', $stateData);
 
             $params = [
                 'client_id' => $this->oidcClientId,
@@ -144,22 +151,18 @@ class KeycloakAuthController extends AbstractController
             ]));
         }
 
+        $native = (bool) ($statePayload['native'] ?? false);
+
         // Extract PKCE verifier from validated state
         $codeVerifier = $statePayload['pkce_verifier'] ?? null;
         if (!$codeVerifier) {
             $this->logger->error('PKCE code_verifier missing from state token');
 
-            return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
-                'error' => 'PKCE verification failed',
-                'provider' => 'keycloak',
-            ]));
+            return $this->oauthLoginResponder->error('keycloak', 'PKCE verification failed', $native);
         }
 
         if (!$code) {
-            return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
-                'error' => 'Authorization code not received',
-                'provider' => 'keycloak',
-            ]));
+            return $this->oauthLoginResponder->error('keycloak', 'Authorization code not received', $native);
         }
 
         try {
@@ -227,6 +230,19 @@ class KeycloakAuthController extends AbstractController
             // Find or create user + sync roles via shared OIDC user service
             $user = $this->oidcUserService->findOrCreateFromClaims($userInfo, $refreshToken);
 
+            // Native (mobile) cannot use cross-origin OIDC cookies — hand the app
+            // its own Bearer tokens via the deep-link handoff. The Keycloak
+            // refresh-cookie flow stays web-only; native refreshes through our
+            // app refresh token instead.
+            if ($native) {
+                $this->logger->info('Keycloak OAuth successful (native handoff)', [
+                    'user_id' => $user->getId(),
+                    'email' => $user->getMail(),
+                ]);
+
+                return $this->oauthLoginResponder->success($user, $request, 'keycloak', true);
+            }
+
             // Create redirect response
             $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
                 'success' => 'true',
@@ -278,10 +294,7 @@ class KeycloakAuthController extends AbstractController
 
             $this->logger->error('Keycloak OAuth callback error', $errorDetails);
 
-            return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
-                'error' => 'Failed to authenticate with Keycloak',
-                'provider' => 'keycloak',
-            ]));
+            return $this->oauthLoginResponder->error('keycloak', 'Failed to authenticate with Keycloak', $native);
         }
     }
 

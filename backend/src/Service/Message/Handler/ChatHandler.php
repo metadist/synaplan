@@ -396,6 +396,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
         ];
 
         // Clamp max_tokens to min(plan_limit, model_max).
+        // plan_limit is only set for ANONYMOUS (the only tier with a hard
+        // MAX_OUTPUT_TOKENS cap); for all authenticated tiers getMaxOutputTokens()
+        // returns null, so the model's full max_tokens is used. Spend for those
+        // tiers is bounded by the cost-budget gate / message-count limits instead.
         // Reuse the User entity loaded earlier for memories/feedback so
         // we don't hit the repository twice per request.
         $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
@@ -971,7 +975,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'modelFeatures' => $modelFeatures,
         ], $options);
 
-        // Clamp max_tokens to min(requested, plan_limit, model_max)
+        // Clamp max_tokens to min(requested, plan_limit, model_max).
+        // plan_limit is only set for ANONYMOUS; authenticated tiers get the
+        // model's full max_tokens (getMaxOutputTokens() returns null for them).
         $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
         $tokenLimits = array_filter(
             [$aiOptions['max_tokens'] ?? null, $planMaxTokens, $modelMaxTokens],
@@ -1871,7 +1877,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $filename = trim($jsonData['BFILEPATH']);
                 $fileContent = $jsonData['BFILETEXT'];
 
-                if (empty($filename) || empty($fileContent)) {
+                if (empty($filename) || !is_string($fileContent) || '' === trim($fileContent)) {
                     return null;
                 }
 

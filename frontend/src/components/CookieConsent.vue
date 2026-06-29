@@ -22,7 +22,7 @@
               <p class="text-sm txt-secondary">
                 {{ $t('cookies.description') }}
                 <a
-                  href="https://www.synaplan.com/privacy-policy"
+                  :href="config.branding.privacyUrl"
                   target="_blank"
                   class="text-[var(--brand)] hover:underline"
                 >

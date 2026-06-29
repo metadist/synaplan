@@ -1,4 +1,5 @@
 import { httpClient } from '@/services/api/httpClient'
+import { saveOrDownloadBlob } from '@/services/api/nativeDownload'
 import { useConfigStore } from '@/stores/config'
 
 // NOTE: this interface is hand-maintained because UsageStatsController's
@@ -211,12 +212,6 @@ export async function downloadUsageExport(sinceTimestamp?: number): Promise<void
     responseType: 'blob',
   })
 
-  const downloadUrl = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = downloadUrl
-  link.download = `synaplan-usage-${Date.now()}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  window.URL.revokeObjectURL(downloadUrl)
+  // Web → anchor download; native → Filesystem + share sheet (Epic 7.1).
+  await saveOrDownloadBlob(blob, `synaplan-usage-${Date.now()}.csv`)
 }

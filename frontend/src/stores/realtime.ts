@@ -56,6 +56,17 @@ export const useRealtimeStore = defineStore('realtime', () => {
     await c.connect()
   }
 
+  /**
+   * Re-open the socket after an app resume WITHOUT creating a connection that
+   * wasn't already in use. centrifuge-js self-heals on network changes, but a
+   * long background on mobile can leave a silently-dead socket — this nudges an
+   * existing client back to life and is a no-op when realtime isn't active.
+   */
+  async function reconnect(): Promise<void> {
+    if (!client) return
+    await client.connect()
+  }
+
   async function disconnect(): Promise<void> {
     if (!client) return
     await client.disconnect()
@@ -69,6 +80,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     lastError,
     getOrCreateClient,
     ensureConnected,
+    reconnect,
     disconnect,
   }
 })

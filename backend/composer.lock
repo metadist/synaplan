@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f210dd1fcf3a3244c29c1899d0afc13b",
+    "content-hash": "dccb623fbda6dd95b5d64c343cb556ca",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -4109,6 +4109,104 @@
             "time": "2026-03-10T16:41:02+00:00"
         },
         {
+            "name": "hoels/app-store-server-library-php",
+            "version": "2.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/hoels/app-store-server-library-php.git",
+                "reference": "a47a74bbd298ee372324ce75108e06e824ec8ad4"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/hoels/app-store-server-library-php/zipball/a47a74bbd298ee372324ce75108e06e824ec8ad4",
+                "reference": "a47a74bbd298ee372324ce75108e06e824ec8ad4",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "ext-mbstring": "*",
+                "ext-openssl": "*",
+                "firebase/php-jwt": "^7.0",
+                "guzzlehttp/guzzle": "^7.8",
+                "hoels/ocsp-php": "^0.1",
+                "php": ">=8.1",
+                "phpseclib/phpseclib": "^3.0"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^13.0",
+                "squizlabs/php_codesniffer": "^4.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "AppStoreServerLibrary\\": "src/AppStoreServerLibrary/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Kai Hölscher"
+                }
+            ],
+            "description": "The PHP server library for the App Store Server API and App Store Server Notifications.",
+            "support": {
+                "issues": "https://github.com/hoels/app-store-server-library-php/issues",
+                "source": "https://github.com/hoels/app-store-server-library-php/tree/2.0.0"
+            },
+            "time": "2026-03-01T15:30:51+00:00"
+        },
+        {
+            "name": "hoels/ocsp-php",
+            "version": "0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/hoels/ocsp-php.git",
+                "reference": "e1ebf23205956b1637c5cc259f4f50b5f3f9dcff"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/hoels/ocsp-php/zipball/e1ebf23205956b1637c5cc259f4f50b5f3f9dcff",
+                "reference": "e1ebf23205956b1637c5cc259f4f50b5f3f9dcff",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.1",
+                "phpseclib/phpseclib": "^3.0"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^1.10",
+                "phpunit/phpunit": "^10.5",
+                "squizlabs/php_codesniffer": "^3.8"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "OCSP\\": [
+                        "src"
+                    ]
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Kai Hölscher"
+                }
+            ],
+            "description": "OCSP library for PHP",
+            "support": {
+                "issues": "https://github.com/hoels/ocsp-php/issues",
+                "source": "https://github.com/hoels/ocsp-php/tree/0.1.0"
+            },
+            "time": "2024-12-26T21:48:43+00:00"
+        },
+        {
             "name": "illuminate/collections",
             "version": "v13.7.0",
             "source": {
@@ -6592,16 +6690,16 @@
         },
         {
             "name": "phpoffice/phppresentation",
-            "version": "1.2.0",
+            "version": "dev-master",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPOffice/PHPPresentation.git",
-                "reference": "b9cdcd413e2d463ba3198f912f32716adc88f340"
+                "reference": "4942bae52f6fd4e0680aa281bf995c4084b8b802"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPOffice/PHPPresentation/zipball/b9cdcd413e2d463ba3198f912f32716adc88f340",
-                "reference": "b9cdcd413e2d463ba3198f912f32716adc88f340",
+                "url": "https://api.github.com/repos/PHPOffice/PHPPresentation/zipball/4942bae52f6fd4e0680aa281bf995c4084b8b802",
+                "reference": "4942bae52f6fd4e0680aa281bf995c4084b8b802",
                 "shasum": ""
             },
             "require": {
@@ -6609,7 +6707,7 @@
                 "ext-zip": "*",
                 "php": "^7.1|^8.0",
                 "phpoffice/common": "^1",
-                "phpoffice/phpspreadsheet": "^1.9 || ^2.0 || ^3.0 || ^4.0"
+                "phpoffice/phpspreadsheet": "^1.9 || ^2.0 || ^3.0 || ^4.0 || ^5.0"
             },
             "require-dev": {
                 "dompdf/dompdf": "^3.1",
@@ -6620,6 +6718,7 @@
             "suggest": {
                 "ext-gd": "Required to add images"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -6656,22 +6755,22 @@
             ],
             "support": {
                 "issues": "https://github.com/PHPOffice/PHPPresentation/issues",
-                "source": "https://github.com/PHPOffice/PHPPresentation/tree/1.2.0"
+                "source": "https://github.com/PHPOffice/PHPPresentation/tree/master"
             },
-            "time": "2025-06-06T10:27:25+00:00"
+            "time": "2025-10-24T19:16:05+00:00"
         },
         {
             "name": "phpoffice/phpspreadsheet",
-            "version": "4.5.0",
+            "version": "5.8.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPOffice/PhpSpreadsheet.git",
-                "reference": "2ea9786632e6fac1aee601b6e426bcc723d8ce13"
+                "reference": "01964d92536edf1a3a874b9580a52824bebf6fbb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPOffice/PhpSpreadsheet/zipball/2ea9786632e6fac1aee601b6e426bcc723d8ce13",
-                "reference": "2ea9786632e6fac1aee601b6e426bcc723d8ce13",
+                "url": "https://api.github.com/repos/PHPOffice/PhpSpreadsheet/zipball/01964d92536edf1a3a874b9580a52824bebf6fbb",
+                "reference": "01964d92536edf1a3a874b9580a52824bebf6fbb",
                 "shasum": ""
             },
             "require": {
@@ -6679,6 +6778,7 @@
                 "ext-ctype": "*",
                 "ext-dom": "*",
                 "ext-fileinfo": "*",
+                "ext-filter": "*",
                 "ext-gd": "*",
                 "ext-iconv": "*",
                 "ext-libxml": "*",
@@ -6693,15 +6793,14 @@
                 "markbaker/complex": "^3.0",
                 "markbaker/matrix": "^3.0",
                 "php": "^8.1",
-                "psr/http-client": "^1.0",
-                "psr/http-factory": "^1.0",
                 "psr/simple-cache": "^1.0 || ^2.0 || ^3.0"
             },
             "require-dev": {
                 "dealerdirect/phpcodesniffer-composer-installer": "dev-main",
                 "dompdf/dompdf": "^2.0 || ^3.0",
+                "ext-intl": "*",
                 "friendsofphp/php-cs-fixer": "^3.2",
-                "mitoteam/jpgraph": "^10.3",
+                "mitoteam/jpgraph": "^10.5",
                 "mpdf/mpdf": "^8.1.1",
                 "phpcompatibility/php-compatibility": "^9.3",
                 "phpstan/phpstan": "^1.1 || ^2.0",
@@ -6713,7 +6812,7 @@
             },
             "suggest": {
                 "dompdf/dompdf": "Option for rendering PDF with PDF Writer",
-                "ext-intl": "PHP Internationalization Functions",
+                "ext-intl": "PHP Internationalization Functions, required for NumberFormat Wizard and StringHelper::setLocale()",
                 "mitoteam/jpgraph": "Option for rendering charts, or including charts with PDF or HTML Writers",
                 "mpdf/mpdf": "Option for rendering PDF with PDF Writer",
                 "tecnickcom/tcpdf": "Option for rendering PDF with PDF Writer"
@@ -6746,6 +6845,9 @@
                 },
                 {
                     "name": "Adrien Crivelli"
+                },
+                {
+                    "name": "Owen Leibman"
                 }
             ],
             "description": "PHPSpreadsheet - Read, Create and Write Spreadsheet documents in PHP - Spreadsheet engine",
@@ -6762,9 +6864,9 @@
             ],
             "support": {
                 "issues": "https://github.com/PHPOffice/PhpSpreadsheet/issues",
-                "source": "https://github.com/PHPOffice/PhpSpreadsheet/tree/4.5.0"
+                "source": "https://github.com/PHPOffice/PhpSpreadsheet/tree/5.8.0"
             },
-            "time": "2025-07-24T05:15:59+00:00"
+            "time": "2026-06-07T03:51:10+00:00"
         },
         {
             "name": "phpoffice/phpword",
@@ -17331,9 +17433,18 @@
             "time": "2025-12-08T11:19:18+00:00"
         }
     ],
-    "aliases": [],
+    "aliases": [
+        {
+            "package": "phpoffice/phppresentation",
+            "version": "9999999-dev",
+            "alias": "1.3.0",
+            "alias_normalized": "1.3.0.0"
+        }
+    ],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "phpoffice/phppresentation": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

@@ -26,7 +26,7 @@
         <router-link
           to="/register"
           data-testid="guest-banner-signup"
-          class="group relative text-xs font-semibold text-white whitespace-nowrap px-2.5 py-0.5 rounded-full bg-brand overflow-hidden transition-shadow duration-300 hover:shadow-md hover:shadow-brand/30"
+          class="group relative text-xs font-semibold text-white whitespace-nowrap px-3 py-1 rounded-full bg-brand shadow-sm overflow-hidden transition-shadow duration-300 hover:shadow-md hover:shadow-brand/40"
         >
           <span class="relative z-10">{{ $t('guest.banner.signUp') }}</span>
           <span class="cta-shimmer" />
@@ -86,7 +86,7 @@ const messagesUsed = computed(() => props.maxMessages - props.remaining)
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.25) 50%,
+    rgba(255, 255, 255, 0.18) 50%,
     transparent 100%
   );
   animation: shimmer 2.5s ease-in-out infinite;
