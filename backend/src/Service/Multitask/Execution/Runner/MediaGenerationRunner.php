@@ -156,6 +156,11 @@ final readonly class MediaGenerationRunner implements TaskRunner
         }
 
         $metadata = $result['metadata'] ?? [];
+        $mediaJob = $metadata['media_job'] ?? null;
+        if (is_array($mediaJob) && is_string($mediaJob['job_id'] ?? null) && '' !== $mediaJob['job_id']) {
+            return NodeResult::running($metadata);
+        }
+
         $file = $metadata['file'] ?? null;
         if (!is_array($file) || empty($file['path'])) {
             // [i2v-debug] The handler returned but carried no usable file. This is

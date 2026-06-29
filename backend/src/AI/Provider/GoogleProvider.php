@@ -1076,6 +1076,30 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             return ['done' => true, 'videoUri' => null, 'error' => $errorMessage.' (code: '.$errorCode.')'];
         }
 
+        // Responsible-AI content filtering: Veo can finish (done:true) WITHOUT an
+        // `error` object and WITHOUT any video, signalling the rejection only via
+        // `raiMediaFilteredCount`/`raiMediaFilteredReasons` (e.g. "we can't create
+        // videos with real people's names or likenesses"). This is a TERMINAL,
+        // non-retryable decision — the same prompt will never produce a video — so
+        // we surface it as a content block carrying Google's own reason text,
+        // rather than letting it fall through to the generic "no video URI" path
+        // (which the async advancer would then pointlessly retry as transient).
+        $generateVideoResponse = $statusData['response']['generateVideoResponse'] ?? [];
+        $filteredReasons = $generateVideoResponse['raiMediaFilteredReasons'] ?? null;
+        $filteredCount = $generateVideoResponse['raiMediaFilteredCount'] ?? 0;
+        if ((is_array($filteredReasons) && [] !== $filteredReasons) || (is_int($filteredCount) && $filteredCount > 0)) {
+            $reasonText = is_array($filteredReasons)
+                ? trim(implode(' ', array_filter($filteredReasons, 'is_string')))
+                : '';
+
+            $this->logger->warning('Google Veo: media filtered by responsible-AI policy', [
+                'filtered_count' => $filteredCount,
+                'reasons' => $filteredReasons,
+            ]);
+
+            throw ProviderException::contentBlocked('google', 'SAFETY', '' !== $reasonText ? $reasonText : null);
+        }
+
         $videoUri = $statusData['response']['generateVideoResponse']['generatedSamples'][0]['video']['uri']
             ?? $statusData['response']['generatedVideos'][0]['video']['uri']
             ?? null;

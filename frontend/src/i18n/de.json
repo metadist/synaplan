@@ -1,4 +1,33 @@
 {
+  "jobs": {
+    "kind": {
+      "video": "Video",
+      "image": "Bild",
+      "audio": "Audio"
+    },
+    "toast": {
+      "ready": "Dein {kind} ist fertig",
+      "failed": "Dein {kind} konnte nicht erstellt werden",
+      "view": "Ansehen"
+    },
+    "cancel": {
+      "stop": "Stoppen",
+      "failed": "Auftrag konnte nicht abgebrochen werden. Bitte erneut versuchen."
+    },
+    "tray": {
+      "title": "Hintergrundaufträge",
+      "close": "Schließen",
+      "openLabel": "Hintergrundaufträge ({count} aktiv)",
+      "empty": "Keine Hintergrundaufträge. Lange Renderings wie Videos erscheinen hier, damit du weiterarbeiten kannst, während sie fertig werden."
+    },
+    "row": {
+      "open": "Öffnen",
+      "working": "Wird bearbeitet…"
+    }
+  },
+  "branding": {
+    "poweredBy": "Bereitgestellt von"
+  },
   "pageTitles": {
     "login": "Anmelden",
     "register": "Registrieren",
@@ -17,6 +46,7 @@
     "memories": "Erinnerungen",
     "feedback": "Feedback",
     "ragSearch": "Suche",
+    "vectorStorage": "Vektorspeicher",
     "configInbound": "Kanäle",
     "configAiModels": "KI-Modelle",
     "configProviderHiggsfield": "Higgsfield-Verbindung",
@@ -60,6 +90,10 @@
     "errorIssuanceFailed": "Synaplan konnte für dieses Konto keinen API-Schlüssel ausstellen."
   },
   "welcome": "Willkommen bei Synaplan",
+  "marketingNews": {
+    "heading": "Neues von Synaplan",
+    "readMore": "Mehr lesen"
+  },
   "chat": {
     "title": "Chat",
     "newChat": "Neuer Chat",
@@ -821,6 +855,19 @@
       "confirmPasswordPlaceholder": "Neues Passwort bestätigen",
       "confirmPasswordHint": "Muss mit neuem Passwort übereinstimmen"
     },
+    "appSecurity": {
+      "title": "App-Sicherheit",
+      "subtitle": "Zusätzlicher Schutz für dieses Gerät",
+      "biometricLock": "Biometrische App-Sperre",
+      "biometricLockHint": "Face ID, Touch ID oder Fingerabdruck zum Öffnen der App verlangen.",
+      "verifyReason": "Biometrische Sperre aktivieren",
+      "enableFailed": "Die biometrische Sperre konnte nicht aktiviert werden. Bitte erneut versuchen."
+    },
+    "legal": {
+      "title": "Datenschutz & AGB",
+      "privacy": "Datenschutzerklärung",
+      "terms": "Nutzungsbedingungen"
+    },
     "dangerZone": {
       "title": "Gefahrenzone",
       "subtitle": "Irreversible Aktionen",
@@ -946,6 +993,38 @@
     "fileGenerated": "Ich habe die Datei '{filename}' für dich erstellt. Du kannst sie jetzt herunterladen.",
     "fileGenerationFailed": "Es gab ein Problem beim Erstellen der Datei. Bitte versuche es erneut.",
     "audioGenerated": "Hier ist die gewünschte Audioausgabe. Du kannst sie unten abspielen oder herunterladen.",
+    "mediaJob": {
+      "title": {
+        "video": "Dein Video wird erstellt…",
+        "image": "Dein Bild wird erstellt…",
+        "audio": "Deine Audioausgabe wird erstellt…"
+      },
+      "backgroundHint": "Das läuft im Hintergrund und kann einige Minuten dauern. Du kannst weiter chatten — diese Nachricht wird aktualisiert, sobald das Ergebnis fertig ist.",
+      "model": "Modell: {model}",
+      "stillRunning": "Auftrag läuft noch · seit {elapsed}",
+      "checkingNow": "Status wird aktualisiert…",
+      "lastChecked": "Zuletzt geprüft vor {seconds}s · nächste Prüfung in ~{interval}s",
+      "progress": "{percent} % fertig",
+      "pollError": "Status konnte nicht aktualisiert werden — nächster Versuch in Kürze.",
+      "refreshStatus": "Status jetzt prüfen",
+      "overdueWarning": "Die maximale Wartezeit ist überschritten. Es wird nach einem Endergebnis gesucht…",
+      "jobNotFound": "Dieser Hintergrundauftrag wird nicht mehr verfolgt. Bitte erneut generieren.",
+      "stalled": {
+        "workerDown": "Der Hintergrund-Worker hat diesen Auftrag noch nicht angenommen. Wenn das so bleibt, ist der Worker vermutlich offline — bitte den Administrator informieren.",
+        "generic": "Der Auftrag macht noch keinen Fortschritt. Es wird weiter auf den Hintergrund-Worker gewartet…"
+      },
+      "failedTitle": {
+        "video": "Videoerstellung fehlgeschlagen",
+        "image": "Bilderstellung fehlgeschlagen",
+        "audio": "Audioerstellung fehlgeschlagen"
+      },
+      "failedBody": "Der Hintergrundauftrag wurde nicht abgeschlossen. Du kannst es mit einem anderen Modell erneut versuchen.",
+      "maxWait": {
+        "video": "Videos können bis zu {minutes} Minuten dauern.",
+        "image": "Bilder sind meist innerhalb weniger Minuten fertig.",
+        "audio": "Audio ist meist innerhalb weniger Minuten fertig."
+      }
+    },
     "cancelledByUser": "⚠️ Vom Benutzer abgebrochen",
     "truncated": "Diese Antwort wurde abgeschnitten, weil das Modell sein Token-Limit erreicht hat.",
     "continueButton": "Antwort fortsetzen"
@@ -1708,6 +1787,11 @@
       "keepSubscription": "Abonnement behalten",
       "loadingPortal": "Rechnungsportal wird geöffnet..."
     },
+    "native": {
+      "purchaseTitle": "In-App-Kauf",
+      "purchaseComingSoon": "In-App-Käufe für den {plan}-Tarif werden gerade eingerichtet und stehen in einem zukünftigen App-Update zur Verfügung.",
+      "manageInStore": "Abonnement im Store verwalten"
+    },
     "plans": {
       "pro": "Pro",
       "team": "Team",
@@ -1876,6 +1960,8 @@
     "status": "STATUS",
     "attachment": "ANHANG",
     "uploaded": "HOCHGELADEN",
+    "vectorized": "Vektorisiert · {count} Chunks",
+    "notVectorized": "Nicht vektorisiert",
     "action": "AKTION",
     "status_uploaded": "Hochgeladen",
     "status_extracting": "Text wird extrahiert…",
@@ -1949,8 +2035,32 @@
     "filterDateTo": "Bis",
     "tabFiles": "Dateien",
     "tabSearch": "Suche",
+    "tabVectors": "Vektoren",
     "intro": "Hochgeladene Dateien werden durchsuchbares Wissen für deine Chats. Ordner lassen sich als Wissensordner nutzen, um eine Unterhaltung einzugrenzen.",
     "useInChat": "Im Chat nutzen"
+  },
+  "vectorStorage": {
+    "intro": "Ein Überblick über deinen Vektorspeicher — wie viele Dateien indexiert sind und wie viele Vektoren (Chunks) für die semantische Suche gespeichert werden.",
+    "provider": "Vektorspeicher",
+    "providerHint": "Das aktive Backend, in dem deine Vektoren gespeichert werden.",
+    "online": "Online",
+    "offline": "Offline",
+    "myTitle": "Deine Vektoren",
+    "files": "Dateien",
+    "vectors": "Vektoren",
+    "vectorsHint": "Durchsuchbare Chunks",
+    "folders": "Ordner",
+    "byFolder": "Vektoren nach Ordner",
+    "defaultFolder": "Ohne Ordner",
+    "chunksCount": "{count} Vektoren",
+    "emptyMine": "Du hast noch keine vektorisierten Dateien. Lade Dateien im Tab „Dateien“ hoch, um sie durchsuchbar zu machen.",
+    "adminTitle": "Alle Nutzer (Admin)",
+    "usersWithVectors": "Nutzer mit Vektoren",
+    "topUsers": "Top 10 Nutzer nach Vektoren",
+    "user": "Nutzer",
+    "userId": "Nutzer #{id}",
+    "emptyAdmin": "Es sind noch keine Vektoren gespeichert.",
+    "deletionNote": "Wenn du eine Datei löschst, werden auch ihre Vektoren aus dem aktiven Vektorspeicher entfernt."
   },
   "fileSelection": {
     "title": "Dateien auswählen oder hochladen",
@@ -3478,5 +3588,20 @@
       "disabled": "Live-Updates sind in dieser Umgebung deaktiviert. Lade die Seite neu, um die neuesten Daten zu sehen.",
       "error": "Echtzeit-Verbindung fehlgeschlagen: {message}"
     }
+  },
+  "network": {
+    "offline": "Du bist offline – prüfe deine Verbindung. Wir verbinden automatisch neu."
+  },
+  "biometricLock": {
+    "title": "Gesperrt",
+    "subtitle": "Entsperre Synaplan, um fortzufahren.",
+    "unlock": "Entsperren",
+    "reason": "{brand} entsperren"
+  },
+  "forceUpdate": {
+    "title": "Update erforderlich",
+    "subtitle": "Diese App-Version wird nicht mehr unterstützt. Bitte aktualisiere auf die neueste Version, um fortzufahren.",
+    "minVersion": "Mindestens erforderliche Version: {version}",
+    "cta": "Jetzt aktualisieren"
   }
 }

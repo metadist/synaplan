@@ -8,10 +8,12 @@ use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Repository\PromptRepository;
+use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\TaskPlanner;
+use App\Service\Prompt\TimeContextBuilder;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -48,6 +50,8 @@ final class TaskPlannerTest extends TestCase
             $this->modelConfigService,
             new TaskPlanValidator(),
             $this->createMock(LoggerInterface::class),
+            $this->createMock(UserRepository::class),
+            new TimeContextBuilder(),
         );
     }
 

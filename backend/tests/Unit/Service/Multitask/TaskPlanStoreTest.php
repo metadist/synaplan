@@ -59,6 +59,40 @@ final class TaskPlanStoreTest extends TestCase
         self::assertSame('["n1"]', $captured[1]['BDEPENDSON']);
     }
 
+    public function testPersistsJobKeyWhenProvided(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1,
+            'language' => 'en',
+            'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'video_generation'],
+                ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1']],
+            ],
+        ]);
+
+        $captured = [];
+        $this->connection->method('insert')
+            ->willReturnCallback(function (string $table, array $data) use (&$captured): int {
+                $captured[] = $data;
+
+                return 1;
+            });
+
+        $written = $this->store->persistWithStatuses(
+            555,
+            $plan,
+            76,
+            ['n1' => 'running', 'n2' => 'pending'],
+            'pending',
+            ['n1' => 'job-key-xyz'],
+        );
+
+        self::assertSame(2, $written);
+        self::assertSame('job-key-xyz', $captured[0]['BJOBKEY']);
+        self::assertArrayNotHasKey('BJOBKEY', $captured[1]);
+    }
+
     public function testReplacesExistingRowsForMessage(): void
     {
         $plan = TaskPlan::singleChatPlan('en');

@@ -4,9 +4,33 @@
 
 import { z } from 'zod'
 import { httpClient, getApiBaseUrl } from './httpClient'
+import { isNativeApp } from './nativeRuntime'
+import { getNativeAccessToken, hasNativeTokens } from './nativeAuth'
 import { UserMemorySchema } from './userMemoriesApi'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 import type { StreamUpdatePayload } from '@/types/chatStream'
+
+/**
+ * SSE auth differs by platform: web sends the session cookie, native sends the
+ * stored Bearer token with cookies omitted (cross-origin). The short-lived
+ * `/auth/token` value is then handed to `EventSource` via the `?token=` query
+ * param (EventSource can't set headers).
+ */
+function sseTokenFetchInit(): RequestInit {
+  if (isNativeApp()) {
+    const token = getNativeAccessToken()
+    return {
+      credentials: 'omit',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  }
+  return { credentials: 'include' }
+}
+
+/** Native has an SSE-capable session when a Bearer token is stored. */
+function hasSseSessionHint(): boolean {
+  return isNativeApp() ? hasNativeTokens() : hasSessionHint()
+}
 
 /**
  * Phase 2c: response shape of `GET /api/v1/messages/{id}/memories`.
@@ -113,7 +137,7 @@ async function getSseToken(): Promise<string | null> {
   }
 
   // Issue #204: never bootstrap auth for callers that have no session.
-  if (!hasSessionHint()) {
+  if (!hasSseSessionHint()) {
     return null
   }
 
@@ -124,9 +148,7 @@ async function getSseToken(): Promise<string | null> {
 
   tokenFetchPromise = (async () => {
     try {
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/token`, {
-        credentials: 'include',
-      })
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/token`, sseTokenFetchInit())
 
       // Handle 401 - try to refresh access token first
       if (response.status === 401) {
@@ -137,9 +159,10 @@ async function getSseToken(): Promise<string | null> {
 
         if (refreshSuccess) {
           // Retry original request after successful refresh
-          const retryResponse = await fetch(`${getApiBaseUrl()}/api/v1/auth/token`, {
-            credentials: 'include',
-          })
+          const retryResponse = await fetch(
+            `${getApiBaseUrl()}/api/v1/auth/token`,
+            sseTokenFetchInit()
+          )
 
           if (retryResponse.ok) {
             const data = await retryResponse.json()

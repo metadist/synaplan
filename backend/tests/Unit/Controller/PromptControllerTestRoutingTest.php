@@ -12,10 +12,12 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
+use App\Repository\UserRepository;
 use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\TaskPlanner;
+use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
@@ -68,6 +70,8 @@ final class PromptControllerTestRoutingTest extends TestCase
                 $this->createMock(ModelConfigService::class),
                 new TaskPlanValidator(),
                 new NullLogger(),
+                $this->createMock(UserRepository::class),
+                new TimeContextBuilder(),
             ),
         );
 

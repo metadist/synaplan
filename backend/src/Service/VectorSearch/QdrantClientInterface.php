@@ -212,6 +212,18 @@ interface QdrantClientInterface
      */
     public function getFilesWithChunks(int $userId): array;
 
+    /**
+     * Get global document statistics across ALL users (admin only).
+     *
+     * Scrolls the entire documents collection and aggregates per user. Use
+     * with care — this is an admin-only inventory call, not a hot path.
+     *
+     * @param int $topLimit Max number of top users to return
+     *
+     * @return array{totalUsers: int, totalFiles: int, totalChunks: int, topUsers: array<int, array{userId: int, files: int, chunks: int}>}
+     */
+    public function getGlobalDocumentStats(int $topLimit = 10): array;
+
     // --- Memory Collection Management ---
 
     /**

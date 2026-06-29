@@ -72,6 +72,9 @@ security:
         - { path: ^/api/v1/config/runtime, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/config/memory-service/check, roles: PUBLIC_ACCESS }
 
+        # Public marketing news for the anonymous guest landing (feed + image proxy)
+        - { path: ^/api/v1/news/, roles: PUBLIC_ACCESS }
+
         # Public auth endpoints
         - { path: ^/api/v1/auth/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/register, roles: PUBLIC_ACCESS }
@@ -80,6 +83,8 @@ security:
         - { path: ^/api/v1/auth/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/resend-verification, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/refresh, roles: PUBLIC_ACCESS }
+        # Native (mobile) OAuth handoff exchange — auth IS the signed handoff token
+        - { path: ^/api/v1/auth/native/exchange, roles: PUBLIC_ACCESS }
 
         # Authenticated auth endpoints
         - { path: ^/api/v1/auth/me, roles: IS_AUTHENTICATED_FULLY }
@@ -157,6 +162,13 @@ security:
 
         # Stripe webhook (public - secured by signature verification)
         - { path: ^/api/v1/stripe/webhook, roles: PUBLIC_ACCESS }
+
+        # Native IAP store notifications (public - Apple ASSN V2 signed JWS /
+        # Google Pub/Sub RTDN carry no Bearer/cookie; secured by signature +
+        # server-side re-query in MobilePurchaseService). The /api/v1/iap/verify
+        # endpoint stays Bearer-protected via the catch-all below.
+        - { path: ^/api/v1/iap/apple/notifications, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/iap/google/notifications, roles: PUBLIC_ACCESS }
 
         # Public subscription plans (no auth needed to view plans)
         - { path: ^/api/v1/subscription/plans, roles: PUBLIC_ACCESS }

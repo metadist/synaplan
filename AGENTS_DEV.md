@@ -2,6 +2,11 @@
 
 ## ⚠️ CRITICAL RULES
 
+### Time Context & Modern AI Models
+- **Current Year:** 2026
+- **Model Awareness:** Keep your knowledge of AI models up to date with the 2026 timeline. GPT-4o is legacy history. The current flagship is GPT-5.5 (with GPT-5.6 coming soon). Claude and other models are also heavily used.
+- **NEVER** write or recommend prompts/plans specifically assuming GPT-4o as the "latest and greatest." Use generic terms like "latest flagship models" or specific 2026 models like "GPT-5.5".
+
 ### Language
 - **Code & Comments**: ALWAYS English
 - **Chat responses**: ALWAYS in the language the user chooses!
@@ -1203,6 +1208,29 @@ final readonly class WidgetService
 
 ## Testing
 
+### ENFORCED Pre-Commit / Pre-Push Gate (mirrors GitHub CI)
+
+**Run this UNFILTERED before every commit. It is the local mirror of the GitHub `CI`
+workflow — green here means green CI; skipping a step means a red `All Checks Passed`.**
+
+```bash
+make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
+```
+
+| Local step | CI job it mirrors |
+|------------|-------------------|
+| `make -C backend lint` | PHP Code Formatting |
+| `make -C backend phpstan` | Backend (PHP/Symfony) — PHPStan (analyses `src/` **and** `tests/`) |
+| `make -C backend test` | Backend (PHP/Symfony) — PHPUnit (full suite) |
+| `make -C frontend lint` + `npm run check:types` + `make -C frontend test` | Frontend (Vue/TypeScript) |
+
+⚠️ **A filtered run is NOT the gate.** `phpunit --filter`, `phpstan analyse <path>`, or
+`vitest <file>` are inner-loop tools only. CI runs `composer phpstan` over the WHOLE repo
+(including `tests/`) and the full PHPUnit/Vitest suites — a green filtered run routinely hides
+errors that fail CI (e.g. a test closure typed `: ?string` that never returns null trips
+`Anonymous function never returns null` in the full PHPStan run). Always finish with the
+unfiltered `make` targets above.
+
 ### Quick Commands (from Project Root)
 ```bash
 # Run ALL quality checks + tests
@@ -1212,7 +1240,7 @@ make build       # Build frontend + widget
 
 # Backend only
 make -C backend lint format test
-make -C backend phpstan  # Static analysis
+make -C backend phpstan  # Static analysis (FULL — never scope to a single path before committing)
 
 # Frontend only
 make -C frontend lint test build
@@ -1252,9 +1280,12 @@ git push origin branch-name
 
 ## Code Quality Checklist
 
-Before committing:
+Before committing (the ENFORCED gate — run the FULL, unfiltered commands):
 - [ ] Run `make lint` (backend + frontend)
-- [ ] Run `make test` (all tests pass)
+- [ ] Run `make -C backend phpstan` (FULL — analyses `src/` + `tests/`, never a single path)
+- [ ] Run `make test` (all tests pass — full suite, not `--filter`)
+- [ ] Run `docker compose exec -T frontend npm run check:types` (vue-tsc, if FE changed)
+- [ ] One-shot equivalent: `make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types`
 - [ ] No trailing whitespace (`.editorconfig` enforces this)
 - [ ] OpenAPI annotations complete (if backend changes)
 - [ ] Translations added (if new text)

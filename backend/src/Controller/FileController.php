@@ -60,6 +60,8 @@ class FileController extends AbstractController
                         new OA\Property(property: 'files[]', type: 'array', items: new OA\Items(type: 'string', format: 'binary')),
                         new OA\Property(property: 'group_key', type: 'string', example: 'customer-support'),
                         new OA\Property(property: 'process_level', type: 'string', enum: ['store', 'extract', 'vectorize', 'full'], example: 'vectorize'),
+                        new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'whatsapp', 'widget', 'api', 'generated'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/Outlook) should set this so the file is labelled by source.'),
+                        new OA\Property(property: 'original_name', type: 'string', example: '/Shared/Q3 Report.pdf', description: 'The file name at the source, preserved even when the stored name is normalised. Falls back to the uploaded filename.'),
                     ]
                 )
             )
@@ -82,6 +84,15 @@ class FileController extends AbstractController
         if (!in_array($processLevel, ['store', 'extract', 'vectorize', 'full'], true)) {
             $processLevel = 'vectorize';
         }
+
+        // Provenance (03_file-management.md §3.1): integrations declare where the
+        // file came from + its original name. Web uploads omit these → web_upload.
+        $source = (string) $request->request->get('source', 'web_upload');
+        if (!in_array($source, File::SOURCES, true)) {
+            $source = 'web_upload';
+        }
+        $originalName = $request->request->get('original_name');
+        $originalName = is_string($originalName) && '' !== trim($originalName) ? trim($originalName) : null;
 
         $uploadedFiles = $request->files->get('files', []);
 
@@ -117,7 +128,7 @@ class FileController extends AbstractController
             return $this->json(['error' => 'No files uploaded. Use form-data with files[] field'], Response::HTTP_BAD_REQUEST);
         }
 
-        $result = $this->uploadService->uploadBatch($uploadedFiles, $user, $groupKey, $processLevel);
+        $result = $this->uploadService->uploadBatch($uploadedFiles, $user, $groupKey, $processLevel, $source, $originalName);
 
         return $this->json($result, $result['success'] ? Response::HTTP_OK : Response::HTTP_PARTIAL_CONTENT);
     }
@@ -376,21 +387,28 @@ class FileController extends AbstractController
         $result = $this->fileRepository->findByUserPaginated($user->getId(), $groupKey, $offset, $limit, $vectorFileIds, $filters);
         $messageFiles = $result['files'];
 
-        $vectorChunkMap = $this->resolveVectorGroupKeys($user->getId(), $messageFiles);
+        $allChunks = $this->getUserVectorChunks($user->getId());
+        $vectorChunkMap = $this->resolveVectorGroupKeys($messageFiles, $allChunks);
 
-        $files = array_map(fn ($mf) => [
-            'id' => $mf->getId(),
-            'filename' => $mf->getFileName(),
-            'path' => $mf->getFilePath(),
-            'file_type' => $mf->getFileType(),
-            'file_size' => $mf->getFileSize(),
-            'mime' => $mf->getFileMime(),
-            'status' => $mf->getStatus(),
-            'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
-            'uploaded_at' => $mf->getCreatedAt(),
-            'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
-            'group_key' => $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null),
-        ], $messageFiles);
+        $files = array_map(function ($mf) use ($vectorChunkMap, $allChunks) {
+            $chunkCount = (int) ($allChunks[$mf->getId()]['chunks'] ?? 0);
+
+            return [
+                'id' => $mf->getId(),
+                'filename' => $mf->getFileName(),
+                'path' => $mf->getFilePath(),
+                'file_type' => $mf->getFileType(),
+                'file_size' => $mf->getFileSize(),
+                'mime' => $mf->getFileMime(),
+                'status' => $mf->getStatus(),
+                'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
+                'uploaded_at' => $mf->getCreatedAt(),
+                'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
+                'group_key' => $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null),
+                'chunks' => $chunkCount,
+                'is_vectorized' => $chunkCount > 0,
+            ];
+        }, $messageFiles);
 
         return $this->json([
             'success' => true,
@@ -817,13 +835,31 @@ class FileController extends AbstractController
     }
 
     /**
+     * Fetch the vector chunk map for a user (fileId => ['chunks' => int, 'groupKey' => string|null]).
+     * Returns an empty map if the vector store is unavailable.
+     *
+     * @return array<int, array{chunks: int, groupKey: string|null}>
+     */
+    private function getUserVectorChunks(int $userId): array
+    {
+        try {
+            return $this->vectorStorageFacade->getFilesWithChunks($userId);
+        } catch (\Throwable $e) {
+            $this->logger->warning('FileController: Vector store chunk lookup failed', ['error' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    /**
      * Resolve group keys from vector store for legacy files missing DB column.
      *
-     * @param File[] $files
+     * @param File[]                                                $files
+     * @param array<int, array{chunks: int, groupKey: string|null}> $allChunks
      *
      * @return array<int, string>
      */
-    private function resolveVectorGroupKeys(int $userId, array $files): array
+    private function resolveVectorGroupKeys(array $files, array $allChunks): array
     {
         $legacyFileIds = array_filter(
             array_map(fn ($mf) => null === $mf->getGroupKey() ? $mf->getId() : null, $files)
@@ -834,15 +870,10 @@ class FileController extends AbstractController
         }
 
         $vectorChunkMap = [];
-        try {
-            $allChunks = $this->vectorStorageFacade->getFilesWithChunks($userId);
-            foreach ($legacyFileIds as $fid) {
-                if (isset($allChunks[$fid]) && !empty($allChunks[$fid]['groupKey'])) {
-                    $vectorChunkMap[$fid] = $allChunks[$fid]['groupKey'];
-                }
+        foreach ($legacyFileIds as $fid) {
+            if (isset($allChunks[$fid]) && !empty($allChunks[$fid]['groupKey'])) {
+                $vectorChunkMap[$fid] = $allChunks[$fid]['groupKey'];
             }
-        } catch (\Throwable $e) {
-            $this->logger->warning('FileController: Vector store chunk lookup failed', ['error' => $e->getMessage()]);
         }
 
         if (!empty($vectorChunkMap)) {

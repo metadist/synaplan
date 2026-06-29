@@ -1,4 +1,33 @@
 {
+  "jobs": {
+    "kind": {
+      "video": "video",
+      "image": "görsel",
+      "audio": "ses"
+    },
+    "toast": {
+      "ready": "{kind} hazır",
+      "failed": "{kind} oluşturulamadı",
+      "view": "Görüntüle"
+    },
+    "cancel": {
+      "stop": "Durdur",
+      "failed": "İş iptal edilemedi. Lütfen tekrar deneyin."
+    },
+    "tray": {
+      "title": "Arka plan işleri",
+      "close": "Kapat",
+      "openLabel": "Arka plan işleri ({count} çalışıyor)",
+      "empty": "Arka plan işi yok. Videolar gibi uzun süren işlemler burada görünür, böylece onlar tamamlanırken çalışmaya devam edebilirsiniz."
+    },
+    "row": {
+      "open": "Aç",
+      "working": "İşleniyor…"
+    }
+  },
+  "branding": {
+    "poweredBy": "Sunan"
+  },
   "pageTitles": {
     "login": "Giriş",
     "register": "Kayıt Ol",
@@ -15,6 +44,7 @@
     "plugins": "Eklentiler",
     "files": "Dosyalar",
     "ragSearch": "Arama",
+    "vectorStorage": "Vektör Deposu",
     "configInbound": "Kanallar",
     "configAiModels": "AI Modelleri",
     "configProviderHiggsfield": "Higgsfield Bağlantısı",
@@ -59,6 +89,10 @@
     "errorIssuanceFailed": "Synaplan bu hesap için bir API anahtarı veremedi."
   },
   "welcome": "Hoş Geldiniz",
+  "marketingNews": {
+    "heading": "Synaplan'dan en yeniler",
+    "readMore": "Devamını oku"
+  },
   "chat": {
     "title": "Sohbet",
     "historyLog": "Geçmiş",
@@ -963,6 +997,19 @@
       "confirmPasswordPlaceholder": "Yeni şifreyi onaylayın",
       "confirmPasswordHint": "Yeni şifreyle eşleşmeli"
     },
+    "appSecurity": {
+      "title": "Uygulama güvenliği",
+      "subtitle": "Bu cihaz için ek koruma",
+      "biometricLock": "Biyometrik uygulama kilidi",
+      "biometricLockHint": "Uygulamayı açmak için Face ID, Touch ID veya parmak izi iste.",
+      "verifyReason": "Biyometrik kilidi etkinleştir",
+      "enableFailed": "Biyometrik kilit etkinleştirilemedi. Lütfen tekrar deneyin."
+    },
+    "legal": {
+      "title": "Gizlilik ve Şartlar",
+      "privacy": "Gizlilik Politikası",
+      "terms": "Kullanım Koşulları"
+    },
     "dangerZone": {
       "title": "Tehlikeli Bölge",
       "subtitle": "Geri alınamaz işlemler",
@@ -1119,6 +1166,38 @@
     "fileGenerated": "Sizin için '{filename}' dosyasını oluşturdum. Şimdi indirebilirsiniz.",
     "fileGenerationFailed": "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.",
     "audioGenerated": "İstediğiniz ses burada. Aşağıdan oynatabilir veya indirebilirsiniz.",
+    "mediaJob": {
+      "title": {
+        "video": "Videonuz oluşturuluyor…",
+        "image": "Görseliniz oluşturuluyor…",
+        "audio": "Sesiniz oluşturuluyor…"
+      },
+      "backgroundHint": "Bu işlem arka planda çalışır ve birkaç dakika sürebilir. Sohbete devam edebilirsiniz — hazır olduğunda bu mesaj güncellenecek.",
+      "model": "Kullanılan model: {model}",
+      "stillRunning": "İş hâlâ çalışıyor · süre: {elapsed}",
+      "checkingNow": "Durum kontrol ediliyor…",
+      "lastChecked": "Son kontrol {seconds}s önce · sonraki ~{interval}s içinde",
+      "progress": "%{percent} tamamlandı",
+      "pollError": "Durum yenilenemedi — bir sonraki kontrolde tekrar denenecek.",
+      "refreshStatus": "Durumu şimdi kontrol et",
+      "overdueWarning": "Bu iş maksimum bekleme süresini aştı. Son sonuç kontrol ediliyor…",
+      "jobNotFound": "Bu arka plan işi artık izlenmiyor. Lütfen yeniden oluşturmayı deneyin.",
+      "stalled": {
+        "workerDown": "Arka plan işleyicisi bu işi henüz almadı. Bu durum sürerse worker büyük olasılıkla çalışmıyordur — yöneticinize bildirin.",
+        "generic": "Bu iş henüz ilerlemedi. Arka plan işleyicisi bekleniyor…"
+      },
+      "failedTitle": {
+        "video": "Video oluşturma başarısız",
+        "image": "Görsel oluşturma başarısız",
+        "audio": "Ses oluşturma başarısız"
+      },
+      "failedBody": "Arka plan işi tamamlanmadı. Farklı bir modelle tekrar deneyebilirsiniz.",
+      "maxWait": {
+        "video": "Videolar {minutes} dakikaya kadar sürebilir.",
+        "image": "Görseller genelde birkaç dakika içinde hazır olur.",
+        "audio": "Ses genelde birkaç dakika içinde hazır olur."
+      }
+    },
     "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
     "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",
     "continueButton": "Yanıtı sürdür"
@@ -1170,6 +1249,11 @@
       "confirmCancel": "Evet, Aboneliği İptal Et",
       "keepSubscription": "Aboneliği Koru",
       "loadingPortal": "Fatura portalı açılıyor..."
+    },
+    "native": {
+      "purchaseTitle": "Uygulama içi satın alma",
+      "purchaseComingSoon": "{plan} planı için uygulama içi satın alma ayarlanıyor ve gelecek bir uygulama güncellemesinde kullanıma sunulacak.",
+      "manageInStore": "Aboneliği mağazada yönet"
     },
     "plans": {
       "pro": "Pro",
@@ -1360,6 +1444,8 @@
     "status": "DURUM",
     "attachment": "EK",
     "uploaded": "YÜKLENDİ",
+    "vectorized": "Vektörleştirildi · {count} parça",
+    "notVectorized": "Vektörleştirilmedi",
     "action": "İŞLEM",
     "status_uploaded": "Yüklendi",
     "status_extracting": "Metin çıkarılıyor…",
@@ -1432,9 +1518,33 @@
     "filterDateTo": "Bitiş",
     "tabFiles": "Dosyalar",
     "tabSearch": "Arama",
+    "tabVectors": "Vektörler",
     "intro": "Yüklediğiniz dosyalar sohbetleriniz için aranabilir bilgiye dönüşür. Klasörler bir konuşmayı sınırlamak için bilgi klasörü olarak kullanılabilir.",
     "useInChat": "Sohbette kullan",
     "status_error": "Hata"
+  },
+  "vectorStorage": {
+    "intro": "Vektör deponuza genel bir bakış — kaç dosyanın dizinlendiği ve anlamsal arama için kaç vektörün (parça) saklandığı.",
+    "provider": "Vektör deposu",
+    "providerHint": "Vektörlerinizin saklandığı etkin arka uç.",
+    "online": "Çevrimiçi",
+    "offline": "Çevrimdışı",
+    "myTitle": "Vektörleriniz",
+    "files": "Dosyalar",
+    "vectors": "Vektörler",
+    "vectorsHint": "Aranabilir parçalar",
+    "folders": "Klasörler",
+    "byFolder": "Klasöre göre vektörler",
+    "defaultFolder": "Klasörsüz",
+    "chunksCount": "{count} vektör",
+    "emptyMine": "Henüz vektörleştirilmiş dosyanız yok. Aranabilir hale getirmek için Dosyalar sekmesinden dosya yükleyin.",
+    "adminTitle": "Tüm kullanıcılar (yönetici)",
+    "usersWithVectors": "Vektörü olan kullanıcılar",
+    "topUsers": "Vektöre göre ilk 10 kullanıcı",
+    "user": "Kullanıcı",
+    "userId": "Kullanıcı #{id}",
+    "emptyAdmin": "Henüz saklanan vektör yok.",
+    "deletionNote": "Bir dosyayı sildiğinizde, vektörleri de etkin vektör deposundan kaldırılır."
   },
   "config": {
     "aiModels": {
@@ -2455,5 +2565,20 @@
       "disabled": "Bu ortamda canlı güncellemeler kapalı. En güncel verileri görmek için sayfayı yenileyin.",
       "error": "Gerçek zamanlı bağlantı başarısız: {message}"
     }
+  },
+  "network": {
+    "offline": "Çevrimdışısın — bağlantını kontrol et. Otomatik olarak yeniden bağlanacağız."
+  },
+  "biometricLock": {
+    "title": "Kilitli",
+    "subtitle": "Devam etmek için Synaplan'ın kilidini aç.",
+    "unlock": "Kilidi aç",
+    "reason": "{brand} kilidini aç"
+  },
+  "forceUpdate": {
+    "title": "Güncelleme gerekli",
+    "subtitle": "Uygulamanın bu sürümü artık desteklenmiyor. Devam etmek için lütfen en son sürüme güncelleyin.",
+    "minVersion": "Gerekli en düşük sürüm: {version}",
+    "cta": "Şimdi güncelle"
   }
 }

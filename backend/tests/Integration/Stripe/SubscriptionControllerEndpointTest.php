@@ -180,6 +180,81 @@ class SubscriptionControllerEndpointTest extends WebTestCase
         $this->assertNull($body['cancelAt']);
     }
 
+    public function testGetSubscriptionStatusExposesSourceAndManageUrlForStripe(): void
+    {
+        // Legacy-shape Stripe subscription (no explicit `source`): the unified
+        // status must backfill source='stripe' and expose manageUrl=null (Stripe
+        // is managed via the on-demand portal, not a static URL).
+        $details = $this->user->getPaymentDetails();
+        $details['subscription'] = [
+            'stripe_subscription_id' => 'sub_src_'.bin2hex(random_bytes(4)),
+            'status' => 'active',
+            'subscription_end' => time() + 30 * 86400,
+            'plan' => 'PRO',
+            'cancel_at_period_end' => true,
+        ];
+        $this->user->setPaymentDetails($details);
+        $this->user->setUserLevel('PRO');
+        $this->em->flush();
+
+        $this->client->request(
+            'GET',
+            '/api/v1/subscription/status',
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->accessToken],
+        );
+
+        $this->assertResponseIsSuccessful();
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+
+        // MOBILE-APP SEAM (Epic 5.1) contract the app + web both read.
+        $this->assertTrue($body['active']);
+        $this->assertSame('PRO', $body['tier']);
+        $this->assertSame('stripe', $body['source']);
+        $this->assertNull($body['manageUrl']);
+        $this->assertTrue($body['cancelAtPeriodEnd']);
+    }
+
+    public function testCheckoutBlocksWhenSubscriptionOwnedByAppStore(): void
+    {
+        // User already owns an ACTIVE subscription via native IAP (Apple). A web
+        // Stripe checkout must be refused (block-cross) with a manage hint, and it
+        // must short-circuit before any Stripe customer is created.
+        $details = $this->user->getPaymentDetails();
+        $details['subscription'] = [
+            'source' => 'apple',
+            'status' => 'active',
+            'subscription_end' => time() + 30 * 86400,
+            'plan' => 'PRO',
+        ];
+        $this->user->setPaymentDetails($details);
+        $this->user->setUserLevel('PRO');
+        $this->em->flush();
+
+        $this->client->request(
+            'POST',
+            '/api/v1/subscription/checkout',
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->accessToken,
+            ],
+            json_encode(['planId' => 'PRO'], JSON_THROW_ON_ERROR),
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $this->assertSame('SUBSCRIPTION_OWNED_BY_OTHER_CHANNEL', $body['code']);
+        $this->assertSame('apple', $body['source']);
+        $this->assertSame('https://apps.apple.com/account/subscriptions', $body['manageUrl']);
+
+        // No Stripe customer must be created on the block-cross path.
+        $this->em->refresh($this->user);
+        $this->assertNull($this->user->getStripeCustomerId());
+    }
+
     public function testGetBudgetReturns401WhenUnauthenticated(): void
     {
         $this->client->getCookieJar()->clear();

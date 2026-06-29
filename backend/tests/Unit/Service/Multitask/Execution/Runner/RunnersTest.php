@@ -392,6 +392,29 @@ final class RunnersTest extends TestCase
         self::assertTrue($capturedOptions['record_media_usage'] ?? false);
     }
 
+    public function testMediaGenerationRunnerReturnsRunningWhenHandlerDetachedAsyncJob(): void
+    {
+        $handler = $this->createMock(MediaGenerationHandler::class);
+        $handler->method('handle')->willReturn([
+            'metadata' => [
+                'media_type' => 'video',
+                'media_job' => [
+                    'job_id' => 'abc123',
+                    'type' => 'video',
+                    'state' => 'running',
+                ],
+            ],
+        ]);
+
+        $runner = new MediaGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n2', Capability::VideoGeneration, [], ['prompt' => 'surfing cat']);
+
+        $result = $runner->run($node, $this->context($this->message('make a video')));
+
+        self::assertTrue($result->isRunning());
+        self::assertSame('abc123', $result->metadata['media_job']['job_id'] ?? null);
+    }
+
     /**
      * Regression for issue #1144: when a media node depends on an upstream node's
      * file output (e.g. inputs.image = "$n1.file"), the runner must lift the

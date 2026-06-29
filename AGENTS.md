@@ -40,13 +40,22 @@ When resolving merge conflicts:
 
 ### MANDATORY Pre-Commit Gate - Run Tests BEFORE Every Commit
 
-**You MUST run and pass ALL of these before committing or allowing a commit.** This matches what CI runs on GitHub. If any step fails, fix the issue before committing. No exceptions.
+**You MUST run and pass ALL of these before committing or allowing a commit.** This is the ENFORCED local mirror of the GitHub `CI` workflow — each step below maps 1:1 to a job in `.github/workflows/`, and the `All Checks Passed` gate will go red if you skip one. If any step fails, fix the issue before committing. No exceptions.
+
+| Local step | CI job it mirrors |
+|------------|-------------------|
+| `make -C backend lint` | PHP Code Formatting |
+| `make -C backend phpstan` | Backend (PHP/Symfony) — PHPStan stage |
+| `make -C backend test` | Backend (PHP/Symfony) — PHPUnit stage |
+| `make -C frontend lint` | Frontend (Vue/TypeScript) — lint |
+| `docker compose exec -T frontend npm run check:types` | Frontend (Vue/TypeScript) — vue-tsc |
+| `make -C frontend test` | Frontend (Vue/TypeScript) — Vitest |
 
 ```bash
 # Step 1: Backend lint (PSR-12 formatting)
 make -C backend lint
 
-# Step 2: Backend static analysis (PHPStan)
+# Step 2: Backend static analysis (PHPStan) — analyses src/ AND tests/, NEVER a single path
 make -C backend phpstan
 
 # Step 3: Backend tests (PHPUnit - all tests, not just Unit/)
@@ -62,14 +71,15 @@ docker compose exec -T frontend npm run check:types
 make -C frontend test
 ```
 
-**Or run everything in one shot:**
+**Or run everything in one shot (this IS the gate — green here ⇒ green CI):**
 ```bash
 make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
 ```
 
 **Rules:**
+- These commands are the gate. A green run of a FILTERED subset (`phpunit --filter ...`, `phpstan analyse <path>`, `vitest <file>`) is NOT the gate and does NOT count — always finish with the unfiltered `make` targets above. (See "Common pre-commit traps".)
 - Run the FULL test suite (`make test`), not just a subset like `tests/Unit/`
-- If `make -C backend phpstan` fails, fix the type errors before committing
+- Run the FULL `make -C backend phpstan` (it analyses `src/` **and** `tests/`); fix every type error before committing
 - If you changed frontend Vue/TS files, the frontend lint and tests are mandatory
 - If you only changed backend PHP files, you may skip frontend checks
 - If you changed backend OpenAPI annotations, run `make -C frontend generate-schemas` then re-run `vue-tsc`
@@ -80,6 +90,7 @@ make lint && make -C backend phpstan && make test && docker compose exec -T fron
 These are real failure modes that have caused a red PR more than once. Each one is invisible if you only run a filtered subset of tests.
 
 - **`--filter` ≠ `make test`.** `phpunit --filter ClassA|ClassB` is great for the inner dev loop, but it does NOT replace the gate. Characterization, integration, and feature tests live OUTSIDE the namespace you usually filter on. Always re-run unfiltered (`make -C backend test`) before committing.
+- **`phpstan analyse <path>` ≠ `make -C backend phpstan`.** Scoping PHPStan to the files you touched (`./vendor/bin/phpstan analyse src/Service/Foo`) hides errors that CI sees, because CI analyses the WHOLE project — **including `tests/`**. A very common miss: a test `willReturnCallback(...)` closure typed `: ?string` that never returns null trips `Anonymous function never returns null`, which only surfaces in the full run. Always re-run the unfiltered `make -C backend phpstan` (analyses `src/` + `tests/`, exactly what the CI "Backend (PHP/Symfony)" job runs as `composer phpstan`) before committing — a green filtered run is meaningless for the gate.
 - **Snapshot / characterization tests.** `backend/tests/Characterization/` (e.g. `RoutingCharacterizationTest`) locks the routing/classifier contract via JSON snapshots in `__snapshots__/`. ANY change to `MessageClassifier`, `MessageSorter`, the fast-path heuristic, or the AI sorter response shape WILL drift these. Re-record with the supported flag and commit the diff:
   ```bash
   docker compose exec -T -e UPDATE_ROUTING_SNAPSHOTS=1 backend ./vendor/bin/phpunit tests/Characterization/RoutingCharacterizationTest.php

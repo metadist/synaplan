@@ -143,4 +143,37 @@ class MediaErrorMessageBuilderTest extends TestCase
         $this->assertStringContainsString('Sorry, the video could not be generated right now.', $message);
         $this->assertStringNotContainsString('opaque', $message);
     }
+
+    public function testAdminDiagnosticsAppendRawCauseForAdminsOnly(): void
+    {
+        $exception = new ProviderException('Higgsfield API error (400): invalid_image_url', 'higgsfield', ['status_code' => 400]);
+
+        // Regular user: clean, non-leaky message — never the raw provider text.
+        $userMessage = $this->builder->buildErrorMessage($exception, 'video', 'en', false);
+        $this->assertStringNotContainsString('invalid_image_url', $userMessage);
+        $this->assertStringNotContainsString('Admin diagnostics', $userMessage);
+
+        // Admin: same clean message PLUS the appended raw diagnostics block.
+        $adminMessage = $this->builder->buildErrorMessage($exception, 'video', 'en', true);
+        $this->assertStringContainsString('We couldn\'t open the image you linked.', $adminMessage);
+        $this->assertStringContainsString('Admin diagnostics', $adminMessage);
+        $this->assertStringContainsString('Provider: higgsfield', $adminMessage);
+        $this->assertStringContainsString('invalid_image_url', $adminMessage);
+        $this->assertStringContainsString('status_code', $adminMessage);
+    }
+
+    public function testContentFilteredVideoSurfacesGoogleReasonToUser(): void
+    {
+        $exception = ProviderException::contentBlocked(
+            'google',
+            'SAFETY',
+            "Sorry, we can't create videos with real people's names or likenesses.",
+        );
+
+        $message = $this->builder->buildErrorMessage($exception, 'video', 'en');
+
+        $this->assertStringContainsString('Google refused to generate the video with code **SAFETY**.', $message);
+        // The actual provider reason is shown to the user as a quoted explanation.
+        $this->assertStringContainsString("> Sorry, we can't create videos with real people's names or likenesses.", $message);
+    }
 }

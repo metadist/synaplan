@@ -7,10 +7,12 @@ namespace App\Service\Multitask;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Repository\PromptRepository;
+use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\Plan\TaskPlanValidator;
+use App\Service\Prompt\TimeContextBuilder;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -51,6 +53,8 @@ final readonly class TaskPlanner
         private ModelConfigService $modelConfigService,
         private TaskPlanValidator $validator,
         private LoggerInterface $logger,
+        private UserRepository $userRepository,
+        private TimeContextBuilder $timeContextBuilder,
     ) {
     }
 
@@ -58,9 +62,10 @@ final readonly class TaskPlanner
      * Produce a task plan for the given message. Never throws — always returns a
      * usable plan (real or single-`chat` fallback).
      *
-     * @param array<int, Message> $conversationHistory oldest-first thread
+     * @param array<int, Message>  $conversationHistory oldest-first thread
+     * @param array<string, mixed> $options             request context (e.g. client_country) used to resolve the user's local time
      */
-    public function plan(Message $message, array $conversationHistory = [], ?int $userId = null): TaskPlanResult
+    public function plan(Message $message, array $conversationHistory = [], ?int $userId = null, array $options = []): TaskPlanResult
     {
         $language = $message->getLanguage() ?: 'en';
 
@@ -76,7 +81,7 @@ final readonly class TaskPlanner
         $provider = $modelId ? $this->modelConfigService->getProviderForModel($modelId) : null;
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
-        $systemPrompt = $this->buildSystemPrompt($promptRow->getPrompt(), $userId, $message);
+        $systemPrompt = $this->buildSystemPrompt($promptRow->getPrompt(), $userId, $message, $options);
         $messages = $this->buildMessages($systemPrompt, $message, $conversationHistory);
 
         try {
@@ -143,7 +148,10 @@ final readonly class TaskPlanner
         return $this->buildSystemPrompt($template, $userId);
     }
 
-    private function buildSystemPrompt(string $template, ?int $userId, ?Message $message = null): string
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function buildSystemPrompt(string $template, ?int $userId, ?Message $message = null, array $options = []): string
     {
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
         $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
@@ -164,36 +172,64 @@ final readonly class TaskPlanner
         $text = str_replace('[DYNAMICLIST]', implode("\n", $dynamicList), $text);
         $text = str_replace('[KEYLIST]', $keyList, $text);
 
-        return $text."\n\n".$this->timeContextBlock($message);
+        return $text."\n\n".$this->timeContextBlock($message, $options);
     }
 
     /**
-     * A short block giving the planner the current server time + timezone and,
-     * when available, when this message was received. The planner uses it to
-     * resolve relative dates/times ("tomorrow at 15:00") into the absolute
-     * `start`/`timezone` a `calendar_event` node needs. Appended unconditionally
-     * so it works regardless of the stored prompt template version.
+     * A short block giving the planner the current time in the USER's local
+     * timezone (not the server's) and, when available, when this message was
+     * received. The planner uses it to resolve relative dates/times ("tomorrow
+     * at 15:00") into the absolute `start`/`timezone` a `calendar_event` node
+     * needs. Appended unconditionally so it works regardless of the stored
+     * prompt template version.
+     *
+     * Timezone resolution is delegated to {@see TimeContextBuilder} — the SAME
+     * profile→country→server fallback the chat handler uses — so a UTC server
+     * no longer makes the planner emit UTC wall-clock times for a user in, say,
+     * Europe/Berlin (which previously surfaced as a 2-hour-off meeting invite).
+     *
+     * @param array<string, mixed> $options
      */
-    private function timeContextBlock(?Message $message): string
+    private function timeContextBlock(?Message $message, array $options = []): string
     {
-        $now = new \DateTimeImmutable('now');
-        $tz = date_default_timezone_get();
+        [$userTimezone, $country] = $this->resolveTimeSignals($message, $options);
 
-        $lines = [
-            '## Current time context (resolve relative dates/times against this)',
-            '- Server time now: '.$now->format(\DateTimeInterface::ATOM).' (timezone: '.$tz.')',
-        ];
+        $lines = [trim($this->timeContextBuilder->build($userTimezone, $country))];
 
         if (null !== $message) {
             $received = $message->getDateTime();
             if ('' !== $received) {
-                $lines[] = '- This message was received at: '.$received.' (server time)';
+                $lines[] = '- This message was received at (raw server stamp): '.$received.'.';
             }
         }
 
-        $lines[] = 'For a calendar/meeting request, emit a "calendar_event" node with an absolute "start" (ISO-8601 local datetime) and an IANA "timezone". If the user\'s timezone is unknown, use the server timezone above.';
+        $lines[] = 'For a calendar/meeting request, emit a "calendar_event" node with an absolute "start" as an ISO-8601 LOCAL datetime in the user\'s local timezone shown above, plus the matching IANA "timezone" string. Do NOT convert the time to UTC and do NOT emit "UTC" unless that is genuinely the user\'s timezone.';
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Resolve the two timezone signals the {@see TimeContextBuilder} needs: the
+     * user's stored IANA timezone (profile, authoritative) and the approximate
+     * Cloudflare country. Mirrors {@see \App\Service\Message\Handler\ChatHandler::buildTimeContext()}.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array{0: string|null, 1: string|null}
+     */
+    private function resolveTimeSignals(?Message $message, array $options): array
+    {
+        $userTimezone = null;
+        $userId = $message?->getUserId();
+        if (null !== $userId && $userId > 0) {
+            $details = $this->userRepository->find($userId)?->getUserDetails() ?? [];
+            $tz = $details['timezone'] ?? null;
+            $userTimezone = is_string($tz) && '' !== trim($tz) ? trim($tz) : null;
+        }
+
+        $country = $options['client_country'] ?? null;
+
+        return [$userTimezone, is_string($country) ? $country : null];
     }
 
     /**

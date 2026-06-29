@@ -72,6 +72,12 @@ interface WidgetConfig {
   // the operator left the in-widget button enabled). Surfaced via the public
   // /widget/{id}/config endpoint, never the raw Slack URL itself.
   humanHandoffEnabled?: boolean
+  // White-label attribution (Epic 4.5), derived from the backend's global
+  // branding config and surfaced via /widget/{id}/config. Defaults reproduce
+  // the historical "powered by synaplan" footer.
+  showPoweredBy?: boolean
+  poweredByLabel?: string
+  poweredByUrl?: string
 }
 
 const DEFAULT_VUE_CDN = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js'
@@ -108,6 +114,9 @@ class SynaplanWidget {
       allowedDomains: [],
       allowFileUpload: false,
       fileUploadLimit: 3,
+      showPoweredBy: true,
+      poweredByLabel: 'synaplan',
+      poweredByUrl: 'https://www.synaplan.com/',
       lazy: true, // Default to lazy loading
       fullscreenMode: false,
       allowFullscreen: false,
@@ -194,6 +203,21 @@ class SynaplanWidget {
           ...this.config,
           ...data.config,
           widgetTitle: data.name || this.config.widgetTitle,
+          // White-label attribution from the backend's global branding config.
+          // Omitted by older backends → keep the defaults set in init().
+          ...(data.branding
+            ? {
+                showPoweredBy: Boolean(data.branding.showPoweredBy ?? true),
+                poweredByLabel:
+                  typeof data.branding.poweredByLabel === 'string'
+                    ? data.branding.poweredByLabel
+                    : 'synaplan',
+                poweredByUrl:
+                  typeof data.branding.poweredByUrl === 'string'
+                    ? data.branding.poweredByUrl
+                    : 'https://www.synaplan.com/',
+              }
+            : {}),
           // Fail closed: only dial WebSockets when the backend explicitly says
           // realtime is on. An older backend that omits the `realtime` block
           // can't serve token/WS endpoints, so attempting to connect would
@@ -469,6 +493,9 @@ class SynaplanWidget {
         buttonIconUrl: this.config!.buttonIconUrl,
         isPreview: false,
         realtime: this.config!.realtime,
+        showPoweredBy: this.config!.showPoweredBy,
+        poweredByLabel: this.config!.poweredByLabel,
+        poweredByUrl: this.config!.poweredByUrl,
       })
 
       this.app.use(i18n)

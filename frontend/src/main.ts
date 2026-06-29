@@ -10,6 +10,10 @@ import App from './App.vue'
 import { useConfigStore } from './stores/config'
 import { useGlobalErrorStore } from './stores/globalError'
 import { installGlobalErrorHandlers } from './utils/installGlobalErrorHandlers'
+import { isNativeApp, getNativeApiBaseUrl } from './services/api/nativeRuntime'
+import { setApiBaseUrl } from './services/api/httpClient'
+import { loadNativeTokens } from './services/api/nativeAuth'
+import { applyBrandingTheme } from './utils/brandingTheme'
 
 // Bootstrap app - load config before mounting.
 // We MUST install global error handlers and mount the app even when bootstrap
@@ -26,6 +30,16 @@ import { installGlobalErrorHandlers } from './utils/installGlobalErrorHandlers'
   // Pinia is now installed → safe to wire global handlers that depend on stores.
   installGlobalErrorHandlers(app)
 
+  // Native shell runs cross-origin (capacitor://localhost). Point the API client
+  // at the real backend BEFORE the first request (config.init) — otherwise every
+  // call would resolve against the WebView's own localhost origin and fail.
+  if (isNativeApp()) {
+    setApiBaseUrl(getNativeApiBaseUrl())
+    // Restore Bearer tokens from secure storage (Keychain/Keystore) before the
+    // first authenticated request so a restarted app keeps its session.
+    await loadNativeTokens()
+  }
+
   const config = useConfigStore()
 
   try {
@@ -39,6 +53,10 @@ import { installGlobalErrorHandlers } from './utils/installGlobalErrorHandlers'
       stack: err instanceof Error ? (err.stack ?? '') : '',
     })
   }
+
+  // MOBILE-APP SEAM (Epic 4): apply white-label color/font from runtime branding
+  // config. No-op for the default brand; re-runs when the app switches servers.
+  applyBrandingTheme()
 
   const recaptchaEnabled = config.recaptcha.enabled
   const recaptchaSiteKey = config.recaptcha.siteKey
