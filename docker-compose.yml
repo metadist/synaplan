@@ -475,7 +475,7 @@ services:
   # Authentication uses short-lived JWTs issued by the PHP backend.
   # ----------------------------------------------------------------------------
   centrifugo:
-    image: centrifugo/centrifugo:v6.8.3@sha256:723aac6035075d62f5aba0e36a60be05d62019df86fe7a59f34857a6a099a10e
+    image: centrifugo/centrifugo:v6.8.4@sha256:165ad23129a8fb28bd04b4468b3e6302656876fd5892ceaedc10139b32593fbc
     container_name: synaplan-centrifugo
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
