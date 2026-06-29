@@ -9,6 +9,7 @@ use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
 use App\Service\FeedbackConstants;
 use App\Service\MarketingNews\MarketingNewsConfig;
+use App\Service\Media\MediaJobConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use Psr\Log\LoggerInterface;
 
@@ -101,6 +102,7 @@ final readonly class SystemConfigService
                     'rasterize' => ['label' => 'PDF Rasterizer', 'fields' => ['RASTERIZE_DPI', 'RASTERIZE_PAGE_CAP', 'RASTERIZE_TIMEOUT_MS']],
                     'whisper' => ['label' => 'Whisper (Audio)', 'fields' => ['WHISPER_ENABLED', 'WHISPER_DEFAULT_MODEL']],
                     'brave' => ['label' => 'Web Search (Brave)', 'fields' => ['BRAVE_SEARCH_ENABLED', 'BRAVE_SEARCH_API_KEY', 'BRAVE_SEARCH_COUNT']],
+                    'media' => ['label' => 'Async media generation', 'fields' => ['MEDIA_ASYNC_JOBS_ENABLED']],
                 ],
             ],
             'routing' => [
@@ -329,6 +331,33 @@ final readonly class SystemConfigService
                 ]);
             } catch (\Throwable $sideEffect) {
                 $this->logger->error('SystemConfigService: failed clearing per-user multitask override', [
+                    'userId' => $actingUserId,
+                    'error' => $sideEffect->getMessage(),
+                ]);
+            }
+        }
+
+        // Async media master switch: existing users were grandfathered to an
+        // explicit per-user OFF row (migration Version20260629120000), which
+        // overrides this global flag. Drop the acting admin's own override so the
+        // value they just set actually applies to their own account immediately.
+        if (MediaJobConfig::CONFIG_GROUP === $group
+            && MediaJobConfig::KEY_ASYNC_JOBS_ENABLED === $key
+            && null !== $actingUserId && $actingUserId > 0
+        ) {
+            try {
+                $removed = $this->configRepository->deleteValue(
+                    $actingUserId,
+                    MediaJobConfig::CONFIG_GROUP,
+                    MediaJobConfig::KEY_ASYNC_JOBS_ENABLED,
+                );
+                $this->logger->info('SystemConfigService: cleared admin per-user async media override', [
+                    'userId' => $actingUserId,
+                    'removed' => $removed,
+                    'globalValue' => $value,
+                ]);
+            } catch (\Throwable $sideEffect) {
+                $this->logger->error('SystemConfigService: failed clearing per-user async media override', [
                     'userId' => $actingUserId,
                     'error' => $sideEffect->getMessage(),
                 ]);
@@ -682,6 +711,18 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
+            ],
+            // Stored in BCONFIG group MEDIA / setting ASYNC_JOBS_ENABLED (the row
+            // MediaJobConfig reads). Master switch for detaching media renders to
+            // background jobs vs running them inline.
+            'MEDIA_ASYNC_JOBS_ENABLED' => [
+                'tab' => 'processing', 'section' => 'media', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Run media generation (image, video, audio) as background jobs so the chat is never blocked — the assistant shows a live status banner and a completion toast. When OFF, renders run inline and the turn blocks until they finish. Requires the worker container. Global default; existing users keep their own setting until they opt in.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => MediaJobConfig::CONFIG_GROUP,
+                'dbKey' => MediaJobConfig::KEY_ASYNC_JOBS_ENABLED,
             ],
             // === Branding (database-backed, no restart required) ===
             // Stored in BCONFIG group BRANDING (ownerId=0) — the rows BrandingService

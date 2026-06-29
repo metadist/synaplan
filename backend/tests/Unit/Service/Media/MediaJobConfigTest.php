@@ -20,12 +20,33 @@ final class MediaJobConfigTest extends TestCase
         $this->config = new MediaJobConfig($this->repo);
     }
 
-    public function testAsyncJobsDisabledByDefault(): void
+    public function testAsyncJobsEnabledByDefault(): void
     {
         $this->repo->method('getValue')->willReturn(null);
 
+        self::assertTrue($this->config->isAsyncJobsEnabled());
+        self::assertTrue($this->config->isAsyncJobsEnabled(42));
+    }
+
+    public function testGlobalDisableApplies(): void
+    {
+        $this->repo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => MediaJobConfig::KEY_ASYNC_JOBS_ENABLED === $setting ? 'false' : null
+        );
+
         self::assertFalse($this->config->isAsyncJobsEnabled());
-        self::assertFalse($this->config->isAsyncJobsEnabled(42));
+    }
+
+    public function testPerUserOffOverridesGlobalDefaultOn(): void
+    {
+        // No global row exists (built-in default ON), but an existing user was
+        // grandfathered to an explicit per-user OFF row.
+        $this->repo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 42 === $owner && MediaJobConfig::KEY_ASYNC_JOBS_ENABLED === $setting ? '0' : null
+        );
+
+        self::assertFalse($this->config->isAsyncJobsEnabled(42), 'grandfathered per-user OFF beats default ON');
+        self::assertTrue($this->config->isAsyncJobsEnabled(99), 'other users inherit default ON');
     }
 
     public function testPerUserOverrideWinsOverGlobal(): void
