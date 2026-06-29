@@ -13,9 +13,13 @@ use App\Repository\ConfigRepository;
  * Flags live in BCONFIG group {@see self::CONFIG_GROUP}:
  *   - ASYNC_JOBS_ENABLED        — master switch: chat/multitask media (image,
  *                                 video, audio) detaches to a background job
- *                                 instead of running inline. Default OFF in
- *                                 Sprint A (nothing creates jobs yet); flipped
- *                                 on for OSS/new installs in Sprint F.
+ *                                 instead of running inline. Built-in default ON
+ *                                 (Sprint F rollout): OSS clones, fresh installs,
+ *                                 dev, and new signups get async media instantly.
+ *                                 Existing users on the live platform are
+ *                                 grandfathered to an explicit per-user OFF row by
+ *                                 a one-time data migration (mirrors the multitask
+ *                                 routing rollout), giving them a switch they own.
  *   - JOB_POLL_INTERVAL_SECONDS — delay the advancer waits before re-dispatching
  *                                 itself for the next non-blocking poll step.
  *   - JOB_IMAGE_INLINE_FAST_MS  — grace window so a fast image render can still
@@ -40,7 +44,7 @@ final readonly class MediaJobConfig
     public const KEY_HEARTBEAT_STALE_SECONDS = 'JOB_HEARTBEAT_STALE_SECONDS';
     public const KEY_MAX_ACTIVE_PER_USER = 'JOB_MAX_ACTIVE_PER_USER';
 
-    private const DEFAULT_ASYNC_JOBS_ENABLED = false;
+    private const DEFAULT_ASYNC_JOBS_ENABLED = true;
     private const DEFAULT_POLL_INTERVAL_SECONDS = 3;
     private const DEFAULT_IMAGE_INLINE_FAST_MS = 1500;
     private const DEFAULT_HEARTBEAT_STALE_SECONDS = 90;
@@ -52,7 +56,7 @@ final readonly class MediaJobConfig
     }
 
     /**
-     * Master switch. Per-user override wins, then global, then built-in default (OFF).
+     * Master switch. Per-user override wins, then global, then built-in default (ON).
      *
      * Pass the EFFECTIVE user id (see ModelConfigService::getEffectiveUserIdForMessage)
      * so email/WhatsApp remapping resolves the flag for the same identity that
