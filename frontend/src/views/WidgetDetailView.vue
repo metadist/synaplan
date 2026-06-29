@@ -5,7 +5,7 @@
       <div class="px-4 lg:px-6 py-4 border-b border-light-border/30 dark:border-dark-border/20">
         <button
           class="text-xs txt-secondary hover:txt-primary transition-colors mb-3 inline-flex items-center gap-1.5"
-          @click="router.push({ name: 'tools-chat-widget' })"
+          @click="router.push({ name: 'channels-widgets' })"
         >
           <Icon icon="heroicons:arrow-left" class="w-3.5 h-3.5" />
           {{ $t('widgets.detail.back') }}

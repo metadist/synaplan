@@ -286,20 +286,13 @@
       <footer class="mt-20 border-t border-light-border dark:border-dark-border py-8">
         <div class="max-w-4xl mx-auto px-4 text-center txt-secondary text-sm">
           <p>
-            {{ $t('shared.poweredBy') }}
-            <a
-              href="https://synaplan.com"
-              target="_blank"
-              class="text-[var(--brand)] hover:underline font-medium"
-            >
-              Synaplan AI
-            </a>
+            <BrandAttribution link-class="text-[var(--brand)] hover:underline font-medium" />
             ·
-            <a href="https://synaplan.com/privacy" target="_blank" class="hover:underline">{{
+            <a :href="config.branding.privacyUrl" target="_blank" class="hover:underline">{{
               $t('shared.privacy')
             }}</a>
             ·
-            <a href="https://synaplan.com/terms" target="_blank" class="hover:underline">{{
+            <a :href="config.branding.termsUrl" target="_blank" class="hover:underline">{{
               $t('shared.terms')
             }}</a>
           </p>
@@ -318,6 +311,7 @@ import MessageImage from '../components/MessageImage.vue'
 import MessageVideo from '../components/MessageVideo.vue'
 import MessageCode from '../components/MessageCode.vue'
 import MessageText from '../components/MessageText.vue'
+import BrandAttribution from '../components/BrandAttribution.vue'
 import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'

@@ -169,6 +169,11 @@ final class QdrantClientMock implements QdrantClientInterface
         return [];
     }
 
+    public function getGlobalDocumentStats(int $topLimit = 10): array
+    {
+        return ['totalUsers' => 0, 'totalFiles' => 0, 'totalChunks' => 0, 'topUsers' => []];
+    }
+
     public function getMemoriesCollectionInfo(): array
     {
         return [

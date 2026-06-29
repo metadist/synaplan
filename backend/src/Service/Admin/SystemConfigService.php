@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Service\Admin;
 
 use App\Repository\ConfigRepository;
+use App\Service\Branding\BrandingService;
+use App\Service\Client\MobileVersionService;
 use App\Service\FeedbackConstants;
 use App\Service\MarketingNews\MarketingNewsConfig;
+use App\Service\Media\MediaJobConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use Psr\Log\LoggerInterface;
 
@@ -58,6 +61,24 @@ final readonly class SystemConfigService
                     'mailer' => ['label' => 'Primary Mailer', 'fields' => ['MAILER_DSN', 'APP_SENDER_EMAIL', 'APP_SENDER_NAME']],
                 ],
             ],
+            'branding' => [
+                'label' => 'Branding',
+                'sections' => [
+                    'identity' => ['label' => 'Brand Identity', 'fields' => ['BRAND_NAME', 'BRAND_TAGLINE', 'BRAND_HOMEPAGE_URL']],
+                    'colors' => ['label' => 'Colors', 'fields' => ['BRAND_PRIMARY_COLOR', 'BRAND_SECONDARY_COLOR', 'BRAND_ACCENT_COLOR']],
+                    'fonts' => ['label' => 'Fonts', 'fields' => ['BRAND_FONT_FAMILY', 'BRAND_HEADING_FONT_FAMILY', 'BRAND_FONT_URL']],
+                    'logos' => ['label' => 'Logos & Icon', 'fields' => ['BRAND_LOGO_URL', 'BRAND_LOGO_DARK_URL', 'BRAND_ICON_URL']],
+                    'legal' => ['label' => 'Legal Links', 'fields' => ['BRAND_PRIVACY_URL', 'BRAND_TERMS_URL']],
+                    'navigation' => ['label' => 'Start Page', 'fields' => ['BRAND_LANDING_PAGE', 'BRAND_DEFAULT_ROUTE']],
+                    'attribution' => ['label' => 'Attribution ("Powered by")', 'fields' => ['BRAND_SHOW_POWERED_BY', 'BRAND_POWERED_BY_LABEL', 'BRAND_POWERED_BY_URL']],
+                ],
+            ],
+            'mobile' => [
+                'label' => 'Mobile App',
+                'sections' => [
+                    'update' => ['label' => 'Forced Update Gate', 'fields' => ['MIN_APP_VERSION', 'IOS_APP_URL', 'ANDROID_APP_URL']],
+                ],
+            ],
             'auth' => [
                 'label' => 'Authentication',
                 'sections' => [
@@ -81,6 +102,7 @@ final readonly class SystemConfigService
                     'rasterize' => ['label' => 'PDF Rasterizer', 'fields' => ['RASTERIZE_DPI', 'RASTERIZE_PAGE_CAP', 'RASTERIZE_TIMEOUT_MS']],
                     'whisper' => ['label' => 'Whisper (Audio)', 'fields' => ['WHISPER_ENABLED', 'WHISPER_DEFAULT_MODEL']],
                     'brave' => ['label' => 'Web Search (Brave)', 'fields' => ['BRAVE_SEARCH_ENABLED', 'BRAVE_SEARCH_API_KEY', 'BRAVE_SEARCH_COUNT']],
+                    'media' => ['label' => 'Async media generation', 'fields' => ['MEDIA_ASYNC_JOBS_ENABLED']],
                 ],
             ],
             'routing' => [
@@ -309,6 +331,33 @@ final readonly class SystemConfigService
                 ]);
             } catch (\Throwable $sideEffect) {
                 $this->logger->error('SystemConfigService: failed clearing per-user multitask override', [
+                    'userId' => $actingUserId,
+                    'error' => $sideEffect->getMessage(),
+                ]);
+            }
+        }
+
+        // Async media master switch: existing users were grandfathered to an
+        // explicit per-user OFF row (migration Version20260629120000), which
+        // overrides this global flag. Drop the acting admin's own override so the
+        // value they just set actually applies to their own account immediately.
+        if (MediaJobConfig::CONFIG_GROUP === $group
+            && MediaJobConfig::KEY_ASYNC_JOBS_ENABLED === $key
+            && null !== $actingUserId && $actingUserId > 0
+        ) {
+            try {
+                $removed = $this->configRepository->deleteValue(
+                    $actingUserId,
+                    MediaJobConfig::CONFIG_GROUP,
+                    MediaJobConfig::KEY_ASYNC_JOBS_ENABLED,
+                );
+                $this->logger->info('SystemConfigService: cleared admin per-user async media override', [
+                    'userId' => $actingUserId,
+                    'removed' => $removed,
+                    'globalValue' => $value,
+                ]);
+            } catch (\Throwable $sideEffect) {
+                $this->logger->error('SystemConfigService: failed clearing per-user async media override', [
                     'userId' => $actingUserId,
                     'error' => $sideEffect->getMessage(),
                 ]);
@@ -663,6 +712,181 @@ final readonly class SystemConfigService
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
             ],
+            // Stored in BCONFIG group MEDIA / setting ASYNC_JOBS_ENABLED (the row
+            // MediaJobConfig reads). Master switch for detaching media renders to
+            // background jobs vs running them inline.
+            'MEDIA_ASYNC_JOBS_ENABLED' => [
+                'tab' => 'processing', 'section' => 'media', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Run media generation (image, video, audio) as background jobs so the chat is never blocked — the assistant shows a live status banner and a completion toast. When OFF, renders run inline and the turn blocks until they finish. Requires the worker container. Global default; existing users keep their own setting until they opt in.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => MediaJobConfig::CONFIG_GROUP,
+                'dbKey' => MediaJobConfig::KEY_ASYNC_JOBS_ENABLED,
+            ],
+            // === Branding (database-backed, no restart required) ===
+            // Stored in BCONFIG group BRANDING (ownerId=0) — the rows BrandingService
+            // reads and the public runtime-config endpoint surfaces to the frontend.
+            'BRAND_NAME' => [
+                'tab' => 'branding', 'section' => 'identity', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Displayed brand/product name (document title, auth screens, attribution).',
+                'default' => BrandingService::DEFAULT_NAME,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_NAME,
+            ],
+            'BRAND_TAGLINE' => [
+                'tab' => 'branding', 'section' => 'identity', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Optional short tagline/description shown beside the brand.',
+                'default' => BrandingService::DEFAULT_TAGLINE,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_TAGLINE,
+            ],
+            'BRAND_HOMEPAGE_URL' => [
+                'tab' => 'branding', 'section' => 'identity', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Brand homepage link used on auth and footer surfaces.',
+                'default' => BrandingService::DEFAULT_HOMEPAGE_URL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_HOMEPAGE_URL,
+            ],
+            'BRAND_PRIVACY_URL' => [
+                'tab' => 'branding', 'section' => 'legal', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Privacy-policy link. Reachable in-app (Settings) and used in store metadata; store policy (Apple/Google) requires it. White-label brands point this at their own page.',
+                'default' => BrandingService::DEFAULT_PRIVACY_URL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_PRIVACY_URL,
+            ],
+            'BRAND_TERMS_URL' => [
+                'tab' => 'branding', 'section' => 'legal', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Terms-of-use link. Reachable in-app (Settings) and used in store metadata. White-label brands point this at their own page.',
+                'default' => BrandingService::DEFAULT_TERMS_URL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_TERMS_URL,
+            ],
+            'BRAND_PRIMARY_COLOR' => [
+                'tab' => 'branding', 'section' => 'colors', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Primary accent color as a hex value (e.g. #003fc7). Injected into the --brand CSS variables at runtime.',
+                'default' => BrandingService::DEFAULT_PRIMARY_COLOR,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_PRIMARY_COLOR,
+            ],
+            'BRAND_SECONDARY_COLOR' => [
+                'tab' => 'branding', 'section' => 'colors', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Optional secondary color as a hex value. Leave empty to keep the default palette.',
+                'default' => BrandingService::DEFAULT_SECONDARY_COLOR,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_SECONDARY_COLOR,
+            ],
+            'BRAND_ACCENT_COLOR' => [
+                'tab' => 'branding', 'section' => 'colors', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Optional accent color as a hex value. Leave empty to keep the default palette.',
+                'default' => BrandingService::DEFAULT_ACCENT_COLOR,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_ACCENT_COLOR,
+            ],
+            'BRAND_FONT_FAMILY' => [
+                'tab' => 'branding', 'section' => 'fonts', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Body font-family CSS stack (e.g. "Inter, sans-serif"). Leave empty to keep the default font.',
+                'default' => BrandingService::DEFAULT_FONT_FAMILY,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_FONT_FAMILY,
+            ],
+            'BRAND_HEADING_FONT_FAMILY' => [
+                'tab' => 'branding', 'section' => 'fonts', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Optional heading font-family CSS stack. Leave empty to fall back to the body font/default.',
+                'default' => BrandingService::DEFAULT_HEADING_FONT_FAMILY,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_HEADING_FONT_FAMILY,
+            ],
+            'BRAND_FONT_URL' => [
+                'tab' => 'branding', 'section' => 'fonts', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Optional web-font stylesheet URL (self-hosted or provider). The origin must be on the CSP allow-list; for the app, on the configured server\'s allowed origins. Leave empty for no external font.',
+                'default' => BrandingService::DEFAULT_FONT_URL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_FONT_URL,
+            ],
+            'BRAND_LOGO_URL' => [
+                'tab' => 'branding', 'section' => 'logos', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Light-mode logo URL. Leave empty to use the bundled Synaplan logo.',
+                'default' => '',
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_LOGO_URL,
+            ],
+            'BRAND_LOGO_DARK_URL' => [
+                'tab' => 'branding', 'section' => 'logos', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Dark-mode logo URL. Leave empty to use the bundled Synaplan logo.',
+                'default' => '',
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_LOGO_DARK_URL,
+            ],
+            'BRAND_ICON_URL' => [
+                'tab' => 'branding', 'section' => 'logos', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Brand icon/favicon URL. Leave empty to use the bundled asset (app icons are produced by Epic 6).',
+                'default' => '',
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_ICON_URL,
+            ],
+            'BRAND_LANDING_PAGE' => [
+                'tab' => 'branding', 'section' => 'navigation', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Logged-out landing: a route name (e.g. "login") or a free-form path starting with "/" (e.g. "/welcome"). Must be a public page. Leave empty to keep the default; unknown/non-public values fail safe to the default.',
+                'default' => BrandingService::DEFAULT_LANDING_PAGE,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_LANDING_PAGE,
+            ],
+            'BRAND_DEFAULT_ROUTE' => [
+                'tab' => 'branding', 'section' => 'navigation', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Post-login default: a route name (e.g. "chat") or a free-form path starting with "/" (e.g. "/files"). Leave empty to keep the default; unknown values fail safe to the default.',
+                'default' => BrandingService::DEFAULT_DEFAULT_ROUTE,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_DEFAULT_ROUTE,
+            ],
+            'BRAND_SHOW_POWERED_BY' => [
+                'tab' => 'branding', 'section' => 'attribution', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show the "· powered by <label>" attribution across auth, logged-out, shared-chat and widget surfaces.',
+                'default' => BrandingService::DEFAULT_SHOW_POWERED_BY,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_SHOW_POWERED_BY,
+            ],
+            'BRAND_POWERED_BY_LABEL' => [
+                'tab' => 'branding', 'section' => 'attribution', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Attribution label — the platform being credited (e.g. "Synaplan").',
+                'default' => BrandingService::DEFAULT_POWERED_BY_LABEL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_POWERED_BY_LABEL,
+            ],
+            'BRAND_POWERED_BY_URL' => [
+                'tab' => 'branding', 'section' => 'attribution', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Attribution link target for the "powered by" label.',
+                'default' => BrandingService::DEFAULT_POWERED_BY_URL,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_POWERED_BY_URL,
+            ],
+
+            // === Mobile app forced-update gate (database-backed, no restart required) ===
+            // Stored in BCONFIG group MOBILE (ownerId=0) — read by MobileVersionService
+            // and surfaced in the public runtime config so the native app can block
+            // too-old installs (Epic 8.2).
+            'MIN_APP_VERSION' => [
+                'tab' => 'mobile', 'section' => 'update', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Minimum supported mobile app version (e.g. 4.0 or 4.1.2). Apps older than this are blocked with a "please update" screen. Leave empty to disable the gate.',
+                'default' => MobileVersionService::DEFAULT_MIN_APP_VERSION,
+                'source' => 'database', 'dbGroup' => MobileVersionService::GROUP, 'dbKey' => MobileVersionService::KEY_MIN_APP_VERSION,
+            ],
+            'IOS_APP_URL' => [
+                'tab' => 'mobile', 'section' => 'update', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'App Store link shown on the forced-update screen (iOS).',
+                'default' => MobileVersionService::DEFAULT_IOS_APP_URL,
+                'source' => 'database', 'dbGroup' => MobileVersionService::GROUP, 'dbKey' => MobileVersionService::KEY_IOS_APP_URL,
+            ],
+            'ANDROID_APP_URL' => [
+                'tab' => 'mobile', 'section' => 'update', 'type' => 'url',
+                'sensitive' => false,
+                'description' => 'Play Store link shown on the forced-update screen (Android).',
+                'default' => MobileVersionService::DEFAULT_ANDROID_APP_URL,
+                'source' => 'database', 'dbGroup' => MobileVersionService::GROUP, 'dbKey' => MobileVersionService::KEY_ANDROID_APP_URL,
+            ],
+
             // === Guest Landing — Marketing News (database-backed, no restart) ===
             // Master switch + per-locale RSS feed URLs in BCONFIG group MARKETING_NEWS.
             // Seeded OFF; feed URLs have no effect until the master switch is ON.

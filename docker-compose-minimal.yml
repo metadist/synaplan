@@ -157,12 +157,19 @@ services:
       centrifugo:
         condition: service_started
     restart: unless-stopped
+    # Generous start_period so a slow first boot is never mistaken for a crash.
+    # Minimal mode skips Ollama/Whisper so the backend usually boots fast, but
+    # the first `up -d` still races image pulls + the dev-image build + the
+    # one-time migrations/seed/cache warm. A failing probe inside start_period
+    # keeps the container "starting" (not "unhealthy"), so nothing downstream
+    # aborts; the moment /api/health answers 200 it flips to healthy. See
+    # docker-compose.yml for the full rationale.
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 3
-      start_period: 90s
+      retries: 5
+      start_period: 300s
     networks:
       - synaplan-network
 

@@ -1,4 +1,33 @@
 {
+  "jobs": {
+    "kind": {
+      "video": "video",
+      "image": "image",
+      "audio": "audio"
+    },
+    "toast": {
+      "ready": "Your {kind} is ready",
+      "failed": "Couldn't create your {kind}",
+      "view": "View"
+    },
+    "cancel": {
+      "stop": "Stop",
+      "failed": "Couldn't cancel the job. Please try again."
+    },
+    "tray": {
+      "title": "Background jobs",
+      "close": "Close",
+      "openLabel": "Background jobs ({count} running)",
+      "empty": "No background jobs. Long renders like videos appear here so you can keep working while they finish."
+    },
+    "row": {
+      "open": "Open",
+      "working": "Working…"
+    }
+  },
+  "branding": {
+    "poweredBy": "Powered by"
+  },
   "pageTitles": {
     "login": "Login",
     "register": "Register",
@@ -17,6 +46,7 @@
     "memories": "Memories",
     "feedback": "Feedback",
     "ragSearch": "Search",
+    "vectorStorage": "Vector Storage",
     "configInbound": "Channels",
     "configAiModels": "AI Models",
     "configProviderHiggsfield": "Higgsfield Connection",
@@ -692,6 +722,8 @@
     "status": "STATUS",
     "attachment": "ATTACHMENT",
     "uploaded": "UPLOADED",
+    "vectorized": "Vectorized · {count} chunks",
+    "notVectorized": "Not vectorized",
     "action": "ACTION",
     "status_uploaded": "Uploaded",
     "status_extracting": "Extracting text…",
@@ -765,8 +797,32 @@
     "filterDateTo": "To",
     "tabFiles": "Files",
     "tabSearch": "Search",
+    "tabVectors": "Vectors",
     "intro": "Files you upload become searchable knowledge for your chats. Folders can be used as knowledge folders to scope a conversation.",
     "useInChat": "Use in chat"
+  },
+  "vectorStorage": {
+    "intro": "An overview of your vector storage — how many files have been indexed and how many vectors (chunks) are stored for semantic search.",
+    "provider": "Vector store",
+    "providerHint": "The active backend where your vectors are stored.",
+    "online": "Online",
+    "offline": "Offline",
+    "myTitle": "Your vectors",
+    "files": "Files",
+    "vectors": "Vectors",
+    "vectorsHint": "Searchable chunks",
+    "folders": "Folders",
+    "byFolder": "Vectors by folder",
+    "defaultFolder": "Ungrouped",
+    "chunksCount": "{count} vectors",
+    "emptyMine": "You don't have any vectorized files yet. Upload files on the Files tab to make them searchable.",
+    "adminTitle": "All users (admin)",
+    "usersWithVectors": "Users with vectors",
+    "topUsers": "Top 10 users by vectors",
+    "user": "User",
+    "userId": "User #{id}",
+    "emptyAdmin": "No vectors are stored yet.",
+    "deletionNote": "When you delete a file, its vectors are removed from the active vector store as well."
   },
   "fileSelection": {
     "title": "Select or Upload Files",
@@ -1610,6 +1666,11 @@
       "confirmCancel": "Yes, Cancel Subscription",
       "keepSubscription": "Keep Subscription",
       "loadingPortal": "Opening billing portal..."
+    },
+    "native": {
+      "purchaseTitle": "In-app purchase",
+      "purchaseComingSoon": "In-app purchases for the {plan} plan are being set up and will be available in a future app update.",
+      "manageInStore": "Manage subscription in the store"
     },
     "plans": {
       "pro": "Pro",
@@ -2776,6 +2837,19 @@
       "confirmPasswordPlaceholder": "Confirm new password",
       "confirmPasswordHint": "Must match new password"
     },
+    "appSecurity": {
+      "title": "App Security",
+      "subtitle": "Extra protection for this device",
+      "biometricLock": "Biometric app lock",
+      "biometricLockHint": "Require Face ID, Touch ID or fingerprint to open the app.",
+      "verifyReason": "Enable biometric lock",
+      "enableFailed": "Could not enable the biometric lock. Please try again."
+    },
+    "legal": {
+      "title": "Privacy & Terms",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Use"
+    },
     "dangerZone": {
       "title": "Danger Zone",
       "subtitle": "Irreversible actions",
@@ -2941,6 +3015,38 @@
     "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",
     "fileGenerationFailed": "There was a problem creating the file. Please try again.",
     "audioGenerated": "Here's the audio you requested. You can play or download it below.",
+    "mediaJob": {
+      "title": {
+        "video": "Generating your video…",
+        "image": "Generating your image…",
+        "audio": "Generating your audio…"
+      },
+      "backgroundHint": "This runs in the background and may take a few minutes. You can keep chatting — this message will update when it's ready.",
+      "model": "Using {model}",
+      "stillRunning": "Job still running · running for {elapsed}",
+      "checkingNow": "Checking status now…",
+      "lastChecked": "Last checked {seconds}s ago · next check in ~{interval}s",
+      "progress": "{percent}% complete",
+      "pollError": "Could not refresh job status — will retry on the next check.",
+      "refreshStatus": "Check status now",
+      "overdueWarning": "This job has passed the maximum wait time. Checking for a final result…",
+      "jobNotFound": "This background job is no longer tracked. Please try generating again.",
+      "stalled": {
+        "workerDown": "The background worker hasn't picked up this job yet. If this persists, the queue worker may be down — contact your administrator.",
+        "generic": "This job hasn't made progress yet. Still waiting for the background worker…"
+      },
+      "failedTitle": {
+        "video": "Video generation failed",
+        "image": "Image generation failed",
+        "audio": "Audio generation failed"
+      },
+      "failedBody": "The background job did not complete. You can try again with a different model.",
+      "maxWait": {
+        "video": "Videos may take up to {minutes} minutes.",
+        "image": "Images usually finish within a few minutes.",
+        "audio": "Audio usually finishes within a few minutes."
+      }
+    },
     "cancelledByUser": "⚠️ Cancelled by user",
     "truncated": "This response was cut short because the model reached its token limit.",
     "continueButton": "Continue response"
@@ -3548,5 +3654,20 @@
       "disabled": "Live updates are turned off in this environment. Refresh to see the latest data.",
       "error": "Realtime connection failed: {message}"
     }
+  },
+  "network": {
+    "offline": "You're offline — check your connection. We'll reconnect automatically."
+  },
+  "biometricLock": {
+    "title": "Locked",
+    "subtitle": "Unlock Synaplan to continue.",
+    "unlock": "Unlock",
+    "reason": "Unlock {brand}"
+  },
+  "forceUpdate": {
+    "title": "Update required",
+    "subtitle": "This version of the app is no longer supported. Please update to the latest version to continue.",
+    "minVersion": "Minimum required version: {version}",
+    "cta": "Update now"
   }
 }

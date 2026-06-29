@@ -47,6 +47,17 @@ final readonly class NodeResult
         return new self(NodeStatus::Skipped, error: $reason);
     }
 
+    /**
+     * Media detached to a background {@see \App\Service\Media\MediaJob} — no file
+     * yet; Sprint C completes the card when the job reaches a terminal state.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    public static function running(array $metadata = []): self
+    {
+        return new self(NodeStatus::Running, metadata: $metadata);
+    }
+
     public function firstFile(): ?array
     {
         return $this->files[0] ?? null;
@@ -55,5 +66,15 @@ final readonly class NodeResult
     public function isSuccessful(): bool
     {
         return NodeStatus::Done === $this->status;
+    }
+
+    public function isRunning(): bool
+    {
+        return NodeStatus::Running === $this->status;
+    }
+
+    public function isSettledUnsuccessful(): bool
+    {
+        return NodeStatus::Failed === $this->status || NodeStatus::Skipped === $this->status;
     }
 }

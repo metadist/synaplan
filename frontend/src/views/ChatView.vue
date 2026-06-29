@@ -168,6 +168,7 @@
               :error-data="message.errorData"
               :truncated="message.truncated"
               :task-plan="message.taskPlan"
+              :media-job="message.mediaJob"
               :was-multitask="message.wasMultitask"
               :is-guest-mode="isGuestMode"
               @regenerate="handleRegenerate(message, $event)"
@@ -178,6 +179,9 @@
               @false-positive="openFalsePositiveModal"
               @click-memory="handleClickMemory"
               @continue="handleContinueResponse(message)"
+              @media-job-update="message.mediaJob = $event"
+              @media-job-completed="handleMediaJobCompleted(message, $event)"
+              @media-job-cancel="mediaJobsStore.cancel($event)"
             />
           </template>
         </div>
@@ -365,6 +369,7 @@ import { useChatsStore, isDefaultChatTitle } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
+import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
 import { useMemoriesStore } from '@/stores/userMemories'
@@ -382,6 +387,7 @@ import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
+import { parseMediaJobPayload, applyMediaJobUpdateToMessage } from '@/utils/messageMapper'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
@@ -443,6 +449,7 @@ const chatsStore = useChatsStore()
 const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
+const mediaJobsStore = useMediaJobsStore()
 const guestStore = useGuestStore()
 const configStore = useConfigStore()
 const memoriesStore = useMemoriesStore()
@@ -551,6 +558,15 @@ const isStreaming = computed(() => {
 
 // Init on mount
 onMounted(async () => {
+  // Subscribe to the per-user realtime channel so finished renders resolve
+  // their banner instantly (push primary). No-op for guests / when realtime is
+  // disabled; the 25s banner poll remains the fallback.
+  void mediaJobsStore.subscribe(authStore.user?.id)
+  // Hydrate the global Jobs tray with any renders already running across chats.
+  if (authStore.isAuthenticated) {
+    void mediaJobsStore.loadActive()
+  }
+
   if (!authStore.isAuthenticated) {
     await guestStore.initSession()
 
@@ -698,6 +714,7 @@ const handleOpenFeedbackDialogEvent = (event: Event) => {
 // Cleanup: Stop streaming when component unmounts (user leaves chat)
 onBeforeUnmount(() => {
   isViewUnmounted = true
+  mediaJobsStore.unsubscribe()
   handleStopStreaming()
   if (currentAudioStreamer) {
     currentAudioStreamer.stop()
@@ -1091,6 +1108,60 @@ function schedulePostStreamMemoryPoll(messageId: number): void {
  *     Earlier parts (e.g. a finished code block followed by more streaming
  *     prose) keep their identity instead of being re-created each tick.
  */
+function applyMediaJobToMessage(message: Message | undefined, raw: unknown): void {
+  if (!message) return
+  // Accept both the bare job payload ({ job_id, type, state }, as sent on the
+  // `complete` event) AND a metadata envelope that nests it under `media_job` /
+  // `mediaJob` (as sent on the `generating` progress event). Attaching the job
+  // as early as the `generating` event lets the MediaJobStatus banner take over
+  // immediately, so the bubble shows ONE in-progress surface instead of
+  // flashing the routing status / inline "generating…" placeholder first.
+  let parsed = parseMediaJobPayload(raw)
+  if (!parsed && raw && typeof raw === 'object') {
+    const envelope = raw as Record<string, unknown>
+    parsed = parseMediaJobPayload(envelope.media_job ?? envelope.mediaJob)
+  }
+  if (parsed) {
+    message.mediaJob = parsed
+  }
+}
+
+/**
+ * Pick the correct inline "generating…" placeholder token for a media job so a
+ * type-less complete event never mislabels (e.g. showing "Generating your
+ * video…" for an image request). Falls back to video for an unknown type.
+ */
+function generatingTokenForMediaJob(raw: unknown): string {
+  let parsed = parseMediaJobPayload(raw)
+  if (!parsed && raw && typeof raw === 'object') {
+    const envelope = raw as Record<string, unknown>
+    parsed = parseMediaJobPayload(envelope.media_job ?? envelope.mediaJob)
+  }
+  switch (parsed?.type) {
+    case 'image':
+      return '__IMAGE_GENERATING__'
+    case 'audio':
+      return '__AUDIO_GENERATING__'
+    default:
+      return '__VIDEO_GENERATING__'
+  }
+}
+
+function handleMediaJobCompleted(message: Message, payload: { url: string; type: string }): void {
+  // Shared with the realtime mediaJobs store so the poll and push completion
+  // paths produce an identical result (state → done + media part appended).
+  applyMediaJobUpdateToMessage(message, {
+    job_id: message.mediaJob?.jobId ?? '',
+    type: payload.type,
+    state: 'done',
+    file: { url: payload.url, type: payload.type },
+  })
+
+  if (message.backendMessageId) {
+    void historyStore.reconcileMessage(message.id, message.backendMessageId)
+  }
+}
+
 function renderStreamingContent(content: string, msgId: string): void {
   const trimmedContent = content.trim()
 
@@ -1683,6 +1754,7 @@ const streamAIResponse = async (
               const mname = data.metadata.model_name
               if (typeof prov === 'string') message.provider = prov
               if (typeof mname === 'string') message.modelLabel = mname
+              applyMediaJobToMessage(message, data.metadata)
             }
           } else if (data.status === 'processing') {
             // Processing/routing — no UI update needed
@@ -1725,6 +1797,11 @@ const streamAIResponse = async (
 
             if (fullContent) {
               renderStreamingContent(fullContent, messageId)
+            } else if (data.mediaJob || data.media_job) {
+              renderStreamingContent(
+                generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
+                messageId
+              )
             }
 
             processingStatus.value = ''
@@ -1732,6 +1809,7 @@ const streamAIResponse = async (
 
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
+              applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
               if (
                 data.searchResults &&
                 Array.isArray(data.searchResults) &&
@@ -1943,6 +2021,7 @@ const streamAIResponse = async (
               if (typeof mname === 'string') {
                 message.modelLabel = mname
               }
+              applyMediaJobToMessage(message, data.metadata)
             }
           } else if (data.status === 'processing') {
             // Processing/routing messages - improved logging
@@ -2370,6 +2449,11 @@ const streamAIResponse = async (
 
             if (fullContent) {
               renderStreamingContent(fullContent, messageId)
+            } else if (data.mediaJob || data.media_job) {
+              renderStreamingContent(
+                generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
+                messageId
+              )
             }
 
             if (currentAudioStreamer) {
@@ -2386,6 +2470,8 @@ const streamAIResponse = async (
             // Update message metadata
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
+              applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
+
               // Mark as truncated so the Continue button appears
               if (data.truncated) {
                 message.truncated = true

@@ -190,4 +190,55 @@ class UserTest extends TestCase
         $this->assertContains('ROLE_ADMIN', $roles);
         $this->assertContains('ROLE_PRO', $roles);
     }
+
+    // ── Epic 5.1: subscription source (channel ownership) ──────────────────
+
+    public function testGetSubscriptionSourceIsNullWithoutSubscription(): void
+    {
+        $user = new User();
+
+        $this->assertNull($user->getSubscriptionSource());
+    }
+
+    public function testGetSubscriptionSourceReturnsExplicitSource(): void
+    {
+        foreach (['stripe', 'apple', 'google'] as $source) {
+            $user = new User();
+            $user->setPaymentDetails(['subscription' => ['source' => $source, 'status' => 'active']]);
+
+            $this->assertSame($source, $user->getSubscriptionSource());
+        }
+    }
+
+    public function testGetSubscriptionSourceBackfillsLegacyStripeFromSubscriptionId(): void
+    {
+        $user = new User();
+        // Legacy subscription written before `source` existed.
+        $user->setPaymentDetails([
+            'subscription' => [
+                'stripe_subscription_id' => 'sub_123',
+                'status' => 'active',
+                'subscription_end' => time() + 1000,
+            ],
+        ]);
+
+        $this->assertSame('stripe', $user->getSubscriptionSource());
+    }
+
+    public function testGetSubscriptionSourceBackfillsLegacyStripeFromStatusOnly(): void
+    {
+        $user = new User();
+        $user->setPaymentDetails(['subscription' => ['status' => 'canceled']]);
+
+        $this->assertSame('stripe', $user->getSubscriptionSource());
+    }
+
+    public function testGetSubscriptionSourceIgnoresInvalidSource(): void
+    {
+        $user = new User();
+        $user->setPaymentDetails(['subscription' => ['source' => 'paypal', 'status' => 'active']]);
+
+        // Unknown channel falls back to the legacy Stripe backfill (status present).
+        $this->assertSame('stripe', $user->getSubscriptionSource());
+    }
 }

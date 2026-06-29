@@ -19,6 +19,11 @@ parameters:
     # OIDC scopes requested during login (space-separated)
     env(OIDC_SCOPES): 'openid email profile offline_access'
 
+    # Native mobile deep-link scheme used for the OAuth handoff (Epic 3).
+    # Must match the custom URL scheme registered by the Capacitor app
+    # (synaplan-apps). Default matches the production bundle id.
+    env(NATIVE_DEEPLINK_SCHEME): 'com.synaplan.app'
+
     # Realtime (Centrifugo) defaults so the backend boots even when no realtime
     # gateway is configured (bare/custom deployment). With these unset,
     # CentrifugoPublisher short-circuits (enabled=false → no publish, never
@@ -80,6 +85,11 @@ parameters:
     env(STRIPE_PRICE_TEAM): ''
     env(STRIPE_PRICE_BUSINESS): ''
     env(STRIPE_PAYMENT_METHODS): ''
+    # Native IAP store product IDs (Epic 5.5). Defaults are the documented
+    # placeholder convention so web-only / open-source deployments stay IAP-off.
+    env(IAP_PRODUCT_PRO): 'com.synaplan.app.pro.monthly'
+    env(IAP_PRODUCT_TEAM): 'com.synaplan.app.team.monthly'
+    env(IAP_PRODUCT_BUSINESS): 'com.synaplan.app.business.monthly'
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
     env(CLOUDFLARE_ACCOUNT_ID): ''
@@ -143,6 +153,18 @@ services:
     # email_me DAG node: resolves upstream file descriptors to absolute paths
     # under the shared uploads dir before attaching them to the result mail.
     App\Service\Multitask\Execution\Runner\EmailMeRunner:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    # Async media job advancer (Release 4.0): finalize step downloads the
+    # produced render and saves it under the shared uploads dir.
+    App\MessageHandler\AdvanceMediaJobCommandHandler:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    # Synchronous image/audio generation for the async-job worker (Release 4.0,
+    # Sprint B): runs the single-call render and saves it under the uploads dir.
+    App\Service\Media\SyncMediaJobGenerator:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
@@ -481,14 +503,12 @@ services:
             $googleClientId: '%env(GOOGLE_CLIENT_ID)%'
             $googleClientSecret: '%env(GOOGLE_CLIENT_SECRET)%'
             $appUrl: '%env(APP_URL)%'
-            $frontendUrl: '%env(FRONTEND_URL)%'
 
     App\Controller\GitHubAuthController:
         arguments:
             $githubClientId: '%env(GITHUB_CLIENT_ID)%'
             $githubClientSecret: '%env(GITHUB_CLIENT_SECRET)%'
             $appUrl: '%env(APP_URL)%'
-            $frontendUrl: '%env(FRONTEND_URL)%'
 
     # OIDC Discovery Controller
     App\Controller\OidcController:
@@ -526,6 +546,32 @@ services:
         arguments:
             $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
             $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
+
+    # Native IAP product ↔ tier mapping (Epic 5.5)
+    App\Service\IapPricingService:
+        arguments:
+            $iapProductPro: '%env(IAP_PRODUCT_PRO)%'
+            $iapProductTeam: '%env(IAP_PRODUCT_TEAM)%'
+            $iapProductBusiness: '%env(IAP_PRODUCT_BUSINESS)%'
+
+    # Native IAP server-side receipt validation (Epic 5.4). Both verifiers are
+    # no-ops until store credentials are configured (isConfigured() === false),
+    # so web-only / open-source deployments keep working.
+    App\Service\Iap\AppleStoreKitVerifier:
+        arguments:
+            $bundleId: '%env(default::IAP_APPLE_BUNDLE_ID)%'
+            $appAppleId: '%env(default::int:IAP_APPLE_APP_APPLE_ID)%'
+            $environment: '%env(default::string:IAP_APPLE_ENVIRONMENT)%'
+            $rootCertsDir: '%env(default::IAP_APPLE_ROOT_CERTS_DIR)%'
+    App\Service\Iap\AppleReceiptVerifierInterface:
+        alias: App\Service\Iap\AppleStoreKitVerifier
+
+    App\Service\Iap\GooglePlayVerifier:
+        arguments:
+            $packageName: '%env(default::IAP_GOOGLE_PACKAGE_NAME)%'
+            $serviceAccountJsonPath: '%env(default::IAP_GOOGLE_SERVICE_ACCOUNT_JSON)%'
+    App\Service\Iap\GooglePlayVerifierInterface:
+        alias: App\Service\Iap\GooglePlayVerifier
 
     # Stripe Payment Controllers (with rate limiting via cache)
     App\Controller\SubscriptionController:
@@ -566,6 +612,17 @@ services:
     App\Service\OAuthStateService:
         arguments:
             $appSecret: '%env(APP_SECRET)%'
+
+    # Native OAuth handoff token (signed, short-lived) for the mobile deep-link flow
+    App\Service\NativeAuthHandoffService:
+        arguments:
+            $appSecret: '%env(APP_SECRET)%'
+
+    # OAuth login responder (web cookies vs native deep-link handoff)
+    App\Service\OAuthLoginResponder:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
+            $nativeDeepLinkScheme: '%env(NATIVE_DEEPLINK_SCHEME)%'
 
     # Token Service (Access/Refresh Tokens)
     App\Service\TokenService:

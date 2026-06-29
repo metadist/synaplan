@@ -159,9 +159,19 @@ final readonly class MessageApiFormatter
         $quotedText = $m->getMeta('quoted_text');
         $quotedMessageIdMeta = $m->getMeta('quoted_message_id');
 
+        $mediaJob = $this->decodeMediaJobMeta($m);
+        $text = $m->getText();
+        if ('' === trim((string) $text) && null !== $mediaJob && 'running' === ($mediaJob['state'] ?? null)) {
+            $text = match ($mediaJob['type'] ?? 'video') {
+                'image' => '__IMAGE_GENERATING__',
+                'audio' => '__AUDIO_GENERATING__',
+                default => '__VIDEO_GENERATING__',
+            };
+        }
+
         return [
             'id' => $m->getId(),
-            'text' => $m->getText(),
+            'text' => $text,
             'direction' => $m->getDirection(),
             'timestamp' => $m->getUnixTimestamp(),
             'provider' => $m->getProviderIndex(),
@@ -180,6 +190,9 @@ final readonly class MessageApiFormatter
             // Per-node task-plan render state for reload (issue #1070 — DAG divergence).
             // Null for non-DAG turns, non-null only on OUT messages of DAG turns.
             'taskPlan' => $this->decodeTaskPlanMeta($m),
+            // Background media job (Release 4.0 async video) — lets the UI show
+            // a persistent "generating in background" banner after reload.
+            'mediaJob' => $mediaJob,
             // Generated content (images, videos, audio from AI)
             'file' => ($m->getFile() && $filePath) ? [
                 'path' => $filePath,
@@ -206,6 +219,29 @@ final readonly class MessageApiFormatter
 
         $decoded = json_decode($raw, true);
         if (!is_array($decoded) || !isset($decoded['cards']) || !is_array($decoded['cards'])) {
+            return null;
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * Decode the persisted `media_job` meta into the API shape expected by the
+     * frontend mapper. Returns null when no background job is attached.
+     *
+     * Shape: { job_id: string, type: string, state: string }
+     *
+     * @return array<string, mixed>|null
+     */
+    private function decodeMediaJobMeta(Message $m): ?array
+    {
+        $raw = $m->getMeta('media_job');
+        if (null === $raw || '' === $raw) {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || !isset($decoded['job_id']) || !is_string($decoded['job_id'])) {
             return null;
         }
 

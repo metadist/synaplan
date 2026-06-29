@@ -1,6 +1,7 @@
 import type {
   Message,
   MessageFile,
+  MediaJobInfo,
   Part,
   TaskPlanState,
   TaskCardKind,
@@ -32,6 +33,94 @@ import {
  * Keep this module side-effect free so it can be unit-tested without
  * mounting the chat view or the Pinia store.
  */
+
+/**
+ * A realtime/poll media-job status update, as delivered by the Centrifugo
+ * `media_job.update` event (Sprint C) or the poll endpoint.
+ */
+export interface MediaJobUpdate {
+  job_id: string
+  message_id?: number | null
+  chat_id?: number | null
+  node_id?: string | null
+  type: string
+  state: string
+  percent?: number | null
+  error?: string | null
+  file?: { url: string; type?: string } | null
+}
+
+/**
+ * Apply a media-job update to a loaded message in place: patch `mediaJob` and,
+ * on a terminal `done` with a produced file, append the generated media part
+ * (idempotent — never duplicates an existing media part of that kind).
+ *
+ * Shared by the realtime `mediaJobs` store (push) and ChatView's completion
+ * handler so the push and poll paths can never diverge.
+ */
+export function applyMediaJobUpdateToMessage(message: Message, update: MediaJobUpdate): void {
+  message.mediaJob = {
+    ...(message.mediaJob ?? {}),
+    jobId: update.job_id,
+    type: update.type,
+    state: update.state,
+    ...(update.error != null ? { error: update.error } : {}),
+    ...(update.percent != null ? { percent: update.percent } : {}),
+  }
+
+  if ('done' === update.state && update.file?.url) {
+    appendGeneratedMediaPart(message, update.file.url, update.file.type ?? update.type)
+  }
+}
+
+/** Append a generated media part to a message, once per media kind. */
+function appendGeneratedMediaPart(message: Message, url: string, type: string): void {
+  const normalized = normalizeMediaUrl(url)
+  if ('video' === type && !message.parts.some((p) => 'video' === p.type)) {
+    message.parts.push({ partId: generatePartId(), type: 'video', url: normalized })
+  } else if ('image' === type && !message.parts.some((p) => 'image' === p.type)) {
+    message.parts.push({
+      partId: generatePartId(),
+      type: 'image',
+      url: normalized,
+      alt: 'Generated image',
+    })
+  } else if ('audio' === type && !message.parts.some((p) => 'audio' === p.type)) {
+    message.parts.push({ partId: generatePartId(), type: 'audio', url: normalized })
+  }
+}
+
+/** Normalize a media_job payload from API rows or SSE metadata. */
+export function parseMediaJobPayload(raw: unknown): MediaJobInfo | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const jobId = row.job_id ?? row.jobId
+  const type = row.type
+  const state = row.state
+  if (typeof jobId !== 'string' || jobId === '') return null
+  if (typeof type !== 'string' || type === '') return null
+  const error = row.error
+  const percent = row.percent
+  return {
+    jobId,
+    type,
+    state: typeof state === 'string' ? state : 'running',
+    error: typeof error === 'string' ? error : undefined,
+    percent: typeof percent === 'number' ? percent : undefined,
+    elapsedSeconds:
+      typeof row.elapsed_seconds === 'number'
+        ? row.elapsed_seconds
+        : typeof row.elapsedSeconds === 'number'
+          ? row.elapsedSeconds
+          : undefined,
+    maxWaitSeconds:
+      typeof row.max_wait_seconds === 'number'
+        ? row.max_wait_seconds
+        : typeof row.maxWaitSeconds === 'number'
+          ? row.maxWaitSeconds
+          : undefined,
+  }
+}
 
 /**
  * Parse content to extract thinking blocks, code blocks, and regular text.
@@ -187,10 +276,18 @@ export interface ApiLoadedMessageRow {
       url?: string
       type?: string
       error?: string
+      job_id?: string
       /** Compact web-search summary fields (search cards only) */
       query?: string
       resultsCount?: number
     }>
+  } | null
+  /** Background async media job (Release 4.0). */
+  mediaJob?: {
+    job_id: string
+    type: string
+    state: string
+    error?: string
   } | null
 }
 
@@ -309,6 +406,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         error: c.error,
         query: c.query,
         resultsCount: c.resultsCount,
+        jobId: typeof c.job_id === 'string' ? c.job_id : undefined,
       }
     })
     taskPlanState = {
@@ -387,6 +485,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     wasMultitask: m.multitask === true,
     tool: toolData,
     taskPlan: taskPlanState,
+    mediaJob: parseMediaJobPayload(m.mediaJob),
   }
 }
 
@@ -474,5 +573,20 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   }
   if (persisted.wasMultitask) {
     local.wasMultitask = true
+  }
+  // Media job state: a terminal client state is FINAL and must never be
+  // downgraded back to `running` by a stale persisted snapshot. Without this
+  // guard the post-completion reconcile (which can race the worker's message
+  // sync) flips a just-completed job back to `running`, which re-enables
+  // polling, which completes again — an endless flicker between the video and
+  // the "generating" banner. Only apply the persisted state when our local
+  // state is not yet terminal, or when the persisted state is itself terminal.
+  if (persisted.mediaJob) {
+    const terminal = new Set(['done', 'failed', 'cancelled'])
+    const localTerminal = local.mediaJob ? terminal.has(local.mediaJob.state) : false
+    const persistedTerminal = terminal.has(persisted.mediaJob.state)
+    if (!localTerminal || persistedTerminal) {
+      local.mediaJob = persisted.mediaJob
+    }
   }
 }

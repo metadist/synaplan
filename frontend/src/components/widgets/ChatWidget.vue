@@ -619,6 +619,7 @@
 
         <!-- Powered By -->
         <div
+          v-if="showPoweredBy"
           class="px-4 py-2 text-center border-t"
           :class="{
             'pb-[calc(env(safe-area-inset-bottom,0px)+12px)]': isMobile && !isPreview,
@@ -626,14 +627,14 @@
           :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
         >
           <p class="text-xs" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }">
-            Powered by
+            {{ $t('branding.poweredBy') }}
             <a
-              href="https://www.synaplan.com/"
+              :href="poweredByUrl"
               target="_blank"
               rel="noopener noreferrer"
               class="font-semibold hover:underline"
               :style="{ color: primaryColor }"
-              >synaplan</a
+              >{{ poweredByLabel }}</a
             >
           </p>
         </div>
@@ -716,6 +717,13 @@ interface Props {
    * realtime backend) keep working — undefined is treated as "disabled".
    */
   realtime?: WidgetRealtimeRuntime
+  /**
+   * White-label attribution (Epic 4.5), echoed from the backend's global
+   * branding config. Defaults reproduce the historical "powered by synaplan".
+   */
+  showPoweredBy?: boolean
+  poweredByLabel?: string
+  poweredByUrl?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -748,6 +756,9 @@ const props = withDefaults(defineProps<Props>(), {
   testMode: false,
   internalMode: false,
   realtime: undefined,
+  showPoweredBy: true,
+  poweredByLabel: 'synaplan',
+  poweredByUrl: 'https://www.synaplan.com/',
 })
 
 const emit = defineEmits<{

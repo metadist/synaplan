@@ -117,6 +117,37 @@ doesn't change on upgrade — enable it per user or globally when ready.
 
 ---
 
+## Async Media Jobs (BCONFIG)
+
+Media generation (image, video, audio) can run as **background jobs** instead of
+blocking the chat turn: the assistant shows a live status banner, a completion
+toast fires when the render is ready, and a global Jobs tray tracks everything.
+Configured via **BCONFIG** (not env vars). Admins manage the master switch in the
+UI (**Settings → Processing → Async media generation**); the rest can be set per
+group in the `BCONFIG` table. Resolution is per-user row → global row
+(`BOWNERID=0`) → built-in code default.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `MEDIA / ASYNC_JOBS_ENABLED` | `true` (new installs)¹ | Master switch: chat/multitask media (image + video + audio) detaches to a background job vs running inline |
+| `MEDIA / JOB_POLL_INTERVAL_SECONDS` | `3` | Delay the advancer waits before re-dispatching itself for the next poll step (clamped 1–30) |
+| `MEDIA / JOB_IMAGE_INLINE_FAST_MS` | `1500` | Grace window: a fast image render that finishes within this on the first advance resolves in the same turn (clamped 0–10000) |
+| `MEDIA / JOB_HEARTBEAT_STALE_SECONDS` | `90` | Seconds without a heartbeat before the reaper presumes the worker died and times the job out (clamped 30–1800) |
+| `MEDIA / JOB_MAX_ACTIVE_PER_USER` | `16` | Max concurrent in-flight media jobs per user (clamped 1–100) |
+
+¹ Existing installations are grandfathered to `0` by migration
+(`Version20260629120000`) so behavior doesn't change on upgrade — each user
+opts in via **Settings → Processing → Async media generation** (or set the
+group/per-user row directly).
+
+> **Requires the `worker` container.** Async jobs are consumed by the dedicated
+> `worker` service (Messenger over Redis Streams). Without it, jobs sit in
+> `queued` and the chat bubble shows "Job still running" indefinitely. The worker
+> **must** run in the same `APP_ENV` as the backend — see
+> [DEVELOPMENT.md](DEVELOPMENT.md#the-worker-service-async-jobs).
+
+---
+
 ## Audio Transcription (Whisper)
 
 ```bash

@@ -13,6 +13,7 @@ use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\Media\MediaCancellationStore;
+use App\Service\Media\MediaJobService;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
@@ -66,6 +67,7 @@ class StreamController extends AbstractController
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private DocumentGeneratorService $documentGenerator,
         private MediaCancellationStore $cancellationStore,
+        private MediaJobService $mediaJobService,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
     ) {
@@ -1274,6 +1276,17 @@ class StreamController extends AbstractController
                         }
                     }
 
+                    if ('' === trim($finalText)
+                        && !empty($response['metadata']['media_job'])
+                        && is_array($response['metadata']['media_job'])
+                        && 'running' === ($response['metadata']['media_job']['state'] ?? null)) {
+                        $finalText = match ($response['metadata']['media_job']['type'] ?? 'video') {
+                            'image' => '__IMAGE_GENERATING__',
+                            'audio' => '__AUDIO_GENERATING__',
+                            default => '__VIDEO_GENERATING__',
+                        };
+                    }
+
                     $outgoingMessage->setText($finalText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
@@ -1334,6 +1347,22 @@ class StreamController extends AbstractController
                 }
                 if (!empty($response['metadata']['media_type'])) {
                     $outgoingMessage->setMeta('media_type', $response['metadata']['media_type']);
+                }
+                if (!empty($response['metadata']['media_job']) && is_array($response['metadata']['media_job'])) {
+                    $outgoingMessage->setMeta(
+                        'media_job',
+                        (string) json_encode($response['metadata']['media_job'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
+                    );
+
+                    // The job was created in the media handler with the INCOMING
+                    // message id (the OUT message didn't exist yet). Now that the
+                    // OUT message is persisted, rebind the job to it so the
+                    // background worker syncs the bubble the user actually sees
+                    // on completion (otherwise it stays stuck on "running").
+                    $mediaJobKey = $response['metadata']['media_job']['job_id'] ?? null;
+                    if (is_string($mediaJobKey) && '' !== $mediaJobKey && null !== $outgoingMessage->getId()) {
+                        $this->mediaJobService->rebindMessage($mediaJobKey, $outgoingMessage->getId());
+                    }
                 }
 
                 // Multi-task routing: mark the OUT message as a DAG turn so the
@@ -1506,6 +1535,10 @@ class StreamController extends AbstractController
 
                 if ('length' === $finishReason) {
                     $completeData['truncated'] = true;
+                }
+
+                if (!empty($response['metadata']['media_job']) && is_array($response['metadata']['media_job'])) {
+                    $completeData['mediaJob'] = $response['metadata']['media_job'];
                 }
 
                 // Include memories used for this response

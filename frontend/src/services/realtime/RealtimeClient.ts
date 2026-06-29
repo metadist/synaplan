@@ -15,6 +15,7 @@
  */
 
 import { Centrifuge, type PublicationContext, type SubscriptionErrorContext } from 'centrifuge'
+import { isNativeApp, getNativeApiBaseUrl } from '@/services/api/nativeRuntime'
 import {
   fetchOperatorConnectionToken,
   fetchVisitorConnectionToken,
@@ -96,6 +97,16 @@ export class RealtimeClient {
 
     if ('visitor' === this.options.identity.kind && this.options.identity.apiBaseUrl) {
       const wsBase = this.options.identity.apiBaseUrl
+        .replace(/^http:/i, 'ws:')
+        .replace(/^https:/i, 'wss:')
+      return `${wsBase.replace(/\/$/, '')}/connection/websocket`
+    }
+
+    // Native shell: window.location.host is the in-app localhost origin, not the
+    // backend. Derive the WS endpoint from the configured native API base so the
+    // operator connection targets the real Centrifugo gateway (Epic 3).
+    if (isNativeApp()) {
+      const wsBase = getNativeApiBaseUrl()
         .replace(/^http:/i, 'ws:')
         .replace(/^https:/i, 'wss:')
       return `${wsBase.replace(/\/$/, '')}/connection/websocket`

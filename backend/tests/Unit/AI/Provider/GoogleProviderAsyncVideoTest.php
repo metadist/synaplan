@@ -246,4 +246,38 @@ class GoogleProviderAsyncVideoTest extends TestCase
 
         $provider->pollVideoOperationOnce('operations/12345');
     }
+
+    /**
+     * Veo's responsible-AI media filter: the operation finishes (done:true) with
+     * NO error object and NO video, signalling the rejection only via
+     * `raiMediaFilteredReasons`. This is a terminal content block and must throw
+     * a content-blocked exception carrying Google's own reason text — NOT fall
+     * through to the generic "no video URI" error that gets retried as transient.
+     */
+    public function testPollVideoOperationOnceContentFilteredThrowsContentBlocked(): void
+    {
+        $data = [
+            'done' => true,
+            'response' => [
+                '@type' => 'type.googleapis.com/google.ai.generativelanguage.v1beta.PredictLongRunningResponse',
+                'generateVideoResponse' => [
+                    'raiMediaFilteredCount' => 1,
+                    'raiMediaFilteredReasons' => [
+                        "Sorry, we can't create videos with real people's names or likenesses. Please remove the celebrity reference and try again.",
+                    ],
+                ],
+            ],
+        ];
+        $provider = $this->createProviderWithMockResponse($data);
+
+        try {
+            $provider->pollVideoOperationOnce('operations/12345');
+            $this->fail('Expected ProviderException for content-filtered Veo response');
+        } catch (ProviderException $e) {
+            $ctx = $e->getContext() ?? [];
+            $this->assertSame('SAFETY', $ctx['block_reason'] ?? null);
+            $this->assertStringContainsString("real people's names", (string) ($ctx['text_response'] ?? ''));
+            $this->assertSame('google', $e->getProviderName());
+        }
+    }
 }

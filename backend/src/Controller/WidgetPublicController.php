@@ -10,6 +10,7 @@ use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\BillingService;
+use App\Service\Branding\BrandingService;
 use App\Service\DiscordNotificationService;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
@@ -64,6 +65,7 @@ class WidgetPublicController extends AbstractController
         private SlackNotificationService $slack,
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private GeneratedFileRegistrar $generatedFileRegistrar,
+        private BrandingService $brandingService,
         private string $uploadDir,
     ) {
     }
@@ -151,6 +153,16 @@ class WidgetPublicController extends AbstractController
                 new OA\Property(property: 'config', type: 'object'),
                 new OA\Property(property: 'isActive', type: 'boolean'),
                 new OA\Property(
+                    property: 'branding',
+                    type: 'object',
+                    description: 'White-label attribution (Epic 4.5) from the global branding config. Lets a hoster hide or re-attribute the widget "Powered by" footer.',
+                    properties: [
+                        new OA\Property(property: 'showPoweredBy', type: 'boolean', example: true),
+                        new OA\Property(property: 'poweredByLabel', type: 'string', example: 'Synaplan'),
+                        new OA\Property(property: 'poweredByUrl', type: 'string', example: 'https://www.synaplan.com'),
+                    ]
+                ),
+                new OA\Property(
                     property: 'realtime',
                     type: 'object',
                     description: 'Realtime / Centrifugo settings consumed by the embedded widget. The cross-origin widget cannot read /api/v1/config/runtime, so we surface the relevant subset here.',
@@ -196,12 +208,23 @@ class WidgetPublicController extends AbstractController
             return $domainError;
         }
 
+        // MOBILE-APP SEAM (Epic 4.5): white-label attribution. The cross-origin
+        // widget cannot read /api/v1/config/runtime, so we surface the global
+        // branding's powered-by subset here (hide / re-attribute flag). Defaults
+        // keep the historical "powered by synaplan" footer.
+        $branding = $this->brandingService->getBranding();
+
         return $this->json([
             'success' => true,
             'widgetId' => $widget->getWidgetId(),
             'name' => $widget->getName(),
             'config' => self::buildPublicConfig($config),
             'isActive' => true,
+            'branding' => [
+                'showPoweredBy' => $branding['showPoweredBy'],
+                'poweredByLabel' => $branding['poweredByLabel'],
+                'poweredByUrl' => $branding['poweredByUrl'],
+            ],
             'realtime' => [
                 // REALTIME_ENABLED is the global kill-switch shared with the
                 // operator UI (see ConfigController::getRuntimeConfig). Empty

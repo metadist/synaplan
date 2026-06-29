@@ -29,7 +29,7 @@
 
     <div class="w-full max-w-md" data-testid="section-card">
       <div class="text-center mb-8" data-testid="section-header">
-        <img :src="logoSrc" alt="synaplan" class="h-12 mx-auto mb-6" />
+        <img :src="logoSrc" :alt="config.branding.name" class="h-12 mx-auto mb-6" />
       </div>
 
       <div class="surface-card p-8 text-center" data-testid="section-content">
@@ -54,15 +54,9 @@
       </div>
 
       <p class="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
-        <a
-          href="https://www.synaplan.com"
-          class="hover:underline opacity-75 hover:opacity-100 transition-opacity"
-          target="_blank"
-          rel="noopener noreferrer"
-          data-testid="link-powered-by"
-        >
-          {{ $t('auth.poweredBySynaplan') }}
-        </a>
+        <BrandAttribution
+          link-class="hover:underline opacity-75 hover:opacity-100 transition-opacity font-medium"
+        />
       </p>
     </div>
   </div>
@@ -75,10 +69,14 @@ import { useI18n } from 'vue-i18n'
 import { SunIcon, MoonIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import Button from '../components/Button.vue'
+import BrandAttribution from '../components/BrandAttribution.vue'
+import { useBrandLogo } from '@/composables/useBrandLogo'
+import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
 const { locale } = useI18n()
 const themeStore = useTheme()
+const config = useConfigStore()
 
 const isDark = computed(() => {
   if (themeStore.theme.value === 'dark') return true
@@ -86,9 +84,7 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const logoSrc = computed(
-  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
-)
+const { logoSrc } = useBrandLogo(isDark)
 
 const currentLanguage = computed(() => locale.value)
 

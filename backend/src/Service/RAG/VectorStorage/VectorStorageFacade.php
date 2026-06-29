@@ -125,6 +125,11 @@ final readonly class VectorStorageFacade implements VectorStorageInterface
         return $this->getActiveStorage()->getFilesWithChunks($userId);
     }
 
+    public function getGlobalStats(int $topLimit = 10): array
+    {
+        return $this->getActiveStorage()->getGlobalStats($topLimit);
+    }
+
     public function isAvailable(): bool
     {
         $provider = $this->config->getProvider();
