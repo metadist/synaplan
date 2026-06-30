@@ -347,6 +347,11 @@ class FileController extends AbstractController
             new OA\Parameter(name: 'group_key', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search in file name and content', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
+            new OA\Parameter(name: 'source', in: 'query', required: false, description: 'Filter by provenance source(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'nextcloud,outlook')),
+            new OA\Parameter(name: 'vector_state', in: 'query', required: false, description: 'Filter by vector state(s): none, pending, vectorized, failed, not_applicable', schema: new OA\Schema(type: 'string', example: 'vectorized')),
+            new OA\Parameter(name: 'origin_kind', in: 'query', required: false, description: 'Filter generated media by kind: image, video, audio, calendar, document', schema: new OA\Schema(type: 'string', example: 'image')),
+            new OA\Parameter(name: 'incoming', in: 'query', required: false, description: 'Filter the Incoming inbox: 1 = only incoming, 0 = exclude incoming', schema: new OA\Schema(type: 'boolean')),
+            new OA\Parameter(name: 'sort', in: 'query', required: false, description: 'Sort order: date_desc (default), date_asc, name_asc, name_desc, size_asc, size_desc', schema: new OA\Schema(type: 'string', example: 'date_desc')),
             new OA\Parameter(name: 'date_from', in: 'query', required: false, description: 'Unix timestamp lower bound', schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'date_to', in: 'query', required: false, description: 'Unix timestamp upper bound', schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 1)),
@@ -371,6 +376,11 @@ class FileController extends AbstractController
         $filters = [
             'search' => $request->query->get('search'),
             'file_type' => $request->query->get('file_type'),
+            'source' => $request->query->get('source'),
+            'vector_state' => $request->query->get('vector_state'),
+            'origin_kind' => $request->query->get('origin_kind'),
+            'incoming' => $request->query->has('incoming') ? $request->query->getBoolean('incoming') : null,
+            'sort' => $request->query->get('sort'),
             'date_from' => $request->query->getInt('date_from') ?: null,
             'date_to' => $request->query->getInt('date_to') ?: null,
         ];
@@ -390,22 +400,38 @@ class FileController extends AbstractController
         $allChunks = $this->getUserVectorChunks($user->getId());
         $vectorChunkMap = $this->resolveVectorGroupKeys($messageFiles, $allChunks);
 
+        // Fix-on-read: keep BVECTORSTATE/BCHUNKCOUNT in sync with the authoritative
+        // vector store so the list renders truthfully with no per-row Qdrant call
+        // (03_file-management.md §3.1). Persisted once so later reads are cheap.
+        $this->syncVectorState($messageFiles, $allChunks);
+
         $files = array_map(function ($mf) use ($vectorChunkMap, $allChunks) {
             $chunkCount = (int) ($allChunks[$mf->getId()]['chunks'] ?? 0);
+            $groupKey = $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null);
 
             return [
                 'id' => $mf->getId(),
                 'filename' => $mf->getFileName(),
+                'display_name' => $mf->getDisplayName(),
+                'original_name' => $mf->getOriginalName(),
                 'path' => $mf->getFilePath(),
                 'file_type' => $mf->getFileType(),
                 'file_size' => $mf->getFileSize(),
                 'mime' => $mf->getFileMime(),
                 'status' => $mf->getStatus(),
+                'source' => $mf->getSource(),
+                'origin_kind' => $mf->getOriginKind(),
+                'incoming' => $mf->isIncoming(),
+                'message_id' => $mf->getMessageId(),
+                'provider' => $mf->getProvider(),
+                'thumb_url' => null !== $mf->getThumbPath() ? '/api/v1/files/'.$mf->getId().'/thumb' : null,
                 'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
                 'uploaded_at' => $mf->getCreatedAt(),
                 'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
-                'group_key' => $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null),
+                'group_key' => $groupKey,
                 'chunks' => $chunkCount,
+                'chunk_count' => $chunkCount,
+                'vector_state' => $mf->getVectorState(),
                 'is_vectorized' => $chunkCount > 0,
             ];
         }, $messageFiles);
@@ -467,6 +493,123 @@ class FileController extends AbstractController
 
             return $this->json(['error' => 'Failed to load file groups'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    #[Route('/facets', name: 'facets', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/facets',
+        summary: 'Faceted counts per source / vector state, plus the incoming count for the tab badge',
+        tags: ['Files'],
+        responses: [
+            new OA\Response(response: 200, description: 'Facet counts'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function getFacets(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            $facets = $this->fileRepository->getFacetsByUser($user->getId());
+
+            return $this->json(['success' => true, 'facets' => $facets]);
+        } catch (\Throwable $e) {
+            $this->logger->error('FileController: Failed to compute facets', ['error' => $e->getMessage()]);
+
+            return $this->json(['error' => 'Failed to load facets'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    #[Route('/accept', name: 'accept_bulk', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/accept',
+        summary: 'Triage (keep) multiple incoming files: clear the incoming flag, optionally file them in a group',
+        tags: ['Files'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['ids'],
+                properties: [
+                    new OA\Property(property: 'ids', type: 'array', items: new OA\Items(type: 'integer')),
+                    new OA\Property(property: 'group_key', type: 'string', nullable: true, example: 'Contracts'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Files accepted'),
+            new OA\Response(response: 400, description: 'No ids provided'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function acceptIncomingBulk(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = $request->toArray();
+        $ids = array_values(array_filter(array_map('intval', (array) ($data['ids'] ?? []))));
+        if (empty($ids)) {
+            return $this->json(['error' => 'ids is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $groupKey = isset($data['group_key']) && is_string($data['group_key']) && '' !== trim($data['group_key'])
+            ? trim($data['group_key'])
+            : null;
+
+        $files = $this->fileRepository->findByUserAndIds($user->getId(), $ids);
+        $accepted = 0;
+        foreach ($files as $file) {
+            $this->promoteIncoming($file, $user->getId(), $groupKey);
+            ++$accepted;
+        }
+        if ($accepted > 0) {
+            $this->fileRepository->flush();
+        }
+
+        return $this->json(['success' => true, 'accepted' => $accepted, 'group_key' => $groupKey]);
+    }
+
+    #[Route('/{id}/accept', name: 'accept', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/accept',
+        summary: 'Triage (keep) an incoming file: clear the incoming flag, optionally file it in a group',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [new OA\Property(property: 'group_key', type: 'string', nullable: true, example: 'Contracts')]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'File accepted'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File not found'),
+        ]
+    )]
+    public function acceptIncoming(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = $request->toArray();
+        $groupKey = isset($data['group_key']) && is_string($data['group_key']) && '' !== trim($data['group_key'])
+            ? trim($data['group_key'])
+            : null;
+
+        $this->promoteIncoming($file, $user->getId(), $groupKey);
+        $this->fileRepository->flush();
+
+        return $this->json(['success' => true, 'id' => $id, 'group_key' => $groupKey]);
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
@@ -885,5 +1028,77 @@ class FileController extends AbstractController
         }
 
         return $vectorChunkMap;
+    }
+
+    /**
+     * Promote an incoming file out of the inbox: optionally file it in a group
+     * and clear the incoming flag + staging path (03_file-management.md §3.3).
+     * Does not flush — the caller flushes once per request.
+     */
+    private function promoteIncoming(File $file, int $userId, ?string $groupKey): void
+    {
+        if (null !== $groupKey) {
+            $file->setGroupKey($groupKey);
+            try {
+                $this->vectorStorageFacade->updateGroupKey($userId, (int) $file->getId(), $groupKey);
+            } catch (\Throwable $e) {
+                $this->logger->warning('FileController: vector group update on accept failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        $file->setIncoming(false);
+        $file->setStagePath(null);
+        $this->fileRepository->save($file, false);
+    }
+
+    /**
+     * Fix-on-read maintenance of BVECTORSTATE/BCHUNKCOUNT from the authoritative
+     * vector store, persisted once so later list reads are cheap.
+     *
+     * @param File[]                                                $files
+     * @param array<int, array{chunks: int, groupKey: string|null}> $allChunks
+     */
+    private function syncVectorState(array $files, array $allChunks): void
+    {
+        $changed = false;
+        foreach ($files as $file) {
+            $chunkCount = (int) ($allChunks[$file->getId()]['chunks'] ?? 0);
+            $derived = $this->deriveVectorState($file, $chunkCount);
+
+            if ($file->getChunkCount() !== $chunkCount || $file->getVectorState() !== $derived) {
+                $file->setChunkCount($chunkCount);
+                $file->setVectorState($derived);
+                $this->fileRepository->save($file, false);
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            try {
+                $this->fileRepository->flush();
+            } catch (\Throwable $e) {
+                $this->logger->warning('FileController: vector-state sync flush failed', ['error' => $e->getMessage()]);
+            }
+        }
+    }
+
+    /**
+     * Derive the authoritative vector state for a file from its chunk count and
+     * upload/extraction status (03_file-management.md §3.1, §4.2).
+     */
+    private function deriveVectorState(File $file, int $chunkCount): string
+    {
+        if ($file->isMedia()) {
+            return File::VECTOR_STATE_NOT_APPLICABLE;
+        }
+        if ($chunkCount > 0) {
+            return File::VECTOR_STATE_VECTORIZED;
+        }
+
+        return match ($file->getStatus()) {
+            'error', 'failed' => File::VECTOR_STATE_FAILED,
+            'extracting', 'vectorizing', 'processing', 'pending' => File::VECTOR_STATE_PENDING,
+            default => File::VECTOR_STATE_NONE,
+        };
     }
 }

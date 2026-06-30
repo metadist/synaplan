@@ -126,7 +126,7 @@ final readonly class MediaJobMessageSync
             }
         }
 
-        $file = $this->fileRegistrar->register($job->getUserId(), $relativePath, $job->getType());
+        $file = $this->fileRegistrar->register($job->getUserId(), $relativePath, $job->getType(), $message->getId());
         if (null === $file) {
             $this->logger->warning('MediaJobMessageSync: failed to register generated file', [
                 'job_key' => $job->getJobKey(),

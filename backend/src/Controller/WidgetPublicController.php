@@ -991,6 +991,7 @@ class WidgetPublicController extends AbstractController
                             $owner->getId(),
                             is_string($localPath) ? $localPath : null,
                             $generatedFile['type'],
+                            $outgoingMessage->getId(),
                         );
                         if (null !== $fileEntity) {
                             $outgoingMessage->addFile($fileEntity);
