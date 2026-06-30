@@ -523,9 +523,11 @@
   height: 100vh;
   height: 100dvh;
   /* Respect the iOS notch (PWA / standalone) so the avatar at the bottom
-     stays tappable. */
+     stays tappable. Also pad the leading edge so a landscape side cutout
+     never clips the rail. */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
 
   background: var(--bg-sidebar);
   backdrop-filter: blur(var(--v2-blur-lg));
@@ -664,8 +666,11 @@
   background: rgba(255, 255, 255, 0.97);
   border-top: 1px solid var(--v2-border);
   box-shadow: 0 -2px 24px rgba(0, 0, 0, 0.08);
-  /* Keep the tabs above the iOS home-indicator bar. */
+  /* Keep the tabs above the iOS home-indicator bar, and clear of a
+     landscape side cutout on either edge. */
   padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 .design-v2.dark .v2-mobile-tabbar {
   background: rgba(10, 16, 30, 0.97);
@@ -1050,4 +1055,49 @@
 .design-v2.dark [data-testid='comp-chat-input-shell'] textarea:focus {
   background: transparent !important;
   box-shadow: none !important;
+}
+
+/* ----------------------------------------------------------
+   Accessibility — honor "Reduce Transparency" / "Reduce Motion"
+   (Apple HIG requirement for glass / translucent materials).
+   The V2 look is built on backdrop-filter blur over translucent
+   surfaces; when a user opts out of transparency we must drop the
+   blur and make those surfaces opaque, and when they opt out of
+   motion we neutralize non-essential transitions/animations.
+   ---------------------------------------------------------- */
+@media (prefers-reduced-transparency: reduce) {
+  /* Opaque the two translucent glass surfaces (others are already solid). */
+  .design-v2 {
+    --bg-sidebar: #dbe3f0;
+    --bg-card: #ffffff;
+  }
+  .design-v2.dark {
+    --bg-sidebar: #0a101e;
+    --bg-card: #10182a;
+  }
+  /* Remove the frosted-glass blur the translucency relied on. */
+  .design-v2 *,
+  .design-v2 *::before,
+  .design-v2 *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  /* Surfaces that hardcode a translucent background → make them opaque. */
+  .design-v2 .v2-mobile-tabbar {
+    background: #ffffff;
+  }
+  .design-v2.dark .v2-mobile-tabbar {
+    background: #0a101e;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .design-v2 *,
+  .design-v2 *::before,
+  .design-v2 *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

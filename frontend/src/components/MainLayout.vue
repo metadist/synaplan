@@ -16,6 +16,9 @@
 
     <!-- Help system host -->
     <HelpHost />
+
+    <!-- Native-only floating back button (iOS has no hardware back). -->
+    <MobileBackButton />
   </div>
 </template>
 
@@ -23,4 +26,5 @@
 import SidebarV2 from './SidebarV2.vue'
 import MobileNav from './MobileNav.vue'
 import HelpHost from './help/HelpHost.vue'
+import MobileBackButton from './MobileBackButton.vue'
 </script>
