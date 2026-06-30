@@ -10,6 +10,7 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\File\FileHelper;
+use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
 use App\Service\File\FileUploadService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
@@ -33,6 +34,7 @@ class FileController extends AbstractController
 {
     public function __construct(
         private FileUploadService $uploadService,
+        private FileListService $fileListService,
         private FileStorageService $storageService,
         private StorageQuotaService $storageQuotaService,
         private FileRepository $fileRepository,
@@ -385,34 +387,11 @@ class FileController extends AbstractController
             'date_to' => $request->query->getInt('date_to') ?: null,
         ];
 
-        $vectorFileIds = [];
-        if ($groupKey) {
-            try {
-                $vectorFileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
-            } catch (\Throwable $e) {
-                $this->logger->warning('FileController: Vector store group lookup failed', ['error' => $e->getMessage()]);
-            }
-        }
-
-        $result = $this->fileRepository->findByUserPaginated($user->getId(), $groupKey, $offset, $limit, $vectorFileIds, $filters);
-        $messageFiles = $result['files'];
-
-        $allChunks = $this->getUserVectorChunks($user->getId());
-        $vectorChunkMap = $this->resolveVectorGroupKeys($messageFiles, $allChunks);
-
-        // Fix-on-read: keep BVECTORSTATE/BCHUNKCOUNT in sync with the authoritative
-        // vector store so the list renders truthfully with no per-row Qdrant call
-        // (03_file-management.md §3.1). Persisted once so later reads are cheap.
-        $this->syncVectorState($messageFiles, $allChunks);
-
-        $files = array_map(
-            fn (File $mf): array => $this->serializeFileRow($mf, $allChunks, $vectorChunkMap),
-            $messageFiles,
-        );
+        $result = $this->fileListService->buildListing($user->getId(), $groupKey, $offset, $limit, $filters);
 
         return $this->json([
             'success' => true,
-            'files' => $files,
+            'files' => $result['files'],
             'pagination' => [
                 'page' => $page,
                 'limit' => $limit,
@@ -534,14 +513,7 @@ class FileController extends AbstractController
             : null;
 
         $files = $this->fileRepository->findByUserAndIds($user->getId(), $ids);
-        $accepted = 0;
-        foreach ($files as $file) {
-            $this->promoteIncoming($file, $user->getId(), $groupKey);
-            ++$accepted;
-        }
-        if ($accepted > 0) {
-            $this->fileRepository->flush();
-        }
+        $accepted = $this->fileListService->acceptMany($files, $user->getId(), $groupKey);
 
         return $this->json(['success' => true, 'accepted' => $accepted, 'group_key' => $groupKey]);
     }
@@ -580,8 +552,7 @@ class FileController extends AbstractController
             ? trim($data['group_key'])
             : null;
 
-        $this->promoteIncoming($file, $user->getId(), $groupKey);
-        $this->fileRepository->flush();
+        $this->fileListService->accept($file, $user->getId(), $groupKey);
 
         return $this->json(['success' => true, 'id' => $id, 'group_key' => $groupKey]);
     }
@@ -949,171 +920,5 @@ class FileController extends AbstractController
         }
 
         return false;
-    }
-
-    /**
-     * Fetch the vector chunk map for a user (fileId => ['chunks' => int, 'groupKey' => string|null]).
-     * Returns an empty map if the vector store is unavailable.
-     *
-     * @return array<int, array{chunks: int, groupKey: string|null}>
-     */
-    private function getUserVectorChunks(int $userId): array
-    {
-        try {
-            return $this->vectorStorageFacade->getFilesWithChunks($userId);
-        } catch (\Throwable $e) {
-            $this->logger->warning('FileController: Vector store chunk lookup failed', ['error' => $e->getMessage()]);
-
-            return [];
-        }
-    }
-
-    /**
-     * Resolve group keys from vector store for legacy files missing DB column.
-     *
-     * @param File[]                                                $files
-     * @param array<int, array{chunks: int, groupKey: string|null}> $allChunks
-     *
-     * @return array<int, string>
-     */
-    private function resolveVectorGroupKeys(array $files, array $allChunks): array
-    {
-        $legacyFileIds = array_filter(
-            array_map(fn ($mf) => null === $mf->getGroupKey() ? $mf->getId() : null, $files)
-        );
-
-        if (empty($legacyFileIds)) {
-            return [];
-        }
-
-        $vectorChunkMap = [];
-        foreach ($legacyFileIds as $fid) {
-            if (isset($allChunks[$fid]) && !empty($allChunks[$fid]['groupKey'])) {
-                $vectorChunkMap[$fid] = $allChunks[$fid]['groupKey'];
-            }
-        }
-
-        if (!empty($vectorChunkMap)) {
-            try {
-                $this->fileRepository->backfillGroupKeys($files, $vectorChunkMap);
-            } catch (\Throwable $e) {
-                $this->logger->warning('FileController: Lazy backfill failed', ['error' => $e->getMessage()]);
-            }
-        }
-
-        return $vectorChunkMap;
-    }
-
-    /**
-     * Build the list-row payload for a single file (03_file-management.md §5),
-     * including provenance, vector state, group and generated-media fields.
-     *
-     * @param array<int, array{chunks: int, groupKey: string|null}> $allChunks
-     * @param array<int, string>                                    $vectorChunkMap
-     *
-     * @return array<string, mixed>
-     */
-    private function serializeFileRow(File $mf, array $allChunks, array $vectorChunkMap): array
-    {
-        $chunkCount = (int) ($allChunks[$mf->getId()]['chunks'] ?? 0);
-        $groupKey = $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null);
-
-        return [
-            'id' => $mf->getId(),
-            'filename' => $mf->getFileName(),
-            'display_name' => $mf->getDisplayName(),
-            'original_name' => $mf->getOriginalName(),
-            'path' => $mf->getFilePath(),
-            'file_type' => $mf->getFileType(),
-            'file_size' => $mf->getFileSize(),
-            'mime' => $mf->getFileMime(),
-            'status' => $mf->getStatus(),
-            'source' => $mf->getSource(),
-            'origin_kind' => $mf->getOriginKind(),
-            'incoming' => $mf->isIncoming(),
-            'message_id' => $mf->getMessageId(),
-            'provider' => $mf->getProvider(),
-            'thumb_url' => null !== $mf->getThumbPath() ? '/api/v1/files/'.$mf->getId().'/thumb' : null,
-            'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
-            'uploaded_at' => $mf->getCreatedAt(),
-            'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
-            'group_key' => $groupKey,
-            'chunks' => $chunkCount,
-            'chunk_count' => $chunkCount,
-            'vector_state' => $mf->getVectorState(),
-            'is_vectorized' => $chunkCount > 0,
-        ];
-    }
-
-    /**
-     * Promote an incoming file out of the inbox: optionally file it in a group
-     * and clear the incoming flag + staging path (03_file-management.md §3.3).
-     * Does not flush — the caller flushes once per request.
-     */
-    private function promoteIncoming(File $file, int $userId, ?string $groupKey): void
-    {
-        if (null !== $groupKey) {
-            $file->setGroupKey($groupKey);
-            try {
-                $this->vectorStorageFacade->updateGroupKey($userId, (int) $file->getId(), $groupKey);
-            } catch (\Throwable $e) {
-                $this->logger->warning('FileController: vector group update on accept failed', ['error' => $e->getMessage()]);
-            }
-        }
-
-        $file->setIncoming(false);
-        $file->setStagePath(null);
-        $this->fileRepository->save($file, false);
-    }
-
-    /**
-     * Fix-on-read maintenance of BVECTORSTATE/BCHUNKCOUNT from the authoritative
-     * vector store, persisted once so later list reads are cheap.
-     *
-     * @param File[]                                                $files
-     * @param array<int, array{chunks: int, groupKey: string|null}> $allChunks
-     */
-    private function syncVectorState(array $files, array $allChunks): void
-    {
-        $changed = false;
-        foreach ($files as $file) {
-            $chunkCount = (int) ($allChunks[$file->getId()]['chunks'] ?? 0);
-            $derived = $this->deriveVectorState($file, $chunkCount);
-
-            if ($file->getChunkCount() !== $chunkCount || $file->getVectorState() !== $derived) {
-                $file->setChunkCount($chunkCount);
-                $file->setVectorState($derived);
-                $this->fileRepository->save($file, false);
-                $changed = true;
-            }
-        }
-
-        if ($changed) {
-            try {
-                $this->fileRepository->flush();
-            } catch (\Throwable $e) {
-                $this->logger->warning('FileController: vector-state sync flush failed', ['error' => $e->getMessage()]);
-            }
-        }
-    }
-
-    /**
-     * Derive the authoritative vector state for a file from its chunk count and
-     * upload/extraction status (03_file-management.md §3.1, §4.2).
-     */
-    private function deriveVectorState(File $file, int $chunkCount): string
-    {
-        if ($file->isMedia()) {
-            return File::VECTOR_STATE_NOT_APPLICABLE;
-        }
-        if ($chunkCount > 0) {
-            return File::VECTOR_STATE_VECTORIZED;
-        }
-
-        return match ($file->getStatus()) {
-            'error', 'failed' => File::VECTOR_STATE_FAILED,
-            'extracting', 'vectorizing', 'processing', 'pending' => File::VECTOR_STATE_PENDING,
-            default => File::VECTOR_STATE_NONE,
-        };
     }
 }
