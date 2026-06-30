@@ -279,10 +279,29 @@ function cacheSseToken(token: string | null): void {
       return
     }
     cachedSseToken = null
-    void getSseToken().catch(() => {
+    warmSseTokenViaRefresh()
+  }, SSE_TOKEN_PROACTIVE_REFRESH_MS)
+}
+
+/**
+ * Background-warm the SSE token cache without producing console noise.
+ *
+ * Refreshes the access-token cookie FIRST, then fetches a fresh SSE token.
+ * The access cookie TTL (5 min) is shorter than the ~3.5 min proactive cycle
+ * and also expires while a tab sits in the background, so warming via
+ * `GET /auth/token` alone hits an expired cookie and the browser logs a 401
+ * to the console every cycle (#1140). The refresh endpoint authenticates via
+ * the longer-lived, non-rotating refresh cookie, so it succeeds even when the
+ * access token has expired and silently renews the access cookie before the
+ * token fetch. When there is no session, `refreshAccessToken()` short-circuits
+ * to `false` and `getSseToken()` returns `null` — no requests, no errors.
+ */
+function warmSseTokenViaRefresh(): void {
+  void refreshAccessToken()
+    .then(() => getSseToken())
+    .catch(() => {
       // Network blip — next call will retry. Don't crash the page.
     })
-  }, SSE_TOKEN_PROACTIVE_REFRESH_MS)
 }
 
 /**
@@ -295,9 +314,9 @@ export function prefetchSseToken(): void {
   if (cachedSseToken || tokenFetchPromise) {
     return
   }
-  void getSseToken().catch(() => {
-    // Silent — this is a best-effort warm-up.
-  })
+  // Refresh the access cookie before warming so a focus/visibility prefetch
+  // after a long idle period does not log a 401 for an expired cookie (#1140).
+  warmSseTokenViaRefresh()
 }
 
 /**
