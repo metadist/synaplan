@@ -1178,6 +1178,7 @@
   "message": {
     "thinking": "Proceso de pensamiento",
     "reasoning": "Razonamiento de IA",
+    "downloadImage": "Descargar imagen",
     "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
     "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
     "audioGenerated": "Aquí está el audio que solicitaste. Puedes reproducirlo o descargarlo abajo.",

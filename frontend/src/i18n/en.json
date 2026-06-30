@@ -3169,6 +3169,7 @@
   "message": {
     "thinking": "Thinking process",
     "reasoning": "AI Reasoning",
+    "downloadImage": "Download image",
     "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",
     "fileGenerationFailed": "There was a problem creating the file. Please try again.",
     "audioGenerated": "Here's the audio you requested. You can play or download it below.",
