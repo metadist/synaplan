@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "dccb623fbda6dd95b5d64c343cb556ca",
+    "content-hash": "09ef9806479b5269aa43a9dc297ad53a",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -13920,16 +13920,16 @@
         },
         {
             "name": "web-token/jwt-library",
-            "version": "4.1.6",
+            "version": "4.1.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/web-token/jwt-library.git",
-                "reference": "e8ab00927a3856f3f0c8218226382cd6a58928a1"
+                "reference": "fbcbf2c276d04d8b056f5c2957815abd5dfb704d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/web-token/jwt-library/zipball/e8ab00927a3856f3f0c8218226382cd6a58928a1",
-                "reference": "e8ab00927a3856f3f0c8218226382cd6a58928a1",
+                "url": "https://api.github.com/repos/web-token/jwt-library/zipball/fbcbf2c276d04d8b056f5c2957815abd5dfb704d",
+                "reference": "fbcbf2c276d04d8b056f5c2957815abd5dfb704d",
                 "shasum": ""
             },
             "require": {
@@ -13993,7 +13993,7 @@
             ],
             "support": {
                 "issues": "https://github.com/web-token/jwt-library/issues",
-                "source": "https://github.com/web-token/jwt-library/tree/4.1.6"
+                "source": "https://github.com/web-token/jwt-library/tree/4.1.7"
             },
             "funding": [
                 {
@@ -14005,7 +14005,7 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2026-04-14T07:44:20+00:00"
+            "time": "2026-06-06T18:12:39+00:00"
         },
         {
             "name": "webklex/php-imap",
