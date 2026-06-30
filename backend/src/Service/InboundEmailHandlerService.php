@@ -529,6 +529,31 @@ final readonly class InboundEmailHandlerService
             return $this->getDefaultDepartment($departments);
         }
 
+        // Pre-flight cost-budget gate (issue #1177): the routing AI call is
+        // billable, so a high-volume handler could otherwise run up unlimited
+        // cost for an owner who is already over budget. Mirror the gate that
+        // MessageController/StreamController apply before their AI calls and
+        // fall back to the default department when the owner is over budget.
+        $handlerUser = $this->userRepository->find($handler->getUserId());
+        if (null === $handlerUser) {
+            $this->logger->warning('Mail handler owner not found; skipping AI routing', [
+                'handler_id' => $handler->getId(),
+                'user_id' => $handler->getUserId(),
+            ]);
+
+            return $this->getDefaultDepartment($departments);
+        }
+
+        $budgetCheck = $this->rateLimitService->checkCostBudget($handlerUser);
+        if (!$budgetCheck['allowed']) {
+            $this->logger->info('Mail handler owner over cost budget; using default department', [
+                'handler_id' => $handler->getId(),
+                'user_id' => $handler->getUserId(),
+            ]);
+
+            return $this->getDefaultDepartment($departments);
+        }
+
         try {
             // Call AI to route email
             $response = $this->aiFacade->chat(
@@ -544,17 +569,14 @@ final readonly class InboundEmailHandlerService
 
             $routedEmail = trim($response['content'] ?? '');
 
-            $handlerUser = $this->userRepository->find($handler->getUserId());
-            if ($handlerUser) {
-                $this->rateLimitService->recordUsage($handlerUser, 'EMAIL_ROUTING', [
-                    'provider' => $response['provider'] ?? $provider,
-                    'model' => $response['model'] ?? $modelName,
-                    'model_id' => $modelId,
-                    'usage' => $response['usage'] ?? [],
-                    'response_text' => $routedEmail,
-                    'input_text' => $fullPrompt,
-                ]);
-            }
+            $this->rateLimitService->recordUsage($handlerUser, 'EMAIL_ROUTING', [
+                'provider' => $response['provider'] ?? $provider,
+                'model' => $response['model'] ?? $modelName,
+                'model_id' => $modelId,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $routedEmail,
+                'input_text' => $fullPrompt,
+            ]);
 
             // Check if AI decided to discard the email
             if ('DISCARD' === strtoupper($routedEmail)) {

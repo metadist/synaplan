@@ -22,10 +22,12 @@ class InboundEmailHandlerServiceTest extends TestCase
 {
     private InboundEmailHandlerService $service;
     private InboundEmailHandlerRepository&MockObject $handlerRepository;
-    private PromptRepository $promptRepository;
-    private AiFacade $aiFacade;
-    private ModelConfigService $modelConfigService;
+    private PromptRepository&MockObject $promptRepository;
+    private AiFacade&MockObject $aiFacade;
+    private ModelConfigService&MockObject $modelConfigService;
     private EncryptionService&MockObject $encryptionService;
+    private UserRepository&MockObject $userRepository;
+    private RateLimitService&MockObject $rateLimitService;
     private LoggerInterface $logger;
 
     protected function setUp(): void
@@ -35,19 +37,106 @@ class InboundEmailHandlerServiceTest extends TestCase
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->encryptionService = $this->createMock(EncryptionService::class);
+        $this->userRepository = $this->createMock(UserRepository::class);
+        $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->service = new InboundEmailHandlerService(
             $this->handlerRepository,
             $this->promptRepository,
-            $this->createMock(UserRepository::class),
+            $this->userRepository,
             $this->aiFacade,
             $this->modelConfigService,
-            $this->createMock(RateLimitService::class),
+            $this->rateLimitService,
             $this->encryptionService,
             $this->createMock(MailHandlerLogService::class),
             $this->logger
         );
+    }
+
+    /**
+     * Build a handler + prompt/model mocks shared by the routing budget tests.
+     *
+     * @return InboundEmailHandler handler with two departments (support = default)
+     */
+    private function setUpRoutingHandler(): InboundEmailHandler
+    {
+        $handler = new InboundEmailHandler();
+        $handler->setUserId(42);
+        $handler->setDepartments([
+            ['email' => 'sales@example.com', 'rules' => 'Sales', 'isDefault' => false],
+            ['email' => 'support@example.com', 'rules' => 'Support', 'isDefault' => true],
+        ]);
+
+        $prompt = $this->createMock(\App\Entity\Prompt::class);
+        $prompt->method('getPrompt')->willReturn('Route this email to [TARGETLIST]');
+        $this->promptRepository->method('findByTopic')->willReturn($prompt);
+
+        $this->modelConfigService->method('getDefaultModel')->willReturn(5);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4');
+
+        return $handler;
+    }
+
+    /**
+     * Issue #1177: when the handler owner is over their cost budget, the
+     * billable AI routing call must be skipped and the default department used.
+     */
+    public function testRouteEmailToDepartmentSkipsAiCallWhenOverCostBudget(): void
+    {
+        $handler = $this->setUpRoutingHandler();
+
+        $this->userRepository->method('find')->with(42)->willReturn($this->createMock(\App\Entity\User::class));
+        $this->rateLimitService->expects($this->once())
+            ->method('checkCostBudget')
+            ->willReturn(['allowed' => false, 'budget' => 0.01, 'used_cost' => 0.5]);
+
+        // The AI call must NOT happen when over budget.
+        $this->aiFacade->expects($this->never())->method('chat');
+        $this->rateLimitService->expects($this->never())->method('recordUsage');
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Subject', 'Body');
+
+        $this->assertSame('support@example.com', $result, 'Over-budget routing must fall back to the default department');
+    }
+
+    /**
+     * Issue #1177: within budget, routing proceeds and usage is recorded.
+     */
+    public function testRouteEmailToDepartmentProceedsWhenWithinBudget(): void
+    {
+        $handler = $this->setUpRoutingHandler();
+
+        $this->userRepository->method('find')->with(42)->willReturn($this->createMock(\App\Entity\User::class));
+        $this->rateLimitService->expects($this->once())
+            ->method('checkCostBudget')
+            ->willReturn(['allowed' => true]);
+
+        $this->aiFacade->expects($this->once())
+            ->method('chat')
+            ->willReturn(['content' => 'sales@example.com', 'provider' => 'openai', 'model' => 'gpt-4', 'usage' => []]);
+        $this->rateLimitService->expects($this->once())->method('recordUsage');
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Subject', 'Body');
+
+        $this->assertSame('sales@example.com', $result);
+    }
+
+    /**
+     * Issue #1177: a deleted/unknown owner must not trigger a billable AI call.
+     */
+    public function testRouteEmailToDepartmentSkipsAiCallWhenOwnerMissing(): void
+    {
+        $handler = $this->setUpRoutingHandler();
+
+        $this->userRepository->method('find')->with(42)->willReturn(null);
+        $this->rateLimitService->expects($this->never())->method('checkCostBudget');
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Subject', 'Body');
+
+        $this->assertSame('support@example.com', $result);
     }
 
     public function testIsMaskedPasswordPlaceholder(): void
