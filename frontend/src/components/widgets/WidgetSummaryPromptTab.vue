@@ -50,7 +50,8 @@ defineExpose({ save })
       :reset-fn="() => widgetsApi.resetSummaryPrompt(widgetId)"
     />
 
-    <!-- Setup Interview Prompt -->
+    <!-- Setup Interview Prompt — folded by default so it doesn't distract
+         from the primary Prompt & Model configuration above. -->
     <WidgetAiPromptSection
       ref="setupSection"
       icon="heroicons:chat-bubble-bottom-center-text"
@@ -59,6 +60,7 @@ defineExpose({ save })
       model-help-key="widgets.advancedConfig.setupPrompt.modelHelp"
       :models="models"
       :loading-models="loadingModels"
+      :initial-collapsed="true"
       :load-fn="() => widgetsApi.getSetupPrompt(widgetId)"
       :save-fn="(prompt, modelId) => widgetsApi.updateSetupPrompt(widgetId, prompt, modelId)"
       :reset-fn="() => widgetsApi.resetSetupPrompt(widgetId)"

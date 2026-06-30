@@ -753,6 +753,14 @@
     "noFiles": "No files uploaded yet",
     "moveTo": "Move to",
     "movedSuccess": "File moved to \"{folder}\"",
+    "removeFromFolder": "Remove from folder",
+    "removedFromFolder": "Removed from folder (file and its search index are kept)",
+    "describeSortAction": "Describe, vectorise & sort — make searchable by AI",
+    "describeSortDone": "Now searchable by AI.",
+    "describeSortDoneGroup": "Now searchable by AI · filed in \"{group}\".",
+    "describeSortFailed": "Couldn't make this file searchable.",
+    "indexPromptAction": "Add generation prompt to knowledge base",
+    "indexPromptDone": "Generation prompt added to your knowledge base.",
     "emptyState": {
       "title": "No files yet",
       "description": "Upload files to get started. You can organize them into folders.",
@@ -799,7 +807,127 @@
     "tabSearch": "Search",
     "tabVectors": "Vectors",
     "intro": "Files you upload become searchable knowledge for your chats. Folders can be used as knowledge folders to scope a conversation.",
-    "useInChat": "Use in chat"
+    "useInChat": "Use in chat",
+    "terms": {
+      "vectorized": "searchable by AI",
+      "knowledgeGroup": "knowledge group",
+      "incoming": "incoming",
+      "generated": "AI-generated",
+      "notApplicable": "not applicable"
+    },
+    "tabBrowse": "Browse",
+    "tabIncoming": "Incoming",
+    "tabGenerated": "Generated",
+    "incomingBadge": "{count} new",
+    "sourceLabel": {
+      "web_upload": "Upload",
+      "chat_attachment": "Chat",
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "opencloud": "OpenCloud",
+      "whatsapp": "WhatsApp",
+      "widget": "Widget",
+      "api": "API",
+      "generated": "AI-generated"
+    },
+    "vectorState": {
+      "vectorized": "Searchable by AI",
+      "vectorizedDetail": "Searchable by AI · {group} · {count} chunks",
+      "processing": "Processing…",
+      "none": "Not searchable",
+      "notApplicable": "Not applicable",
+      "failed": "Failed"
+    },
+    "filter": {
+      "source": "Source",
+      "group": "Group",
+      "type": "Type",
+      "vectorized": "Searchable",
+      "date": "Date",
+      "clear": "Clear filters",
+      "typeAll": "All types",
+      "typeDocs": "Documents",
+      "typeImages": "Images",
+      "typeVideo": "Video",
+      "typeAudio": "Audio",
+      "vectorizedYes": "Searchable by AI",
+      "vectorizedNo": "Not searchable",
+      "noGroup": "No group"
+    },
+    "help": {
+      "vectorized": "When a file is searchable by AI, its contents are added to your knowledge base so the assistant can use them to answer you.",
+      "group": "Knowledge groups bundle files together. When the AI searches a group, it can use every file in it.",
+      "source": "Where this file came from — an upload, a chat, Outlook, Nextcloud, OpenCloud, WhatsApp, the widget, the API, or AI-generated.",
+      "incoming": "Files other apps pushed in for your knowledge base. Review them, then keep or dismiss.",
+      "typeFilter": "Show only one kind of file — documents, images, video or audio.",
+      "vectorizedFilter": "Filter by whether files are searchable by AI.",
+      "reVectorize": "Re-read this file and refresh what the AI knows from it. Use after editing it or if it failed.",
+      "moveGroup": "Move files into another knowledge group. This changes which group the AI searches them in — it doesn't delete anything.",
+      "storage": "How much of your storage you've used. AI-generated media counts too, shown separately."
+    },
+    "empty": {
+      "browseTitle": "Your file library",
+      "browseBody": "Every upload, chat attachment and AI-generated file lives here, ready to search and reuse.",
+      "browseAction": "Upload your first file",
+      "filteredBody": "No files match these filters.",
+      "filteredAction": "Clear filters",
+      "incomingBody": "Files sent in from Outlook, Nextcloud or OpenCloud appear here for you to review before filing.",
+      "incomingAction": "Set up integrations",
+      "generatedBody": "Images, video and audio you create in chat are saved here so you can find and download them again.",
+      "generatedAction": "Start a chat",
+      "groupBody": "This group has no files yet. Add files to make them searchable together.",
+      "groupAction": "Add files"
+    },
+    "toast": {
+      "uploaded": "Uploaded {name}. | Uploaded {count} files.",
+      "uploadFailed": "Couldn't upload {name}. {reason}",
+      "tooLarge": "{name} is too large (max {limit}).",
+      "unsupported": "{type} files aren't supported.",
+      "vectorizeStart": "Making {name} searchable by AI…",
+      "vectorizeDone": "{name} is now searchable by AI.",
+      "vectorizeFailed": "Couldn't process {name}.",
+      "revectorizedBulk": "Refreshed {count} files.",
+      "moved": "Moved {count} files to {group}.",
+      "filed": "Filed {count} files in {group}.",
+      "deleted": "Deleted {count} files.",
+      "incomingKept": "Kept {count} files in {group}.",
+      "incomingDismissed": "Dismissed {count} files.",
+      "shareCreated": "Share link copied to clipboard.",
+      "shareRevoked": "Sharing turned off for {name}.",
+      "downloadPreparing": "Preparing {count} files for download…",
+      "genericError": "Something went wrong. {reason}",
+      "undo": "Undo"
+    },
+    "confirm": {
+      "deleteTitle": "Delete {count} files?",
+      "deleteBody": "Their AI-searchable content is removed too. This can't be undone.",
+      "deleteConfirm": "Delete",
+      "dismissTitle": "Dismiss {count} files?",
+      "dismissBody": "They won't be added to your library. You can re-import them later from the source.",
+      "dismissConfirm": "Dismiss"
+    },
+    "incoming": {
+      "title": "Incoming",
+      "subtitle": "Files pushed in for your knowledge base — review, then keep or dismiss.",
+      "keep": "Keep",
+      "keepAll": "Keep all",
+      "assignGroup": "Assign group",
+      "dismiss": "Dismiss",
+      "open": "Open",
+      "retry": "Retry",
+      "provenance": "from {source} · {time}"
+    },
+    "generated": {
+      "title": "Generated",
+      "subtitle": "Images, video and audio created in your chats.",
+      "openInChat": "Open in chat",
+      "download": "Download"
+    },
+    "explainer": {
+      "text": "Everything you upload or create lives here. Files marked \"searchable by AI\" are added to your knowledge base so the assistant can use them.",
+      "dismiss": "Got it",
+      "reopen": "What is this?"
+    }
   },
   "vectorStorage": {
     "intro": "An overview of your vector storage — how many files have been indexed and how many vectors (chunks) are stored for semantic search.",
@@ -874,12 +1002,25 @@
       "extension_not_allowed": "{filename}: File type is not supported. {message}",
       "rate_limit_exceeded": "{filename}: Upload rate limit reached. {message}",
       "generic": "{filename}: Upload is not allowed. {message}"
-    }
+    },
+    "helper": "Attached files are sent to the AI for this message. Files marked ✅ are also searchable across all your chats.",
+    "searchYourFiles": "Search your files",
+    "typeAll": "All",
+    "typeDocs": "Docs",
+    "typeImages": "Images",
+    "typeVideo": "Video",
+    "typeAudio": "Audio",
+    "recent": "Recent",
+    "allFilesFiltered": "All files",
+    "attachCount": "Attach {count} file | Attach {count} files",
+    "noRecents": "Pick a recent file or upload a new one to use in this chat.",
+    "noResults": "No files match. Try another search or upload a new file."
   },
   "fileMention": {
     "hint": "Type to search files — press Enter to attach",
     "noResults": "No files found",
-    "fileAttached": "{name} attached"
+    "fileAttached": "{name} attached",
+    "header": "Type to find a file to give the AI"
   },
   "config": {
     "aiModels": {
@@ -2178,7 +2319,7 @@
       "websitePlaceholder": "your-website.com",
       "websiteHelp": "Enter your domain. Your domain will be added to the allowed list.",
       "infoTitle": "Quick Start",
-      "infoDescription": "Your widget will be ready to use immediately. You can customize it further with AI-guided setup or advanced settings later.",
+      "infoDescription": "Your widget works right away. You can fine-tune it later with the AI Setup Assistant or in Advanced Settings.",
       "previewLabel": "Widget Preview",
       "previewClickHint": "Click the chat button to see how it works",
       "previewChatGreeting": "Hi! How can I help you today?",
@@ -2192,8 +2333,8 @@
       "readyToUse": "Ready to embed on your website",
       "embedCodeLabel": "Embed Code",
       "embedCodeError": "Failed to load embed code",
-      "aiSetupTitle": "AI-Guided Setup",
-      "aiSetupDescription": "Let AI help you configure the perfect assistant for your business through a short interview.",
+      "aiSetupTitle": "AI Setup Assistant",
+      "aiSetupDescription": "Answer a few quick questions and the AI Setup Assistant configures your widget for you.",
       "advancedTitle": "Advanced Settings",
       "advancedDescription": "Customize branding, behavior, file uploads, and security settings manually.",
       "testNow": "Test Widget Now"
@@ -2201,19 +2342,19 @@
     "setupChat": {
       "title": "AI Setup Assistant",
       "subtitle": "Let's configure your widget together",
-      "progressLabel": "Interview progress",
+      "progressLabel": "Setup progress",
       "inputPlaceholder": "Type your answer...",
       "skipButton": "Skip for now",
       "completeTitle": "Setup Complete!",
-      "completeDescription": "Your custom assistant configuration has been generated. Click below to save it.",
+      "completeDescription": "Your AI assistant is ready. Click below to save it to your widget.",
       "saveButton": "Save Configuration",
       "saveSuccess": "Widget configuration saved successfully!",
       "saveError": "Failed to save configuration",
       "sendError": "Failed to send message",
-      "startError": "Failed to start interview",
-      "modelNotConfigured": "No AI model configured. Please select a model under Settings → AI Instructions → AI Setup Interview.",
-      "editHintTitle": "Want to fine-tune your assistant?",
-      "editHintDescription": "After saving, you can edit the AI assistant configuration anytime in the widget's Advanced Settings under the 'AI Assistant' tab."
+      "startError": "Failed to start setup",
+      "modelNotConfigured": "No AI model configured. Pick one under Advanced Settings → AI Setup → Prompt & Model.",
+      "editHintTitle": "Want to fine-tune your AI assistant?",
+      "editHintDescription": "After saving, you can fine-tune your AI assistant anytime in Advanced Settings → AI Setup → Widget AI Wizard."
     },
     "detail": {
       "back": "Back to widgets",
@@ -2345,6 +2486,11 @@
     "advancedConfig": {
       "title": "Advanced Configuration",
       "editPrompt": "Edit AI Prompt",
+      "tabGroups": {
+        "setup": "Setup",
+        "securityLegal": "Security & Legal",
+        "aiSetup": "AI Setup"
+      },
       "tabs": {
         "branding": "Branding",
         "behavior": "Behavior",
@@ -2352,6 +2498,8 @@
         "privacy": "Privacy",
         "assistant": "AI Assistant",
         "aiPrompts": "AI Instructions",
+        "aiWizard": "Widget AI Wizard",
+        "promptModel": "Prompt & Model",
         "customFields": "Custom Fields"
       },
       "dataProcessing": "Data Processing Agreement (Art. 28 GDPR)",
@@ -2418,9 +2566,9 @@
         "placeholderSystemPrompt": "Replaced with the widget's current system prompt"
       },
       "setupPrompt": {
-        "title": "AI Setup Interview",
-        "description": "Controls the AI assistant that guides users through widget configuration.",
-        "modelHelp": "Select which AI model should conduct the setup interview."
+        "title": "AI Setup Assistant Prompt",
+        "description": "Controls the AI Setup Assistant that guides you through configuring your widget.",
+        "modelHelp": "Select which AI model should run the AI Setup Assistant."
       },
       "behaviorRules": {
         "title": "Guided Behavior Rules",
@@ -2573,16 +2721,16 @@
       "saveSuccess": "Settings saved successfully!",
       "saveError": "Failed to save settings",
       "aiSetupRequired": "AI Setup Required",
-      "aiSetupRequiredDescription": "To customize your AI assistant, you first need to complete the guided AI setup. This will help configure the perfect assistant for your needs.",
+      "aiSetupRequiredDescription": "To customize your widget's AI assistant, first run the AI Setup Assistant. It asks a few quick questions and sets everything up for you.",
       "startAiSetup": "Start AI Setup",
       "manualCreate": "Create Manually",
       "creatingPrompt": "Creating prompt...",
       "manualCreateError": "Failed to create prompt",
       "restartAiSetup": "Restart Setup",
       "restartAiSetupTitle": "Re-run AI Setup Assistant",
-      "restartAiSetupDescription": "Start the guided setup again to reconfigure your assistant.",
+      "restartAiSetupDescription": "Run the AI Setup Assistant again to reconfigure your widget's AI assistant.",
       "systemPromptTitle": "Using Shared System Prompt",
-      "systemPromptDescription": "This widget uses a shared system prompt that cannot be edited directly. To customize the behavior, run the AI setup to create your own personalized prompt.",
+      "systemPromptDescription": "This widget uses a shared system prompt that can't be edited directly. To customize how it replies, run the AI Setup Assistant to create your own.",
       "customizePrompt": "Customize Prompt",
       "promptName": "Assistant Name",
       "selectionRules": "Selection Rules",

@@ -58,7 +58,7 @@
                 type="file"
                 multiple
                 class="hidden"
-                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
+                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.md,.csv,.xlsx,.xls,.pptx,.ppt,.odt,.ods,.ics"
                 data-testid="input-file-selection-upload"
                 @change="handleFileUpload"
               />
@@ -136,6 +136,26 @@
                 <option value="extracted">{{ $t('files.status_extracted') }}</option>
                 <option value="uploaded">{{ $t('files.status_uploaded') }}</option>
               </select>
+            </div>
+            <!-- §4.10.3: type filter chips (horizontally scrollable on mobile) -->
+            <div
+              class="flex items-center gap-1.5 mt-2 overflow-x-auto scroll-thin"
+              data-testid="file-selection-type-chips"
+            >
+              <button
+                v-for="chip in typeChips"
+                :key="chip.value"
+                class="shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors"
+                :class="
+                  filterType === chip.value
+                    ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                    : 'border-light-border/30 dark:border-dark-border/15 txt-secondary hover:text-[var(--brand)] hover:border-[var(--brand)]/40'
+                "
+                :data-testid="`file-selection-type-${chip.value}`"
+                @click="filterType = chip.value"
+              >
+                {{ $t(chip.labelKey) }}
+              </button>
             </div>
           </div>
 
@@ -264,6 +284,14 @@
             </div>
           </div>
 
+          <!-- §4.10.2 helper line: clarify the consequence of attaching. -->
+          <p
+            class="px-3 sm:px-6 pt-2 text-[11px] sm:text-xs txt-secondary"
+            data-testid="file-selection-helper"
+          >
+            {{ $t('fileSelection.helper') }}
+          </p>
+
           <!-- Footer with actions -->
           <div
             class="flex items-center justify-between gap-3 px-3 py-3 sm:px-6 sm:py-4 border-t border-light-border/20 dark:border-dark-border/15"
@@ -390,6 +418,34 @@ const files = ref<FileItem[]>([])
 const selectedFileIds = ref<Set<number>>(new Set())
 const searchQuery = ref('')
 const filterStatus = ref('all')
+// §4.10.3: type filter chips inside the picker — the counterpart of the
+// manager's Type filter, so the right file is findable in seconds.
+type AttachTypeFilter = 'all' | 'docs' | 'images' | 'video' | 'audio'
+const filterType = ref<AttachTypeFilter>('all')
+const typeChips: Array<{ value: AttachTypeFilter; labelKey: string }> = [
+  { value: 'all', labelKey: 'fileSelection.typeAll' },
+  { value: 'docs', labelKey: 'fileSelection.typeDocs' },
+  { value: 'images', labelKey: 'fileSelection.typeImages' },
+  { value: 'video', labelKey: 'fileSelection.typeVideo' },
+  { value: 'audio', labelKey: 'fileSelection.typeAudio' },
+]
+
+const matchesTypeFilter = (fileType: string): boolean => {
+  if (filterType.value === 'all') return true
+  const type = (fileType || '').toLowerCase()
+  switch (filterType.value) {
+    case 'images':
+      return /jpg|jpeg|png|gif|webp|heic|heif|image/.test(type)
+    case 'video':
+      return /mp4|webm|mov|avi|mkv|video/.test(type)
+    case 'audio':
+      return /mp3|wav|ogg|m4a|audio/.test(type)
+    case 'docs':
+      return /pdf|docx?|txt|xlsx?|csv|pptx?|md|word|excel|powerpoint|document/.test(type)
+    default:
+      return true
+  }
+}
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploadProgress = ref<{ current: number; total: number } | null>(null)
 /** Byte upload progress (XHR); null when not active */
@@ -412,11 +468,19 @@ const filteredFiles = computed(() => {
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    result = result.filter((f) => f.filename.toLowerCase().includes(query))
+    result = result.filter(
+      (f) =>
+        f.filename.toLowerCase().includes(query) ||
+        (f.original_name?.toLowerCase().includes(query) ?? false)
+    )
   }
 
   if (filterStatus.value !== 'all') {
     result = result.filter((f) => f.status === filterStatus.value)
+  }
+
+  if (filterType.value !== 'all') {
+    result = result.filter((f) => matchesTypeFilter(f.file_type))
   }
 
   return result

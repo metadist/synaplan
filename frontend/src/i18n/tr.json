@@ -601,7 +601,22 @@
       "network": "{filename}: Yükleme sırasında bağlantı koptu. Ağınızı kontrol edip tekrar deneyin.",
       "invalid_response": "{filename}: Sunucu beklenmeyen bir yanıt döndürdü. Lütfen tekrar deneyin.",
       "http_error": "{filename}: Yükleme başarısız oldu (hata {status}). Lütfen tekrar deneyin."
-    }
+    },
+    "helper": "Eklenen dosyalar bu mesaj için yapay zekâya gönderilir. ✅ ile işaretli dosyalar ayrıca tüm sohbetlerinizde aranabilir.",
+    "searchYourFiles": "Dosyalarınızda ara",
+    "typeAll": "Tümü",
+    "typeDocs": "Belge",
+    "typeImages": "Görsel",
+    "typeVideo": "Video",
+    "typeAudio": "Ses",
+    "recent": "Son kullanılan",
+    "allFilesFiltered": "Tüm dosyalar",
+    "attachCount": "{count} dosya ekle | {count} dosya ekle",
+    "noRecents": "Bu sohbette kullanmak için son kullanılan bir dosya seçin veya yeni bir tane yükleyin.",
+    "noResults": "Dosya yok. Başka bir arama deneyin veya yeni dosya yükleyin."
+  },
+  "fileMention": {
+    "header": "Yapay zekâya verecek bir dosya bulmak için yazın"
   },
   "aiProvider": {
     "error": {
@@ -928,19 +943,19 @@
     "setupChat": {
       "title": "AI Kurulum Asistanı",
       "subtitle": "Widget'ınızı birlikte yapılandıralım",
-      "progressLabel": "Görüşme ilerlemesi",
+      "progressLabel": "Kurulum ilerlemesi",
       "inputPlaceholder": "Cevabınızı yazın...",
       "skipButton": "Şimdilik atla",
       "completeTitle": "Kurulum Tamamlandı!",
-      "completeDescription": "Özel asistan yapılandırmanız oluşturuldu. Kaydetmek için aşağıya tıklayın.",
+      "completeDescription": "AI asistanınız hazır. Widget'ınıza kaydetmek için aşağıya tıklayın.",
       "saveButton": "Yapılandırmayı Kaydet",
       "saveSuccess": "Widget yapılandırması başarıyla kaydedildi!",
       "saveError": "Yapılandırma kaydedilemedi",
       "sendError": "Mesaj gönderilemedi",
-      "startError": "Görüşme başlatılamadı",
-      "modelNotConfigured": "AI modeli yapılandırılmamış. Lütfen Ayarlar → AI Talimatları → AI Kurulum Görüşmesi altından bir model seçin.",
-      "editHintTitle": "Asistanınızı ince ayar yapmak ister misiniz?",
-      "editHintDescription": "Kaydettikten sonra, AI asistan yapılandırmasını gelişmiş ayarlarda 'AI Asistanı' sekmesinden istediğiniz zaman düzenleyebilirsiniz."
+      "startError": "Kurulum başlatılamadı",
+      "modelNotConfigured": "AI modeli yapılandırılmamış. Lütfen Gelişmiş Ayarlar → AI Kurulumu → Prompt ve Model altından bir model seçin.",
+      "editHintTitle": "AI asistanınızı ince ayarlamak ister misiniz?",
+      "editHintDescription": "Kaydettikten sonra, AI asistanınızı Gelişmiş Ayarlar → AI Kurulumu → Widget AI Sihirbazı altından istediğiniz zaman ince ayarlayabilirsiniz."
     }
   },
   "profile": {
@@ -1474,6 +1489,14 @@
     "noFiles": "Henüz dosya yüklenmemiş",
     "moveTo": "Taşı",
     "movedSuccess": "Dosya \"{folder}\" klasörüne taşındı",
+    "removeFromFolder": "Klasörden çıkar",
+    "removedFromFolder": "Klasörden çıkarıldı (dosya ve arama dizini korunur)",
+    "describeSortAction": "Açıkla, vektörle ve sırala — yapay zekâ ile aranabilir yap",
+    "describeSortDone": "Artık yapay zekâ ile aranabilir.",
+    "describeSortDoneGroup": "Artık yapay zekâ ile aranabilir · \"{group}\" içine eklendi.",
+    "describeSortFailed": "Bu dosya aranabilir yapılamadı.",
+    "indexPromptAction": "Üretim istemini bilgi tabanına ekle",
+    "indexPromptDone": "Üretim istemi bilgi tabanınıza eklendi.",
     "emptyState": {
       "title": "Henüz dosya yok",
       "description": "Başlamak için dosya yükle. Dosyaları klasörler halinde düzenleyebilirsin.",
@@ -1521,7 +1544,127 @@
     "tabVectors": "Vektörler",
     "intro": "Yüklediğiniz dosyalar sohbetleriniz için aranabilir bilgiye dönüşür. Klasörler bir konuşmayı sınırlamak için bilgi klasörü olarak kullanılabilir.",
     "useInChat": "Sohbette kullan",
-    "status_error": "Hata"
+    "status_error": "Hata",
+    "terms": {
+      "vectorized": "yapay zekâ ile aranabilir",
+      "knowledgeGroup": "bilgi grubu",
+      "incoming": "gelen",
+      "generated": "yapay zekâ üretimi",
+      "notApplicable": "uygulanamaz"
+    },
+    "tabBrowse": "Gözat",
+    "tabIncoming": "Gelen",
+    "tabGenerated": "Üretilen",
+    "incomingBadge": "{count} yeni",
+    "sourceLabel": {
+      "web_upload": "Yükleme",
+      "chat_attachment": "Sohbet",
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "opencloud": "OpenCloud",
+      "whatsapp": "WhatsApp",
+      "widget": "Widget",
+      "api": "API",
+      "generated": "Yapay zekâ üretimi"
+    },
+    "vectorState": {
+      "vectorized": "Yapay zekâ ile aranabilir",
+      "vectorizedDetail": "Yapay zekâ ile aranabilir · {group} · {count} parça",
+      "processing": "İşleniyor…",
+      "none": "Aranamaz",
+      "notApplicable": "Uygulanamaz",
+      "failed": "Başarısız"
+    },
+    "filter": {
+      "source": "Kaynak",
+      "group": "Grup",
+      "type": "Tür",
+      "vectorized": "Aranabilir",
+      "date": "Tarih",
+      "clear": "Filtreleri temizle",
+      "typeAll": "Tüm türler",
+      "typeDocs": "Belgeler",
+      "typeImages": "Görseller",
+      "typeVideo": "Video",
+      "typeAudio": "Ses",
+      "vectorizedYes": "Yapay zekâ ile aranabilir",
+      "vectorizedNo": "Aranamaz",
+      "noGroup": "Grup yok"
+    },
+    "help": {
+      "vectorized": "Bir dosya yapay zekâ ile aranabilir olduğunda içeriği bilgi tabanınıza eklenir; böylece asistan yanıt verirken bunu kullanabilir.",
+      "group": "Bilgi grupları dosyaları bir araya getirir. Yapay zekâ bir grupta arama yaptığında içindeki tüm dosyaları kullanabilir.",
+      "source": "Bu dosyanın nereden geldiği — yükleme, sohbet, Outlook, Nextcloud, OpenCloud, WhatsApp, widget, API veya yapay zekâ üretimi.",
+      "incoming": "Diğer uygulamaların bilgi tabanınız için gönderdiği dosyalar. İnceleyin, sonra saklayın veya çıkarın.",
+      "typeFilter": "Yalnızca tek bir dosya türünü göster — belgeler, görseller, video veya ses.",
+      "vectorizedFilter": "Dosyaların yapay zekâ ile aranabilir olup olmadığına göre filtrele.",
+      "reVectorize": "Bu dosyayı yeniden okuyup yapay zekânın ondan öğrendiklerini tazele. Düzenledikten sonra veya başarısız olduğunda kullan.",
+      "moveGroup": "Dosyaları başka bir bilgi grubuna taşı. Bu, yapay zekânın onları hangi grupta aradığını değiştirir; hiçbir şey silinmez.",
+      "storage": "Depolamanızın ne kadarını kullandığınız. Yapay zekâ üretimi içerik de sayılır ve ayrı gösterilir."
+    },
+    "empty": {
+      "browseTitle": "Dosya kitaplığınız",
+      "browseBody": "Her yükleme, sohbet eki ve yapay zekâ üretimi dosya burada; aramaya ve yeniden kullanmaya hazır.",
+      "browseAction": "İlk dosyanızı yükleyin",
+      "filteredBody": "Bu filtrelere uyan dosya yok.",
+      "filteredAction": "Filtreleri temizle",
+      "incomingBody": "Outlook, Nextcloud veya OpenCloud'dan gönderilen dosyalar, dosyalamadan önce incelemeniz için burada görünür.",
+      "incomingAction": "Entegrasyonları ayarla",
+      "generatedBody": "Sohbette oluşturduğunuz görseller, video ve ses, tekrar bulup indirebilmeniz için burada saklanır.",
+      "generatedAction": "Sohbet başlat",
+      "groupBody": "Bu grupta henüz dosya yok. Birlikte aranabilir olmaları için dosya ekleyin.",
+      "groupAction": "Dosya ekle"
+    },
+    "toast": {
+      "uploaded": "{name} yüklendi. | {count} dosya yüklendi.",
+      "uploadFailed": "{name} yüklenemedi. {reason}",
+      "tooLarge": "{name} çok büyük (en fazla {limit}).",
+      "unsupported": "{type} dosyaları desteklenmiyor.",
+      "vectorizeStart": "{name} yapay zekâ ile aranabilir yapılıyor…",
+      "vectorizeDone": "{name} artık yapay zekâ ile aranabilir.",
+      "vectorizeFailed": "{name} işlenemedi.",
+      "revectorizedBulk": "{count} dosya tazelendi.",
+      "moved": "{count} dosya {group} grubuna taşındı.",
+      "filed": "{count} dosya {group} grubuna eklendi.",
+      "deleted": "{count} dosya silindi.",
+      "incomingKept": "{count} dosya {group} grubunda saklandı.",
+      "incomingDismissed": "{count} dosya çıkarıldı.",
+      "shareCreated": "Paylaşım bağlantısı panoya kopyalandı.",
+      "shareRevoked": "{name} için paylaşım kapatıldı.",
+      "downloadPreparing": "{count} dosya indirme için hazırlanıyor…",
+      "genericError": "Bir şeyler ters gitti. {reason}",
+      "undo": "Geri al"
+    },
+    "confirm": {
+      "deleteTitle": "{count} dosya silinsin mi?",
+      "deleteBody": "Yapay zekâ ile aranabilir içerikleri de kaldırılır. Bu geri alınamaz.",
+      "deleteConfirm": "Sil",
+      "dismissTitle": "{count} dosya çıkarılsın mı?",
+      "dismissBody": "Kitaplığınıza eklenmezler. Daha sonra kaynaktan yeniden içe aktarabilirsiniz.",
+      "dismissConfirm": "Çıkar"
+    },
+    "incoming": {
+      "title": "Gelen",
+      "subtitle": "Bilgi tabanınız için gönderilen dosyalar — inceleyin, sonra saklayın veya çıkarın.",
+      "keep": "Sakla",
+      "keepAll": "Tümünü sakla",
+      "assignGroup": "Grup ata",
+      "dismiss": "Çıkar",
+      "open": "Aç",
+      "retry": "Yeniden dene",
+      "provenance": "{source} · {time}"
+    },
+    "generated": {
+      "title": "Üretilen",
+      "subtitle": "Sohbetlerinizde oluşturulan görseller, video ve ses.",
+      "openInChat": "Sohbette aç",
+      "download": "İndir"
+    },
+    "explainer": {
+      "text": "Yüklediğiniz veya oluşturduğunuz her şey burada. „Yapay zekâ ile aranabilir“ olarak işaretli dosyalar bilgi tabanınıza eklenir; böylece asistan bunları kullanabilir.",
+      "dismiss": "Anladım",
+      "reopen": "Bu nedir?"
+    }
   },
   "vectorStorage": {
     "intro": "Vektör deponuza genel bir bakış — kaç dosyanın dizinlendiği ve anlamsal arama için kaç vektörün (parça) saklandığı.",

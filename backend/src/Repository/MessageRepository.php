@@ -253,6 +253,27 @@ class MessageRepository extends ServiceEntityRepository
         ]);
     }
 
+    /**
+     * Keyset-paginated scan of messages that carry a file on the legacy
+     * BFILEPATH column (file=1, non-empty path) with id greater than $afterId.
+     * Used by app:files:backfill-media to heal generated media that never got a
+     * BFILES row (03_file-management.md §3.2).
+     *
+     * @return Message[]
+     */
+    public function findFileMessagesAfter(int $afterId, int $limit): array
+    {
+        return $this->createQueryBuilder('m')
+            ->where('m.file = 1')
+            ->andWhere("m.filePath != ''")
+            ->andWhere('m.id > :afterId')
+            ->setParameter('afterId', $afterId)
+            ->orderBy('m.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function flush(): void
     {
         $this->getEntityManager()->flush();

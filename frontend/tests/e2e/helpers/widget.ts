@@ -176,6 +176,7 @@ export async function updateWidgetSettings(
   const behaviorSection = page.locator(selectors.widgets.advancedConfig.behaviorTab)
   const isBehaviorTabVisible = await behaviorSection.isVisible().catch(() => false)
   if (!isBehaviorTabVisible) {
+    await page.locator(selectors.widgets.advancedConfig.tabGroupSetup).click()
     await page.locator(selectors.widgets.advancedConfig.tabButtonBehavior).click()
     await behaviorSection.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
   }
@@ -268,6 +269,7 @@ export async function setWidgetTaskPrompt(
   const assistantTab = page.locator(selectors.widgets.advancedConfig.assistantTab)
   const isAssistantTabVisible = await assistantTab.isVisible().catch(() => false)
   if (!isAssistantTabVisible) {
+    await page.locator(selectors.widgets.advancedConfig.tabGroupAiSetup).click()
     await page.locator(selectors.widgets.advancedConfig.tabButtonAssistant).click()
     await assistantTab.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
   }
@@ -304,6 +306,7 @@ export async function setWidgetTaskPrompt(
     const assistantTab = page.locator(selectors.widgets.advancedConfig.assistantTab)
     const isAssistantTabVisible = await assistantTab.isVisible().catch(() => false)
     if (!isAssistantTabVisible) {
+      await page.locator(selectors.widgets.advancedConfig.tabGroupAiSetup).click()
       await page.locator(selectors.widgets.advancedConfig.tabButtonAssistant).click()
       await assistantTab.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     }

@@ -1991,6 +1991,14 @@
     "noFiles": "Noch keine Dateien hochgeladen",
     "moveTo": "Verschieben nach",
     "movedSuccess": "Datei nach \"{folder}\" verschoben",
+    "removeFromFolder": "Aus Ordner entfernen",
+    "removedFromFolder": "Aus Ordner entfernt (Datei und Suchindex bleiben erhalten)",
+    "describeSortAction": "Beschreiben, vektorisieren & einsortieren – KI-durchsuchbar machen",
+    "describeSortDone": "Jetzt KI-durchsuchbar.",
+    "describeSortDoneGroup": "Jetzt KI-durchsuchbar · abgelegt in \"{group}\".",
+    "describeSortFailed": "Diese Datei konnte nicht durchsuchbar gemacht werden.",
+    "indexPromptAction": "Erzeugungs-Prompt zur Wissensbasis hinzufügen",
+    "indexPromptDone": "Erzeugungs-Prompt zu deiner Wissensbasis hinzugefügt.",
     "emptyState": {
       "title": "Noch keine Dateien",
       "description": "Lade Dateien hoch, um loszulegen. Du kannst sie in Ordnern organisieren.",
@@ -2037,7 +2045,127 @@
     "tabSearch": "Suche",
     "tabVectors": "Vektoren",
     "intro": "Hochgeladene Dateien werden durchsuchbares Wissen für deine Chats. Ordner lassen sich als Wissensordner nutzen, um eine Unterhaltung einzugrenzen.",
-    "useInChat": "Im Chat nutzen"
+    "useInChat": "Im Chat nutzen",
+    "terms": {
+      "vectorized": "KI-durchsuchbar",
+      "knowledgeGroup": "Wissensgruppe",
+      "incoming": "Eingang",
+      "generated": "KI-erzeugt",
+      "notApplicable": "nicht zutreffend"
+    },
+    "tabBrowse": "Durchsuchen",
+    "tabIncoming": "Eingang",
+    "tabGenerated": "Erzeugt",
+    "incomingBadge": "{count} neu",
+    "sourceLabel": {
+      "web_upload": "Upload",
+      "chat_attachment": "Chat",
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "opencloud": "OpenCloud",
+      "whatsapp": "WhatsApp",
+      "widget": "Widget",
+      "api": "API",
+      "generated": "KI-erzeugt"
+    },
+    "vectorState": {
+      "vectorized": "KI-durchsuchbar",
+      "vectorizedDetail": "KI-durchsuchbar · {group} · {count} Abschnitte",
+      "processing": "Wird verarbeitet…",
+      "none": "Nicht durchsuchbar",
+      "notApplicable": "Nicht zutreffend",
+      "failed": "Fehlgeschlagen"
+    },
+    "filter": {
+      "source": "Quelle",
+      "group": "Gruppe",
+      "type": "Typ",
+      "vectorized": "Durchsuchbar",
+      "date": "Datum",
+      "clear": "Filter zurücksetzen",
+      "typeAll": "Alle Typen",
+      "typeDocs": "Dokumente",
+      "typeImages": "Bilder",
+      "typeVideo": "Video",
+      "typeAudio": "Audio",
+      "vectorizedYes": "KI-durchsuchbar",
+      "vectorizedNo": "Nicht durchsuchbar",
+      "noGroup": "Keine Gruppe"
+    },
+    "help": {
+      "vectorized": "Wenn eine Datei KI-durchsuchbar ist, wird ihr Inhalt deiner Wissensbasis hinzugefügt, damit der Assistent ihn für Antworten nutzen kann.",
+      "group": "Wissensgruppen bündeln Dateien. Wenn die KI eine Gruppe durchsucht, kann sie jede Datei darin nutzen.",
+      "source": "Woher diese Datei stammt – Upload, Chat, Outlook, Nextcloud, OpenCloud, WhatsApp, Widget, API oder KI-erzeugt.",
+      "incoming": "Dateien, die andere Apps für deine Wissensbasis eingeliefert haben. Prüfe sie und behalte oder verwirf sie.",
+      "typeFilter": "Nur eine Dateiart anzeigen – Dokumente, Bilder, Video oder Audio.",
+      "vectorizedFilter": "Danach filtern, ob Dateien KI-durchsuchbar sind.",
+      "reVectorize": "Diese Datei neu einlesen und das Wissen der KI daraus auffrischen. Nach Änderungen oder bei Fehlern verwenden.",
+      "moveGroup": "Dateien in eine andere Wissensgruppe verschieben. Das ändert, in welcher Gruppe die KI sie durchsucht – es wird nichts gelöscht.",
+      "storage": "Wie viel deines Speichers belegt ist. KI-erzeugte Medien zählen mit und werden separat angezeigt."
+    },
+    "empty": {
+      "browseTitle": "Deine Dateibibliothek",
+      "browseBody": "Jeder Upload, Chat-Anhang und jede KI-erzeugte Datei liegt hier – bereit zum Suchen und Wiederverwenden.",
+      "browseAction": "Erste Datei hochladen",
+      "filteredBody": "Keine Dateien passen zu diesen Filtern.",
+      "filteredAction": "Filter zurücksetzen",
+      "incomingBody": "Dateien aus Outlook, Nextcloud oder OpenCloud erscheinen hier, damit du sie vor dem Ablegen prüfen kannst.",
+      "incomingAction": "Integrationen einrichten",
+      "generatedBody": "Bilder, Video und Audio, die du im Chat erstellst, werden hier gespeichert, damit du sie wiederfinden und erneut herunterladen kannst.",
+      "generatedAction": "Chat starten",
+      "groupBody": "Diese Gruppe enthält noch keine Dateien. Füge Dateien hinzu, um sie gemeinsam durchsuchbar zu machen.",
+      "groupAction": "Dateien hinzufügen"
+    },
+    "toast": {
+      "uploaded": "{name} hochgeladen. | {count} Dateien hochgeladen.",
+      "uploadFailed": "{name} konnte nicht hochgeladen werden. {reason}",
+      "tooLarge": "{name} ist zu groß (max. {limit}).",
+      "unsupported": "{type}-Dateien werden nicht unterstützt.",
+      "vectorizeStart": "{name} wird KI-durchsuchbar gemacht…",
+      "vectorizeDone": "{name} ist jetzt KI-durchsuchbar.",
+      "vectorizeFailed": "{name} konnte nicht verarbeitet werden.",
+      "revectorizedBulk": "{count} Dateien aktualisiert.",
+      "moved": "{count} Dateien nach {group} verschoben.",
+      "filed": "{count} Dateien in {group} abgelegt.",
+      "deleted": "{count} Dateien gelöscht.",
+      "incomingKept": "{count} Dateien in {group} behalten.",
+      "incomingDismissed": "{count} Dateien verworfen.",
+      "shareCreated": "Freigabelink in die Zwischenablage kopiert.",
+      "shareRevoked": "Freigabe für {name} deaktiviert.",
+      "downloadPreparing": "{count} Dateien werden zum Download vorbereitet…",
+      "genericError": "Etwas ist schiefgelaufen. {reason}",
+      "undo": "Rückgängig"
+    },
+    "confirm": {
+      "deleteTitle": "{count} Dateien löschen?",
+      "deleteBody": "Ihr KI-durchsuchbarer Inhalt wird ebenfalls entfernt. Das kann nicht rückgängig gemacht werden.",
+      "deleteConfirm": "Löschen",
+      "dismissTitle": "{count} Dateien verwerfen?",
+      "dismissBody": "Sie werden nicht zu deiner Bibliothek hinzugefügt. Du kannst sie später erneut aus der Quelle importieren.",
+      "dismissConfirm": "Verwerfen"
+    },
+    "incoming": {
+      "title": "Eingang",
+      "subtitle": "Dateien, die für deine Wissensbasis eingeliefert wurden – prüfen, dann behalten oder verwerfen.",
+      "keep": "Behalten",
+      "keepAll": "Alle behalten",
+      "assignGroup": "Gruppe zuweisen",
+      "dismiss": "Verwerfen",
+      "open": "Öffnen",
+      "retry": "Erneut versuchen",
+      "provenance": "von {source} · {time}"
+    },
+    "generated": {
+      "title": "Erzeugt",
+      "subtitle": "Bilder, Video und Audio aus deinen Chats.",
+      "openInChat": "Im Chat öffnen",
+      "download": "Herunterladen"
+    },
+    "explainer": {
+      "text": "Alles, was du hochlädst oder erstellst, liegt hier. Als „KI-durchsuchbar“ markierte Dateien werden deiner Wissensbasis hinzugefügt, damit der Assistent sie nutzen kann.",
+      "dismiss": "Verstanden",
+      "reopen": "Was ist das?"
+    }
   },
   "vectorStorage": {
     "intro": "Ein Überblick über deinen Vektorspeicher — wie viele Dateien indexiert sind und wie viele Vektoren (Chunks) für die semantische Suche gespeichert werden.",
@@ -2112,12 +2240,25 @@
       "extension_not_allowed": "{filename}: Dateityp wird nicht unterstützt. {message}",
       "rate_limit_exceeded": "{filename}: Upload-Limit erreicht. {message}",
       "generic": "{filename}: Upload nicht erlaubt. {message}"
-    }
+    },
+    "helper": "Angehängte Dateien werden für diese Nachricht an die KI gesendet. Mit ✅ markierte Dateien sind außerdem in all deinen Chats durchsuchbar.",
+    "searchYourFiles": "Deine Dateien durchsuchen",
+    "typeAll": "Alle",
+    "typeDocs": "Dok.",
+    "typeImages": "Bilder",
+    "typeVideo": "Video",
+    "typeAudio": "Audio",
+    "recent": "Zuletzt",
+    "allFilesFiltered": "Alle Dateien",
+    "attachCount": "{count} Datei anhängen | {count} Dateien anhängen",
+    "noRecents": "Wähle eine zuletzt verwendete Datei oder lade eine neue für diesen Chat hoch.",
+    "noResults": "Keine Dateien gefunden. Andere Suche versuchen oder neue Datei hochladen."
   },
   "fileMention": {
     "hint": "Tippen um Dateien zu suchen — Enter zum Anhängen",
     "noResults": "Keine Dateien gefunden",
-    "fileAttached": "{name} angehängt"
+    "fileAttached": "{name} angehängt",
+    "header": "Tippen, um eine Datei für die KI zu finden"
   },
   "storage": {
     "title": "Speicherplatz",
@@ -2308,7 +2449,7 @@
       "websitePlaceholder": "ihre-website.de",
       "websiteHelp": "Domain eingeben. Domain wird zur erlaubten Liste hinzugefügt.",
       "infoTitle": "Schnellstart",
-      "infoDescription": "Ihr Widget ist sofort einsatzbereit. Sie können es später mit dem KI-geführten Setup oder den erweiterten Einstellungen anpassen.",
+      "infoDescription": "Ihr Widget ist sofort einsatzbereit. Sie können es später mit dem KI-Setup-Assistenten oder in den Erweiterten Einstellungen feinabstimmen.",
       "previewLabel": "Widget-Vorschau",
       "previewClickHint": "Klicken Sie auf den Chat-Button, um zu sehen wie es funktioniert",
       "previewChatGreeting": "Hallo! Wie kann ich Ihnen helfen?",
@@ -2322,8 +2463,8 @@
       "readyToUse": "Bereit zum Einbetten auf Ihrer Website",
       "embedCodeLabel": "Einbettungs-Code",
       "embedCodeError": "Einbettungs-Code konnte nicht geladen werden",
-      "aiSetupTitle": "KI-geführtes Setup",
-      "aiSetupDescription": "Lassen Sie sich von der KI bei der Konfiguration des perfekten Assistenten für Ihr Unternehmen helfen.",
+      "aiSetupTitle": "KI-Setup-Assistent",
+      "aiSetupDescription": "Beantworten Sie ein paar kurze Fragen, und der KI-Setup-Assistent richtet Ihr Widget für Sie ein.",
       "advancedTitle": "Erweiterte Einstellungen",
       "advancedDescription": "Passen Sie Branding, Verhalten, Datei-Uploads und Sicherheitseinstellungen manuell an.",
       "testNow": "Widget jetzt testen"
@@ -2331,19 +2472,19 @@
     "setupChat": {
       "title": "KI-Setup-Assistent",
       "subtitle": "Lassen Sie uns Ihr Widget gemeinsam konfigurieren",
-      "progressLabel": "Interview-Fortschritt",
+      "progressLabel": "Setup-Fortschritt",
       "inputPlaceholder": "Geben Sie Ihre Antwort ein...",
       "skipButton": "Vorerst überspringen",
       "completeTitle": "Setup abgeschlossen!",
-      "completeDescription": "Ihre individuelle Assistenten-Konfiguration wurde generiert. Klicken Sie unten, um sie zu speichern.",
+      "completeDescription": "Ihr KI-Assistent ist bereit. Klicken Sie unten, um ihn in Ihrem Widget zu speichern.",
       "saveButton": "Konfiguration speichern",
       "saveSuccess": "Widget-Konfiguration erfolgreich gespeichert!",
       "saveError": "Konfiguration konnte nicht gespeichert werden",
       "sendError": "Nachricht konnte nicht gesendet werden",
-      "startError": "Interview konnte nicht gestartet werden",
-      "modelNotConfigured": "Kein KI-Modell konfiguriert. Bitte wählen Sie unter Einstellungen → KI-Anweisungen → KI-Setup-Interview ein Modell aus.",
-      "editHintTitle": "Möchten Sie Ihren Assistenten feinabstimmen?",
-      "editHintDescription": "Nach dem Speichern können Sie die KI-Assistenten-Konfiguration jederzeit in den erweiterten Einstellungen unter dem Tab 'KI-Assistent' bearbeiten."
+      "startError": "Setup konnte nicht gestartet werden",
+      "modelNotConfigured": "Kein KI-Modell konfiguriert. Wählen Sie eines unter Erweiterte Einstellungen → KI-Setup → Prompt & Modell.",
+      "editHintTitle": "Möchten Sie Ihren KI-Assistenten feinabstimmen?",
+      "editHintDescription": "Nach dem Speichern können Sie Ihren KI-Assistenten jederzeit unter Erweiterte Einstellungen → KI-Setup → Widget-KI-Assistent feinabstimmen."
     },
     "detail": {
       "back": "Zurück zu Widgets",
@@ -2475,6 +2616,11 @@
     "advancedConfig": {
       "title": "Erweiterte Konfiguration",
       "editPrompt": "KI-Prompt bearbeiten",
+      "tabGroups": {
+        "setup": "Einrichtung",
+        "securityLegal": "Sicherheit & Recht",
+        "aiSetup": "KI-Einrichtung"
+      },
       "tabs": {
         "branding": "Branding",
         "behavior": "Verhalten",
@@ -2482,6 +2628,8 @@
         "privacy": "Datenschutz",
         "assistant": "KI-Assistent",
         "aiPrompts": "KI-Anweisungen",
+        "aiWizard": "Widget-KI-Assistent",
+        "promptModel": "Prompt & Modell",
         "customFields": "Benutzerdefinierte Felder"
       },
       "dataProcessing": "Auftragsverarbeitungsvertrag (Art. 28 DSGVO)",
@@ -2548,9 +2696,9 @@
         "placeholderSystemPrompt": "Wird durch den aktuellen System-Prompt des Widgets ersetzt"
       },
       "setupPrompt": {
-        "title": "KI-Setup-Interview",
-        "description": "Steuert den KI-Assistenten, der Nutzer durch die Widget-Konfiguration führt.",
-        "modelHelp": "Wähle, welches KI-Modell das Setup-Interview durchführen soll."
+        "title": "Prompt des KI-Setup-Assistenten",
+        "description": "Steuert den KI-Setup-Assistenten, der Sie durch die Konfiguration Ihres Widgets führt.",
+        "modelHelp": "Wähle, welches KI-Modell den KI-Setup-Assistenten ausführen soll."
       },
       "behaviorRules": {
         "title": "Geführte Verhaltensregeln",
@@ -2703,16 +2851,16 @@
       "saveSuccess": "Einstellungen erfolgreich gespeichert!",
       "saveError": "Einstellungen konnten nicht gespeichert werden",
       "aiSetupRequired": "KI-Setup erforderlich",
-      "aiSetupRequiredDescription": "Um Ihren KI-Assistenten anzupassen, müssen Sie zuerst das geführte KI-Setup abschließen. Dies hilft Ihnen, den perfekten Assistenten für Ihre Bedürfnisse zu konfigurieren.",
+      "aiSetupRequiredDescription": "Um den KI-Assistenten Ihres Widgets anzupassen, führen Sie zuerst den KI-Setup-Assistenten aus. Er stellt ein paar kurze Fragen und richtet alles für Sie ein.",
       "startAiSetup": "KI-Setup starten",
       "manualCreate": "Manuell erstellen",
       "creatingPrompt": "Prompt wird erstellt...",
       "manualCreateError": "Prompt konnte nicht erstellt werden",
       "restartAiSetup": "Setup neu starten",
       "restartAiSetupTitle": "KI-Setup-Assistent erneut ausführen",
-      "restartAiSetupDescription": "Starten Sie das geführte Setup erneut, um Ihren Assistenten neu zu konfigurieren.",
+      "restartAiSetupDescription": "Führen Sie den KI-Setup-Assistenten erneut aus, um den KI-Assistenten Ihres Widgets neu zu konfigurieren.",
       "systemPromptTitle": "Gemeinsamer System-Prompt aktiv",
-      "systemPromptDescription": "Dieses Widget verwendet einen gemeinsamen System-Prompt, der nicht direkt bearbeitet werden kann. Um das Verhalten anzupassen, führen Sie das KI-Setup aus, um Ihren eigenen personalisierten Prompt zu erstellen.",
+      "systemPromptDescription": "Dieses Widget verwendet einen gemeinsamen System-Prompt, der nicht direkt bearbeitet werden kann. Um anzupassen, wie es antwortet, führen Sie den KI-Setup-Assistenten aus, um Ihren eigenen zu erstellen.",
       "customizePrompt": "Prompt anpassen",
       "promptName": "Assistentenname",
       "selectionRules": "Auswahlregeln",

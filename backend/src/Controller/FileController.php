@@ -10,6 +10,7 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\File\FileHelper;
+use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
 use App\Service\File\FileUploadService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
@@ -33,6 +34,7 @@ class FileController extends AbstractController
 {
     public function __construct(
         private FileUploadService $uploadService,
+        private FileListService $fileListService,
         private FileStorageService $storageService,
         private StorageQuotaService $storageQuotaService,
         private FileRepository $fileRepository,
@@ -261,6 +263,110 @@ class FileController extends AbstractController
         return $this->json($result);
     }
 
+    #[Route('/{id}/describe', name: 'describe', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/describe',
+        summary: 'Describe, vectorize & sort a file (makes images/audio/video RAG-ready)',
+        description: 'Generates a RAG-ready description (rich scene description for images, transcript + visual for audio/video, text for documents), vectorizes it, and files the result into an AI-chosen knowledge group when the user has not already chosen one.',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'File described and vectorized'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File not found or missing on disk'),
+            new OA\Response(response: 422, description: 'No searchable content could be derived'),
+            new OA\Response(response: 500, description: 'Description or vectorization failed'),
+        ]
+    )]
+    public function describeFile(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $result = $this->uploadService->describeVectorizeAndSort($file, $user);
+
+        if ($result['success']) {
+            return $this->json($result);
+        }
+
+        $statusCode = match ($result['errorType'] ?? null) {
+            'not_found' => Response::HTTP_NOT_FOUND,
+            'rate_limited' => Response::HTTP_TOO_MANY_REQUESTS,
+            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            default => Response::HTTP_INTERNAL_SERVER_ERROR,
+        };
+
+        return $this->json($result, $statusCode);
+    }
+
+    #[Route('/{id}/index-prompt', name: 'index_prompt', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/index-prompt',
+        summary: 'Add an AI-generated file\'s generation prompt to the knowledge base',
+        description: 'For files created by the AI, vectorizes the original generation prompt so the artefact becomes searchable by what the user asked for.',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Prompt indexed'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File not found'),
+            new OA\Response(response: 422, description: 'No generation prompt available'),
+            new OA\Response(response: 500, description: 'Vectorization failed'),
+        ]
+    )]
+    public function indexPrompt(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Resolve the generation prompt from the originating message: the
+        // resolved media prompt (BMESSAGEMETA.media_prompt) if present, else the
+        // user's original request text.
+        $prompt = '';
+        $messageId = $file->getMessageId();
+        if (null !== $messageId) {
+            $message = $this->messageRepository->find($messageId);
+            if ($message) {
+                $prompt = (string) ($message->getMeta('media_prompt') ?? '');
+                if ('' === trim($prompt)) {
+                    $prompt = $message->getText();
+                }
+            }
+        }
+
+        // No stored generation prompt (e.g. a generated/imported image with no
+        // originating prompt) — fall back to describing the actual file so the
+        // action still makes it searchable instead of failing.
+        $result = '' === trim($prompt)
+            ? $this->uploadService->describeVectorizeAndSort($file, $user)
+            : $this->uploadService->indexGenerationPrompt($file, $user, $prompt);
+
+        if ($result['success']) {
+            return $this->json($result);
+        }
+
+        $statusCode = match ($result['errorType'] ?? null) {
+            'not_found' => Response::HTTP_NOT_FOUND,
+            'rate_limited' => Response::HTTP_TOO_MANY_REQUESTS,
+            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            default => Response::HTTP_INTERNAL_SERVER_ERROR,
+        };
+
+        return $this->json($result, $statusCode);
+    }
+
     #[Route('/{id}/download', name: 'download', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/files/{id}/download',
@@ -347,6 +453,11 @@ class FileController extends AbstractController
             new OA\Parameter(name: 'group_key', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search in file name and content', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
+            new OA\Parameter(name: 'source', in: 'query', required: false, description: 'Filter by provenance source(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'nextcloud,outlook')),
+            new OA\Parameter(name: 'vector_state', in: 'query', required: false, description: 'Filter by vector state(s): none, pending, vectorized, failed, not_applicable', schema: new OA\Schema(type: 'string', example: 'vectorized')),
+            new OA\Parameter(name: 'origin_kind', in: 'query', required: false, description: 'Filter generated media by kind: image, video, audio, calendar, document', schema: new OA\Schema(type: 'string', example: 'image')),
+            new OA\Parameter(name: 'incoming', in: 'query', required: false, description: 'Filter the Incoming inbox: 1 = only incoming, 0 = exclude incoming', schema: new OA\Schema(type: 'boolean')),
+            new OA\Parameter(name: 'sort', in: 'query', required: false, description: 'Sort order: date_desc (default), date_asc, name_asc, name_desc, size_asc, size_desc', schema: new OA\Schema(type: 'string', example: 'date_desc')),
             new OA\Parameter(name: 'date_from', in: 'query', required: false, description: 'Unix timestamp lower bound', schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'date_to', in: 'query', required: false, description: 'Unix timestamp upper bound', schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 1)),
@@ -371,48 +482,20 @@ class FileController extends AbstractController
         $filters = [
             'search' => $request->query->get('search'),
             'file_type' => $request->query->get('file_type'),
+            'source' => $request->query->get('source'),
+            'vector_state' => $request->query->get('vector_state'),
+            'origin_kind' => $request->query->get('origin_kind'),
+            'incoming' => $request->query->has('incoming') ? $request->query->getBoolean('incoming') : null,
+            'sort' => $request->query->get('sort'),
             'date_from' => $request->query->getInt('date_from') ?: null,
             'date_to' => $request->query->getInt('date_to') ?: null,
         ];
 
-        $vectorFileIds = [];
-        if ($groupKey) {
-            try {
-                $vectorFileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($user->getId(), $groupKey);
-            } catch (\Throwable $e) {
-                $this->logger->warning('FileController: Vector store group lookup failed', ['error' => $e->getMessage()]);
-            }
-        }
-
-        $result = $this->fileRepository->findByUserPaginated($user->getId(), $groupKey, $offset, $limit, $vectorFileIds, $filters);
-        $messageFiles = $result['files'];
-
-        $allChunks = $this->getUserVectorChunks($user->getId());
-        $vectorChunkMap = $this->resolveVectorGroupKeys($messageFiles, $allChunks);
-
-        $files = array_map(function ($mf) use ($vectorChunkMap, $allChunks) {
-            $chunkCount = (int) ($allChunks[$mf->getId()]['chunks'] ?? 0);
-
-            return [
-                'id' => $mf->getId(),
-                'filename' => $mf->getFileName(),
-                'path' => $mf->getFilePath(),
-                'file_type' => $mf->getFileType(),
-                'file_size' => $mf->getFileSize(),
-                'mime' => $mf->getFileMime(),
-                'status' => $mf->getStatus(),
-                'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
-                'uploaded_at' => $mf->getCreatedAt(),
-                'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
-                'group_key' => $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null),
-                'chunks' => $chunkCount,
-                'is_vectorized' => $chunkCount > 0,
-            ];
-        }, $messageFiles);
+        $result = $this->fileListService->buildListing($user->getId(), $groupKey, $offset, $limit, $filters);
 
         return $this->json([
             'success' => true,
-            'files' => $files,
+            'files' => $result['files'],
             'pagination' => [
                 'page' => $page,
                 'limit' => $limit,
@@ -467,6 +550,115 @@ class FileController extends AbstractController
 
             return $this->json(['error' => 'Failed to load file groups'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    #[Route('/facets', name: 'facets', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/facets',
+        summary: 'Faceted counts per source / vector state, plus the incoming count for the tab badge',
+        tags: ['Files'],
+        responses: [
+            new OA\Response(response: 200, description: 'Facet counts'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function getFacets(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            $facets = $this->fileRepository->getFacetsByUser($user->getId());
+
+            return $this->json(['success' => true, 'facets' => $facets]);
+        } catch (\Throwable $e) {
+            $this->logger->error('FileController: Failed to compute facets', ['error' => $e->getMessage()]);
+
+            return $this->json(['error' => 'Failed to load facets'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    #[Route('/accept', name: 'accept_bulk', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/accept',
+        summary: 'Triage (keep) multiple incoming files: clear the incoming flag, optionally file them in a group',
+        tags: ['Files'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['ids'],
+                properties: [
+                    new OA\Property(property: 'ids', type: 'array', items: new OA\Items(type: 'integer')),
+                    new OA\Property(property: 'group_key', type: 'string', nullable: true, example: 'Contracts'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Files accepted'),
+            new OA\Response(response: 400, description: 'No ids provided'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function acceptIncomingBulk(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = $request->toArray();
+        $ids = array_values(array_filter(array_map('intval', (array) ($data['ids'] ?? []))));
+        if (empty($ids)) {
+            return $this->json(['error' => 'ids is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $groupKey = isset($data['group_key']) && is_string($data['group_key']) && '' !== trim($data['group_key'])
+            ? trim($data['group_key'])
+            : null;
+
+        $files = $this->fileRepository->findByUserAndIds($user->getId(), $ids);
+        $accepted = $this->fileListService->acceptMany($files, $user->getId(), $groupKey);
+
+        return $this->json(['success' => true, 'accepted' => $accepted, 'group_key' => $groupKey]);
+    }
+
+    #[Route('/{id}/accept', name: 'accept', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/accept',
+        summary: 'Triage (keep) an incoming file: clear the incoming flag, optionally file it in a group',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [new OA\Property(property: 'group_key', type: 'string', nullable: true, example: 'Contracts')]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'File accepted'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File not found'),
+        ]
+    )]
+    public function acceptIncoming(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = $request->toArray();
+        $groupKey = isset($data['group_key']) && is_string($data['group_key']) && '' !== trim($data['group_key'])
+            ? trim($data['group_key'])
+            : null;
+
+        $this->fileListService->accept($file, $user->getId(), $groupKey);
+
+        return $this->json(['success' => true, 'id' => $id, 'group_key' => $groupKey]);
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
@@ -759,6 +951,44 @@ class FileController extends AbstractController
         return $this->json(['success' => true, 'chunksUpdated' => $chunksUpdated]);
     }
 
+    #[Route('/{id}/group-key', name: 'clear_group_key', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/files/{id}/group-key',
+        summary: 'Remove a file from its knowledge group (keeps the file and its vectors)',
+        description: 'Clears BGROUPKEY and moves the file\'s vector chunks to the ungrouped DEFAULT bucket. The file stays searchable by AI — only its folder membership is removed; nothing is deleted.',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'File removed from its group'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'File not found'),
+        ]
+    )]
+    public function clearGroupKey(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $file->setGroupKey(null);
+        $this->fileRepository->save($file);
+
+        // Keep the vectors — just move them to the ungrouped DEFAULT bucket so
+        // the file stays searchable globally but no longer belongs to a folder.
+        $chunksUpdated = $this->vectorStorageFacade->updateGroupKey($user->getId(), $file->getId(), 'DEFAULT');
+
+        return $this->json(['success' => true, 'chunksUpdated' => $chunksUpdated]);
+    }
+
     #[Route('/{id}/re-vectorize', name: 're_vectorize', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/files/{id}/re-vectorize',
@@ -832,58 +1062,5 @@ class FileController extends AbstractController
         }
 
         return false;
-    }
-
-    /**
-     * Fetch the vector chunk map for a user (fileId => ['chunks' => int, 'groupKey' => string|null]).
-     * Returns an empty map if the vector store is unavailable.
-     *
-     * @return array<int, array{chunks: int, groupKey: string|null}>
-     */
-    private function getUserVectorChunks(int $userId): array
-    {
-        try {
-            return $this->vectorStorageFacade->getFilesWithChunks($userId);
-        } catch (\Throwable $e) {
-            $this->logger->warning('FileController: Vector store chunk lookup failed', ['error' => $e->getMessage()]);
-
-            return [];
-        }
-    }
-
-    /**
-     * Resolve group keys from vector store for legacy files missing DB column.
-     *
-     * @param File[]                                                $files
-     * @param array<int, array{chunks: int, groupKey: string|null}> $allChunks
-     *
-     * @return array<int, string>
-     */
-    private function resolveVectorGroupKeys(array $files, array $allChunks): array
-    {
-        $legacyFileIds = array_filter(
-            array_map(fn ($mf) => null === $mf->getGroupKey() ? $mf->getId() : null, $files)
-        );
-
-        if (empty($legacyFileIds)) {
-            return [];
-        }
-
-        $vectorChunkMap = [];
-        foreach ($legacyFileIds as $fid) {
-            if (isset($allChunks[$fid]) && !empty($allChunks[$fid]['groupKey'])) {
-                $vectorChunkMap[$fid] = $allChunks[$fid]['groupKey'];
-            }
-        }
-
-        if (!empty($vectorChunkMap)) {
-            try {
-                $this->fileRepository->backfillGroupKeys($files, $vectorChunkMap);
-            } catch (\Throwable $e) {
-                $this->logger->warning('FileController: Lazy backfill failed', ['error' => $e->getMessage()]);
-            }
-        }
-
-        return $vectorChunkMap;
     }
 }

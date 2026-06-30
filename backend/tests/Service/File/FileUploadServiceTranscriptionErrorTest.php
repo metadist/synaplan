@@ -6,6 +6,8 @@ namespace App\Tests\Service\File;
 
 use App\Entity\File;
 use App\Entity\User;
+use App\Repository\FileRepository;
+use App\Service\File\FileGroupSorter;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\FileUploadService;
@@ -53,6 +55,8 @@ final class FileUploadServiceTranscriptionErrorTest extends TestCase
             $this->createStub(VectorStorageFacade::class),
             $this->createStub(StorageQuotaService::class),
             $this->rateLimitService,
+            $this->createStub(FileGroupSorter::class),
+            $this->createStub(FileRepository::class),
             $this->em,
             new NullLogger(),
             '/tmp/uploads',

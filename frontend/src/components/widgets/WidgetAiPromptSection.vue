@@ -19,9 +19,13 @@ interface Props {
   loadFn: () => Promise<{ prompt: string; isDefault: boolean; modelId: number }>
   saveFn: (prompt: string, modelId: number) => Promise<unknown>
   resetFn: () => Promise<unknown>
+  initialCollapsed?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  placeholders: undefined,
+  initialCollapsed: false,
+})
 
 const { t } = useI18n()
 const { success, error: showError } = useNotification()
@@ -33,7 +37,7 @@ const modelId = ref(-1)
 const originalModelId = ref(-1)
 const isDefault = ref(true)
 const loading = ref(false)
-const collapsed = ref(false)
+const collapsed = ref(props.initialCollapsed)
 
 const groupedModels = computed(() => {
   const groups: { label: string; models: AIModel[]; capability: Capability }[] = []

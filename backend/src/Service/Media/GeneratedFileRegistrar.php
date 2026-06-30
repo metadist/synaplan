@@ -26,8 +26,10 @@ final readonly class GeneratedFileRegistrar
     /**
      * @param string|null $relativePath path relative to the upload dir (handler metadata `local_path`)
      * @param string      $type         handler media type (`audio`/`image`/`video`/...); falls back to the file extension
+     * @param int|null    $messageId    originating BMESSAGES.BID, for "jump to chat" (03_file-management.md §3.1)
+     * @param string|null $provider     generating provider/model, for the Generated gallery
      */
-    public function register(int $userId, ?string $relativePath, string $type): ?File
+    public function register(int $userId, ?string $relativePath, string $type, ?int $messageId = null, ?string $provider = null): ?File
     {
         if (null === $relativePath || '' === $relativePath) {
             return null;
@@ -37,15 +39,28 @@ final readonly class GeneratedFileRegistrar
             $absolutePath = $this->uploadDir.'/'.$relativePath;
             $fileSize = is_file($absolutePath) ? (filesize($absolutePath) ?: 0) : 0;
             $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+            $fileType = '' !== $type ? $type : $extension;
+            $originKind = $this->deriveOriginKind($fileType, $extension);
 
             $file = new File();
             $file->setUserId($userId);
             $file->setFilePath($relativePath);
-            $file->setFileType('' !== $type ? $type : $extension);
+            $file->setFileType($fileType);
             $file->setFileName(basename($relativePath));
             $file->setFileSize($fileSize);
             $file->setFileMime($this->mimeForExtension($extension));
             $file->setStatus('generated');
+            // G1: every generated artefact becomes a first-class BFILES row so it
+            // shows in the file manager's Generated gallery (03_file-management.md
+            // §3.2), not just generated documents as before.
+            $file->setSource('generated');
+            $file->setOriginKind($originKind);
+            $file->setMessageId($messageId);
+            $file->setProvider($provider);
+            // Every generated artefact starts un-indexed; the user can add its
+            // generation prompt to the knowledge base on demand from the file
+            // manager ("Add prompt to knowledge base").
+            $file->setVectorState(File::VECTOR_STATE_NONE);
 
             $this->files->save($file);
 
@@ -58,6 +73,26 @@ final readonly class GeneratedFileRegistrar
 
             return null;
         }
+    }
+
+    /**
+     * Map a handler media type / extension to a generated origin kind
+     * (one of {@see File::ORIGIN_KINDS}). Defaults to `document`.
+     */
+    private function deriveOriginKind(string $type, string $extension): string
+    {
+        $type = strtolower($type);
+        if (in_array($type, File::ORIGIN_KINDS, true)) {
+            return $type;
+        }
+
+        return match ($extension) {
+            'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg' => 'image',
+            'mp4', 'webm', 'mov', 'avi', 'mkv' => 'video',
+            'mp3', 'wav', 'ogg', 'm4a' => 'audio',
+            'ics' => 'calendar',
+            default => 'document',
+        };
     }
 
     private function mimeForExtension(string $extension): string

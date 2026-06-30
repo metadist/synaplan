@@ -41,31 +41,65 @@
           </button>
         </div>
 
-        <!-- Tabs (hidden in promptOnly mode) -->
+        <!-- Tab group dropdowns (hidden in promptOnly mode) -->
         <div
           v-if="!promptOnly"
-          class="px-2 sm:px-6 border-b border-light-border/30 dark:border-dark-border/20 flex-shrink-0 overflow-x-auto"
+          ref="tabBarRef"
+          class="px-2 sm:px-6 border-b border-light-border/30 dark:border-dark-border/20 flex-shrink-0"
         >
-          <div class="flex gap-0 sm:gap-1">
-            <button
-              v-for="tab in tabs"
-              :key="tab.id"
-              :class="[
-                'flex-1 sm:flex-none px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-colors relative whitespace-nowrap',
-                activeTab === tab.id ? 'txt-primary' : 'txt-secondary hover:txt-primary',
-              ]"
-              :data-testid="`btn-tab-${tab.id}`"
-              @click="activeTab = tab.id"
-            >
-              <span class="flex items-center justify-center sm:justify-start gap-1 sm:gap-2">
-                <Icon :icon="tab.icon" class="w-4 h-4 flex-shrink-0" />
-                <span class="truncate">{{ $t(tab.labelKey) }}</span>
-              </span>
+          <div class="flex gap-1 sm:gap-2 py-2">
+            <div v-for="group in tabGroups" :key="group.id" class="relative flex-1 sm:flex-none">
+              <button
+                :class="[
+                  'w-full sm:w-auto flex items-center justify-between gap-2 px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-colors',
+                  group.tabs.some((t) => t.id === activeTab)
+                    ? 'bg-[var(--brand)]/10 txt-brand'
+                    : 'txt-secondary hover:txt-primary hover-surface',
+                ]"
+                :data-testid="`btn-tab-group-${group.id}`"
+                @click="toggleGroup(group.id)"
+              >
+                <span class="flex items-center gap-1.5 min-w-0">
+                  <Icon :icon="group.icon" class="w-4 h-4 flex-shrink-0" />
+                  <span class="truncate">{{ $t(group.labelKey) }}</span>
+                </span>
+                <Icon
+                  icon="heroicons:chevron-down"
+                  :class="[
+                    'w-4 h-4 flex-shrink-0 transition-transform',
+                    openGroup === group.id && 'rotate-180',
+                  ]"
+                />
+              </button>
+
+              <!-- Dropdown menu -->
               <div
-                v-if="activeTab === tab.id"
-                class="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--brand)]"
-              ></div>
-            </button>
+                v-if="openGroup === group.id"
+                class="absolute left-0 top-full mt-1 z-20 min-w-[12rem] surface-card rounded-lg shadow-xl border border-light-border/30 dark:border-dark-border/20 py-1"
+                :data-testid="`menu-tab-group-${group.id}`"
+              >
+                <button
+                  v-for="tab in group.tabs"
+                  :key="tab.id"
+                  :class="[
+                    'w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+                    activeTab === tab.id
+                      ? 'txt-brand bg-[var(--brand)]/5'
+                      : 'txt-secondary hover:txt-primary hover-surface',
+                  ]"
+                  :data-testid="`btn-tab-${tab.id}`"
+                  @click="selectTab(tab.id)"
+                >
+                  <Icon :icon="tab.icon" class="w-4 h-4 flex-shrink-0" />
+                  <span class="truncate">{{ $t(tab.labelKey) }}</span>
+                  <Icon
+                    v-if="activeTab === tab.id"
+                    icon="heroicons:check"
+                    class="w-4 h-4 ml-auto flex-shrink-0"
+                  />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1921,47 +1955,91 @@ const hasLocalhostInDomains = computed(() => {
   )
 })
 
-const tabs = computed(() => {
+// Tabs are grouped into condensed dropdowns to keep the header from
+// overflowing horizontally. Group membership is purely a UI concern;
+// `activeTab` still drives which content panel renders.
+const tabGroups = computed(() => {
   return [
     {
-      id: 'branding',
-      icon: 'heroicons:paint-brush',
-      labelKey: 'widgets.advancedConfig.tabs.branding',
+      id: 'setup',
+      icon: 'heroicons:squares-2x2',
+      labelKey: 'widgets.advancedConfig.tabGroups.setup',
+      tabs: [
+        {
+          id: 'branding',
+          icon: 'heroicons:paint-brush',
+          labelKey: 'widgets.advancedConfig.tabs.branding',
+        },
+        {
+          id: 'behavior',
+          icon: 'heroicons:adjustments-horizontal',
+          labelKey: 'widgets.advancedConfig.tabs.behavior',
+        },
+        {
+          id: 'custom-fields',
+          icon: 'heroicons:rectangle-stack',
+          labelKey: 'widgets.advancedConfig.tabs.customFields',
+        },
+      ],
     },
     {
-      id: 'behavior',
-      icon: 'heroicons:adjustments-horizontal',
-      labelKey: 'widgets.advancedConfig.tabs.behavior',
-    },
-    {
-      id: 'security',
+      id: 'security-legal',
       icon: 'heroicons:shield-check',
-      labelKey: 'widgets.advancedConfig.tabs.security',
+      labelKey: 'widgets.advancedConfig.tabGroups.securityLegal',
+      tabs: [
+        {
+          id: 'security',
+          icon: 'heroicons:shield-check',
+          labelKey: 'widgets.advancedConfig.tabs.security',
+        },
+        {
+          id: 'privacy',
+          icon: 'heroicons:shield-exclamation',
+          labelKey: 'widgets.advancedConfig.tabs.privacy',
+        },
+      ],
     },
     {
-      id: 'custom-fields',
-      icon: 'heroicons:rectangle-stack',
-      labelKey: 'widgets.advancedConfig.tabs.customFields',
-    },
-    {
-      id: 'privacy',
-      icon: 'heroicons:shield-exclamation',
-      labelKey: 'widgets.advancedConfig.tabs.privacy',
-    },
-    {
-      id: 'assistant',
+      id: 'ai-setup',
       icon: 'heroicons:sparkles',
-      labelKey: 'widgets.advancedConfig.tabs.assistant',
-    },
-    {
-      id: 'ai-prompts',
-      icon: 'heroicons:cpu-chip',
-      labelKey: 'widgets.advancedConfig.tabs.aiPrompts',
+      labelKey: 'widgets.advancedConfig.tabGroups.aiSetup',
+      tabs: [
+        {
+          id: 'assistant',
+          icon: 'heroicons:sparkles',
+          labelKey: 'widgets.advancedConfig.tabs.aiWizard',
+        },
+        {
+          id: 'ai-prompts',
+          icon: 'heroicons:cpu-chip',
+          labelKey: 'widgets.advancedConfig.tabs.promptModel',
+        },
+      ],
     },
   ]
 })
 
 const activeTab = ref(props.initialTab || 'branding')
+
+// Which tab-group dropdown is currently open (null = all closed).
+const openGroup = ref<string | null>(null)
+const tabBarRef = ref<HTMLElement | null>(null)
+
+function toggleGroup(groupId: string) {
+  openGroup.value = openGroup.value === groupId ? null : groupId
+}
+
+function selectTab(tabId: string) {
+  activeTab.value = tabId
+  openGroup.value = null
+}
+
+function handleTabBarOutsideClick(event: MouseEvent) {
+  if (!openGroup.value) return
+  if (tabBarRef.value && !tabBarRef.value.contains(event.target as Node)) {
+    openGroup.value = null
+  }
+}
 const saving = ref(false)
 const newDomain = ref('')
 const summaryPromptTab = ref<InstanceType<typeof WidgetSummaryPromptTab> | null>(null)
@@ -2166,6 +2244,7 @@ function clearCooldownTimer() {
 
 onBeforeUnmount(() => {
   clearCooldownTimer()
+  document.removeEventListener('click', handleTabBarOutsideClick)
 })
 
 function startCooldown(seconds: number) {
@@ -2854,6 +2933,9 @@ watch(
 )
 
 onMounted(async () => {
+  // Close any open tab-group dropdown when clicking elsewhere.
+  document.addEventListener('click', handleTabBarOutsideClick)
+
   // Set loading state immediately if we have a custom prompt to prevent flicker
   if (hasCustomPrompt.value) {
     promptLoading.value = true
