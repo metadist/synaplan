@@ -37,8 +37,19 @@ services:
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
     depends_on:
+      # service_STARTED, not service_healthy: the Vite dev server does not need a
+      # HEALTHY backend to boot — its only backend dependency is schema generation
+      # (20-generate-schemas.sh), which already polls the backend for ~5 min and,
+      # combined with `restart: unless-stopped`, retries until it succeeds.
+      #
+      # Gating on service_healthy made `docker compose up -d` BLOCK for the
+      # backend's 900s health start_period. If that blocking command was ever
+      # interrupted (Ctrl+C, IDE/tool timeout, laptop sleep) the frontend was left
+      # in state "Created" and NEVER started — and restart policies do not cover a
+      # container that never started, so it sat there forever ("just wait" never
+      # helped). service_started returns immediately, so the stack self-heals.
       backend:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     networks:
       - synaplan-network
