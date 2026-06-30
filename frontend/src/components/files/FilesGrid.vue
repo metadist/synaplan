@@ -83,7 +83,7 @@
               {{ $t('files.generated.download') }}
             </button>
             <button
-              v-if="file.message_id"
+              v-if="file.chat_id"
               class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
               :title="$t('files.generated.openInChat')"
               :data-testid="`btn-generated-open-${file.id}`"
@@ -136,10 +136,12 @@ import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/ou
 import filesService, { type FileItem, type FileOriginKind } from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useNotification } from '@/composables/useNotification'
+import { useChatsStore } from '@/stores/chats'
 
 const { t } = useI18n()
 const router = useRouter()
 const { error: showError } = useNotification()
+const chatsStore = useChatsStore()
 
 const files = ref<FileItem[]>([])
 const loading = ref(false)
@@ -211,8 +213,12 @@ const download = async (file: FileItem) => {
 }
 
 const openInChat = (file: FileItem) => {
-  if (!file.message_id) return
-  router.push({ path: '/', query: { message: String(file.message_id) } })
+  // Deep-link to the exact conversation the artefact was generated in. The file
+  // row carries chat_id (resolved from its originating message); selecting it
+  // before navigating ensures ChatView loads that chat instead of the latest.
+  if (!file.chat_id) return
+  chatsStore.setActiveChat(file.chat_id)
+  router.push({ name: 'chat' })
 }
 
 onMounted(load)
