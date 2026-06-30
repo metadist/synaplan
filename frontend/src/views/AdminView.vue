@@ -629,6 +629,11 @@
         <div v-if="activeTab === 'subscriptions'" data-testid="section-subscriptions">
           <AdminSubscriptionsPanel />
         </div>
+
+        <!-- App server Tab (native shell only) -->
+        <div v-if="activeTab === 'appServer'">
+          <AdminAppServerPanel />
+        </div>
       </div>
     </div>
 
@@ -716,6 +721,9 @@ const AdminSubscriptionsPanel = defineAsyncComponent(
 const AdminSystemInfoPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSystemInfoPanel.vue')
 )
+const AdminAppServerPanel = defineAsyncComponent(
+  () => import('@/components/admin/AdminAppServerPanel.vue')
+)
 
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -724,6 +732,7 @@ import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
+import { isNativeApp } from '@/services/api/nativeRuntime'
 
 const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
@@ -733,7 +742,7 @@ const { success, error: showError } = useNotification()
 const { confirm } = useDialog()
 const router = useRouter()
 
-type TabId = 'overview' | 'users' | 'prompts' | 'usage' | 'subscriptions'
+type TabId = 'overview' | 'users' | 'prompts' | 'usage' | 'subscriptions' | 'appServer'
 interface AdminTab {
   id: TabId
   label: string
@@ -742,13 +751,21 @@ interface AdminTab {
 
 // Tabs
 const activeTab = ref<TabId>('overview')
-const tabs = computed<AdminTab[]>(() => [
-  { id: 'overview', label: t('admin.tabs.overview'), icon: 'mdi:view-dashboard' },
-  { id: 'users', label: t('admin.tabs.users'), icon: 'mdi:account-multiple' },
-  { id: 'prompts', label: t('admin.tabs.prompts'), icon: 'mdi:text-box-multiple' },
-  { id: 'usage', label: t('admin.tabs.usage'), icon: 'mdi:chart-bar' },
-  { id: 'subscriptions', label: t('admin.tabs.subscriptions'), icon: 'mdi:credit-card-outline' },
-])
+const tabs = computed<AdminTab[]>(() => {
+  const baseTabs: AdminTab[] = [
+    { id: 'overview', label: t('admin.tabs.overview'), icon: 'mdi:view-dashboard' },
+    { id: 'users', label: t('admin.tabs.users'), icon: 'mdi:account-multiple' },
+    { id: 'prompts', label: t('admin.tabs.prompts'), icon: 'mdi:text-box-multiple' },
+    { id: 'usage', label: t('admin.tabs.usage'), icon: 'mdi:chart-bar' },
+    { id: 'subscriptions', label: t('admin.tabs.subscriptions'), icon: 'mdi:credit-card-outline' },
+  ]
+  // Native shell only: the backend the app connects to is a client-side bootstrap
+  // value with no meaning on the web build, so the tab is hidden there.
+  if (isNativeApp()) {
+    baseTabs.push({ id: 'appServer', label: t('admin.tabs.appServer'), icon: 'mdi:server-network' })
+  }
+  return baseTabs
+})
 
 // Overview
 const overview = ref<SystemOverview | null>(null)

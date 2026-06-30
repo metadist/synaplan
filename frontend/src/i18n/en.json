@@ -152,7 +152,26 @@
       "users": "Users",
       "prompts": "Prompts",
       "usage": "Usage",
-      "subscriptions": "Subscriptions"
+      "subscriptions": "Subscriptions",
+      "appServer": "App server"
+    },
+    "appServer": {
+      "title": "App server",
+      "description": "Choose which Synaplan server this app connects to. Only change this if you run your own Synaplan server.",
+      "unavailable": "Server settings are not available in this build.",
+      "currentLabel": "Current server",
+      "defaultLabel": "Default",
+      "inputLabel": "Server URL",
+      "hint": "The app will reload after saving to connect to the new server.",
+      "save": "Test & save",
+      "testing": "Checking server …",
+      "reset": "Reset to default",
+      "savedReloading": "Connected. Reloading …",
+      "invalidUrl": "Please enter a valid URL (e.g. https://web.synaplan.com).",
+      "unreachable": "Server unreachable. Please check the address.",
+      "resetConfirmTitle": "Reset server?",
+      "resetConfirmMessage": "The app will connect to {server} again and reload.",
+      "resetConfirmAction": "Reset"
     },
     "overview": {
       "totalUsers": "Total Users",

@@ -147,7 +147,26 @@
       "users": "Benutzer",
       "prompts": "Prompts",
       "usage": "Nutzung",
-      "subscriptions": "Abonnements"
+      "subscriptions": "Abonnements",
+      "appServer": "App-Server"
+    },
+    "appServer": {
+      "title": "App-Server",
+      "description": "Lege fest, mit welchem Synaplan-Server sich diese App verbindet. Ändere das nur, wenn du einen eigenen Synaplan-Server betreibst.",
+      "unavailable": "Die Server-Einstellung ist in diesem Build nicht verfügbar.",
+      "currentLabel": "Aktueller Server",
+      "defaultLabel": "Standard",
+      "inputLabel": "Server-URL",
+      "hint": "Die App lädt nach dem Speichern neu, um sich mit dem neuen Server zu verbinden.",
+      "save": "Testen & speichern",
+      "testing": "Server wird geprüft …",
+      "reset": "Auf Standard zurücksetzen",
+      "savedReloading": "Verbunden. Wird neu geladen …",
+      "invalidUrl": "Bitte gib eine gültige URL ein (z. B. https://web.synaplan.com).",
+      "unreachable": "Server nicht erreichbar. Bitte prüfe die Adresse.",
+      "resetConfirmTitle": "Server zurücksetzen?",
+      "resetConfirmMessage": "Die App verbindet sich wieder mit {server} und lädt neu.",
+      "resetConfirmAction": "Zurücksetzen"
     },
     "overview": {
       "totalUsers": "Gesamtbenutzer",

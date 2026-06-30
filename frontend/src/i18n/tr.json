@@ -144,7 +144,26 @@
       "overview": "Genel Bakış",
       "users": "Kullanıcılar",
       "prompts": "Promptlar",
-      "usage": "Kullanım"
+      "usage": "Kullanım",
+      "appServer": "Uygulama sunucusu"
+    },
+    "appServer": {
+      "title": "Uygulama sunucusu",
+      "description": "Bu uygulamanın hangi Synaplan sunucusuna bağlanacağını seç. Bunu yalnızca kendi Synaplan sunucunu çalıştırıyorsan değiştir.",
+      "unavailable": "Sunucu ayarı bu sürümde kullanılamıyor.",
+      "currentLabel": "Geçerli sunucu",
+      "defaultLabel": "Varsayılan",
+      "inputLabel": "Sunucu URL'si",
+      "hint": "Uygulama, yeni sunucuya bağlanmak için kaydettikten sonra yeniden yüklenecek.",
+      "save": "Test et ve kaydet",
+      "testing": "Sunucu kontrol ediliyor …",
+      "reset": "Varsayılana sıfırla",
+      "savedReloading": "Bağlandı. Yeniden yükleniyor …",
+      "invalidUrl": "Lütfen geçerli bir URL gir (örn. https://web.synaplan.com).",
+      "unreachable": "Sunucuya ulaşılamıyor. Lütfen adresi kontrol et.",
+      "resetConfirmTitle": "Sunucu sıfırlansın mı?",
+      "resetConfirmMessage": "Uygulama tekrar {server} adresine bağlanacak ve yeniden yüklenecek.",
+      "resetConfirmAction": "Sıfırla"
     },
     "overview": {
       "totalUsers": "Toplam Kullanıcı",
