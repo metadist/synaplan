@@ -317,6 +317,22 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.ragSearch' },
     },
     {
+      // Incoming inbox: files pushed in by integrations (Outlook/Nextcloud/
+      // OpenCloud) awaiting triage before they join the curated library (§4.5).
+      path: '/files/incoming',
+      name: 'files-incoming',
+      component: () => import('@/views/IncomingView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.files' },
+    },
+    {
+      // Generated-media gallery: images/video/audio created in chats, saved so
+      // the user can find and re-download them (§4.6).
+      path: '/files/generated',
+      name: 'files-generated',
+      component: () => import('@/views/GeneratedView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.files' },
+    },
+    {
       // Vector storage (Qdrant/MariaDB) inventory: how many files and vectors
       // are stored for the user, plus a global admin view.
       path: '/files/vectors',

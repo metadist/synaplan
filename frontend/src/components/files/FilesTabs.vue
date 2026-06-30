@@ -1,7 +1,7 @@
 <template>
   <div data-testid="tabs-files">
     <nav
-      class="flex items-center gap-1 border-b border-light-border/20 dark:border-dark-border/10"
+      class="flex items-center gap-1 border-b border-light-border/20 dark:border-dark-border/10 overflow-x-auto scroll-thin"
       :aria-label="$t('nav.files')"
     >
       <router-link
@@ -12,7 +12,34 @@
         data-testid="tab-files-browse"
       >
         <FolderIcon class="w-4 h-4" aria-hidden="true" />
-        <span>{{ $t('files.tabFiles') }}</span>
+        <span>{{ $t('files.tabBrowse') }}</span>
+      </router-link>
+      <router-link
+        to="/files/incoming"
+        class="files-tab txt-secondary"
+        :class="active === 'incoming' && 'files-tab--active'"
+        :aria-current="active === 'incoming' ? 'page' : undefined"
+        data-testid="tab-files-incoming"
+      >
+        <InboxArrowDownIcon class="w-4 h-4" aria-hidden="true" />
+        <span>{{ $t('files.tabIncoming') }}</span>
+        <span
+          v-if="incomingCount > 0"
+          class="inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] px-1 rounded-full text-[10px] font-bold bg-[var(--brand)] text-white"
+          data-testid="tab-incoming-badge"
+        >
+          {{ incomingCount }}
+        </span>
+      </router-link>
+      <router-link
+        to="/files/generated"
+        class="files-tab txt-secondary"
+        :class="active === 'generated' && 'files-tab--active'"
+        :aria-current="active === 'generated' ? 'page' : undefined"
+        data-testid="tab-files-generated"
+      >
+        <SparklesIcon class="w-4 h-4" aria-hidden="true" />
+        <span>{{ $t('files.tabGenerated') }}</span>
       </router-link>
       <router-link
         to="/files/search"
@@ -41,11 +68,32 @@
 </template>
 
 <script setup lang="ts">
-import { CircleStackIcon, FolderIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
+import { ref, onMounted } from 'vue'
+import {
+  CircleStackIcon,
+  FolderIcon,
+  InboxArrowDownIcon,
+  MagnifyingGlassIcon,
+  SparklesIcon,
+} from '@heroicons/vue/24/outline'
+import filesService from '@/services/filesService'
 
 defineProps<{
-  active: 'files' | 'search' | 'vectors'
+  active: 'files' | 'search' | 'vectors' | 'incoming' | 'generated'
 }>()
+
+// Incoming count badge — shown on every files tab so the user notices when
+// integrations have pushed new files for triage (§4.5). Best-effort, silent.
+const incomingCount = ref(0)
+
+onMounted(async () => {
+  try {
+    const facets = await filesService.getFacets()
+    incomingCount.value = facets.incoming
+  } catch {
+    incomingCount.value = 0
+  }
+})
 </script>
 
 <style scoped>
@@ -58,6 +106,7 @@ defineProps<{
   font-size: 0.875rem;
   font-weight: 500;
   border-bottom: 2px solid transparent;
+  white-space: nowrap;
   transition:
     color 0.15s ease,
     border-color 0.15s ease;
