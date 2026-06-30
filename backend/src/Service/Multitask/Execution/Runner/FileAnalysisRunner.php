@@ -45,6 +45,19 @@ final readonly class FileAnalysisRunner implements TaskRunner
         $prompt = $this->stringInput($inputs['prompt'] ?? $inputs['text'] ?? null);
 
         $synthetic = $this->syntheticMessage($context, $prompt);
+
+        // Issue #1080: a DAG can chain image_generation → file_analysis →
+        // text2sound, so the file to analyze may be produced by an UPSTREAM node
+        // (referenced as `$nX.file` / `$nX.files` in this node's inputs) rather
+        // than uploaded by the user. The inbound message carries no attachment in
+        // that case, so without lifting the resolved upstream file the runner
+        // fails with "no file to analyze" and the downstream node cascades to
+        // "skipped". When the inbound message already carries its own files the
+        // user's upload wins; otherwise fall back to the upstream-generated file.
+        if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
+            $this->attachUpstreamFile($synthetic, $inputs);
+        }
+
         if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
             return NodeResult::failed('file_analysis: no file to analyze');
         }
@@ -113,6 +126,94 @@ final readonly class FileAnalysisRunner implements TaskRunner
         }
 
         return $m;
+    }
+
+    /**
+     * Lift the first resolved upstream file descriptor out of the node's inputs
+     * onto the synthetic message's legacy single-file fields (issue #1080).
+     *
+     * NodeContext resolves `$nX.file` / `$nX.files` into descriptors shaped like
+     * `['path' => ..., 'type' => ..., 'local_path' => ...]`. FileAnalysisHandler
+     * reads the legacy single-file path (`getFilePath()`/`getFileText()`) when the
+     * message carries no `File` entities and normalises the public
+     * `/api/v1/files/uploads/...` form to a relative upload path itself, so
+     * surfacing one path is enough to route a generated image to the vision model.
+     *
+     * @param array<string, mixed> $inputs
+     */
+    private function attachUpstreamFile(Message $message, array $inputs): void
+    {
+        $descriptor = $this->firstUpstreamFile($inputs);
+        if (null === $descriptor) {
+            return;
+        }
+
+        $path = $descriptor['local_path'] ?? $descriptor['path'] ?? null;
+        if (!is_string($path) || '' === trim($path)) {
+            return;
+        }
+
+        $message->setFile(1);
+        $message->setFilePath($path);
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $message->setFileType('' !== $extension ? $extension : (is_string($descriptor['type'] ?? null) ? $descriptor['type'] : ''));
+        $message->setFileText(is_string($descriptor['text'] ?? null) ? $descriptor['text'] : '');
+
+        $this->logger->info('FileAnalysisRunner: analyzing upstream-generated file', [
+            'path' => $path,
+        ]);
+    }
+
+    /**
+     * Find the first upstream file descriptor among the resolved inputs. The
+     * `prompt`/`text` inputs are skipped; every other value is scanned because it
+     * may be a single descriptor or a list of them.
+     *
+     * @param array<string, mixed> $inputs
+     *
+     * @return array<string, mixed>|null
+     */
+    private function firstUpstreamFile(array $inputs): ?array
+    {
+        foreach ($inputs as $key => $value) {
+            if ('prompt' === $key || 'text' === $key) {
+                continue;
+            }
+            $descriptor = $this->findDescriptor($value);
+            if (null !== $descriptor) {
+                return $descriptor;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Recursively locate the first file descriptor (an array carrying a `path` or
+     * `local_path`) inside a resolved input value.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function findDescriptor(mixed $value): ?array
+    {
+        if (!is_array($value)) {
+            return null;
+        }
+
+        $hasPath = (isset($value['local_path']) && is_string($value['local_path']) && '' !== $value['local_path'])
+            || (isset($value['path']) && is_string($value['path']) && '' !== $value['path']);
+        if ($hasPath) {
+            return $value;
+        }
+
+        foreach ($value as $item) {
+            $descriptor = $this->findDescriptor($item);
+            if (null !== $descriptor) {
+                return $descriptor;
+            }
+        }
+
+        return null;
     }
 
     private function stringInput(mixed $value): ?string
