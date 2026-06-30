@@ -149,7 +149,13 @@ final readonly class MessagePreProcessor
                 'type' => $fileType,
                 'text_length' => strlen($messageFile->getFileText()),
             ]);
-            $messageFile->setStatus('processed');
+            // Issue #1191: re-attaching an already-vectorized file must NOT
+            // downgrade its status to 'processed' — the Qdrant vectors are
+            // still valid, so the DB status would become inconsistent. Only
+            // promote files that have not already reached a terminal state.
+            if (!in_array($messageFile->getStatus(), ['vectorized', 'processed'], true)) {
+                $messageFile->setStatus('processed');
+            }
 
             // Issue #887: even when extraction was already done at upload
             // time, the analysis-billing event fires HERE (the message is

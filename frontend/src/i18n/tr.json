@@ -1468,6 +1468,7 @@
     "status_vectorizing": "İndeksleniyor…",
     "status_vectorized": "Vektörleştirildi",
     "status_processed": "İşlendi",
+    "status_generated": "Oluşturuldu",
     "attached": "Ekli",
     "standalone": "Bağımsız",
     "attachedToMessage": "Bu dosya bir mesaja ekli",
