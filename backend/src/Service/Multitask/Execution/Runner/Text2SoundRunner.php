@@ -10,6 +10,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\TtsTextSanitizer;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -38,6 +39,11 @@ final readonly class Text2SoundRunner implements TaskRunner
             $text = implode("\n\n", array_filter($text, 'is_string'));
         }
         $text = is_string($text) ? $text : (string) $context->message->getText();
+
+        // Strip markdown, <think> blocks, [Memory:ID] badges and other
+        // non-speakable artifacts before TTS (issue #1164) — same treatment
+        // TtsController and StreamController already apply before synthesis.
+        $text = TtsTextSanitizer::sanitize($text);
 
         if ('' === trim($text)) {
             return NodeResult::failed('no text to synthesize');

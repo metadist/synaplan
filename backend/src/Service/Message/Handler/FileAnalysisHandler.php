@@ -7,6 +7,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\ModelConfigService;
+use App\Service\Prompt\LanguageDirectiveBuilder;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
@@ -386,6 +387,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         $this->notify($progressCallback, 'generating', 'Replying to voice message...');
 
         $prompts = $this->buildAudioConversationalPrompt($audioFiles, $userPrompt);
+        $prompts['system'] .= $this->buildLanguageDirective($classification);
 
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
@@ -477,6 +479,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         $this->notify($progressCallback, 'generating', 'Replying to voice message...');
 
         $prompts = $this->buildAudioConversationalPrompt($audioFiles, $userPrompt);
+        $prompts['system'] .= $this->buildLanguageDirective($classification);
 
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
@@ -568,7 +571,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             count($documents) > 1 ? 'Analyzing document contents...' : 'Analyzing document content...',
         );
 
-        $systemPrompt = $this->buildDocumentsSystemPrompt($documents);
+        $systemPrompt = $this->buildDocumentsSystemPrompt($documents).$this->buildLanguageDirective($classification);
         $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
 
         // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
@@ -660,7 +663,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             count($documents) > 1 ? 'Analyzing document contents...' : 'Analyzing document content...',
         );
 
-        $systemPrompt = $this->buildDocumentsSystemPrompt($documents);
+        $systemPrompt = $this->buildDocumentsSystemPrompt($documents).$this->buildLanguageDirective($classification);
         $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
 
         // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
@@ -829,7 +832,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'image_count' => count($images),
         ]);
 
-        $perImage = $this->analyzeImageBatch($message, $images, $userPrompt, $provider, $modelName, $progressCallback);
+        $perImage = $this->analyzeImageBatch($message, $images, $userPrompt, $provider, $modelName, $progressCallback, $this->buildLanguageDirective($classification));
         $content = $this->combineImageAnalyses($perImage, $images);
 
         $this->notify($progressCallback, 'complete', 'Analysis complete.');
@@ -903,12 +906,17 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         ?string $provider,
         ?string $modelName,
         ?callable $progressCallback,
+        string $languageDirective = '',
     ): array {
         $perImagePrompt = !empty($userPrompt)
             ? $userPrompt
             : (count($images) > 1
                 ? 'Please describe this image in detail. The user uploaded several images in the same message — describe each one independently.'
                 : 'Please describe this image in detail.');
+
+        // Respond in the conversation language instead of defaulting to
+        // English for image descriptions (issue #1163).
+        $perImagePrompt .= $languageDirective;
 
         $results = [];
 
@@ -1564,6 +1572,30 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         }
 
         return ltrim($path, '/');
+    }
+
+    /**
+     * Build a language directive from the detected conversation language so
+     * file-analysis replies match the user's language instead of defaulting
+     * to English (issue #1163). Mirrors ChatHandler's use of
+     * LanguageDirectiveBuilder, including the anti-echo clause. Returns an
+     * empty string when no language was classified, leaving prompts unchanged.
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function buildLanguageDirective(array $classification): string
+    {
+        $language = is_string($classification['language'] ?? null)
+            ? trim($classification['language'])
+            : '';
+
+        if ('' === $language) {
+            return '';
+        }
+
+        return 'auto' === $language
+            ? LanguageDirectiveBuilder::buildAutoDirective()
+            : LanguageDirectiveBuilder::buildForLanguage($language);
     }
 
     /**

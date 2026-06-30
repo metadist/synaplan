@@ -6,7 +6,6 @@ use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
-use App\Service\File\DataUrlFixer;
 use App\Service\File\OgImageService;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\WidgetSessionService;
@@ -28,7 +27,6 @@ class ChatController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private WidgetSessionService $widgetSessionService,
-        private DataUrlFixer $dataUrlFixer,
         private OgImageService $ogImageService,
         private MessageApiFormatter $messageApiFormatter,
         private LoggerInterface $logger,
@@ -553,36 +551,16 @@ class ChatController extends AbstractController
             ['unixTimestamp' => 'ASC']
         );
 
-        $messageData = array_map(function ($m) {
-            $data = [
-                'id' => $m->getId(),
-                'text' => $m->getText(),
-                'direction' => $m->getDirection(),
-                'timestamp' => $m->getUnixTimestamp(),
-                'provider' => $m->getProviderIndex(),
-                'topic' => $m->getTopic(),
-                'originalTopic' => $m->getMeta('original_topic'),
-                'originalMediaType' => $m->getMeta('original_media_type'),
-                'language' => $m->getLanguage(),
-            ];
-
-            // Include file information if present
-            if ($m->getFile() && $m->getFilePath()) {
-                // Fix data URL to file if needed (legacy migration)
-                $filePath = $m->getFilePath();
-                if (str_starts_with($filePath, 'data:')) {
-                    $filePath = $this->dataUrlFixer->ensureFileOnDisk($m);
-                }
-                if ($filePath) {
-                    $data['file'] = [
-                        'path' => $filePath,
-                        'type' => $m->getFileType(),
-                    ];
-                }
-            }
-
-            return $data;
-        }, $messages);
+        // Issue #1175: serialize shared messages through the canonical
+        // MessageApiFormatter (same as the authenticated history endpoint)
+        // so user-uploaded file attachments (the File entity M2M relation,
+        // exposed as `files[]`) are visible to viewers — the previous inline
+        // serializer only emitted the legacy single `file` field, so uploads
+        // silently disappeared in the shared view.
+        $messageData = array_map(
+            fn ($m) => $this->messageApiFormatter->format($m),
+            $messages
+        );
 
         return $this->json([
             'success' => true,

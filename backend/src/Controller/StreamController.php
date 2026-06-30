@@ -2518,6 +2518,20 @@ class StreamController extends AbstractController
         }
 
         try {
+            // Issue #1170: a document-generation node persists its File via
+            // ChatHandler::storeGeneratedFile() (with the clean display name)
+            // BEFORE this runs. Re-registering the same on-disk file here would
+            // create a second File row pointing at the identical path, so the
+            // file shows up twice on the Files page. Reuse the existing row
+            // instead — it already carries the nicer display name.
+            $existing = $this->em->getRepository(File::class)->findOneBy([
+                'userId' => $userId,
+                'filePath' => $relativePath,
+            ]);
+            if ($existing instanceof File) {
+                return $existing;
+            }
+
             $absolutePath = $this->uploadDir.'/'.$relativePath;
             $fileSize = is_file($absolutePath) ? (filesize($absolutePath) ?: 0) : 0;
             $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));

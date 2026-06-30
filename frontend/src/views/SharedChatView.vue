@@ -227,6 +227,54 @@
                 <MessageVideo v-if="message.file.type === 'video'" :url="message.file.path" />
               </div>
 
+              <!-- User-uploaded attachments (issue #1175): rendered from the
+                   File entity relation via public upload URLs, so shared-chat
+                   viewers see images/PDFs/audio uploaded by the chat owner. -->
+              <div
+                v-if="message.files && message.files.length"
+                class="mt-3 space-y-3"
+                data-testid="section-shared-attachments"
+              >
+                <template v-for="file in message.files" :key="file.id">
+                  <MessageImage
+                    v-if="isImageFileType(file.fileType, file.fileMime)"
+                    :url="buildUploadUrl(file.filePath)"
+                    :alt="file.filename"
+                  />
+                  <MessageVideo
+                    v-else-if="isVideoFileType(file.fileType, file.fileMime)"
+                    :url="buildUploadUrl(file.filePath)"
+                  />
+                  <MessageAudio
+                    v-else-if="isAudioFileType(file.fileType, file.fileMime)"
+                    :url="buildUploadUrl(file.filePath)"
+                  />
+                  <a
+                    v-else
+                    :href="buildUploadUrl(file.filePath)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg surface-chip txt-primary text-sm font-medium hover-surface transition-colors"
+                    data-testid="link-shared-attachment"
+                  >
+                    <svg
+                      class="w-4 h-4 flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                      />
+                    </svg>
+                    <span class="truncate max-w-[12rem]">{{ file.filename }}</span>
+                  </a>
+                </template>
+              </div>
+
               <!-- Topic Badge -->
               <div v-if="message.topic" class="mt-3 flex items-center gap-2 flex-wrap">
                 <span
@@ -309,14 +357,34 @@ import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import MessageImage from '../components/MessageImage.vue'
 import MessageVideo from '../components/MessageVideo.vue'
+import MessageAudio from '../components/MessageAudio.vue'
 import MessageCode from '../components/MessageCode.vue'
 import MessageText from '../components/MessageText.vue'
 import BrandAttribution from '../components/BrandAttribution.vue'
+import {
+  buildUploadUrl,
+  isAudioFileType,
+  isImageFileType,
+  isVideoFileType,
+} from '@/utils/mediaTypes'
 import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
 import { supportedLanguages, type SupportedLanguage } from '@/i18n'
 import { parseAIResponse } from '@/utils/responseParser'
+
+// Issue #1175: user-uploaded attachments travel on the File entity M2M
+// relation, serialized by MessageApiFormatter as `files[]`. The shared
+// endpoint now returns them so viewers can see uploaded images, PDFs, audio,
+// etc. — not just the legacy single AI-generated `file`.
+const SharedChatFileSchema = z.object({
+  id: z.number(),
+  filename: z.string(),
+  fileType: z.string(),
+  filePath: z.string(),
+  fileSize: z.number().nullable().optional(),
+  fileMime: z.string().nullable().optional(),
+})
 
 const SharedChatMessageSchema = z.object({
   id: z.number(),
@@ -331,7 +399,9 @@ const SharedChatMessageSchema = z.object({
       path: z.string(),
       type: z.string(),
     })
+    .nullable()
     .optional(),
+  files: z.array(SharedChatFileSchema).optional(),
 })
 
 const SharedChatPayloadSchema = z.object({
@@ -353,6 +423,15 @@ const loading = ref(true)
 const error = ref(false)
 const currentLang = ref<string>('en')
 
+interface SharedChatFile {
+  id: number
+  filename: string
+  fileType: string
+  filePath: string
+  fileSize?: number | null
+  fileMime?: string | null
+}
+
 interface Message {
   id: number
   text: string
@@ -364,7 +443,8 @@ interface Message {
   file?: {
     path: string
     type: string
-  }
+  } | null
+  files?: SharedChatFile[]
 }
 
 interface Chat {
