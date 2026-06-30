@@ -9,6 +9,7 @@ use App\Entity\Model;
 use App\Entity\User;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobConfig;
@@ -80,6 +81,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
             $this->mediaJobService,
             $this->mediaJobDispatcher,
             $this->mediaJobMessageSync,
+            $this->createMock(GeneratedFileRegistrar::class),
             sys_get_temp_dir(),
             false,
             'https://app.example.test',

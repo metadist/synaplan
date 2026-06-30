@@ -580,8 +580,8 @@
                     :class="[
                       'px-4 py-3 shadow-sm',
                       message.direction === 'OUT'
-                        ? 'bg-gradient-to-br from-emerald-600 to-emerald-500 text-white rounded-2xl rounded-br-md'
-                        : 'bg-white/5 dark:bg-white/5 rounded-2xl rounded-bl-md',
+                        ? 'bubble-user rounded-2xl rounded-br-md'
+                        : 'surface-chip border border-[var(--border-light)] rounded-2xl rounded-bl-md',
                     ]"
                     data-quotable
                     :data-message-id="message.id"
@@ -606,7 +606,7 @@
                           'flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors text-xs',
                           message.direction === 'OUT'
                             ? 'bg-white/20 hover:bg-white/30 text-white'
-                            : 'bg-white/10 hover:bg-white/20 txt-primary',
+                            : 'bg-[var(--brand-alpha-light)] hover:bg-[var(--brand)]/20 txt-primary',
                         ]"
                       >
                         <Icon :icon="getFileIcon(file.mimeType)" class="w-4 h-4 flex-shrink-0" />
@@ -633,7 +633,7 @@
                 <!-- Typing Preview -->
                 <div v-if="typingPreview?.text" class="max-w-[80%] mr-auto animate-pulse">
                   <div
-                    class="px-4 py-3 shadow-sm bg-white/5 dark:bg-white/5 rounded-2xl rounded-bl-md border border-dashed border-white/20"
+                    class="px-4 py-3 shadow-sm surface-chip rounded-2xl rounded-bl-md border border-dashed border-[var(--border-light)]"
                   >
                     <p class="text-sm leading-relaxed txt-secondary italic">
                       {{ typingPreview.text }}
@@ -647,7 +647,7 @@
                 <!-- AI Typing Indicator (Internal Mode) -->
                 <div v-if="internalAiTyping" class="max-w-[80%] ml-auto">
                   <div
-                    class="px-4 py-3 shadow-sm bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-2xl rounded-br-md"
+                    class="px-4 py-3 shadow-sm bg-[var(--brand)] text-white rounded-2xl rounded-br-md"
                   >
                     <div class="flex items-center gap-1.5">
                       <span
