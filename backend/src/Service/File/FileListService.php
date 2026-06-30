@@ -141,7 +141,7 @@ final readonly class FileListService
             'message_id' => $mf->getMessageId(),
             'provider' => $mf->getProvider(),
             'thumb_url' => null !== $mf->getThumbPath() ? '/api/v1/files/'.$mf->getId().'/thumb' : null,
-            'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
+            'text_preview' => mb_substr($mf->getFileText(), 0, 200),
             'uploaded_at' => $mf->getCreatedAt(),
             'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
             'group_key' => $groupKey,
