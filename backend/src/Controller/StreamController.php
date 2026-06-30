@@ -2555,6 +2555,18 @@ class StreamController extends AbstractController
         $content = $fileData['content'];
         $extension = $fileData['extension'];
 
+        // Issue #1196: never persist a generated document from whitespace-only
+        // content — it would create a DB row plus a blank file with no usable
+        // body. Bail early so the caller can surface a real failure instead.
+        if ('' === trim((string) $content)) {
+            $this->logger->warning('StreamController: refusing to store generated file with empty content', [
+                'filename' => $filename,
+                'extension' => $extension,
+            ]);
+
+            return null;
+        }
+
         try {
             // Generate storage path similar to FileStorageService
             $year = date('Y');
