@@ -16,7 +16,7 @@
 services:
   # Vue.js Frontend
   frontend:
-    image: node:22@sha256:c601a46abb4d2ab80a9dc3da208d50d1122642d53f17a101926ace71e5a9bf1c
+    image: node:24@sha256:fdddfb3e688158251943d52eba361de991548f6814007acba4917ae6b512d6be
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -50,7 +50,7 @@ services:
   # rendering chunks (native binary + JS heap), which OOM-killed every build
   # and left dist-widget without widget.js.
   frontend-widgets:
-    image: node:22@sha256:c601a46abb4d2ab80a9dc3da208d50d1122642d53f17a101926ace71e5a9bf1c
+    image: node:24@sha256:fdddfb3e688158251943d52eba361de991548f6814007acba4917ae6b512d6be
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
