@@ -219,6 +219,8 @@ export const fileItemSchema = z.object({
   uploaded_at: z.number(),
   uploaded_date: z.string(),
   message_id: z.number().nullable(),
+  /** Owning chat id (resolved from the originating message) for deep-linking. */
+  chat_id: z.number().nullable().optional(),
   is_attached: z.boolean().optional(),
   group_key: z.string().nullable().optional(),
   chunks: z.number().optional(),

@@ -274,6 +274,38 @@ class MessageRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Map a set of message ids to their owning chat id (BCHATID), skipping
+     * messages that are not attached to a chat. Used by the file manager to
+     * deep-link a generated artefact to the exact conversation it came from
+     * (the file row only carries the message id).
+     *
+     * @param int[] $messageIds
+     *
+     * @return array<int, int> messageId => chatId
+     */
+    public function findChatIdsByMessageIds(array $messageIds): array
+    {
+        if (empty($messageIds)) {
+            return [];
+        }
+
+        $rows = $this->createQueryBuilder('m')
+            ->select('m.id AS mid, m.chatId AS cid')
+            ->where('m.id IN (:ids)')
+            ->andWhere('m.chatId IS NOT NULL')
+            ->setParameter('ids', $messageIds)
+            ->getQuery()
+            ->getResult();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) $row['mid']] = (int) $row['cid'];
+        }
+
+        return $map;
+    }
+
     public function flush(): void
     {
         $this->getEntityManager()->flush();

@@ -83,7 +83,7 @@
               {{ $t('files.generated.download') }}
             </button>
             <button
-              v-if="file.message_id"
+              v-if="file.chat_id"
               class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
               :title="$t('files.generated.openInChat')"
               :data-testid="`btn-generated-open-${file.id}`"
@@ -95,11 +95,40 @@
         </div>
       </div>
     </div>
+
+    <!-- Pagination -->
+    <div
+      v-if="!loading && totalPages > 1"
+      class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/5"
+      data-testid="generated-pagination"
+    >
+      <span class="text-xs txt-secondary">
+        {{ $t('files.page') }} {{ currentPage }} / {{ totalPages }}
+      </span>
+      <div class="flex gap-2">
+        <button
+          :disabled="currentPage === 1"
+          class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          data-testid="btn-generated-prev"
+          @click="previousPage"
+        >
+          {{ $t('files.previous') }}
+        </button>
+        <button
+          :disabled="currentPage >= totalPages"
+          class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          data-testid="btn-generated-next"
+          @click="nextPage"
+        >
+          {{ $t('files.next') }}
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
@@ -107,28 +136,45 @@ import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/ou
 import filesService, { type FileItem, type FileOriginKind } from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useNotification } from '@/composables/useNotification'
+import { useChatsStore } from '@/stores/chats'
 
 const { t } = useI18n()
 const router = useRouter()
 const { error: showError } = useNotification()
+const chatsStore = useChatsStore()
 
 const files = ref<FileItem[]>([])
 const loading = ref(false)
+const currentPage = ref(1)
+const totalCount = ref(0)
+const itemsPerPage = 30
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / itemsPerPage)))
 
-const load = async () => {
+const load = async (page = currentPage.value) => {
   loading.value = true
   try {
     const list = await filesService.listFiles({
       source: 'generated',
       sort: 'date_desc',
-      limit: 100,
+      page,
+      limit: itemsPerPage,
     })
     files.value = list.files
+    totalCount.value = list.pagination.total
+    currentPage.value = list.pagination.page
   } catch {
     showError(t('files.toast.genericError', { reason: '' }))
   } finally {
     loading.value = false
   }
+}
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) load(currentPage.value + 1)
+}
+
+const previousPage = () => {
+  if (currentPage.value > 1) load(currentPage.value - 1)
 }
 
 const kindOf = (file: FileItem): FileOriginKind => {
@@ -167,8 +213,12 @@ const download = async (file: FileItem) => {
 }
 
 const openInChat = (file: FileItem) => {
-  if (!file.message_id) return
-  router.push({ path: '/', query: { message: String(file.message_id) } })
+  // Deep-link to the exact conversation the artefact was generated in. The file
+  // row carries chat_id (resolved from its originating message); selecting it
+  // before navigating ensures ChatView loads that chat instead of the latest.
+  if (!file.chat_id) return
+  chatsStore.setActiveChat(file.chat_id)
+  router.push({ name: 'chat' })
 }
 
 onMounted(load)

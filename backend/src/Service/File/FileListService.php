@@ -6,6 +6,7 @@ namespace App\Service\File;
 
 use App\Entity\File;
 use App\Repository\FileRepository;
+use App\Repository\MessageRepository;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use Psr\Log\LoggerInterface;
 
@@ -19,6 +20,7 @@ final readonly class FileListService
 {
     public function __construct(
         private FileRepository $fileRepository,
+        private MessageRepository $messageRepository,
         private VectorStorageFacade $vectorStorageFacade,
         private LoggerInterface $logger,
     ) {
@@ -48,12 +50,18 @@ final readonly class FileListService
         $allChunks = $this->getUserVectorChunks($userId);
         $vectorChunkMap = $this->resolveVectorGroupKeys($files, $allChunks);
 
+        // Resolve each file's owning chat (via its originating message) in one
+        // query so the "open in chat" deep link targets the exact conversation
+        // instead of falling back to the latest chat.
+        $messageIds = array_values(array_filter(array_map(static fn (File $mf): ?int => $mf->getMessageId(), $files)));
+        $chatIdMap = [] !== $messageIds ? $this->messageRepository->findChatIdsByMessageIds($messageIds) : [];
+
         // Fix-on-read: keep BVECTORSTATE/BCHUNKCOUNT in sync with the authoritative
         // vector store so the list renders truthfully with no per-row Qdrant call.
         $this->syncVectorState($files, $allChunks);
 
         $rows = array_map(
-            fn (File $mf): array => $this->serializeFileRow($mf, $allChunks, $vectorChunkMap),
+            fn (File $mf): array => $this->serializeFileRow($mf, $allChunks, $vectorChunkMap, $chatIdMap),
             $files,
         );
 
@@ -117,13 +125,15 @@ final readonly class FileListService
      *
      * @param array<int, array{chunks: int, groupKey: string|null}> $allChunks
      * @param array<int, string>                                    $vectorChunkMap
+     * @param array<int, int>                                       $chatIdMap      messageId => chatId
      *
      * @return array<string, mixed>
      */
-    private function serializeFileRow(File $mf, array $allChunks, array $vectorChunkMap): array
+    private function serializeFileRow(File $mf, array $allChunks, array $vectorChunkMap, array $chatIdMap = []): array
     {
         $chunkCount = (int) ($allChunks[$mf->getId()]['chunks'] ?? 0);
         $groupKey = $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null);
+        $messageId = $mf->getMessageId();
 
         return [
             'id' => $mf->getId(),
@@ -138,7 +148,8 @@ final readonly class FileListService
             'source' => $mf->getSource(),
             'origin_kind' => $mf->getOriginKind(),
             'incoming' => $mf->isIncoming(),
-            'message_id' => $mf->getMessageId(),
+            'message_id' => $messageId,
+            'chat_id' => null !== $messageId ? ($chatIdMap[$messageId] ?? null) : null,
             'provider' => $mf->getProvider(),
             'thumb_url' => null !== $mf->getThumbPath() ? '/api/v1/files/'.$mf->getId().'/thumb' : null,
             'text_preview' => mb_substr($mf->getFileText(), 0, 200),
