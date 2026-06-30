@@ -28,7 +28,7 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param array<int>                                                                                                                                  $vectorFileIds
+     * @param array<int>                                                                                                                                                                        $vectorFileIds
      * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
      *
      * @return array{files: File[], total: int}
