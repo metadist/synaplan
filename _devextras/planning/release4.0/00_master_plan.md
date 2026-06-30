@@ -123,7 +123,8 @@ Full design in [`02_async-media-ux.md`](./02_async-media-ux.md).
 | 4 | **Frictionless Onboarding & Conversion Flow** — Token wallet, anti-bot guards, seamless trial | [`05_onboarding-conversion-flow.md`](./05_onboarding-conversion-flow.md) | P1 | Planned |
 | 5 | **Self-Aware Routing** — route product/feature/how-to questions to a `synaplan` topic + curated "About Synaplan" RAG source; registry-derived, multilingual (de/en/es/tr). Includes the shipped meeting-reminder timezone fix. | [`06_self-aware-routing.md`](./06_self-aware-routing.md) | P1 | Planned (timezone fix shipped) |
 | 6 | **Share generated files to destinations ("Send to…")** — Phase A: Nextcloud app saves *every* generated file type (Word/PPT/MP3/ICS/…) into `Synaplan/<Kind>` from both NC chat surfaces. Phase B/C: generic `DestinationProvider` registry + standard shareable object + Web Share API. Shares the `source` provenance model with Feature 2. | [`07_file-sharing-destinations.md`](./07_file-sharing-destinations.md) | P1 | Provenance joint sprint shipped (2026-06-27); A2 + B/C planned |
-| 7 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
+| 7 | **MCP data nodes + Skill Registry** — add a "pull data from MCP" building block to the DAG routing, and formalize every DAG block as a self-describing **Skill** so the planner prompt is generated (not hand-maintained) — the n8n-style "manage the points" answer. | [`08_mcp-data-nodes-and-skill-registry.md`](./08_mcp-data-nodes-and-skill-registry.md) | P1 | Draft for discussion (2026-06-30) |
+| 8 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
 
 > "We have more things to implement" — this index is the place to add them.
 > Each new 4.0 feature gets a `0N_<slug>.md` and a row here. Candidate backlog
