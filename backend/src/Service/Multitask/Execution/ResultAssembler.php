@@ -85,6 +85,35 @@ final class ResultAssembler
             'partial_failure' => $partialFailure,
         ];
 
+        // Issue #1197: the reply node is frequently `compose_reply`, whose
+        // runner carries NO provider/model metadata, so the inference provider
+        // that actually produced the answer (e.g. groq) is dropped and the chat
+        // bubble falls back to a wrong/default avatar. Backfill the chat-model
+        // meta from the last successful node that recorded a provider (the node
+        // closest to the final answer in execution order), so StreamController
+        // persists the real ai_chat_provider/model.
+        if (empty($metadata['provider'])) {
+            foreach ($plan->topologicalOrder() as $node) {
+                $nodeResult = $context->getResult($node->id);
+                if (null === $nodeResult || !$nodeResult->isSuccessful()) {
+                    continue;
+                }
+                $nodeProvider = $nodeResult->metadata['provider'] ?? null;
+                if (!is_string($nodeProvider) || '' === $nodeProvider) {
+                    continue;
+                }
+                // Last provider-bearing node wins (do not break): it is the one
+                // that produced the user-facing answer text.
+                $metadata['provider'] = $nodeProvider;
+                if (isset($nodeResult->metadata['model'])) {
+                    $metadata['model'] = $nodeResult->metadata['model'];
+                }
+                if (isset($nodeResult->metadata['model_id'])) {
+                    $metadata['model_id'] = $nodeResult->metadata['model_id'];
+                }
+            }
+        }
+
         // Propagate web_search results from the first successful WebSearch node
         // into the top-level metadata so StreamController can set the
         // web_search_query/count metas and populate the Sources dropdown.

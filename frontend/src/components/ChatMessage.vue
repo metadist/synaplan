@@ -1265,7 +1265,11 @@ const displayProvider = computed(() => {
   if (legacy && !isChannelSource(legacy)) {
     return legacy
   }
-  return 'OpenAI'
+  // Issue #1197: when no provider metadata is available, fall back to a
+  // neutral avatar (ServiceIcon renders a generic robot icon for an empty
+  // service) instead of hardcoding OpenAI, which mislabels replies served by
+  // other providers (e.g. Groq).
+  return ''
 })
 
 // Real AI provider/model values for the legacy popover row. Hides
