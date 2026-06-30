@@ -2530,6 +2530,9 @@ class StreamController extends AbstractController
             $file->setFileSize($fileSize);
             $file->setFileMime($this->getMimeTypeForExtension($extension));
             $file->setStatus('generated');
+            // Issue #1190: mark provenance so generated files are distinguishable
+            // from uploads (default 'web_upload') and can be targeted for repair.
+            $file->setSource('generated');
 
             $this->em->persist($file);
             $this->em->flush();
@@ -2617,6 +2620,10 @@ class StreamController extends AbstractController
             // exact current content instead of re-deriving it.
             $file->setFileText($content);
             $file->setStatus('generated');
+            // Issue #1190: mark provenance so generated files are distinguishable
+            // from uploads (default 'web_upload') and can be regenerated from
+            // BFILETEXT on download when the on-disk binary goes missing.
+            $file->setSource('generated');
 
             $this->em->persist($file);
             $this->em->flush();

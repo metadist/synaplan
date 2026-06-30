@@ -363,6 +363,46 @@ class FileControllerTest extends WebTestCase
         $this->assertEquals(401, $response->getStatusCode());
     }
 
+    /**
+     * Issue #1190: a chat-generated file whose on-disk binary is missing but
+     * whose BFILETEXT survives must be downloadable — the controller
+     * regenerates the binary from the stored text instead of returning 404.
+     */
+    public function testDownloadRegeneratesMissingGeneratedBinaryFromText(): void
+    {
+        $file = new \App\Entity\File();
+        $file->setUserId($this->testUser->getId());
+        $file->setFilePath('missing/'.uniqid('regen_', true).'.docx');
+        $file->setFileType('docx');
+        $file->setFileName('Trainingsplan.docx');
+        $file->setFileSize(0);
+        $file->setFileMime('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        $file->setFileText("# Trainingsplan\n\nMontag: **Bankdrücken** 3 x 10 Wdh.");
+        $file->setStatus('generated');
+        $file->setSource('generated');
+        $file->setCreatedAt(time());
+
+        $this->em->persist($file);
+        $this->em->flush();
+        $fileId = $file->getId();
+
+        $this->client->request('GET', '/api/v1/files/'.$fileId.'/download', [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+        ]);
+
+        $response = $this->client->getResponse();
+        // A 200 binary response for a file whose on-disk path does not exist can
+        // ONLY come from the BFILETEXT regeneration fallback — a 404 JSON error
+        // would be returned otherwise.
+        $this->assertEquals(200, $response->getStatusCode(), 'Missing-binary generated file must be regenerated, not 404');
+        $this->assertInstanceOf(\Symfony\Component\HttpFoundation\BinaryFileResponse::class, $response);
+        $this->assertStringContainsString(
+            'Trainingsplan.docx',
+            (string) $response->headers->get('Content-Disposition'),
+            'Regenerated download must keep the original filename'
+        );
+    }
+
     private function createTestFile(string $filename, string $content): string
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'synaplan_test_');
