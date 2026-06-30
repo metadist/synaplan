@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { api } from './apiService'
 import { httpClient, getApiBaseUrl, refreshAccessToken } from './api/httpClient'
 import { saveOrDownloadBlob } from './api/nativeDownload'
@@ -167,69 +168,86 @@ export interface UploadResponse {
   process_level: string
 }
 
-export type FileSource =
-  | 'web_upload'
-  | 'chat_attachment'
-  | 'outlook'
-  | 'nextcloud'
-  | 'opencloud'
-  | 'whatsapp'
-  | 'widget'
-  | 'api'
-  | 'generated'
+// Zod schemas are the single source of truth for the file API data shapes:
+// each schema both validates the JSON at runtime (where we call `.parse()`)
+// and produces the static TypeScript type via `z.infer` — so the types can
+// never drift from the validation (AGENTS_DEV.md "Type Safety & Validation").
+export const fileSourceSchema = z.enum([
+  'web_upload',
+  'chat_attachment',
+  'outlook',
+  'nextcloud',
+  'opencloud',
+  'whatsapp',
+  'widget',
+  'api',
+  'generated',
+])
+export type FileSource = z.infer<typeof fileSourceSchema>
 
-export type FileVectorState = 'none' | 'pending' | 'vectorized' | 'failed' | 'not_applicable'
+export const fileVectorStateSchema = z.enum([
+  'none',
+  'pending',
+  'vectorized',
+  'failed',
+  'not_applicable',
+])
+export type FileVectorState = z.infer<typeof fileVectorStateSchema>
 
-export type FileOriginKind = 'image' | 'video' | 'audio' | 'calendar' | 'document'
+export const fileOriginKindSchema = z.enum(['image', 'video', 'audio', 'calendar', 'document'])
+export type FileOriginKind = z.infer<typeof fileOriginKindSchema>
 
-export interface FileItem {
-  id: number
-  filename: string
+export const fileItemSchema = z.object({
+  id: z.number(),
+  filename: z.string(),
   /** Original (source) name when present, else the stored name (§4.4). */
-  display_name?: string
-  original_name?: string | null
-  path: string
-  file_type: string
-  file_size: number
-  mime: string
-  status: string
+  display_name: z.string().optional(),
+  original_name: z.string().nullable().optional(),
+  path: z.string(),
+  file_type: z.string(),
+  file_size: z.number(),
+  mime: z.string(),
+  status: z.string(),
   /** Provenance: where the file came from (§3.1, §4.4). */
-  source?: FileSource
-  origin_kind?: FileOriginKind | null
+  source: fileSourceSchema.optional(),
+  origin_kind: fileOriginKindSchema.nullable().optional(),
   /** True while a freshly-arrived external push awaits triage (§3.3). */
-  incoming?: boolean
-  provider?: string | null
-  thumb_url?: string | null
-  text_preview: string
-  uploaded_at: number
-  uploaded_date: string
-  message_id: number | null
-  is_attached: boolean
-  group_key?: string
-  chunks?: number
-  chunk_count?: number
+  incoming: z.boolean().optional(),
+  provider: z.string().nullable().optional(),
+  thumb_url: z.string().nullable().optional(),
+  text_preview: z.string(),
+  uploaded_at: z.number(),
+  uploaded_date: z.string(),
+  message_id: z.number().nullable(),
+  is_attached: z.boolean().optional(),
+  group_key: z.string().nullable().optional(),
+  chunks: z.number().optional(),
+  chunk_count: z.number().optional(),
   /** Authoritative vectorization state (§3.1, §4.2). */
-  vector_state?: FileVectorState
-  is_vectorized?: boolean
-}
+  vector_state: fileVectorStateSchema.optional(),
+  is_vectorized: z.boolean().optional(),
+})
+export type FileItem = z.infer<typeof fileItemSchema>
 
-export interface FileFacets {
-  source: Record<string, number>
-  vector_state: Record<string, number>
-  incoming: number
-  total: number
-}
+export const fileFacetsSchema = z.object({
+  source: z.record(z.string(), z.number()),
+  vector_state: z.record(z.string(), z.number()),
+  incoming: z.number(),
+  total: z.number(),
+})
+export type FileFacets = z.infer<typeof fileFacetsSchema>
 
-export interface FileListResponse {
-  success: boolean
-  files: FileItem[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    pages: number
-  }
-}
+export const fileListResponseSchema = z.object({
+  success: z.boolean(),
+  files: z.array(fileItemSchema),
+  pagination: z.object({
+    page: z.number(),
+    limit: z.number(),
+    total: z.number(),
+    pages: z.number(),
+  }),
+})
+export type FileListResponse = z.infer<typeof fileListResponseSchema>
 
 // Fallback when the server pre-flight response doesn't include
 // `max_files_per_request` (older deployments) — match PHP's historical
@@ -675,16 +693,19 @@ export const listFiles = async (options: FileListOptions = {}): Promise<FileList
   if (options.dateFrom) params.date_from = options.dateFrom
   if (options.dateTo) params.date_to = options.dateTo
 
-  const response = await api.get<FileListResponse>('/api/v1/files', { params })
-  return response.data
+  const response = await api.get('/api/v1/files', { params })
+  // Validate at runtime: the schema is the same definition the FileListResponse
+  // type is inferred from, so a backend contract drift surfaces here instead of
+  // as a confusing render bug downstream.
+  return fileListResponseSchema.parse(response.data)
 }
 
 /**
  * Faceted counts for the filter bar + Incoming tab badge (§5).
  */
 export const getFacets = async (): Promise<FileFacets> => {
-  const response = await api.get<{ success: boolean; facets: FileFacets }>('/api/v1/files/facets')
-  return response.data.facets
+  const response = await api.get<{ success: boolean; facets: unknown }>('/api/v1/files/facets')
+  return fileFacetsSchema.parse(response.data.facets)
 }
 
 /**
