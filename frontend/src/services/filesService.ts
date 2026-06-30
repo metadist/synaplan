@@ -167,14 +167,39 @@ export interface UploadResponse {
   process_level: string
 }
 
+export type FileSource =
+  | 'web_upload'
+  | 'chat_attachment'
+  | 'outlook'
+  | 'nextcloud'
+  | 'opencloud'
+  | 'whatsapp'
+  | 'widget'
+  | 'api'
+  | 'generated'
+
+export type FileVectorState = 'none' | 'pending' | 'vectorized' | 'failed' | 'not_applicable'
+
+export type FileOriginKind = 'image' | 'video' | 'audio' | 'calendar' | 'document'
+
 export interface FileItem {
   id: number
   filename: string
+  /** Original (source) name when present, else the stored name (§4.4). */
+  display_name?: string
+  original_name?: string | null
   path: string
   file_type: string
   file_size: number
   mime: string
   status: string
+  /** Provenance: where the file came from (§3.1, §4.4). */
+  source?: FileSource
+  origin_kind?: FileOriginKind | null
+  /** True while a freshly-arrived external push awaits triage (§3.3). */
+  incoming?: boolean
+  provider?: string | null
+  thumb_url?: string | null
   text_preview: string
   uploaded_at: number
   uploaded_date: string
@@ -182,7 +207,17 @@ export interface FileItem {
   is_attached: boolean
   group_key?: string
   chunks?: number
+  chunk_count?: number
+  /** Authoritative vectorization state (§3.1, §4.2). */
+  vector_state?: FileVectorState
   is_vectorized?: boolean
+}
+
+export interface FileFacets {
+  source: Record<string, number>
+  vector_state: Record<string, number>
+  incoming: number
+  total: number
 }
 
 export interface FileListResponse {
@@ -593,10 +628,27 @@ const uploadFilesBatch = async (
   return sendXhr()
 }
 
+export type FileSortOrder =
+  | 'date_desc'
+  | 'date_asc'
+  | 'name_asc'
+  | 'name_desc'
+  | 'size_asc'
+  | 'size_desc'
+
 export interface FileListOptions {
   groupKey?: string
   search?: string
   fileType?: string
+  /** Comma-separated provenance source(s) to filter by (§5). */
+  source?: string
+  /** Comma-separated vector state(s) to filter by (§5). */
+  vectorState?: string
+  /** Comma-separated generated origin kind(s) to filter by (§5). */
+  originKind?: string
+  /** true = only Incoming inbox, false = exclude incoming, undefined = all (§5). */
+  incoming?: boolean
+  sort?: FileSortOrder
   dateFrom?: number
   dateTo?: number
   page?: number
@@ -604,7 +656,7 @@ export interface FileListOptions {
 }
 
 /**
- * List user's files with optional filtering and search
+ * List user's files with optional filtering, faceting and search
  */
 export const listFiles = async (options: FileListOptions = {}): Promise<FileListResponse> => {
   const params: Record<string, string | number> = {
@@ -615,10 +667,52 @@ export const listFiles = async (options: FileListOptions = {}): Promise<FileList
   if (options.groupKey) params.group_key = options.groupKey
   if (options.search) params.search = options.search
   if (options.fileType) params.file_type = options.fileType
+  if (options.source) params.source = options.source
+  if (options.vectorState) params.vector_state = options.vectorState
+  if (options.originKind) params.origin_kind = options.originKind
+  if (options.incoming !== undefined) params.incoming = options.incoming ? 1 : 0
+  if (options.sort) params.sort = options.sort
   if (options.dateFrom) params.date_from = options.dateFrom
   if (options.dateTo) params.date_to = options.dateTo
 
   const response = await api.get<FileListResponse>('/api/v1/files', { params })
+  return response.data
+}
+
+/**
+ * Faceted counts for the filter bar + Incoming tab badge (§5).
+ */
+export const getFacets = async (): Promise<FileFacets> => {
+  const response = await api.get<{ success: boolean; facets: FileFacets }>('/api/v1/files/facets')
+  return response.data.facets
+}
+
+/**
+ * Triage (keep) an incoming file: clear the incoming flag, optionally file it
+ * in a knowledge group (§5, §3.3).
+ */
+export const acceptIncoming = async (
+  fileId: number,
+  groupKey?: string
+): Promise<{ success: boolean; id: number; group_key: string | null }> => {
+  const response = await api.post<{ success: boolean; id: number; group_key: string | null }>(
+    `/api/v1/files/${fileId}/accept`,
+    groupKey ? { group_key: groupKey } : {}
+  )
+  return response.data
+}
+
+/**
+ * Triage (keep) multiple incoming files in one call (§5, §3.3).
+ */
+export const acceptIncomingBulk = async (
+  fileIds: number[],
+  groupKey?: string
+): Promise<{ success: boolean; accepted: number; group_key: string | null }> => {
+  const response = await api.post<{ success: boolean; accepted: number; group_key: string | null }>(
+    '/api/v1/files/accept',
+    groupKey ? { ids: fileIds, group_key: groupKey } : { ids: fileIds }
+  )
   return response.data
 }
 
@@ -917,6 +1011,9 @@ export default {
   uploadFiles,
   checkUpload,
   listFiles,
+  getFacets,
+  acceptIncoming,
+  acceptIncomingBulk,
   deleteFile,
   deleteMultipleFiles,
   getFileGroups,

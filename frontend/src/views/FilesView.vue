@@ -391,6 +391,29 @@
                     {{ activeFilterCount }}
                   </span>
                 </button>
+                <!-- §4.5: Incoming inbox quick-toggle with a count badge so the
+                     user notices when integrations have pushed new files. -->
+                <button
+                  v-if="incomingCount > 0 || filterIncoming"
+                  class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-all shrink-0"
+                  :class="
+                    filterIncoming
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                      : 'border-black/[0.06] dark:border-white/[0.06] txt-secondary hover:border-[var(--brand)]/50 hover:text-[var(--brand)]'
+                  "
+                  :title="$t('files.help.incoming')"
+                  data-testid="btn-incoming-toggle"
+                  @click="toggleIncomingFilter"
+                >
+                  <Icon icon="heroicons:inbox-arrow-down" class="w-4 h-4" />
+                  <span class="hidden sm:inline">{{ $t('files.tabIncoming') }}</span>
+                  <span
+                    v-if="incomingCount > 0"
+                    class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold bg-[var(--brand)] text-white"
+                  >
+                    {{ incomingCount }}
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -422,6 +445,51 @@
                       </option>
                       <option value="mp3,mp4">{{ $t('files.filterTypeAudio') }}</option>
                       <option value="xlsx,csv">{{ $t('files.filterTypeSpreadsheet') }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      class="block text-[11px] font-medium txt-secondary uppercase tracking-wider mb-1"
+                    >
+                      {{ $t('files.filter.source') }}
+                    </label>
+                    <select
+                      v-model="filterSource"
+                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      data-testid="select-source"
+                      @change="onFilterChange"
+                    >
+                      <option value="">{{ $t('files.filter.source') }}</option>
+                      <option value="web_upload">{{ $t('files.sourceLabel.web_upload') }}</option>
+                      <option value="chat_attachment">
+                        {{ $t('files.sourceLabel.chat_attachment') }}
+                      </option>
+                      <option value="outlook">{{ $t('files.sourceLabel.outlook') }}</option>
+                      <option value="nextcloud">{{ $t('files.sourceLabel.nextcloud') }}</option>
+                      <option value="opencloud">{{ $t('files.sourceLabel.opencloud') }}</option>
+                      <option value="whatsapp">{{ $t('files.sourceLabel.whatsapp') }}</option>
+                      <option value="widget">{{ $t('files.sourceLabel.widget') }}</option>
+                      <option value="api">{{ $t('files.sourceLabel.api') }}</option>
+                      <option value="generated">{{ $t('files.sourceLabel.generated') }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      class="block text-[11px] font-medium txt-secondary uppercase tracking-wider mb-1"
+                    >
+                      {{ $t('files.filter.vectorized') }}
+                    </label>
+                    <select
+                      v-model="filterVectorized"
+                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      data-testid="select-vectorized"
+                      @change="onFilterChange"
+                    >
+                      <option value="">{{ $t('files.filter.vectorized') }}</option>
+                      <option value="vectorized">{{ $t('files.filter.vectorizedYes') }}</option>
+                      <option value="none,pending,failed">
+                        {{ $t('files.filter.vectorizedNo') }}
+                      </option>
                     </select>
                   </div>
                   <div>
@@ -717,14 +785,17 @@
                       <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="text-xs font-medium txt-primary truncate">{{ file.filename }}</p>
-                      <div class="flex items-center gap-1.5 mt-0.5 min-w-0">
+                      <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
+                        {{ displayName(file) }}
+                      </p>
+                      <div class="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap">
+                        <FileVectorPill
+                          :state="vectorStateOf(file)"
+                          :chunk-count="file.chunk_count ?? file.chunks ?? 0"
+                          :group-key="file.group_key"
+                        />
                         <span class="text-[10px] txt-secondary shrink-0">{{
                           formatFileSize(file.file_size)
-                        }}</span>
-                        <span class="text-[10px] txt-secondary shrink-0">·</span>
-                        <span class="text-[10px] txt-secondary truncate">{{
-                          vectorStatusLabel(file)
                         }}</span>
                         <button
                           v-if="file.group_key"
@@ -819,22 +890,26 @@
                           >
                             <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                           </div>
-                          <div class="flex flex-col gap-0.5 min-w-0">
-                            <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
-                            <span
-                              class="text-[10px] txt-secondary truncate"
-                              :title="vectorStatusLabel(file)"
-                            >
-                              {{ vectorStatusLabel(file) }}
-                            </span>
-                            <button
-                              v-if="file.group_key"
-                              class="inline-flex items-center gap-1 self-start text-[10px] text-[var(--brand)]/70 hover:text-[var(--brand)] transition-colors"
-                              @click="enterFolder(file.group_key!)"
-                            >
-                              <Icon icon="heroicons:folder-solid" class="w-3 h-3" />
-                              {{ file.group_key }}
-                            </button>
+                          <div class="flex flex-col gap-1 min-w-0">
+                            <span class="text-sm txt-primary truncate" :title="file.filename">{{
+                              displayName(file)
+                            }}</span>
+                            <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                              <FileSourceBadge v-if="file.source" :source="file.source" />
+                              <FileVectorPill
+                                :state="vectorStateOf(file)"
+                                :chunk-count="file.chunk_count ?? file.chunks ?? 0"
+                                :group-key="file.group_key"
+                              />
+                              <button
+                                v-if="file.group_key"
+                                class="inline-flex items-center gap-1 text-[10px] text-[var(--brand)]/70 hover:text-[var(--brand)] transition-colors"
+                                @click="enterFolder(file.group_key!)"
+                              >
+                                <Icon icon="heroicons:folder-solid" class="w-3 h-3" />
+                                {{ file.group_key }}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -1047,14 +1122,17 @@
                     <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-xs font-medium txt-primary truncate">{{ file.filename }}</p>
-                    <div class="flex items-center gap-1.5 min-w-0">
+                    <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
+                      {{ displayName(file) }}
+                    </p>
+                    <div class="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap">
+                      <FileVectorPill
+                        :state="vectorStateOf(file)"
+                        :chunk-count="file.chunk_count ?? file.chunks ?? 0"
+                        :group-key="file.group_key"
+                      />
                       <span class="text-[10px] txt-secondary shrink-0">{{
                         formatFileSize(file.file_size)
-                      }}</span>
-                      <span class="text-[10px] txt-secondary shrink-0">·</span>
-                      <span class="text-[10px] txt-secondary truncate">{{
-                        vectorStatusLabel(file)
                       }}</span>
                     </div>
                   </div>
@@ -1145,14 +1223,18 @@
                         >
                           <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                         </div>
-                        <div class="flex flex-col gap-0.5 min-w-0">
-                          <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
-                          <span
-                            class="text-[10px] txt-secondary truncate"
-                            :title="vectorStatusLabel(file)"
-                          >
-                            {{ vectorStatusLabel(file) }}
-                          </span>
+                        <div class="flex flex-col gap-1 min-w-0">
+                          <span class="text-sm txt-primary truncate" :title="file.filename">{{
+                            displayName(file)
+                          }}</span>
+                          <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                            <FileSourceBadge v-if="file.source" :source="file.source" />
+                            <FileVectorPill
+                              :state="vectorStateOf(file)"
+                              :chunk-count="file.chunk_count ?? file.chunks ?? 0"
+                              :group-key="file.group_key"
+                            />
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -1355,6 +1437,8 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
 import FilesIntegrationsBanner from '@/components/FilesIntegrationsBanner.vue'
 import FilesTabs from '@/components/files/FilesTabs.vue'
+import FileVectorPill from '@/components/files/FileVectorPill.vue'
+import FileSourceBadge from '@/components/files/FileSourceBadge.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import { Icon } from '@iconify/vue'
 import {
@@ -1413,6 +1497,11 @@ const showFilters = ref(false)
 const filterFileType = ref('')
 const filterDateFrom = ref('')
 const filterDateTo = ref('')
+// Feature 2 (§4.4, §4.2, §4.5) — provenance / searchable / incoming filters.
+const filterSource = ref('')
+const filterVectorized = ref('')
+const filterIncoming = ref(false)
+const incomingCount = ref(0)
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const activeFilterCount = computed(() => {
@@ -1420,6 +1509,9 @@ const activeFilterCount = computed(() => {
   if (filterFileType.value) count++
   if (filterDateFrom.value) count++
   if (filterDateTo.value) count++
+  if (filterSource.value) count++
+  if (filterVectorized.value) count++
+  if (filterIncoming.value) count++
   return count
 })
 
@@ -1912,6 +2004,9 @@ const loadFiles = async (page = currentPage.value) => {
       groupKey: filterGroup.value || undefined,
       search: searchQuery.value || undefined,
       fileType: filterFileType.value || undefined,
+      source: filterSource.value || undefined,
+      vectorState: filterVectorized.value || undefined,
+      incoming: filterIncoming.value ? true : undefined,
       dateFrom: buildDateTimestamp(filterDateFrom.value),
       dateTo: buildDateTimestamp(filterDateTo.value, true),
       page,
@@ -1959,8 +2054,26 @@ const resetFilters = () => {
   filterFileType.value = ''
   filterDateFrom.value = ''
   filterDateTo.value = ''
+  filterSource.value = ''
+  filterVectorized.value = ''
+  filterIncoming.value = false
   currentPage.value = 1
   loadFiles(1)
+}
+
+const toggleIncomingFilter = () => {
+  filterIncoming.value = !filterIncoming.value
+  currentPage.value = 1
+  loadFiles(1)
+}
+
+const loadFacets = async () => {
+  try {
+    const facets = await filesService.getFacets()
+    incomingCount.value = facets.incoming
+  } catch {
+    incomingCount.value = 0
+  }
 }
 
 const loadFileGroups = async () => {
@@ -2247,13 +2360,18 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
-const vectorStatusLabel = (file: FileItem): string =>
-  file.is_vectorized ? t('files.vectorized', { count: file.chunks ?? 0 }) : t('files.notVectorized')
+/** §4.4: show the original (source) name when present, else the stored name. */
+const displayName = (file: FileItem): string =>
+  file.display_name || file.original_name || file.filename
+
+/** Derive the pill state, falling back to chunk count for legacy rows. */
+const vectorStateOf = (file: FileItem) =>
+  file.vector_state ?? (file.is_vectorized ? 'vectorized' : 'none')
 
 // Load initial data
 onMounted(async () => {
   document.addEventListener('click', closeFolderMenu)
-  await Promise.all([loadFileGroups(), loadFiles()])
+  await Promise.all([loadFileGroups(), loadFiles(), loadFacets()])
 
   const persistedFiles = loadFileMetadata()
   if (persistedFiles && persistedFiles.length > 0) {
