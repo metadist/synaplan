@@ -336,7 +336,7 @@
                     : files.slice(0, totalBadgesCount > 3 ? 2 : files.length)"
                   :key="file.id"
                   :class="[
-                    'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer text-sm',
+                    'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer text-sm min-w-0 max-w-full',
                     role === 'user'
                       ? 'bg-black/25 hover:bg-black/35'
                       : 'bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20',
@@ -344,10 +344,12 @@
                   @click="downloadFile(file)"
                 >
                   <Icon :icon="getFileIcon(file.fileType)" class="w-4 h-4 flex-shrink-0" />
-                  <span class="font-medium truncate max-w-[200px]">{{ file.filename }}</span>
-                  <span v-if="file.fileSize" class="text-xs opacity-60">{{
-                    formatFileSize(file.fileSize)
-                  }}</span>
+                  <span class="font-medium truncate min-w-0 flex-1">{{ file.filename }}</span>
+                  <span
+                    v-if="file.fileSize"
+                    class="text-xs opacity-60 flex-shrink-0 whitespace-nowrap"
+                    >{{ formatFileSize(file.fileSize) }}</span
+                  >
                 </div>
               </template>
 
