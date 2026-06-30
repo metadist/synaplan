@@ -18,10 +18,14 @@ use Psr\Log\LoggerInterface;
  * MessageProcessor call sites, gated by MULTITASK_ROUTING_ENABLED.
  *
  * Plan source + path selection:
- *   - Only genuinely AI-classified messages (classification source `ai_sorting`)
- *     are sent to the {@see TaskPlanner}. Deterministic/simple branches
- *     (fast-path chat, slash commands, attachments, widget, again) keep using
- *     the proven single-node path — no planner latency, no behaviour change.
+ *   - AI-classified messages (classification source `ai_sorting`) AND non-image
+ *     file attachments (`attachment_document_or_audio`) are sent to the
+ *     {@see TaskPlanner}. Other deterministic/simple branches (fast-path chat,
+ *     slash commands, widget, again) keep using the proven single-node path —
+ *     no planner latency, no behaviour change. File attachments are planned so
+ *     multi-intent messages ("summarize this DOCX, make an image and read it
+ *     aloud") are no longer reduced to a lone file analysis (issue #1192); a
+ *     single-intent attachment still degrades to the legacy single-node path.
  *     Widget conversations are excluded even when AI-classified ("standard
  *     sorting" widgets set `is_widget_mode`) — the embed client has no
  *     task-plan UI.
@@ -182,8 +186,20 @@ final readonly class TaskPlanExecutor
      */
     private function planForExecution(Message $message, array $thread, array $classification, array $options = []): ?TaskPlanResult
     {
-        // Only AI-sorted messages are candidates for multi-task planning.
-        if ('ai_sorting' !== ($classification['source'] ?? null)) {
+        // Messages eligible for multi-task planning:
+        //   - `ai_sorting`: genuinely AI-classified turns.
+        //   - `attachment_document_or_audio`: non-image file attachments. These
+        //     used to be force-routed to single-node file analysis, which
+        //     silently dropped any *additional* intents in the same message
+        //     ("summarize this DOCX, make an image and read it aloud" became just
+        //     a summary). Sending them to the planner restores multi-intent
+        //     support. This is safe because a single-intent attachment yields a
+        //     single-node (or fallback) plan → shouldUseLegacyRouter() delegates
+        //     to the legacy router with the original analyzefile classification,
+        //     i.e. identical behaviour. Only genuinely multi-intent messages run
+        //     the DAG (issue #1192).
+        $source = $classification['source'] ?? null;
+        if (!in_array($source, ['ai_sorting', 'attachment_document_or_audio'], true)) {
             return null;
         }
 

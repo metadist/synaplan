@@ -135,6 +135,55 @@ final class ResultAssemblerTest extends TestCase
         $this->assertSame('skipped', $n2['state']);
     }
 
+    /**
+     * Issue #1197: when the reply node is `compose_reply` (no provider meta of
+     * its own), the assembler must backfill provider/model/model_id from the
+     * upstream LLM node so StreamController persists the real inference
+     * provider (e.g. groq) and the chat bubble shows the correct avatar.
+     */
+    public function testProviderMetadataPropagatedFromUpstreamNodeToReply(): void
+    {
+        $plan = $this->plan();
+        $ctx = $this->context();
+
+        $ctx->setResult('n1', NodeResult::ok('Summary text', [], [
+            'provider' => 'groq',
+            'model' => 'gpt-oss-120b',
+            'model_id' => 76,
+        ]));
+        $ctx->setResult('n2', NodeResult::ok(null, [['path' => 'uploads/tts.mp3', 'type' => 'audio']]));
+        // compose_reply reply node carries no provider metadata.
+        $ctx->setResult('n3', NodeResult::ok('Summary text', [['path' => 'uploads/tts.mp3', 'type' => 'audio']]));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertSame('groq', $result['metadata']['provider']);
+        $this->assertSame('gpt-oss-120b', $result['metadata']['model']);
+        $this->assertSame(76, $result['metadata']['model_id']);
+    }
+
+    /**
+     * Issue #1197: an explicit provider on the reply node must NOT be
+     * overwritten by the upstream backfill.
+     */
+    public function testReplyNodeProviderNotOverriddenByBackfill(): void
+    {
+        $plan = $this->plan();
+        $ctx = $this->context();
+
+        $ctx->setResult('n1', NodeResult::ok('Summary text', [], ['provider' => 'groq', 'model' => 'gpt-oss-120b']));
+        $ctx->setResult('n2', NodeResult::ok(null, [['path' => 'uploads/tts.mp3', 'type' => 'audio']]));
+        $ctx->setResult('n3', NodeResult::ok('Summary text', [['path' => 'uploads/tts.mp3', 'type' => 'audio']], [
+            'provider' => 'anthropic',
+            'model' => 'claude-opus',
+        ]));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertSame('anthropic', $result['metadata']['provider']);
+        $this->assertSame('claude-opus', $result['metadata']['model']);
+    }
+
     private function searchPlan(): TaskPlan
     {
         return TaskPlan::fromArray([

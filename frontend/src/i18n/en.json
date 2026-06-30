@@ -732,6 +732,7 @@
     "status_vectorized": "Ready",
     "status_error": "Error",
     "status_processed": "Processed",
+    "status_generated": "Generated",
     "attached": "Attached",
     "standalone": "Standalone",
     "attachedToMessage": "This file is attached to a message",

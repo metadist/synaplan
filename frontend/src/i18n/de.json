@@ -1970,6 +1970,7 @@
     "status_vectorized": "Bereit",
     "status_error": "Fehler",
     "status_processed": "Verarbeitet",
+    "status_generated": "Generiert",
     "attached": "Angehängt",
     "standalone": "Eigenständig",
     "attachedToMessage": "Diese Datei ist an eine Nachricht angehängt",

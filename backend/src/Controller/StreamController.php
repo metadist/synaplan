@@ -2530,6 +2530,9 @@ class StreamController extends AbstractController
             $file->setFileSize($fileSize);
             $file->setFileMime($this->getMimeTypeForExtension($extension));
             $file->setStatus('generated');
+            // Issue #1190: mark provenance so generated files are distinguishable
+            // from uploads (default 'web_upload') and can be targeted for repair.
+            $file->setSource('generated');
 
             $this->em->persist($file);
             $this->em->flush();
@@ -2551,6 +2554,18 @@ class StreamController extends AbstractController
         $filename = $fileData['filename'];
         $content = $fileData['content'];
         $extension = $fileData['extension'];
+
+        // Issue #1196: never persist a generated document from whitespace-only
+        // content — it would create a DB row plus a blank file with no usable
+        // body. Bail early so the caller can surface a real failure instead.
+        if ('' === trim((string) $content)) {
+            $this->logger->warning('StreamController: refusing to store generated file with empty content', [
+                'filename' => $filename,
+                'extension' => $extension,
+            ]);
+
+            return null;
+        }
 
         try {
             // Generate storage path similar to FileStorageService
@@ -2617,6 +2632,10 @@ class StreamController extends AbstractController
             // exact current content instead of re-deriving it.
             $file->setFileText($content);
             $file->setStatus('generated');
+            // Issue #1190: mark provenance so generated files are distinguishable
+            // from uploads (default 'web_upload') and can be regenerated from
+            // BFILETEXT on download when the on-disk binary goes missing.
+            $file->setSource('generated');
 
             $this->em->persist($file);
             $this->em->flush();

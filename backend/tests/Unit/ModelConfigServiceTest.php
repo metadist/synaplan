@@ -524,7 +524,10 @@ class ModelConfigServiceTest extends TestCase
 
     public function testGetEffectiveUserIdForMessageWithEmailChannelNoKeyword(): void
     {
-        // Mock message with email channel but no keyword (smart@synaplan.net)
+        // Regression test for issue #1176: a keyword-less email from an
+        // identified sender (smart@synaplan.net) must use the SENDER'S own
+        // user id for model selection — same as web chat — not the legacy
+        // hardcoded user ID 2.
         $message = $this->createMock(\App\Entity\Message::class);
         $message->method('getUserId')->willReturn(20);
         $message->method('getMeta')
@@ -533,7 +536,7 @@ class ModelConfigServiceTest extends TestCase
                     return 'email';
                 }
                 if ('email_keyword' === $key) {
-                    return null; // No keyword, so should use user ID 2
+                    return null; // No keyword (smart@synaplan.net)
                 }
 
                 return null;
@@ -546,7 +549,11 @@ class ModelConfigServiceTest extends TestCase
 
         $result = $this->service->getEffectiveUserIdForMessage($message);
 
-        $this->assertEquals(2, $result, 'Email channel without keyword should return user ID 2');
+        $this->assertEquals(
+            20,
+            $result,
+            'Email channel without keyword must return the sender\'s own userId (issue #1176)'
+        );
     }
 
     public function testGetEffectiveUserIdForMessageWithNullChannel(): void

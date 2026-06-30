@@ -135,6 +135,21 @@ final readonly class MessagePreProcessor
         // File existiert lokal?
         $fullPath = $this->uploadsDir.'/'.$filePath;
         if (!file_exists($fullPath)) {
+            // Issue #1190: a chat-generated file (OfficeMaker path) can lose its
+            // on-disk binary (e.g. a Docker rebuild) while BFILETEXT survives in
+            // the DB. Such a file is still fully usable for chat/analysis and the
+            // binary is regenerable on download, so it must NOT be flagged as
+            // 'error'. Only mark missing files without recoverable text as errors.
+            if (!empty($messageFile->getFileText())) {
+                $this->logger->warning('File binary missing on disk but BFILETEXT present; keeping status', [
+                    'file_id' => $messageFile->getId(),
+                    'path' => $fullPath,
+                    'status' => $messageFile->getStatus(),
+                ]);
+
+                return;
+            }
+
             $this->logger->warning("File not found: {$fullPath}");
             $messageFile->setStatus('error');
 
@@ -149,7 +164,13 @@ final readonly class MessagePreProcessor
                 'type' => $fileType,
                 'text_length' => strlen($messageFile->getFileText()),
             ]);
-            $messageFile->setStatus('processed');
+            // Issue #1191: re-attaching an already-vectorized file must NOT
+            // downgrade its status to 'processed' — the Qdrant vectors are
+            // still valid, so the DB status would become inconsistent. Only
+            // promote files that have not already reached a terminal state.
+            if (!in_array($messageFile->getStatus(), ['vectorized', 'processed'], true)) {
+                $messageFile->setStatus('processed');
+            }
 
             // Issue #887: even when extraction was already done at upload
             // time, the analysis-billing event fires HERE (the message is

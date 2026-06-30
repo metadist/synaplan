@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\File\DocumentGeneratorService;
 use App\Service\File\FileHelper;
 use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
@@ -43,6 +44,7 @@ class FileController extends AbstractController
         private WidgetService $widgetService,
         private VectorStorageFacade $vectorStorageFacade,
         private VectorMigrationService $migrationService,
+        private DocumentGeneratorService $documentGenerator,
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
@@ -397,10 +399,65 @@ class FileController extends AbstractController
 
         $absolutePath = $this->uploadDir.'/'.$file->getFilePath();
         if (!FileHelper::fileExistsNfs($absolutePath)) {
+            // Issue #1190: a chat-generated file can lose its on-disk binary
+            // (e.g. a Docker rebuild) while BFILETEXT — the Markdown/text source
+            // it was built from — survives in the DB. Rather than a dead-end 404
+            // (the user can still preview the content), regenerate the binary
+            // from BFILETEXT on the fly so the download stays consistent with
+            // the preview.
+            $regenerated = $this->regenerateMissingBinary($file);
+            if (null !== $regenerated) {
+                return $regenerated;
+            }
+
             return $this->json(['error' => 'File not found on disk'], Response::HTTP_NOT_FOUND);
         }
 
         $response = new BinaryFileResponse($absolutePath);
+        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $file->getFileName());
+
+        return $response;
+    }
+
+    /**
+     * Rebuild a missing on-disk binary from the file's stored text source
+     * (BFILETEXT) and return it as a one-shot download. Used as a safety net
+     * for chat-generated files whose binary was lost (issue #1190). Returns
+     * null when the file cannot be regenerated (no text or write failure), so
+     * the caller falls back to a 404.
+     */
+    private function regenerateMissingBinary(File $file): ?BinaryFileResponse
+    {
+        $text = $file->getFileText();
+        if ('' === trim($text)) {
+            return null;
+        }
+
+        $extension = strtolower(pathinfo($file->getFileName(), PATHINFO_EXTENSION))
+            ?: strtolower($file->getFileType());
+        if ('' === $extension) {
+            return null;
+        }
+
+        try {
+            $tmpPath = tempnam(sys_get_temp_dir(), 'regen_').'.'.$extension;
+            $this->documentGenerator->write($text, $extension, $tmpPath);
+        } catch (\Throwable $e) {
+            $this->logger->warning('FileController: failed to regenerate missing binary from BFILETEXT', [
+                'file_id' => $file->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        $this->logger->info('FileController: regenerated missing binary from BFILETEXT for download', [
+            'file_id' => $file->getId(),
+            'extension' => $extension,
+        ]);
+
+        $response = new BinaryFileResponse($tmpPath);
+        $response->deleteFileAfterSend(true);
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $file->getFileName());
 
         return $response;

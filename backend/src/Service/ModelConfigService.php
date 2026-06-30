@@ -604,15 +604,19 @@ final readonly class ModelConfigService
     /**
      * Get effective user ID for model selection based on message channel.
      *
-     * For Email messages:
-     *   - smart@synaplan.net (no keyword) → returns user ID 2 for model selection
-     *   - smart+keyword@synaplan.net (with keyword) → returns sender's user ID
+     * For Email messages: always returns the sender's own user ID. The message
+     * only reaches this branch once it has been mapped to a real account
+     * (the null-userId guard above filters out senders we could not identify),
+     * so a registered sender must get the SAME model they use in web chat —
+     * whether or not they used a +keyword address (issue #1176). Unmapped
+     * senders never get here, so there is no longer a hardcoded user-ID-2
+     * fallback that silently overrode the sender's configured model.
      *
      * For WhatsApp messages: Returns user ID only if WhatsApp number is verified.
      * For web/other channels: Always returns the user ID (no verification required).
      *
-     * This ensures unverified WhatsApp users and emails without keywords get default models,
-     * while web users and emails with keywords always get their configured models.
+     * This ensures unverified WhatsApp users get default models, while web users
+     * and identified email senders always get their configured models.
      */
     public function getEffectiveUserIdForMessage(Message $message): ?int
     {
@@ -623,15 +627,9 @@ final readonly class ModelConfigService
 
         $channel = $message->getMeta('channel');
 
-        // For Email: if no keyword (smart@synaplan.net), use user ID 2 for model selection
+        // For Email: the sender is already an identified account (guarded above),
+        // so use their own configured model regardless of +keyword (issue #1176).
         if ('email' === $channel) {
-            $emailKeyword = $message->getMeta('email_keyword');
-            // If no keyword (smart@synaplan.net without +keyword), use user ID 2
-            if (empty($emailKeyword)) {
-                return 2;
-            }
-
-            // If keyword exists (smart+keyword@synaplan.net), use sender's user ID
             return $userId;
         }
 

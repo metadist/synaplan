@@ -83,9 +83,19 @@ final readonly class DocumentGeneratorService
 
         $html = (new \Parsedown())->text($content);
 
+        // PhpWord parses the HTML with DOMDocument::loadXML() (XHTML), which
+        // rejects unclosed void tags. LLMs routinely emit bare `<br>` (and
+        // sometimes `<hr>` / `<img>`) inside markdown table cells; Parsedown
+        // passes those through verbatim, the XML parse then fails mid-table and
+        // PhpWord silently produces a structurally valid but EMPTY document
+        // (no <w:t> runs). Self-closing the void tags first keeps the table
+        // content intact (issue #1196).
+        $html = $this->normalizeVoidTags($html);
+
         // Ensure special characters (like '&', '<', '>') are escaped in the XML to prevent document corruption.
         WordSettings::setOutputEscapingEnabled(true);
 
+        $usedFallback = false;
         try {
             $phpWord = new PhpWord();
             $section = $phpWord->addSection();
@@ -95,18 +105,80 @@ final readonly class DocumentGeneratorService
                 'error' => $e->getMessage(),
             ]);
 
-            $phpWord = new PhpWord();
-            $section = $phpWord->addSection();
-            foreach ($this->splitLines($content) as $line) {
-                if ('' === trim($line)) {
-                    $section->addTextBreak();
-                } else {
-                    $section->addText($line);
-                }
-            }
+            $phpWord = $this->buildPlainTextDocx($content);
+            $usedFallback = true;
         }
 
         WordIOFactory::createWriter($phpWord, 'Word2007')->save($absolutePath);
+
+        // Defense in depth: even when addHtml() does not throw, a malformed
+        // fragment can leave the body without a single text run. Assert the
+        // saved document actually contains text and, if not, rebuild it from
+        // the plain-text fallback so we never ship a blank-but-valid DOCX.
+        if (!$usedFallback && !$this->docxHasText($absolutePath)) {
+            $this->logger->warning('DocumentGeneratorService: DOCX produced no text runs, rebuilding with plain text fallback', [
+                'path' => $absolutePath,
+            ]);
+
+            WordIOFactory::createWriter($this->buildPlainTextDocx($content), 'Word2007')->save($absolutePath);
+        }
+    }
+
+    /**
+     * Build a DOCX from the raw content as plain paragraphs. Used as the
+     * always-valid fallback when HTML conversion fails or yields no text.
+     */
+    private function buildPlainTextDocx(string $content): PhpWord
+    {
+        $phpWord = new PhpWord();
+        $section = $phpWord->addSection();
+        foreach ($this->splitLines($content) as $line) {
+            if ('' === trim($line)) {
+                $section->addTextBreak();
+            } else {
+                $section->addText($line);
+            }
+        }
+
+        return $phpWord;
+    }
+
+    /**
+     * Self-close HTML void tags that PhpWord's XML parser would otherwise
+     * reject (`<br>` → `<br/>`, `<hr>` → `<hr/>`, `<img ...>` → `<img .../>`).
+     * Tags that are already self-closed are left untouched.
+     */
+    private function normalizeVoidTags(string $html): string
+    {
+        // <br> and <hr> with optional attributes, not already self-closed.
+        $html = preg_replace('/<(br|hr)(\s[^>]*?)?\s*(?<!\/)>/i', '<$1$2/>', $html) ?? $html;
+
+        // <img ...> not already self-closed.
+        $html = preg_replace('/<img(\s[^>]*?)?\s*(?<!\/)>/i', '<img$1/>', $html) ?? $html;
+
+        return $html;
+    }
+
+    /**
+     * Whether the saved DOCX contains at least one text run (`<w:t>`), i.e.
+     * the body is not blank. Reads word/document.xml from the OOXML zip.
+     */
+    private function docxHasText(string $absolutePath): bool
+    {
+        $zip = new \ZipArchive();
+        if (true !== $zip->open($absolutePath)) {
+            // Can't inspect it — assume valid rather than forcing a rebuild.
+            return true;
+        }
+
+        $xml = $zip->getFromName('word/document.xml');
+        $zip->close();
+
+        if (false === $xml) {
+            return true;
+        }
+
+        return str_contains($xml, '<w:t>') || str_contains($xml, '<w:t ');
     }
 
     /**

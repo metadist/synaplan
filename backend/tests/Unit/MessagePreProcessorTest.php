@@ -309,6 +309,122 @@ class MessagePreProcessorTest extends TestCase
     }
 
     /**
+     * Issue #1191 — re-attaching an already-vectorized file (BFILETEXT
+     * present) must NOT downgrade its status to 'processed'. The Qdrant
+     * vectors are still valid, so flipping the DB status to 'processed' would
+     * make the two stores inconsistent.
+     */
+    public function testProcessFileEntityDoesNotDowngradeVectorizedStatusOnReAttach(): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_vec_'.uniqid().'.pdf';
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(55);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn('pdf');
+            $file->method('getFileName')->willReturn('kb.pdf');
+            $file->method('getFileSize')->willReturn(2048);
+            $file->method('getFileText')->willReturn('Vectorized knowledge contents');
+            $file->method('getUserId')->willReturn(7);
+            $file->method('getStatus')->willReturn('vectorized');
+
+            // The status must never be touched for an already-vectorized file.
+            $file->expects($this->never())->method('setStatus');
+
+            // Owner not resolvable → billing is a no-op (keeps the test focused).
+            $this->userRepository->method('find')->with(7)->willReturn(null);
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(7);
+
+            $this->fileProcessor->expects($this->never())->method('extractText');
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
+
+    /**
+     * Issue #1190 — when a file's on-disk binary is missing but BFILETEXT is
+     * present (chat-generated file whose binary was lost), the preprocessor
+     * must NOT flag it as 'error'; the file is still usable from the DB text.
+     */
+    public function testProcessFileEntityKeepsStatusWhenBinaryMissingButTextPresent(): void
+    {
+        $file = $this->createMock(\App\Entity\File::class);
+        $file->method('getId')->willReturn(60);
+        $file->method('getFilePath')->willReturn('does/not/exist.docx');
+        $file->method('getFileType')->willReturn('docx');
+        $file->method('getFileText')->willReturn('Recoverable markdown body');
+        $file->method('getStatus')->willReturn('generated');
+        $file->method('getUserId')->willReturn(7);
+
+        // Status must not be downgraded to 'error' for a recoverable file.
+        $file->expects($this->never())->method('setStatus');
+
+        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $message = $this->createMock(Message::class);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFiles')->willReturn($files);
+        $message->method('getUserId')->willReturn(7);
+
+        $this->messageRepository->method('save');
+
+        $this->service->process($message);
+    }
+
+    /**
+     * Issue #1190 — a missing binary with NO recoverable text is a genuine
+     * error and must still be flagged as such.
+     */
+    public function testProcessFileEntityMarksErrorWhenBinaryMissingAndNoText(): void
+    {
+        $file = $this->createMock(\App\Entity\File::class);
+        $file->method('getId')->willReturn(61);
+        $file->method('getFilePath')->willReturn('does/not/exist.docx');
+        $file->method('getFileType')->willReturn('docx');
+        $file->method('getFileText')->willReturn('');
+
+        $file->expects($this->atLeastOnce())->method('setStatus')->with('error');
+
+        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $message = $this->createMock(Message::class);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFiles')->willReturn($files);
+        $message->method('getUserId')->willReturn(7);
+
+        $this->messageRepository->method('save');
+
+        $this->service->process($message);
+    }
+
+    /**
      * Issue #954 — '.md', '.csv', and '.ppt' uploads must be routed through
      * FileProcessor like every other document type. Before the fix they were
      * missing from DOCUMENT_EXTENSIONS, so the preprocessor silently skipped

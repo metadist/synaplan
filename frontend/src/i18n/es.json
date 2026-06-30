@@ -1467,6 +1467,7 @@
     "status_vectorizing": "Indexando…",
     "status_vectorized": "Vectorizado",
     "status_processed": "Procesado",
+    "status_generated": "Generado",
     "attached": "Adjunto",
     "standalone": "Independiente",
     "attachedToMessage": "Este archivo está adjunto a un mensaje",
