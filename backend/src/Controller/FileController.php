@@ -405,36 +405,10 @@ class FileController extends AbstractController
         // (03_file-management.md §3.1). Persisted once so later reads are cheap.
         $this->syncVectorState($messageFiles, $allChunks);
 
-        $files = array_map(function ($mf) use ($vectorChunkMap, $allChunks) {
-            $chunkCount = (int) ($allChunks[$mf->getId()]['chunks'] ?? 0);
-            $groupKey = $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null);
-
-            return [
-                'id' => $mf->getId(),
-                'filename' => $mf->getFileName(),
-                'display_name' => $mf->getDisplayName(),
-                'original_name' => $mf->getOriginalName(),
-                'path' => $mf->getFilePath(),
-                'file_type' => $mf->getFileType(),
-                'file_size' => $mf->getFileSize(),
-                'mime' => $mf->getFileMime(),
-                'status' => $mf->getStatus(),
-                'source' => $mf->getSource(),
-                'origin_kind' => $mf->getOriginKind(),
-                'incoming' => $mf->isIncoming(),
-                'message_id' => $mf->getMessageId(),
-                'provider' => $mf->getProvider(),
-                'thumb_url' => null !== $mf->getThumbPath() ? '/api/v1/files/'.$mf->getId().'/thumb' : null,
-                'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
-                'uploaded_at' => $mf->getCreatedAt(),
-                'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
-                'group_key' => $groupKey,
-                'chunks' => $chunkCount,
-                'chunk_count' => $chunkCount,
-                'vector_state' => $mf->getVectorState(),
-                'is_vectorized' => $chunkCount > 0,
-            ];
-        }, $messageFiles);
+        $files = array_map(
+            fn (File $mf): array => $this->serializeFileRow($mf, $allChunks, $vectorChunkMap),
+            $messageFiles,
+        );
 
         return $this->json([
             'success' => true,
@@ -1028,6 +1002,47 @@ class FileController extends AbstractController
         }
 
         return $vectorChunkMap;
+    }
+
+    /**
+     * Build the list-row payload for a single file (03_file-management.md §5),
+     * including provenance, vector state, group and generated-media fields.
+     *
+     * @param array<int, array{chunks: int, groupKey: string|null}> $allChunks
+     * @param array<int, string>                                    $vectorChunkMap
+     *
+     * @return array<string, mixed>
+     */
+    private function serializeFileRow(File $mf, array $allChunks, array $vectorChunkMap): array
+    {
+        $chunkCount = (int) ($allChunks[$mf->getId()]['chunks'] ?? 0);
+        $groupKey = $mf->getGroupKey() ?: ($vectorChunkMap[$mf->getId()] ?? null);
+
+        return [
+            'id' => $mf->getId(),
+            'filename' => $mf->getFileName(),
+            'display_name' => $mf->getDisplayName(),
+            'original_name' => $mf->getOriginalName(),
+            'path' => $mf->getFilePath(),
+            'file_type' => $mf->getFileType(),
+            'file_size' => $mf->getFileSize(),
+            'mime' => $mf->getFileMime(),
+            'status' => $mf->getStatus(),
+            'source' => $mf->getSource(),
+            'origin_kind' => $mf->getOriginKind(),
+            'incoming' => $mf->isIncoming(),
+            'message_id' => $mf->getMessageId(),
+            'provider' => $mf->getProvider(),
+            'thumb_url' => null !== $mf->getThumbPath() ? '/api/v1/files/'.$mf->getId().'/thumb' : null,
+            'text_preview' => mb_substr($mf->getFileText() ?? '', 0, 200),
+            'uploaded_at' => $mf->getCreatedAt(),
+            'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
+            'group_key' => $groupKey,
+            'chunks' => $chunkCount,
+            'chunk_count' => $chunkCount,
+            'vector_state' => $mf->getVectorState(),
+            'is_vectorized' => $chunkCount > 0,
+        ];
     }
 
     /**
