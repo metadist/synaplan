@@ -6,8 +6,7 @@
     >
       <router-link
         to="/files"
-        class="files-tab txt-secondary"
-        :class="active === 'files' && 'files-tab--active'"
+        :class="tabClass('files')"
         :aria-current="active === 'files' ? 'page' : undefined"
         data-testid="tab-files-browse"
       >
@@ -16,8 +15,7 @@
       </router-link>
       <router-link
         to="/files/incoming"
-        class="files-tab txt-secondary"
-        :class="active === 'incoming' && 'files-tab--active'"
+        :class="tabClass('incoming')"
         :aria-current="active === 'incoming' ? 'page' : undefined"
         data-testid="tab-files-incoming"
       >
@@ -33,8 +31,7 @@
       </router-link>
       <router-link
         to="/files/generated"
-        class="files-tab txt-secondary"
-        :class="active === 'generated' && 'files-tab--active'"
+        :class="tabClass('generated')"
         :aria-current="active === 'generated' ? 'page' : undefined"
         data-testid="tab-files-generated"
       >
@@ -43,8 +40,7 @@
       </router-link>
       <router-link
         to="/files/search"
-        class="files-tab txt-secondary"
-        :class="active === 'search' && 'files-tab--active'"
+        :class="tabClass('search')"
         :aria-current="active === 'search' ? 'page' : undefined"
         data-testid="tab-files-search"
       >
@@ -53,8 +49,7 @@
       </router-link>
       <router-link
         to="/files/vectors"
-        class="files-tab txt-secondary"
-        :class="active === 'vectors' && 'files-tab--active'"
+        :class="tabClass('vectors')"
         :aria-current="active === 'vectors' ? 'page' : undefined"
         data-testid="tab-files-vectors"
       >
@@ -78,9 +73,22 @@ import {
 } from '@heroicons/vue/24/outline'
 import filesService from '@/services/filesService'
 
-defineProps<{
-  active: 'files' | 'search' | 'vectors' | 'incoming' | 'generated'
+type FilesTab = 'files' | 'search' | 'vectors' | 'incoming' | 'generated'
+
+const props = defineProps<{
+  active: FilesTab
 }>()
+
+// Tailwind-only tab styling (AGENTS_DEV: no component-scoped CSS). The `-mb-px`
+// pulls the active 2px bottom border over the nav's own border for the
+// classic tab look; brand color comes from the CSS token.
+const BASE_TAB =
+  'inline-flex items-center gap-1.5 px-4 py-2 -mb-px text-sm font-medium border-b-2 whitespace-nowrap transition-colors'
+
+const tabClass = (name: FilesTab): string =>
+  props.active === name
+    ? `${BASE_TAB} text-[var(--brand)] border-[var(--brand)]`
+    : `${BASE_TAB} txt-secondary border-transparent hover:text-[var(--brand)]`
 
 // Incoming count badge — shown on every files tab so the user notices when
 // integrations have pushed new files for triage (§4.5). Best-effort, silent.
@@ -95,29 +103,3 @@ onMounted(async () => {
   }
 })
 </script>
-
-<style scoped>
-.files-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 1rem;
-  margin-bottom: -1px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-bottom: 2px solid transparent;
-  white-space: nowrap;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.files-tab:hover,
-.files-tab--active {
-  color: var(--brand) !important;
-}
-
-.files-tab--active {
-  border-bottom-color: var(--brand);
-}
-</style>
