@@ -1044,6 +1044,158 @@ class ConfigController extends AbstractController
     }
 
     /**
+     * Get the user's planner model selection (DEFAULTMODEL.PLAN).
+     *
+     * The planner (TaskPlanner) breaks complex requests into a multi-task DAG.
+     * Its model resolves to the per-user DEFAULTMODEL.PLAN override, then the
+     * global one, then falls back to the Sorting model (DEFAULTMODEL.SORT). This
+     * endpoint exposes that selection so it is configurable in the UI instead of
+     * only via direct SQL (#1143).
+     */
+    #[Route('/routing/planner-model', name: 'routing_planner_model_get', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/routing/planner-model',
+        summary: 'Get the planner model selection',
+        description: 'Returns the resolved planner model id (DEFAULTMODEL.PLAN, user override then global) and the Sorting model id it falls back to when no planner model is set.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Planner model selection',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'modelId', type: 'integer', nullable: true, description: 'Selected planner model id, or null when none is configured (falls back to the Sorting model)', example: 12),
+                new OA\Property(property: 'fallbackModelId', type: 'integer', nullable: true, description: 'Sorting model id used when no planner model is set', example: 7),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function getPlannerModel(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $userId = $user->getId();
+
+        $config = $this->configRepository->findOneBy([
+            'ownerId' => $userId,
+            'group' => 'DEFAULTMODEL',
+            'setting' => 'PLAN',
+        ]) ?? $this->configRepository->findOneBy([
+            'ownerId' => 0,
+            'group' => 'DEFAULTMODEL',
+            'setting' => 'PLAN',
+        ]);
+
+        $modelId = null;
+        if ($config) {
+            $candidate = (int) $config->getValue();
+            $model = $this->modelRepository->find($candidate);
+            $modelId = ($model && 1 === $model->getActive()) ? $candidate : null;
+        }
+
+        return $this->json([
+            'success' => true,
+            'modelId' => $modelId,
+            'fallbackModelId' => $this->modelConfigService->getDefaultModel('SORT', $userId),
+        ]);
+    }
+
+    /**
+     * Save (or clear) the user's planner model selection (DEFAULTMODEL.PLAN).
+     *
+     * A null `modelId` removes the per-user override so the planner reverts to
+     * the global default / Sorting model fallback.
+     */
+    #[Route('/routing/planner-model', name: 'routing_planner_model_save', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/config/routing/planner-model',
+        summary: 'Save the planner model selection',
+        description: 'Writes the per-user DEFAULTMODEL.PLAN override. Pass `modelId: null` to clear the override and fall back to the Sorting model.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['modelId'],
+                properties: [
+                    new OA\Property(property: 'modelId', type: 'integer', nullable: true, description: 'Planner model id, or null to clear the override', example: 12),
+                ]
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Planner model saved',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'modelId', type: 'integer', nullable: true, example: 12),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid request body or model not available')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function savePlannerModel(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || !array_key_exists('modelId', $data)) {
+            return $this->json(['error' => 'Invalid data'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $userId = $user->getId();
+        $raw = $data['modelId'];
+
+        $existing = $this->configRepository->findOneBy([
+            'ownerId' => $userId,
+            'group' => 'DEFAULTMODEL',
+            'setting' => 'PLAN',
+        ]);
+
+        // null clears the per-user override → revert to the Sorting model fallback.
+        if (null === $raw) {
+            if ($existing) {
+                $this->em->remove($existing);
+                $this->em->flush();
+            }
+
+            return $this->json(['success' => true, 'modelId' => null]);
+        }
+
+        if (!is_int($raw) && !(is_string($raw) && ctype_digit($raw))) {
+            return $this->json(['error' => 'Invalid model id'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $modelId = (int) $raw;
+        $model = $this->modelRepository->find($modelId);
+        if (!$model || 1 !== $model->getActive()) {
+            return $this->json(['error' => 'Model not found or inactive'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $config = $existing;
+        if (!$config) {
+            $config = new Config();
+            $config->setOwnerId($userId);
+            $config->setGroup('DEFAULTMODEL');
+            $config->setSetting('PLAN');
+        }
+        $config->setValue((string) $modelId);
+        $this->em->persist($config);
+        $this->em->flush();
+
+        return $this->json(['success' => true, 'modelId' => $modelId]);
+    }
+
+    /**
      * Check if a model is available/ready to use.
      *
      * @param int $modelId Model ID to check

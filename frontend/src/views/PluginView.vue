@@ -33,11 +33,13 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
 import MainLayout from '@/components/MainLayout.vue'
 
 const route = useRoute()
+const { t } = useI18n()
 const configStore = useConfigStore()
 const authStore = useAuthStore()
 const pluginContainer = ref<HTMLElement | null>(null)
@@ -55,7 +57,21 @@ const plugin = computed(() => {
  * We look for an 'index.js' ES module in the plugin's assets.
  */
 async function loadPlugin() {
-  if (!plugin.value || !authStore.user?.id || !pluginContainer.value) return
+  if (!pluginContainer.value) return
+
+  // Ensure runtime config (which lists the user's installed plugins) is
+  // available before deciding the plugin is missing — otherwise a slow config
+  // load would be misread as "not installed".
+  await configStore.init()
+
+  // Plugin exists in the repo but is not installed for this user: surface a
+  // clear message instead of hanging on "Loading plugin…" forever (#1154).
+  const activePlugin = configStore.plugins.find((p) => p.name === pluginName.value)
+  if (!activePlugin || !authStore.user?.id) {
+    loading.value = false
+    error.value = t('plugins.notFound')
+    return
+  }
 
   loading.value = true
   error.value = null
@@ -78,7 +94,7 @@ async function loadPlugin() {
         userId: authStore.user.id,
         apiBaseUrl: configStore.apiBaseUrl,
         pluginBaseUrl: pluginBaseUrl,
-        config: plugin.value,
+        config: activePlugin,
         // Pass shared services if needed
       })
     } else {

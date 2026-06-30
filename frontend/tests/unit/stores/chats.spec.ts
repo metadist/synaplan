@@ -97,6 +97,68 @@ describe('Chats Store', () => {
     })
   })
 
+  describe('loadChats / ensureValidActiveChat', () => {
+    function widgetChat(id: number) {
+      return {
+        id,
+        title: 'Widget session',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        source: 'widget',
+        widgetSession: {
+          widgetId: 'w1',
+          widgetName: 'Demo',
+          sessionId: 's1',
+          messageCount: 1,
+          lastMessage: null,
+          created: 0,
+          expires: 0,
+        },
+      }
+    }
+
+    function regularChat(id: number) {
+      return {
+        id,
+        title: 'Regular chat',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        messageCount: 1,
+      }
+    }
+
+    it('does not restore a stored widget session as the active chat', async () => {
+      localStorage.setItem('synaplan_active_chat_id', '5')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [widgetChat(5), regularChat(9)] })
+
+      await store.loadChats()
+
+      // Falls back to the first regular chat instead of the widget session.
+      expect(store.activeChatId).toBe(9)
+    })
+
+    it('selects null when only widget sessions exist', async () => {
+      localStorage.setItem('synaplan_active_chat_id', '5')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [widgetChat(5)] })
+
+      await store.loadChats()
+
+      expect(store.activeChatId).toBeNull()
+    })
+
+    it('keeps a valid regular chat selection', async () => {
+      localStorage.setItem('synaplan_active_chat_id', '9')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9), widgetChat(5)] })
+
+      await store.loadChats()
+
+      expect(store.activeChatId).toBe(9)
+    })
+  })
+
   describe('bumpChatActivity', () => {
     it('updates updatedAt to a fresh ISO timestamp so the chat sorts to the top', () => {
       const store = useChatsStore()
