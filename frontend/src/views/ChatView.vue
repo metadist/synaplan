@@ -2897,6 +2897,15 @@ const handleStopStreaming = async () => {
     stopStreamingFn = null
   }
 
+  // Resolve the turn id reliably (issues #1141/#1142): the module-level
+  // currentTrackId can be cleared by a racing complete/error handler. When
+  // that happened on navigate-away/reload the backend was never told to stop
+  // AND the partial answer was never persisted (the save below was skipped),
+  // so the whole response — including already-generated media — was lost. Fall
+  // back to the plan-scoped id captured when the turn started.
+  const streamingMessageForTrack = historyStore.messages.find((m) => m.isStreaming)
+  const effectiveTrackId = streamingMessageForTrack?.taskPlan?.trackId ?? currentTrackId
+
   // Notify backend to stop streaming.
   // Guests have no auth session: the auth-guarded /stop-stream endpoint would
   // return 401 and the http client would force a "session expired" redirect to
@@ -2904,14 +2913,14 @@ const handleStopStreaming = async () => {
   // the backend detects the abort via connection_aborted() in the stream loop.
   if (isGuestMode.value) {
     // No backend notification needed for guests.
-  } else if (currentTrackId) {
+  } else if (effectiveTrackId) {
     try {
-      await chatApi.stopStream(currentTrackId)
+      await chatApi.stopStream(effectiveTrackId)
     } catch (error) {
       console.error('❌ Failed to notify backend:', error)
     }
   } else {
-    console.warn('⚠️ No currentTrackId - skipping backend notification')
+    console.warn('⚠️ No trackId - skipping backend notification')
   }
 
   // Stop streaming audio
@@ -2968,7 +2977,9 @@ const handleStopStreaming = async () => {
 
     // Save the cancelled message to backend so it persists after refresh
     // CRITICAL: Use the ORIGINAL chatId where stream was started, NOT the current active chat!
-    const trackIdToSave = currentTrackId
+    // Use the #1141/#1142-hardened track id so the save still fires when
+    // currentTrackId was cleared mid-turn (navigate-away / reload).
+    const trackIdToSave = effectiveTrackId
     const chatIdToSave = currentStreamingChatId
 
     if (isGuestMode.value) {
