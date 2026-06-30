@@ -59,16 +59,17 @@ describe('FileVectorPill', () => {
     expect(wrapper.text()).toBe('Failed')
   })
 
-  it('renders not-applicable for media', () => {
+  it('renders nothing for the legacy not-applicable state', () => {
+    // Media is no longer "not applicable" — any stray legacy value renders
+    // nothing, just like the not-searchable state.
     const wrapper = mountPill({ state: 'not_applicable' })
-    expect(wrapper.text()).toBe('Not applicable')
-    expect(wrapper.get('[data-testid="file-vector-pill"]').attributes('title')).toBe(
-      'Not applicable'
-    )
+    expect(wrapper.find('[data-testid="file-vector-pill"]').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
   })
 
-  it('defaults to the not-searchable state', () => {
+  it('renders nothing when the file is not searchable', () => {
     const wrapper = mountPill()
-    expect(wrapper.text()).toBe('Not searchable')
+    expect(wrapper.find('[data-testid="file-vector-pill"]').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
   })
 })

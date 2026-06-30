@@ -6,6 +6,7 @@ namespace App\Service\File;
 
 use App\Entity\File;
 use App\Entity\User;
+use App\Repository\FileRepository;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
@@ -22,6 +23,8 @@ final readonly class FileUploadService
         private VectorStorageFacade $vectorStorageFacade,
         private StorageQuotaService $storageQuotaService,
         private RateLimitService $rateLimitService,
+        private FileGroupSorter $groupSorter,
+        private FileRepository $fileRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
@@ -248,6 +251,17 @@ final readonly class FileUploadService
         ];
 
         if ('store' === $processLevel) {
+            return $result;
+        }
+
+        // Media (image/audio/video) is NOT auto-extracted/vectorized on upload.
+        // The user opts in per file via the file manager's "Describe, vectorize
+        // & sort" action (FileController::describe), which produces a rich
+        // description and files it into a knowledge group. Documents keep the
+        // automatic extract+vectorize pipeline below.
+        if ($file->isMedia()) {
+            $result['media_pending_describe'] = true;
+
             return $result;
         }
 
@@ -599,5 +613,176 @@ final readonly class FileUploadService
         } catch (\Throwable $e) {
             return ['success' => false, 'error' => 'Vectorization failed: '.$e->getMessage()];
         }
+    }
+
+    /**
+     * The file manager's "Describe, vectorize & sort" action: (re)extract a
+     * RAG-ready description (rich scene description for images, transcript +
+     * visual for audio/video, normal text for documents), vectorize it, and
+     * file the result into an AI-chosen knowledge group when the user has not
+     * already picked one. Idempotent — existing vectors are cleared first.
+     *
+     * @return array{success: bool, error?: string, errorType?: string, chunksCreated?: int, extractedTextLength?: int, groupKey?: string}
+     */
+    public function describeVectorizeAndSort(File $file, User $user): array
+    {
+        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
+        if (!$rateLimitCheck['allowed']) {
+            return [
+                'success' => false,
+                'error' => "Rate limit exceeded for FILE_ANALYSIS. Used: {$rateLimitCheck['used']}/{$rateLimitCheck['limit']}",
+                'errorType' => 'rate_limited',
+            ];
+        }
+
+        $absolutePath = $this->uploadDir.'/'.ltrim($file->getFilePath(), '/');
+        if (!FileHelper::fileExistsNfs($absolutePath)) {
+            return ['success' => false, 'error' => 'File not found on disk', 'errorType' => 'not_found'];
+        }
+
+        $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+
+        $file->setStatus('extracting');
+        $this->em->flush();
+
+        try {
+            [$extractedText] = $this->fileProcessor->extractText(
+                $file->getFilePath(),
+                $fileExtension,
+                $user->getId(),
+                $file->isMedia(),
+            );
+        } catch (\Throwable $e) {
+            $file->setStatus('error');
+            $this->em->flush();
+
+            return ['success' => false, 'error' => 'Description failed: '.$e->getMessage(), 'errorType' => 'extraction_failed'];
+        }
+
+        if ('' === trim($extractedText)) {
+            $file->setStatus('error');
+            $this->em->flush();
+
+            return ['success' => false, 'error' => 'Could not derive any searchable content from this file.', 'errorType' => 'empty_content'];
+        }
+
+        $file->setFileText($extractedText);
+        $file->setStatus('extracted');
+        $this->em->flush();
+
+        // Clear any prior vectors so a re-run cannot double-count chunks.
+        $this->vectorStorageFacade->deleteByFile($user->getId(), $file->getId());
+
+        // Sort: keep a user-chosen group, otherwise let the AI pick one.
+        $groupKey = $file->getGroupKey() ?? '';
+        if ('' === trim($groupKey) || 'DEFAULT' === $groupKey) {
+            $existingGroups = array_keys($this->fileRepository->getGroupCountsByUser($user->getId()));
+            $suggested = $this->groupSorter->suggestGroup($extractedText, $existingGroups, $user->getId());
+            if (null !== $suggested) {
+                $groupKey = $suggested;
+            }
+        }
+
+        $file->setStatus('vectorizing');
+        $this->em->flush();
+
+        try {
+            $vectorResult = $this->vectorizationService->vectorizeAndStore(
+                $extractedText,
+                $user->getId(),
+                (int) $file->getId(),
+                $groupKey,
+                FileHelper::getFileTypeCode($fileExtension),
+            );
+        } catch (\Throwable $e) {
+            $file->setStatus('extracted');
+            $this->em->flush();
+
+            return ['success' => false, 'error' => 'Vectorization failed: '.$e->getMessage(), 'errorType' => 'vectorization_failed'];
+        }
+
+        if (!$vectorResult['success']) {
+            $file->setStatus('extracted');
+            $this->em->flush();
+
+            return ['success' => false, 'error' => 'Vectorization failed: '.($vectorResult['error'] ?? 'Unknown error'), 'errorType' => 'vectorization_failed'];
+        }
+
+        if ('' !== trim($groupKey) && 'DEFAULT' !== $groupKey) {
+            $file->setGroupKey($groupKey);
+        }
+        $file->setStatus('vectorized');
+        $this->em->flush();
+
+        $this->rateLimitService->recordFileAnalysisOnce($user, (int) $file->getId(), [
+            'filename' => $file->getFileName(),
+            'source' => 'WEB_DESCRIBE',
+        ]);
+
+        return [
+            'success' => true,
+            'chunksCreated' => $vectorResult['chunks_created'],
+            'extractedTextLength' => strlen($extractedText),
+            'groupKey' => $groupKey,
+        ];
+    }
+
+    /**
+     * "Add prompt to knowledge base" for an AI-generated file: vectorize the
+     * supplied generation prompt so the artefact becomes findable by what the
+     * user asked for. Idempotent — existing vectors are cleared first.
+     *
+     * @return array{success: bool, error?: string, errorType?: string, chunksCreated?: int, groupKey?: string}
+     */
+    public function indexGenerationPrompt(File $file, User $user, string $prompt): array
+    {
+        $prompt = trim($prompt);
+        if ('' === $prompt) {
+            return ['success' => false, 'error' => 'No generation prompt available for this file.', 'errorType' => 'empty_content'];
+        }
+
+        $file->setFileText($prompt);
+        $this->em->flush();
+
+        $this->vectorStorageFacade->deleteByFile($user->getId(), $file->getId());
+
+        $groupKey = $file->getGroupKey() ?? '';
+        if ('' === trim($groupKey) || 'DEFAULT' === $groupKey) {
+            $existingGroups = array_keys($this->fileRepository->getGroupCountsByUser($user->getId()));
+            $suggested = $this->groupSorter->suggestGroup($prompt, $existingGroups, $user->getId());
+            if (null !== $suggested) {
+                $groupKey = $suggested;
+            }
+        }
+
+        $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+
+        try {
+            $vectorResult = $this->vectorizationService->vectorizeAndStore(
+                $prompt,
+                $user->getId(),
+                (int) $file->getId(),
+                $groupKey,
+                FileHelper::getFileTypeCode($fileExtension),
+            );
+        } catch (\Throwable $e) {
+            return ['success' => false, 'error' => 'Vectorization failed: '.$e->getMessage(), 'errorType' => 'vectorization_failed'];
+        }
+
+        if (!$vectorResult['success']) {
+            return ['success' => false, 'error' => 'Vectorization failed: '.($vectorResult['error'] ?? 'Unknown error'), 'errorType' => 'vectorization_failed'];
+        }
+
+        if ('' !== trim($groupKey) && 'DEFAULT' !== $groupKey) {
+            $file->setGroupKey($groupKey);
+        }
+        $file->setStatus('vectorized');
+        $this->em->flush();
+
+        return [
+            'success' => true,
+            'chunksCreated' => $vectorResult['chunks_created'],
+            'groupKey' => $groupKey,
+        ];
     }
 }

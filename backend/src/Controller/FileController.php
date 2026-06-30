@@ -263,6 +263,110 @@ class FileController extends AbstractController
         return $this->json($result);
     }
 
+    #[Route('/{id}/describe', name: 'describe', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/describe',
+        summary: 'Describe, vectorize & sort a file (makes images/audio/video RAG-ready)',
+        description: 'Generates a RAG-ready description (rich scene description for images, transcript + visual for audio/video, text for documents), vectorizes it, and files the result into an AI-chosen knowledge group when the user has not already chosen one.',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'File described and vectorized'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File not found or missing on disk'),
+            new OA\Response(response: 422, description: 'No searchable content could be derived'),
+            new OA\Response(response: 500, description: 'Description or vectorization failed'),
+        ]
+    )]
+    public function describeFile(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $result = $this->uploadService->describeVectorizeAndSort($file, $user);
+
+        if ($result['success']) {
+            return $this->json($result);
+        }
+
+        $statusCode = match ($result['errorType'] ?? null) {
+            'not_found' => Response::HTTP_NOT_FOUND,
+            'rate_limited' => Response::HTTP_TOO_MANY_REQUESTS,
+            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            default => Response::HTTP_INTERNAL_SERVER_ERROR,
+        };
+
+        return $this->json($result, $statusCode);
+    }
+
+    #[Route('/{id}/index-prompt', name: 'index_prompt', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/index-prompt',
+        summary: 'Add an AI-generated file\'s generation prompt to the knowledge base',
+        description: 'For files created by the AI, vectorizes the original generation prompt so the artefact becomes searchable by what the user asked for.',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Prompt indexed'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File not found'),
+            new OA\Response(response: 422, description: 'No generation prompt available'),
+            new OA\Response(response: 500, description: 'Vectorization failed'),
+        ]
+    )]
+    public function indexPrompt(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Resolve the generation prompt from the originating message: the
+        // resolved media prompt (BMESSAGEMETA.media_prompt) if present, else the
+        // user's original request text.
+        $prompt = '';
+        $messageId = $file->getMessageId();
+        if (null !== $messageId) {
+            $message = $this->messageRepository->find($messageId);
+            if ($message) {
+                $prompt = (string) ($message->getMeta('media_prompt') ?? '');
+                if ('' === trim($prompt)) {
+                    $prompt = $message->getText();
+                }
+            }
+        }
+
+        // No stored generation prompt (e.g. a generated/imported image with no
+        // originating prompt) — fall back to describing the actual file so the
+        // action still makes it searchable instead of failing.
+        $result = '' === trim($prompt)
+            ? $this->uploadService->describeVectorizeAndSort($file, $user)
+            : $this->uploadService->indexGenerationPrompt($file, $user, $prompt);
+
+        if ($result['success']) {
+            return $this->json($result);
+        }
+
+        $statusCode = match ($result['errorType'] ?? null) {
+            'not_found' => Response::HTTP_NOT_FOUND,
+            'rate_limited' => Response::HTTP_TOO_MANY_REQUESTS,
+            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            default => Response::HTTP_INTERNAL_SERVER_ERROR,
+        };
+
+        return $this->json($result, $statusCode);
+    }
+
     #[Route('/{id}/download', name: 'download', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/files/{id}/download',
@@ -843,6 +947,44 @@ class FileController extends AbstractController
         $this->fileRepository->updateGroupKey($file, $newGroupKey);
 
         $chunksUpdated = $this->vectorStorageFacade->updateGroupKey($user->getId(), $file->getId(), $newGroupKey);
+
+        return $this->json(['success' => true, 'chunksUpdated' => $chunksUpdated]);
+    }
+
+    #[Route('/{id}/group-key', name: 'clear_group_key', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/files/{id}/group-key',
+        summary: 'Remove a file from its knowledge group (keeps the file and its vectors)',
+        description: 'Clears BGROUPKEY and moves the file\'s vector chunks to the ungrouped DEFAULT bucket. The file stays searchable by AI — only its folder membership is removed; nothing is deleted.',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'File removed from its group'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'File not found'),
+        ]
+    )]
+    public function clearGroupKey(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $file->setGroupKey(null);
+        $this->fileRepository->save($file);
+
+        // Keep the vectors — just move them to the ungrouped DEFAULT bucket so
+        // the file stays searchable globally but no longer belongs to a folder.
+        $chunksUpdated = $this->vectorStorageFacade->updateGroupKey($user->getId(), $file->getId(), 'DEFAULT');
 
         return $this->json(['success' => true, 'chunksUpdated' => $chunksUpdated]);
     }

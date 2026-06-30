@@ -39,6 +39,15 @@
             class="w-3.5 h-3.5 ml-auto text-[var(--brand)]"
           />
         </button>
+        <button
+          v-if="canRemove"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs txt-secondary hover:bg-red-500/10 hover:text-red-500 transition-colors text-left border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-2"
+          data-testid="btn-remove-from-folder"
+          @click="$emit('remove')"
+        >
+          <Icon icon="heroicons:folder-minus" class="w-4 h-4 shrink-0" />
+          <span class="truncate">{{ $t('files.removeFromFolder') }}</span>
+        </button>
         <div class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5">
           <div class="flex items-center gap-1.5 px-3 py-1">
             <Icon icon="heroicons:folder-plus" class="w-4 h-4 text-[var(--brand)] shrink-0" />
@@ -65,11 +74,14 @@ defineProps<{
   open: boolean
   folders: Array<{ name: string; count: number }>
   currentFolder?: string
+  /** Show the "Remove from folder" action (only meaningful when the file is in a group). */
+  canRemove?: boolean
 }>()
 
 defineEmits<{
   toggle: []
   move: [folderName: string]
+  remove: []
 }>()
 
 const newTarget = ref('')

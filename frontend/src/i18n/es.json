@@ -943,19 +943,19 @@
     "setupChat": {
       "title": "Asistente de Configuración IA",
       "subtitle": "Configuremos tu widget juntos",
-      "progressLabel": "Progreso de la entrevista",
+      "progressLabel": "Progreso de la configuración",
       "inputPlaceholder": "Escribe tu respuesta...",
       "skipButton": "Omitir por ahora",
       "completeTitle": "¡Configuración Completa!",
-      "completeDescription": "Se ha generado la configuración personalizada de tu asistente. Haz clic abajo para guardarla.",
+      "completeDescription": "Tu asistente de IA está listo. Haz clic abajo para guardarlo en tu widget.",
       "saveButton": "Guardar Configuración",
       "saveSuccess": "¡Configuración del widget guardada exitosamente!",
       "saveError": "No se pudo guardar la configuración",
       "sendError": "No se pudo enviar el mensaje",
-      "startError": "No se pudo iniciar la entrevista",
-      "modelNotConfigured": "No hay modelo de IA configurado. Selecciona un modelo en Configuración → Instrucciones de IA → Entrevista de Configuración IA.",
-      "editHintTitle": "¿Quieres afinar tu asistente?",
-      "editHintDescription": "Después de guardar, puedes editar la configuración del asistente IA en cualquier momento en la pestaña 'Asistente IA' de la configuración avanzada."
+      "startError": "No se pudo iniciar la configuración",
+      "modelNotConfigured": "No hay modelo de IA configurado. Selecciona uno en Configuración Avanzada → Configuración IA → Prompt y Modelo.",
+      "editHintTitle": "¿Quieres afinar tu asistente de IA?",
+      "editHintDescription": "Después de guardar, puedes afinar tu asistente de IA en cualquier momento en Configuración Avanzada → Configuración IA → Asistente IA del Widget."
     }
   },
   "profile": {
@@ -1488,6 +1488,14 @@
     "noFiles": "Aún no hay archivos subidos",
     "moveTo": "Mover a",
     "movedSuccess": "Archivo movido a \"{folder}\"",
+    "removeFromFolder": "Quitar de la carpeta",
+    "removedFromFolder": "Quitado de la carpeta (se conservan el archivo y su índice de búsqueda)",
+    "describeSortAction": "Describir, vectorizar y ordenar: hacer consultable por IA",
+    "describeSortDone": "Ya es consultable por IA.",
+    "describeSortDoneGroup": "Ya es consultable por IA · archivado en \"{group}\".",
+    "describeSortFailed": "No se pudo hacer consultable este archivo.",
+    "indexPromptAction": "Añadir el prompt de generación a la base de conocimiento",
+    "indexPromptDone": "Prompt de generación añadido a tu base de conocimiento.",
     "emptyState": {
       "title": "Aún no hay archivos",
       "description": "Sube archivos para empezar. Puedes organizarlos en carpetas.",

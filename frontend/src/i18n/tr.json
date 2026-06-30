@@ -943,19 +943,19 @@
     "setupChat": {
       "title": "AI Kurulum Asistanı",
       "subtitle": "Widget'ınızı birlikte yapılandıralım",
-      "progressLabel": "Görüşme ilerlemesi",
+      "progressLabel": "Kurulum ilerlemesi",
       "inputPlaceholder": "Cevabınızı yazın...",
       "skipButton": "Şimdilik atla",
       "completeTitle": "Kurulum Tamamlandı!",
-      "completeDescription": "Özel asistan yapılandırmanız oluşturuldu. Kaydetmek için aşağıya tıklayın.",
+      "completeDescription": "AI asistanınız hazır. Widget'ınıza kaydetmek için aşağıya tıklayın.",
       "saveButton": "Yapılandırmayı Kaydet",
       "saveSuccess": "Widget yapılandırması başarıyla kaydedildi!",
       "saveError": "Yapılandırma kaydedilemedi",
       "sendError": "Mesaj gönderilemedi",
-      "startError": "Görüşme başlatılamadı",
-      "modelNotConfigured": "AI modeli yapılandırılmamış. Lütfen Ayarlar → AI Talimatları → AI Kurulum Görüşmesi altından bir model seçin.",
-      "editHintTitle": "Asistanınızı ince ayar yapmak ister misiniz?",
-      "editHintDescription": "Kaydettikten sonra, AI asistan yapılandırmasını gelişmiş ayarlarda 'AI Asistanı' sekmesinden istediğiniz zaman düzenleyebilirsiniz."
+      "startError": "Kurulum başlatılamadı",
+      "modelNotConfigured": "AI modeli yapılandırılmamış. Lütfen Gelişmiş Ayarlar → AI Kurulumu → Prompt ve Model altından bir model seçin.",
+      "editHintTitle": "AI asistanınızı ince ayarlamak ister misiniz?",
+      "editHintDescription": "Kaydettikten sonra, AI asistanınızı Gelişmiş Ayarlar → AI Kurulumu → Widget AI Sihirbazı altından istediğiniz zaman ince ayarlayabilirsiniz."
     }
   },
   "profile": {
@@ -1489,6 +1489,14 @@
     "noFiles": "Henüz dosya yüklenmemiş",
     "moveTo": "Taşı",
     "movedSuccess": "Dosya \"{folder}\" klasörüne taşındı",
+    "removeFromFolder": "Klasörden çıkar",
+    "removedFromFolder": "Klasörden çıkarıldı (dosya ve arama dizini korunur)",
+    "describeSortAction": "Açıkla, vektörle ve sırala — yapay zekâ ile aranabilir yap",
+    "describeSortDone": "Artık yapay zekâ ile aranabilir.",
+    "describeSortDoneGroup": "Artık yapay zekâ ile aranabilir · \"{group}\" içine eklendi.",
+    "describeSortFailed": "Bu dosya aranabilir yapılamadı.",
+    "indexPromptAction": "Üretim istemini bilgi tabanına ekle",
+    "indexPromptDone": "Üretim istemi bilgi tabanınıza eklendi.",
     "emptyState": {
       "title": "Henüz dosya yok",
       "description": "Başlamak için dosya yükle. Dosyaları klasörler halinde düzenleyebilirsin.",

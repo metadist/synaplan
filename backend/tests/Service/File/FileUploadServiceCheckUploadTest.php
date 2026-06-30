@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Service\File;
 
 use App\Entity\User;
+use App\Repository\FileRepository;
+use App\Service\File\FileGroupSorter;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\FileUploadService;
@@ -40,6 +42,8 @@ class FileUploadServiceCheckUploadTest extends TestCase
             $this->createStub(VectorStorageFacade::class),
             $this->storageQuotaService,
             $this->rateLimitService,
+            $this->createStub(FileGroupSorter::class),
+            $this->createStub(FileRepository::class),
             $this->createStub(EntityManagerInterface::class),
             $this->createStub(LoggerInterface::class),
             '/tmp/uploads',

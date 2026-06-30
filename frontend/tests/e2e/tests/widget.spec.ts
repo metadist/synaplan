@@ -133,6 +133,7 @@ test.describe('@ci @smoke Widget', () => {
 
       const securityTab = page.locator(selectors.widgets.advancedConfig.securityTab)
       if (!(await securityTab.isVisible())) {
+        await page.locator(selectors.widgets.advancedConfig.tabGroupSecurityLegal).click()
         await page.locator(selectors.widgets.advancedConfig.tabButtonSecurity).click()
         await securityTab.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
       }

@@ -1028,6 +1028,44 @@ export async function processFile(
   return response
 }
 
+/**
+ * Describe, vectorize & sort a file — makes images/audio/video (and any stored
+ * document) RAG-ready by generating a description, vectorizing it, and filing it
+ * into an AI-chosen knowledge group.
+ */
+export async function describeVectorizeSortFile(fileId: number): Promise<{
+  success: boolean
+  chunksCreated?: number
+  groupKey?: string
+  error?: string
+}> {
+  return httpClient(`/api/v1/files/${fileId}/describe`, { method: 'POST' })
+}
+
+/**
+ * Add an AI-generated file's generation prompt to the knowledge base on demand.
+ */
+export async function indexPromptFile(fileId: number): Promise<{
+  success: boolean
+  chunksCreated?: number
+  groupKey?: string
+  error?: string
+}> {
+  return httpClient(`/api/v1/files/${fileId}/index-prompt`, { method: 'POST' })
+}
+
+/**
+ * Remove a file from its knowledge group (folder) without deleting the file or
+ * its vectors — the chunks move to the ungrouped DEFAULT bucket and stay
+ * searchable by AI.
+ */
+export async function removeFileFromGroup(fileId: number): Promise<{
+  success: boolean
+  chunksUpdated: number
+}> {
+  return httpClient(`/api/v1/files/${fileId}/group-key`, { method: 'DELETE' })
+}
+
 export default {
   uploadFiles,
   checkUpload,
@@ -1049,4 +1087,7 @@ export default {
   reVectorizeFile,
   migrateFileToQdrant,
   processFile,
+  describeVectorizeSortFile,
+  indexPromptFile,
+  removeFileFromGroup,
 }

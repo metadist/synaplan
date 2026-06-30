@@ -1,5 +1,8 @@
 <template>
+  <!-- Nothing is shown when a file is not searchable — the absence of a pill is
+       the "not searchable" state. Only searchable / processing / failed render. -->
   <span
+    v-if="visible"
     class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
     :class="variant.classes"
     :title="tooltip"
@@ -32,6 +35,9 @@ const props = withDefaults(
 
 const { t } = useI18n()
 
+// Only render for states that carry meaning; "none"/legacy values show nothing.
+const visible = computed(() => ['vectorized', 'pending', 'failed'].includes(props.state))
+
 // Visual variants per 03_file-management.md §5.1.2.B — standard palette
 // utilities (already used across the files UI), dark-mode safe.
 const variant = computed(() => {
@@ -52,12 +58,6 @@ const variant = computed(() => {
       return {
         classes: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
         icon: 'mdi:alert-circle',
-        spin: false,
-      }
-    case 'not_applicable':
-      return {
-        classes: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-        icon: 'mdi:minus-circle-outline',
         spin: false,
       }
     default:
@@ -83,17 +83,10 @@ const label = computed(() => {
       return t('files.vectorState.processing')
     case 'failed':
       return t('files.vectorState.failed')
-    case 'not_applicable':
-      return t('files.vectorState.notApplicable')
     default:
       return t('files.vectorState.none')
   }
 })
 
-const tooltip = computed(() => {
-  if (props.state === 'not_applicable') {
-    return t('files.vectorState.notApplicable')
-  }
-  return t('files.help.vectorized')
-})
+const tooltip = computed(() => t('files.help.vectorized'))
 </script>

@@ -66,7 +66,7 @@
             ref="fileInputRef"
             type="file"
             multiple
-            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.heic,.heif,.mp3,.mp4,.mov,.avi,.mkv,.xlsx,.csv"
+            accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.csv,.odt,.ods,.odp,.odg,.odf,.ics,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp3,.mp4,.wav,.ogg,.m4a,.webm,.mov,.avi,.mkv"
             class="hidden"
             data-testid="input-files"
             @change="handleFileSelect"
@@ -841,9 +841,41 @@
                       <FolderMoveMenu
                         :open="folderMenuOpen === file.id"
                         :folders="displayedFolders"
+                        :can-remove="!!file.group_key"
                         @toggle="toggleFolderMenu(file.id)"
                         @move="moveFileToFolder(file.id, $event)"
+                        @remove="removeFileFromFolder(file.id)"
                       />
+                      <button
+                        v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
+                        class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                        :title="$t('files.describeSortAction')"
+                        :disabled="isDescribing(file.id)"
+                        data-testid="btn-describe"
+                        @click="describeAndSort(file)"
+                      >
+                        <Icon
+                          :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
+                          class="w-4 h-4"
+                          :class="isDescribing(file.id) && 'animate-spin'"
+                        />
+                      </button>
+                      <button
+                        v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
+                        class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                        :title="$t('files.indexPromptAction')"
+                        :disabled="isDescribing(file.id)"
+                        data-testid="btn-index-prompt"
+                        @click="describeAndSort(file)"
+                      >
+                        <Icon
+                          :icon="
+                            isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
+                          "
+                          class="w-4 h-4"
+                          :class="isDescribing(file.id) && 'animate-spin'"
+                        />
+                      </button>
                       <button
                         class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                         :title="$t('common.view')"
@@ -960,9 +992,45 @@
                           <FolderMoveMenu
                             :open="folderMenuOpen === file.id"
                             :folders="displayedFolders"
+                            :can-remove="!!file.group_key"
                             @toggle="toggleFolderMenu(file.id)"
                             @move="moveFileToFolder(file.id, $event)"
+                            @remove="removeFileFromFolder(file.id)"
                           />
+                          <button
+                            v-if="
+                              vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'
+                            "
+                            class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                            :title="$t('files.describeSortAction')"
+                            :disabled="isDescribing(file.id)"
+                            data-testid="btn-describe"
+                            @click="describeAndSort(file)"
+                          >
+                            <Icon
+                              :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
+                              class="w-4 h-4"
+                              :class="isDescribing(file.id) && 'animate-spin'"
+                            />
+                          </button>
+                          <button
+                            v-if="
+                              vectorStateOf(file) !== 'vectorized' && file.source === 'generated'
+                            "
+                            class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                            :title="$t('files.indexPromptAction')"
+                            :disabled="isDescribing(file.id)"
+                            data-testid="btn-index-prompt"
+                            @click="describeAndSort(file)"
+                          >
+                            <Icon
+                              :icon="
+                                isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
+                              "
+                              class="w-4 h-4"
+                              :class="isDescribing(file.id) && 'animate-spin'"
+                            />
+                          </button>
                           <button
                             class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
                             :title="$t('files.download')"
@@ -1171,9 +1239,39 @@
                       :open="folderMenuOpen === file.id"
                       :folders="displayedFolders"
                       :current-folder="openFolder"
+                      :can-remove="!!file.group_key"
                       @toggle="toggleFolderMenu(file.id)"
                       @move="moveFileToFolder(file.id, $event)"
+                      @remove="removeFileFromFolder(file.id)"
                     />
+                    <button
+                      v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
+                      class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                      :title="$t('files.describeSortAction')"
+                      :disabled="isDescribing(file.id)"
+                      data-testid="btn-describe"
+                      @click="describeAndSort(file)"
+                    >
+                      <Icon
+                        :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
+                        class="w-4 h-4"
+                        :class="isDescribing(file.id) && 'animate-spin'"
+                      />
+                    </button>
+                    <button
+                      v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
+                      class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                      :title="$t('files.indexPromptAction')"
+                      :disabled="isDescribing(file.id)"
+                      data-testid="btn-index-prompt"
+                      @click="describeAndSort(file)"
+                    >
+                      <Icon
+                        :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'"
+                        class="w-4 h-4"
+                        :class="isDescribing(file.id) && 'animate-spin'"
+                      />
+                    </button>
                     <button
                       class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                       :title="$t('common.view')"
@@ -1286,9 +1384,41 @@
                           :open="folderMenuOpen === file.id"
                           :folders="displayedFolders"
                           :current-folder="openFolder"
+                          :can-remove="!!file.group_key"
                           @toggle="toggleFolderMenu(file.id)"
                           @move="moveFileToFolder(file.id, $event)"
+                          @remove="removeFileFromFolder(file.id)"
                         />
+                        <button
+                          v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
+                          class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                          :title="$t('files.describeSortAction')"
+                          :disabled="isDescribing(file.id)"
+                          data-testid="btn-describe"
+                          @click="describeAndSort(file)"
+                        >
+                          <Icon
+                            :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
+                            class="w-4 h-4"
+                            :class="isDescribing(file.id) && 'animate-spin'"
+                          />
+                        </button>
+                        <button
+                          v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
+                          class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                          :title="$t('files.indexPromptAction')"
+                          :disabled="isDescribing(file.id)"
+                          data-testid="btn-index-prompt"
+                          @click="describeAndSort(file)"
+                        >
+                          <Icon
+                            :icon="
+                              isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
+                            "
+                            class="w-4 h-4"
+                            :class="isDescribing(file.id) && 'animate-spin'"
+                          />
+                        </button>
                         <button
                           class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
                           :title="$t('files.download')"
@@ -1811,6 +1941,59 @@ const moveFileToFolder = async (fileId: number, folderName: string) => {
   }
 }
 
+// Files currently running "Describe, vectorize & sort" / "Add prompt to KB".
+const describingIds = ref<number[]>([])
+const isDescribing = (id: number): boolean => describingIds.value.includes(id)
+
+/**
+ * Make a file RAG-ready. For AI-generated files this indexes their generation
+ * prompt; for everything else it describes, vectorizes & AI-sorts the file into
+ * a knowledge group. Same trigger, different per-file action (decided in UI by
+ * the file's source).
+ */
+const describeAndSort = async (file: FileItem) => {
+  if (isDescribing(file.id)) return
+  const isGenerated = file.source === 'generated'
+  describingIds.value = [...describingIds.value, file.id]
+  try {
+    const res = isGenerated
+      ? await filesService.indexPromptFile(file.id)
+      : await filesService.describeVectorizeSortFile(file.id)
+    if (res.success) {
+      if (res.groupKey) {
+        // Sorted into a knowledge group (describe path, or index-prompt that
+        // also picked a group). Show the group-aware confirmation either way.
+        showSuccess(t('files.describeSortDoneGroup', { group: res.groupKey }))
+      } else if (isGenerated) {
+        showSuccess(t('files.indexPromptDone'))
+      } else {
+        showSuccess(t('files.describeSortDone'))
+      }
+      await loadFileGroups()
+      await loadFiles()
+    } else {
+      showError(res.error || t('files.describeSortFailed'))
+    }
+  } catch (err: unknown) {
+    showError(getErrorMessage(err) || t('files.describeSortFailed'))
+  } finally {
+    describingIds.value = describingIds.value.filter((x) => x !== file.id)
+  }
+}
+
+// Remove a file from its folder without deleting the file or its vectors.
+const removeFileFromFolder = async (fileId: number) => {
+  folderMenuOpen.value = null
+  try {
+    await filesService.removeFileFromGroup(fileId)
+    showSuccess(t('files.removedFromFolder'))
+    await loadFileGroups()
+    await loadFiles()
+  } catch (err: unknown) {
+    showError(getErrorMessage(err) || 'Failed to remove file from folder')
+  }
+}
+
 const closeFolderMenu = (e: MouseEvent) => {
   if (folderMenuOpen.value !== null) {
     const target = e.target as HTMLElement
@@ -1964,7 +2147,10 @@ const uploadFiles = async () => {
     const result = await filesService.uploadFiles({
       files: selectedFiles.value,
       groupKey,
-      processLevel: 'vectorize', // Always vectorize for optimal RAG performance
+      // Documents auto-vectorize; the server stores media (image/audio/video)
+      // without indexing — the user makes it RAG-ready per file via the
+      // "Describe, vectorize & sort" action.
+      processLevel: 'vectorize',
       onProgress: (progress) => {
         uploadProgress.value = progress
       },

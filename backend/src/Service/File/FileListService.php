@@ -240,12 +240,14 @@ final readonly class FileListService
     /**
      * Derive the authoritative vector state for a file from its chunk count and
      * upload/extraction status (03_file-management.md §3.1, §4.2).
+     *
+     * Media (image/audio/video) is treated exactly like documents: it is only
+     * "not searchable" until the user runs "Describe, vectorize & sort", after
+     * which it carries real chunks and reads as vectorized. The legacy
+     * "not applicable" state is no longer produced.
      */
     private function deriveVectorState(File $file, int $chunkCount): string
     {
-        if ($file->isMedia()) {
-            return File::VECTOR_STATE_NOT_APPLICABLE;
-        }
         if ($chunkCount > 0) {
             return File::VECTOR_STATE_VECTORIZED;
         }

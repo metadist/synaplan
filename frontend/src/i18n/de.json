@@ -1991,6 +1991,14 @@
     "noFiles": "Noch keine Dateien hochgeladen",
     "moveTo": "Verschieben nach",
     "movedSuccess": "Datei nach \"{folder}\" verschoben",
+    "removeFromFolder": "Aus Ordner entfernen",
+    "removedFromFolder": "Aus Ordner entfernt (Datei und Suchindex bleiben erhalten)",
+    "describeSortAction": "Beschreiben, vektorisieren & einsortieren – KI-durchsuchbar machen",
+    "describeSortDone": "Jetzt KI-durchsuchbar.",
+    "describeSortDoneGroup": "Jetzt KI-durchsuchbar · abgelegt in \"{group}\".",
+    "describeSortFailed": "Diese Datei konnte nicht durchsuchbar gemacht werden.",
+    "indexPromptAction": "Erzeugungs-Prompt zur Wissensbasis hinzufügen",
+    "indexPromptDone": "Erzeugungs-Prompt zu deiner Wissensbasis hinzugefügt.",
     "emptyState": {
       "title": "Noch keine Dateien",
       "description": "Lade Dateien hoch, um loszulegen. Du kannst sie in Ordnern organisieren.",
@@ -2441,7 +2449,7 @@
       "websitePlaceholder": "ihre-website.de",
       "websiteHelp": "Domain eingeben. Domain wird zur erlaubten Liste hinzugefügt.",
       "infoTitle": "Schnellstart",
-      "infoDescription": "Ihr Widget ist sofort einsatzbereit. Sie können es später mit dem KI-geführten Setup oder den erweiterten Einstellungen anpassen.",
+      "infoDescription": "Ihr Widget ist sofort einsatzbereit. Sie können es später mit dem KI-Setup-Assistenten oder in den Erweiterten Einstellungen feinabstimmen.",
       "previewLabel": "Widget-Vorschau",
       "previewClickHint": "Klicken Sie auf den Chat-Button, um zu sehen wie es funktioniert",
       "previewChatGreeting": "Hallo! Wie kann ich Ihnen helfen?",
@@ -2455,8 +2463,8 @@
       "readyToUse": "Bereit zum Einbetten auf Ihrer Website",
       "embedCodeLabel": "Einbettungs-Code",
       "embedCodeError": "Einbettungs-Code konnte nicht geladen werden",
-      "aiSetupTitle": "KI-geführtes Setup",
-      "aiSetupDescription": "Lassen Sie sich von der KI bei der Konfiguration des perfekten Assistenten für Ihr Unternehmen helfen.",
+      "aiSetupTitle": "KI-Setup-Assistent",
+      "aiSetupDescription": "Beantworten Sie ein paar kurze Fragen, und der KI-Setup-Assistent richtet Ihr Widget für Sie ein.",
       "advancedTitle": "Erweiterte Einstellungen",
       "advancedDescription": "Passen Sie Branding, Verhalten, Datei-Uploads und Sicherheitseinstellungen manuell an.",
       "testNow": "Widget jetzt testen"
@@ -2464,19 +2472,19 @@
     "setupChat": {
       "title": "KI-Setup-Assistent",
       "subtitle": "Lassen Sie uns Ihr Widget gemeinsam konfigurieren",
-      "progressLabel": "Interview-Fortschritt",
+      "progressLabel": "Setup-Fortschritt",
       "inputPlaceholder": "Geben Sie Ihre Antwort ein...",
       "skipButton": "Vorerst überspringen",
       "completeTitle": "Setup abgeschlossen!",
-      "completeDescription": "Ihre individuelle Assistenten-Konfiguration wurde generiert. Klicken Sie unten, um sie zu speichern.",
+      "completeDescription": "Ihr KI-Assistent ist bereit. Klicken Sie unten, um ihn in Ihrem Widget zu speichern.",
       "saveButton": "Konfiguration speichern",
       "saveSuccess": "Widget-Konfiguration erfolgreich gespeichert!",
       "saveError": "Konfiguration konnte nicht gespeichert werden",
       "sendError": "Nachricht konnte nicht gesendet werden",
-      "startError": "Interview konnte nicht gestartet werden",
-      "modelNotConfigured": "Kein KI-Modell konfiguriert. Bitte wählen Sie unter Einstellungen → KI-Anweisungen → KI-Setup-Interview ein Modell aus.",
-      "editHintTitle": "Möchten Sie Ihren Assistenten feinabstimmen?",
-      "editHintDescription": "Nach dem Speichern können Sie die KI-Assistenten-Konfiguration jederzeit in den erweiterten Einstellungen unter dem Tab 'KI-Assistent' bearbeiten."
+      "startError": "Setup konnte nicht gestartet werden",
+      "modelNotConfigured": "Kein KI-Modell konfiguriert. Wählen Sie eines unter Erweiterte Einstellungen → KI-Setup → Prompt & Modell.",
+      "editHintTitle": "Möchten Sie Ihren KI-Assistenten feinabstimmen?",
+      "editHintDescription": "Nach dem Speichern können Sie Ihren KI-Assistenten jederzeit unter Erweiterte Einstellungen → KI-Setup → Widget-KI-Assistent feinabstimmen."
     },
     "detail": {
       "back": "Zurück zu Widgets",
@@ -2608,6 +2616,11 @@
     "advancedConfig": {
       "title": "Erweiterte Konfiguration",
       "editPrompt": "KI-Prompt bearbeiten",
+      "tabGroups": {
+        "setup": "Einrichtung",
+        "securityLegal": "Sicherheit & Recht",
+        "aiSetup": "KI-Einrichtung"
+      },
       "tabs": {
         "branding": "Branding",
         "behavior": "Verhalten",
@@ -2615,6 +2628,8 @@
         "privacy": "Datenschutz",
         "assistant": "KI-Assistent",
         "aiPrompts": "KI-Anweisungen",
+        "aiWizard": "Widget-KI-Assistent",
+        "promptModel": "Prompt & Modell",
         "customFields": "Benutzerdefinierte Felder"
       },
       "dataProcessing": "Auftragsverarbeitungsvertrag (Art. 28 DSGVO)",
@@ -2681,9 +2696,9 @@
         "placeholderSystemPrompt": "Wird durch den aktuellen System-Prompt des Widgets ersetzt"
       },
       "setupPrompt": {
-        "title": "KI-Setup-Interview",
-        "description": "Steuert den KI-Assistenten, der Nutzer durch die Widget-Konfiguration führt.",
-        "modelHelp": "Wähle, welches KI-Modell das Setup-Interview durchführen soll."
+        "title": "Prompt des KI-Setup-Assistenten",
+        "description": "Steuert den KI-Setup-Assistenten, der Sie durch die Konfiguration Ihres Widgets führt.",
+        "modelHelp": "Wähle, welches KI-Modell den KI-Setup-Assistenten ausführen soll."
       },
       "behaviorRules": {
         "title": "Geführte Verhaltensregeln",
@@ -2836,16 +2851,16 @@
       "saveSuccess": "Einstellungen erfolgreich gespeichert!",
       "saveError": "Einstellungen konnten nicht gespeichert werden",
       "aiSetupRequired": "KI-Setup erforderlich",
-      "aiSetupRequiredDescription": "Um Ihren KI-Assistenten anzupassen, müssen Sie zuerst das geführte KI-Setup abschließen. Dies hilft Ihnen, den perfekten Assistenten für Ihre Bedürfnisse zu konfigurieren.",
+      "aiSetupRequiredDescription": "Um den KI-Assistenten Ihres Widgets anzupassen, führen Sie zuerst den KI-Setup-Assistenten aus. Er stellt ein paar kurze Fragen und richtet alles für Sie ein.",
       "startAiSetup": "KI-Setup starten",
       "manualCreate": "Manuell erstellen",
       "creatingPrompt": "Prompt wird erstellt...",
       "manualCreateError": "Prompt konnte nicht erstellt werden",
       "restartAiSetup": "Setup neu starten",
       "restartAiSetupTitle": "KI-Setup-Assistent erneut ausführen",
-      "restartAiSetupDescription": "Starten Sie das geführte Setup erneut, um Ihren Assistenten neu zu konfigurieren.",
+      "restartAiSetupDescription": "Führen Sie den KI-Setup-Assistenten erneut aus, um den KI-Assistenten Ihres Widgets neu zu konfigurieren.",
       "systemPromptTitle": "Gemeinsamer System-Prompt aktiv",
-      "systemPromptDescription": "Dieses Widget verwendet einen gemeinsamen System-Prompt, der nicht direkt bearbeitet werden kann. Um das Verhalten anzupassen, führen Sie das KI-Setup aus, um Ihren eigenen personalisierten Prompt zu erstellen.",
+      "systemPromptDescription": "Dieses Widget verwendet einen gemeinsamen System-Prompt, der nicht direkt bearbeitet werden kann. Um anzupassen, wie es antwortet, führen Sie den KI-Setup-Assistenten aus, um Ihren eigenen zu erstellen.",
       "customizePrompt": "Prompt anpassen",
       "promptName": "Assistentenname",
       "selectionRules": "Auswahlregeln",

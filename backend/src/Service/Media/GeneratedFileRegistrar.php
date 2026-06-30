@@ -57,11 +57,10 @@ final readonly class GeneratedFileRegistrar
             $file->setOriginKind($originKind);
             $file->setMessageId($messageId);
             $file->setProvider($provider);
-            // Media (image/video/audio/calendar) is not a RAG document; generated
-            // documents stay "none" so they can be vectorized on demand.
-            $file->setVectorState(
-                'document' === $originKind ? File::VECTOR_STATE_NONE : File::VECTOR_STATE_NOT_APPLICABLE
-            );
+            // Every generated artefact starts un-indexed; the user can add its
+            // generation prompt to the knowledge base on demand from the file
+            // manager ("Add prompt to knowledge base").
+            $file->setVectorState(File::VECTOR_STATE_NONE);
 
             $this->files->save($file);
 
