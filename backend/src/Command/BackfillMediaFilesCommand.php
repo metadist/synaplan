@@ -57,6 +57,7 @@ final class BackfillMediaFilesCommand extends Command
 
         $created = 0;
         $skipped = 0;
+        $unsupported = 0;
         $afterId = 0;
 
         while (true) {
@@ -68,10 +69,23 @@ final class BackfillMediaFilesCommand extends Command
             foreach ($messages as $message) {
                 $afterId = max($afterId, (int) $message->getId());
 
-                $path = $message->getFilePath();
-                $kind = $this->originKindFor($message->getFileType(), $path);
+                $rawPath = $message->getFilePath();
+                $kind = $this->originKindFor($message->getFileType(), $rawPath);
                 if (null === $kind) {
                     continue; // not media (documents already have rows)
+                }
+
+                // Reduce a stored display URL to the upload-dir-relative path.
+                $path = $this->normalizeRelativePath($rawPath);
+
+                // Legacy rows that inlined the base64 image into BFILEPATH cannot
+                // become a file row (no on-disk file, and it overflows BFILEPATH
+                // varchar(255)). Count + skip them so one bad row never aborts the
+                // run — the registrar guards this too, this just keeps the tally
+                // honest and avoids a pointless insert attempt.
+                if (str_starts_with($path, 'data:') || strlen($path) > 255) {
+                    ++$unsupported;
+                    continue;
                 }
 
                 $existing = $this->fileRepository->findOneBy([
@@ -103,13 +117,32 @@ final class BackfillMediaFilesCommand extends Command
         }
 
         $io->success(sprintf(
-            '%s %d media file row(s); %d already present/skipped.',
+            '%s %d media file row(s); %d already present/skipped; %d unsupported (data URI / oversized path).',
             $dryRun ? 'Would create' : 'Created',
             $created,
             $skipped,
+            $unsupported,
         ));
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Reduce a stored media path to the upload-dir-relative form BFILES expects.
+     * Strips an absolute public URL or the `/api/v1/files/uploads/` serve prefix
+     * that BMESSAGES.BFILEPATH sometimes stores; a relative path is unchanged.
+     * Mirrors {@see GeneratedFileRegistrar::normalizeRelativePath()}.
+     */
+    private function normalizeRelativePath(string $path): string
+    {
+        if (1 === preg_match('#^https?://[^/]+(/.*)$#i', $path, $m)) {
+            $path = $m[1];
+        }
+
+        $stripped = preg_replace('#^/?api/v1/files/uploads/#', '', $path);
+        $path = null === $stripped ? $path : $stripped;
+
+        return ltrim($path, '/');
     }
 
     /**

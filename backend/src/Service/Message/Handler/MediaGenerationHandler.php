@@ -11,6 +11,7 @@ use App\Message\ExtractMemoriesCommand;
 use App\Service\File\FileHelper;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobConfig;
@@ -54,6 +55,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private MediaJobService $mediaJobService,
         private MediaJobDispatcher $mediaJobDispatcher,
         private MediaJobMessageSync $mediaJobMessageSync,
+        private GeneratedFileRegistrar $generatedFileRegistrar,
         private string $uploadDir = '/var/www/backend/var/uploads',
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
@@ -645,6 +647,16 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 // Build display URL for StaticUploadController
                 $displayUrl = '/api/v1/files/uploads/'.$relativePath;
 
+                // Register the generated audio as a BFILES row (see image/video
+                // branch) so inline TTS output appears in the Generated gallery.
+                $this->generatedFileRegistrar->register(
+                    $message->getUserId(),
+                    $relativePath,
+                    $mediaType,
+                    $message->getId(),
+                    $result['provider'] ?? $provider,
+                );
+
                 // Clean, localized confirmation (the audio player + download is the
                 // deliverable). Emitting a token — rendered by the frontend via
                 // i18n, like __FILE_GENERATED__ for documents — avoids leaking the
@@ -794,6 +806,19 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
             // Build display URL for StaticUploadController
             $displayUrl = '/api/v1/files/uploads/'.$localPath;
+
+            // Register the generated artefact as a first-class BFILES row so it
+            // shows in the file manager's Generated gallery. The async path does
+            // this via MediaJobMessageSync; the inline (synchronous) path must do
+            // it here too, otherwise users on inline rendering never see their
+            // chat-generated media in the file world. Best-effort + idempotent.
+            $this->generatedFileRegistrar->register(
+                $message->getUserId(),
+                $localPath,
+                $mediaType,
+                $message->getId(),
+                $result['provider'] ?? $provider,
+            );
 
             // Generate thumbnail for video files
             $thumbnailPath = null;
