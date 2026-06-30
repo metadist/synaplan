@@ -34,7 +34,7 @@ that:
 |------|-------|-----------------|
 | New-user trial | NEW-tier *count* limits (50 msgs, 5 images, 2 videos…) → padlocks | Welcome Wallet (~€5) → **everything unlocked** until balance hits 0 |
 | Top-up | Period-scoped budget raise in **€100** steps; expires with the period | **Persistent** wallet credit in **€19.95 / €49.95** packs; never expires |
-| Top-up channel | Stripe web only | Stripe web **+ Apple/Google IAP** (app), with an internal **+25%** app surcharge |
+| Top-up channel | Stripe web only | Stripe web **+ Apple/Google IAP** (app), with an internal **price buffer** on the app SKUs (~20–25%) |
 | Exhaustion UX | `LimitReachedModal` (count limit) | Same modal, balance-aware: "top up" or "subscribe" |
 | Accounting unit | EUR (`BCOST`) | EUR internally; **displayed as "credits"** (1 credit = €0.01) |
 
@@ -61,23 +61,27 @@ The Welcome Wallet resolves both: **show, don't tell** for verified humans, with
 
 ## 2. Product model — the Wallet
 
-### 2.1 Unit of account (locked recommendation)
+### 2.1 Unit of account (LOCKED)
 
 - **Internal unit = EUR.** The wallet balance, grants, top-ups and usage debits are
   all stored as EUR decimals, reusing the existing cost engine (`BUSELOG.BCOST`,
   `BILLING/MARKUP_PERCENT`). This is the lowest-regression choice — no parallel
   "token cost" table, no re-pricing of every model.
-- **Displayed unit = "credits", where `WALLET_CREDITS_PER_EUR = 100`** (1 credit =
-  €0.01). A €5 welcome grant shows as **500 credits**; a €19.95 pack as **1 995
-  credits**. Showing credits (not euros) reinforces that the balance is *prepaid
-  AI usage*, not refundable money — important legally (see §6).
-- The conversion rate is an operator-tunable constant so we can rebalance the
-  "feel" (e.g. 1 credit = €0.005) without touching the cost engine.
-
-> Product decision to confirm: keep "credits" as the user-facing word (matches the
-> original trial copy "50 credits remaining"), vs. the looser "tokens" the PO used
-> verbally. Recommendation: **credits** (avoids confusion with LLM tokens). The
-> word "tokens" stays internal/marketing-only.
+- **Displayed unit = "credits", `WALLET_CREDITS_PER_EUR = 100`** (1 credit = €0.01).
+  A €5 welcome grant shows as **500 credits**; a €19.95 pack as **1 995 credits**.
+  Showing credits (not euros) reinforces that the balance is *prepaid AI usage*, not
+  refundable money — important legally (see §6). **User-facing term is "credits" in
+  every locale** (`en` credits · `de` Guthaben/Credits · `es` créditos · `tr`
+  kredi) — never "tokens" in UI (tokens stays internal/marketing-only).
+- The conversion rate stays an operator-tunable constant so we can rebalance the
+  "feel" without touching the cost engine.
+- **Debits ALWAYS include the markup.** What is debited from the wallet is the
+  *charged* cost = provider cost × `(1 + BILLING/MARKUP_PERCENT/100)`, never the raw
+  provider cost. Example with the default 10% markup: a provider image that costs
+  €1.00 debits **€1.10 (110 credits)**. The markup is the platform's margin and is
+  single-sourced from the existing `BILLING/MARKUP_PERCENT` (operators can raise it).
+  Wallet credit value (welcome grant + purchases) is denominated in this same
+  *charged* EUR, so a 500-credit grant buys ~4–5 such images.
 
 ### 2.2 What the wallet is (and is NOT)
 
@@ -126,19 +130,16 @@ allowance = (subscription monthly budget left this period)   ← existing, perio
 - **Pay-as-you-go users (NEW / no active subscription):** monthly budget = €0, so
   spend draws **straight from the wallet** (welcome grant + top-ups). This is the
   consumer flow the PO described.
-- **Subscribers (PRO/TEAM/BUSINESS):** keep their monthly budget; the wallet is an
-  overflow / always-available prepaid balance they may also top up. Draw order:
-  **period budget first, then wallet** (so subscribers don't burn prepaid credit
-  while they still have included budget).
+- **Subscribers (PRO/TEAM/BUSINESS) — LOCKED draw order:** they spend their included
+  **monthly budget first**; only **after that budget is exhausted** do they draw from
+  the wallet. When the wallet then runs dry, they **top it up** (same packs). So a
+  subscriber never burns prepaid credit while included budget remains, and the wallet
+  is the seamless "keep going past my plan" overflow.
 - **Debit timing:** when `RateLimitService::recordUsage()` writes a `BUSELOG` row,
   a follow-on `WalletService` debit is written for the portion of the charged cost
   that falls on the wallet (charged cost = `BCOST × markupMultiplier`). The debit
-  references `BUSELOG.BID` for traceability and idempotency.
-
-> Product decision to confirm: do **subscribers** also draw from the wallet after
-> their monthly budget, or is the wallet a pay-as-you-go-only construct?
-> Recommendation: **universal wallet, period-budget-first draw order** (above) — it
-> is the most flexible and keeps one code path.
+  references `BUSELOG.BID` for traceability and idempotency. The portion still
+  covered by the period budget is **not** debited from the wallet.
 
 ### 2.5 The "everything unlocked" behaviour
 
@@ -156,26 +157,42 @@ spend gate (balance) becomes the single source of truth. Concretely:
   user's real tier (NEW = local/free models only, no rich media) — graceful
   degradation, exactly as the original plan intended.
 
-This keeps the financial blast radius bounded by the *balance*, not by trusting
-the count limits — a bot with a drained €5 wallet simply can't spend more.
+**Funded-trial soft caps (LOCKED anti-abuse ceiling).** "Everything unlocked" lifts
+the count padlocks for *capability access*, but the **welcome-grant trial** keeps a
+hard ceiling on the most expensive media so a single €5 grant can't be turned into a
+pile of costly assets even before the balance math bites:
+
+- **Images: max 7**, **Videos: max 2** while the user is on the welcome grant (no
+  purchased credit, no active subscription). Text/chat is balance-limited only.
+- These caps are seeded config (`RATELIMITS_TRIAL` group: `IMAGES_TOTAL=7`,
+  `VIDEOS_TOTAL=2`) so they are operator-tunable and counted lifetime over the trial.
+- Once the user **buys** any credit or subscribes, the trial caps no longer apply —
+  the wallet balance / period budget is the only limit.
+
+This keeps the financial blast radius bounded by the *balance* **and** a media-count
+ceiling — a bot with a drained €5 wallet can spend no more, and can't extract more
+than 7 images / 2 videos even within it.
 
 ---
 
 ## 3. Money flow — top-ups
 
-### 3.1 Fixed packs (replaces the €100 step)
+### 3.1 Fixed packs (replaces the €100 step) — LOCKED
 
-Two fixed packs, configured as seeded catalog data (`App\Seed\WalletPackSeeder`):
+Three fixed packs, mirroring the subscription price points (PRO/TEAM/BUSINESS =
+€19.95/€49.95/€99.95), configured as seeded catalog data
+(`App\Seed\WalletPackSeeder`):
 
 | Pack | Web price (Stripe, reference) | Credit value granted | Displayed credits |
 |------|-------------------------------|----------------------|-------------------|
 | Small | €19.95 | €19.95 of wallet credit | 1 995 |
-| Large | €49.95 | €49.95 of wallet credit | 4 995 |
+| Medium | €49.95 | €49.95 of wallet credit | 4 995 |
+| Large | €99.95 | €99.95 of wallet credit | 9 995 |
 
 This changes the existing `POST /api/v1/subscription/topup` contract (today: N ×
-€100 steps) into a **pack-based** top-up (`packId: 'small'|'large'`). The legacy
-"steps" path is removed behind the flag (see §7 regression note) and the
-`LimitReachedModal.vue` EUR-100 step selector is replaced by the two packs.
+€100 steps) into a **pack-based** top-up (`packId: 'small'|'medium'|'large'`). The
+legacy "steps" path is removed behind the flag (see §8 regression note) and the
+`LimitReachedModal.vue` EUR-100 step selector is replaced by the three packs.
 
 ### 3.2 Web (Stripe) flow
 
@@ -189,35 +206,38 @@ This changes the existing `POST /api/v1/subscription/topup` contract (today: N �
    `billing_address_collection`/`tax_id_collection`/`automatic_tax` wiring already
    on the subscription + topup checkouts.
 
-### 3.3 App (native IAP) flow + the internal +25% surcharge
+### 3.3 App (native IAP) flow + the internal price buffer
 
 The app **must not** open Stripe web checkout (Apple 3.1.1 / Google Play). Top-ups
 in the app go through **consumable IAP products**, validated server-side by the
 existing `MobilePurchaseService` seam (extended for consumables).
 
-**The +25% app surcharge (internal — never surfaced to users):**
+**The app price buffer (internal — never surfaced to users):**
 
-- The **store price** of each top-up SKU is set ~**25% above** the web reference
-  price to absorb Apple/Google fees, exactly mirroring the ≈30% subscription
-  commission-baking already documented in `docs/PAYMENTS_CHANNELS.md`.
+- The **store price** of each top-up SKU is set **above** the web reference price to
+  absorb Apple/Google fees and still make a margin — exactly mirroring the ≈30%
+  subscription commission-baking already documented in `docs/PAYMENTS_CHANNELS.md`.
+- It is **not** a flat 25%: each store price is a deliberately "nice" round-ish
+  number that carries a comfortable buffer (≈20–25%) over the web price. The buffer
+  just has to cover the store cut and leave service margin — not break us, not gouge.
 - The **credit value granted is the web reference value**, identical across
   channels. App users pay more money for the *same* credits; the wallet is credited
   with the web value.
 
-| Pack | Web price | App store price (≈ +25%) | Credit value granted (both channels) |
-|------|-----------|--------------------------|--------------------------------------|
-| Small | €19.95 | ≈ €24.99 (store SKU) | €19.95 → 1 995 credits |
-| Large | €49.95 | ≈ €59.99 (store SKU) | €49.95 → 4 995 credits |
+| Pack | Web price (Stripe) | App store price (buffered) | Credit value granted (both channels) |
+|------|--------------------|----------------------------|--------------------------------------|
+| Small | €19.95 | **€24.95** (≈ +25%) | €19.95 → 1 995 credits |
+| Medium | €49.95 | **€59.95** (≈ +20%) | €49.95 → 4 995 credits |
+| Large | €99.95 | **€119.00** (≈ +19%) | €99.95 → 9 995 credits |
 
-- Implementation: a new env-config map `WALLET_IAP_TOPUP_SMALL` / `_LARGE`
-  (store product IDs) → mapped to a **credit-EUR value** by a `WalletPackService`
-  (the consumable mirror of `IapPricingService`). The server credits the mapped
-  value regardless of the store-charged amount.
-- **Internal-only:** `WALLET_IAP_SURCHARGE_PERCENT = 25` is used only to *derive
-  the recommended store price* in launch tooling/docs. **No user-facing copy,
-  tooltip, invoice line, or API field ever mentions the surcharge.** Store prices
-  are set in App Store Connect / Play Console; the app shows the store's localized
-  price as-is.
+- Implementation: a new env-config map `WALLET_IAP_TOPUP_SMALL` / `_MEDIUM` /
+  `_LARGE` (store product IDs) → mapped to a **credit-EUR value** by a
+  `WalletPackService` (the consumable mirror of `IapPricingService`). The server
+  credits the mapped value regardless of the store-charged amount.
+- **Internal-only:** the per-pack store prices above are *recommendations* set in
+  App Store Connect / Play Console. **No user-facing copy, tooltip, invoice line, or
+  API field ever mentions a "surcharge", "buffer", or "fee".** The app simply shows
+  the store's localized price and the credits granted.
 - IAP top-ups are **consumables** (each purchase grants credit and is "consumed"),
   not subscriptions — so block-cross / one-owner subscription rules do **not**
   apply, but **replay protection** (one transaction id credited once) does, via the
@@ -228,24 +248,22 @@ existing `MobilePurchaseService` seam (extended for consumables).
 
 > Apple Pay / Google Pay on **web** (as Stripe payment methods) are a later,
 > separate add (just a `payment_method_types` entry on the Stripe Checkout). They
-> are **not** native IAP and carry **no** surcharge.
+> are **not** native IAP and carry the normal web price (no app buffer).
 
-### 3.4 Welcome grant
+### 3.4 Welcome grant — LOCKED
 
 - On the **first verified** login, `WalletService::grantWelcome()` writes a single
-  `welcome_grant` ledger entry of `WALLET_WELCOME_GRANT_EUR` (default **€5.00** →
-  500 credits), idempotent on `(welcome_grant, user:{id})` so it is granted **once
-  ever** per account.
+  `welcome_grant` ledger entry of `WALLET_WELCOME_GRANT_EUR` = **€5.00 → 500
+  credits**, idempotent on `(welcome_grant, user:{id})` so it is granted **once ever**
+  per account.
 - "Verified" = OIDC (Google) verified email **or** a clicked email-verification
   link for local signups (see §4). The grant is **not** written at row-insert time
   — only after verification — which is the anti-abuse gate from the original plan.
 - The welcome grant is a **promotional credit**: non-refundable, no cash value,
   subject to the anti-abuse guards in §5.
-
-> Product decision to confirm: should the **welcome grant** expire (e.g. 30 days)
-> while **purchased** credit never expires? Recommendation: purchased credit never
-> expires; welcome grant **does not expire** either (PO's stated preference) but is
-> hard-gated by the §5 anti-abuse rules. Revisit only if abuse appears.
+- **Expiry: never.** Both the welcome grant **and** all purchased credit are
+  persistent and never expire. (Anti-abuse is handled by the §5 verification +
+  Turnstile + 3-grants/IP/24h + funded-trial media caps, not by expiry.)
 
 ---
 
@@ -282,7 +300,7 @@ Key points:
 3. **Exhaustion UX** reuses the centralized `useLimitCheck()` →
    `LimitReachedModal.vue` path already wired into `ChatView.vue` for the
    `COST_BUDGET_EXCEEDED` SSE code. The modal becomes **balance-aware**: "You've
-   used your free credits — top up (1 995 / 4 995) or go PRO." On native, the
+   used your free credits — top up (1 995 / 4 995 / 9 995) or go PRO." On native, the
    top-up CTA routes to **IAP**, never Stripe (same `isNativeApp()` guard as
    `SubscriptionView.vue`).
 4. **Wallet meter** in the shell (sidebar/header): a small `WalletMeter.vue` reading
@@ -309,9 +327,10 @@ by the €5 grant, but we still block farming:
 4. **Financially-safe grant size:** €5 (500 credits) — enough for a genuine wow
    (a couple of videos *or* a long flagship chat), too little for a scraper to
    extract commercial value before needing a fresh verified email **and** IP.
-5. **Per-capability sanity caps inside the trial:** even with balance, keep a soft
-   cap (e.g. ≤ N videos) so a single drained wallet can't be turned into one
-   expensive asset; tuned via config. (Optional — flag for product.)
+5. **Per-capability caps inside the welcome trial (LOCKED):** even with grant
+   balance, the trial is hard-capped at **7 images** and **2 videos** (seeded
+   `RATELIMITS_TRIAL`), so a single drained €5 grant can't be turned into a pile of
+   expensive assets. Caps lift the moment the user buys credit or subscribes (§2.5).
 6. **Replay/ownership protection** on every credit source via the ledger unique key
    (Stripe session id, IAP transaction id) and `MobilePurchaseService`'s existing
    "one receipt → one account" rule.
@@ -335,7 +354,7 @@ by the €5 grant, but we still block farming:
   - **App (Apple/Google IAP):** the store is MoR — collects/remits consumer VAT,
     pays net after the 15–30% cut; issues a consumer receipt. Book revenue per
     channel separately (as already documented in `docs/PAYMENTS_CHANNELS.md`).
-- **The +25% app price is internal cost-recovery only.** It is *never* presented as
+- **The app price buffer is internal cost-recovery only.** It is *never* presented as
   a "fee", "surcharge", or "app tax" in UI, invoices, receipts, or API. The user
   sees only the store's localized price and the credits granted.
 - **Update `docs/PAYMENTS_CHANNELS.md`** with a new "Wallet top-ups (consumables)"
@@ -355,11 +374,12 @@ shippable and CI-green on its own; everything is gated by `WALLET_ENABLED`
 (default **off**) so partial merges never change live behaviour.
 
 ### W0 — Spike & sign-off (no code that ships behaviour)
-- Confirm the open product decisions (credits vs tokens wording; subscriber draw
-  order; grant expiry; per-capability trial caps).
-- Legal sign-off on §6 copy + store tax categories.
-- Lock the conversion rate (`WALLET_CREDITS_PER_EUR`) and pack prices.
-- **Exit:** decisions recorded in §10; no merge required.
+- ✅ **Product decisions resolved 2026-06-30** — see §11. (Wording = "credits" in all
+  locales; rate 100; grant 500; subscribers draw budget-first then wallet; nothing
+  expires; trial caps 7 images / 2 videos; backfill grant + email; three packs with
+  buffered app prices.)
+- Legal sign-off on §6 copy + store tax categories (the remaining W0 blocker).
+- **Exit:** legal sign-off recorded; no merge required.
 
 ### W1 — Wallet backbone (backend-only, no UX)
 - Migration: `BWALLET` + `BWALLET_LEDGER` (idempotent, comparator-free SQL).
@@ -395,8 +415,9 @@ shippable and CI-green on its own; everything is gated by `WALLET_ENABLED`
 ### W4 — Frontend: meter, packs, unlock, exhaustion
 - `WalletMeter.vue` in the shell (credits remaining + top-up button), reads
   `GET /api/v1/wallet`.
-- Rework `LimitReachedModal.vue`: replace the €100-step selector with the two packs;
-  make it balance-aware; native guard routes top-up to IAP, web to Stripe.
+- Rework `LimitReachedModal.vue`: replace the €100-step selector with the three packs
+  (€19.95 / €49.95 / €99.95); make it balance-aware; native guard routes top-up to
+  IAP, web to Stripe.
 - `AIModelsConfiguration.vue` + chat composer: remove premium padlocks for
   wallet-funded users; restore at zero balance.
 - `SubscriptionView.vue` / `UsageStatistics.vue`: show wallet alongside subscription.
@@ -407,15 +428,19 @@ shippable and CI-green on its own; everything is gated by `WALLET_ENABLED`
 - Extend `MobilePurchaseService` for **consumable** top-ups: `POST /api/v1/iap/topup`
   verify → `WalletService::creditFromIap()` (replay-protected via ledger unique key).
   Apple ASSN / Google RTDN paths handle refunds → `reversal` ledger entries.
-- Store SKUs + recommended store prices (≈ +25%) documented in
-  `synaplan-apps/docs/LAUNCH_CHECKLIST.md`; `WALLET_IAP_TOPUP_*` env map.
+- Store SKUs + recommended buffered store prices (€24.95 / €59.95 / €119.00)
+  documented in `synaplan-apps/docs/LAUNCH_CHECKLIST.md`; `WALLET_IAP_TOPUP_*` env map.
+- Add `RATELIMITS_TRIAL` seed (`IMAGES_TOTAL=7`, `VIDEOS_TOTAL=2`) + wire the
+  funded-trial caps into `checkLimit()` (§2.5 / §5).
 - `grantWelcome()` wired into the verification + OIDC-new-user paths.
 - `TurnstileService` + runtime config + register/resend verification; **3 grants /
   IP / 24h** cap.
 - **Rollout:** flip `WALLET_ENABLED=true` on web first, then app once IAP store
-  products are live; grandfather existing users (one-time backfill grant is a
-  product decision — default: existing users get the welcome grant once, gated by
-  the same idempotency key).
+  products are live. **One-time backfill (LOCKED):** every existing user receives the
+  500-credit welcome grant once (idempotent on the same `(welcome_grant, user:{id})`
+  key) via an `app:wallet:backfill-grant` command, **plus a one-off email**: *"We've
+  added 500 free credits to your account."* (localized × 4). Send via the existing
+  mail pipeline; throttle the batch.
 
 ---
 
@@ -462,7 +487,8 @@ make lint && make -C backend phpstan && make test && docker compose exec -T fron
 | Idempotency | `WalletServiceIdempotencyTest` | duplicate `(type, sourceRef)` credited/debited **once**; concurrent retry race (UniqueConstraintViolation → no-op) |
 | Welcome grant | `WalletServiceTest::grantWelcome` | granted once per user; not before verification; respects 3/IP/24h cap |
 | Conversion | `WalletPackServiceTest` | EUR ↔ credits; pack→price→credit-value; **IAP product→web credit value** (channel-independent credit) |
-| Gate | `RateLimitServiceCostBudgetTest` | allowance = period budget + wallet; subscriber draw order (budget first); wallet-funded lifts count caps; zero-balance falls back to tier |
+| Gate | `RateLimitServiceCostBudgetTest` | allowance = period budget + wallet; subscriber draw order (budget first, then wallet); wallet-funded lifts count caps; zero-balance falls back to tier; **welcome-trial caps 7 images / 2 videos** enforced and lifted after first purchase |
+| Backfill | `WalletBackfillGrantCommandTest` | grants existing users once (idempotent); re-run is a no-op; enqueues one email per granted user |
 | Spend | `RateLimitServiceRecordUsageWalletTest` | debit written with correct markup; references `BUSELOG.BID`; not double-debited |
 | Stripe webhook | `StripeWebhookControllerWalletTest` (Integration, mocked Stripe) | `type:'wallet_topup'` → `topup_stripe` entry; idempotent on session id; legacy `type:'topup'` still credits `BUSER_TOPUPS` |
 | IAP | `MobilePurchaseServiceTopupTest` (Unit, fake verifiers) | consumable verify → `topup_*` credit; replay (same txn) → no double credit; refund RTDN/ASSN → `reversal` |
@@ -478,7 +504,7 @@ not a scoped path — watch the `willReturnCallback` `: ?string` trap from
 | Component | Test | Asserts |
 |-----------|------|---------|
 | `WalletMeter.vue` | mount + mocked `GET /wallet` | renders credits; unlimited/zero states; top-up button |
-| `LimitReachedModal.vue` | updated spec | shows two packs (not €100 steps); balance-aware copy; **native guard** routes to IAP, web to Stripe (extend `SubscriptionViewNativeGuard.spec.ts` pattern) |
+| `LimitReachedModal.vue` | updated spec | shows three packs €19.95/€49.95/€99.95 (not €100 steps); balance-aware copy; **native guard** routes to IAP, web to Stripe (extend `SubscriptionViewNativeGuard.spec.ts` pattern) |
 | `ChatView.vue` | extend existing | `COST_BUDGET_EXCEEDED` SSE still opens the (balance-aware) modal |
 | Schemas | `usageApi.spec.ts` / generated | wallet fields parse via generated Zod schema (regen after OpenAPI change) |
 
@@ -495,8 +521,9 @@ Stub heavy deps (Pinia/i18n/`MessageText`) per the `AGENTS_DEV.md` frontend-test
 - Stripe **test mode** end-to-end (real Checkout, test card) → webhook → ledger
   credit → meter updates.
 - IAP **sandbox** (Apple sandbox tester / Google license tester): consumable
-  purchase at the **+25% store price** credits the **web value**; verify the
-  surcharge never appears in any user-visible surface.
+  purchase at the **buffered store price** (e.g. €24.95) credits the **web value**
+  (€19.95 → 1 995 credits); verify the buffer never appears in any user-visible
+  surface.
 - Turnstile challenge on register in a real browser; verify 3/IP/24h grant cap.
 
 ---
@@ -504,16 +531,21 @@ Stub heavy deps (Pinia/i18n/`MessageText`) per the `AGENTS_DEV.md` frontend-test
 ## 10. Definition of done
 
 - A new user (Apple/Google or verified email) lands with **no padlocks** and a
-  visible **wallet meter (~500 credits)**; can generate 1–2 videos *or* a long
-  flagship chat from the welcome balance.
+  visible **wallet meter (500 credits)**; can generate media (≤ 7 images / ≤ 2 videos
+  in the trial) *or* a long flagship chat from the welcome balance.
 - At zero balance, the action cleanly fails (429 / `COST_BUDGET_EXCEEDED`) and the
-  balance-aware `LimitReachedModal` offers the **two packs** (web→Stripe,
-  app→IAP) or PRO.
+  balance-aware `LimitReachedModal` offers the **three packs** €19.95/€49.95/€99.95
+  (web→Stripe, app→IAP) or PRO.
+- Subscribers spend **included budget first, then the wallet**, then top up.
 - Top-up credits land in the **persistent** wallet, **never expire**, and **cannot**
-  be exchanged for cash; idempotent on every retry/replay.
-- App top-ups are priced ~**+25%** at the store yet grant the **same** credits as
-  web; **no user-facing surface mentions the surcharge.**
-- Anti-abuse: Turnstile + verification gate + 3 grants/IP/24h block farming.
+  be exchanged for cash; idempotent on every retry/replay. Every debit applies the
+  `BILLING/MARKUP_PERCENT` markup (e.g. €1.00 provider cost → €1.10 debited).
+- App top-ups are priced with a **buffer** at the store (≈ €24.95/€59.95/€119.00) yet
+  grant the **same** credits as web; **no user-facing surface mentions the buffer.**
+- Anti-abuse: Turnstile + verification gate + 3 grants/IP/24h + trial media caps
+  (7 images / 2 videos) block farming.
+- Existing users receive a one-time **500-credit backfill grant** + a localized
+  "we added 500 free credits" email (idempotent, re-run safe).
 - `WALLET_ENABLED=false` ⇒ **byte-for-byte** current behaviour (legacy top-ups,
   subscriptions, open-source mode all unchanged).
 - i18n complete in `en`/`de`/`es`/`tr`; `docs/PAYMENTS_CHANNELS.md` updated; legal
@@ -522,16 +554,21 @@ Stub heavy deps (Pinia/i18n/`MessageText`) per the `AGENTS_DEV.md` frontend-test
 
 ---
 
-## 11. Open product decisions (resolve in W0)
+## 11. Product decisions — RESOLVED (2026-06-30)
 
-1. User-facing term: **credits** (recommended) vs "tokens".
-2. Conversion rate `WALLET_CREDITS_PER_EUR` (recommended **100**, i.e. 1 credit = 1¢).
-3. Welcome grant size (recommended **€5.00 / 500 credits**).
-4. Do **subscribers** also draw from the wallet (recommended **yes**, period-budget-first)?
-5. Welcome-grant expiry (recommended **none**; purchased credit **never** expires).
-6. Per-capability soft caps inside the funded trial (optional anti-abuse).
-7. One-time **backfill** welcome grant for existing users at rollout (recommended **yes**, idempotent).
-8. Exact store prices for the +25% SKUs (set in App Store Connect / Play Console).
+| # | Decision | Resolution |
+|---|----------|------------|
+| 1 | User-facing term | **"credits"**, localized in all four locales (`de` Guthaben/Credits · `es` créditos · `tr` kredi). "tokens" never appears in UI. |
+| 2 | Conversion rate `WALLET_CREDITS_PER_EUR` | **100** (1 credit = €0.01). Debits **always** apply `BILLING/MARKUP_PERCENT` first — a €1.00 provider cost debits €1.10 (110 credits). |
+| 3 | Welcome grant size | **500 credits (€5.00)**. |
+| 4 | Subscribers draw from wallet? | **Yes — included monthly budget first, then the wallet, then top up.** |
+| 5 | Expiry | **Never** — welcome grant *and* purchased credit are permanent. |
+| 6 | Per-capability trial caps | **Yes — 7 images, 2 videos** during the welcome trial (`RATELIMITS_TRIAL`); lifted after first purchase/subscription. |
+| 7 | Backfill grant for existing users | **Yes — one-time, idempotent**, with a localized email "we added 500 free credits to your account". |
+| 8 | App (IAP) store prices | **Not a flat +25%** — buffered "nice" prices mapped from the Stripe price points: **€19.95→€24.95, €49.95→€59.95, €99.95→€119.00.** Buffer just covers the store cut + service margin. |
+
+Remaining W0 blocker: **legal sign-off** on the §6 ToS/refund/consent copy and the
+store-product tax categories.
 
 ---
 
@@ -542,7 +579,7 @@ Stub heavy deps (Pinia/i18n/`MessageText`) per the `AGENTS_DEV.md` frontend-test
 | `synaplan` (backend) | migration (`BWALLET`, `BWALLET_LEDGER`); `Wallet`/`WalletLedgerEntry` entities + repos; `WalletService`, `WalletPackService`, `TurnstileService`; `WalletController`; wire `RateLimitService` (debit + gate + count-lift); extend `StripeWebhookController` + `MobilePurchaseService`; `App\Seed\WalletPackSeeder`; OpenAPI |
 | `synaplan` (frontend) | `WalletMeter.vue`; rework `LimitReachedModal.vue`; padlock removal in `AIModelsConfiguration.vue` + composer; wallet in `SubscriptionView`/`UsageStatistics`; Turnstile in register/login; regenerated Zod schemas; i18n × 4 |
 | `synaplan` (docs) | `docs/PAYMENTS_CHANNELS.md` wallet/consumable section |
-| `synaplan-apps` | consumable IAP products (Apple/Google), store prices ≈ +25%, sandbox testers, `docs/LAUNCH_CHECKLIST.md` |
+| `synaplan-apps` | consumable IAP products (Apple/Google), buffered store prices (€24.95/€59.95/€119.00), sandbox testers, `docs/LAUNCH_CHECKLIST.md` |
 
 All of the above sits inside the `AGENTS.md` "Ask First" boundary (DB schema, new
 deps, payment/IAP, Docker/CI config). **This plan is that ask** — implementation
