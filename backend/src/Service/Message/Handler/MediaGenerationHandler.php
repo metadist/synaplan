@@ -719,6 +719,18 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     );
                 }
 
+                // Stop button / disconnect support for the blocking image path
+                // (issue #1155). Mirrors the video path above: probe the shared
+                // cancellation store plus connection_aborted() so providers that
+                // poll for the result (e.g. fal/HuggingFace) abort mid-flight
+                // instead of running an unwanted generation to completion. For
+                // single-shot providers it is a harmless no-op. Only applied on
+                // the synchronous path — never serialized into an async job.
+                $cancelCheck = $this->buildCancelCheck($options);
+                if (null !== $cancelCheck) {
+                    $imageOptions['cancel_check'] = $cancelCheck;
+                }
+
                 $result = $this->aiFacade->generateImage(
                     $prompt,
                     $message->getUserId(),
