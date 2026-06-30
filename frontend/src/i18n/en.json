@@ -799,7 +799,127 @@
     "tabSearch": "Search",
     "tabVectors": "Vectors",
     "intro": "Files you upload become searchable knowledge for your chats. Folders can be used as knowledge folders to scope a conversation.",
-    "useInChat": "Use in chat"
+    "useInChat": "Use in chat",
+    "terms": {
+      "vectorized": "searchable by AI",
+      "knowledgeGroup": "knowledge group",
+      "incoming": "incoming",
+      "generated": "AI-generated",
+      "notApplicable": "not applicable"
+    },
+    "tabBrowse": "Browse",
+    "tabIncoming": "Incoming",
+    "tabGenerated": "Generated",
+    "incomingBadge": "{count} new",
+    "sourceLabel": {
+      "web_upload": "Upload",
+      "chat_attachment": "Chat",
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "opencloud": "OpenCloud",
+      "whatsapp": "WhatsApp",
+      "widget": "Widget",
+      "api": "API",
+      "generated": "AI-generated"
+    },
+    "vectorState": {
+      "vectorized": "Searchable by AI",
+      "vectorizedDetail": "Searchable by AI · {group} · {count} chunks",
+      "processing": "Processing…",
+      "none": "Not searchable",
+      "notApplicable": "Not applicable",
+      "failed": "Failed"
+    },
+    "filter": {
+      "source": "Source",
+      "group": "Group",
+      "type": "Type",
+      "vectorized": "Searchable",
+      "date": "Date",
+      "clear": "Clear filters",
+      "typeAll": "All types",
+      "typeDocs": "Documents",
+      "typeImages": "Images",
+      "typeVideo": "Video",
+      "typeAudio": "Audio",
+      "vectorizedYes": "Searchable by AI",
+      "vectorizedNo": "Not searchable",
+      "noGroup": "No group"
+    },
+    "help": {
+      "vectorized": "When a file is searchable by AI, its contents are added to your knowledge base so the assistant can use them to answer you.",
+      "group": "Knowledge groups bundle files together. When the AI searches a group, it can use every file in it.",
+      "source": "Where this file came from — an upload, a chat, Outlook, Nextcloud, OpenCloud, WhatsApp, the widget, the API, or AI-generated.",
+      "incoming": "Files other apps pushed in for your knowledge base. Review them, then keep or dismiss.",
+      "typeFilter": "Show only one kind of file — documents, images, video or audio.",
+      "vectorizedFilter": "Filter by whether files are searchable by AI.",
+      "reVectorize": "Re-read this file and refresh what the AI knows from it. Use after editing it or if it failed.",
+      "moveGroup": "Move files into another knowledge group. This changes which group the AI searches them in — it doesn't delete anything.",
+      "storage": "How much of your storage you've used. AI-generated media counts too, shown separately."
+    },
+    "empty": {
+      "browseTitle": "Your file library",
+      "browseBody": "Every upload, chat attachment and AI-generated file lives here, ready to search and reuse.",
+      "browseAction": "Upload your first file",
+      "filteredBody": "No files match these filters.",
+      "filteredAction": "Clear filters",
+      "incomingBody": "Files sent in from Outlook, Nextcloud or OpenCloud appear here for you to review before filing.",
+      "incomingAction": "Set up integrations",
+      "generatedBody": "Images, video and audio you create in chat are saved here so you can find and download them again.",
+      "generatedAction": "Start a chat",
+      "groupBody": "This group has no files yet. Add files to make them searchable together.",
+      "groupAction": "Add files"
+    },
+    "toast": {
+      "uploaded": "Uploaded {name}. | Uploaded {count} files.",
+      "uploadFailed": "Couldn't upload {name}. {reason}",
+      "tooLarge": "{name} is too large (max {limit}).",
+      "unsupported": "{type} files aren't supported.",
+      "vectorizeStart": "Making {name} searchable by AI…",
+      "vectorizeDone": "{name} is now searchable by AI.",
+      "vectorizeFailed": "Couldn't process {name}.",
+      "revectorizedBulk": "Refreshed {count} files.",
+      "moved": "Moved {count} files to {group}.",
+      "filed": "Filed {count} files in {group}.",
+      "deleted": "Deleted {count} files.",
+      "incomingKept": "Kept {count} files in {group}.",
+      "incomingDismissed": "Dismissed {count} files.",
+      "shareCreated": "Share link copied to clipboard.",
+      "shareRevoked": "Sharing turned off for {name}.",
+      "downloadPreparing": "Preparing {count} files for download…",
+      "genericError": "Something went wrong. {reason}",
+      "undo": "Undo"
+    },
+    "confirm": {
+      "deleteTitle": "Delete {count} files?",
+      "deleteBody": "Their AI-searchable content is removed too. This can't be undone.",
+      "deleteConfirm": "Delete",
+      "dismissTitle": "Dismiss {count} files?",
+      "dismissBody": "They won't be added to your library. You can re-import them later from the source.",
+      "dismissConfirm": "Dismiss"
+    },
+    "incoming": {
+      "title": "Incoming",
+      "subtitle": "Files pushed in for your knowledge base — review, then keep or dismiss.",
+      "keep": "Keep",
+      "keepAll": "Keep all",
+      "assignGroup": "Assign group",
+      "dismiss": "Dismiss",
+      "open": "Open",
+      "retry": "Retry",
+      "provenance": "from {source} · {time}"
+    },
+    "generated": {
+      "title": "Generated",
+      "subtitle": "Images, video and audio created in your chats.",
+      "openInChat": "Open in chat",
+      "download": "Download"
+    },
+    "explainer": {
+      "text": "Everything you upload or create lives here. Files marked \"searchable by AI\" are added to your knowledge base so the assistant can use them.",
+      "dismiss": "Got it",
+      "reopen": "What is this?"
+    }
   },
   "vectorStorage": {
     "intro": "An overview of your vector storage — how many files have been indexed and how many vectors (chunks) are stored for semantic search.",
@@ -874,12 +994,25 @@
       "extension_not_allowed": "{filename}: File type is not supported. {message}",
       "rate_limit_exceeded": "{filename}: Upload rate limit reached. {message}",
       "generic": "{filename}: Upload is not allowed. {message}"
-    }
+    },
+    "helper": "Attached files are sent to the AI for this message. Files marked ✅ are also searchable across all your chats.",
+    "searchYourFiles": "Search your files",
+    "typeAll": "All",
+    "typeDocs": "Docs",
+    "typeImages": "Images",
+    "typeVideo": "Video",
+    "typeAudio": "Audio",
+    "recent": "Recent",
+    "allFilesFiltered": "All files",
+    "attachCount": "Attach {count} file | Attach {count} files",
+    "noRecents": "Pick a recent file or upload a new one to use in this chat.",
+    "noResults": "No files match. Try another search or upload a new file."
   },
   "fileMention": {
     "hint": "Type to search files — press Enter to attach",
     "noResults": "No files found",
-    "fileAttached": "{name} attached"
+    "fileAttached": "{name} attached",
+    "header": "Type to find a file to give the AI"
   },
   "config": {
     "aiModels": {

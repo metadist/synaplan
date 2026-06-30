@@ -2037,7 +2037,127 @@
     "tabSearch": "Suche",
     "tabVectors": "Vektoren",
     "intro": "Hochgeladene Dateien werden durchsuchbares Wissen für deine Chats. Ordner lassen sich als Wissensordner nutzen, um eine Unterhaltung einzugrenzen.",
-    "useInChat": "Im Chat nutzen"
+    "useInChat": "Im Chat nutzen",
+    "terms": {
+      "vectorized": "KI-durchsuchbar",
+      "knowledgeGroup": "Wissensgruppe",
+      "incoming": "Eingang",
+      "generated": "KI-erzeugt",
+      "notApplicable": "nicht zutreffend"
+    },
+    "tabBrowse": "Durchsuchen",
+    "tabIncoming": "Eingang",
+    "tabGenerated": "Erzeugt",
+    "incomingBadge": "{count} neu",
+    "sourceLabel": {
+      "web_upload": "Upload",
+      "chat_attachment": "Chat",
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "opencloud": "OpenCloud",
+      "whatsapp": "WhatsApp",
+      "widget": "Widget",
+      "api": "API",
+      "generated": "KI-erzeugt"
+    },
+    "vectorState": {
+      "vectorized": "KI-durchsuchbar",
+      "vectorizedDetail": "KI-durchsuchbar · {group} · {count} Abschnitte",
+      "processing": "Wird verarbeitet…",
+      "none": "Nicht durchsuchbar",
+      "notApplicable": "Nicht zutreffend",
+      "failed": "Fehlgeschlagen"
+    },
+    "filter": {
+      "source": "Quelle",
+      "group": "Gruppe",
+      "type": "Typ",
+      "vectorized": "Durchsuchbar",
+      "date": "Datum",
+      "clear": "Filter zurücksetzen",
+      "typeAll": "Alle Typen",
+      "typeDocs": "Dokumente",
+      "typeImages": "Bilder",
+      "typeVideo": "Video",
+      "typeAudio": "Audio",
+      "vectorizedYes": "KI-durchsuchbar",
+      "vectorizedNo": "Nicht durchsuchbar",
+      "noGroup": "Keine Gruppe"
+    },
+    "help": {
+      "vectorized": "Wenn eine Datei KI-durchsuchbar ist, wird ihr Inhalt deiner Wissensbasis hinzugefügt, damit der Assistent ihn für Antworten nutzen kann.",
+      "group": "Wissensgruppen bündeln Dateien. Wenn die KI eine Gruppe durchsucht, kann sie jede Datei darin nutzen.",
+      "source": "Woher diese Datei stammt – Upload, Chat, Outlook, Nextcloud, OpenCloud, WhatsApp, Widget, API oder KI-erzeugt.",
+      "incoming": "Dateien, die andere Apps für deine Wissensbasis eingeliefert haben. Prüfe sie und behalte oder verwirf sie.",
+      "typeFilter": "Nur eine Dateiart anzeigen – Dokumente, Bilder, Video oder Audio.",
+      "vectorizedFilter": "Danach filtern, ob Dateien KI-durchsuchbar sind.",
+      "reVectorize": "Diese Datei neu einlesen und das Wissen der KI daraus auffrischen. Nach Änderungen oder bei Fehlern verwenden.",
+      "moveGroup": "Dateien in eine andere Wissensgruppe verschieben. Das ändert, in welcher Gruppe die KI sie durchsucht – es wird nichts gelöscht.",
+      "storage": "Wie viel deines Speichers belegt ist. KI-erzeugte Medien zählen mit und werden separat angezeigt."
+    },
+    "empty": {
+      "browseTitle": "Deine Dateibibliothek",
+      "browseBody": "Jeder Upload, Chat-Anhang und jede KI-erzeugte Datei liegt hier – bereit zum Suchen und Wiederverwenden.",
+      "browseAction": "Erste Datei hochladen",
+      "filteredBody": "Keine Dateien passen zu diesen Filtern.",
+      "filteredAction": "Filter zurücksetzen",
+      "incomingBody": "Dateien aus Outlook, Nextcloud oder OpenCloud erscheinen hier, damit du sie vor dem Ablegen prüfen kannst.",
+      "incomingAction": "Integrationen einrichten",
+      "generatedBody": "Bilder, Video und Audio, die du im Chat erstellst, werden hier gespeichert, damit du sie wiederfinden und erneut herunterladen kannst.",
+      "generatedAction": "Chat starten",
+      "groupBody": "Diese Gruppe enthält noch keine Dateien. Füge Dateien hinzu, um sie gemeinsam durchsuchbar zu machen.",
+      "groupAction": "Dateien hinzufügen"
+    },
+    "toast": {
+      "uploaded": "{name} hochgeladen. | {count} Dateien hochgeladen.",
+      "uploadFailed": "{name} konnte nicht hochgeladen werden. {reason}",
+      "tooLarge": "{name} ist zu groß (max. {limit}).",
+      "unsupported": "{type}-Dateien werden nicht unterstützt.",
+      "vectorizeStart": "{name} wird KI-durchsuchbar gemacht…",
+      "vectorizeDone": "{name} ist jetzt KI-durchsuchbar.",
+      "vectorizeFailed": "{name} konnte nicht verarbeitet werden.",
+      "revectorizedBulk": "{count} Dateien aktualisiert.",
+      "moved": "{count} Dateien nach {group} verschoben.",
+      "filed": "{count} Dateien in {group} abgelegt.",
+      "deleted": "{count} Dateien gelöscht.",
+      "incomingKept": "{count} Dateien in {group} behalten.",
+      "incomingDismissed": "{count} Dateien verworfen.",
+      "shareCreated": "Freigabelink in die Zwischenablage kopiert.",
+      "shareRevoked": "Freigabe für {name} deaktiviert.",
+      "downloadPreparing": "{count} Dateien werden zum Download vorbereitet…",
+      "genericError": "Etwas ist schiefgelaufen. {reason}",
+      "undo": "Rückgängig"
+    },
+    "confirm": {
+      "deleteTitle": "{count} Dateien löschen?",
+      "deleteBody": "Ihr KI-durchsuchbarer Inhalt wird ebenfalls entfernt. Das kann nicht rückgängig gemacht werden.",
+      "deleteConfirm": "Löschen",
+      "dismissTitle": "{count} Dateien verwerfen?",
+      "dismissBody": "Sie werden nicht zu deiner Bibliothek hinzugefügt. Du kannst sie später erneut aus der Quelle importieren.",
+      "dismissConfirm": "Verwerfen"
+    },
+    "incoming": {
+      "title": "Eingang",
+      "subtitle": "Dateien, die für deine Wissensbasis eingeliefert wurden – prüfen, dann behalten oder verwerfen.",
+      "keep": "Behalten",
+      "keepAll": "Alle behalten",
+      "assignGroup": "Gruppe zuweisen",
+      "dismiss": "Verwerfen",
+      "open": "Öffnen",
+      "retry": "Erneut versuchen",
+      "provenance": "von {source} · {time}"
+    },
+    "generated": {
+      "title": "Erzeugt",
+      "subtitle": "Bilder, Video und Audio aus deinen Chats.",
+      "openInChat": "Im Chat öffnen",
+      "download": "Herunterladen"
+    },
+    "explainer": {
+      "text": "Alles, was du hochlädst oder erstellst, liegt hier. Als „KI-durchsuchbar“ markierte Dateien werden deiner Wissensbasis hinzugefügt, damit der Assistent sie nutzen kann.",
+      "dismiss": "Verstanden",
+      "reopen": "Was ist das?"
+    }
   },
   "vectorStorage": {
     "intro": "Ein Überblick über deinen Vektorspeicher — wie viele Dateien indexiert sind und wie viele Vektoren (Chunks) für die semantische Suche gespeichert werden.",
@@ -2112,12 +2232,25 @@
       "extension_not_allowed": "{filename}: Dateityp wird nicht unterstützt. {message}",
       "rate_limit_exceeded": "{filename}: Upload-Limit erreicht. {message}",
       "generic": "{filename}: Upload nicht erlaubt. {message}"
-    }
+    },
+    "helper": "Angehängte Dateien werden für diese Nachricht an die KI gesendet. Mit ✅ markierte Dateien sind außerdem in all deinen Chats durchsuchbar.",
+    "searchYourFiles": "Deine Dateien durchsuchen",
+    "typeAll": "Alle",
+    "typeDocs": "Dok.",
+    "typeImages": "Bilder",
+    "typeVideo": "Video",
+    "typeAudio": "Audio",
+    "recent": "Zuletzt",
+    "allFilesFiltered": "Alle Dateien",
+    "attachCount": "{count} Datei anhängen | {count} Dateien anhängen",
+    "noRecents": "Wähle eine zuletzt verwendete Datei oder lade eine neue für diesen Chat hoch.",
+    "noResults": "Keine Dateien gefunden. Andere Suche versuchen oder neue Datei hochladen."
   },
   "fileMention": {
     "hint": "Tippen um Dateien zu suchen — Enter zum Anhängen",
     "noResults": "Keine Dateien gefunden",
-    "fileAttached": "{name} angehängt"
+    "fileAttached": "{name} angehängt",
+    "header": "Tippen, um eine Datei für die KI zu finden"
   },
   "storage": {
     "title": "Speicherplatz",
