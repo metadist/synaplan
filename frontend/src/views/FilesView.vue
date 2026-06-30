@@ -5,8 +5,30 @@
       data-testid="page-files-upload"
     >
       <div class="max-w-7xl mx-auto space-y-6">
-        <!-- §4.8: the knowledge base has two tabs — Files (browse) + Search -->
+        <!-- §4.8: the knowledge base tabs — Browse / Incoming / Generated / Search -->
         <FilesTabs active="files" />
+
+        <!-- §4.9 E: first-visit dismissible explainer; remembered per user. -->
+        <Transition name="fade">
+          <div
+            v-if="showExplainer"
+            class="flex items-start gap-3 p-3 sm:p-4 rounded-xl border border-[var(--brand)]/20 bg-[var(--brand)]/[0.05]"
+            data-testid="files-explainer"
+          >
+            <Icon
+              icon="mdi:information-outline"
+              class="w-5 h-5 text-[var(--brand)] shrink-0 mt-0.5"
+            />
+            <p class="text-sm txt-secondary flex-1 min-w-0">{{ $t('files.explainer.text') }}</p>
+            <button
+              class="shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors"
+              data-testid="btn-explainer-dismiss"
+              @click="dismissExplainer"
+            >
+              {{ $t('files.explainer.dismiss') }}
+            </button>
+          </div>
+        </Transition>
 
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
@@ -606,13 +628,21 @@
               >
                 <Icon icon="heroicons:folder-plus" class="w-10 h-10 text-[var(--brand)]/40" />
               </div>
-              <div class="text-center">
+              <div class="text-center max-w-sm">
                 <p class="text-base font-medium txt-primary mb-1">
-                  {{ $t('files.emptyState.title') }}
+                  {{ $t('files.empty.browseTitle') }}
                 </p>
-                <p class="text-sm txt-secondary max-w-sm">
-                  {{ $t('files.emptyState.description') }}
+                <p class="text-sm txt-secondary mb-5">
+                  {{ $t('files.empty.browseBody') }}
                 </p>
+                <button
+                  class="btn-primary px-5 py-2.5 rounded-lg inline-flex items-center gap-2"
+                  data-testid="btn-empty-upload"
+                  @click="fileInputRef?.click()"
+                >
+                  <CloudArrowUpIcon class="w-5 h-5" />
+                  {{ $t('files.empty.browseAction') }}
+                </button>
               </div>
             </div>
 
@@ -1503,6 +1533,23 @@ const filterVectorized = ref('')
 const filterIncoming = ref(false)
 const incomingCount = ref(0)
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+// §4.9 E: first-visit explainer, remembered per user via localStorage.
+const EXPLAINER_DISMISSED_KEY = 'synaplan:files:explainer-dismissed'
+const showExplainer = ref(false)
+try {
+  showExplainer.value = localStorage.getItem(EXPLAINER_DISMISSED_KEY) !== '1'
+} catch {
+  showExplainer.value = true
+}
+const dismissExplainer = () => {
+  showExplainer.value = false
+  try {
+    localStorage.setItem(EXPLAINER_DISMISSED_KEY, '1')
+  } catch {
+    /* ignore storage failures */
+  }
+}
 
 const activeFilterCount = computed(() => {
   let count = 0
