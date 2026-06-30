@@ -1178,6 +1178,7 @@
   "message": {
     "thinking": "Düşünme süreci",
     "reasoning": "AI Akıl Yürütme",
+    "downloadImage": "Görseli indir",
     "fileGenerated": "Sizin için '{filename}' dosyasını oluşturdum. Şimdi indirebilirsiniz.",
     "fileGenerationFailed": "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.",
     "audioGenerated": "İstediğiniz ses burada. Aşağıdan oynatabilir veya indirebilirsiniz.",

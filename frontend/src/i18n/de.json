@@ -990,6 +990,7 @@
   "message": {
     "thinking": "Denkprozess",
     "reasoning": "KI-Überlegung",
+    "downloadImage": "Bild herunterladen",
     "fileGenerated": "Ich habe die Datei '{filename}' für dich erstellt. Du kannst sie jetzt herunterladen.",
     "fileGenerationFailed": "Es gab ein Problem beim Erstellen der Datei. Bitte versuche es erneut.",
     "audioGenerated": "Hier ist die gewünschte Audioausgabe. Du kannst sie unten abspielen oder herunterladen.",

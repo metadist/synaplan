@@ -7,8 +7,8 @@
         "php": ">=8.3",
         "ext-ctype": "*",
         "ext-iconv": "*",
-        "api-platform/doctrine-orm": "^4.3.5",
-        "api-platform/symfony": "^4.3.5",
+        "api-platform/doctrine-orm": "^4.3.15",
+        "api-platform/symfony": "^4.3.15",
         "ardagnsrn/ollama-php": "^1.0.5",
         "codewithkyrian/whisper.php": "^1.1",
         "doctrine/dbal": "^4.4.3",
@@ -19,7 +19,7 @@
         "erusev/parsedown": "^1.8.0",
         "firebase/php-jwt": "^7.0.5",
         "gemini-api-php/client": "^1.7.2",
-        "google/apiclient": "^2.19.2",
+        "google/apiclient": "^2.19.4",
         "google/protobuf": "^5.34.1",
         "google/recaptcha": "^1.5.0",
         "grpc/grpc": "^1.80",
@@ -63,7 +63,7 @@
         "symfony/twig-bundle": "8.1.*",
         "symfony/validator": "8.1.*",
         "symfony/yaml": "8.1.*",
-        "web-token/jwt-library": "^4.1.6",
+        "web-token/jwt-library": "^4.1.7",
         "webklex/php-imap": "^6.2"
     },
     "config": {
@@ -134,7 +134,7 @@
     "require-dev": {
         "dama/doctrine-test-bundle": "^8.6",
         "dg/bypass-finals": "^1.9",
-        "friendsofphp/php-cs-fixer": "^3.95.1",
+        "friendsofphp/php-cs-fixer": "^3.95.11",
         "phpstan/phpstan": "^2.1.53",
         "phpstan/phpstan-doctrine": "^2.0.21",
         "phpunit/phpunit": "^12.5.23",
