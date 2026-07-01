@@ -2574,5 +2574,8 @@
     "subtitle": "Esta versión de la app ya no es compatible. Actualiza a la última versión para continuar.",
     "minVersion": "Versión mínima requerida: {version}",
     "cta": "Actualizar ahora"
+  },
+  "nativeServer": {
+    "changeServer": "Cambiar servidor"
   }
 }

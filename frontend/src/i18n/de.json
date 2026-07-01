@@ -3598,5 +3598,8 @@
     "subtitle": "Diese App-Version wird nicht mehr unterstützt. Bitte aktualisiere auf die neueste Version, um fortzufahren.",
     "minVersion": "Mindestens erforderliche Version: {version}",
     "cta": "Jetzt aktualisieren"
+  },
+  "nativeServer": {
+    "changeServer": "Server ändern"
   }
 }

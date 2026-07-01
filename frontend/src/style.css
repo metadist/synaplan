@@ -35,6 +35,16 @@
   [data-testid='section-primary-content'] > :first-child:not([data-testid='page-chat']) {
     padding-top: calc(env(safe-area-inset-top, 0px) + 62px);
   }
+
+  /* ChatView is intentionally excluded above (messages scroll behind the
+     floating button), but with the WebView running edge-to-edge (iOS
+     contentInset: 'never' + viewport-fit=cover) its scroll content would
+     otherwise start under the status bar / notch. Pad the scroll container's
+     top by the safe-area inset so the first message / empty state sits below
+     the status bar, while messages still scroll up behind it. */
+  [data-testid='page-chat'] [data-testid='section-messages'] {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 }
 
 /* Base */

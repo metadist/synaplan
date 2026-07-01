@@ -1,6 +1,10 @@
 <template>
   <div
-    class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden"
+    class="min-h-screen bg-light-bg dark:bg-dark-bg flex justify-center px-4 py-12 relative overflow-hidden"
+    :class="isNativeApp() ? 'items-start' : 'items-center'"
+    :style="
+      isNativeApp() ? { paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)' } : undefined
+    "
     data-testid="page-login"
   >
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
@@ -17,7 +21,32 @@
       />
     </div>
 
-    <div class="absolute top-6 right-6 flex items-center gap-2" data-testid="section-controls">
+    <button
+      v-if="isNativeApp()"
+      class="absolute left-6 h-9 w-9 rounded-lg icon-ghost flex items-center justify-center z-20"
+      style="top: calc(env(safe-area-inset-top, 0px) + 1.5rem)"
+      :aria-label="$t('common.back')"
+      data-testid="btn-back"
+      @click="goBack"
+    >
+      <ArrowLeftIcon class="w-5 h-5" />
+    </button>
+
+    <div
+      class="absolute right-6 flex items-center gap-2 z-20"
+      style="top: calc(env(safe-area-inset-top, 0px) + 1.5rem)"
+      data-testid="section-controls"
+    >
+      <button
+        v-if="isNativeServerControlAvailable()"
+        class="h-9 w-9 rounded-lg icon-ghost flex items-center justify-center"
+        :aria-label="$t('nativeServer.changeServer')"
+        :title="$t('nativeServer.changeServer')"
+        data-testid="btn-change-server"
+        @click="openNativeServerOverlay()"
+      >
+        <ServerIcon class="w-4 h-4" />
+      </button>
       <button class="h-9 px-3 rounded-lg icon-ghost text-xs font-medium" @click="cycleLanguage">
         {{ currentLanguage.toUpperCase() }}
       </button>
@@ -364,8 +393,19 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { SunIcon, MoonIcon, EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
+import {
+  SunIcon,
+  MoonIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  ArrowLeftIcon,
+  ServerIcon,
+} from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
+import {
+  isNativeServerControlAvailable,
+  openNativeServerOverlay,
+} from '@/services/api/nativeServer'
 import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
@@ -419,6 +459,17 @@ const toggleTheme = () => {
   const themes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system']
   const currentIndex = themes.indexOf(themeStore.theme.value)
   themeStore.setTheme(themes[(currentIndex + 1) % themes.length])
+}
+
+// The native shell has no browser back button, so auth pages would otherwise be a
+// dead end for guests. Go back in history when possible, else fall back to the
+// chat home so the user is never stranded.
+const goBack = () => {
+  if (window.history.state?.back) {
+    router.back()
+  } else {
+    router.push('/')
+  }
 }
 
 const { login, error: authError, loading, clearError } = useAuth()

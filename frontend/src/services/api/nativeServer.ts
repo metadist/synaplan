@@ -79,6 +79,24 @@ export async function saveNativeServerUrl(url: string): Promise<NativeServerSave
   }
 }
 
+/**
+ * Open the app-owned native server overlay (dismissable), so the user can point
+ * the app at a different Synaplan server. Available on every screen regardless of
+ * auth state — this is the "change the server even when logged out" entry point.
+ * No-op when the native control surface is absent (plain web build).
+ */
+export function openNativeServerOverlay(): void {
+  const api = getApi()
+  if (!api) {
+    return
+  }
+  try {
+    api.open()
+  } catch {
+    /* no-op: nothing the SPA can do if the native bridge is gone */
+  }
+}
+
 /** Reset to the build/compiled default server and reload the WebView. */
 export function resetNativeServerUrl(): void {
   const api = getApi()

@@ -3664,5 +3664,8 @@
     "subtitle": "This version of the app is no longer supported. Please update to the latest version to continue.",
     "minVersion": "Minimum required version: {version}",
     "cta": "Update now"
+  },
+  "nativeServer": {
+    "changeServer": "Change server"
   }
 }

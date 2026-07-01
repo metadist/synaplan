@@ -198,6 +198,15 @@
                   <ArrowRightOnRectangleIcon class="w-5 h-5" />
                   <span>{{ $t('auth.signIn') }}</span>
                 </router-link>
+                <button
+                  v-if="isNativeServerControlAvailable()"
+                  class="more-account-row txt-primary"
+                  data-testid="btn-mobile-more-server"
+                  @click="handleChangeServer"
+                >
+                  <ServerIcon class="w-5 h-5" />
+                  <span>{{ $t('nativeServer.changeServer') }}</span>
+                </button>
               </template>
 
               <!-- Authenticated account rows (mirrors the rail's avatar menu) -->
@@ -303,10 +312,15 @@ import {
   FolderIcon,
   PlusIcon,
   RocketLaunchIcon,
+  ServerIcon,
   UserCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import {
+  isNativeServerControlAvailable,
+  openNativeServerOverlay,
+} from '../services/api/nativeServer'
 import { useAppModeStore } from '../stores/appMode'
 import { useAuthStore } from '../stores/auth'
 import { useChatsStore } from '../stores/chats'
@@ -431,6 +445,11 @@ const handleLogout = async () => {
   moreOpen.value = false
   await logout()
   router.push('/login')
+}
+
+const handleChangeServer = () => {
+  moreOpen.value = false
+  openNativeServerOverlay()
 }
 
 // Opening the sheet starts with the active section expanded.

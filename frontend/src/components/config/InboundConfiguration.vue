@@ -46,10 +46,12 @@
           class="flex items-center justify-between p-3 surface-chip rounded-lg border border-light-border/30 dark:border-dark-border/20"
           data-testid="item-email-channel"
         >
-          <div class="flex items-center gap-3">
-            <EnvelopeIcon class="w-5 h-5 text-blue-500" />
-            <span class="txt-primary font-medium">{{ channel.email }}</span>
-            <span class="pill pill--active text-xs">{{ channel.handling }}</span>
+          <div class="flex items-center gap-x-3 gap-y-2 flex-wrap min-w-0">
+            <EnvelopeIcon class="w-5 h-5 text-blue-500 flex-shrink-0" />
+            <span class="txt-primary font-medium break-all">{{ channel.email }}</span>
+            <span class="pill pill--active text-xs whitespace-nowrap flex-shrink-0">
+              {{ channel.handling }}
+            </span>
           </div>
         </div>
 

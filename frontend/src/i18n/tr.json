@@ -2575,5 +2575,8 @@
     "subtitle": "Uygulamanın bu sürümü artık desteklenmiyor. Devam etmek için lütfen en son sürüme güncelleyin.",
     "minVersion": "Gerekli en düşük sürüm: {version}",
     "cta": "Şimdi güncelle"
+  },
+  "nativeServer": {
+    "changeServer": "Sunucuyu değiştir"
   }
 }
