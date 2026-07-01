@@ -292,6 +292,15 @@ final readonly class FileProcessor
                 $text = preg_replace('/^test image description:\s*/i', '', $text);
             }
 
+            // OCR-only mode: vision models routinely ignore the "return empty
+            // string" instruction for text-less images and reply with prose
+            // ("There is no visible text in the image ..."). Storing that as
+            // fileText pollutes the RAG index, so normalise it to empty. The
+            // describe mode intentionally wants prose, so it is left untouched.
+            if (!$describe && $this->isNoTextResponse((string) $text)) {
+                $text = '';
+            }
+
             $this->logger->info('FileProcessor: Vision AI extraction', [
                 'strategy' => $describe ? 'vision_describe' : 'vision_ai',
                 'bytes' => strlen($text),
@@ -309,6 +318,42 @@ final readonly class FileProcessor
                 @unlink($tempJpegAbsolute);
             }
         }
+    }
+
+    /**
+     * Detect a vision model's "there is no text in this image" prose (returned
+     * instead of the requested empty string) so OCR of a text-less image
+     * produces an empty result rather than useless meta-content.
+     */
+    private function isNoTextResponse(string $text): bool
+    {
+        $normalized = trim($text);
+        if ('' === $normalized) {
+            return false;
+        }
+
+        // Genuine OCR output of a text-bearing image is typically far longer
+        // than a one-line refusal, so only short answers are candidates.
+        if (mb_strlen($normalized) > 300) {
+            return false;
+        }
+
+        $patterns = [
+            '/there\s+is\s+no\s+(visible|readable|legible|discernible)?\s*text/i',
+            '/no\s+(visible|readable|legible|discernible)?\s*text\s+(is\s+)?(present|found|visible|detected|in\s+(the|this)\s+image)/i',
+            '/does\s+not\s+contain\s+(any\s+)?(visible\s+)?text/i',
+            '/return(ing)?\s+an?\s+empty\s+string/i',
+            '/empty\s+string\s+as\s+requested/i',
+            '/(cannot|could\s+not|unable\s+to)\s+(find|detect|see|identify)\s+any\s+text/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (1 === preg_match($pattern, $normalized)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
