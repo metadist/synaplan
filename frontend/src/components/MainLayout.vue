@@ -19,6 +19,9 @@
 
     <!-- Native-only floating back button (iOS has no hardware back). -->
     <MobileBackButton />
+
+    <!-- Global background-jobs tray (Release 4.0) — self-contained floating launcher -->
+    <JobsTrayLauncher />
   </div>
 </template>
 
@@ -27,4 +30,5 @@ import SidebarV2 from './SidebarV2.vue'
 import MobileNav from './MobileNav.vue'
 import HelpHost from './help/HelpHost.vue'
 import MobileBackButton from './MobileBackButton.vue'
+import JobsTrayLauncher from './jobs/JobsTrayLauncher.vue'
 </script>

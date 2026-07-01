@@ -145,6 +145,19 @@ make -C frontend help
 - All UI text through `vue-i18n`
 - **Always update ALL four locales**: `en.json`, `de.json`, `es.json`, `tr.json` (registered in `frontend/src/i18n/index.ts` as `supportedLanguages = ['de', 'en', 'es', 'tr']`). A key missing from a locale silently falls back to English.
 
+### UI copy & wording (UX clarity)
+
+User-facing text must be **clean, consistent, and crystal clear for a non-technical user ("average joe")**. Chaotic or contradictory wording is a bug.
+
+- **Write for the average user, not the developer.** Prefer plain language over internal jargon. Avoid exposing implementation terms ("interview", "prompt topic", "selection rules", "node") in primary copy; explain in plain words or move to an "Expert:" affordance.
+- **Use ONE canonical term per concept** — never mix synonyms for the same thing across the interface:
+  - **chat widget** (short: **widget**) — the embeddable product the user creates and embeds on their site. (de: *Chat-Widget*/*Widget*, es: *widget de chat*/*widget*, tr: *sohbet widget'ı*/*widget*)
+  - **AI assistant** — the AI that answers inside a widget. (de: *KI-Assistent*, es: *asistente de IA*, tr: *AI asistanı*)
+  - **AI Setup Assistant** — the guided chat that configures a widget (not "interview", "AI-guided setup", or "wizard interview"). (de: *KI-Setup-Assistent*, es: *Asistente de Configuración IA*, tr: *AI Kurulum Asistanı*)
+  - Distinguish the two: you configure the **widget**; the AI that powers it is the **AI assistant**. Say "your widget's AI assistant" when both are in play.
+- **Copy must be CORRECT.** When you rename a tab, button, menu, or route, grep for every string that references the old name (breadcrumbs like "Settings → … → …", "the 'X' tab") and update them in the same change — a description that points to a label that no longer exists is a defect.
+- Keep the canonical terms above in sync with this list when product naming changes, and apply the same term in all four locales.
+
 ## Code Style Quick Reference
 
 | Area | Standard | Details |

@@ -60,8 +60,7 @@ final readonly class ChatRunner implements TaskRunner
 
         $language = is_string($context->classification['language'] ?? null) ? $context->classification['language'] : ($context->message->getLanguage() ?: 'en');
         $capabilityTag = Capability::Summarize === $node->capability ? 'SUMMARIZE' : 'CHAT';
-        $modelId = $this->modelConfigService->getDefaultModel($capabilityTag, $context->userId)
-            ?? $this->modelConfigService->getDefaultModel('CHAT', $context->userId);
+        $modelId = $this->resolveModelId($capabilityTag, $context);
         $provider = $modelId ? $this->modelConfigService->getProviderForModel($modelId) : null;
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
@@ -123,6 +122,35 @@ final readonly class ChatRunner implements TaskRunner
         }
 
         return NodeResult::ok($full, [], $metadata);
+    }
+
+    /**
+     * Resolve the model id for a text node, honouring the user's explicit
+     * selection (issue #1069).
+     *
+     * The legacy single-node ChatHandler resolves the model as
+     * `classification.model_id` (the frontend dropdown / "Again" choice) >
+     * `classification.override_model_id` (widget config) > capability default.
+     * The DAG path previously skipped the first two and always used
+     * `getDefaultModel()`, so a user-selected model was silently ignored on any
+     * multi-node plan — and an unavailable selection was masked by the system
+     * default instead of surfacing an error. Mirror the legacy chain here so the
+     * behaviour is identical regardless of which path the classifier picks.
+     */
+    private function resolveModelId(string $capabilityTag, NodeContext $context): ?int
+    {
+        $selected = $context->classification['model_id'] ?? null;
+        if (is_numeric($selected) && (int) $selected > 0) {
+            return (int) $selected;
+        }
+
+        $override = $context->classification['override_model_id'] ?? null;
+        if (is_numeric($override) && (int) $override > 0) {
+            return (int) $override;
+        }
+
+        return $this->modelConfigService->getDefaultModel($capabilityTag, $context->userId)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', $context->userId);
     }
 
     /**

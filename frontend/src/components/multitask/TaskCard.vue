@@ -295,6 +295,14 @@ const handleRetry = () => {
         class="task-card__skeleton mt-2 rounded-lg"
         :class="card.kind === 'audio' ? 'h-10' : 'h-40'"
       />
+
+      <p
+        v-if="card.state === 'running' && isMediaKind && !card.url"
+        class="text-sm txt-muted mt-2 leading-relaxed"
+        data-testid="task-card-background-hint"
+      >
+        {{ $t('message.mediaJob.backgroundHint') }}
+      </p>
     </template>
   </div>
 </template>

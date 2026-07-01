@@ -284,6 +284,11 @@ export const selectors = {
     advancedConfig: {
       modal: '[data-testid="modal-advanced-config"]',
       tabButton: '[data-testid="btn-tab"]',
+      // Tabs are grouped into condensed dropdowns; open the matching group
+      // before clicking a tab item.
+      tabGroupSetup: '[data-testid="btn-tab-group-setup"]',
+      tabGroupSecurityLegal: '[data-testid="btn-tab-group-security-legal"]',
+      tabGroupAiSetup: '[data-testid="btn-tab-group-ai-setup"]',
       tabButtonBranding: '[data-testid="btn-tab-branding"]',
       tabButtonBehavior: '[data-testid="btn-tab-behavior"]',
       tabButtonSecurity: '[data-testid="btn-tab-security"]',

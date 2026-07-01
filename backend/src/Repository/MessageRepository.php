@@ -253,6 +253,59 @@ class MessageRepository extends ServiceEntityRepository
         ]);
     }
 
+    /**
+     * Keyset-paginated scan of messages that carry a file on the legacy
+     * BFILEPATH column (file=1, non-empty path) with id greater than $afterId.
+     * Used by app:files:backfill-media to heal generated media that never got a
+     * BFILES row (03_file-management.md §3.2).
+     *
+     * @return Message[]
+     */
+    public function findFileMessagesAfter(int $afterId, int $limit): array
+    {
+        return $this->createQueryBuilder('m')
+            ->where('m.file = 1')
+            ->andWhere("m.filePath != ''")
+            ->andWhere('m.id > :afterId')
+            ->setParameter('afterId', $afterId)
+            ->orderBy('m.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Map a set of message ids to their owning chat id (BCHATID), skipping
+     * messages that are not attached to a chat. Used by the file manager to
+     * deep-link a generated artefact to the exact conversation it came from
+     * (the file row only carries the message id).
+     *
+     * @param int[] $messageIds
+     *
+     * @return array<int, int> messageId => chatId
+     */
+    public function findChatIdsByMessageIds(array $messageIds): array
+    {
+        if (empty($messageIds)) {
+            return [];
+        }
+
+        $rows = $this->createQueryBuilder('m')
+            ->select('m.id AS mid, m.chatId AS cid')
+            ->where('m.id IN (:ids)')
+            ->andWhere('m.chatId IS NOT NULL')
+            ->setParameter('ids', $messageIds)
+            ->getQuery()
+            ->getResult();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) $row['mid']] = (int) $row['cid'];
+        }
+
+        return $map;
+    }
+
     public function flush(): void
     {
         $this->getEntityManager()->flush();

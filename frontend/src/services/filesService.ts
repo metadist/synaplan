@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { api } from './apiService'
 import { httpClient, getApiBaseUrl, refreshAccessToken } from './api/httpClient'
 import { saveOrDownloadBlob } from './api/nativeDownload'
@@ -167,34 +168,88 @@ export interface UploadResponse {
   process_level: string
 }
 
-export interface FileItem {
-  id: number
-  filename: string
-  path: string
-  file_type: string
-  file_size: number
-  mime: string
-  status: string
-  text_preview: string
-  uploaded_at: number
-  uploaded_date: string
-  message_id: number | null
-  is_attached: boolean
-  group_key?: string
-  chunks?: number
-  is_vectorized?: boolean
-}
+// Zod schemas are the single source of truth for the file API data shapes:
+// each schema both validates the JSON at runtime (where we call `.parse()`)
+// and produces the static TypeScript type via `z.infer` — so the types can
+// never drift from the validation (AGENTS_DEV.md "Type Safety & Validation").
+export const fileSourceSchema = z.enum([
+  'web_upload',
+  'chat_attachment',
+  'outlook',
+  'nextcloud',
+  'opencloud',
+  'whatsapp',
+  'widget',
+  'api',
+  'generated',
+])
+export type FileSource = z.infer<typeof fileSourceSchema>
 
-export interface FileListResponse {
-  success: boolean
-  files: FileItem[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    pages: number
-  }
-}
+export const fileVectorStateSchema = z.enum([
+  'none',
+  'pending',
+  'vectorized',
+  'failed',
+  'not_applicable',
+])
+export type FileVectorState = z.infer<typeof fileVectorStateSchema>
+
+export const fileOriginKindSchema = z.enum(['image', 'video', 'audio', 'calendar', 'document'])
+export type FileOriginKind = z.infer<typeof fileOriginKindSchema>
+
+export const fileItemSchema = z.object({
+  id: z.number(),
+  filename: z.string(),
+  /** Original (source) name when present, else the stored name (§4.4). */
+  display_name: z.string().optional(),
+  original_name: z.string().nullable().optional(),
+  path: z.string(),
+  file_type: z.string(),
+  file_size: z.number(),
+  mime: z.string(),
+  status: z.string(),
+  /** Provenance: where the file came from (§3.1, §4.4). */
+  source: fileSourceSchema.optional(),
+  origin_kind: fileOriginKindSchema.nullable().optional(),
+  /** True while a freshly-arrived external push awaits triage (§3.3). */
+  incoming: z.boolean().optional(),
+  provider: z.string().nullable().optional(),
+  thumb_url: z.string().nullable().optional(),
+  text_preview: z.string(),
+  uploaded_at: z.number(),
+  uploaded_date: z.string(),
+  message_id: z.number().nullable(),
+  /** Owning chat id (resolved from the originating message) for deep-linking. */
+  chat_id: z.number().nullable().optional(),
+  is_attached: z.boolean().optional(),
+  group_key: z.string().nullable().optional(),
+  chunks: z.number().optional(),
+  chunk_count: z.number().optional(),
+  /** Authoritative vectorization state (§3.1, §4.2). */
+  vector_state: fileVectorStateSchema.optional(),
+  is_vectorized: z.boolean().optional(),
+})
+export type FileItem = z.infer<typeof fileItemSchema>
+
+export const fileFacetsSchema = z.object({
+  source: z.record(z.string(), z.number()),
+  vector_state: z.record(z.string(), z.number()),
+  incoming: z.number(),
+  total: z.number(),
+})
+export type FileFacets = z.infer<typeof fileFacetsSchema>
+
+export const fileListResponseSchema = z.object({
+  success: z.boolean(),
+  files: z.array(fileItemSchema),
+  pagination: z.object({
+    page: z.number(),
+    limit: z.number(),
+    total: z.number(),
+    pages: z.number(),
+  }),
+})
+export type FileListResponse = z.infer<typeof fileListResponseSchema>
 
 // Fallback when the server pre-flight response doesn't include
 // `max_files_per_request` (older deployments) — match PHP's historical
@@ -593,10 +648,27 @@ const uploadFilesBatch = async (
   return sendXhr()
 }
 
+export type FileSortOrder =
+  | 'date_desc'
+  | 'date_asc'
+  | 'name_asc'
+  | 'name_desc'
+  | 'size_asc'
+  | 'size_desc'
+
 export interface FileListOptions {
   groupKey?: string
   search?: string
   fileType?: string
+  /** Comma-separated provenance source(s) to filter by (§5). */
+  source?: string
+  /** Comma-separated vector state(s) to filter by (§5). */
+  vectorState?: string
+  /** Comma-separated generated origin kind(s) to filter by (§5). */
+  originKind?: string
+  /** true = only Incoming inbox, false = exclude incoming, undefined = all (§5). */
+  incoming?: boolean
+  sort?: FileSortOrder
   dateFrom?: number
   dateTo?: number
   page?: number
@@ -604,7 +676,7 @@ export interface FileListOptions {
 }
 
 /**
- * List user's files with optional filtering and search
+ * List user's files with optional filtering, faceting and search
  */
 export const listFiles = async (options: FileListOptions = {}): Promise<FileListResponse> => {
   const params: Record<string, string | number> = {
@@ -615,10 +687,55 @@ export const listFiles = async (options: FileListOptions = {}): Promise<FileList
   if (options.groupKey) params.group_key = options.groupKey
   if (options.search) params.search = options.search
   if (options.fileType) params.file_type = options.fileType
+  if (options.source) params.source = options.source
+  if (options.vectorState) params.vector_state = options.vectorState
+  if (options.originKind) params.origin_kind = options.originKind
+  if (options.incoming !== undefined) params.incoming = options.incoming ? 1 : 0
+  if (options.sort) params.sort = options.sort
   if (options.dateFrom) params.date_from = options.dateFrom
   if (options.dateTo) params.date_to = options.dateTo
 
-  const response = await api.get<FileListResponse>('/api/v1/files', { params })
+  const response = await api.get('/api/v1/files', { params })
+  // Validate at runtime: the schema is the same definition the FileListResponse
+  // type is inferred from, so a backend contract drift surfaces here instead of
+  // as a confusing render bug downstream.
+  return fileListResponseSchema.parse(response.data)
+}
+
+/**
+ * Faceted counts for the filter bar + Incoming tab badge (§5).
+ */
+export const getFacets = async (): Promise<FileFacets> => {
+  const response = await api.get<{ success: boolean; facets: unknown }>('/api/v1/files/facets')
+  return fileFacetsSchema.parse(response.data.facets)
+}
+
+/**
+ * Triage (keep) an incoming file: clear the incoming flag, optionally file it
+ * in a knowledge group (§5, §3.3).
+ */
+export const acceptIncoming = async (
+  fileId: number,
+  groupKey?: string
+): Promise<{ success: boolean; id: number; group_key: string | null }> => {
+  const response = await api.post<{ success: boolean; id: number; group_key: string | null }>(
+    `/api/v1/files/${fileId}/accept`,
+    groupKey ? { group_key: groupKey } : {}
+  )
+  return response.data
+}
+
+/**
+ * Triage (keep) multiple incoming files in one call (§5, §3.3).
+ */
+export const acceptIncomingBulk = async (
+  fileIds: number[],
+  groupKey?: string
+): Promise<{ success: boolean; accepted: number; group_key: string | null }> => {
+  const response = await api.post<{ success: boolean; accepted: number; group_key: string | null }>(
+    '/api/v1/files/accept',
+    groupKey ? { ids: fileIds, group_key: groupKey } : { ids: fileIds }
+  )
   return response.data
 }
 
@@ -913,10 +1030,51 @@ export async function processFile(
   return response
 }
 
+/**
+ * Describe, vectorize & sort a file — makes images/audio/video (and any stored
+ * document) RAG-ready by generating a description, vectorizing it, and filing it
+ * into an AI-chosen knowledge group.
+ */
+export async function describeVectorizeSortFile(fileId: number): Promise<{
+  success: boolean
+  chunksCreated?: number
+  groupKey?: string
+  error?: string
+}> {
+  return httpClient(`/api/v1/files/${fileId}/describe`, { method: 'POST' })
+}
+
+/**
+ * Add an AI-generated file's generation prompt to the knowledge base on demand.
+ */
+export async function indexPromptFile(fileId: number): Promise<{
+  success: boolean
+  chunksCreated?: number
+  groupKey?: string
+  error?: string
+}> {
+  return httpClient(`/api/v1/files/${fileId}/index-prompt`, { method: 'POST' })
+}
+
+/**
+ * Remove a file from its knowledge group (folder) without deleting the file or
+ * its vectors — the chunks move to the ungrouped DEFAULT bucket and stay
+ * searchable by AI.
+ */
+export async function removeFileFromGroup(fileId: number): Promise<{
+  success: boolean
+  chunksUpdated: number
+}> {
+  return httpClient(`/api/v1/files/${fileId}/group-key`, { method: 'DELETE' })
+}
+
 export default {
   uploadFiles,
   checkUpload,
   listFiles,
+  getFacets,
+  acceptIncoming,
+  acceptIncomingBulk,
   deleteFile,
   deleteMultipleFiles,
   getFileGroups,
@@ -931,4 +1089,7 @@ export default {
   reVectorizeFile,
   migrateFileToQdrant,
   processFile,
+  describeVectorizeSortFile,
+  indexPromptFile,
+  removeFileFromGroup,
 }

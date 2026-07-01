@@ -90,4 +90,50 @@ final class GeneratedFileRegistrarTest extends TestCase
 
         self::assertNull($this->registrar()->register(1, 'voice.mp3', 'audio'));
     }
+
+    public function testStripsServeRoutePrefixToRelativePath(): void
+    {
+        $file = $this->registrar()->register(7, '/api/v1/files/uploads/41/004/00441/pic.png', 'image');
+
+        self::assertInstanceOf(File::class, $file);
+        self::assertSame('41/004/00441/pic.png', $file->getFilePath());
+        self::assertSame('pic.png', $file->getFileName());
+        self::assertSame('image', $file->getOriginKind());
+    }
+
+    public function testStripsAbsolutePublicUrlToRelativePath(): void
+    {
+        $file = $this->registrar()->register(7, 'https://web.example.com/api/v1/files/uploads/41/pic.jpg', 'image');
+
+        self::assertInstanceOf(File::class, $file);
+        self::assertSame('41/pic.jpg', $file->getFilePath());
+    }
+
+    public function testSkipsInlinedDataUriPath(): void
+    {
+        $this->files->expects(self::never())->method('save');
+
+        $dataUri = 'data:image/png;base64,'.str_repeat('A', 5000);
+        self::assertNull($this->registrar()->register(1, $dataUri, 'image'));
+    }
+
+    public function testSkipsOverlongPath(): void
+    {
+        $this->files->expects(self::never())->method('save');
+
+        self::assertNull($this->registrar()->register(1, str_repeat('a/', 200).'x.png', 'image'));
+    }
+
+    public function testReturnsExistingRowWithoutCreatingDuplicate(): void
+    {
+        $existing = new File();
+        $this->files->method('findOneBy')
+            ->with(['userId' => 9, 'filePath' => '41/pic.png'])
+            ->willReturn($existing);
+        $this->files->expects(self::never())->method('save');
+
+        $file = $this->registrar()->register(9, '/api/v1/files/uploads/41/pic.png', 'image');
+
+        self::assertSame($existing, $file);
+    }
 }

@@ -250,7 +250,7 @@ class WidgetLiveSupportController extends AbstractController
             // Create File entity with correct method names
             $file = new File();
             $file->setUserId($user->getId());
-            $file->setFileName($uploadedFile->getClientOriginalName());
+            $file->setFileName($storageResult['display_name'] ?? $uploadedFile->getClientOriginalName());
             $file->setFilePath($storageResult['path']);
             $file->setFileSize($storageResult['size']);
             $file->setFileMime($storageResult['mime']);

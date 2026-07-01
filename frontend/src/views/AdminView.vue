@@ -1,6 +1,6 @@
 <template>
   <MainLayout data-testid="view-admin">
-    <div class="container mx-auto px-6 py-8 max-w-7xl">
+    <div class="container mx-auto px-6 py-8 max-w-7xl overflow-x-hidden">
       <!-- Header -->
       <div class="mb-8">
         <div class="flex items-center gap-3 mb-2">
@@ -11,12 +11,14 @@
       </div>
 
       <!-- Tabs h -->
-      <div class="flex gap-2 mb-6 border-b border-light-border/30 dark:border-dark-border/20">
+      <div
+        class="flex gap-2 mb-6 border-b border-light-border/30 dark:border-dark-border/20 overflow-x-auto scroll-thin"
+      >
         <button
           v-for="tab in tabs"
           :key="tab.id"
           :class="[
-            'px-4 py-3 font-medium transition-colors relative',
+            'px-4 py-3 font-medium transition-colors relative whitespace-nowrap flex-shrink-0',
             activeTab === tab.id
               ? 'txt-primary border-b-2 border-[var(--brand)]'
               : 'txt-secondary hover:txt-primary',

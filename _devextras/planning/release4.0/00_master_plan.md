@@ -102,11 +102,13 @@ These were decided with the product owner and are now fixed for 4.0:
 3. **Actionable completion toaster** — when a job finishes, a toast pops; clicking
    it **jumps the user back to the exact chat + card that carries the produced
    media** (opens the chat if needed, scrolls to and highlights the card).
-4. **Professional "spawned-off-the-DAG" visualisation** — when the planner's DAG
-   routing decides a node is a long render, the UI clearly and elegantly shows
-   that the task was *spawned off as a background job* (a deliberate, polished
-   transition from inline card → tracked background job), so users understand
-   the system is working for them while they continue.
+4. **Professional "spawned-off" visualisation** — when a render is detached, the
+   UI clearly and elegantly shows that the task is running as a background job so
+   users understand the system is working for them while they continue.
+   **Surface decision (2026-06-27, Option B):** this is a dedicated status
+   **banner on the assistant message** (`MediaJobStatus.vue`), not a multitask
+   `TaskCard` sub-state — one surface for every detach path, reload-trivial, and
+   it leaves the multitask card contract untouched. See `02_async-media-ux.md` §2b.
 
 Full design in [`02_async-media-ux.md`](./02_async-media-ux.md).
 
@@ -114,11 +116,15 @@ Full design in [`02_async-media-ux.md`](./02_async-media-ux.md).
 
 | # | Feature | File | Priority | Status |
 |---|---|---|---|---|
-| 1 | **Async media generation ("fire & continue")** — backend/architecture | [`01_async-media-jobs.md`](./01_async-media-jobs.md) | P0 | Planned |
-| 1·UX | **Async media UX** — DAG spawn visual, global Jobs tray, actionable toaster, jump-to-card | [`02_async-media-ux.md`](./02_async-media-ux.md) | P0 | Planned |
+| 1 | **Async media generation ("fire & continue")** — backend/architecture | [`01_async-media-jobs.md`](./01_async-media-jobs.md) | P0 | Sprints A–F shipped (rollout: default ON + grandfather migration + admin switch); legacy consolidation remains |
+| 1·UX | **Async media UX** — dedicated status banner (Option B), realtime completion + actionable toaster, global Jobs tray, cancel | [`02_async-media-ux.md`](./02_async-media-ux.md) | P0 | Banner + toaster + Jobs tray + cancel shipped (A–D) |
 | 2 | **File management world** — one home for every file: sources, vectorized status, groups, generated-media gallery | [`03_file-management.md`](./03_file-management.md) | P0 | Planned |
 | 3 | **Image & first-boot optimization** — multi-arch (arm64) base image, baked dev deps, custom `bge-m3` Ollama image; fast `docker compose up` on Mac | [`04_image-build-optimization.md`](./04_image-build-optimization.md) | P1 | Planned |
-| 4 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
+| 4 | **Frictionless Onboarding & the Token Wallet** — persistent prepaid **credit wallet** (500-credit welcome grant unlocks everything bar a 7-image/2-video trial cap; three top-up packs €19.95/€49.95/€99.95 via Stripe web + Apple/Google IAP with a buffered app price; markup-on-every-debit; non-refundable, never-expiring AI-compute credit), built on the existing cost-budget/markup/IAP spine; Turnstile + verification anti-abuse; one-time backfill grant for existing users | [`05_onboarding-conversion-flow.md`](./05_onboarding-conversion-flow.md) | P1 | Planned (decisions locked 2026-06-30) |
+| 5 | **Self-Aware Routing** — route product/feature/how-to questions to a `synaplan` topic + curated "About Synaplan" RAG source; registry-derived, multilingual (de/en/es/tr). Includes the shipped meeting-reminder timezone fix. | [`06_self-aware-routing.md`](./06_self-aware-routing.md) | P1 | Planned (timezone fix shipped) |
+| 6 | **Share generated files to destinations ("Send to…")** — Phase A: Nextcloud app saves *every* generated file type (Word/PPT/MP3/ICS/…) into `Synaplan/<Kind>` from both NC chat surfaces. Phase B/C: generic `DestinationProvider` registry + standard shareable object + Web Share API. Shares the `source` provenance model with Feature 2. | [`07_file-sharing-destinations.md`](./07_file-sharing-destinations.md) | P1 | Provenance joint sprint shipped (2026-06-27); A2 + B/C planned |
+| 7 | **MCP data nodes + Skill Registry** — add a "pull data from MCP" building block to the DAG routing, and formalize every DAG block as a self-describing **Skill** so the planner prompt is generated (not hand-maintained) — the n8n-style "manage the points" answer. | [`08_mcp-data-nodes-and-skill-registry.md`](./08_mcp-data-nodes-and-skill-registry.md) | P1 | Draft for discussion (2026-06-30) |
+| 8 | _TBD — to be added as we scope the rest of 4.0_ | — | — | Backlog |
 
 > "We have more things to implement" — this index is the place to add them.
 > Each new 4.0 feature gets a `0N_<slug>.md` and a row here. Candidate backlog
@@ -155,7 +161,7 @@ User sends "video from <image>"  ──▶  StreamController / TaskPlanExecutor
   Centrifugo push  ◀───────────────────  "job terminal" event
         │
         ▼
-  card updates in place + toast "Your video is ready"
+  banner on the message updates in place + toast "Your video is ready"
   (also persisted to BMESSAGES → survives reload / shows on any channel)
 
   reaper (scheduled): times out stale jobs past deadline → markTimedOut

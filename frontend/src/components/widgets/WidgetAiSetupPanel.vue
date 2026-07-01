@@ -123,8 +123,8 @@
     <div
       v-if="messages.length <= 2 && !isTyping"
       :class="[
-        'flex flex-wrap gap-1.5 border-t border-light-border/20 dark:border-dark-border/10',
-        fullscreen ? 'px-6 pt-3 pb-0' : 'px-4 pt-2 pb-0',
+        'flex flex-wrap gap-2 border-t border-light-border/20 dark:border-dark-border/10',
+        fullscreen ? 'px-6 py-3' : 'px-4 py-2.5',
       ]"
     >
       <button

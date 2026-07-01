@@ -256,6 +256,61 @@ final class TaskPlanExecutorTest extends TestCase
         self::assertSame(['content' => 'router answer'], $result);
     }
 
+    public function testFileAttachmentMultiIntentRunsDag(): void
+    {
+        // Issue #1192: a non-image attachment carrying multiple intents
+        // (summarize + image + TTS) must be planned, not reduced to a lone
+        // file analysis. A multi-node plan runs the DAG.
+        $multiNode = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n4',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'file_analysis'],
+                ['id' => 'n2', 'capability' => 'summarize', 'depends_on' => ['n1']],
+                ['id' => 'n3', 'capability' => 'image_generation', 'depends_on' => ['n2']],
+                ['id' => 'n4', 'capability' => 'compose_reply', 'depends_on' => ['n2', 'n3']],
+            ],
+        ]);
+        $this->planner->expects(self::once())->method('plan')->willReturn(new TaskPlanResult($multiNode, fallback: false, modelId: 76));
+        $this->dagExecutor->method('execute')->willReturn($this->assembled([
+            'content' => 'Here is your summary and image',
+            'files' => [['path' => '/api/v1/files/uploads/img.png', 'type' => 'image']],
+            'node_statuses' => ['n1' => 'done', 'n2' => 'done', 'n3' => 'done', 'n4' => 'done'],
+        ]));
+
+        // The legacy single-node router must NOT be used for a multi-node plan.
+        $this->router->expects(self::never())->method('routeStream');
+
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'file_analysis', 'topic' => 'analyzefile', 'language' => 'en', 'source' => 'attachment_document_or_audio'],
+            static function (): void {},
+        );
+
+        self::assertSame('Here is your summary and image', $result['content']);
+        self::assertSame('image', $result['metadata']['file']['type']);
+    }
+
+    public function testSingleIntentFileAttachmentDelegatesToLegacyRouter(): void
+    {
+        // Issue #1192: a single-intent attachment still degrades to the proven
+        // single-node path — the planner returns a single-node plan and the
+        // legacy router answers (no DAG, behaviour preserved).
+        $this->planner->expects(self::once())->method('plan')
+            ->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: true, modelId: 76));
+        $this->dagExecutor->expects(self::never())->method('execute');
+        $this->router->expects(self::once())->method('routeStream')->willReturn(['content' => 'file summary']);
+
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'file_analysis', 'topic' => 'analyzefile', 'language' => 'en', 'source' => 'attachment_document_or_audio'],
+            static function (): void {},
+        );
+
+        self::assertSame(['content' => 'file summary'], $result);
+    }
+
     public function testSingleCalendarEventNodeRunsDagNotLegacyRouter(): void
     {
         // A lone calendar_event has NO legacy router equivalent — running it

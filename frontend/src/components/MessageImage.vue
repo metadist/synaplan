@@ -31,6 +31,23 @@
           </svg>
         </div>
       </div>
+      <button
+        v-if="blobUrl"
+        class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity surface-card p-2 rounded-full txt-primary"
+        :aria-label="$t('message.downloadImage')"
+        :title="$t('message.downloadImage')"
+        data-testid="btn-image-download"
+        @click.stop="downloadImage"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
+          />
+        </svg>
+      </button>
     </div>
     <p v-if="alt" class="mt-2 text-sm txt-secondary">{{ alt }}</p>
   </div>
@@ -52,8 +69,25 @@
         @click="closeFullscreen"
       >
         <button
+          v-if="blobUrl"
+          class="absolute top-4 right-16 text-white/80 hover:text-white transition-colors p-2 z-10"
+          :aria-label="$t('message.downloadImage')"
+          :title="$t('message.downloadImage')"
+          data-testid="btn-image-download-fullscreen"
+          @click.stop="downloadImage"
+        >
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
+            />
+          </svg>
+        </button>
+        <button
           class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors p-2 z-10"
-          aria-label="Close"
+          :aria-label="$t('common.close')"
           data-testid="btn-image-close"
           @click.stop="closeFullscreen"
         >
@@ -119,6 +153,49 @@ const loadImage = async () => {
     blobUrl.value = URL.createObjectURL(blob)
   } catch (error) {
     console.error('Failed to load image:', error)
+  }
+}
+
+// Derive a sensible filename from the source URL, falling back to image.png
+// when the URL carries no usable name (e.g. a query-only blob endpoint).
+const downloadFilename = (): string => {
+  const path = props.url.split('?')[0].split('#')[0]
+  const name = path.substring(path.lastIndexOf('/') + 1)
+  return name && name.includes('.') ? name : 'image.png'
+}
+
+// Internal images load as blob: URLs (authenticated via cookies), so native
+// "Save image as…" fails. Trigger a real download from the already-loaded blob;
+// for external/not-yet-loaded URLs, fetch a fresh blob so the download still
+// produces a valid file (issue #1071).
+const downloadImage = async () => {
+  let tempUrl: string | null = null
+  try {
+    let href = blobUrl.value
+
+    if (!href || !href.startsWith('blob:')) {
+      const fullUrl = props.url.startsWith('/') ? `${config.appBaseUrl}${props.url}` : props.url
+      const response = await fetch(fullUrl, { method: 'GET', credentials: 'include' })
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      const blob = await response.blob()
+      tempUrl = URL.createObjectURL(blob)
+      href = tempUrl
+    }
+
+    const link = document.createElement('a')
+    link.href = href
+    link.download = downloadFilename()
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error('Failed to download image:', error)
+  } finally {
+    if (tempUrl) {
+      URL.revokeObjectURL(tempUrl)
+    }
   }
 }
 

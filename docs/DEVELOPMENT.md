@@ -24,9 +24,29 @@ docker compose restart worker
 
 ### The `worker` service (async jobs)
 
-Async jobs — chat `ProcessMessageCommand`, re-vectorization, plugin installs, widget crawling — run in the dedicated `worker` container, which consumes the Redis Streams transports (`async_ai_high`, `async_extract`, `async_index`) via `messenger:consume`. Without it, queued work never executes and the UI hangs on any "running in background" flow.
+Async jobs — chat `ProcessMessageCommand`, re-vectorization, plugin installs, widget crawling, and the background media-render advancer (`AdvanceMediaJobCommand`) — run in the dedicated `worker` container, which consumes the Redis Streams transports (`async_ai_high`, `async_extract`, `async_index`) via `messenger:consume`. Without it, queued work never executes and the UI hangs on any "running in background" flow (including async video generation).
 
-The worker runs with `APP_ENV=prod` on purpose (dev-mode event dispatcher kills the consumer); it clears and re-warms its own prod cache on every boot, so after switching branches a `docker compose restart worker` is enough to pick up code changes.
+The worker boot script (`docker-compose.yml`) is **fail-fast**:
+
+- If the `./backend` bind-mount is broken (no `bin/console`), it exits with `64` instead of looping forever on a silenced error (this used to hang the worker for hours unnoticed).
+- The DB-ready wait is bounded to ~3 minutes and prints the actual SQL error every 10 retries.
+- It logs the resolved `APP_ENV` on boot.
+- A Docker `healthcheck` probes for the live `messenger:consume` process every 30 s — `docker compose ps` reports `(unhealthy)` immediately if the consumer ever dies.
+
+The worker **MUST run in the same `APP_ENV` as the backend container**. The `RedisService` prefixes every key with `synaplan:{env}:`, so a mismatch (e.g. backend `dev` / worker `prod`) silently splits the system in two: the worker consumes `AdvanceMediaJobCommand` messages but `findByKey()` reads the wrong namespace and returns `null`, leaving the job stuck in `queued` until the reaper times it out 20 min later. Local dev uses `APP_ENV=dev` for both; production uses `prod` for both (see `synaplan-platform/docker-compose.yml`).
+
+After switching branches a `docker compose restart worker` is enough to pick up code changes (the entrypoint clears and re-warms the cache).
+
+#### Troubleshooting stuck media jobs
+
+The chat bubble for an async video shows `Auftrag läuft noch / Job still running` indefinitely:
+
+1. **Is the worker healthy?** `docker compose ps worker` must show `(healthy)`. If not, check `docker compose logs worker` for the FATAL line.
+2. **Did the message reach the queue?** `docker compose exec -T redis redis-cli XLEN async_index` should be ≥ 1 right after the request, then drop to 0 within a second when the worker picks it up.
+3. **Is the job actually in Redis?** `docker compose exec -T redis redis-cli --raw KEYS 'synaplan:*:mediajob:*'` lists every active job and tells you which environment prefix is being used. A backend/worker env mismatch is visible here as two different prefixes.
+4. **Re-arm a stuck job** without waiting for the reaper:
+   `docker compose exec -T backend php bin/console app:media:advance-jobs <job_id>` (or `--all` for every active job).
+5. **The reaper backstop** (`app:media:reap-jobs`) drives every stale / past-deadline job to `timed_out` with a localized error so no bubble hangs forever. Run it from cron (every minute) or manually.
 
 ### Redis (cache, sessions, locks, messenger, realtime)
 

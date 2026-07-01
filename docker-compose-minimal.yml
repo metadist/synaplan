@@ -23,7 +23,7 @@
 services:
   # Vue.js Frontend
   frontend:
-    image: node:22@sha256:e0d149b4727ac0c20d9774e801e423d7a946a0bffced886f42cfe9cd3c67820a
+    image: node:22@sha256:c601a46abb4d2ab80a9dc3da208d50d1122642d53f17a101926ace71e5a9bf1c
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -48,7 +48,7 @@ services:
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
-    image: node:22@sha256:e0d149b4727ac0c20d9774e801e423d7a946a0bffced886f42cfe9cd3c67820a
+    image: node:22@sha256:c601a46abb4d2ab80a9dc3da208d50d1122642d53f17a101926ace71e5a9bf1c
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
@@ -157,12 +157,19 @@ services:
       centrifugo:
         condition: service_started
     restart: unless-stopped
+    # Generous start_period so a slow first boot is never mistaken for a crash.
+    # Minimal mode skips Ollama/Whisper so the backend usually boots fast, but
+    # the first `up -d` still races image pulls + the dev-image build + the
+    # one-time migrations/seed/cache warm. A failing probe inside start_period
+    # keeps the container "starting" (not "unhealthy"), so nothing downstream
+    # aborts; the moment /api/health answers 200 it flips to healthy. See
+    # docker-compose.yml for the full rationale.
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 3
-      start_period: 90s
+      retries: 5
+      start_period: 300s
     networks:
       - synaplan-network
 

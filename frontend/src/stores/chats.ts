@@ -101,16 +101,19 @@ export const useChatsStore = defineStore('chats', () => {
 
   function ensureValidActiveChat() {
     const candidateId = activeChatId.value ?? readActiveChatId()
-    if (candidateId && chats.value.some((chat) => chat.id === candidateId)) {
-      updateActiveChatSelection(candidateId)
+    const candidate = candidateId ? chats.value.find((chat) => chat.id === candidateId) : undefined
+
+    // Never auto-restore a widget session as the active chat in the main
+    // ChatView. Widget sessions belong to their dedicated widget session view;
+    // restoring one here renders out-of-context system messages and the chat
+    // is hidden in the collapsed "Widget Chats" sidebar section (#1152).
+    if (candidate && !candidate.widgetSession) {
+      updateActiveChatSelection(candidate.id)
       return
     }
 
-    if (chats.value.length > 0) {
-      updateActiveChatSelection(chats.value[0].id)
-    } else {
-      updateActiveChatSelection(null)
-    }
+    const firstRegularChat = chats.value.find((chat) => !chat.widgetSession)
+    updateActiveChatSelection(firstRegularChat ? firstRegularChat.id : null)
   }
 
   async function loadChats() {

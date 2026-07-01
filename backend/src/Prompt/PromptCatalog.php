@@ -610,14 +610,17 @@ node into an image edit (PIC2PIC).
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
 The event fields go in `params`. Resolve the relative time against the time
-context into an absolute ISO-8601 local `start` + IANA `timezone`.
+context into an absolute ISO-8601 LOCAL `start` (the wall-clock time in the
+user's timezone) plus the matching IANA `timezone`. Use the user's local
+timezone from the time context — never force "UTC" unless that is genuinely the
+user's zone. (The example below assumes a user in Europe/Berlin.)
 
 {
   "version": 1,
   "language": "en",
   "reply_node": "n2",
   "tasks": [
-    { "id": "n1", "capability": "calendar_event", "params": { "title": "Meeting with Sanam", "start": "2026-06-10T09:00:00", "timezone": "UTC", "duration_minutes": 60, "attendees": ["Sanam"] } },
+    { "id": "n1", "capability": "calendar_event", "params": { "title": "Meeting with Sanam", "start": "2026-06-10T09:00:00", "timezone": "Europe/Berlin", "duration_minutes": 60, "attendees": ["Sanam"] } },
     { "id": "n2", "capability": "compose_reply", "depends_on": ["n1"], "inputs": { "text": "Here is your meeting invite for tomorrow at 09:00 with Sanam.", "attachments": ["$n1.file"] } }
   ]
 }

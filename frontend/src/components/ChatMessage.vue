@@ -108,7 +108,7 @@
 
         <!-- Processing Status (inside bubble, before content) -->
         <div
-          v-if="isStreaming && processingStatus && role === 'assistant'"
+          v-if="isStreaming && processingStatus && role === 'assistant' && !showMediaJobBanner"
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-typing-indicator"
         >
@@ -336,7 +336,7 @@
                     : files.slice(0, totalBadgesCount > 3 ? 2 : files.length)"
                   :key="file.id"
                   :class="[
-                    'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer text-sm',
+                    'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer text-sm min-w-0 max-w-full',
                     role === 'user'
                       ? 'bg-black/25 hover:bg-black/35'
                       : 'bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20',
@@ -344,10 +344,12 @@
                   @click="downloadFile(file)"
                 >
                   <Icon :icon="getFileIcon(file.fileType)" class="w-4 h-4 flex-shrink-0" />
-                  <span class="font-medium truncate max-w-[200px]">{{ file.filename }}</span>
-                  <span v-if="file.fileSize" class="text-xs opacity-60">{{
-                    formatFileSize(file.fileSize)
-                  }}</span>
+                  <span class="font-medium truncate min-w-0 flex-1">{{ file.filename }}</span>
+                  <span
+                    v-if="file.fileSize"
+                    class="text-xs opacity-60 flex-shrink-0 whitespace-nowrap"
+                    >{{ formatFileSize(file.fileSize) }}</span
+                  >
                 </div>
               </template>
 
@@ -408,11 +410,22 @@
           <!-- Multitask routing: show task cards when a plan is active (streaming)
                or when cards exist from a persisted DAG turn (after reload). -->
           <TaskPlanBubble
-            v-if="taskPlan && taskPlan.cards.length > 0"
-            :plan="taskPlan"
+            v-if="displayTaskPlan && displayTaskPlan.cards.length > 0"
+            :plan="displayTaskPlan"
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
           />
+
+          <!-- Background async media job (Release 4.0 — e.g. detached video render) -->
+          <div v-if="showMediaJobBanner" class="px-4 pt-3">
+            <MediaJobStatus
+              :media-job="mediaJob!"
+              :model-label="mediaJobModelLabel ?? undefined"
+              @update:media-job="emit('mediaJobUpdate', $event)"
+              @completed="emit('mediaJobCompleted', $event)"
+              @cancel="emit('mediaJobCancel', $event)"
+            />
+          </div>
 
           <MessagePart
             v-for="(part, index) in contentParts"
@@ -959,12 +972,14 @@ import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'
-import type { Part, MessageFile, TaskPlanState } from '@/stores/history'
+import type { Part, MessageFile, MediaJobInfo, TaskPlanState } from '@/stores/history'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
+import MediaJobStatus from '@/components/MediaJobStatus.vue'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
+import { dedupeTaskPlanProse } from '@/utils/taskPlanDisplay'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -1042,6 +1057,8 @@ interface Props {
   truncated?: boolean
   // Multitask routing: live task-card state while a multi-node plan streams.
   taskPlan?: TaskPlanState | null
+  /** Background media job — persists after stream ends (async video). */
+  mediaJob?: MediaJobInfo | null
   // Multitask routing: this assistant turn ran the DAG (persisted flag, also
   // true for live plans). Switches "Again with…" to the simple "Again".
   wasMultitask?: boolean
@@ -1181,7 +1198,24 @@ const feedbacks = computed(() => {
 // Process content parts to make reference numbers [1], [2], etc. clickable for search results
 // NOTE: Memory badges ([Memory X]) are handled in MessageText.vue, not here!
 const contentParts = computed(() => {
-  const parts = props.parts.filter((p) => p.type !== 'thinking')
+  let parts = props.parts.filter((p) => p.type !== 'thinking')
+
+  // The `__VIDEO_GENERATING__` token is a backend placeholder, never user-facing
+  // text. The dedicated banner (while running/failed) or the finished video part
+  // (when done) is the real surface. Strip the placeholder whenever this message
+  // carries a media job in ANY state — gating it on the banner's visibility
+  // alone made the placeholder reappear next to the video the moment the job
+  // completed, producing the text↔video flicker.
+  if (props.role === 'assistant' && props.mediaJob) {
+    const generatingTokens = [
+      '__VIDEO_GENERATING__',
+      '__IMAGE_GENERATING__',
+      '__AUDIO_GENERATING__',
+    ]
+    parts = parts.filter(
+      (p) => !(p.type === 'text' && generatingTokens.includes(p.content?.trim() ?? ''))
+    )
+  }
 
   // If no search results, return parts as-is
   if (!props.searchResults || props.searchResults.length === 0) {
@@ -1205,6 +1239,21 @@ const contentParts = computed(() => {
   })
 })
 
+// Multitask routing: hide a task card's prose when that exact text is already
+// the final answer in the message body, so a DAG whose reply node passes an
+// upstream text node through verbatim (poem → TTS, summarize → translate, …)
+// no longer renders the same text twice. See dedupeTaskPlanProse for the full
+// rationale. Compare against the raw body text (props.parts), not the
+// citation-processed `contentParts`, so the verbatim card text still matches.
+const displayTaskPlan = computed<TaskPlanState | null>(() =>
+  dedupeTaskPlanProse(
+    props.taskPlan,
+    props.parts
+      .filter((p) => p.type === 'text' && typeof p.content === 'string')
+      .map((p) => p.content as string)
+  )
+)
+
 // Get provider for avatar icon (prefer aiModels.chat, fallback to legacy provider prop).
 // Channel-source tokens like `WHATSAPP` / `EMAIL` / `widget` must never reach
 // `getProviderIcon` — they would silently fall through to the default robot
@@ -1218,7 +1267,11 @@ const displayProvider = computed(() => {
   if (legacy && !isChannelSource(legacy)) {
     return legacy
   }
-  return 'OpenAI'
+  // Issue #1197: when no provider metadata is available, fall back to a
+  // neutral avatar (ServiceIcon renders a generic robot icon for an empty
+  // service) instead of hardcoding OpenAI, which mislabels replies served by
+  // other providers (e.g. Groq).
+  return ''
 })
 
 // Real AI provider/model values for the legacy popover row. Hides
@@ -1287,6 +1340,18 @@ const isKnownModelName = (name?: string | null): boolean => {
   return n !== '' && n !== 'unknown'
 }
 
+const showMediaJobBanner = computed(() => {
+  if (props.role !== 'assistant' || !props.mediaJob) return false
+  const state = props.mediaJob.state
+  return state === 'running' || state === 'failed' || state === 'cancelled'
+})
+
+const mediaJobModelLabel = computed(() => {
+  const fromAiModels = props.aiModels?.chat?.model
+  if (fromAiModels && isKnownModelName(fromAiModels)) return fromAiModels
+  return legacyModelLabel.value
+})
+
 const formattedTime = computed(() => formatTime(props.timestamp))
 
 // Check if we're in a processing state (hide model info during these states)
@@ -1341,6 +1406,9 @@ const emit = defineEmits<{
   falsePositive: [text: string, messageId?: number]
   'click-memory': [memory: UserMemory]
   continue: []
+  mediaJobUpdate: [job: MediaJobInfo]
+  mediaJobCompleted: [payload: { url: string; type: string }]
+  mediaJobCancel: [jobId: string]
 }>()
 
 const router = useRouter()

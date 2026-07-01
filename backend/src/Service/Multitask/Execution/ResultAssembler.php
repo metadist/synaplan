@@ -38,6 +38,7 @@ final class ResultAssembler
      *     files: list<array<string, mixed>>,
      *     metadata: array<string, mixed>,
      *     node_statuses: array<string, string>,
+     *     node_job_keys: array<string, string>,
      *     partial_failure: bool,
      *     all_failed: bool
      * }
@@ -45,12 +46,19 @@ final class ResultAssembler
     public function assemble(TaskPlan $plan, NodeContext $context): array
     {
         $statuses = [];
+        $jobKeys = [];
         $successCount = 0;
         $failureCount = 0;
         foreach ($plan->nodes as $node) {
             $result = $context->getResult($node->id);
-            $status = null !== $result ? $result->status : NodeStatus::Skipped;
+            $status = null !== $result ? $result->status : NodeStatus::Pending;
             $statuses[$node->id] = $status->value;
+            if (null !== $result) {
+                $mediaJob = $result->metadata['media_job'] ?? null;
+                if (is_array($mediaJob) && is_string($mediaJob['job_id'] ?? null) && '' !== $mediaJob['job_id']) {
+                    $jobKeys[$node->id] = $mediaJob['job_id'];
+                }
+            }
             if (NodeStatus::Done === $status) {
                 ++$successCount;
             } elseif (NodeStatus::Failed === $status) {
@@ -76,6 +84,35 @@ final class ResultAssembler
             'node_statuses' => $statuses,
             'partial_failure' => $partialFailure,
         ];
+
+        // Issue #1197: the reply node is frequently `compose_reply`, whose
+        // runner carries NO provider/model metadata, so the inference provider
+        // that actually produced the answer (e.g. groq) is dropped and the chat
+        // bubble falls back to a wrong/default avatar. Backfill the chat-model
+        // meta from the last successful node that recorded a provider (the node
+        // closest to the final answer in execution order), so StreamController
+        // persists the real ai_chat_provider/model.
+        if (empty($metadata['provider'])) {
+            foreach ($plan->topologicalOrder() as $node) {
+                $nodeResult = $context->getResult($node->id);
+                if (null === $nodeResult || !$nodeResult->isSuccessful()) {
+                    continue;
+                }
+                $nodeProvider = $nodeResult->metadata['provider'] ?? null;
+                if (!is_string($nodeProvider) || '' === $nodeProvider) {
+                    continue;
+                }
+                // Last provider-bearing node wins (do not break): it is the one
+                // that produced the user-facing answer text.
+                $metadata['provider'] = $nodeProvider;
+                if (isset($nodeResult->metadata['model'])) {
+                    $metadata['model'] = $nodeResult->metadata['model'];
+                }
+                if (isset($nodeResult->metadata['model_id'])) {
+                    $metadata['model_id'] = $nodeResult->metadata['model_id'];
+                }
+            }
+        }
 
         // Propagate web_search results from the first successful WebSearch node
         // into the top-level metadata so StreamController can set the
@@ -110,7 +147,7 @@ final class ResultAssembler
                 continue;
             }
             $nodeResult = $context->getResult($node->id);
-            $nodeStatus = null !== $nodeResult ? $nodeResult->status->value : 'skipped';
+            $nodeStatus = null !== $nodeResult ? $nodeResult->status->value : 'pending';
             $card = [
                 'nodeId' => $node->id,
                 'capability' => $node->capability->value,
@@ -146,6 +183,10 @@ final class ResultAssembler
                 if (null !== $nodeResult->error && '' !== $nodeResult->error) {
                     $card['error'] = $nodeResult->error;
                 }
+                $mediaJob = $nodeResult->metadata['media_job'] ?? null;
+                if (is_array($mediaJob) && is_string($mediaJob['job_id'] ?? null) && '' !== $mediaJob['job_id']) {
+                    $card['job_id'] = $mediaJob['job_id'];
+                }
             }
             $renderCards[] = $card;
         }
@@ -160,6 +201,7 @@ final class ResultAssembler
             'files' => $files,
             'metadata' => $metadata,
             'node_statuses' => $statuses,
+            'node_job_keys' => $jobKeys,
             'partial_failure' => $partialFailure,
             'all_failed' => $allFailed,
         ];

@@ -2,7 +2,9 @@
 
 export const URLS = {
   BASE_URL: process.env.BASE_URL || 'http://localhost:5173',
-  MAILHOG_URL: process.env.MAILHOG_URL || 'http://localhost:8025',
+  // Test stack (docker-compose.test.yml) maps MailHog to host port 8026 by
+  // default so it can run alongside the dev stack (8025).
+  MAILHOG_URL: process.env.MAILHOG_URL || 'http://localhost:8026',
 
   get TEST_PAGE_URL() {
     return `${this.BASE_URL}/widget-test.html`

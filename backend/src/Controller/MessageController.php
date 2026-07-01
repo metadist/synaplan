@@ -7,6 +7,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -699,19 +700,25 @@ class MessageController extends AbstractController
 
             if (!$storageResult['success']) {
                 return $this->json([
-                    'error' => 'File storage failed: '.$storageResult['error'],
+                    'error' => FileHelper::withAdminDiagnostics(
+                        'File storage failed: '.$storageResult['error'],
+                        $user->isAdmin(),
+                        $storageResult['error_detail'] ?? null,
+                    ),
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
             $relativePath = $storageResult['path'];
-            $fileExtension = strtolower($uploadedFile->getClientOriginalExtension());
+            // A HEIC upload is stored as JPEG; use the final stored extension so
+            // the chat pipeline treats it as an image, not an unsupported HEIC.
+            $fileExtension = strtolower($storageResult['extension'] ?? $uploadedFile->getClientOriginalExtension());
 
             // Create File entity (NEW: separate entity for files)
             $messageFile = new File();
             $messageFile->setUserId($user->getId()); // CRITICAL: Set user ID to avoid NULL constraint violation
             $messageFile->setFilePath($relativePath);
             $messageFile->setFileType($fileExtension);
-            $messageFile->setFileName($uploadedFile->getClientOriginalName());
+            $messageFile->setFileName($storageResult['display_name'] ?? $uploadedFile->getClientOriginalName());
             $messageFile->setFileSize($storageResult['size']);
             $messageFile->setFileMime($storageResult['mime']);
             $messageFile->setStatus('uploaded');
@@ -795,7 +802,7 @@ class MessageController extends AbstractController
             $response = [
                 'success' => true,
                 'file_id' => $messageFile->getId(),
-                'filename' => $uploadedFile->getClientOriginalName(),
+                'filename' => $messageFile->getFileName(),
                 'size' => $storageResult['size'],
                 'mime' => $storageResult['mime'],
                 'file_type' => $fileExtension,

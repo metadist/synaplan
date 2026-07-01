@@ -181,6 +181,46 @@
       </div>
     </div>
 
+    <!-- Planner Model (all users): choose which model powers the planner -->
+    <div class="surface-card overflow-hidden" data-testid="section-routing-planner-model">
+      <div class="p-6">
+        <div class="flex items-start gap-3 mb-4">
+          <div class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0">
+            <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-[var(--brand)]" />
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-lg font-semibold txt-primary">
+              {{ $t('config.routing.plannerModelTitle') }}
+            </h3>
+            <p class="text-sm txt-secondary mt-0.5">
+              {{ $t('config.routing.plannerModelDesc') }}
+            </p>
+          </div>
+        </div>
+
+        <label class="block text-sm font-medium txt-primary mb-2" for="planner-model-select">
+          {{ $t('config.routing.plannerModelLabel') }}
+        </label>
+        <select
+          id="planner-model-select"
+          :value="plannerModelId ?? ''"
+          :disabled="loadingPlannerModel || savingPlannerModel"
+          class="w-full max-w-md px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
+          data-testid="select-planner-model"
+          @change="onPlannerModelChange(($event.target as HTMLSelectElement).value)"
+        >
+          <option value="">{{ $t('config.routing.plannerModelAuto') }}</option>
+          <option v-for="model in plannerModels" :key="model.id" :value="model.id">
+            {{ model.name }} ({{ model.service }})
+          </option>
+        </select>
+
+        <p v-if="plannerModelId === null" class="text-xs txt-secondary mt-2">
+          {{ $t('config.routing.plannerModelFallbackHint') }}
+        </p>
+      </div>
+    </div>
+
     <!-- Legacy fallback (admin only) — collapsed by default -->
     <div v-if="isAdmin" class="space-y-6" data-testid="section-routing-legacy">
       <button
@@ -432,6 +472,8 @@ import type { SortingPromptData } from '@/mocks/sortingPrompt'
 import { promptsApi } from '@/services/api/promptsApi'
 import type { SortingPromptPayload } from '@/services/api/promptsApi'
 import { getConfigValues, updateConfigValue } from '@/services/api/adminConfigApi'
+import { getModels, getPlannerModel, savePlannerModel } from '@/services/api/configApi'
+import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
 import { useAuthStore } from '@/stores/auth'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
@@ -453,6 +495,16 @@ const plannerTab = ref<'rendered' | 'source'>('rendered')
 const plannerEditMode = ref(false)
 const loadingPlanner = ref(false)
 const savingPlanner = ref(false)
+
+// --- Planner model selection (per-user DEFAULTMODEL.PLAN) -------------------
+// Lets any user pick which model powers the multi-task planner without needing
+// DB access (#1143). The pool is the chat-tagged models — the same set the
+// Sorting model dropdown uses. `null` means "no override": the planner falls
+// back to the user's Sorting model.
+const plannerModels = ref<AIModel[]>([])
+const plannerModelId = ref<number | null>(null)
+const loadingPlannerModel = ref(false)
+const savingPlannerModel = ref(false)
 
 // --- Legacy fallback disclosure (collapsed by default) ----------------------
 const legacyOpen = ref(false)
@@ -744,12 +796,45 @@ const resetPlannerPrompt = () => {
   plannerTab.value = 'rendered'
 }
 
+// --- Planner model load / save ---------------------------------------------
+const loadPlannerModel = async () => {
+  loadingPlannerModel.value = true
+  try {
+    const [modelsRes, plannerRes] = await Promise.all([getModels(), getPlannerModel()])
+    plannerModels.value = modelsRes.success ? (modelsRes.models.CHAT ?? []) : []
+    plannerModelId.value = plannerRes.modelId
+  } catch (err) {
+    const message = err instanceof Error ? err.message : t('config.routing.plannerModelLoadFailed')
+    showError(message)
+  } finally {
+    loadingPlannerModel.value = false
+  }
+}
+
+const onPlannerModelChange = async (rawValue: string) => {
+  const nextId = rawValue === '' ? null : Number(rawValue)
+  const previous = plannerModelId.value
+  plannerModelId.value = nextId
+  savingPlannerModel.value = true
+  try {
+    await savePlannerModel(nextId)
+    success(t('config.routing.plannerModelSaved'))
+  } catch (err) {
+    plannerModelId.value = previous
+    const message = err instanceof Error ? err.message : t('config.routing.plannerModelSaveFailed')
+    showError(message)
+  } finally {
+    savingPlannerModel.value = false
+  }
+}
+
 watch(locale, () => {
   loadSortingPrompt()
 })
 
 onMounted(() => {
   loadSortingPrompt()
+  loadPlannerModel()
   if (isAdmin.value) {
     loadRoutingToggles()
     loadPlannerPrompt()

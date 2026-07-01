@@ -48,23 +48,34 @@ final readonly class TaskPlanStore
      * Atomic (delete + inserts in one transaction) and best-effort.
      *
      * @param array<string, string> $statuses
+     * @param array<string, string> $jobKeys  nodeId => MediaJob job_key (async media)
      */
-    public function persistWithStatuses(int $messageId, TaskPlan $plan, ?int $modelId, array $statuses, string $default = 'pending'): int
-    {
+    public function persistWithStatuses(
+        int $messageId,
+        TaskPlan $plan,
+        ?int $modelId,
+        array $statuses,
+        string $default = 'pending',
+        array $jobKeys = [],
+    ): int {
         try {
-            return (int) $this->connection->transactional(function (Connection $connection) use ($messageId, $plan, $modelId, $statuses, $default): int {
+            return (int) $this->connection->transactional(function (Connection $connection) use ($messageId, $plan, $modelId, $statuses, $default, $jobKeys): int {
                 $connection->delete('BMESSAGE_TASKS', ['BMESSAGEID' => $messageId]);
 
                 $written = 0;
                 foreach ($plan->nodes as $node) {
-                    $connection->insert('BMESSAGE_TASKS', [
+                    $row = [
                         'BMESSAGEID' => $messageId,
                         'BNODEID' => $node->id,
                         'BCAPABILITY' => $node->capability->value,
                         'BDEPENDSON' => json_encode($node->dependsOn, \JSON_UNESCAPED_SLASHES) ?: '[]',
                         'BSTATUS' => $statuses[$node->id] ?? $default,
                         'BMODELID' => $modelId,
-                    ]);
+                    ];
+                    if (isset($jobKeys[$node->id]) && '' !== $jobKeys[$node->id]) {
+                        $row['BJOBKEY'] = $jobKeys[$node->id];
+                    }
+                    $connection->insert('BMESSAGE_TASKS', $row);
                     ++$written;
                 }
 

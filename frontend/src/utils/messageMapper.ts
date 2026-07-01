@@ -1,6 +1,7 @@
 import type {
   Message,
   MessageFile,
+  MediaJobInfo,
   Part,
   TaskPlanState,
   TaskCardKind,
@@ -32,6 +33,94 @@ import {
  * Keep this module side-effect free so it can be unit-tested without
  * mounting the chat view or the Pinia store.
  */
+
+/**
+ * A realtime/poll media-job status update, as delivered by the Centrifugo
+ * `media_job.update` event (Sprint C) or the poll endpoint.
+ */
+export interface MediaJobUpdate {
+  job_id: string
+  message_id?: number | null
+  chat_id?: number | null
+  node_id?: string | null
+  type: string
+  state: string
+  percent?: number | null
+  error?: string | null
+  file?: { url: string; type?: string } | null
+}
+
+/**
+ * Apply a media-job update to a loaded message in place: patch `mediaJob` and,
+ * on a terminal `done` with a produced file, append the generated media part
+ * (idempotent — never duplicates an existing media part of that kind).
+ *
+ * Shared by the realtime `mediaJobs` store (push) and ChatView's completion
+ * handler so the push and poll paths can never diverge.
+ */
+export function applyMediaJobUpdateToMessage(message: Message, update: MediaJobUpdate): void {
+  message.mediaJob = {
+    ...(message.mediaJob ?? {}),
+    jobId: update.job_id,
+    type: update.type,
+    state: update.state,
+    ...(update.error != null ? { error: update.error } : {}),
+    ...(update.percent != null ? { percent: update.percent } : {}),
+  }
+
+  if ('done' === update.state && update.file?.url) {
+    appendGeneratedMediaPart(message, update.file.url, update.file.type ?? update.type)
+  }
+}
+
+/** Append a generated media part to a message, once per media kind. */
+function appendGeneratedMediaPart(message: Message, url: string, type: string): void {
+  const normalized = normalizeMediaUrl(url)
+  if ('video' === type && !message.parts.some((p) => 'video' === p.type)) {
+    message.parts.push({ partId: generatePartId(), type: 'video', url: normalized })
+  } else if ('image' === type && !message.parts.some((p) => 'image' === p.type)) {
+    message.parts.push({
+      partId: generatePartId(),
+      type: 'image',
+      url: normalized,
+      alt: 'Generated image',
+    })
+  } else if ('audio' === type && !message.parts.some((p) => 'audio' === p.type)) {
+    message.parts.push({ partId: generatePartId(), type: 'audio', url: normalized })
+  }
+}
+
+/** Normalize a media_job payload from API rows or SSE metadata. */
+export function parseMediaJobPayload(raw: unknown): MediaJobInfo | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const jobId = row.job_id ?? row.jobId
+  const type = row.type
+  const state = row.state
+  if (typeof jobId !== 'string' || jobId === '') return null
+  if (typeof type !== 'string' || type === '') return null
+  const error = row.error
+  const percent = row.percent
+  return {
+    jobId,
+    type,
+    state: typeof state === 'string' ? state : 'running',
+    error: typeof error === 'string' ? error : undefined,
+    percent: typeof percent === 'number' ? percent : undefined,
+    elapsedSeconds:
+      typeof row.elapsed_seconds === 'number'
+        ? row.elapsed_seconds
+        : typeof row.elapsedSeconds === 'number'
+          ? row.elapsedSeconds
+          : undefined,
+    maxWaitSeconds:
+      typeof row.max_wait_seconds === 'number'
+        ? row.max_wait_seconds
+        : typeof row.maxWaitSeconds === 'number'
+          ? row.maxWaitSeconds
+          : undefined,
+  }
+}
 
 /**
  * Parse content to extract thinking blocks, code blocks, and regular text.
@@ -187,10 +276,18 @@ export interface ApiLoadedMessageRow {
       url?: string
       type?: string
       error?: string
+      job_id?: string
       /** Compact web-search summary fields (search cards only) */
       query?: string
       resultsCount?: number
     }>
+  } | null
+  /** Background async media job (Release 4.0). */
+  mediaJob?: {
+    job_id: string
+    type: string
+    state: string
+    error?: string
   } | null
 }
 
@@ -289,6 +386,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   // media parts in the bubble (same dedup logic as reconcileLocalMessage).
   let taskPlanState: TaskPlanState | null = null
   const cardMediaUrls = new Set<string>()
+  const cardTexts = new Set<string>()
   if (m.taskPlan && m.taskPlan.cards.length > 0) {
     const cards = m.taskPlan.cards.map((c) => {
       const kind: TaskCardKind = isTaskCardKind(c.kind) ? c.kind : 'text'
@@ -297,6 +395,10 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
       if (c.url) {
         cardUrl = normalizeMediaUrl(buildUploadUrl(c.url))
         cardMediaUrls.add(mediaUrlKey(cardUrl))
+      }
+      const cardText = (c.text ?? '').trim()
+      if (cardText) {
+        cardTexts.add(normalizeCardText(cardText))
       }
       return {
         nodeId: c.nodeId,
@@ -309,6 +411,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         error: c.error,
         query: c.query,
         resultsCount: c.resultsCount,
+        jobId: typeof c.job_id === 'string' ? c.job_id : undefined,
       }
     })
     taskPlanState = {
@@ -320,12 +423,24 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
 
   // Remove any plain-media parts whose URL already appears on a restored card
   // so the user sees each piece of media exactly once (card is the primary surface).
-  const deduplicatedParts =
-    cardMediaUrls.size > 0
-      ? parts.filter(
-          (p) => !(isMediaPartType(p.type) && p.url && cardMediaUrls.has(mediaUrlKey(p.url)))
-        )
-      : parts
+  //
+  // Issue #1165: also drop text parts whose content is identical to a card's
+  // text. On reload `ResultAssembler` persists the reply-node output both as
+  // the message `content` AND inside the task cards, so a node's text would
+  // otherwise appear twice (once in the card, once in the body below it). The
+  // card is the primary surface, so the duplicated body text is removed.
+  const needsDedup = cardMediaUrls.size > 0 || cardTexts.size > 0
+  const deduplicatedParts = needsDedup
+    ? parts.filter((p) => {
+        if (isMediaPartType(p.type) && p.url && cardMediaUrls.has(mediaUrlKey(p.url))) {
+          return false
+        }
+        if (p.type === 'text' && p.content && cardTexts.has(normalizeCardText(p.content))) {
+          return false
+        }
+        return true
+      })
+    : parts
 
   // Reconstruct tool metadata from topic field for user messages
   // Also clean command prefix from message content
@@ -387,6 +502,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     wasMultitask: m.multitask === true,
     tool: toolData,
     taskPlan: taskPlanState,
+    mediaJob: parseMediaJobPayload(m.mediaJob),
   }
 }
 
@@ -402,6 +518,16 @@ function mediaUrlKey(url: string): string {
   } catch {
     return url
   }
+}
+
+/**
+ * Comparison key for card vs. body text dedup (issue #1165). The persisted
+ * message `content` and a card's `text` come from the same node output but can
+ * differ in trailing/leading whitespace or newline runs, so both sides are
+ * trimmed and inner whitespace is collapsed before comparison.
+ */
+function normalizeCardText(text: string): string {
+  return text.trim().replace(/\s+/g, ' ')
 }
 
 /**
@@ -474,5 +600,20 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   }
   if (persisted.wasMultitask) {
     local.wasMultitask = true
+  }
+  // Media job state: a terminal client state is FINAL and must never be
+  // downgraded back to `running` by a stale persisted snapshot. Without this
+  // guard the post-completion reconcile (which can race the worker's message
+  // sync) flips a just-completed job back to `running`, which re-enables
+  // polling, which completes again — an endless flicker between the video and
+  // the "generating" banner. Only apply the persisted state when our local
+  // state is not yet terminal, or when the persisted state is itself terminal.
+  if (persisted.mediaJob) {
+    const terminal = new Set(['done', 'failed', 'cancelled'])
+    const localTerminal = local.mediaJob ? terminal.has(local.mediaJob.state) : false
+    const persistedTerminal = terminal.has(persisted.mediaJob.state)
+    if (!localTerminal || persistedTerminal) {
+      local.mediaJob = persisted.mediaJob
+    }
   }
 }

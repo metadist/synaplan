@@ -164,6 +164,42 @@ final class RunnersTest extends TestCase
         self::assertStringNotContainsString('The instruction', (string) $result->text);
     }
 
+    /**
+     * Regression for issue #1069: the DAG path must respect the user's selected
+     * chat model (`classification.model_id`) instead of silently falling back to
+     * the system default via getDefaultModel().
+     */
+    public function testChatRunnerHonorsUserSelectedModel(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb): array {
+            $cb('Paris');
+
+            return ['provider' => 'ollama', 'model' => 'nemotron-3-nano'];
+        });
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        // The user explicitly picked a model — the runner must NOT consult the
+        // capability/system default at all.
+        $modelConfig->expects(self::never())->method('getDefaultModel');
+        $modelConfig->expects(self::once())->method('getProviderForModel')->with(999)->willReturn('ollama');
+        $modelConfig->expects(self::once())->method('getModelName')->with(999)->willReturn('nemotron-3-nano');
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'Was ist die Hauptstadt von Frankreich']);
+
+        $context = new NodeContext(
+            $this->message('Was ist die Hauptstadt von Frankreich'),
+            [],
+            1,
+            ['language' => 'de', 'model_id' => 999],
+        );
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(999, $result->metadata['model_id'] ?? null);
+    }
+
     public function testChatRunnerFailsOnEmptyInput(): void
     {
         $runner = new ChatRunner($this->createMock(AiFacade::class), $this->createMock(ModelConfigService::class), $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
@@ -390,6 +426,29 @@ final class RunnersTest extends TestCase
         self::assertTrue($result->isSuccessful());
         self::assertIsArray($capturedOptions);
         self::assertTrue($capturedOptions['record_media_usage'] ?? false);
+    }
+
+    public function testMediaGenerationRunnerReturnsRunningWhenHandlerDetachedAsyncJob(): void
+    {
+        $handler = $this->createMock(MediaGenerationHandler::class);
+        $handler->method('handle')->willReturn([
+            'metadata' => [
+                'media_type' => 'video',
+                'media_job' => [
+                    'job_id' => 'abc123',
+                    'type' => 'video',
+                    'state' => 'running',
+                ],
+            ],
+        ]);
+
+        $runner = new MediaGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n2', Capability::VideoGeneration, [], ['prompt' => 'surfing cat']);
+
+        $result = $runner->run($node, $this->context($this->message('make a video')));
+
+        self::assertTrue($result->isRunning());
+        self::assertSame('abc123', $result->metadata['media_job']['job_id'] ?? null);
     }
 
     /**
@@ -730,6 +789,45 @@ final class RunnersTest extends TestCase
         self::assertSame('The image shows a cat.', $result->text);
         self::assertSame('analyzefile', $captured['topic']);
         self::assertSame('file_analysis', $captured['intent']);
+    }
+
+    /**
+     * Regression for issue #1080: when the planner chains
+     * image_generation → file_analysis (the file to analyze is produced by an
+     * upstream node, referenced as `$n1.file`), the runner must lift that
+     * generated file onto the synthetic message instead of failing with
+     * "no file to analyze".
+     */
+    public function testFileAnalysisUsesUpstreamGeneratedFile(): void
+    {
+        $handler = $this->createMock(FileAnalysisHandler::class);
+        $seenMessage = null;
+        $handler->method('handle')->willReturnCallback(function (Message $msg) use (&$seenMessage): array {
+            $seenMessage = $msg;
+
+            return ['content' => 'The image shows a cat on the moon.', 'metadata' => ['analysis_type' => 'vision']];
+        });
+
+        $runner = new FileAnalysisRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n2', Capability::FileAnalysis, ['n1'], [
+            'prompt' => 'Describe the generated image',
+            'file' => '$n1.file',
+        ]);
+
+        $ctx = $this->context($this->message('generate an image then describe it'));
+        $ctx->setResult('n1', NodeResult::ok(null, [[
+            'path' => '/api/v1/files/uploads/1/000/cat.png',
+            'type' => 'image',
+            'local_path' => '1/000/cat.png',
+        ]]));
+
+        $result = $runner->run($node, $ctx);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('The image shows a cat on the moon.', $result->text);
+        self::assertInstanceOf(Message::class, $seenMessage);
+        self::assertSame('1/000/cat.png', $seenMessage->getFilePath());
+        self::assertSame('png', $seenMessage->getFileType());
     }
 
     public function testFileAnalysisFailsWithoutAttachment(): void

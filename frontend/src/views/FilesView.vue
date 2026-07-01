@@ -5,8 +5,30 @@
       data-testid="page-files-upload"
     >
       <div class="max-w-7xl mx-auto space-y-6">
-        <!-- §4.8: the knowledge base has two tabs — Files (browse) + Search -->
+        <!-- §4.8: the knowledge base tabs — Browse / Incoming / Generated / Search -->
         <FilesTabs active="files" />
+
+        <!-- §4.9 E: first-visit dismissible explainer; remembered per user. -->
+        <Transition name="fade">
+          <div
+            v-if="showExplainer"
+            class="flex items-start gap-3 p-3 sm:p-4 rounded-xl border border-[var(--brand)]/20 bg-[var(--brand)]/[0.05]"
+            data-testid="files-explainer"
+          >
+            <Icon
+              icon="mdi:information-outline"
+              class="w-5 h-5 text-[var(--brand)] shrink-0 mt-0.5"
+            />
+            <p class="text-sm txt-secondary flex-1 min-w-0">{{ $t('files.explainer.text') }}</p>
+            <button
+              class="shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors"
+              data-testid="btn-explainer-dismiss"
+              @click="dismissExplainer"
+            >
+              {{ $t('files.explainer.dismiss') }}
+            </button>
+          </div>
+        </Transition>
 
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
@@ -44,7 +66,7 @@
             ref="fileInputRef"
             type="file"
             multiple
-            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.mp3,.mp4,.mov,.avi,.mkv,.xlsx,.csv"
+            accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.csv,.odt,.ods,.odp,.odg,.odf,.ics,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp3,.mp4,.wav,.ogg,.m4a,.webm,.mov,.avi,.mkv"
             class="hidden"
             data-testid="input-files"
             @change="handleFileSelect"
@@ -391,6 +413,29 @@
                     {{ activeFilterCount }}
                   </span>
                 </button>
+                <!-- §4.5: Incoming inbox quick-toggle with a count badge so the
+                     user notices when integrations have pushed new files. -->
+                <button
+                  v-if="incomingCount > 0 || filterIncoming"
+                  class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-all shrink-0"
+                  :class="
+                    filterIncoming
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                      : 'border-black/[0.06] dark:border-white/[0.06] txt-secondary hover:border-[var(--brand)]/50 hover:text-[var(--brand)]'
+                  "
+                  :title="$t('files.help.incoming')"
+                  data-testid="btn-incoming-toggle"
+                  @click="toggleIncomingFilter"
+                >
+                  <Icon icon="heroicons:inbox-arrow-down" class="w-4 h-4" />
+                  <span class="hidden sm:inline">{{ $t('files.tabIncoming') }}</span>
+                  <span
+                    v-if="incomingCount > 0"
+                    class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold bg-[var(--brand)] text-white"
+                  >
+                    {{ incomingCount }}
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -422,6 +467,51 @@
                       </option>
                       <option value="mp3,mp4">{{ $t('files.filterTypeAudio') }}</option>
                       <option value="xlsx,csv">{{ $t('files.filterTypeSpreadsheet') }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      class="block text-[11px] font-medium txt-secondary uppercase tracking-wider mb-1"
+                    >
+                      {{ $t('files.filter.source') }}
+                    </label>
+                    <select
+                      v-model="filterSource"
+                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      data-testid="select-source"
+                      @change="onFilterChange"
+                    >
+                      <option value="">{{ $t('files.filter.source') }}</option>
+                      <option value="web_upload">{{ $t('files.sourceLabel.web_upload') }}</option>
+                      <option value="chat_attachment">
+                        {{ $t('files.sourceLabel.chat_attachment') }}
+                      </option>
+                      <option value="outlook">{{ $t('files.sourceLabel.outlook') }}</option>
+                      <option value="nextcloud">{{ $t('files.sourceLabel.nextcloud') }}</option>
+                      <option value="opencloud">{{ $t('files.sourceLabel.opencloud') }}</option>
+                      <option value="whatsapp">{{ $t('files.sourceLabel.whatsapp') }}</option>
+                      <option value="widget">{{ $t('files.sourceLabel.widget') }}</option>
+                      <option value="api">{{ $t('files.sourceLabel.api') }}</option>
+                      <option value="generated">{{ $t('files.sourceLabel.generated') }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      class="block text-[11px] font-medium txt-secondary uppercase tracking-wider mb-1"
+                    >
+                      {{ $t('files.filter.vectorized') }}
+                    </label>
+                    <select
+                      v-model="filterVectorized"
+                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      data-testid="select-vectorized"
+                      @change="onFilterChange"
+                    >
+                      <option value="">{{ $t('files.filter.vectorized') }}</option>
+                      <option value="vectorized">{{ $t('files.filter.vectorizedYes') }}</option>
+                      <option value="none,pending,failed">
+                        {{ $t('files.filter.vectorizedNo') }}
+                      </option>
                     </select>
                   </div>
                   <div>
@@ -538,13 +628,21 @@
               >
                 <Icon icon="heroicons:folder-plus" class="w-10 h-10 text-[var(--brand)]/40" />
               </div>
-              <div class="text-center">
+              <div class="text-center max-w-sm">
                 <p class="text-base font-medium txt-primary mb-1">
-                  {{ $t('files.emptyState.title') }}
+                  {{ $t('files.empty.browseTitle') }}
                 </p>
-                <p class="text-sm txt-secondary max-w-sm">
-                  {{ $t('files.emptyState.description') }}
+                <p class="text-sm txt-secondary mb-5">
+                  {{ $t('files.empty.browseBody') }}
                 </p>
+                <button
+                  class="btn-primary px-5 py-2.5 rounded-lg inline-flex items-center gap-2"
+                  data-testid="btn-empty-upload"
+                  @click="fileInputRef?.click()"
+                >
+                  <CloudArrowUpIcon class="w-5 h-5" />
+                  {{ $t('files.empty.browseAction') }}
+                </button>
               </div>
             </div>
 
@@ -717,14 +815,17 @@
                       <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="text-xs font-medium txt-primary truncate">{{ file.filename }}</p>
-                      <div class="flex items-center gap-1.5 mt-0.5 min-w-0">
+                      <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
+                        {{ displayName(file) }}
+                      </p>
+                      <div class="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap">
+                        <FileVectorPill
+                          :state="vectorStateOf(file)"
+                          :chunk-count="file.chunk_count ?? file.chunks ?? 0"
+                          :group-key="file.group_key"
+                        />
                         <span class="text-[10px] txt-secondary shrink-0">{{
                           formatFileSize(file.file_size)
-                        }}</span>
-                        <span class="text-[10px] txt-secondary shrink-0">·</span>
-                        <span class="text-[10px] txt-secondary truncate">{{
-                          vectorStatusLabel(file)
                         }}</span>
                         <button
                           v-if="file.group_key"
@@ -740,9 +841,41 @@
                       <FolderMoveMenu
                         :open="folderMenuOpen === file.id"
                         :folders="displayedFolders"
+                        :can-remove="!!file.group_key"
                         @toggle="toggleFolderMenu(file.id)"
                         @move="moveFileToFolder(file.id, $event)"
+                        @remove="removeFileFromFolder(file.id)"
                       />
+                      <button
+                        v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
+                        class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                        :title="$t('files.describeSortAction')"
+                        :disabled="isDescribing(file.id)"
+                        data-testid="btn-describe"
+                        @click="describeAndSort(file)"
+                      >
+                        <Icon
+                          :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
+                          class="w-4 h-4"
+                          :class="isDescribing(file.id) && 'animate-spin'"
+                        />
+                      </button>
+                      <button
+                        v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
+                        class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                        :title="$t('files.indexPromptAction')"
+                        :disabled="isDescribing(file.id)"
+                        data-testid="btn-index-prompt"
+                        @click="describeAndSort(file)"
+                      >
+                        <Icon
+                          :icon="
+                            isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
+                          "
+                          class="w-4 h-4"
+                          :class="isDescribing(file.id) && 'animate-spin'"
+                        />
+                      </button>
                       <button
                         class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                         :title="$t('common.view')"
@@ -819,22 +952,26 @@
                           >
                             <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                           </div>
-                          <div class="flex flex-col gap-0.5 min-w-0">
-                            <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
-                            <span
-                              class="text-[10px] txt-secondary truncate"
-                              :title="vectorStatusLabel(file)"
-                            >
-                              {{ vectorStatusLabel(file) }}
-                            </span>
-                            <button
-                              v-if="file.group_key"
-                              class="inline-flex items-center gap-1 self-start text-[10px] text-[var(--brand)]/70 hover:text-[var(--brand)] transition-colors"
-                              @click="enterFolder(file.group_key!)"
-                            >
-                              <Icon icon="heroicons:folder-solid" class="w-3 h-3" />
-                              {{ file.group_key }}
-                            </button>
+                          <div class="flex flex-col gap-1 min-w-0">
+                            <span class="text-sm txt-primary truncate" :title="file.filename">{{
+                              displayName(file)
+                            }}</span>
+                            <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                              <FileSourceBadge v-if="file.source" :source="file.source" />
+                              <FileVectorPill
+                                :state="vectorStateOf(file)"
+                                :chunk-count="file.chunk_count ?? file.chunks ?? 0"
+                                :group-key="file.group_key"
+                              />
+                              <button
+                                v-if="file.group_key"
+                                class="inline-flex items-center gap-1 text-[10px] text-[var(--brand)]/70 hover:text-[var(--brand)] transition-colors"
+                                @click="enterFolder(file.group_key!)"
+                              >
+                                <Icon icon="heroicons:folder-solid" class="w-3 h-3" />
+                                {{ file.group_key }}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -855,9 +992,45 @@
                           <FolderMoveMenu
                             :open="folderMenuOpen === file.id"
                             :folders="displayedFolders"
+                            :can-remove="!!file.group_key"
                             @toggle="toggleFolderMenu(file.id)"
                             @move="moveFileToFolder(file.id, $event)"
+                            @remove="removeFileFromFolder(file.id)"
                           />
+                          <button
+                            v-if="
+                              vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'
+                            "
+                            class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                            :title="$t('files.describeSortAction')"
+                            :disabled="isDescribing(file.id)"
+                            data-testid="btn-describe"
+                            @click="describeAndSort(file)"
+                          >
+                            <Icon
+                              :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
+                              class="w-4 h-4"
+                              :class="isDescribing(file.id) && 'animate-spin'"
+                            />
+                          </button>
+                          <button
+                            v-if="
+                              vectorStateOf(file) !== 'vectorized' && file.source === 'generated'
+                            "
+                            class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                            :title="$t('files.indexPromptAction')"
+                            :disabled="isDescribing(file.id)"
+                            data-testid="btn-index-prompt"
+                            @click="describeAndSort(file)"
+                          >
+                            <Icon
+                              :icon="
+                                isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
+                              "
+                              class="w-4 h-4"
+                              :class="isDescribing(file.id) && 'animate-spin'"
+                            />
+                          </button>
                           <button
                             class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
                             :title="$t('files.download')"
@@ -1047,14 +1220,17 @@
                     <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-xs font-medium txt-primary truncate">{{ file.filename }}</p>
-                    <div class="flex items-center gap-1.5 min-w-0">
+                    <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
+                      {{ displayName(file) }}
+                    </p>
+                    <div class="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap">
+                      <FileVectorPill
+                        :state="vectorStateOf(file)"
+                        :chunk-count="file.chunk_count ?? file.chunks ?? 0"
+                        :group-key="file.group_key"
+                      />
                       <span class="text-[10px] txt-secondary shrink-0">{{
                         formatFileSize(file.file_size)
-                      }}</span>
-                      <span class="text-[10px] txt-secondary shrink-0">·</span>
-                      <span class="text-[10px] txt-secondary truncate">{{
-                        vectorStatusLabel(file)
                       }}</span>
                     </div>
                   </div>
@@ -1063,9 +1239,39 @@
                       :open="folderMenuOpen === file.id"
                       :folders="displayedFolders"
                       :current-folder="openFolder"
+                      :can-remove="!!file.group_key"
                       @toggle="toggleFolderMenu(file.id)"
                       @move="moveFileToFolder(file.id, $event)"
+                      @remove="removeFileFromFolder(file.id)"
                     />
+                    <button
+                      v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
+                      class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                      :title="$t('files.describeSortAction')"
+                      :disabled="isDescribing(file.id)"
+                      data-testid="btn-describe"
+                      @click="describeAndSort(file)"
+                    >
+                      <Icon
+                        :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
+                        class="w-4 h-4"
+                        :class="isDescribing(file.id) && 'animate-spin'"
+                      />
+                    </button>
+                    <button
+                      v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
+                      class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                      :title="$t('files.indexPromptAction')"
+                      :disabled="isDescribing(file.id)"
+                      data-testid="btn-index-prompt"
+                      @click="describeAndSort(file)"
+                    >
+                      <Icon
+                        :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'"
+                        class="w-4 h-4"
+                        :class="isDescribing(file.id) && 'animate-spin'"
+                      />
+                    </button>
                     <button
                       class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                       :title="$t('common.view')"
@@ -1145,14 +1351,18 @@
                         >
                           <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                         </div>
-                        <div class="flex flex-col gap-0.5 min-w-0">
-                          <span class="text-sm txt-primary truncate">{{ file.filename }}</span>
-                          <span
-                            class="text-[10px] txt-secondary truncate"
-                            :title="vectorStatusLabel(file)"
-                          >
-                            {{ vectorStatusLabel(file) }}
-                          </span>
+                        <div class="flex flex-col gap-1 min-w-0">
+                          <span class="text-sm txt-primary truncate" :title="file.filename">{{
+                            displayName(file)
+                          }}</span>
+                          <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                            <FileSourceBadge v-if="file.source" :source="file.source" />
+                            <FileVectorPill
+                              :state="vectorStateOf(file)"
+                              :chunk-count="file.chunk_count ?? file.chunks ?? 0"
+                              :group-key="file.group_key"
+                            />
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -1174,9 +1384,41 @@
                           :open="folderMenuOpen === file.id"
                           :folders="displayedFolders"
                           :current-folder="openFolder"
+                          :can-remove="!!file.group_key"
                           @toggle="toggleFolderMenu(file.id)"
                           @move="moveFileToFolder(file.id, $event)"
+                          @remove="removeFileFromFolder(file.id)"
                         />
+                        <button
+                          v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
+                          class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                          :title="$t('files.describeSortAction')"
+                          :disabled="isDescribing(file.id)"
+                          data-testid="btn-describe"
+                          @click="describeAndSort(file)"
+                        >
+                          <Icon
+                            :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
+                            class="w-4 h-4"
+                            :class="isDescribing(file.id) && 'animate-spin'"
+                          />
+                        </button>
+                        <button
+                          v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
+                          class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
+                          :title="$t('files.indexPromptAction')"
+                          :disabled="isDescribing(file.id)"
+                          data-testid="btn-index-prompt"
+                          @click="describeAndSort(file)"
+                        >
+                          <Icon
+                            :icon="
+                              isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
+                            "
+                            class="w-4 h-4"
+                            :class="isDescribing(file.id) && 'animate-spin'"
+                          />
+                        </button>
                         <button
                           class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
                           :title="$t('files.download')"
@@ -1355,6 +1597,8 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
 import FilesIntegrationsBanner from '@/components/FilesIntegrationsBanner.vue'
 import FilesTabs from '@/components/files/FilesTabs.vue'
+import FileVectorPill from '@/components/files/FileVectorPill.vue'
+import FileSourceBadge from '@/components/files/FileSourceBadge.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import { Icon } from '@iconify/vue'
 import {
@@ -1413,13 +1657,38 @@ const showFilters = ref(false)
 const filterFileType = ref('')
 const filterDateFrom = ref('')
 const filterDateTo = ref('')
+// Feature 2 (§4.4, §4.2, §4.5) — provenance / searchable / incoming filters.
+const filterSource = ref('')
+const filterVectorized = ref('')
+const filterIncoming = ref(false)
+const incomingCount = ref(0)
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+// §4.9 E: first-visit explainer, remembered per user via localStorage.
+const EXPLAINER_DISMISSED_KEY = 'synaplan:files:explainer-dismissed'
+const showExplainer = ref(false)
+try {
+  showExplainer.value = localStorage.getItem(EXPLAINER_DISMISSED_KEY) !== '1'
+} catch {
+  showExplainer.value = true
+}
+const dismissExplainer = () => {
+  showExplainer.value = false
+  try {
+    localStorage.setItem(EXPLAINER_DISMISSED_KEY, '1')
+  } catch {
+    /* ignore storage failures */
+  }
+}
 
 const activeFilterCount = computed(() => {
   let count = 0
   if (filterFileType.value) count++
   if (filterDateFrom.value) count++
   if (filterDateTo.value) count++
+  if (filterSource.value) count++
+  if (filterVectorized.value) count++
+  if (filterIncoming.value) count++
   return count
 })
 
@@ -1672,6 +1941,59 @@ const moveFileToFolder = async (fileId: number, folderName: string) => {
   }
 }
 
+// Files currently running "Describe, vectorize & sort" / "Add prompt to KB".
+const describingIds = ref<number[]>([])
+const isDescribing = (id: number): boolean => describingIds.value.includes(id)
+
+/**
+ * Make a file RAG-ready. For AI-generated files this indexes their generation
+ * prompt; for everything else it describes, vectorizes & AI-sorts the file into
+ * a knowledge group. Same trigger, different per-file action (decided in UI by
+ * the file's source).
+ */
+const describeAndSort = async (file: FileItem) => {
+  if (isDescribing(file.id)) return
+  const isGenerated = file.source === 'generated'
+  describingIds.value = [...describingIds.value, file.id]
+  try {
+    const res = isGenerated
+      ? await filesService.indexPromptFile(file.id)
+      : await filesService.describeVectorizeSortFile(file.id)
+    if (res.success) {
+      if (res.groupKey) {
+        // Sorted into a knowledge group (describe path, or index-prompt that
+        // also picked a group). Show the group-aware confirmation either way.
+        showSuccess(t('files.describeSortDoneGroup', { group: res.groupKey }))
+      } else if (isGenerated) {
+        showSuccess(t('files.indexPromptDone'))
+      } else {
+        showSuccess(t('files.describeSortDone'))
+      }
+      await loadFileGroups()
+      await loadFiles()
+    } else {
+      showError(res.error || t('files.describeSortFailed'))
+    }
+  } catch (err: unknown) {
+    showError(getErrorMessage(err) || t('files.describeSortFailed'))
+  } finally {
+    describingIds.value = describingIds.value.filter((x) => x !== file.id)
+  }
+}
+
+// Remove a file from its folder without deleting the file or its vectors.
+const removeFileFromFolder = async (fileId: number) => {
+  folderMenuOpen.value = null
+  try {
+    await filesService.removeFileFromGroup(fileId)
+    showSuccess(t('files.removedFromFolder'))
+    await loadFileGroups()
+    await loadFiles()
+  } catch (err: unknown) {
+    showError(getErrorMessage(err) || 'Failed to remove file from folder')
+  }
+}
+
 const closeFolderMenu = (e: MouseEvent) => {
   if (folderMenuOpen.value !== null) {
     const target = e.target as HTMLElement
@@ -1825,7 +2147,10 @@ const uploadFiles = async () => {
     const result = await filesService.uploadFiles({
       files: selectedFiles.value,
       groupKey,
-      processLevel: 'vectorize', // Always vectorize for optimal RAG performance
+      // Documents auto-vectorize; the server stores media (image/audio/video)
+      // without indexing — the user makes it RAG-ready per file via the
+      // "Describe, vectorize & sort" action.
+      processLevel: 'vectorize',
       onProgress: (progress) => {
         uploadProgress.value = progress
       },
@@ -1912,6 +2237,9 @@ const loadFiles = async (page = currentPage.value) => {
       groupKey: filterGroup.value || undefined,
       search: searchQuery.value || undefined,
       fileType: filterFileType.value || undefined,
+      source: filterSource.value || undefined,
+      vectorState: filterVectorized.value || undefined,
+      incoming: filterIncoming.value ? true : undefined,
       dateFrom: buildDateTimestamp(filterDateFrom.value),
       dateTo: buildDateTimestamp(filterDateTo.value, true),
       page,
@@ -1959,8 +2287,26 @@ const resetFilters = () => {
   filterFileType.value = ''
   filterDateFrom.value = ''
   filterDateTo.value = ''
+  filterSource.value = ''
+  filterVectorized.value = ''
+  filterIncoming.value = false
   currentPage.value = 1
   loadFiles(1)
+}
+
+const toggleIncomingFilter = () => {
+  filterIncoming.value = !filterIncoming.value
+  currentPage.value = 1
+  loadFiles(1)
+}
+
+const loadFacets = async () => {
+  try {
+    const facets = await filesService.getFacets()
+    incomingCount.value = facets.incoming
+  } catch {
+    incomingCount.value = 0
+  }
 }
 
 const loadFileGroups = async () => {
@@ -2247,13 +2593,18 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
-const vectorStatusLabel = (file: FileItem): string =>
-  file.is_vectorized ? t('files.vectorized', { count: file.chunks ?? 0 }) : t('files.notVectorized')
+/** §4.4: show the original (source) name when present, else the stored name. */
+const displayName = (file: FileItem): string =>
+  file.display_name || file.original_name || file.filename
+
+/** Derive the pill state, falling back to chunk count for legacy rows. */
+const vectorStateOf = (file: FileItem) =>
+  file.vector_state ?? (file.is_vectorized ? 'vectorized' : 'none')
 
 // Load initial data
 onMounted(async () => {
   document.addEventListener('click', closeFolderMenu)
-  await Promise.all([loadFileGroups(), loadFiles()])
+  await Promise.all([loadFileGroups(), loadFiles(), loadFacets()])
 
   const persistedFiles = loadFileMetadata()
   if (persistedFiles && persistedFiles.length > 0) {

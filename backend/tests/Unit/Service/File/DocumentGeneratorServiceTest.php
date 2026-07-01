@@ -56,6 +56,44 @@ class DocumentGeneratorServiceTest extends TestCase
         $this->assertTrue($this->isZipContaining($path, 'word/document.xml'));
     }
 
+    /**
+     * Issue #1196: LLMs emit bare `<br>` inside markdown table cells. PhpWord's
+     * XML parser rejects the unclosed tag and silently produced a structurally
+     * valid but EMPTY DOCX (no <w:t> runs). The generator must now self-close
+     * void tags so the table content survives.
+     */
+    public function testDocxWithBrInTableCellContainsText(): void
+    {
+        $path = $this->tmpDir.'/table_br.docx';
+        $content = "| Day | Exercise |\n| --- | --- |\n| 1 | Bench press<br>Pull-ups |";
+        $this->service->write($content, 'docx', $path);
+
+        $documentXml = $this->readDocxDocument($path);
+        $this->assertStringContainsString('<w:t', $documentXml, 'DOCX with <br> in a table cell must contain text runs');
+        $this->assertStringContainsString('Bench press', $documentXml);
+        $this->assertStringContainsString('Pull-ups', $documentXml);
+    }
+
+    /**
+     * Issue #1196 (defense in depth): even pathological HTML must never yield a
+     * blank-but-valid DOCX — the post-write assertion rebuilds from plain text.
+     */
+    public function testDocxAlwaysContainsTextForNonEmptyContent(): void
+    {
+        $path = $this->tmpDir.'/pathological.docx';
+        $content = "Line one<br>Line two\n\n| a | b |\n| --- | --- |\n| x<br>y | z |";
+        $this->service->write($content, 'docx', $path);
+
+        $documentXml = $this->readDocxDocument($path);
+        $this->assertStringContainsString('<w:t', $documentXml, 'A non-empty source must always yield a non-empty DOCX body');
+    }
+
+    public function testWriteDocxThrowsOnEmptyContent(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->service->write("   \n  ", 'docx', $this->tmpDir.'/empty.docx');
+    }
+
     public function testXlsxIsValidOoxmlZip(): void
     {
         $path = $this->tmpDir.'/test.xlsx';
@@ -90,6 +128,17 @@ class DocumentGeneratorServiceTest extends TestCase
         $this->service->write($content, 'md', $path);
 
         $this->assertSame($content, file_get_contents($path));
+    }
+
+    private function readDocxDocument(string $path): string
+    {
+        $zip = new \ZipArchive();
+        $this->assertTrue(true === $zip->open($path), 'DOCX must be a valid OOXML zip');
+        $xml = $zip->getFromName('word/document.xml');
+        $zip->close();
+        $this->assertNotFalse($xml, 'DOCX must contain word/document.xml');
+
+        return (string) $xml;
     }
 
     private function isZipContaining(string $path, string $entry): bool

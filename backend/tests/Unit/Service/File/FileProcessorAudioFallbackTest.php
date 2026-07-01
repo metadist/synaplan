@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\File;
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Service\File\FileProcessor;
+use App\Service\File\HeicConverter;
 use App\Service\File\PdfRasterizer;
 use App\Service\File\TextCleaner;
 use App\Service\File\TikaClient;
@@ -45,6 +46,7 @@ final class FileProcessorAudioFallbackTest extends TestCase
             $this->aiFacade,
             $this->whisperService,
             $this->createStub(VideoAnalysisService::class),
+            new HeicConverter(new NullLogger()),
             new NullLogger(),
             sys_get_temp_dir(),
             100,

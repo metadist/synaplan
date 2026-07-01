@@ -11,6 +11,39 @@ import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 import type { StreamUpdatePayload } from '@/types/chatStream'
 
 /**
+ * Map a recorder MIME type to an audio file extension the backend accepts and
+ * routes to the transcription path.
+ *
+ * Safari/macOS cannot record `audio/webm` and falls back to `audio/mp4`, but
+ * an MP4-audio recording must be named `.m4a` (not `.mp4`): the backend treats
+ * `mp4` as a video type, and external STT APIs key off the filename extension,
+ * so a mislabeled upload silently fails to transcribe. Everything here maps to
+ * an extension in the backend's audio set (`ogg/mp3/wav/m4a/opus/flac/webm`).
+ */
+const AUDIO_MIME_TO_EXTENSION: Record<string, string> = {
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/aac': 'm4a',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/flac': 'flac',
+}
+
+/**
+ * Derive a recording filename from a blob's MIME type (params like
+ * `;codecs=opus` are stripped). Defaults to `webm` for Chrome/Firefox/opus.
+ */
+export const audioRecordingFilename = (mimeType: string | undefined): string => {
+  const subtype = (mimeType ?? '').split(';')[0].trim().toLowerCase()
+
+  return `recording.${AUDIO_MIME_TO_EXTENSION[subtype] ?? 'webm'}`
+}
+
+/**
  * SSE auth differs by platform: web sends the session cookie, native sends the
  * stored Bearer token with cookies omitted (cross-origin). The short-lived
  * `/auth/token` value is then handed to `EventSource` via the `?token=` query
@@ -246,10 +279,29 @@ function cacheSseToken(token: string | null): void {
       return
     }
     cachedSseToken = null
-    void getSseToken().catch(() => {
+    warmSseTokenViaRefresh()
+  }, SSE_TOKEN_PROACTIVE_REFRESH_MS)
+}
+
+/**
+ * Background-warm the SSE token cache without producing console noise.
+ *
+ * Refreshes the access-token cookie FIRST, then fetches a fresh SSE token.
+ * The access cookie TTL (5 min) is shorter than the ~3.5 min proactive cycle
+ * and also expires while a tab sits in the background, so warming via
+ * `GET /auth/token` alone hits an expired cookie and the browser logs a 401
+ * to the console every cycle (#1140). The refresh endpoint authenticates via
+ * the longer-lived, non-rotating refresh cookie, so it succeeds even when the
+ * access token has expired and silently renews the access cookie before the
+ * token fetch. When there is no session, `refreshAccessToken()` short-circuits
+ * to `false` and `getSseToken()` returns `null` — no requests, no errors.
+ */
+function warmSseTokenViaRefresh(): void {
+  void refreshAccessToken()
+    .then(() => getSseToken())
+    .catch(() => {
       // Network blip — next call will retry. Don't crash the page.
     })
-  }, SSE_TOKEN_PROACTIVE_REFRESH_MS)
 }
 
 /**
@@ -262,9 +314,9 @@ export function prefetchSseToken(): void {
   if (cachedSseToken || tokenFetchPromise) {
     return
   }
-  void getSseToken().catch(() => {
-    // Silent — this is a best-effort warm-up.
-  })
+  // Refresh the access cookie before warming so a focus/visibility prefetch
+  // after a long idle period does not log a 401 for an expired cookie (#1140).
+  warmSseTokenViaRefresh()
 }
 
 /**
@@ -554,7 +606,7 @@ export const chatApi = {
    */
   async transcribeAudio(
     audioBlob: Blob,
-    filename = 'recording.webm'
+    filename?: string
   ): Promise<{
     success: boolean
     file_id: number
@@ -563,8 +615,13 @@ export const chatApi = {
     language?: string
     duration?: number
   }> {
+    // Derive the extension from the actual recording MIME so Safari/macOS
+    // (audio/mp4) uploads as `.m4a` and stays on the transcription path,
+    // instead of always claiming `.webm`.
+    const resolvedFilename = filename ?? audioRecordingFilename(audioBlob.type)
+
     const formData = new FormData()
-    formData.append('file', audioBlob, filename)
+    formData.append('file', audioBlob, resolvedFilename)
 
     return httpClient('/api/v1/messages/upload-file', {
       method: 'POST',

@@ -67,6 +67,35 @@ export interface ResetDefaultsResponse {
   defaults: Record<string, number>
 }
 
+export interface PlannerModelResponse {
+  success: boolean
+  modelId: number | null
+  fallbackModelId: number | null
+}
+
+/**
+ * Get the planner model selection (DEFAULTMODEL.PLAN) for the current user,
+ * plus the Sorting model id it falls back to when no planner model is set.
+ */
+export const getPlannerModel = async (): Promise<PlannerModelResponse> => {
+  return httpClient<PlannerModelResponse>('/api/v1/config/routing/planner-model')
+}
+
+/**
+ * Save (modelId) or clear (null) the per-user planner model override.
+ */
+export const savePlannerModel = async (
+  modelId: number | null
+): Promise<{ success: boolean; modelId: number | null }> => {
+  return httpClient<{ success: boolean; modelId: number | null }>(
+    '/api/v1/config/routing/planner-model',
+    {
+      method: 'POST',
+      body: JSON.stringify({ modelId }),
+    }
+  )
+}
+
 /**
  * Remove all user-specific model overrides so the user falls back
  * to the platform defaults.
@@ -83,6 +112,8 @@ export const configApi = {
   saveDefaultModels,
   checkModelAvailability,
   resetDefaultModels,
+  getPlannerModel,
+  savePlannerModel,
 }
 
 // Qdrant Availability Check

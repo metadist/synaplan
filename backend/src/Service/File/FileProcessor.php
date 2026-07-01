@@ -40,6 +40,10 @@ final readonly class FileProcessor
         'image/png',
         'image/gif',
         'image/webp',
+        // HEIC/HEIF are transcoded to JPEG before being sent to a vision
+        // provider (see extractFromImage) — providers themselves reject HEIC.
+        'image/heic',
+        'image/heif',
     ];
 
     private const TRANSCRIBABLE_MEDIA_EXTENSIONS = [
@@ -92,6 +96,7 @@ final readonly class FileProcessor
         private AiFacade $aiFacade,
         private WhisperService $whisperService,
         private VideoAnalysisService $videoAnalysisService,
+        private HeicConverter $heicConverter,
         private LoggerInterface $logger,
         private string $uploadDir,
         private int $tikaMinLength,
@@ -106,10 +111,16 @@ final readonly class FileProcessor
      * @param string   $relativePath  Relative path to file (from upload dir)
      * @param string   $fileExtension File extension (e.g. 'pdf', 'docx')
      * @param int|null $userId        User ID for Vision AI fallback
+     * @param bool     $describe      When true, images are *described* (scene +
+     *                                legible text) for RAG instead of OCR-only.
+     *                                Used by the file manager's "Describe,
+     *                                vectorize & sort" action. No effect on
+     *                                documents/audio/video, which already produce
+     *                                descriptive content.
      *
      * @return array [extractedText, meta] where meta contains strategy, mime, ext, etc
      */
-    public function extractText(string $relativePath, string $fileExtension, ?int $userId = null): array
+    public function extractText(string $relativePath, string $fileExtension, ?int $userId = null, bool $describe = false): array
     {
         $absolutePath = $this->resolveAbsolutePath($relativePath);
         $mime = mime_content_type($absolutePath) ?: '';
@@ -139,7 +150,7 @@ final readonly class FileProcessor
 
         // Strategy 2: Image files -> Vision AI
         if ($this->isImageMime($mime)) {
-            return $this->extractFromImage($relativePath, $userId, $meta);
+            return $this->extractFromImage($relativePath, $userId, $meta, $describe);
         }
 
         // Strategy 3: Audio/Video files -> Whisper transcription
@@ -237,17 +248,42 @@ final readonly class FileProcessor
 
     /**
      * Extract text from image using Vision AI.
+     *
+     * @param bool $describe when true, produce a rich scene description (plus
+     *                       legible text) for RAG; otherwise OCR visible text only
      */
-    private function extractFromImage(string $relativePath, ?int $userId, array $baseMeta): array
+    private function extractFromImage(string $relativePath, ?int $userId, array $baseMeta, bool $describe = false): array
     {
         $this->logger->info('FileProcessor: Using Vision AI for image');
 
+        // Vision providers reject HEIC/HEIF. Web uploads are already transcoded
+        // to JPEG at store time, but images arriving from other sources (e.g.
+        // email attachments) may still be HEIC here — convert to a throwaway
+        // JPEG so the vision provider can read it.
+        $mime = is_string($baseMeta['mime'] ?? null) ? $baseMeta['mime'] : '';
+        $ext = is_string($baseMeta['ext'] ?? null) ? $baseMeta['ext'] : '';
+        $tempJpegAbsolute = null;
+        if ($this->heicConverter->isHeic($ext, $mime)) {
+            $tempJpegAbsolute = $this->convertHeicForVision($relativePath);
+            if (null !== $tempJpegAbsolute) {
+                $relativePath = $this->absoluteToRelative($tempJpegAbsolute);
+            }
+        }
+
         try {
-            // Use Vision AI provider
-            $prompt = 'Extract all visible text from this image. '
-                .'Return only the text exactly as it appears, preserving line breaks. '
-                .'Do not add descriptions or commentary. '
-                .'If no text is present, return empty string.';
+            // Use Vision AI provider. Two modes: OCR-only (default, used by the
+            // chat/upload extraction path) and a rich description for RAG (the
+            // file manager's "Describe, vectorize & sort" action).
+            $prompt = $describe
+                ? 'Describe this image in detail so it can be found by search later. '
+                    .'Cover the scene and setting, the main subjects and objects, any people '
+                    .'and what they appear to be doing, colours and mood, and other notable details. '
+                    .'If any text is legible in the image, transcribe it after a line "Text in image:". '
+                    .'Be factual and concise.'
+                : 'Extract all visible text from this image. '
+                    .'Return only the text exactly as it appears, preserving line breaks. '
+                    .'Do not add descriptions or commentary. '
+                    .'If no text is present, return empty string.';
             $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
 
             $text = $result['content'] ?? '';
@@ -257,18 +293,48 @@ final readonly class FileProcessor
             }
 
             $this->logger->info('FileProcessor: Vision AI extraction', [
-                'strategy' => 'vision_ai',
+                'strategy' => $describe ? 'vision_describe' : 'vision_ai',
                 'bytes' => strlen($text),
             ]);
 
-            return [$text, ['strategy' => 'vision_ai', 'provider' => $result['provider'] ?? 'unknown'] + $baseMeta];
+            return [$text, ['strategy' => $describe ? 'vision_describe' : 'vision_ai', 'provider' => $result['provider'] ?? 'unknown'] + $baseMeta];
         } catch (\Throwable $e) {
             $this->logger->error('FileProcessor: Vision AI failed', [
                 'error' => $e->getMessage(),
             ]);
 
             return ['', ['strategy' => 'vision_failed', 'error' => $e->getMessage()] + $baseMeta];
+        } finally {
+            if (null !== $tempJpegAbsolute && file_exists($tempJpegAbsolute)) {
+                @unlink($tempJpegAbsolute);
+            }
         }
+    }
+
+    /**
+     * Transcode a HEIC/HEIF image to a temporary JPEG inside the upload tree so
+     * it can be handed to a vision provider via a relative path.
+     *
+     * @return string|null absolute path to the temp JPEG, or null on failure
+     */
+    private function convertHeicForVision(string $relativePath): ?string
+    {
+        $sourceAbsolute = $this->resolveAbsolutePath($relativePath);
+        $tempAbsolute = dirname($sourceAbsolute).'/heic_vision_'.uniqid().'.jpg';
+
+        if ($this->heicConverter->convertFileToJpeg($sourceAbsolute, $tempAbsolute)) {
+            $this->logger->info('FileProcessor: Transcoded HEIC to JPEG for vision', [
+                'source' => basename($sourceAbsolute),
+            ]);
+
+            return $tempAbsolute;
+        }
+
+        $this->logger->warning('FileProcessor: HEIC to JPEG conversion failed; sending original to vision', [
+            'source' => basename($sourceAbsolute),
+        ]);
+
+        return null;
     }
 
     /**

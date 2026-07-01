@@ -1,6 +1,6 @@
 # Feature 1 · UX — Detached Media Scheduling (DAG spawn, Jobs tray, toaster)
 
-**Release:** 4.0 · **Priority:** P0 · **Status:** Planned
+**Release:** 4.0 · **Priority:** P0 · **Status:** In progress — Sprint B shipped; in-conversation surface decided (Option B, dedicated banner)
 **Companion:** [`01_async-media-jobs.md`](./01_async-media-jobs.md) (backend/architecture)
 **Builds on:** [Multitask UX & Streaming Protocol Spec](../20260606-routing/09_multitask_ux_spec.md)
 
@@ -31,7 +31,52 @@
 - **Global** Jobs tray (across all chats), reachable from the app shell.
 - Completion shows an **actionable toaster**; clicking jumps to the chat + card
   with the produced media.
-- A **professional "spawned-off-the-DAG" visual** makes the detach moment clear.
+- A **professional "spawned-off" visual** makes the detach moment clear.
+
+---
+
+## 2b. Surface decision — dedicated banner (Option B), locked 2026-06-27
+
+The in-conversation surface for a detached render is a **dedicated status banner
+on the assistant message** (`MediaJobStatus.vue`), **not** a sub-state of the
+multitask `TaskCard`. This was evaluated against the original `TaskCard`
+sub-state idea and chosen because:
+
+- It is **one surface for every detach path** — single `/vid` `/pic` commands,
+  natural-language media requests, and (later) multitask DAG media nodes all
+  render the same banner. No risk of a `TaskCard` *and* a separate status widget
+  fighting for the same bubble.
+- It is **reload-trivial**: the banner is driven by the persisted `media_job`
+  message meta + the poll/realtime status, so F5 / navigation "just works"
+  without reconstructing live DAG cards from history.
+- It keeps the multitask card contract **unchanged** (cards stay a
+  streaming-time affordance that flattens on reload, per the multitask spec) —
+  no scoped exception to that rule is needed.
+
+**What this means for this document:** wherever the original draft described a
+`TaskCard` "running in background" sub-state or a "fly-from-card-to-tray"
+animation, the canonical surface is now the banner. The **global Jobs tray**,
+**actionable completion toaster**, **jump-to-message**, reload resilience,
+cancel, and a11y/i18n goals are all **unchanged** — they simply read from the
+`mediaJobs` store and target the message that carries the banner.
+
+### Status (what is already built)
+
+| Area | State |
+|------|-------|
+| Backend job backbone, worker, reaper, deadline enforcement (Sprint A) | ✅ shipped + hardened |
+| Detach **image + video + audio** uniformly behind `MEDIA.ASYNC_JOBS_ENABLED` (Sprint B) | ✅ shipped |
+| `MediaJobStatus.vue` banner — running/failed/overdue/stalled/lost, elapsed, last-checked, **manual refresh**, progress, max-wait, model | ✅ shipped (Tailwind-only, token-driven, dark-mode safe) |
+| Poll endpoint + Zod client (`/api/v1/media-jobs/{jobKey}`) | ✅ shipped |
+| Reload contract: file attached to message + `media_job` meta → banner/video survive F5 | ✅ shipped |
+| Advancer hardening: transient-retry, lock re-dispatch, callable-safe Redis serialize, `--recover` | ✅ shipped |
+| Realtime push (Centrifugo `media_job.update` on `user:{id}`), `mediaJobs` store, actionable completion toaster (Sprint C) | ✅ shipped |
+| Cancel end-to-end (`POST /media-jobs/{id}/cancel` → `MediaJobCanceller` → mark cancelled + provider stop + push; Stop button on the banner) + active-jobs list endpoint (`GET /media-jobs`) + store data layer (`activeJobs`, `loadActive`, `cancel`) (Sprint D-1) | ✅ shipped |
+| Global Jobs tray **UI** (`JobsTrayLauncher` floating badge + `JobsTray` slide-over + `JobRow` with Open/Stop), mounted in `MainLayout`, hydrated on chat load + push-pruned (Sprint D-2) | ✅ shipped |
+| **Per-user Redis index** (`mediajob:user:{id}` set, maintained in `MediaJobStore::save`): `findActiveForUser`/`countActiveForUser` are now O(that user's jobs) and tenant-isolated — no global active-set scan. (Sprint E) | ✅ shipped |
+| **Per-user concurrency ceiling** (`MEDIA.JOB_MAX_ACTIVE_PER_USER`, default **16**, clamped 1–100): `detachMediaToAsyncJob` rejects past the limit with a localized message (all 4 locales) and never creates a job / calls the provider. (Sprint E) | ✅ shipped |
+| **Async usage billing** (`MediaJobUsageRecorder`, wired into `MediaJobMessageSync::syncTerminalState`): bills **only `completed`** renders, idempotent (`_usage_recorded` flag), `media_usage` stashed on the job at detach so cost matches the inline path. Failed/cancelled/timed-out are never billed (honours provider refunds). (Sprint E, #1146) | ✅ shipped |
+| **Rollout (Sprint F):** built-in default flipped **ON** + global ON row seeded (`MediaJobConfigSeeder` in `app:seed`); existing users grandfathered to per-user OFF (migration `Version20260629120000`); operator UI switch at **Settings → Processing → Async media generation** (`SystemConfigService`). | ✅ shipped |
 
 ---
 
@@ -39,65 +84,73 @@
 
 ### 3.1 The "spawn-off" moment (the signature interaction)
 
-When the planner emits a DAG and a node resolves to a long-render media
-capability, the task card is born *already knowing* it will detach.
-
-Sequence in the task-plan bubble:
+When a media render is detached (a `/vid` `/pic` command, a natural-language
+media request, or later a DAG media node), the assistant message immediately
+shows the **`MediaJobStatus` banner** in place of an empty/streaming bubble.
 
 ```
 [ user prompt ]
-┌─────────────────────────────── Task plan ───────────────────────────────┐
-│  ◐ Video from your image            running · spawning background job…    │
-│     ░░░░░░░░░░░░░░░░░░░░  (shimmer)                                        │
-└──────────────────────────────────────────────────────────────────────────┘
-        │  (≈800ms: card lifts, a subtle "fly-to-tray" chip animates
-        │   toward the tray launcher, which pulses + increments its badge)
-        ▼
-┌─────────────────────────────── Task plan ───────────────────────────────┐
-│  ⧖ Video from your image     running in background · 12%   [View in tray] │
-│     ▓▓▓░░░░░░░░░░░░░░░░░  rendering 12%                                     │
-└──────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────── assistant message ───────────────────────────┐
+│  ◐ Generating your video…                              [ Check status now ]│
+│  This runs in the background and may take a few minutes. You can keep      │
+│  chatting — this message updates when it's ready.                          │
+│  Job still running · running for 0m 6s                                     │
+│  Last checked 6s ago · next check in ~25s                                  │
+│  Videos may take up to 20 minutes.   ▓▓▓░░░░░░░  12%   ·  Using veo-3.1…    │
+└────────────────────────────────────────────────────────────────────────────┘
+        │  (the tray launcher pulses + increments its active-jobs badge)
+        ▼  user keeps typing — composer was never blocked
 ```
 
-- **Motion:** the card does NOT disappear. It stays in the conversation as the
-  canonical home of the result. A small "ghost" chip animates from the card to
-  the tray launcher (≈600–800ms, `prefers-reduced-motion` → no fly, just badge
-  increment + a one-line state change). This visually *teaches* the spawn.
-- **Copy:** state line transitions `running` → `running in background`. A subtle
-  `[View in tray]` affordance appears.
-- **Composer:** never blocked. The "thinking" indicator clears as soon as the
+- **The banner is the canonical home of the result.** It stays on the message;
+  on completion it is replaced *in place* by the actual media (see §3.3).
+- **Copy:** a clear "Generating your {type}…" title + the background-work hint,
+  so the user understands the system parallelised the work — confidence, not
+  machinery.
+- **Composer:** never blocked. The "thinking" indicator clears the moment the
   job is spawned (the turn is logically complete; the render continues detached).
+- **Motion:** no per-card fly animation. The detach is taught by (a) the banner
+  appearing instantly and (b) the tray launcher badge ticking up (a single
+  pulse). Both respect `prefers-reduced-motion`.
 
 ### 3.2 While it runs
 
-- The in-conversation card shows a live **progress bar** (reuses the existing
-  `TaskCard` `progressPercent`/`showProgress`) + provider-coarse status
-  ("queued", "rendering", "finalizing") + elapsed time.
-- The **tray launcher** in the shell shows a small animated badge with the count
-  of active jobs (e.g. a pulsing dot + "2").
-- The user can open another chat, start a new render, or do anything — multiple
-  jobs track independently and concurrently.
+The banner (`MediaJobStatus.vue`, already shipped) shows, live:
+
+- title + spinner, **elapsed time** ("running for 2m 15s"), **last-checked age**
+  ("Last checked 12s ago · next check in ~25s") and a **manual "Check status
+  now"** button — so the user is never staring at a frozen widget.
+- a **progress bar** when the provider reports a percent, the **max-wait**
+  guidance per type (video 20 min / image · audio a few minutes), and the model.
+- distinct, localized, non-leaky sub-states: **overdue** (past max wait,
+  resolving), **worker-stalled** (queue worker likely down — contact admin),
+  transient **poll error** (retrying), and **job-no-longer-tracked**.
+- The **tray launcher** badge (Sprint D) shows the count of active jobs.
+- The user can open another chat, start another render, reload — jobs track
+  independently and the banner rehydrates from persisted meta + status.
 
 ### 3.3 Completion → pulled back
 
 On terminal success:
 
-- The in-conversation card flips `running → done`, the skeleton/bar is replaced
-  by the actual media (image thumb / `<video controls>` / audio player), exactly
-  as media renders today.
+- The banner is replaced **in place** by the actual media (image thumb /
+  `<video controls>` / audio player). This already works on reload via the
+  persisted file; Sprint C makes it instant via realtime push (today it lands
+  on the next poll tick).
 - An **actionable toaster** appears (bottom, via the existing
   `NotificationContainer`): a thumbnail + "Your video is ready" + **View**.
   - Clicking **View** (or the toast body) → routes to the owning chat if not
-    already there, scrolls the card into view, and plays a brief **highlight
-    pulse** on the card.
+    already there, scrolls the **message** into view, and plays a brief
+    **highlight pulse** on it.
 - The tray launcher badge decrements; the job moves to the tray's "Recent"
   section (kept for the session / 24h).
 
 On failure / timeout:
 
-- Card flips to `failed` with the **localized, non-leaky** message from
-  `MediaErrorMessageBuilder`, plus the existing **Retry with <model>** affordance.
-- A toaster: "Couldn't create your video" + **Details** (jumps to the card).
+- The banner flips to its **failed** state with the **localized, non-leaky**
+  message from `MediaErrorMessageBuilder` (type-specific title) — already
+  implemented — plus the **Retry with <model>** affordance (Sprint C/D).
+- A toaster: "Couldn't create your video" + **Details** (jumps to the message).
 
 ### 3.4 The global Jobs tray
 
@@ -137,27 +190,40 @@ A slide-over panel (right side), opened from the shell launcher:
 
 ## 4. Component inventory
 
-### New (frontend)
+### Already shipped (frontend)
 
 | Component / module | Responsibility |
 |---|---|
-| `stores/mediaJobs.ts` (Pinia) | Source of truth for all jobs (active + recent). Subscribes to Centrifugo `media_job.update`, hydrates from `GET /media/jobs` on load, exposes `activeCount`, `jobsForMessage()`, `cancel()`. Patches the `history` store's matching `TaskCard` in place. |
+| `components/MediaJobStatus.vue` | **The canonical in-conversation surface.** Renders running/failed/overdue/stalled/lost states, elapsed + last-checked, manual refresh, progress, max-wait, model. Tailwind-only + design tokens, dark-mode safe. Emits `completed` (adds the media part) + `update:mediaJob`. |
+| `composables/useMediaJobPoll.ts` | 25s poll with terminal latch, manual `refreshNow()`, 404→lost, transient-error surfacing. (Polling is the fallback once Sprint C push lands.) |
+| `services/api/mediaJobApi.ts` | Zod-validated `GET /api/v1/media-jobs/{jobKey}`. |
+| `utils/messageMapper.ts` + `stores/history.ts` (`MediaJobInfo`) | Map/reconcile `mediaJob` on the message; terminal state is final (anti-flicker). |
+
+### New (Sprint C/D)
+
+| Component / module | Responsibility |
+|---|---|
+| `stores/mediaJobs.ts` (Pinia) | Source of truth for all jobs (active + recent). Subscribes to Centrifugo `media_job.update`, hydrates from `GET /media/jobs` on load, exposes `activeCount`, `jobsForMessage()`, `cancel()`. Patches the matching message's `mediaJob` in place (the banner is the projection). |
 | `components/jobs/JobsTrayLauncher.vue` | Shell button + animated active-count badge; opens the tray. Lives in `SidebarV2` (and mobile top bar). |
 | `components/jobs/JobsTray.vue` | The slide-over panel (Active/Recent groups, rows, empty state). |
 | `components/jobs/JobRow.vue` | One job row (icon, prompt, chat, progress, Open/Stop/Download). |
 | `components/jobs/JobCompletionToast.vue` *(or extend toast)* | Rich, **actionable** toast (thumbnail + label + View). See §6. |
-| `composables/useJobNavigation.ts` | `jumpToJob(job)`: route to chat → wait for render → scroll card into view → trigger highlight pulse. |
+| `composables/useJobNavigation.ts` | `jumpToJob(job)`: route to chat → wait for render → scroll the **message** into view → trigger highlight pulse. |
 
-### Modified (frontend)
+### Modified (Sprint C/D)
 
 | File | Change |
 |---|---|
-| `components/multitask/TaskCard.vue` | Add `running in background` sub-state visuals, the fly-to-tray ghost animation hook, `[View in tray]` affordance, and a highlight-pulse class toggled by `useJobNavigation`. |
-| `stores/history.ts` | `TaskCard` gains `jobKey?: string` + `backgrounded?: boolean`; reload hydration re-attaches live cards for messages with active jobs (evolves the flatten rule — see §7). |
 | `composables/useNotification.ts` | Extend `Notification` with optional `action?: { label, onClick }` and optional `thumbnailUrl`/`icon` so a toast can be clickable. (Today toasts are message-only.) |
 | `components/NotificationContainer.vue` | Render the optional action button / thumbnail; clickable body. |
+| `components/ChatMessage.vue` | Wire the `mediaJobs` store push updates into the existing banner; add the highlight-pulse class toggled by `useJobNavigation`. |
 | `components/SidebarV2.vue` | Mount `JobsTrayLauncher`. |
-| `services/api/chatApi.ts` + `types/chatStream.ts` | Recognise the new `task_update` `state:'running'` carrying `job_id` / `backgrounded`. |
+
+> **TaskCard is intentionally untouched.** Per the Option B decision (§2b), the
+> multitask `TaskCard` keeps its current streaming-time contract; detached media
+> surfaces via the banner on the message, never as a card sub-state. When DAG
+> media nodes are detached (later sprint), the node simply yields a message-level
+> `media_job` that drives the same banner + tray.
 
 ### Backend (contracts consumed here — defined in `01`)
 
@@ -171,20 +237,23 @@ A slide-over panel (right side), opened from the shell launcher:
 ## 5. State & data flow
 
 ```
-spawn:   handler → MediaJobService.create → SSE task_update{state:running, job_id, backgrounded}
+spawn:   handler → MediaJobService.create → SSE complete{mediaJob:{job_id,type,state:running}}
+                                              │   (+ persisted as message media_job meta)
+ frontend: message.mediaJob = running  → MediaJobStatus banner renders  + mediaJobs.add(job)
                                               │
- frontend: history.TaskCard{state:running, jobKey, backgrounded}  +  mediaJobs.add(job)
+ live:    Centrifugo media_job.update ──▶ mediaJobs.patch ──▶ message.mediaJob patched (percent)
+          (fallback today: 25s poll /media-jobs/{id} from the banner itself)
                                               │
- live:    Centrifugo media_job.update ──▶ mediaJobs.patch(job) ──▶ history card patched (percent)
+ done:    media_job.update{state:done,file} ─▶ banner→media in place + toast(actionable) + tray Recent
                                               │
- done:    media_job.update{state:done,file} ─▶ card→done(url)  +  toast(actionable)  +  tray Recent
-                                              │
- reload:  GET /media/jobs?message_ids ──▶ re-attach running cards  +  resubscribe
- fallback: Centrifugo down → poll /media/jobs/{id} (mediaJobs store)
+ reload:  GET messages (media_job meta + attached file) ──▶ banner/media rehydrate; resubscribe
+ fallback: Centrifugo down → the banner's own 25s poll keeps it live
 ```
 
-The `mediaJobs` store is the single front-end owner; `TaskCard` rendering stays a
-projection so the in-conversation card and the tray row never disagree.
+The `mediaJobs` store is the single front-end owner; the **`MediaJobStatus`
+banner is a projection** of the message's `mediaJob`, so the in-conversation
+surface and the tray row never disagree. (Until Sprint C, the banner self-polls;
+the store + push simply replace that poll as the primary update path.)
 
 ---
 
@@ -210,29 +279,34 @@ export interface Notification {
 - success: thumbnail + "Your {kind} is ready" + **View** → `useJobNavigation.jumpToJob`.
 - longer `duration` for media (e.g. 8s) so the user can react; persists in tray
   regardless.
-- failure: error styling + **Details** → jump to the failed card.
+- failure: error styling + **Details** → jump to the failed message (its banner).
 
 ## 7. Reload / navigation resilience (evolves the flatten rule)
 
-The multitask spec's current rule is: *cards are a streaming-time affordance;
-history is flattened on reload* (it explicitly lists "reconstructing live cards
-from history" as a non-goal). Async jobs require a **scoped exception**:
+With Option B the multitask flatten rule needs **no exception** — the banner is
+not a DAG card, so the "don't reconstruct live cards from history" non-goal is
+untouched. Reload resilience is already implemented and simpler:
 
-- **Finished** turns still flatten exactly as today (text + media in the bubble).
-- A message that has an **active** `MediaJob` re-attaches a **live card** on
-  reload (hydrated from `GET /media/jobs?message_ids=…`), so a render in flight
-  survives F5 / navigation and still resolves in place.
-- Once terminal, it flattens on the next load like everything else.
+- **Finished** turns flatten exactly as today (text + media in the bubble); the
+  completed render is attached to the message as a `File` (+ legacy file field),
+  so it renders on reload like any generated media.
+- A message with an **active** `MediaJob` rehydrates the **banner** from the
+  persisted `media_job` meta and resumes status updates (poll today, push in
+  Sprint C), so an in-flight render survives F5 / navigation and resolves in
+  place.
+- Terminal state is final on the client (anti-flicker guard), so a stale running
+  snapshot can never downgrade a finished banner.
 
 This keeps history clean while honouring "come back effortlessly".
 
 ## 8. Motion & visual language
 
-- **Spawn fly-to-tray:** 600–800ms, ease-out, a small translucent chip with the
-  kind icon; tray launcher does a single pulse + badge tick. Respect
-  `prefers-reduced-motion` (skip the fly; keep state-text + badge).
-- **Progress bar:** reuse `task-card__progress` track/fill tokens.
-- **Highlight pulse on jump:** 1.2s, two soft brand-tinted pulses on the card
+- **Spawn cue:** the banner appears instantly; the tray launcher does a single
+  pulse + badge tick (no per-card fly animation). Respect
+  `prefers-reduced-motion` (keep state-text + badge, drop the pulse).
+- **Progress bar:** the banner's brand-filled track (`bg-brand` on a
+  `--border-light` track), already implemented with tokens — no hardcoded hex.
+- **Highlight pulse on jump:** 1.2s, two soft brand-tinted pulses on the message
   border (token `--brand`), no layout shift.
 - **Tray:** slide-over from the right, 240ms; backdrop scrim on mobile, none on
   desktop (non-modal so users keep working).
@@ -269,8 +343,11 @@ All strings in **all four** locales (`en`, `de`, `es`, `tr`) under a new
 - **Job finishes while user is on the same card** → no toast jump needed; card
   resolves in place; still logged to tray Recent (toast optional/suppressed if
   card is on screen).
-- **Fast image** → resolves within `MEDIA_JOB_IMAGE_INLINE_FAST_MS`; no fly-off,
-  no tray noise (feels like today).
+- **Fast image** → currently detaches uniformly and shows the banner briefly,
+  resolving on the next status update. Once Sprint C push lands this feels
+  near-instant. (The `MEDIA_JOB_IMAGE_INLINE_FAST_MS` inline-fast grace window is
+  **deferred** — see note below; it is the planned optimisation to let a sub-second
+  image resolve in the same turn with no banner. Tracked for Sprint C/F.)
 - **Cancelled** → card + row show neutral "Stopped"; respect provider billing
   reality in copy.
 - **Centrifugo down** → polling fallback keeps cards + tray live (slower cadence).
@@ -281,9 +358,9 @@ All strings in **all four** locales (`en`, `de`, `es`, `tr`) under a new
 
 | `01` sprint | UX delivered here |
 |---|---|
-| B (detach chat path) | Spawn-off card sub-state + `[View in tray]` (static), composer stays free. |
-| C (realtime + persist) | `mediaJobs` store, actionable completion toaster, in-place resolve, fly-to-tray motion. |
-| D (resilience + tray + cancel) | Global Jobs tray + launcher/badge, jump-to-card + highlight, reload hydration, Stop. |
+| B (detach chat path) | ✅ **Done.** `MediaJobStatus` banner (running/failed/overdue/stalled/lost + elapsed/last-checked/manual-refresh/progress), composer stays free, reload-resilient, image+video+audio. |
+| C (realtime + persist) | ✅ **Done.** `mediaJobs` store + Centrifugo `media_job.update` push as the primary completion path (banner self-poll is the fallback), actionable completion toaster (deep-links to the chat), instant in-place resolve via the shared `applyMediaJobUpdateToMessage` helper. (Tray-badge pulse moves to Sprint D with the tray.) |
+| D (resilience + tray + cancel) | ✅ **Done.** Cancel end-to-end (banner Stop + `MediaJobCanceller` + `/media-jobs/{id}/cancel`), active-jobs list endpoint, `mediaJobs` tray data layer, and the global Jobs tray UI (`JobsTrayLauncher` floating badge → `JobsTray` slide-over → `JobRow` Open/Stop), mounted in the shell, hydrated on chat load and pruned by realtime push. (Reload resilience was already covered by the persisted-meta banner from B/C. Jump-to-message *highlight pulse* — Open navigates to the chat today; the pulse animation is a deferred polish item for F.) |
 | E (cross-channel) | (Web UX stable; WhatsApp/Email delivery is channel-side.) |
 | F (rollout) | Polish pass, reduced-motion/a11y audit, E2E, i18n completeness. |
 
@@ -293,4 +370,5 @@ All strings in **all four** locales (`en`, `de`, `es`, `tr`) under a new
 2. Should Recent persist across reloads (needs the 24h Redis record) or be
    session-only? (Leaning: show terminal jobs from the 24h window.)
 3. Desktop notification opt-in in 4.0, or strictly in-app toaster? (Backlog.)
-4. Per-card "Stop" vs tray "Stop" — keep both (consistent) — confirm.
+4. Cancel/"Stop" placement: tray row only, or also a Stop affordance on the
+   banner? (Leaning: tray in Sprint D; add to the banner if users expect it.)

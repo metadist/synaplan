@@ -1,4 +1,30 @@
 {
+  "jobs": {
+    "kind": {
+      "video": "vídeo",
+      "image": "imagen",
+      "audio": "audio"
+    },
+    "toast": {
+      "ready": "Tu {kind} está listo",
+      "failed": "No se pudo crear tu {kind}",
+      "view": "Ver"
+    },
+    "cancel": {
+      "stop": "Detener",
+      "failed": "No se pudo cancelar el trabajo. Inténtalo de nuevo."
+    },
+    "tray": {
+      "title": "Trabajos en segundo plano",
+      "close": "Cerrar",
+      "openLabel": "Trabajos en segundo plano ({count} en curso)",
+      "empty": "No hay trabajos en segundo plano. Los procesos largos como los vídeos aparecen aquí para que puedas seguir trabajando mientras terminan."
+    },
+    "row": {
+      "open": "Abrir",
+      "working": "Procesando…"
+    }
+  },
   "branding": {
     "poweredBy": "Desarrollado por"
   },
@@ -595,7 +621,22 @@
       "network": "{filename}: Se perdió la conexión durante la subida. Revisa tu red e inténtalo de nuevo.",
       "invalid_response": "{filename}: El servidor devolvió una respuesta inesperada. Inténtalo de nuevo.",
       "http_error": "{filename}: La subida falló (error {status}). Inténtalo de nuevo."
-    }
+    },
+    "helper": "Los archivos adjuntos se envían a la IA para este mensaje. Los archivos marcados con ✅ también son consultables en todos tus chats.",
+    "searchYourFiles": "Buscar en tus archivos",
+    "typeAll": "Todos",
+    "typeDocs": "Doc.",
+    "typeImages": "Imágenes",
+    "typeVideo": "Vídeo",
+    "typeAudio": "Audio",
+    "recent": "Recientes",
+    "allFilesFiltered": "Todos los archivos",
+    "attachCount": "Adjuntar {count} archivo | Adjuntar {count} archivos",
+    "noRecents": "Elige un archivo reciente o sube uno nuevo para usar en este chat.",
+    "noResults": "No hay archivos. Prueba otra búsqueda o sube uno nuevo."
+  },
+  "fileMention": {
+    "header": "Escribe para encontrar un archivo que dar a la IA"
   },
   "aiProvider": {
     "error": {
@@ -922,19 +963,19 @@
     "setupChat": {
       "title": "Asistente de Configuración IA",
       "subtitle": "Configuremos tu widget juntos",
-      "progressLabel": "Progreso de la entrevista",
+      "progressLabel": "Progreso de la configuración",
       "inputPlaceholder": "Escribe tu respuesta...",
       "skipButton": "Omitir por ahora",
       "completeTitle": "¡Configuración Completa!",
-      "completeDescription": "Se ha generado la configuración personalizada de tu asistente. Haz clic abajo para guardarla.",
+      "completeDescription": "Tu asistente de IA está listo. Haz clic abajo para guardarlo en tu widget.",
       "saveButton": "Guardar Configuración",
       "saveSuccess": "¡Configuración del widget guardada exitosamente!",
       "saveError": "No se pudo guardar la configuración",
       "sendError": "No se pudo enviar el mensaje",
-      "startError": "No se pudo iniciar la entrevista",
-      "modelNotConfigured": "No hay modelo de IA configurado. Selecciona un modelo en Configuración → Instrucciones de IA → Entrevista de Configuración IA.",
-      "editHintTitle": "¿Quieres afinar tu asistente?",
-      "editHintDescription": "Después de guardar, puedes editar la configuración del asistente IA en cualquier momento en la pestaña 'Asistente IA' de la configuración avanzada."
+      "startError": "No se pudo iniciar la configuración",
+      "modelNotConfigured": "No hay modelo de IA configurado. Selecciona uno en Configuración Avanzada → Configuración IA → Prompt y Modelo.",
+      "editHintTitle": "¿Quieres afinar tu asistente de IA?",
+      "editHintDescription": "Después de guardar, puedes afinar tu asistente de IA en cualquier momento en Configuración Avanzada → Configuración IA → Asistente IA del Widget."
     }
   },
   "profile": {
@@ -1186,9 +1227,42 @@
   "message": {
     "thinking": "Proceso de pensamiento",
     "reasoning": "Razonamiento de IA",
+    "downloadImage": "Descargar imagen",
     "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
     "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
     "audioGenerated": "Aquí está el audio que solicitaste. Puedes reproducirlo o descargarlo abajo.",
+    "mediaJob": {
+      "title": {
+        "video": "Generando tu vídeo…",
+        "image": "Generando tu imagen…",
+        "audio": "Generando tu audio…"
+      },
+      "backgroundHint": "Esto se ejecuta en segundo plano y puede tardar unos minutos. Puedes seguir chateando — este mensaje se actualizará cuando esté listo.",
+      "model": "Usando {model}",
+      "stillRunning": "Trabajo en curso · lleva {elapsed}",
+      "checkingNow": "Comprobando estado…",
+      "lastChecked": "Última comprobación hace {seconds}s · siguiente en ~{interval}s",
+      "progress": "{percent} % completado",
+      "pollError": "No se pudo actualizar el estado — se reintentará en la próxima comprobación.",
+      "refreshStatus": "Comprobar estado ahora",
+      "overdueWarning": "Este trabajo superó el tiempo máximo de espera. Comprobando el resultado final…",
+      "jobNotFound": "Este trabajo en segundo plano ya no se rastrea. Inténtalo de nuevo.",
+      "stalled": {
+        "workerDown": "El proceso en segundo plano aún no ha aceptado este trabajo. Si continúa así, el worker probablemente esté caído — contacta al administrador.",
+        "generic": "Este trabajo aún no ha avanzado. Seguimos esperando al proceso en segundo plano…"
+      },
+      "failedTitle": {
+        "video": "Error al generar el vídeo",
+        "image": "Error al generar la imagen",
+        "audio": "Error al generar el audio"
+      },
+      "failedBody": "El trabajo en segundo plano no se completó. Puedes intentarlo de nuevo con otro modelo.",
+      "maxWait": {
+        "video": "Los vídeos pueden tardar hasta {minutes} minutos.",
+        "image": "Las imágenes suelen estar listas en pocos minutos.",
+        "audio": "El audio suele estar listo en pocos minutos."
+      }
+    },
     "cancelledByUser": "⚠️ Cancelado por el usuario",
     "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
     "continueButton": "Continuar respuesta"
@@ -1423,7 +1497,7 @@
     "newFolderExists": "Ya existe una carpeta llamada \"{name}\"",
     "newFolderInvalid": "Introduce un nombre de carpeta válido",
     "noFileSelected": "Ninguno seleccionado",
-    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, MP3, MP4",
+    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, HEIC, MP3, MP4",
     "autoProcessingTitle": "Procesamiento Automático",
     "autoProcessingInfo": "Todos los archivos se extraen y vectorizan automáticamente para un rendimiento RAG óptimo con búsqueda semántica.",
     "uploadAndProcess": "Subir y Procesar Archivos",
@@ -1447,6 +1521,7 @@
     "status_vectorizing": "Indexando…",
     "status_vectorized": "Vectorizado",
     "status_processed": "Procesado",
+    "status_generated": "Generado",
     "attached": "Adjunto",
     "standalone": "Independiente",
     "attachedToMessage": "Este archivo está adjunto a un mensaje",
@@ -1468,6 +1543,14 @@
     "noFiles": "Aún no hay archivos subidos",
     "moveTo": "Mover a",
     "movedSuccess": "Archivo movido a \"{folder}\"",
+    "removeFromFolder": "Quitar de la carpeta",
+    "removedFromFolder": "Quitado de la carpeta (se conservan el archivo y su índice de búsqueda)",
+    "describeSortAction": "Describir, vectorizar y ordenar: hacer consultable por IA",
+    "describeSortDone": "Ya es consultable por IA.",
+    "describeSortDoneGroup": "Ya es consultable por IA · archivado en \"{group}\".",
+    "describeSortFailed": "No se pudo hacer consultable este archivo.",
+    "indexPromptAction": "Añadir el prompt de generación a la base de conocimiento",
+    "indexPromptDone": "Prompt de generación añadido a tu base de conocimiento.",
     "emptyState": {
       "title": "Aún no hay archivos",
       "description": "Sube archivos para empezar. Puedes organizarlos en carpetas.",
@@ -1515,7 +1598,127 @@
     "tabVectors": "Vectores",
     "intro": "Los archivos que subes se convierten en conocimiento consultable para tus chats. Las carpetas pueden usarse como carpetas de conocimiento para acotar una conversación.",
     "useInChat": "Usar en el chat",
-    "status_error": "Error"
+    "status_error": "Error",
+    "terms": {
+      "vectorized": "consultable por IA",
+      "knowledgeGroup": "grupo de conocimiento",
+      "incoming": "entrantes",
+      "generated": "generado por IA",
+      "notApplicable": "no aplicable"
+    },
+    "tabBrowse": "Explorar",
+    "tabIncoming": "Entrantes",
+    "tabGenerated": "Generados",
+    "incomingBadge": "{count} nuevos",
+    "sourceLabel": {
+      "web_upload": "Subida",
+      "chat_attachment": "Chat",
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "opencloud": "OpenCloud",
+      "whatsapp": "WhatsApp",
+      "widget": "Widget",
+      "api": "API",
+      "generated": "Generado por IA"
+    },
+    "vectorState": {
+      "vectorized": "Consultable por IA",
+      "vectorizedDetail": "Consultable por IA · {group} · {count} fragmentos",
+      "processing": "Procesando…",
+      "none": "No consultable",
+      "notApplicable": "No aplicable",
+      "failed": "Falló"
+    },
+    "filter": {
+      "source": "Origen",
+      "group": "Grupo",
+      "type": "Tipo",
+      "vectorized": "Consultable",
+      "date": "Fecha",
+      "clear": "Quitar filtros",
+      "typeAll": "Todos los tipos",
+      "typeDocs": "Documentos",
+      "typeImages": "Imágenes",
+      "typeVideo": "Vídeo",
+      "typeAudio": "Audio",
+      "vectorizedYes": "Consultable por IA",
+      "vectorizedNo": "No consultable",
+      "noGroup": "Sin grupo"
+    },
+    "help": {
+      "vectorized": "Cuando un archivo es consultable por IA, su contenido se añade a tu base de conocimiento para que el asistente pueda usarlo al responderte.",
+      "group": "Los grupos de conocimiento agrupan archivos. Cuando la IA busca en un grupo, puede usar todos sus archivos.",
+      "source": "De dónde viene este archivo: una subida, un chat, Outlook, Nextcloud, OpenCloud, WhatsApp, el widget, la API o generado por IA.",
+      "incoming": "Archivos que otras apps han enviado para tu base de conocimiento. Revísalos y consérvalos o descártalos.",
+      "typeFilter": "Mostrar solo un tipo de archivo: documentos, imágenes, vídeo o audio.",
+      "vectorizedFilter": "Filtrar según si los archivos son consultables por IA.",
+      "reVectorize": "Volver a leer este archivo y actualizar lo que la IA sabe de él. Úsalo tras editarlo o si falló.",
+      "moveGroup": "Mover archivos a otro grupo de conocimiento. Esto cambia en qué grupo los busca la IA; no elimina nada.",
+      "storage": "Cuánto almacenamiento has usado. El contenido generado por IA también cuenta y se muestra por separado."
+    },
+    "empty": {
+      "browseTitle": "Tu biblioteca de archivos",
+      "browseBody": "Aquí están todas tus subidas, adjuntos de chat y archivos generados por IA, listos para buscar y reutilizar.",
+      "browseAction": "Sube tu primer archivo",
+      "filteredBody": "Ningún archivo coincide con estos filtros.",
+      "filteredAction": "Quitar filtros",
+      "incomingBody": "Los archivos enviados desde Outlook, Nextcloud u OpenCloud aparecen aquí para que los revises antes de archivarlos.",
+      "incomingAction": "Configurar integraciones",
+      "generatedBody": "Las imágenes, el vídeo y el audio que creas en el chat se guardan aquí para que puedas encontrarlos y descargarlos de nuevo.",
+      "generatedAction": "Iniciar un chat",
+      "groupBody": "Este grupo aún no tiene archivos. Añade archivos para hacerlos consultables juntos.",
+      "groupAction": "Añadir archivos"
+    },
+    "toast": {
+      "uploaded": "{name} subido. | {count} archivos subidos.",
+      "uploadFailed": "No se pudo subir {name}. {reason}",
+      "tooLarge": "{name} es demasiado grande (máx. {limit}).",
+      "unsupported": "Los archivos {type} no son compatibles.",
+      "vectorizeStart": "Haciendo {name} consultable por IA…",
+      "vectorizeDone": "{name} ya es consultable por IA.",
+      "vectorizeFailed": "No se pudo procesar {name}.",
+      "revectorizedBulk": "{count} archivos actualizados.",
+      "moved": "{count} archivos movidos a {group}.",
+      "filed": "{count} archivos archivados en {group}.",
+      "deleted": "{count} archivos eliminados.",
+      "incomingKept": "{count} archivos conservados en {group}.",
+      "incomingDismissed": "{count} archivos descartados.",
+      "shareCreated": "Enlace para compartir copiado al portapapeles.",
+      "shareRevoked": "Se desactivó el uso compartido de {name}.",
+      "downloadPreparing": "Preparando {count} archivos para descargar…",
+      "genericError": "Algo salió mal. {reason}",
+      "undo": "Deshacer"
+    },
+    "confirm": {
+      "deleteTitle": "¿Eliminar {count} archivos?",
+      "deleteBody": "También se elimina su contenido consultable por IA. Esto no se puede deshacer.",
+      "deleteConfirm": "Eliminar",
+      "dismissTitle": "¿Descartar {count} archivos?",
+      "dismissBody": "No se añadirán a tu biblioteca. Puedes volver a importarlos más tarde desde el origen.",
+      "dismissConfirm": "Descartar"
+    },
+    "incoming": {
+      "title": "Entrantes",
+      "subtitle": "Archivos enviados para tu base de conocimiento: revísalos y consérvalos o descártalos.",
+      "keep": "Conservar",
+      "keepAll": "Conservar todo",
+      "assignGroup": "Asignar grupo",
+      "dismiss": "Descartar",
+      "open": "Abrir",
+      "retry": "Reintentar",
+      "provenance": "de {source} · {time}"
+    },
+    "generated": {
+      "title": "Generados",
+      "subtitle": "Imágenes, vídeo y audio creados en tus chats.",
+      "openInChat": "Abrir en el chat",
+      "download": "Descargar"
+    },
+    "explainer": {
+      "text": "Todo lo que subes o creas está aquí. Los archivos marcados como «consultables por IA» se añaden a tu base de conocimiento para que el asistente pueda usarlos.",
+      "dismiss": "Entendido",
+      "reopen": "¿Qué es esto?"
+    }
   },
   "vectorStorage": {
     "intro": "Un resumen de tu almacenamiento vectorial: cuántos archivos se han indexado y cuántos vectores (fragmentos) se guardan para la búsqueda semántica.",
@@ -1710,6 +1913,14 @@
       "plannerSaveFailed": "No se pudo guardar el prompt del planificador.",
       "plannerLoadFailed": "No se pudo cargar el prompt del planificador.",
       "plannerAdminRequired": "Se requiere acceso de administrador para editar el prompt del planificador.",
+      "plannerModelTitle": "Modelo del planificador",
+      "plannerModelDesc": "Elige qué modelo de IA divide las solicitudes complejas en tarjetas de tareas. Cambia a otro modelo si tu modelo predeterminado no está disponible (p. ej. con límite de uso).",
+      "plannerModelLabel": "Modelo",
+      "plannerModelAuto": "Automático (usar modelo de clasificación)",
+      "plannerModelFallbackHint": "No hay modelo del planificador seleccionado: el planificador usa tu modelo de clasificación.",
+      "plannerModelSaved": "Modelo del planificador guardado.",
+      "plannerModelSaveFailed": "No se pudo guardar el modelo del planificador.",
+      "plannerModelLoadFailed": "No se pudo cargar el modelo del planificador.",
       "legacyTitle": "Alternativa heredada (admin)",
       "legacyDesc": "El prompt del clasificador de IA de un solo tema, usado cuando el enrutamiento multitarea está desactivado."
     },

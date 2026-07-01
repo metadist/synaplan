@@ -51,6 +51,7 @@ final readonly class DagExecutor
      *     files: list<array<string, mixed>>,
      *     metadata: array<string, mixed>,
      *     node_statuses: array<string, string>,
+     *     node_job_keys: array<string, string>,
      *     partial_failure: bool,
      *     all_failed: bool
      * }
@@ -93,11 +94,19 @@ final readonly class DagExecutor
     private function executeSequential(TaskPlan $plan, NodeContext $context, ?callable $progressCallback): void
     {
         foreach ($plan->topologicalOrder() as $node) {
-            $blockedBy = $this->unmetDependency($plan, $context, $node->id);
-            if (null !== $blockedBy) {
-                $result = NodeResult::skipped("dependency '{$blockedBy}' did not complete");
+            if (null !== $context->getResult($node->id)) {
+                continue;
+            }
+
+            $failedDep = $this->failedDependency($context, $node);
+            if (null !== $failedDep) {
+                $result = NodeResult::skipped("dependency '{$failedDep}' did not complete");
                 $context->setResult($node->id, $result);
                 $this->emitState($progressCallback, $node, 'skipped', $this->failureMetadata($node, $result, $context));
+                continue;
+            }
+
+            if ($this->blockedByIncompleteDependency($context, $node)) {
                 continue;
             }
 
@@ -221,10 +230,51 @@ final readonly class DagExecutor
 
         $context->setResult($node->id, $result);
         $this->emitFilesFor($node, $result, $progressCallback);
+        $this->emitNodeOutcome($progressCallback, $node, $result, $context);
+    }
+
+    /**
+     * Emit the terminal SSE state for a settled node, or keep a detached media
+     * job in the `running` card state (Sprint B async backbone).
+     */
+    private function emitNodeOutcome(?callable $progressCallback, TaskNode $node, NodeResult $result, NodeContext $context): void
+    {
+        if ($result->isRunning()) {
+            $this->emitState($progressCallback, $node, 'running', $this->runningMetadata($node, $result));
+
+            return;
+        }
+
         $extra = $result->isSuccessful()
             ? $this->successMetadata($node, $result)
             : $this->failureMetadata($node, $result, $context);
         $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed', $extra);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function runningMetadata(TaskNode $node, NodeResult $result): array
+    {
+        $extra = [];
+        $mediaJob = $result->metadata['media_job'] ?? null;
+        if (is_array($mediaJob)) {
+            if (isset($mediaJob['job_id']) && is_string($mediaJob['job_id']) && '' !== $mediaJob['job_id']) {
+                $extra['job_id'] = $mediaJob['job_id'];
+            }
+            if (isset($mediaJob['type']) && is_string($mediaJob['type'])) {
+                $extra['media_type'] = $mediaJob['type'];
+            }
+        }
+
+        if ($this->isMediaKind($node)) {
+            $prompt = is_string($result->metadata['media_prompt'] ?? null) ? $result->metadata['media_prompt'] : null;
+            if (null !== $prompt && '' !== $prompt) {
+                $extra['prompt'] = mb_substr($prompt, 0, self::MAX_PROMPT_LENGTH);
+            }
+        }
+
+        return $extra;
     }
 
     /**
@@ -243,10 +293,7 @@ final readonly class DagExecutor
             unset($inflight[$node->id]);
             $context->setResult($node->id, $result);
             $this->emitFilesFor($node, $result, $progressCallback);
-            $extra = $result->isSuccessful()
-                ? $this->successMetadata($node, $result)
-                : $this->failureMetadata($node, $result, $context);
-            $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed', $extra);
+            $this->emitNodeOutcome($progressCallback, $node, $result, $context);
 
             return;
         }
@@ -322,14 +369,39 @@ final readonly class DagExecutor
 
     private function settledFailedDependency(NodeContext $context, TaskNode $node): ?string
     {
+        return $this->failedDependency($context, $node);
+    }
+
+    /**
+     * First dependency that settled as failed/skipped, or null when deps are
+     * still running/pending or all succeeded.
+     */
+    private function failedDependency(NodeContext $context, TaskNode $node): ?string
+    {
         foreach ($node->dependsOn as $dep) {
             $r = $context->getResult($dep);
-            if (null !== $r && !$r->isSuccessful()) {
+            if (null !== $r && $r->isSettledUnsuccessful()) {
                 return $dep;
             }
         }
 
         return null;
+    }
+
+    /**
+     * True when a dependency has not finished successfully yet (including async
+     * media jobs still in `running`).
+     */
+    private function blockedByIncompleteDependency(NodeContext $context, TaskNode $node): bool
+    {
+        foreach ($node->dependsOn as $dep) {
+            $r = $context->getResult($dep);
+            if (null === $r || !$r->isSuccessful()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function stringInput(mixed $value): ?string
@@ -341,25 +413,6 @@ final readonly class DagExecutor
             $parts = array_filter($value, 'is_string');
 
             return [] === $parts ? null : implode("\n\n", $parts);
-        }
-
-        return null;
-    }
-
-    /**
-     * First dependency id of $nodeId that did not finish Done, or null if all met.
-     */
-    private function unmetDependency(TaskPlan $plan, NodeContext $context, string $nodeId): ?string
-    {
-        $node = $plan->nodeById($nodeId);
-        if (null === $node) {
-            return null;
-        }
-        foreach ($node->dependsOn as $dep) {
-            $depResult = $context->getResult($dep);
-            if (null === $depResult || !$depResult->isSuccessful()) {
-                return $dep;
-            }
         }
 
         return null;

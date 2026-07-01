@@ -7,6 +7,7 @@ use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\DiscordNotificationService;
+use App\Service\Email\RawMimeEmailParser;
 use App\Service\EmailChatService;
 use App\Service\EmailWebhookIdempotencyService;
 use App\Service\InternalEmailService;
@@ -44,6 +45,7 @@ class WebhookController extends AbstractController
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
+        private RawMimeEmailParser $rawMimeEmailParser,
     ) {
     }
 
@@ -117,6 +119,27 @@ class WebhookController extends AbstractController
         $toEmail = strtolower(trim((string) $data['to']));
         $subject = $data['subject'] ?? '(no subject)';
         $body = $data['body'];
+
+        // Issue #1077: some relays forward the untouched MIME source (headers,
+        // multipart boundaries, base64 attachments) instead of the parsed
+        // text/plain part. Stored as-is it becomes the chat message and the AI
+        // pipeline never sees the real question, so no reply is sent. Detect that
+        // shape and extract the readable text before any further processing.
+        if (is_string($body) && $this->rawMimeEmailParser->looksLikeRawMime($body)) {
+            $parsedBody = $this->rawMimeEmailParser->extractText($body);
+            if ('' !== trim($parsedBody)) {
+                $this->logger->info('Email webhook: parsed raw MIME body into plain text', [
+                    'raw_length' => strlen($body),
+                    'parsed_length' => strlen($parsedBody),
+                ]);
+                $body = $parsedBody;
+            } else {
+                $this->logger->warning('Email webhook: body looked like raw MIME but no text could be extracted', [
+                    'raw_length' => strlen($body),
+                ]);
+            }
+        }
+
         $messageId = $data['message_id'] ?? null;
         $inReplyTo = $data['in_reply_to'] ?? null;
         $debugDiscord = str_ends_with($fromEmail, '@metadist.onmicrosoft.com');

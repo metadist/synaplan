@@ -15,8 +15,27 @@
       <InformationCircleIcon v-else class="w-5 h-5" />
     </div>
 
+    <img
+      v-if="notification.thumbnailUrl"
+      :src="notification.thumbnailUrl"
+      alt=""
+      class="flex-shrink-0 w-10 h-10 rounded object-cover"
+    />
+
     <div class="flex-1 min-w-0">
+      <p v-if="notification.title" class="text-sm font-semibold break-words">
+        {{ notification.title }}
+      </p>
       <p class="text-sm font-medium break-words">{{ notification.message }}</p>
+      <button
+        v-if="notification.action"
+        type="button"
+        class="mt-2 inline-flex items-center rounded bg-white/20 px-2 py-1 text-xs font-medium hover:bg-white/30 transition-colors"
+        data-testid="btn-notification-action"
+        @click="handleAction"
+      >
+        {{ notification.action.label }}
+      </button>
     </div>
 
     <button
@@ -39,13 +58,18 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { Notification } from '@/composables/useNotification'
 
-defineProps<{
+const props = defineProps<{
   notification: Notification
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   close: []
 }>()
+
+function handleAction(): void {
+  props.notification.action?.onClick()
+  emit('close')
+}
 
 const typeClasses = {
   success: 'bg-green-500/90 dark:bg-green-600/90 text-white border-green-600',
