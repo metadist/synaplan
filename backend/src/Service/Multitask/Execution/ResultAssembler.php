@@ -49,6 +49,7 @@ final class ResultAssembler
         $jobKeys = [];
         $successCount = 0;
         $failureCount = 0;
+        $inProgressCount = 0;
         foreach ($plan->nodes as $node) {
             $result = $context->getResult($node->id);
             $status = null !== $result ? $result->status : NodeStatus::Pending;
@@ -63,10 +64,20 @@ final class ResultAssembler
                 ++$successCount;
             } elseif (NodeStatus::Failed === $status) {
                 ++$failureCount;
+            } elseif (NodeStatus::Running === $status || NodeStatus::Pending === $status) {
+                // A node still running (async media detached to a background job)
+                // or pending (blocked by such a dependency) means the plan is
+                // IN PROGRESS, not failed. Counting these as failures made
+                // `all_failed` true for async media plans, which triggered the
+                // legacy fallback and a second, duplicate generation (#1218).
+                ++$inProgressCount;
             }
         }
 
-        $allFailed = 0 === $successCount;
+        // Only a genuinely dead plan — nothing succeeded AND nothing is still
+        // in progress (every node settled as Failed/Skipped) — warrants the
+        // legacy fallback. A single Running/Pending node keeps the plan alive.
+        $allFailed = 0 === $successCount && 0 === $inProgressCount;
         $replyResult = $context->getResult($plan->replyNode);
 
         if (null !== $replyResult && $replyResult->isSuccessful()) {

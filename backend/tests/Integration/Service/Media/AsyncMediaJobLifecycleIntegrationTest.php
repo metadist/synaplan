@@ -408,6 +408,41 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         }
     }
 
+    public function testCompletedJobStillBoundToIncomingMessageNeverClobbersPrompt(): void
+    {
+        // Issue #1218: the job is created bound to the INCOMING message id and
+        // only rebound to the OUT message once StreamController has persisted
+        // it. If a fast image render completes on the worker BEFORE that rebind,
+        // the terminal sync hits the IN row. It must NOT clear the user's prompt
+        // (data loss) nor pin the generated image to their own bubble — the
+        // direction guard leaves the IN message completely untouched.
+        $user = $this->createUser();
+        $incoming = $this->createIncomingMessage($user, 'erstelle ein Bild einer Katze und beschreibe es');
+
+        $job = $this->jobService->create([
+            'userId' => $user->getId(),
+            'type' => MediaJob::TYPE_IMAGE,
+            'provider' => 'openai',
+            'prompt' => 'a cat',
+            'model' => 'gpt-image-1',
+            'messageId' => $incoming->getId(), // rebind lost the race → still IN
+            'options' => ['lang' => 'de'],
+        ]);
+        $this->createdJobKeys[] = $job->getJobKey();
+        $this->jobService->markCompleted($job, [
+            'file' => ['url' => '/api/v1/files/uploads/cat.png', 'type' => 'image'],
+            'provider' => 'openai',
+            'model' => 'gpt-image-1',
+        ]);
+
+        $this->messageSync->syncTerminalState($job);
+
+        $this->em->refresh($incoming);
+        self::assertSame('erstelle ein Bild einer Katze und beschreibe es', $incoming->getText(), 'IN prompt must be preserved');
+        self::assertSame(0, $incoming->getFiles()->count(), 'generated image must not attach to the IN message');
+        self::assertNull($incoming->getMeta('media_job'), 'no media_job meta must be written to the IN message');
+    }
+
     public function testSyncImageJobRendersSavesAndAttachesToMessage(): void
     {
         $user = $this->createUser();
@@ -727,6 +762,23 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         $message->setMessageType('WW');
         $message->setText('');
         $message->setDirection('OUT');
+        $this->em->persist($message);
+        $this->em->flush();
+        $this->createdMessageIds[] = $message->getId();
+
+        return $message;
+    }
+
+    private function createIncomingMessage(User $user, string $text): Message
+    {
+        $message = new Message();
+        $message->setUserId($user->getId());
+        $message->setTrackingId(0);
+        $message->setUnixTimestamp(time());
+        $message->setDateTime(date('YmdHis'));
+        $message->setMessageType('WW');
+        $message->setText($text);
+        $message->setDirection('IN');
         $this->em->persist($message);
         $this->em->flush();
         $this->createdMessageIds[] = $message->getId();

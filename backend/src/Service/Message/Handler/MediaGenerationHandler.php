@@ -575,7 +575,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 }
 
                 $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-                if ($this->mediaJobConfig->isAsyncJobsEnabled($effectiveUserId)
+                if ($this->asyncJobsAllowed($effectiveUserId, $options)
                     && $this->aiFacade->supportsAsyncVideo($provider)) {
                     return $this->detachVideoToAsyncJob(
                         $message,
@@ -607,7 +607,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 ]);
 
                 $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-                if ($this->mediaJobConfig->isAsyncJobsEnabled($effectiveUserId)) {
+                if ($this->asyncJobsAllowed($effectiveUserId, $options)) {
                     return $this->detachMediaToAsyncJob(
                         MediaJob::TYPE_AUDIO,
                         $message,
@@ -712,7 +712,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 }
 
                 $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-                if ($this->mediaJobConfig->isAsyncJobsEnabled($effectiveUserId)) {
+                if ($this->asyncJobsAllowed($effectiveUserId, $options)) {
                     $inputRef = $attachedImagePaths[0] ?? null;
 
                     return $this->detachMediaToAsyncJob(
@@ -1505,6 +1505,26 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         }
 
         return $out;
+    }
+
+    /**
+     * Whether this render may detach to a background {@see MediaJob}.
+     *
+     * The async backbone is the default, but a caller can force the blocking
+     * inline path via `options['force_inline_media']`. The multitask DAG uses
+     * this for a media node another node depends on: the downstream
+     * `file_analysis`/`compose_reply` needs the produced file in the SAME turn,
+     * which an async detach could never deliver (#1218).
+     *
+     * @param array<string, mixed> $options
+     */
+    private function asyncJobsAllowed(int $effectiveUserId, array $options): bool
+    {
+        if (!empty($options['force_inline_media'])) {
+            return false;
+        }
+
+        return $this->mediaJobConfig->isAsyncJobsEnabled($effectiveUserId);
     }
 
     /**

@@ -142,6 +142,72 @@ final class DagExecutorTest extends TestCase
         );
     }
 
+    /**
+     * Issue #1218: a media node another node depends on (here `file_analysis`
+     * reads `$n1.file`) must be flagged for synchronous in-turn generation, so
+     * the produced file is available to that dependent — an async detach could
+     * never deliver it. NodeContext::mustRunMediaInline() is how the runner
+     * learns this; assert the executor sets it and the compound chain completes.
+     */
+    public function testMediaNodeWithDependentRunsInlineAndCompletesCompoundChain(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'image_generation', 'inputs' => ['prompt' => 'a cat']],
+                ['id' => 'n2', 'capability' => 'file_analysis', 'depends_on' => ['n1'], 'inputs' => ['prompt' => 'describe it', 'file' => '$n1.file']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n1', 'n2'], 'inputs' => ['text' => '$n2.text', 'attachments' => ['$n1.file']]],
+            ],
+        ]);
+
+        $inlineSeen = [];
+        $runner = $this->runner(function (TaskNode $node, NodeContext $ctx) use (&$inlineSeen): NodeResult {
+            $inlineSeen[$node->id] = $ctx->mustRunMediaInline($node->id);
+            $in = $ctx->resolveInputs($node);
+
+            return match ($node->capability) {
+                Capability::ImageGeneration => NodeResult::ok(null, [['path' => '/api/v1/files/uploads/n1.png', 'type' => 'image']]),
+                Capability::FileAnalysis => NodeResult::ok('a cat on a windowsill'),
+                Capability::ComposeReply => NodeResult::ok(is_string($in['text']) ? $in['text'] : '', array_values(array_filter((array) ($in['attachments'] ?? []), 'is_array'))),
+                default => NodeResult::failed('unexpected'),
+            };
+        });
+
+        $result = $this->executor($runner)->execute($plan, $this->context());
+
+        self::assertTrue($inlineSeen['n1'], 'image node with a dependent must run inline');
+        self::assertFalse($result['all_failed']);
+        self::assertFalse($result['partial_failure']);
+        self::assertSame('a cat on a windowsill', $result['content']);
+        self::assertCount(1, $result['files']);
+        self::assertSame('image', $result['files'][0]['type']);
+        self::assertSame(['n1' => 'done', 'n2' => 'done', 'n3' => 'done'], $result['node_statuses']);
+    }
+
+    /**
+     * Control: a terminal media node (nothing depends on it) is NOT flagged for
+     * inline generation — it keeps the async detach for the non-blocking
+     * "generating…" UX.
+     */
+    public function testTerminalMediaNodeIsNotFlaggedForInline(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+            'tasks' => [['id' => 'n1', 'capability' => 'image_generation', 'inputs' => ['prompt' => 'a cat']]],
+        ]);
+
+        $inline = null;
+        $runner = $this->runner(function (TaskNode $node, NodeContext $ctx) use (&$inline): NodeResult {
+            $inline = $ctx->mustRunMediaInline($node->id);
+
+            return NodeResult::ok(null, [['path' => '/api/v1/files/uploads/n1.png', 'type' => 'image']]);
+        });
+
+        $this->executor($runner)->execute($plan, $this->context());
+
+        self::assertFalse($inline, 'terminal media node must keep the async detach');
+    }
+
     public function testFailureIsolationSkipsDependentsButRunsIndependentBranch(): void
     {
         // n1 fails -> n2 (depends n1) skipped; n3 (independent) still runs; reply = n3.

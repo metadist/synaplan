@@ -51,6 +51,27 @@ final readonly class MediaJobMessageSync
         }
 
         $status = $this->mediaJobService->toStatusArray($job);
+
+        // Direction guard (#1218): the generated media, its status meta and text
+        // belong on the OUT (assistant) bubble the user sees. A job is created
+        // bound to the INCOMING message id (the OUT row does not exist yet) and
+        // only rebound to OUT once StreamController has persisted it. If the
+        // worker finishes a fast image render BEFORE that rebind, this sync would
+        // hit the IN row — clearing the user's prompt (data loss) and pinning the
+        // image to their own message. Never touch an IN message here; billing and
+        // the realtime push are still emitted (both idempotent/best-effort).
+        if ('IN' === $message->getDirection()) {
+            $this->logger->info('MediaJobMessageSync: skipped terminal mutation on IN message (awaiting rebind)', [
+                'job_key' => $job->getJobKey(),
+                'message_id' => $messageId,
+                'state' => $status['state'],
+            ]);
+            $this->usageRecorder->record($job);
+            $this->realtimeNotifier->publishUpdate($job);
+
+            return;
+        }
+
         $mediaJobMeta = [
             'job_id' => $job->getJobKey(),
             'type' => $job->getType(),

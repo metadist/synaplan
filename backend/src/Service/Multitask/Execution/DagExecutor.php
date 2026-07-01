@@ -58,6 +58,16 @@ final readonly class DagExecutor
      */
     public function execute(TaskPlan $plan, NodeContext $context, ?callable $progressCallback = null): array
     {
+        // A media node whose file is CONSUMED by a downstream processing node
+        // (e.g. `file_analysis` reading `$n1.file` to describe the image) must
+        // render synchronously — the bytes have to exist in-turn or that
+        // dependent is blocked forever. Detaching it to an async job left the
+        // dependent stuck, which (before #1218) was masked by the all_failed
+        // legacy fallback re-generating the media. A media node attached ONLY to
+        // `compose_reply` (pure delivery) keeps the async detach: compose_reply
+        // waits and the background job delivers the file when it completes.
+        $context->setInlineMediaNodeIds($this->mediaNodesConsumedByProcessingNodes($plan));
+
         // Wire the per-node token-chunk sink so streaming runners can emit
         // task_chunk events tagged with the running node id.
         if (null !== $progressCallback) {
@@ -307,6 +317,15 @@ final readonly class DagExecutor
             ? $context->classification['language']
             : ($context->message->getLanguage() ?: 'en');
 
+        // The media subprocess rebuilds a fresh NodeContext, so the inline-media
+        // decision (a dependent needs this node's file in-turn, #1218) cannot
+        // ride the context — forward it through options, which MediaGenerationRunner
+        // honours as an equivalent to NodeContext::mustRunMediaInline().
+        $options = $context->options;
+        if ($context->mustRunMediaInline($node->id)) {
+            $options['force_inline_media'] = true;
+        }
+
         return new MediaNodeRequest(
             nodeId: $node->id,
             capability: $node->capability->value,
@@ -319,7 +338,7 @@ final readonly class DagExecutor
             // and options ride along for handler parity with the inline path.
             messageId: $context->message->getId(),
             thread: $this->normalizeThread($context->thread),
-            options: $context->options,
+            options: $options,
         );
     }
 
@@ -353,6 +372,32 @@ final readonly class DagExecutor
     private function isMediaKind(TaskNode $node): bool
     {
         return in_array($node->capability->uiKind(), ['image', 'video', 'audio'], true);
+    }
+
+    /**
+     * Node ids that a PROCESSING node depends on — i.e. every dependency of a
+     * node that actually consumes its input (`file_analysis`, `summarize`, …),
+     * excluding the `compose_reply` assembler whose dependencies are only
+     * gathered for delivery. A media node in this set must render synchronously
+     * so the produced file is available in-turn (see {@see execute()} /
+     * NodeContext::mustRunMediaInline()); a media node depended on ONLY by
+     * compose_reply keeps its async detach.
+     *
+     * @return list<string>
+     */
+    private function mediaNodesConsumedByProcessingNodes(TaskPlan $plan): array
+    {
+        $ids = [];
+        foreach ($plan->nodes as $node) {
+            if (Capability::ComposeReply === $node->capability) {
+                continue;
+            }
+            foreach ($node->dependsOn as $dep) {
+                $ids[$dep] = true;
+            }
+        }
+
+        return array_keys($ids);
     }
 
     private function dependenciesSatisfied(NodeContext $context, TaskNode $node): bool
