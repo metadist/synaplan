@@ -185,7 +185,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { type Command, useCommandsStore } from '@/stores/commands'
-import { getFeaturesStatus, type Feature } from '@/services/featuresService'
+import { getFeaturesStatus, DevOnlyFeatureError, type Feature } from '@/services/featuresService'
 import { useRouter } from 'vue-router'
 
 interface Props {
@@ -265,11 +265,19 @@ const getToolMessage = (toolId: string): string => {
 }
 
 const loadFeaturesStatus = async () => {
+  // `/api/v1/config/features` is dev-only and returns 403 in production, which
+  // spammed the console on every Tools open (issues #1105, #1066). Outside dev
+  // there is nothing to fetch, so skip the request entirely — matching the
+  // guard already used in `useNavItems`.
+  if (!import.meta.env.DEV) return
+
   try {
     isLoadingFeatures.value = true
     const status = await getFeaturesStatus()
     featuresStatus.value = status.features
   } catch (error) {
+    // A 403 here just means we're not in dev mode — expected, not an error.
+    if (error instanceof DevOnlyFeatureError) return
     console.error('Failed to load features status:', error)
   } finally {
     isLoadingFeatures.value = false
