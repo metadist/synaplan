@@ -441,6 +441,16 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         self::assertSame('erstelle ein Bild einer Katze und beschreibe es', $incoming->getText(), 'IN prompt must be preserved');
         self::assertSame(0, $incoming->getFiles()->count(), 'generated image must not attach to the IN message');
         self::assertNull($incoming->getMeta('media_job'), 'no media_job meta must be written to the IN message');
+
+        // The realtime push must also be suppressed while bound to IN: it carries
+        // the IN message_id + file, so publishing it would make the client patch
+        // the user bubble and append the image there — the same "image on the
+        // user's message" bug through realtime (Copilot review, PR #1219).
+        $pushedForIncoming = array_values(array_filter(
+            $this->publishedEvents,
+            static fn (array $e): bool => 'media_job.update' === $e['event'] && ($e['payload']['message_id'] ?? null) === $incoming->getId(),
+        ));
+        self::assertSame([], $pushedForIncoming, 'no media_job.update may be pushed for the IN message');
     }
 
     public function testSyncImageJobRendersSavesAndAttachesToMessage(): void

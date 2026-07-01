@@ -58,16 +58,20 @@ final readonly class MediaJobMessageSync
         // only rebound to OUT once StreamController has persisted it. If the
         // worker finishes a fast image render BEFORE that rebind, this sync would
         // hit the IN row — clearing the user's prompt (data loss) and pinning the
-        // image to their own message. Never touch an IN message here; billing and
-        // the realtime push are still emitted (both idempotent/best-effort).
+        // image to their own message. Never touch an IN message here, and DO NOT
+        // publish the realtime update either: it carries the IN message_id + file,
+        // so the client would patch the user bubble and append the media part
+        // there — re-introducing the "image on the user's message" bug through
+        // realtime even though the DB row is untouched. The client's job poll
+        // (keyed by job_id) resolves the OUT banner as the fallback. Billing is
+        // still recorded (the render happened; idempotent).
         if ('IN' === $message->getDirection()) {
-            $this->logger->info('MediaJobMessageSync: skipped terminal mutation on IN message (awaiting rebind)', [
+            $this->logger->info('MediaJobMessageSync: skipped terminal mutation + realtime push on IN message (awaiting rebind)', [
                 'job_key' => $job->getJobKey(),
                 'message_id' => $messageId,
                 'state' => $status['state'],
             ]);
             $this->usageRecorder->record($job);
-            $this->realtimeNotifier->publishUpdate($job);
 
             return;
         }
