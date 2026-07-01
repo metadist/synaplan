@@ -69,7 +69,6 @@ function handleInput(event: Event) {
 function handleToggle() {
   const newValue = localValue.value === 'true' ? 'false' : 'true'
   localValue.value = newValue
-  isDirty.value = true
   emit('update', props.fieldKey, newValue)
 }
 
