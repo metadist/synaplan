@@ -30,8 +30,8 @@ final readonly class DefaultModelConfigSeeder
      * @var list<array{group: string, setting: string, modelKey: string}>
      */
     private const PROD_MODEL_DEFAULTS = [
-        ['group' => 'DEFAULTMODEL', 'setting' => 'CHAT',       'modelKey' => 'anthropic:claude-sonnet-4-6:chat'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'modelKey' => 'anthropic:claude-sonnet-4-6:chat'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'CHAT',       'modelKey' => 'anthropic:claude-sonnet-5:chat'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'modelKey' => 'anthropic:claude-sonnet-5:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SORT',       'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
         // Multi-task routing planner. Same fast/cheap tier as SORT but a
         // dedicated binding so it can be tuned without touching the legacy
@@ -53,7 +53,7 @@ final readonly class DefaultModelConfigSeeder
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'modelKey' => 'piper:piper-multi:text2sound'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',   'modelKey' => 'groq:meta-llama/llama-4-scout-17b-16e-instruct:pic2text'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'modelKey' => 'groq:whisper-large-v3:sound2text'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'modelKey' => 'anthropic:claude-sonnet-4-6:chat'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'modelKey' => 'anthropic:claude-sonnet-5:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE',  'modelKey' => 'ollama:bge-m3:vectorize'],
     ];
 
