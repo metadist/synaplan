@@ -40,6 +40,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-4-7',
         'claude-opus-4-8',
         'claude-sonnet-4-6',
+        'claude-sonnet-5',
         'claude-haiku-4-5',
         'claude-fable-5',
     ];
@@ -50,6 +51,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-4-7',
         'claude-opus-4-8',
         'claude-sonnet-4-6',
+        'claude-sonnet-5',
         'claude-fable-5',
     ];
 
@@ -63,6 +65,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     private const TEMPERATURE_DEPRECATED_MODELS = [
         'claude-opus-4-7',
         'claude-opus-4-8',
+        'claude-sonnet-5',
         'claude-fable-5',
     ];
 
@@ -98,8 +101,8 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     public function getDefaultModels(): array
     {
         return [
-            'chat' => 'claude-sonnet-4-6',
-            'vision' => 'claude-sonnet-4-6',
+            'chat' => 'claude-sonnet-5',
+            'vision' => 'claude-sonnet-5',
         ];
     }
 
@@ -417,7 +420,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     public function compareImages(string $imageUrl1, string $imageUrl2): array
     {
         // Claude supports multiple images in a single request
-        $model = 'claude-sonnet-4-6';
+        $model = 'claude-sonnet-5';
 
         try {
             $image1Data = $this->prepareImageData($imageUrl1);
@@ -477,7 +480,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         }
 
         try {
-            $model = $options['model'] ?? 'claude-sonnet-4-6';
+            $model = $options['model'] ?? 'claude-sonnet-5';
 
             $imageData = $this->prepareImageData($imagePath);
 
