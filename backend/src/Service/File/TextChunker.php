@@ -32,14 +32,27 @@ final readonly class TextChunker
 
         // Split into lines
         $lines = explode("\n", $text);
-        $totalLines = count($lines);
+
+        // Expand any line that is larger than a whole chunk into smaller
+        // segments (sentence → word → character boundaries). Without this a
+        // long text that contains no newlines would collapse into a single
+        // oversized chunk. Each segment keeps its original line number so the
+        // overlap bookkeeping below still works.
+        $segments = [];
+        foreach ($lines as $lineNum => $line) {
+            foreach ($this->splitLongLine($line) as $segment) {
+                $segments[] = ['text' => $segment, 'line' => $lineNum];
+            }
+        }
 
         $chunks = [];
         $currentChunk = '';
         $chunkStartLine = 0;
         $chunkEndLine = 0;
 
-        foreach ($lines as $lineNum => $line) {
+        foreach ($segments as $segment) {
+            $line = $segment['text'];
+            $lineNum = $segment['line'];
             $lineLength = strlen($line);
 
             // If current chunk + new line would exceed max size
@@ -119,6 +132,106 @@ final readonly class TextChunker
         }
 
         return $overlapLines;
+    }
+
+    /**
+     * Split a single oversized line into pieces no larger than maxChunkSize.
+     *
+     * Prefers sentence boundaries, then word boundaries, and finally a hard
+     * character cut so that continuous text without any natural break points
+     * (e.g. copy-pasted paragraphs stripped of newlines) is still split.
+     *
+     * @return string[]
+     */
+    private function splitLongLine(string $line): array
+    {
+        if (strlen($line) <= $this->maxChunkSize) {
+            return [$line];
+        }
+
+        // Split on sentence boundaries while keeping the terminating punctuation.
+        $sentences = preg_split('/(?<=[.!?])\s+/u', $line) ?: [$line];
+
+        $pieces = [];
+        $current = '';
+
+        foreach ($sentences as $sentence) {
+            if ('' === $sentence) {
+                continue;
+            }
+
+            // A single sentence may still be too long → fall back to words/chars.
+            if (strlen($sentence) > $this->maxChunkSize) {
+                if ('' !== $current) {
+                    $pieces[] = $current;
+                    $current = '';
+                }
+                foreach ($this->splitByWords($sentence) as $wordPiece) {
+                    $pieces[] = $wordPiece;
+                }
+
+                continue;
+            }
+
+            $candidate = '' === $current ? $sentence : $current.' '.$sentence;
+            if (strlen($candidate) > $this->maxChunkSize) {
+                $pieces[] = $current;
+                $current = $sentence;
+            } else {
+                $current = $candidate;
+            }
+        }
+
+        if ('' !== $current) {
+            $pieces[] = $current;
+        }
+
+        return $pieces;
+    }
+
+    /**
+     * Split text on word boundaries, hard-cutting words longer than maxChunkSize.
+     *
+     * @return string[]
+     */
+    private function splitByWords(string $text): array
+    {
+        $words = preg_split('/\s+/u', $text) ?: [$text];
+
+        $pieces = [];
+        $current = '';
+
+        foreach ($words as $word) {
+            if ('' === $word) {
+                continue;
+            }
+
+            if (strlen($word) > $this->maxChunkSize) {
+                if ('' !== $current) {
+                    $pieces[] = $current;
+                    $current = '';
+                }
+                foreach (str_split($word, $this->maxChunkSize) as $part) {
+                    $pieces[] = $part;
+                }
+
+                continue;
+            }
+
+            $candidate = '' === $current ? $word : $current.' '.$word;
+            if (strlen($candidate) > $this->maxChunkSize) {
+                $pieces[] = $current;
+                $current = $word;
+            } else {
+                $current = $candidate;
+            }
+        }
+
+        if ('' !== $current) {
+            $pieces[] = $current;
+        }
+
+        return $pieces;
     }
 
     /**
