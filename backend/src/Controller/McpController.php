@@ -73,9 +73,40 @@ class McpController extends AbstractController
             ],
         );
 
-        $psrResponse = $this->serverFactory->build($user)->run($transport);
+        try {
+            $psrResponse = $this->serverFactory->build($user)->run($transport);
+        } catch (\InvalidArgumentException $e) {
+            // A malformed / unknown `Mcp-Session-Id` makes the SDK throw while
+            // parsing the header (Uuid::fromString) instead of producing a
+            // JSON-RPC response. Mirror the SDK's expired-session behaviour and
+            // return a clean -32600 error rather than a raw 500. Only convert
+            // when a session header is actually present so genuine failures
+            // still surface as errors.
+            if ('' === $request->headers->get('Mcp-Session-Id', '')) {
+                throw $e;
+            }
+
+            $this->logger->info('MCP request rejected: invalid or unknown session id.', ['exception' => $e]);
+
+            return $this->sessionErrorResponse();
+        }
 
         return $this->toSymfonyResponse($psrResponse);
+    }
+
+    /**
+     * JSON-RPC error mirroring the SDK response for an expired/deleted session.
+     */
+    private function sessionErrorResponse(): JsonResponse
+    {
+        return new JsonResponse([
+            'jsonrpc' => '2.0',
+            'id' => '',
+            'error' => [
+                'code' => -32600,
+                'message' => 'Session not found or has expired.',
+            ],
+        ]);
     }
 
     /**
