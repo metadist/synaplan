@@ -160,6 +160,32 @@ describe('MessageAudio', () => {
     }
   })
 
+  it('pauses a currently playing audio when another one starts (issue #1078)', async () => {
+    const first = mount(MessageAudio, {
+      props: { url: 'https://example.com/first.ogg' },
+    })
+    const second = mount(MessageAudio, {
+      props: { url: 'https://example.com/second.ogg' },
+    })
+
+    try {
+      // Start the first player.
+      await first.find('[data-testid="btn-audio-play"]').trigger('click')
+      await flushPromises()
+      expect(first.find('[data-testid="btn-audio-play"]').attributes('aria-label')).toBe('Pause')
+
+      // Starting the second player must stop the first.
+      await second.find('[data-testid="btn-audio-play"]').trigger('click')
+      await flushPromises()
+
+      expect(second.find('[data-testid="btn-audio-play"]').attributes('aria-label')).toBe('Pause')
+      expect(first.find('[data-testid="btn-audio-play"]').attributes('aria-label')).toBe('Play')
+    } finally {
+      first.unmount()
+      second.unmount()
+    }
+  })
+
   it('escalates a play() NotSupportedError to the load-error retry flow', async () => {
     const rejection = Object.assign(new Error('The element has no supported sources.'), {
       name: 'NotSupportedError',
