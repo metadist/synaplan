@@ -63,6 +63,27 @@ class TextChunkerTest extends TestCase
         }
     }
 
+    public function testHardSplitPreservesMultibyteCharacters(): void
+    {
+        // Small budget forces the hard character-split fallback; the "word" is
+        // built from 2-byte (ä) and 4-byte (😀) UTF-8 characters with no
+        // separators. A byte-based split would cut mid-character and produce
+        // invalid UTF-8 — see PR #1215 Copilot review.
+        $chunker = new TextChunker(maxChunkSize: 10, overlapSize: 3, minChunkSize: 4);
+
+        $text = str_repeat('ä😀', 40);
+
+        $chunks = $chunker->chunkify($text);
+
+        self::assertGreaterThan(1, count($chunks));
+        foreach ($chunks as $chunk) {
+            self::assertTrue(
+                mb_check_encoding($chunk['content'], 'UTF-8'),
+                'Every chunk (including its overlap prefix) must be valid UTF-8'
+            );
+        }
+    }
+
     public function testShortTextReturnsSingleChunk(): void
     {
         $chunker = new TextChunker(maxChunkSize: 1500, overlapSize: 150, minChunkSize: 200);

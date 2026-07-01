@@ -107,8 +107,10 @@ final readonly class TextChunker
             return $text;
         }
 
-        // Get last N characters, but try to break at word boundary
-        $overlap = substr($text, -$this->overlapSize);
+        // Get the last N bytes, but never start in the middle of a multibyte
+        // UTF-8 character (mb_strcut snaps to a character boundary; a raw
+        // substr(-N) would corrupt the leading character of the overlap).
+        $overlap = mb_strcut($text, strlen($text) - $this->overlapSize, null, 'UTF-8');
         $spacePos = strpos($overlap, ' ');
 
         if (false !== $spacePos && $spacePos < $this->overlapSize / 2) {
@@ -211,8 +213,21 @@ final readonly class TextChunker
                     $pieces[] = $current;
                     $current = '';
                 }
-                foreach (str_split($word, $this->maxChunkSize) as $part) {
+                // Hard-split an over-long word by byte budget, but never cut
+                // through a multibyte UTF-8 character. str_split() splits on raw
+                // bytes and can emit invalid UTF-8 (this method works on /u
+                // Unicode input), which later breaks json_encode(), DB storage
+                // and embeddings. mb_strcut() honours the byte budget while
+                // snapping to a character boundary.
+                $wordLength = strlen($word);
+                $offset = 0;
+                while ($offset < $wordLength) {
+                    $part = mb_strcut($word, $offset, $this->maxChunkSize, 'UTF-8');
+                    if ('' === $part) {
+                        break;
+                    }
                     $pieces[] = $part;
+                    $offset += strlen($part);
                 }
 
                 continue;
