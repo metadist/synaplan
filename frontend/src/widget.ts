@@ -58,7 +58,9 @@ interface WidgetConfig {
   allowFileUpload?: boolean
   fileUploadLimit?: number
   lazy?: boolean
-  vueUrl?: string | null // undefined = default CDN, null = skip, string = custom URL
+  // Vue is bundled into widget.js. undefined/null = use the bundled Vue (no
+  // external load); a non-empty string = load Vue from that URL instead.
+  vueUrl?: string | null
   fullscreenMode?: boolean
   allowFullscreen?: boolean
   hideButton?: boolean
