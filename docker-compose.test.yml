@@ -6,7 +6,9 @@
 #
 # Usage:
 #   Local:  docker compose -f docker-compose.test.yml up -d
-#           (MailHog on 8025/1025; stop dev stack first if it uses the same ports)
+#           (MailHog host ports default to 8026/1026 so the test stack can run
+#            alongside the dev stack, which uses 8025/1025. Override with
+#            MAILHOG_TEST_WEB_PORT / MAILHOG_TEST_SMTP_PORT if needed.)
 #   CI:     docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up
 #           (docker-compose.test.ci.yml removes volume mounts to use baked image)
 
@@ -171,9 +173,11 @@ services:
   mailhog_test:
     image: mailhog/mailhog:latest@sha256:8d76a3d4ffa32a3661311944007a415332c4bb855657f4f6c57996405c009bea
     container_name: synaplan-mailhog-test
+    # Host ports differ from the dev stack (8025/1025) so both can run at once.
+    # Container ports stay 8025/1025 — internal MAILER_DSN (mailhog_test:1025) is unaffected.
     ports:
-      - "8025:8025"  # Web UI / API
-      - "1025:1025"  # SMTP
+      - "${MAILHOG_TEST_WEB_PORT:-8026}:8025"  # Web UI / API
+      - "${MAILHOG_TEST_SMTP_PORT:-1026}:1025"  # SMTP
     restart: "no"
     networks:
       - synaplan-test-network
