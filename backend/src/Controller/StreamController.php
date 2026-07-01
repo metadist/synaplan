@@ -1382,6 +1382,30 @@ class StreamController extends AbstractController
                     );
                 }
 
+                // Multi-task async media (DAG): image/video generation nodes create
+                // their MediaJob with the INCOMING user message id (the runner's
+                // synthetic message reuses the real IN id, and the OUT message does
+                // not exist yet). Unlike the single-task path above, these node jobs
+                // are NOT surfaced on the top-level `metadata['media_job']`, so
+                // without rebinding them here the background worker's
+                // MediaJobMessageSync would sync the finished media onto the USER
+                // (IN) bubble — clearing the prompt text and showing the generated
+                // image as if the user had sent it (the "generated image appears as
+                // the user's prompt after reload" regression). Rebind every node
+                // job (the job_id lives on each task card) to the OUT message the
+                // user actually sees. rebindMessage is idempotent and a no-op on
+                // already-terminal jobs.
+                if (null !== $outgoingMessage->getId()
+                    && isset($response['metadata']['task_plan_render']['cards'])
+                    && is_array($response['metadata']['task_plan_render']['cards'])) {
+                    foreach ($response['metadata']['task_plan_render']['cards'] as $card) {
+                        $cardJobKey = is_array($card) ? ($card['job_id'] ?? null) : null;
+                        if (is_string($cardJobKey) && '' !== $cardJobKey) {
+                            $this->mediaJobService->rebindMessage($cardJobKey, $outgoingMessage->getId());
+                        }
+                    }
+                }
+
                 $this->persistOriginalMediaMeta(
                     $outgoingMessage,
                     $classification,

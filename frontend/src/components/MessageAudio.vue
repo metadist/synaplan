@@ -182,6 +182,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
+import { useAudioPlayback } from '@/composables/useAudioPlayback'
 
 interface Props {
   url: string
@@ -190,6 +191,10 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+// Only one inline audio player may play at a time (issue #1078): starting this
+// one pauses any other that is currently playing.
+const { setActive, clearActive } = useAudioPlayback()
 
 const audioRef = ref<HTMLAudioElement>()
 const isPlaying = ref(false)
@@ -245,6 +250,14 @@ const formatTime = (seconds: number): string => {
 const currentTime = computed(() => formatTime(currentTimeSeconds.value))
 const duration = computed(() => formatTime(durationSeconds.value))
 
+// Pause this player when another one takes over the shared "playing" slot.
+const stopSelf = (): void => {
+  if (audioRef.value && !audioRef.value.paused) {
+    audioRef.value.pause()
+  }
+  isPlaying.value = false
+}
+
 const handleAudioError = () => {
   if (retryCount.value < maxRetries) {
     isRetrying.value = true
@@ -286,6 +299,7 @@ const handleLoadSuccess = () => {
       .play()
       .then(() => {
         isPlaying.value = true
+        setActive(stopSelf)
       })
       .catch(() => {
         // Autoplay was blocked — the user can still click play manually.
@@ -299,6 +313,7 @@ const togglePlay = async () => {
   if (isPlaying.value) {
     audioRef.value.pause()
     isPlaying.value = false
+    clearActive()
     return
   }
 
@@ -309,6 +324,7 @@ const togglePlay = async () => {
     // tears down the chat view through the global error handler — see #976.
     await audioRef.value.play()
     isPlaying.value = true
+    setActive(stopSelf)
   } catch (err) {
     isPlaying.value = false
     // `NotSupportedError` indicates the source could not be loaded — escalate
@@ -373,6 +389,7 @@ const onEnded = () => {
   isPlaying.value = false
   progress.value = 0
   currentTimeSeconds.value = 0
+  clearActive()
 }
 
 onUnmounted(() => {
