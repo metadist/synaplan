@@ -136,6 +136,63 @@ final class ResultAssemblerTest extends TestCase
     }
 
     /**
+     * Issue #1218 (root cause): a node still `Running` (async media detached to a
+     * background job) or `Pending` (blocked by such a dependency) means the plan
+     * is IN PROGRESS — it must NOT be reported as `all_failed`, otherwise
+     * TaskPlanExecutor discards the plan and re-runs the legacy router, producing
+     * a SECOND (duplicate) generation.
+     */
+    public function testRunningNodeIsNotReportedAsAllFailed(): void
+    {
+        $plan = $this->plan();
+        $ctx = $this->context();
+
+        // n1 detaches async → Running; n2/n3 stay Pending (blocked by n1).
+        $ctx->setResult('n1', NodeResult::running(['media_job' => ['job_id' => 'abc', 'type' => 'image']]));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertFalse($result['all_failed']);
+    }
+
+    /**
+     * The genuinely dead plan — every node settled Failed/Skipped, nothing
+     * running and nothing succeeded — still reports `all_failed` so the legacy
+     * fallback can produce an answer.
+     */
+    public function testAllSettledUnsuccessfulIsReportedAsAllFailed(): void
+    {
+        $plan = $this->plan();
+        $ctx = $this->context();
+
+        $ctx->setResult('n1', NodeResult::failed('boom'));
+        $ctx->setResult('n2', NodeResult::skipped('dependency failed'));
+        $ctx->setResult('n3', NodeResult::skipped('dependency failed'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertTrue($result['all_failed']);
+    }
+
+    /**
+     * A single successful node is enough to keep the assembled result out of the
+     * all-failed fallback path.
+     */
+    public function testOneSuccessfulNodeIsNotAllFailed(): void
+    {
+        $plan = $this->plan();
+        $ctx = $this->context();
+
+        $ctx->setResult('n1', NodeResult::ok('Summary text'));
+        $ctx->setResult('n2', NodeResult::failed('TTS provider unavailable'));
+        $ctx->setResult('n3', NodeResult::ok('Summary text'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertFalse($result['all_failed']);
+    }
+
+    /**
      * Issue #1197: when the reply node is `compose_reply` (no provider meta of
      * its own), the assembler must backfill provider/model/model_id from the
      * upstream LLM node so StreamController persists the real inference
