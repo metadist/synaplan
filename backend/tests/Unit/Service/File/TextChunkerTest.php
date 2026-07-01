@@ -84,6 +84,30 @@ class TextChunkerTest extends TestCase
         }
     }
 
+    public function testHardSplitKeepsAllDataWhenBudgetSmallerThanCharacter(): void
+    {
+        // maxChunkSize (1 byte) is smaller than a 4-byte emoji, which forces
+        // mb_strcut() to return '' in the hard-split loop. The loop must still
+        // make progress and must not drop the remaining characters — see
+        // PR #1220 Copilot review.
+        $chunker = new TextChunker(maxChunkSize: 1, overlapSize: 1, minChunkSize: 1);
+
+        $emojis = ['😀', '😁', '😂', '🤣'];
+        $chunks = $chunker->chunkify(implode('', $emojis));
+
+        self::assertNotEmpty($chunks);
+
+        $combined = '';
+        foreach ($chunks as $chunk) {
+            self::assertTrue(mb_check_encoding($chunk['content'], 'UTF-8'));
+            $combined .= $chunk['content'];
+        }
+
+        foreach ($emojis as $emoji) {
+            self::assertStringContainsString($emoji, $combined, "Character {$emoji} must survive hard-splitting");
+        }
+    }
+
     public function testShortTextReturnsSingleChunk(): void
     {
         $chunker = new TextChunker(maxChunkSize: 1500, overlapSize: 150, minChunkSize: 200);

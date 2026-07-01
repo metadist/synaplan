@@ -224,7 +224,14 @@ final readonly class TextChunker
                 while ($offset < $wordLength) {
                     $part = mb_strcut($word, $offset, $this->maxChunkSize, 'UTF-8');
                     if ('' === $part) {
-                        break;
+                        // maxChunkSize is smaller than the next character's byte
+                        // length, so mb_strcut() can't fit a whole character.
+                        // Never drop data: emit that single character (it will
+                        // exceed the byte budget) so the loop keeps advancing.
+                        $part = mb_substr(mb_strcut($word, $offset, 4, 'UTF-8'), 0, 1, 'UTF-8');
+                        if ('' === $part) {
+                            break;
+                        }
                     }
                     $pieces[] = $part;
                     $offset += strlen($part);
