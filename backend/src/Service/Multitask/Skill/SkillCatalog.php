@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask\Skill;
 
 use App\Service\Multitask\Execution\TaskRunner;
+use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
@@ -28,11 +29,16 @@ final class SkillCatalog
     private array $byCapability = [];
 
     /**
-     * @param iterable<TaskRunner> $runners
+     * @param iterable<TaskRunner>        $runners
+     * @param MultitaskRoutingConfig|null $routingConfig resolves per-block enable
+     *                                                   flags; null (unit tests)
+     *                                                   falls back to each
+     *                                                   descriptor's enabledDefault
      */
     public function __construct(
         #[AutowireIterator('app.multitask.runner')]
         iterable $runners = [],
+        private readonly ?MultitaskRoutingConfig $routingConfig = null,
     ) {
         foreach ($runners as $runner) {
             foreach ($runner->describe() as $descriptor) {
@@ -55,6 +61,15 @@ final class SkillCatalog
         $lines = [];
         foreach (Capability::cases() as $capability) {
             $descriptor = $this->byCapability[$capability->value] ?? null;
+
+            // Flag-gated blocks (url_fetch, mcp_fetch, email_search …) are
+            // omitted entirely when disabled: the planner never learns they
+            // exist, so it cannot emit them (plan 09 §6 — plan-time gate; the
+            // runner re-checks the flag at run time as defense in depth).
+            if (null !== $descriptor && !$this->isEnabled($descriptor, $userId)) {
+                continue;
+            }
+
             $lines[] = '- "'.$capability->value.'": '.(null !== $descriptor ? $descriptor->summary : '');
 
             $note = null !== $descriptor && null !== $descriptor->dynamicNote
@@ -66,5 +81,17 @@ final class SkillCatalog
         }
 
         return implode("\n", $lines);
+    }
+
+    private function isEnabled(SkillDescriptor $descriptor, ?int $userId): bool
+    {
+        if (null === $descriptor->enabledFlag) {
+            return true;
+        }
+        if (null === $this->routingConfig) {
+            return $descriptor->enabledDefault;
+        }
+
+        return $this->routingConfig->isFeatureEnabled($descriptor->enabledFlag, $userId, $descriptor->enabledDefault);
     }
 }

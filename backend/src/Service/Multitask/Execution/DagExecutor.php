@@ -532,16 +532,16 @@ final readonly class DagExecutor
     }
 
     /**
-     * Extra `task_update` metadata for a successfully completed node.
-     * Currently only web_search nodes carry extra data (query + results_count)
-     * so the live task card shows a compact summary matching the reload state
-     * (QA feedback PR #1076 — search card body parity).
+     * Extra `task_update` metadata for a successfully completed node. Nodes
+     * with a search-style card (web_search: query + results_count; url_fetch:
+     * fetched hostnames as the query) carry a compact summary so the live task
+     * card matches the reload state (QA feedback PR #1076 — card body parity).
      *
      * @return array<string, mixed>
      */
     private function successMetadata(TaskNode $node, NodeResult $result): array
     {
-        if (Capability::WebSearch !== $node->capability) {
+        if (!in_array($node->capability, [Capability::WebSearch, Capability::UrlFetch], true)) {
             return [];
         }
 

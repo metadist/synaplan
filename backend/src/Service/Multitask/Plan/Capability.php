@@ -36,6 +36,9 @@ enum Capability: string
     /** Web search (BraveSearchService + SearchQueryGenerator). */
     case WebSearch = 'web_search';
 
+    /** Fetch + read the content of specific URL(s) named in the request (UrlContentService). */
+    case UrlFetch = 'url_fetch';
+
     /** Vision / OCR / document Q&A (FileAnalysisHandler). */
     case FileAnalysis = 'file_analysis';
 
@@ -77,7 +80,7 @@ enum Capability: string
         return match ($this) {
             self::ExtractText => 'extract',
             self::Chat, self::Summarize, self::Translate, self::RagQuery, self::FileAnalysis => 'text',
-            self::WebSearch => 'search',
+            self::WebSearch, self::UrlFetch => 'search',
             self::ImageGeneration => 'image',
             self::VideoGeneration => 'video',
             self::Text2Sound => 'audio',

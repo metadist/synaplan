@@ -40,6 +40,7 @@ final readonly class MultitaskRoutingConfig
     public const KEY_PARALLEL_ENABLED = 'PARALLEL_ENABLED';
     public const KEY_MAX_PARALLEL = 'MAX_PARALLEL';
     public const KEY_NODE_TIMEOUT = 'NODE_TIMEOUT';
+    public const KEY_URL_FETCH_ENABLED = 'URL_FETCH_ENABLED';
 
     private const DEFAULT_ROUTING_ENABLED = true;
     private const DEFAULT_SHADOW_MODE = false;
@@ -104,6 +105,18 @@ final readonly class MultitaskRoutingConfig
         $n = null !== $value ? (int) $value : self::DEFAULT_NODE_TIMEOUT;
 
         return max(10, min(600, $n));
+    }
+
+    /**
+     * Generic per-block feature flag (release-4.0 data nodes: URL_FETCH_ENABLED,
+     * MCP_FETCH_ENABLED, EMAIL_SEARCH_ENABLED, …). Same resolution order as the
+     * routing master switch: per-user row → global row → built-in default.
+     * Consumed by the {@see Skill\SkillCatalog} at plan
+     * time and re-checked by the block's runner at run time.
+     */
+    public function isFeatureEnabled(string $setting, ?int $userId, bool $default): bool
+    {
+        return $this->resolveFlag($setting, $userId, $default);
     }
 
     private function resolveFlag(string $setting, ?int $userId, bool $default): bool

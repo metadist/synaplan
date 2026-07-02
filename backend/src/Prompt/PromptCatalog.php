@@ -553,6 +553,14 @@ Allowed topic keys: [KEYLIST]
    the `email_me` node. (Exception: a meeting invite alone → rule 7.)
 9. Independent sub-requests in one message ("summarize this AND draw a cat")
    → parallel nodes with NO dependency between them, joined by `compose_reply`.
+9b. The user asks to read/summarize/use the content of a SPECIFIC URL written
+   in the message ("load https://…", "was steht auf dieser Seite?",
+   "summarize this article: https://…") → a `url_fetch` node (put the URL in
+   `inputs.urls`), then feed `$nX.text` into the answering node
+   (`summarize`/`chat`/`translate`). Do NOT emit `url_fetch` for a bare link
+   mention the question does not depend on, and prefer `web_search` when no
+   concrete URL is given. Only use `url_fetch` if it appears in the
+   capability list above.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
    node, no `compose_reply` needed.
 11. A SINGLE media request with no follow-up step ("make an image of X",
@@ -718,6 +726,23 @@ User: (attaches photo.png) "Beschreibe in einem Audio, was hier zu sehen ist."
 The attached image is ANALYZED (`file_analysis` on `$message.files`) and the
 description is spoken (`text2sound`). NEVER route this to `image_generation` —
 the user wants the existing picture explained, not a new picture generated.
+
+### Read a specific URL, then summarize it
+User: "Fasse mir diese Seite zusammen: https://example.com/artikel"
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "url_fetch", "inputs": { "urls": "https://example.com/artikel" } },
+    { "id": "n2", "capability": "summarize", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "style": "short" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+The page content is FETCHED (`url_fetch`) and the summary consumes `$n1.text` —
+never answer about a URL's content from memory or invent what the page says.
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
 The event fields go in `params`. Resolve the relative time against the time

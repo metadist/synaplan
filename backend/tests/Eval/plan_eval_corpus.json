@@ -135,6 +135,16 @@
     }
   },
   {
+    "id": "url_fetch_summarize",
+    "text": "Fasse mir diese Seite zusammen: https://www.synaplan.com/",
+    "language": "de",
+    "expect": {
+      "capabilities": ["url_fetch"],
+      "edges": ["url_fetch->summarize"],
+      "forbid": ["web_search", "image_generation"]
+    }
+  },
+  {
     "id": "translate_then_speak",
     "text": "Übersetze 'Das Leben ist schön' ins Englische und sprich es mir vor.",
     "language": "de",

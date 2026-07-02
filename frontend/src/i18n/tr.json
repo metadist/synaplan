@@ -1131,6 +1131,7 @@
       "translate": "Çeviri",
       "rag_query": "Bilgi yanıtı",
       "web_search": "Web araması",
+      "url_fetch": "Web sayfası okunuyor",
       "file_analysis": "Dosya analizi",
       "image_generation": "Görsel",
       "video_generation": "Video",

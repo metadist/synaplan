@@ -25,13 +25,20 @@ use App\Service\Multitask\Plan\Capability;
 final readonly class SkillDescriptor
 {
     /**
-     * @param string                         $summary     one-line, planner-facing description ([CAPABILITYLIST] entry)
-     * @param (\Closure(?int): ?string)|null $dynamicNote per-user expansion appended below the summary
+     * @param string                         $summary        one-line, planner-facing description ([CAPABILITYLIST] entry)
+     * @param (\Closure(?int): ?string)|null $dynamicNote    per-user expansion appended below the summary
+     * @param string|null                    $enabledFlag    BCONFIG `MULTITASK.<flag>` gating this block; when the flag
+     *                                                       resolves to false the capability is OMITTED from the planner
+     *                                                       catalog (the planner never learns it exists — plan 09 §6)
+     * @param bool                           $enabledDefault flag value when no BCONFIG row exists (new experimental
+     *                                                       blocks ship default-off and are flipped on when validated)
      */
     public function __construct(
         public Capability $capability,
         public string $summary,
         public ?\Closure $dynamicNote = null,
+        public ?string $enabledFlag = null,
+        public bool $enabledDefault = false,
     ) {
     }
 }

@@ -13,6 +13,7 @@ use App\Service\Multitask\Execution\Runner\ExtractTextRunner;
 use App\Service\Multitask\Execution\Runner\FileAnalysisRunner;
 use App\Service\Multitask\Execution\Runner\MediaGenerationRunner;
 use App\Service\Multitask\Execution\Runner\Text2SoundRunner;
+use App\Service\Multitask\Execution\Runner\UrlFetchRunner;
 use App\Service\Multitask\Execution\Runner\WebSearchRunner;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Skill\SkillCatalog;
@@ -37,6 +38,7 @@ final class SkillCatalogFactory
         ExtractTextRunner::class,
         ChatRunner::class,
         WebSearchRunner::class,
+        UrlFetchRunner::class,
         FileAnalysisRunner::class,
         MediaGenerationRunner::class,
         Text2SoundRunner::class,
@@ -48,6 +50,14 @@ final class SkillCatalogFactory
 
     public static function real(): SkillCatalog
     {
+        return new SkillCatalog(self::runners());
+    }
+
+    /**
+     * @return list<TaskRunner>
+     */
+    public static function runners(): array
+    {
         $runners = [];
         foreach (self::RUNNER_CLASSES as $class) {
             /** @var TaskRunner $runner */
@@ -55,6 +65,6 @@ final class SkillCatalogFactory
             $runners[] = $runner;
         }
 
-        return new SkillCatalog($runners);
+        return $runners;
     }
 }

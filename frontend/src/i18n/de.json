@@ -934,6 +934,7 @@
       "translate": "Übersetzung",
       "rag_query": "Wissensantwort",
       "web_search": "Websuche",
+      "url_fetch": "Webseite lesen",
       "file_analysis": "Dateianalyse",
       "image_generation": "Bild",
       "video_generation": "Video",

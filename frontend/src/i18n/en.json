@@ -3113,6 +3113,7 @@
       "translate": "Translation",
       "rag_query": "Knowledge answer",
       "web_search": "Web search",
+      "url_fetch": "Reading web page",
       "file_analysis": "File analysis",
       "image_generation": "Image",
       "video_generation": "Video",

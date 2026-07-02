@@ -33,7 +33,12 @@ final class SkillCatalogTest extends TestCase
             $lines,
         );
 
-        self::assertSame(Capability::values(), $renderedOrder);
+        // Flag-gated blocks (url_fetch, …) may be omitted, but whatever IS
+        // rendered must follow the Capability enum declaration order.
+        $expected = array_values(array_intersect(Capability::values(), $renderedOrder));
+        self::assertSame($expected, $renderedOrder);
+        self::assertContains('chat', $renderedOrder);
+        self::assertContains('compose_reply', $renderedOrder);
     }
 
     public function testDynamicNoteIsAppendedBelowTheSummaryWithTheUserId(): void
@@ -70,5 +75,28 @@ final class SkillCatalogTest extends TestCase
 
         self::assertStringContainsString('- "chat": ', $rendered);
         self::assertCount(count(Capability::cases()), explode("\n", $rendered));
+    }
+
+    public function testFlagGatedCapabilityIsOmittedWhenDisabledAndListedWhenEnabled(): void
+    {
+        // Default (no routing config, enabledDefault=false): url_fetch is
+        // invisible to the planner.
+        $off = SkillCatalogFactory::real()->renderCapabilityList();
+        self::assertStringNotContainsString('"url_fetch"', $off);
+
+        // Flag resolved ON: the capability line appears in enum order.
+        $configRepo = $this->createMock(\App\Repository\ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 'URL_FETCH_ENABLED' === $setting ? '1' : null,
+        );
+        $catalog = new SkillCatalog(
+            SkillCatalogFactory::runners(),
+            new \App\Service\Multitask\MultitaskRoutingConfig($configRepo),
+        );
+
+        $on = $catalog->renderCapabilityList();
+        self::assertStringContainsString('- "url_fetch": ', $on);
+        $lines = explode("\n", $on);
+        self::assertCount(count(Capability::cases()), $lines);
     }
 }
