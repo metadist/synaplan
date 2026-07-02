@@ -777,6 +777,14 @@ class InboundEmailHandlerServiceTest extends TestCase
         $this->modelConfigService->method('getDefaultModel')->willReturn(42);
         $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
         $this->modelConfigService->method('getModelName')->willReturn('gpt-4');
+
+        // Issue #1177 added a pre-flight cost-budget gate before the AI call:
+        // the handler owner must exist and be within budget, otherwise routing
+        // falls back to the default department without consulting the AI.
+        // Stub the gate as "owner exists, within budget" so these tests keep
+        // exercising the AI-driven routing paths.
+        $this->userRepository->method('find')->willReturn($this->createMock(\App\Entity\User::class));
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => true]);
     }
 
     // ────────────────────────────────────────────────────────────────
