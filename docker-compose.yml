@@ -522,7 +522,7 @@ services:
 
   # Ollama - Local AI Models (GPU-accelerated if NVIDIA available)
   ollama:
-    image: ollama/ollama:latest@sha256:bfc9c6d53cc6989aa5131a6fde6b162b2802d4d337657f3253b5f69579bddeee
+    image: ollama/ollama:latest@sha256:f1a705f2bd113fb8d15f85f7c217f0dc5f6bebda6b0cc42b82c3ad165ffcb9dc
     container_name: synaplan-ollama
     ports:
       - "11435:11434"
