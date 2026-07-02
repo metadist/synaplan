@@ -93,7 +93,7 @@
 
         <!-- Scrollable container with padding for scrollbar alignment -->
         <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
-          <div class="pl-[60px] py-2" :style="{ paddingRight: `${textareaPaddingRightPx}px` }">
+          <div class="pl-[48px] py-1.5" :style="{ paddingRight: `${textareaPaddingRightPx}px` }">
             <!-- Textarea -->
             <Textarea
               ref="textareaRef"
@@ -111,13 +111,13 @@
 
         <!-- Fixed file upload button (positioned absolutely) -->
         <div
-          class="absolute bottom-2 left-3 md:left-4 pointer-events-none"
+          class="absolute bottom-2 left-1 md:left-[6px] pointer-events-none"
           data-testid="section-chat-attachments"
         >
           <button
             type="button"
             :class="[
-              'icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto relative',
+              'surface-chip icon-ghost h-[36px] min-w-[36px] flex items-center justify-center rounded-lg pointer-events-auto relative',
               isGuestMode && 'opacity-50',
             ]"
             :aria-label="$t('chatInput.attach')"
@@ -148,7 +148,7 @@
 
         <!-- Fixed action buttons (positioned absolutely) -->
         <div
-          class="absolute bottom-2 right-3 md:right-4 flex items-center gap-2 pointer-events-none"
+          class="absolute bottom-1 right-2 md:right-3 flex items-center gap-2 pointer-events-none"
           data-testid="section-chat-primary-actions"
         >
           <button
@@ -214,7 +214,9 @@
         </div>
       </div>
 
-      <!-- Main controls - always visible below input in advanced mode -->
+      <!-- Main controls below the input — Advanced mode only, including the
+           Easy Mode toggle. Switching to Easy hides this whole row; the way
+           back to Advanced is Settings → App Mode. -->
       <div
         v-if="!appModeStore.isEasyMode"
         class="mt-3 flex items-center gap-2"
@@ -276,6 +278,19 @@
           :groups="knowledgeGroups"
           class="flex-shrink-0"
         />
+
+        <!-- Switch to Easy Mode. One-way from here: this whole row is hidden
+             in Easy mode, so Advanced is re-enabled via Settings → App Mode. -->
+        <button
+          type="button"
+          class="pill flex-shrink-0 ml-auto"
+          :title="$t('settings.appMode.easy')"
+          data-testid="btn-toggle-app-mode"
+          @click="appModeStore.setMode('easy')"
+        >
+          <Icon icon="mdi:feather" class="w-4 h-4" />
+          <span class="text-xs font-medium">{{ $t('settings.appMode.easy') }}</span>
+        </button>
       </div>
     </div>
 
