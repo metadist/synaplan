@@ -12,38 +12,53 @@ Full-stack AI knowledge management platform: RAG with MariaDB VECTOR + Qdrant, e
 ## Repository Architecture
 
 | Repo | Purpose |
-|------|---------|
+| ---- | ------- |
 | `synaplan/` | Main app source code, local development environment (includes Qdrant) |
 | `synaplan-base-php/` | Base Docker image (FrankenPHP + gRPC + whisper.cpp) |
 | `synaplan-platform/` | Production deployment configs, pulls pre-built images |
 
 **Local dev** (`synaplan/`): Builds from source, includes all dev tools (phpMyAdmin, MailHog, Vite dev server). Qdrant runs as a Docker service for AI memories and RAG vector search.
 
-**Production** (`synaplan-platform/`): Uses `ghcr.io/metadist/synaplan:latest`, multi-server with Galera cluster.
-
-See `_devextras/SYSADMIN-help.md` for deployment details.
+**Production** (`synaplan-platform/`): Uses `ghcr.io/metadist/synaplan:latest`, multi-server with external Galera cluster. See `_devextras/SYSADMIN-help.md`.
 
 ## Critical Rules
 
-### Merge Conflicts - NEVER Accept One Side Blindly
+### Language
 
-When resolving merge conflicts:
-1. **Manually merge both sides** - understand what each adds/changes
-2. **NEVER** use `git checkout --ours` or `git checkout --theirs` for code files
-3. **Preserve ALL functionality** from both branches unless explicitly instructed
-4. **If unsure, ASK** - throwing away code is worse than asking
+- **Code, comments, commit messages: ALWAYS English.** Never write German (or any other language) in code or comments.
+- Chat responses: in the language the user chooses.
 
-### No Attribution in Commits
+### Docker Environment
 
-- Use conventional commits (feat:, fix:, refactor:, etc.)
-- **NEVER** add "Generated with Claude Code", "Co-Authored-By: Claude", or similar
+All backend/frontend tooling runs inside containers:
 
-### MANDATORY Pre-Commit Gate - Run Tests BEFORE Every Commit
+```bash
+docker compose exec backend php bin/console cache:clear
+docker compose exec -T frontend npm run check:types
+```
 
-**You MUST run and pass ALL of these before committing or allowing a commit.** This is the ENFORCED local mirror of the GitHub `CI` workflow — each step below maps 1:1 to a job in `.github/workflows/`, and the `All Checks Passed` gate will go red if you skip one. If any step fails, fix the issue before committing. No exceptions.
+Prefer the `make` targets (they wrap `docker compose exec` correctly).
+
+### Git — allowed, but NEVER on main
+
+- Git operations (branch, add, commit, push) are allowed.
+- **NEVER** commit or push directly to `main`; never force-push `main` or `master`. All changes go through feature branches + PRs.
+- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:` — e.g. `feat(frontend): add runtime config API support`.
+- **NEVER** add attribution ("Generated with Claude Code", "Co-Authored-By: …", or similar).
+
+### Merge Conflicts — NEVER Accept One Side Blindly
+
+1. **Manually merge both sides** — understand what each adds/changes.
+2. **NEVER** use `git checkout --ours` / `--theirs` for code files.
+3. **Preserve ALL functionality** from both branches unless explicitly instructed.
+4. **If unsure, ASK** — throwing away code is worse than asking.
+
+### MANDATORY Pre-Commit Gate — Run Tests BEFORE Every Commit
+
+This is the ENFORCED local mirror of the GitHub `CI` workflow — each step maps 1:1 to a CI job, and the `All Checks Passed` gate goes red if you skip one. If any step fails, fix it before committing. No exceptions.
 
 | Local step | CI job it mirrors |
-|------------|-------------------|
+| ---------- | ----------------- |
 | `make -C backend lint` | PHP Code Formatting |
 | `make -C backend phpstan` | Backend (PHP/Symfony) — PHPStan stage |
 | `make -C backend test` | Backend (PHP/Symfony) — PHPUnit stage |
@@ -51,165 +66,228 @@ When resolving merge conflicts:
 | `docker compose exec -T frontend npm run check:types` | Frontend (Vue/TypeScript) — vue-tsc |
 | `make -C frontend test` | Frontend (Vue/TypeScript) — Vitest |
 
-```bash
-# Step 1: Backend lint (PSR-12 formatting)
-make -C backend lint
+**One-shot (this IS the gate — green here ⇒ green CI):**
 
-# Step 2: Backend static analysis (PHPStan) — analyses src/ AND tests/, NEVER a single path
-make -C backend phpstan
-
-# Step 3: Backend tests (PHPUnit - all tests, not just Unit/)
-make -C backend test
-
-# Step 4: Frontend lint (Prettier + ESLint)
-make -C frontend lint
-
-# Step 5: Frontend type check (vue-tsc -b — catches errors ESLint misses!)
-docker compose exec -T frontend npm run check:types
-
-# Step 6: Frontend tests (Vitest)
-make -C frontend test
-```
-
-**Or run everything in one shot (this IS the gate — green here ⇒ green CI):**
 ```bash
 make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
 ```
 
 **Rules:**
-- These commands are the gate. A green run of a FILTERED subset (`phpunit --filter ...`, `phpstan analyse <path>`, `vitest <file>`) is NOT the gate and does NOT count — always finish with the unfiltered `make` targets above. (See "Common pre-commit traps".)
-- Run the FULL test suite (`make test`), not just a subset like `tests/Unit/`
-- Run the FULL `make -C backend phpstan` (it analyses `src/` **and** `tests/`); fix every type error before committing
-- If you changed frontend Vue/TS files, the frontend lint and tests are mandatory
-- If you only changed backend PHP files, you may skip frontend checks
-- If you changed backend OpenAPI annotations, run `make -C frontend generate-schemas` then re-run `vue-tsc`
-- **NEVER** commit with failing tests — this blocks the entire CI/CD pipeline
 
-### Common pre-commit traps (read once, save yourself a red CI)
+- A green FILTERED run (`phpunit --filter ...`, `phpstan analyse <path>`, `vitest <file>`) is NOT the gate — always finish with the unfiltered `make` targets.
+- `make -C backend phpstan` analyses `src/` **and** `tests/` — never scope it to a single path.
+- If you only changed backend PHP, you may skip frontend checks (and vice versa).
+- If you changed backend OpenAPI annotations: `make -C frontend generate-schemas`, then re-run `vue-tsc`.
+- **NEVER** commit with failing tests.
 
-These are real failure modes that have caused a red PR more than once. Each one is invisible if you only run a filtered subset of tests.
+### Common pre-commit traps
 
-- **`--filter` ≠ `make test`.** `phpunit --filter ClassA|ClassB` is great for the inner dev loop, but it does NOT replace the gate. Characterization, integration, and feature tests live OUTSIDE the namespace you usually filter on. Always re-run unfiltered (`make -C backend test`) before committing.
-- **`phpstan analyse <path>` ≠ `make -C backend phpstan`.** Scoping PHPStan to the files you touched (`./vendor/bin/phpstan analyse src/Service/Foo`) hides errors that CI sees, because CI analyses the WHOLE project — **including `tests/`**. A very common miss: a test `willReturnCallback(...)` closure typed `: ?string` that never returns null trips `Anonymous function never returns null`, which only surfaces in the full run. Always re-run the unfiltered `make -C backend phpstan` (analyses `src/` + `tests/`, exactly what the CI "Backend (PHP/Symfony)" job runs as `composer phpstan`) before committing — a green filtered run is meaningless for the gate.
-- **Snapshot / characterization tests.** `backend/tests/Characterization/` (e.g. `RoutingCharacterizationTest`) locks the routing/classifier contract via JSON snapshots in `__snapshots__/`. ANY change to `MessageClassifier`, `MessageSorter`, the fast-path heuristic, or the AI sorter response shape WILL drift these. Re-record with the supported flag and commit the diff:
+Real failure modes that have caused red CI more than once:
+
+- **`--filter` ≠ `make test`.** Characterization, integration, and feature tests live OUTSIDE the namespace you usually filter on. Always re-run unfiltered before committing.
+- **`phpstan analyse <path>` ≠ `make -C backend phpstan`.** CI analyses the WHOLE project including `tests/`. Example miss: a test closure typed `: ?string` that never returns null trips `Anonymous function never returns null` only in the full run.
+- **Snapshot / characterization tests.** `backend/tests/Characterization/` locks the routing/classifier contract via JSON snapshots. Any change to `MessageClassifier`, `MessageSorter`, the fast-path heuristic, or the AI sorter response shape WILL drift them. Re-record and review every changed line — never silently re-record:
+
   ```bash
   docker compose exec -T -e UPDATE_ROUTING_SNAPSHOTS=1 backend ./vendor/bin/phpunit tests/Characterization/RoutingCharacterizationTest.php
-  git diff backend/tests/Characterization/__snapshots__/   # review every changed line
+  git diff backend/tests/Characterization/__snapshots__/
   ```
-  Never silently re-record without reading the diff — a wrong snapshot bakes the regression in.
-- **Frontend tests need Pinia + i18n + `useMarkdown` set up.** If you mount a component that uses `MessageText`, `useMemoriesStore`, `useFeedbackStore`, or any markdown-pipeline composable, the existing test scaffolding around `TaskPlanBubble` / `ChatMessage` doesn't auto-bootstrap them. **Stub the heavy dependency** in the test (`stubs: { MessageText: { template: '...', props: ['content', 'isStreaming', 'readonly'] } }`) instead of pulling the full app context into a unit test.
-- **Docker-restart cache permissions.** After `docker compose down` (or restarting Docker Desktop) the bind-mounted `backend/var/cache/test` can lose write perms and EVERY kernel-booting integration test fails with `Unable to write in the "cache" directory`. This is NOT your code:
+
+- **Frontend tests need Pinia + i18n + `useMarkdown` set up.** Stub heavy dependencies (`stubs: { MessageText: { template: '...', props: [...] } }`) instead of pulling the full app context into a unit test.
+- **Docker-restart cache permissions.** After `docker compose down`, `backend/var/cache/test` can lose write perms and every kernel-booting test fails with `Unable to write in the "cache" directory`. Fix, then re-run:
+
   ```bash
   docker compose exec -T backend sh -c 'rm -rf var/cache/test && mkdir -p var/cache/test && chmod -R 777 var/cache/test'
   ```
-  Then re-run `make -C backend test`. Don't push until the suite is actually clean.
-- **Heuristic changes ≠ production effect.** If a config flag (e.g. `CLASSIFIER.FAST_PATH_ENABLED`) defaults the surrounding code path OFF, your new logic in that path can pass every targeted test and still be a no-op in prod. Always check the default in `BCONFIG` (or the code's hard-coded fallback) and confirm the path is reachable before claiming a fix.
+
+- **Heuristic changes ≠ production effect.** If a config flag (e.g. `CLASSIFIER.FAST_PATH_ENABLED`) defaults a code path OFF, new logic there passes tests and is still a no-op in prod. Check the `BCONFIG` default and confirm the path is reachable before claiming a fix.
 
 ## Essential Commands
 
 ```bash
-# Start/stop services
-docker compose up -d
-docker compose down
+docker compose up -d / down            # Start/stop services
+make lint && make -C backend phpstan && make test   # Quality gate
+make build                              # Frontend app + widget
+make help / make -C backend help / make -C frontend help
 
-# Quality checks (ALWAYS before committing)
-make lint && make -C backend phpstan && make test
-
-# Building
-make build         # Frontend app + widget
-
-# Discover more commands
-make help
-make -C backend help
-make -C frontend help
+# Dev URLs
+# Frontend: http://localhost:5173 — Backend: http://localhost:8000 — API docs: http://localhost:8000/api/doc
 ```
 
-## Key Constraints
+## Frontend Rules
 
-### Frontend Runtime Config
-- **NO** `VITE_*` env vars for runtime config - we're open source, runtime location unknown at build time
-- Widget: use `detectApiUrl()` from `widget-utils.ts`
-- App: use `useConfigStore().apiBaseUrl`
-- **NEVER** hardcode `http://localhost:8000`
+### Type Safety & Validation (Zod)
 
-### Widget Development
-- Must work cross-origin (CORS-ready)
-- API URL detected from script source at runtime
+- **ALWAYS use Zod schemas for API responses** — generated from the backend OpenAPI spec (`make -C frontend generate-schemas` → `frontend/src/generated/api-schemas.ts`).
+- **NEVER write manual TypeScript interfaces for API responses** — they break silently when the API changes.
 
-### API Development
-- Write detailed OpenAPI annotations on all endpoints
-- Frontend schemas auto-generated from backend OpenAPI spec
-- After changing annotations: `make -C frontend generate-schemas`
+```typescript
+import { GetRuntimeConfigResponseSchema } from '@/generated/api-schemas'
+type RuntimeConfig = z.infer<typeof GetRuntimeConfigResponseSchema>
+
+const config = await httpClient('/api/v1/config/runtime', {
+  schema: GetRuntimeConfigResponseSchema
+})
+```
+
+- Use existing API clients in `services/api/` (based on `httpClient`).
+
+### Runtime Config
+
+- **NO** `VITE_*` env vars for runtime config — we're open source, runtime location unknown at build time. Dev-only flags (e.g. `VITE_AUTO_LOGIN_DEV`) are OK.
+- App: `useConfigStore().apiBaseUrl` (loaded from `/api/v1/config/runtime`). Widget: `detectApiUrl()` from `widget-utils.ts`.
+- **NEVER** hardcode `http://localhost:8000`.
+
+### Styling
+
+- Use CSS variables and utility classes from `frontend/src/style.css` (`var(--bg-card)`, `var(--txt-primary)`, `surface-card`, `btn-primary`, …) — **never Tailwind colors directly**, never one-off custom CSS classes.
+- Tailwind utilities for layout/spacing are fine; dark mode must work (tokens handle it).
+- See `docs/FRONTEND_CONVENTIONS.md` for the token/utility reference.
+
+### Vue 3 / Composition API
+
+- **ALWAYS `<script setup lang="ts">`** — no Options API.
+- Prefer `ref()` over `reactive()` (including in Pinia stores); `computed()` for derived state (never a method).
+- Clean up listeners/timers in `onUnmounted()`.
+- Unique `:key` in every `v-for`; **never** combine `v-if` and `v-for` on the same element (filter via `computed` instead).
+- **NEVER mutate props** — emit events to the parent.
+- Modern JS: top-level `await` (not `.then()`), `const`/`let`, arrow functions, no semicolons (ESLint enforces).
+- Lazy load only heavy components (charts, editors, modals) via `defineAsyncComponent` / dynamic route imports — not small, frequently used ones.
+- Pinia stores: setup style with `ref()` + `computed()`, actions as plain functions, return only the public API.
+
+### Dialogs & Notifications
+
+- **NEVER** use native `alert()` / `confirm()` / `prompt()`.
+- Confirmation/input: `useDialog()` (`confirm({ title, message, danger: true })`, `prompt({...})`).
+- Toasts: `useNotification()` (`success(t('...'))`, `error(t('...'))`).
 
 ### i18n
-- All UI text through `vue-i18n`
-- **Always update ALL four locales**: `en.json`, `de.json`, `es.json`, `tr.json` (registered in `frontend/src/i18n/index.ts` as `supportedLanguages = ['de', 'en', 'es', 'tr']`). A key missing from a locale silently falls back to English.
+
+- All UI text through `vue-i18n` — never hardcode user-facing strings.
+- **Always update ALL four locales**: `en.json`, `de.json`, `es.json`, `tr.json` (`frontend/src/i18n/`, registered as `supportedLanguages = ['de', 'en', 'es', 'tr']`). A missing key silently falls back to English.
 
 ### UI copy & wording (UX clarity)
 
-User-facing text must be **clean, consistent, and crystal clear for a non-technical user ("average joe")**. Chaotic or contradictory wording is a bug.
+User-facing text must be **clean, consistent, and crystal clear for a non-technical user**. Chaotic or contradictory wording is a bug.
 
-- **Write for the average user, not the developer.** Prefer plain language over internal jargon. Avoid exposing implementation terms ("interview", "prompt topic", "selection rules", "node") in primary copy; explain in plain words or move to an "Expert:" affordance.
-- **Use ONE canonical term per concept** — never mix synonyms for the same thing across the interface:
-  - **chat widget** (short: **widget**) — the embeddable product the user creates and embeds on their site. (de: *Chat-Widget*/*Widget*, es: *widget de chat*/*widget*, tr: *sohbet widget'ı*/*widget*)
+- **Write for the average user, not the developer.** No implementation jargon ("interview", "prompt topic", "node") in primary copy.
+- **ONE canonical term per concept**, applied in all four locales:
+  - **chat widget** (short: **widget**) — the embeddable product. (de: *Chat-Widget*, es: *widget de chat*, tr: *sohbet widget'ı*)
   - **AI assistant** — the AI that answers inside a widget. (de: *KI-Assistent*, es: *asistente de IA*, tr: *AI asistanı*)
-  - **AI Setup Assistant** — the guided chat that configures a widget (not "interview", "AI-guided setup", or "wizard interview"). (de: *KI-Setup-Assistent*, es: *Asistente de Configuración IA*, tr: *AI Kurulum Asistanı*)
-  - Distinguish the two: you configure the **widget**; the AI that powers it is the **AI assistant**. Say "your widget's AI assistant" when both are in play.
-- **Copy must be CORRECT.** When you rename a tab, button, menu, or route, grep for every string that references the old name (breadcrumbs like "Settings → … → …", "the 'X' tab") and update them in the same change — a description that points to a label that no longer exists is a defect.
-- Keep the canonical terms above in sync with this list when product naming changes, and apply the same term in all four locales.
+  - **AI Setup Assistant** — the guided chat that configures a widget. (de: *KI-Setup-Assistent*, es: *Asistente de Configuración IA*, tr: *AI Kurulum Asistanı*)
+- **Copy must be CORRECT.** When renaming a tab/button/route, grep for every string referencing the old name (breadcrumbs, "the 'X' tab") and update them in the same change.
 
-## Code Style Quick Reference
+### Widget Development
 
-| Area | Standard | Details |
-|------|----------|---------|
-| PHP | PSR-12, strict types, final readonly classes | See `docs/PHP_CONVENTIONS.md` |
-| TypeScript | No semicolons, single quotes, no `any` | See `docs/FRONTEND_CONVENTIONS.md` |
-| Vue | Composition API, `<script setup>`, TypeScript | See `docs/FRONTEND_CONVENTIONS.md` |
-| API | Zod validation, OpenAPI annotations | See `docs/API_PATTERNS.md` |
-| Styling | CSS variables from `style.css`, never Tailwind colors directly | See `docs/FRONTEND_CONVENTIONS.md` |
+- Entry: `frontend/src/widget.ts` → `vite.config.widget.ts` → `dist-widget/` (`make -C frontend build-widget`).
+- Must work cross-origin (CORS-ready); API URL detected from script source at runtime via `detectApiUrl()`.
+
+## Backend Rules
+
+### API Development
+
+- **ALWAYS write complete OpenAPI annotations** on all endpoints (`@OA\Response`, `@OA\Property`, required fields, examples) — the frontend Zod schemas are generated from them.
+- After changing annotations: `make -C frontend generate-schemas`, then re-run `vue-tsc`.
+- Test endpoints via Swagger UI at `http://localhost:8000/api/doc` (not curl/Postman). Before creating a new endpoint, check if a similar one exists.
+
+### Code Style (PHP)
+
+- PSR-12, strict types, type hints everywhere: `public function foo(string $bar): int`.
+- `final` classes and `readonly` properties by default.
+- Specific error messages with context — never `throw new \Exception('Error occurred')`.
+- Named constants instead of magic numbers.
+- No comments about deleted code — git history covers that.
+- Modern Symfony/Doctrine:
+  - DBAL: `bindValue()` first, then `executeQuery()` with no arguments (param-passing is removed in DBAL 4); `ArrayParameterType::INTEGER` for `IN (:ids)`.
+  - Explicit request access: `$request->query->get()` / `$request->request->get()` / `$request->attributes->get()` — never ambiguous `$request->get()`.
+  - Empty `eraseCredentials()` gets `#[\Deprecated]` (Symfony 7.3+).
+
+### Database Usage
+
+- **NEVER hardcode AI model names** — query via `ModelRepository`; users configure models in the UI.
+- All queries in Repositories — no DQL/EntityManager work in controllers.
+
+### Database Schema & Seed Data
+
+Three separated areas — see `docs/MIGRATIONS.md`:
+
+| What | Where | Runs in |
+| ---- | ----- | ------- |
+| **Schema** (CREATE/ALTER/DROP) | Doctrine Migrations in `backend/migrations/` (`make -C backend migrate-diff` → review → `migrate`) | dev + prod |
+| **Catalog data** (models, prompts, default config, rate limits) | Idempotent seeders in `backend/src/Seed/` + `app:seed` (`make -C backend seed`) | dev + prod |
+| **Demo data** (users, example widget) | `backend/src/DataFixtures/` + `App\Seed\DemoWidgetConfigSeeder` | dev/test only |
+
+**CRITICAL:**
+
+- ❌ **NEVER** `doctrine:schema:update --force` against prod or any shared DB.
+- ❌ **NEVER** `doctrine:fixtures:load` in prod (purges all entity tables); never put production data in `DataFixtures/`.
+- ✅ Seeders must be INSERT-IF-NOT-EXISTS (`BConfigSeeder::insertIfMissing`) or `INSERT … ON DUPLICATE KEY UPDATE`. For `BMODELS`, operator-owned toggles (`BSELECTABLE`, `BACTIVE`, `BISDEFAULT`) are seeded once and never overwritten.
+- ⚠️ **`BCONFIG` defaults are bootstrap-only** — changing a seeder value does NOT propagate to existing installs. To roll out a new default, ship a migration that explicitly UPDATEs the affected rows.
+- Model bindings reference catalog entries by `service:providerId:tag` keys (via `ModelCatalog::findBidByKey`), never raw BIDs.
+
+### Production Platform Specifics (Galera)
+
+Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker** (one shared schema across `web1`/`web2`/`web3`; migrations run on backend container start). These cause prod-only failures that never reproduce locally:
+
+1. **`DATABASE_*_URL` MUST use `serverVersion=mariadb-<x.y.z>`** — a bare version number selects the MySQL platform and breaks introspection (phantom diffs, `TableDoesNotExist`).
+2. **Prod-reachable migrations MUST NOT touch `Schema $schema`** (`hasTable()`, `getTable()`, …) — the DBAL comparator throws `There is no table with name "<x>"` on this cluster, with a varying table name per run. Use raw, idempotent `addSql()` (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`); for conditional DML, query `information_schema` via `$this->connection`, not the Schema API.
+3. **Several FKs have no `ON DELETE CASCADE`** (e.g. `BPROMPTMETA.BPROMPTID`) — delete child rows before parent rows in migrations.
+4. Manual cluster heal scripts live in `synaplan-platform/` (private repo — never commit node IPs here; this repo is public).
+
+### Project-Specific Patterns
+
+- **Internal prompts** (not selectable by AI classification) MUST use the `tools:` prefix in `topic` (e.g. `tools:memory_extraction`). `MessageSorter` excludes them via `excludeTools: true`. A user-facing prompt without the prefix WILL be selected by the AI.
+- **Memory badges**: AI responses reference memories as `[Memory:ID]`. Only use IDs from the current memory list in the system prompt — never copy from earlier chat messages, never invent IDs. `MessageText.vue` renders the badges.
+- **Feedback categories** `feedback_negative` / `feedback_positive` / `feedback_false_positive` are hidden from the user memory list, used internally.
+- **Qdrant**: PHP talks directly to Qdrant's REST API via `QdrantClientDirect` (`QDRANT_URL=http://qdrant:6333`); `QdrantClientMock` for dev/test. Collections (`user_memories`, `user_documents`) are auto-created. Memory point IDs are deterministic UUIDv5 from `mem_{userId}_{memoryId}`.
+- **SSE streaming**: backend sends `token`, `memories_loaded`, `feedback_loaded`, `complete`, `error` events via `sendSseEvent()`; frontend handles them in `ChatView.vue`.
 
 ## Architecture Patterns
 
-- **Controllers**: HTTP handling only, under 50 lines
-- **Services**: All business logic, use DI
-- **Repositories**: All database queries, no DQL in controllers
-- **Components**: Modular, under 300 lines
-- **API Clients**: Use existing clients in `services/api/`, Zod schemas required
+- **Controllers**: HTTP handling only, thin, under 50 lines per method — validation + delegate to a Service.
+- **Services**: All business logic, `final readonly`, constructor DI.
+- **Repositories**: All database queries.
+- **Components**: Modular, under 300 lines — split larger ones.
+- Extract when: controller method > 50 lines → Service; component > 300 lines → split; code repeated 3+ times → composable/service. Don't extract 1-2 trivial methods used once.
+
+## Red Flags — STOP and Rethink
+
+- Native `alert()` / `confirm()` / `prompt()` instead of `useDialog()` / `useNotification()`
+- Manual TS interface for an API response (use generated Zod schemas)
+- Business logic or EntityManager work in a controller
+- Hardcoded user-facing strings (use `$t()`) or hardcoded AI model names (use `ModelRepository`)
+- Tailwind colors / custom CSS instead of `style.css` tokens
+- `setTimeout()` to "fix" race conditions
+- German (or non-English) code comments
+- Committing to `main`, or committing with AI attribution
+- `doctrine:schema:update --force` on a shared DB (generate a migration instead)
+- Internal prompt without `tools:` prefix; invented Memory IDs
+- Hardcoded API URL in the widget (use `detectApiUrl()`)
+- `console.log` debugging left in; `any` types
 
 ## Boundaries
 
 ### Ask First Before
+
 - Changing database schema (always via Doctrine Migrations — see `docs/MIGRATIONS.md`)
 - Adding dependencies (npm/composer)
 - Modifying Docker/CI/build configs
 - Adding new AI provider integrations
 
-### Database Schema & Seed Data
-
-- **Schema** belongs to **Doctrine Migrations** (`backend/migrations/`). Generate with
-  `make -C backend migrate-diff`, never use `doctrine:schema:update --force` against any
-  shared/production DB.
-- **Production-essential catalog data** (AI models, system prompts, default config, rate
-  limits) belongs to idempotent seed services in `backend/src/Seed/` and the `app:seed`
-  command. Re-runnable safely in any environment.
-- **Demo data** (admin/demo/test users, example widget) belongs to `backend/src/DataFixtures/`
-  and `App\Seed\DemoWidgetConfigSeeder`. Only loaded in `dev`/`test`.
-
 ### Never Do
+
 - Commit secrets or `.env` files with credentials
 - Edit `vendor/` or `node_modules/`
 - Commit `dist/` directories
-- Push directly to `main`
-- Force push to `main` or `master`
-- Skip lint/test before committing
+- Commit or push directly to `main`; force-push `main`/`master`
+- Skip the pre-commit gate
 
 ## Detailed Documentation
 
-For comprehensive guides, see:
-- `docs/PHP_CONVENTIONS.md` - PHP code style, examples, patterns
-- `docs/FRONTEND_CONVENTIONS.md` - TypeScript, Vue, styling, i18n
-- `docs/API_PATTERNS.md` - Zod schemas, OpenAPI, httpClient usage
-- `docs/MIGRATIONS.md` - Doctrine migrations + idempotent seed workflow
-- `docs/E2E_TESTING.md` - Playwright E2E test guidelines
-- `docs/DEVELOPMENT.md` - Development setup
-- `backend/.env.example` - Environment variables
+- `docs/PHP_CONVENTIONS.md` — PHP code style, examples, patterns
+- `docs/FRONTEND_CONVENTIONS.md` — TypeScript, Vue, styling tokens, i18n
+- `docs/API_PATTERNS.md` — Zod schemas, OpenAPI, httpClient usage
+- `docs/MIGRATIONS.md` — Doctrine migrations + idempotent seed workflow
+- `docs/E2E_TESTING.md` — Playwright E2E test guidelines
+- `docs/DEVELOPMENT.md` — Development setup
+- `backend/.env.example` — Environment variables

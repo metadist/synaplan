@@ -26,7 +26,7 @@ use Doctrine\Migrations\AbstractMigration;
  *
  * Operator-owned columns (BSELECTABLE, BACTIVE, BISDEFAULT) are
  * deliberately NOT touched per the BMODELS catalog-vs-operator contract
- * documented in AGENTS_DEV.md.
+ * documented in AGENTS.md.
  */
 final class Version20260513120000 extends AbstractMigration
 {
