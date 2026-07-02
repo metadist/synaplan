@@ -835,7 +835,7 @@ class StreamController extends AbstractController
                         // response is persisted and available on return. Only an
                         // EXPLICIT Stop, which flags the turn via CancellationStore
                         // through /stop-stream, aborts the inline text stream.
-                        if (null !== $trackId && '' !== (string) $trackId
+                        if ('' !== (string) $trackId
                             && $this->cancellationStore->isCancelled((string) $trackId)) {
                             throw new \RuntimeException('Client disconnected');
                         }
