@@ -317,6 +317,11 @@
       "testConnection": "Verbindung testen",
       "testFailed": "Verbindungstest fehlgeschlagen",
       "commandCopied": "Befehl in Zwischenablage kopiert",
+      "tabGroups": {
+        "aiData": "KI & Daten",
+        "communication": "Kommunikation",
+        "security": "Sicherheit & Anmeldung"
+      },
       "liveBadge": "Live",
       "liveHint": "Änderungen werden sofort wirksam, kein Neustart erforderlich.",
       "restartBanner": {

@@ -293,6 +293,11 @@
       "testConnection": "Probar Conexión",
       "testFailed": "Prueba de conexión fallida",
       "commandCopied": "Comando copiado al portapapeles",
+      "tabGroups": {
+        "aiData": "IA y datos",
+        "communication": "Comunicación",
+        "security": "Seguridad e inicio de sesión"
+      },
       "restartBanner": {
         "title": "Configuración Actualizada — Reinicio Requerido",
         "message": "Sus cambios se han guardado en el archivo .env. Para que los cambios surtan efecto, debe reiniciar sus contenedores Docker.",
