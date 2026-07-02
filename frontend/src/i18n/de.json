@@ -946,7 +946,13 @@
       "document_generation": "Dokument",
       "calendar_event": "Kalendereinladung",
       "email_me": "E-Mail-Versand"
-    }
+    },
+    "copyText": "Text kopieren",
+    "copied": "In die Zwischenablage kopiert",
+    "copyFailed": "Kopieren fehlgeschlagen",
+    "expand": "Text anzeigen",
+    "collapse": "Text ausblenden",
+    "redundantCollapsed": "Dieser Text ist Teil der Antwort unten."
   },
   "processing": {
     "started": "Starte Verarbeitung...",
@@ -2017,8 +2023,8 @@
     "describeSortDone": "Jetzt KI-durchsuchbar.",
     "describeSortDoneGroup": "Jetzt KI-durchsuchbar · abgelegt in \"{group}\".",
     "describeSortFailed": "Diese Datei konnte nicht durchsuchbar gemacht werden.",
-    "indexPromptAction": "Erzeugungs-Prompt zur Wissensbasis hinzufügen",
-    "indexPromptDone": "Erzeugungs-Prompt zu deiner Wissensbasis hinzugefügt.",
+    "indexPromptAction": "Zur Wissensbasis hinzufügen",
+    "indexPromptDone": "Zu deiner Wissensbasis hinzugefügt.",
     "emptyState": {
       "title": "Noch keine Dateien",
       "description": "Lade Dateien hoch, um loszulegen. Du kannst sie in Ordnern organisieren.",

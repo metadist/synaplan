@@ -1143,7 +1143,13 @@
       "document_generation": "Belge",
       "calendar_event": "Takvim daveti",
       "email_me": "E-posta gönderimi"
-    }
+    },
+    "copyText": "Metni kopyala",
+    "copied": "Panoya kopyalandı",
+    "copyFailed": "Kopyalanamadı",
+    "expand": "Metni göster",
+    "collapse": "Metni gizle",
+    "redundantCollapsed": "Bu metin aşağıdaki yanıtın bir parçasıdır."
   },
   "processing": {
     "started": "İşlem başlatılıyor...",
@@ -1507,8 +1513,8 @@
     "describeSortDone": "Artık yapay zekâ ile aranabilir.",
     "describeSortDoneGroup": "Artık yapay zekâ ile aranabilir · \"{group}\" içine eklendi.",
     "describeSortFailed": "Bu dosya aranabilir yapılamadı.",
-    "indexPromptAction": "Üretim istemini bilgi tabanına ekle",
-    "indexPromptDone": "Üretim istemi bilgi tabanınıza eklendi.",
+    "indexPromptAction": "Bilgi tabanına ekle",
+    "indexPromptDone": "Bilgi tabanınıza eklendi.",
     "emptyState": {
       "title": "Henüz dosya yok",
       "description": "Başlamak için dosya yükle. Dosyaları klasörler halinde düzenleyebilirsin.",

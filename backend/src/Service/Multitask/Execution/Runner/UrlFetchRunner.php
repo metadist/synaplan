@@ -58,7 +58,9 @@ final readonly class UrlFetchRunner implements TaskRunner
                 Capability::UrlFetch,
                 'Fetch and read the content of specific URL(s) the user named in the message (inputs.urls, falls back to URLs in the message text). Use when the answer depends on that page\'s content; prefer web_search when no concrete URL is given.',
                 enabledFlag: MultitaskRoutingConfig::KEY_URL_FETCH_ENABLED,
-                enabledDefault: false,
+                // Validated in plan-09 S2 verification — rollout default ON
+                // (S6). Operators can still disable via BCONFIG.
+                enabledDefault: true,
             ),
         ];
     }
@@ -71,7 +73,7 @@ final readonly class UrlFetchRunner implements TaskRunner
         if (!$this->routingConfig->isFeatureEnabled(
             MultitaskRoutingConfig::KEY_URL_FETCH_ENABLED,
             $context->userId,
-            false,
+            true,
         )) {
             return NodeResult::failed('url_fetch is disabled');
         }

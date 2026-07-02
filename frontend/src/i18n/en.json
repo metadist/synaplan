@@ -767,8 +767,8 @@
     "describeSortDone": "Now searchable by AI.",
     "describeSortDoneGroup": "Now searchable by AI · filed in \"{group}\".",
     "describeSortFailed": "Couldn't make this file searchable.",
-    "indexPromptAction": "Add generation prompt to knowledge base",
-    "indexPromptDone": "Generation prompt added to your knowledge base.",
+    "indexPromptAction": "Add to knowledge base",
+    "indexPromptDone": "Added to your knowledge base.",
     "emptyState": {
       "title": "No files yet",
       "description": "Upload files to get started. You can organize them into folders.",
@@ -3125,7 +3125,13 @@
       "document_generation": "Document",
       "calendar_event": "Calendar invite",
       "email_me": "Email result"
-    }
+    },
+    "copyText": "Copy text",
+    "copied": "Copied to clipboard",
+    "copyFailed": "Could not copy",
+    "expand": "Show text",
+    "collapse": "Hide text",
+    "redundantCollapsed": "This text is part of the answer below."
   },
   "processing": {
     "started": "Starting processing...",

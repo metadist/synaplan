@@ -304,6 +304,8 @@ export interface ApiLoadedMessageRow {
       /** Compact web-search summary fields (search cards only) */
       query?: string
       resultsCount?: number
+      /** #1229 smart collapse: card prose is contained in the answer body. */
+      redundant?: boolean
     }>
   } | null
   /** Background async media job (Release 4.0). */
@@ -410,7 +412,6 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   // media parts in the bubble (same dedup logic as reconcileLocalMessage).
   let taskPlanState: TaskPlanState | null = null
   const cardMediaUrls = new Set<string>()
-  const cardTexts = new Set<string>()
   if (m.taskPlan && m.taskPlan.cards.length > 0) {
     const cards = m.taskPlan.cards.map((c) => {
       const kind: TaskCardKind = isTaskCardKind(c.kind) ? c.kind : 'text'
@@ -419,10 +420,6 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
       if (c.url) {
         cardUrl = normalizeMediaUrl(buildUploadUrl(c.url))
         cardMediaUrls.add(mediaUrlKey(cardUrl))
-      }
-      const cardText = (c.text ?? '').trim()
-      if (cardText) {
-        cardTexts.add(normalizeCardText(cardText))
       }
       return {
         nodeId: c.nodeId,
@@ -436,6 +433,10 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         query: c.query,
         resultsCount: c.resultsCount,
         jobId: typeof c.job_id === 'string' ? c.job_id : undefined,
+        // #1229 smart collapse: assembly-time redundancy flag. The body stays
+        // the canonical answer surface; the duplicated card collapses (the
+        // previous #1165 approach of REMOVING the body text is retired).
+        redundant: c.redundant === true,
       }
     })
     taskPlanState = {
@@ -447,24 +448,12 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
 
   // Remove any plain-media parts whose URL already appears on a restored card
   // so the user sees each piece of media exactly once (card is the primary surface).
-  //
-  // Issue #1165: also drop text parts whose content is identical to a card's
-  // text. On reload `ResultAssembler` persists the reply-node output both as
-  // the message `content` AND inside the task cards, so a node's text would
-  // otherwise appear twice (once in the card, once in the body below it). The
-  // card is the primary surface, so the duplicated body text is removed.
-  const needsDedup = cardMediaUrls.size > 0 || cardTexts.size > 0
-  const deduplicatedParts = needsDedup
-    ? parts.filter((p) => {
-        if (isMediaPartType(p.type) && p.url && cardMediaUrls.has(mediaUrlKey(p.url))) {
-          return false
-        }
-        if (p.type === 'text' && p.content && cardTexts.has(normalizeCardText(p.content))) {
-          return false
-        }
-        return true
-      })
-    : parts
+  const deduplicatedParts =
+    cardMediaUrls.size > 0
+      ? parts.filter(
+          (p) => !(isMediaPartType(p.type) && p.url && cardMediaUrls.has(mediaUrlKey(p.url)))
+        )
+      : parts
 
   // Reconstruct tool metadata from topic field for user messages
   // Also clean command prefix from message content
@@ -542,16 +531,6 @@ function mediaUrlKey(url: string): string {
   } catch {
     return url
   }
-}
-
-/**
- * Comparison key for card vs. body text dedup (issue #1165). The persisted
- * message `content` and a card's `text` come from the same node output but can
- * differ in trailing/leading whitespace or newline runs, so both sides are
- * trimmed and inner whitespace is collapsed before comparison.
- */
-function normalizeCardText(text: string): string {
-  return text.trim().replace(/\s+/g, ' ')
 }
 
 /**

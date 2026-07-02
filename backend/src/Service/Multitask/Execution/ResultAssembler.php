@@ -184,6 +184,14 @@ final class ResultAssembler
                     }
                 } elseif (null !== $nodeResult->text && '' !== $nodeResult->text) {
                     $card['text'] = $nodeResult->text;
+                    // #1229 smart collapse: a text card whose prose is already
+                    // contained in the final assembled answer is REDUNDANT — the
+                    // body is the canonical answer surface, so the frontend
+                    // collapses the card to its header. A card with unique
+                    // content (the reply is just a short connector) stays open.
+                    if ($this->isRedundantText($nodeResult->text, $content)) {
+                        $card['redundant'] = true;
+                    }
                 }
                 // First file from this node provides the media url/type for the card.
                 $firstFile = $nodeResult->firstFile();
@@ -216,6 +224,25 @@ final class ResultAssembler
             'partial_failure' => $partialFailure,
             'all_failed' => $allFailed,
         ];
+    }
+
+    /**
+     * Whether a card's prose already appears (verbatim, whitespace-normalized)
+     * inside the final answer text (#1229). Containment — not equality — so a
+     * compose_reply that wraps the card text in a connector sentence still
+     * marks the card redundant.
+     */
+    private function isRedundantText(string $cardText, string $finalText): bool
+    {
+        $normalize = static fn (string $s): string => trim((string) preg_replace('/\s+/u', ' ', $s));
+
+        $card = $normalize($cardText);
+        $final = $normalize($finalText);
+        if ('' === $card || '' === $final) {
+            return false;
+        }
+
+        return str_contains($final, $card);
     }
 
     /**

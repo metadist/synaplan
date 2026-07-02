@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useI18n } from 'vue-i18n'
 import type { TaskCard } from '@/stores/history'
 import { useAiConfigStore } from '@/stores/aiConfig'
+import { useNotification } from '@/composables/useNotification'
 import type { AIModel, Capability } from '@/types/ai-models'
 import MessageText from '@/components/MessageText.vue'
+import TaskCardMedia from '@/components/multitask/TaskCardMedia.vue'
 
 const props = defineProps<{ card: TaskCard }>()
 
@@ -83,6 +86,36 @@ const isProseKind = computed(() => ['text', 'extract'].includes(props.card.kind)
 // The full results are available via the Sources dropdown on the message body.
 const isSearchKind = computed(() => props.card.kind === 'search')
 
+// #1229 smart collapse: a DONE prose card whose text is already contained in
+// the answer body collapses to its header — the body is the canonical answer
+// surface. The chevron lets the user peek anyway; cards with unique content
+// stay open. Streaming cards are never collapsed.
+const userExpanded = ref<boolean | null>(null)
+const isCollapsible = computed(
+  () => isProseKind.value && props.card.state === 'done' && props.card.redundant === true
+)
+const collapsed = computed(() => isCollapsible.value && userExpanded.value !== true)
+const toggleCollapsed = () => {
+  userExpanded.value = collapsed.value
+}
+
+// Copy-to-clipboard for text-bearing done cards (#1229). Media cards get
+// download/lightbox via TaskCardMedia instead.
+const { t } = useI18n()
+const { success: notifySuccess, error: notifyError } = useNotification()
+const canCopy = computed(
+  () =>
+    props.card.state === 'done' && !!props.card.text && (isProseKind.value || isSearchKind.value)
+)
+const copyText = async () => {
+  try {
+    await navigator.clipboard.writeText(props.card.text ?? '')
+    notifySuccess(t('taskPlan.copied'))
+  } catch {
+    notifyError(t('taskPlan.copyFailed'))
+  }
+}
+
 // Model tag matching this card's media kind — the pool the retry button picks from.
 const retryTag = computed((): Capability | null => {
   switch (props.card.kind) {
@@ -154,6 +187,30 @@ const handleRetry = () => {
       >
         <Icon icon="mdi:stop" class="w-4 h-4" />
         <span class="font-medium">{{ $t('taskPlan.stop') }}</span>
+      </button>
+
+      <button
+        v-if="canCopy"
+        type="button"
+        class="p-1 rounded txt-muted hover:txt-primary transition-colors"
+        :aria-label="$t('taskPlan.copyText')"
+        :title="$t('taskPlan.copyText')"
+        data-testid="task-card-copy"
+        @click="copyText"
+      >
+        <Icon icon="mdi:content-copy" class="w-4 h-4" />
+      </button>
+
+      <button
+        v-if="isCollapsible"
+        type="button"
+        class="p-1 rounded txt-muted hover:txt-primary transition-colors"
+        :aria-label="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
+        :title="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
+        data-testid="task-card-toggle"
+        @click="toggleCollapsed"
+      >
+        <Icon :icon="collapsed ? 'mdi:chevron-down' : 'mdi:chevron-up'" class="w-4 h-4" />
       </button>
 
       <span class="flex items-center gap-1 text-xs">
@@ -246,6 +303,15 @@ const handleRetry = () => {
         <span v-else-if="card.query">{{ card.query }}</span>
       </div>
 
+      <!-- Redundant prose collapsed to a one-line hint (#1229) -->
+      <p
+        v-if="!isSearchKind && card.text && collapsed"
+        class="text-xs txt-muted"
+        data-testid="task-card-collapsed-hint"
+      >
+        {{ $t('taskPlan.redundantCollapsed') }}
+      </p>
+
       <!-- Streaming / final text (prose and non-search kinds) -->
       <div
         v-else-if="!isSearchKind && card.text"
@@ -261,33 +327,8 @@ const handleRetry = () => {
         <span v-if="card.state === 'running'" class="task-card__cursor" aria-hidden="true">▍</span>
       </div>
 
-      <!-- Resolved media -->
-      <div v-if="card.url" class="mt-2">
-        <img
-          v-if="card.kind === 'image'"
-          :src="card.url"
-          :alt="$t('taskPlan.kind.image')"
-          class="rounded-lg max-h-72 w-auto"
-        />
-        <video
-          v-else-if="card.kind === 'video'"
-          :src="card.url"
-          controls
-          class="rounded-lg max-h-72 w-auto"
-        />
-        <audio v-else-if="card.kind === 'audio'" :src="card.url" controls class="w-full" />
-        <a
-          v-else-if="card.kind === 'document'"
-          :href="card.url"
-          target="_blank"
-          rel="noopener"
-          class="inline-flex items-center gap-2 text-sm"
-          style="color: var(--brand)"
-        >
-          <Icon icon="mdi:download" class="w-4 h-4" />
-          {{ $t('taskPlan.download') }}
-        </a>
-      </div>
+      <!-- Resolved media: never collapsed; download + image lightbox (#1229) -->
+      <TaskCardMedia v-if="card.url" :kind="card.kind" :url="card.url" />
 
       <!-- Media skeleton while waiting -->
       <div

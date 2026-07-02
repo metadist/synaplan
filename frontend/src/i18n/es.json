@@ -1143,7 +1143,13 @@
       "document_generation": "Documento",
       "calendar_event": "Invitación de calendario",
       "email_me": "Envío por correo"
-    }
+    },
+    "copyText": "Copiar texto",
+    "copied": "Copiado al portapapeles",
+    "copyFailed": "No se pudo copiar",
+    "expand": "Mostrar texto",
+    "collapse": "Ocultar texto",
+    "redundantCollapsed": "Este texto forma parte de la respuesta de abajo."
   },
   "processing": {
     "started": "Iniciando procesamiento...",
@@ -1506,8 +1512,8 @@
     "describeSortDone": "Ya es consultable por IA.",
     "describeSortDoneGroup": "Ya es consultable por IA · archivado en \"{group}\".",
     "describeSortFailed": "No se pudo hacer consultable este archivo.",
-    "indexPromptAction": "Añadir el prompt de generación a la base de conocimiento",
-    "indexPromptDone": "Prompt de generación añadido a tu base de conocimiento.",
+    "indexPromptAction": "Añadir a la base de conocimiento",
+    "indexPromptDone": "Añadido a tu base de conocimiento.",
     "emptyState": {
       "title": "Aún no hay archivos",
       "description": "Sube archivos para empezar. Puedes organizarlos en carpetas.",

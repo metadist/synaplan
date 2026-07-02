@@ -77,32 +77,30 @@ final class SkillCatalogTest extends TestCase
         self::assertCount(count(Capability::cases()), explode("\n", $rendered));
     }
 
-    public function testFlagGatedCapabilityIsOmittedWhenDisabledAndListedWhenEnabled(): void
+    public function testFlagGatedCapabilityVisibilityFollowsTheRolloutDefaults(): void
     {
-        // Default (no routing config, enabledDefault=false): url_fetch is
-        // invisible to the planner.
-        $off = SkillCatalogFactory::real()->renderCapabilityList();
-        self::assertStringNotContainsString('"url_fetch"', $off);
+        // Built-in defaults (no BCONFIG rows): url_fetch is ON after the
+        // plan-09 S6 rollout; mcp_fetch and email_search are DYNAMIC blocks
+        // (requiresDynamicNote) that additionally need a per-user sub-catalog /
+        // availability note — without one they stay invisible regardless of
+        // their flags, so exactly two capability lines are missing.
+        $default = SkillCatalogFactory::real()->renderCapabilityList();
+        self::assertStringContainsString('- "url_fetch": ', $default);
+        self::assertStringNotContainsString('"mcp_fetch"', $default);
+        self::assertStringNotContainsString('"email_search"', $default);
+        self::assertCount(count(Capability::cases()) - 2, explode("\n", $default));
 
-        // Flag resolved ON: the capability line appears in enum order.
+        // Operator kill switch: an explicit URL_FETCH_ENABLED=0 row hides the
+        // block from the planner again.
         $configRepo = $this->createMock(\App\Repository\ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
-            static fn (int $owner, string $group, string $setting): ?string => 'URL_FETCH_ENABLED' === $setting ? '1' : null,
+            static fn (int $owner, string $group, string $setting): ?string => 'URL_FETCH_ENABLED' === $setting ? '0' : null,
         );
         $catalog = new SkillCatalog(
             SkillCatalogFactory::runners(),
             new \App\Service\Multitask\MultitaskRoutingConfig($configRepo),
         );
 
-        $on = $catalog->renderCapabilityList();
-        self::assertStringContainsString('- "url_fetch": ', $on);
-        // mcp_fetch and email_search are DYNAMIC blocks (requiresDynamicNote):
-        // without a per-user sub-catalog / availability note they stay
-        // invisible even when their flags are on — so exactly two capability
-        // lines are missing here.
-        self::assertStringNotContainsString('"mcp_fetch"', $on);
-        self::assertStringNotContainsString('"email_search"', $on);
-        $lines = explode("\n", $on);
-        self::assertCount(count(Capability::cases()) - 2, $lines);
+        self::assertStringNotContainsString('"url_fetch"', $catalog->renderCapabilityList());
     }
 }

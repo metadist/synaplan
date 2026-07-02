@@ -979,7 +979,7 @@ import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
-import { dedupeTaskPlanProse } from '@/utils/taskPlanDisplay'
+import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -1239,14 +1239,13 @@ const contentParts = computed(() => {
   })
 })
 
-// Multitask routing: hide a task card's prose when that exact text is already
-// the final answer in the message body, so a DAG whose reply node passes an
-// upstream text node through verbatim (poem → TTS, summarize → translate, …)
-// no longer renders the same text twice. See dedupeTaskPlanProse for the full
-// rationale. Compare against the raw body text (props.parts), not the
+// Multitask routing, #1229 smart collapse: mark a task card's prose redundant
+// when that text is already part of the final answer in the message body —
+// the card then collapses to its header instead of repeating the wall of
+// text. Compare against the raw body text (props.parts), not the
 // citation-processed `contentParts`, so the verbatim card text still matches.
 const displayTaskPlan = computed<TaskPlanState | null>(() =>
-  dedupeTaskPlanProse(
+  markRedundantTaskPlanProse(
     props.taskPlan,
     props.parts
       .filter((p) => p.type === 'text' && typeof p.content === 'string')
