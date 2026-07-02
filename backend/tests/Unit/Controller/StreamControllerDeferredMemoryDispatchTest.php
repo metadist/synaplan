@@ -11,6 +11,7 @@ use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\Media\MediaCancellationStore;
+use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
@@ -79,6 +80,7 @@ final class StreamControllerDeferredMemoryDispatchTest extends TestCase
             $this->createMock(DocumentGeneratorService::class),
             $this->createMock(MediaCancellationStore::class),
             $this->createMock(MediaJobService::class),
+            $this->createMock(MediaJobMessageSync::class),
         );
     }
 

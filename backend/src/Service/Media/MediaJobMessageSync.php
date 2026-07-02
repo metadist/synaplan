@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Media;
 
 use App\Repository\MessageRepository;
+use App\Service\Multitask\TaskPlanStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -20,6 +21,15 @@ use Psr\Log\LoggerInterface;
  *      and attach it to the message — this is the single channel history
  *      endpoints serialize (`getFiles()`), so without it a reload shows an
  *      empty bubble even though the file is on disk and the job is `done`.
+ *
+ * Multitask node jobs (the job carries a `nodeId`) are synced differently
+ * (#1239): the OUT message of a DAG turn holds the ASSEMBLED reply (poem +
+ * connector text), so the single-task text mutation (clear on done / error on
+ * failed) would destroy it, and the `media_job` banner meta belongs only to
+ * single-task turns. Instead the matching card inside the persisted
+ * `task_plan` meta is patched (state/url/error) and the BMESSAGE_TASKS row is
+ * healed via the job key — the reload then shows the finished card exactly
+ * like a card that completed inside the live turn.
  */
 final readonly class MediaJobMessageSync
 {
@@ -29,6 +39,7 @@ final readonly class MediaJobMessageSync
         private GeneratedFileRegistrar $fileRegistrar,
         private MediaJobRealtimeNotifier $realtimeNotifier,
         private MediaJobUsageRecorder $usageRecorder,
+        private TaskPlanStore $taskPlanStore,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -76,28 +87,39 @@ final readonly class MediaJobMessageSync
             return;
         }
 
-        $mediaJobMeta = [
-            'job_id' => $job->getJobKey(),
-            'type' => $job->getType(),
-            'state' => $status['state'],
-        ];
-        if (null !== $job->getError() && '' !== $job->getError()) {
-            $mediaJobMeta['error'] = $job->getError();
-        }
-
-        $message->setMeta(
-            'media_job',
-            (string) json_encode($mediaJobMeta, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
-        );
-
-        if (MediaJob::STATUS_FAILED === $job->getStatus() || MediaJob::STATUS_TIMED_OUT === $job->getStatus()) {
-            $errorText = $job->getError();
-            if (null !== $errorText && '' !== trim($errorText)) {
-                $message->setText($errorText);
+        $nodeId = $job->getNodeId();
+        if (null !== $nodeId && '' !== $nodeId) {
+            // Multitask node job: the task card is the surface — patch the
+            // persisted card state and NEVER touch the assembled reply text
+            // or the single-task `media_job` banner meta (see class docblock).
+            $this->syncTaskPlanCard($job, $message, $status['state']);
+            if (MediaJob::STATUS_COMPLETED === $job->getStatus()) {
+                $this->attachGeneratedFile($job, $message);
             }
-        } elseif (MediaJob::STATUS_COMPLETED === $job->getStatus()) {
-            $message->setText('');
-            $this->attachGeneratedFile($job, $message);
+        } else {
+            $mediaJobMeta = [
+                'job_id' => $job->getJobKey(),
+                'type' => $job->getType(),
+                'state' => $status['state'],
+            ];
+            if (null !== $job->getError() && '' !== $job->getError()) {
+                $mediaJobMeta['error'] = $job->getError();
+            }
+
+            $message->setMeta(
+                'media_job',
+                (string) json_encode($mediaJobMeta, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
+            );
+
+            if (MediaJob::STATUS_FAILED === $job->getStatus() || MediaJob::STATUS_TIMED_OUT === $job->getStatus()) {
+                $errorText = $job->getError();
+                if (null !== $errorText && '' !== trim($errorText)) {
+                    $message->setText($errorText);
+                }
+            } elseif (MediaJob::STATUS_COMPLETED === $job->getStatus()) {
+                $message->setText('');
+                $this->attachGeneratedFile($job, $message);
+            }
         }
 
         $this->em->flush();
@@ -117,6 +139,67 @@ final readonly class MediaJobMessageSync
         // (best-effort; the persisted state above + the client poll are the
         // fallback if realtime is disabled/unreachable).
         $this->realtimeNotifier->publishUpdate($job);
+    }
+
+    /**
+     * Patch the terminal outcome of an async media node into the OUT message's
+     * persisted `task_plan` render meta and the BMESSAGE_TASKS row (#1239).
+     *
+     * The DAG turn persisted the card as 'running' (the job outlives the
+     * request); without this heal a reload keeps showing the skeleton/spinner
+     * even though the render finished. The card is matched by nodeId — the
+     * plan validator guarantees node ids are unique within a plan.
+     */
+    private function syncTaskPlanCard(MediaJob $job, \App\Entity\Message $message, string $state): void
+    {
+        $this->taskPlanStore->updateStatusByJobKey($job->getJobKey(), $state);
+
+        $raw = $message->getMeta('task_plan');
+        if (null === $raw || '' === $raw) {
+            return;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || !is_array($decoded['cards'] ?? null)) {
+            return;
+        }
+
+        $patched = false;
+        foreach ($decoded['cards'] as &$card) {
+            if (!is_array($card) || ($card['nodeId'] ?? null) !== $job->getNodeId()) {
+                continue;
+            }
+            $card['state'] = $state;
+            if (null !== $job->getError() && '' !== $job->getError()) {
+                $card['error'] = $job->getError();
+            }
+            $result = $job->getResult();
+            $file = is_array($result['file'] ?? null) ? $result['file'] : null;
+            if (null !== $file && is_string($file['url'] ?? null) && '' !== $file['url']) {
+                // Stored as the public upload URL — the frontend mapper's
+                // buildUploadUrl() passes that form through unchanged.
+                $card['url'] = $file['url'];
+                $card['type'] = is_string($file['type'] ?? null) ? $file['type'] : $job->getType();
+            }
+            $patched = true;
+            break;
+        }
+        unset($card);
+
+        if (!$patched) {
+            return;
+        }
+
+        $message->setMeta(
+            'task_plan',
+            (string) json_encode($decoded, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
+        );
+
+        $this->logger->info('MediaJobMessageSync: healed task card for terminal node job', [
+            'job_key' => $job->getJobKey(),
+            'message_id' => $message->getId(),
+            'node_id' => $job->getNodeId(),
+            'state' => $state,
+        ]);
     }
 
     /**

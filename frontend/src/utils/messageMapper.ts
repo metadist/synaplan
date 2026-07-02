@@ -57,8 +57,32 @@ export interface MediaJobUpdate {
  *
  * Shared by the realtime `mediaJobs` store (push) and ChatView's completion
  * handler so the push and poll paths can never diverge.
+ *
+ * Multitask node jobs (the update carries a `node_id` matching a task card)
+ * patch the CARD instead (#1239): the card is the surface for DAG media — the
+ * single-task banner and a bubble-level media part would be wrong/duplicative
+ * next to it.
  */
 export function applyMediaJobUpdateToMessage(message: Message, update: MediaJobUpdate): void {
+  if (update.node_id && message.taskPlan) {
+    const card = message.taskPlan.cards.find((c) => c.nodeId === update.node_id)
+    if (card) {
+      // A user-cancelled card is terminal on the client (same rule as the SSE
+      // task_update handler) — never overwrite it with a late job state.
+      if (card.state !== 'cancelled' && isTaskCardState(update.state)) {
+        card.state = update.state
+      }
+      if (update.error) {
+        card.error = update.error
+      }
+      if (update.file?.url) {
+        card.url = normalizeMediaUrl(update.file.url)
+        card.mediaType = update.file.type ?? update.type
+      }
+      return
+    }
+  }
+
   message.mediaJob = {
     ...(message.mediaJob ?? {}),
     jobId: update.job_id,
