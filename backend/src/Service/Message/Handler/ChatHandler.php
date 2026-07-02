@@ -41,6 +41,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
     /** Maximum length of a quoted-reference excerpt injected into the prompt. */
     private const MAX_QUOTED_REFERENCE_LENGTH = 4000;
 
+    /**
+     * Maximum base64 payload length (characters) for a single inline vision
+     * image. Kept well under Anthropic's 1M-token context limit — base64
+     * tokenizes at roughly 1.7 tokens per character on that provider, so
+     * ~450K characters (~337 KB raw) stays comfortably below the ceiling with
+     * margin for the surrounding prompt (issue #1238).
+     */
+    private const MAX_VISION_BASE64_LENGTH = 450000;
+
     /** @var iterable<PluginContextProviderInterface> */
     private iterable $pluginContextProviders;
 
@@ -1622,9 +1631,100 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         $mimeType = $this->getImageMimeType($relativePath);
+
+        // Guard against oversized inline vision payloads. A large image
+        // embedded as a base64 data URL can blow the provider's context
+        // window: an ~828 KB generated PNG expands to ~1.1M base64 characters,
+        // which Anthropic tokenizes to ~1.9M tokens — over its 1M limit — and
+        // returns an HTTP 400 that surfaces as an error bubble (issue #1238).
+        // The 10 MB file-size cap above does not prevent this, so downscale
+        // the pixels first and only skip the image when it still cannot be
+        // brought under budget.
+        if ($this->estimateBase64Length(strlen($imageData)) > self::MAX_VISION_BASE64_LENGTH) {
+            $downscaled = $this->downscaleImageForVision($imageData);
+            if (null === $downscaled) {
+                $this->logger->warning('ChatHandler: Skipping vision image that exceeds the inline payload budget', [
+                    'path' => $relativePath,
+                    'original_size_kb' => round(strlen($imageData) / 1024, 1),
+                ]);
+
+                return null;
+            }
+
+            $this->logger->info('ChatHandler: Downscaled oversized vision image', [
+                'path' => $relativePath,
+                'original_size_kb' => round(strlen($imageData) / 1024, 1),
+                'downscaled_size_kb' => round(strlen($downscaled) / 1024, 1),
+            ]);
+
+            $imageData = $downscaled;
+            $mimeType = 'image/jpeg';
+        }
+
         $base64 = base64_encode($imageData);
 
         return 'data:'.$mimeType.';base64,'.$base64;
+    }
+
+    /**
+     * Estimate the character length of the base64 encoding of a byte string
+     * without allocating the encoded string (base64 emits 4 characters per 3
+     * input bytes, padded).
+     */
+    private function estimateBase64Length(int $bytes): int
+    {
+        return intdiv($bytes + 2, 3) * 4;
+    }
+
+    /**
+     * Downscale an oversized image so its base64 payload fits within the
+     * inline-vision budget (issue #1238).
+     *
+     * Re-encodes as JPEG — smaller than PNG for photos and generated renders —
+     * via Imagick, progressively reducing the longest edge until the encoded
+     * size is under budget. 1568 px is Anthropic's own recommended vision cap;
+     * the smaller steps are the fallback for very detailed images that still
+     * exceed the budget at higher resolutions.
+     *
+     * @return string|null JPEG bytes under budget, or null when Imagick is
+     *                     unavailable or the image cannot be reduced enough
+     */
+    private function downscaleImageForVision(string $imageData): ?string
+    {
+        if (!extension_loaded('imagick') || !class_exists(\Imagick::class)) {
+            return null;
+        }
+
+        foreach ([1568, 1024, 768, 512] as $maxEdge) {
+            try {
+                $imagick = new \Imagick();
+                $imagick->readImageBlob($imageData);
+                $imagick->setIteratorIndex(0);
+                $imagick->autoOrient();
+                // bestfit: scale down so neither edge exceeds $maxEdge while
+                // preserving aspect ratio.
+                $imagick->resizeImage($maxEdge, $maxEdge, \Imagick::FILTER_LANCZOS, 1, true);
+                $imagick->setImageFormat('jpeg');
+                $imagick->setImageCompressionQuality(80);
+                $imagick->stripImage();
+                $jpeg = $imagick->getImageBlob();
+                $imagick->clear();
+                $imagick->destroy();
+
+                if ('' !== $jpeg && $this->estimateBase64Length(strlen($jpeg)) <= self::MAX_VISION_BASE64_LENGTH) {
+                    return $jpeg;
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: Vision image downscale attempt failed', [
+                    'max_edge' => $maxEdge,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /**
