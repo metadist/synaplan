@@ -136,6 +136,20 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'sort_video_params', 'text' => 'make a 8s 720p clip', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'video', 'duration' => 8, 'resolution' => '720p']],
             ['id' => 'sort_audio', 'text' => 'make a song', 'language' => 'de', 'fastPath' => false, 'sorter' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'audio']],
 
+            // ---- #1237 guard: mediamaker/audio + image attachment → describe path ----
+            // The sorter mis-votes mediamaker/audio because the user names an audio
+            // OUTPUT ("beschreibe in einem audio …"); with an attached image the
+            // classifier must deterministically reroute to `general` (vision
+            // describe; the planner chains file_analysis → text2sound) instead of
+            // letting MediaGenerationHandler run a doomed pic2pic image job.
+            ['id' => 'sort_audio_describe_attached_image', 'text' => 'beschreibe in einem audio was hier zu sehen ist', 'language' => 'de', 'fastPath' => false, 'files' => [['type' => 'png', 'name' => 'photo.png']], 'sorter' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'audio']],
+            // Generated-file re-attachment stores the generic kind `image` (#1236) —
+            // the guard must accept it like a concrete extension.
+            ['id' => 'sort_audio_describe_attached_generic_image', 'text' => 'beschreibe in einem audio was hier zu sehen ist', 'language' => 'de', 'fastPath' => false, 'files' => [['type' => 'image', 'name' => 'media_1_google.png']], 'sorter' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'audio']],
+            // Control: mediamaker/audio WITHOUT an image attachment stays mediamaker
+            // (a genuine "read this text aloud" TTS request must not be rerouted).
+            ['id' => 'sort_audio_no_attachment_stays_mediamaker', 'text' => 'lies mir diesen text vor: hallo welt', 'language' => 'de', 'fastPath' => false, 'sorter' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'audio']],
+
             // ---- Sorter-driven: other canonical topics ----
             ['id' => 'sort_officemaker', 'text' => 'mach eine excel tabelle', 'language' => 'de', 'fastPath' => false, 'sorter' => ['topic' => 'officemaker', 'language' => 'de']],
             ['id' => 'sort_general', 'text' => 'tell me a joke', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'sorting_model_id' => 5, 'sorting_provider' => 'ollama', 'sorting_model_name' => 'llama3']],

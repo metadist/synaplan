@@ -1,0 +1,146 @@
+[
+  {
+    "id": "plain_question",
+    "text": "Wer bist du?",
+    "language": "de",
+    "expect": {
+      "capabilities": ["chat"],
+      "forbid": ["image_generation", "text2sound", "web_search"]
+    }
+  },
+  {
+    "id": "single_image",
+    "text": "Erstelle ein Bild von einem Sonnenuntergang",
+    "language": "de",
+    "expect": {
+      "capabilities": ["image_generation"],
+      "forbid": ["chat", "file_analysis"]
+    }
+  },
+  {
+    "id": "poem_then_mp3",
+    "text": "Schreib mir ein Liebesgedicht und lies es mir als MP3 vor.",
+    "language": "de",
+    "expect": {
+      "capabilities": ["chat", "text2sound", "compose_reply"],
+      "edges": ["chat->text2sound"],
+      "forbid": ["image_generation"]
+    }
+  },
+  {
+    "id": "poem_mp3_image_email",
+    "text": "Write a spring poem, read it aloud and make a fitting picture with it. Mail everything to me.",
+    "language": "en",
+    "expect": {
+      "capabilities": ["chat", "text2sound", "image_generation", "email_me", "compose_reply"],
+      "edges": ["chat->text2sound", "chat->email_me"]
+    }
+  },
+  {
+    "id": "image_then_describe",
+    "text": "Erstelle ein Bild einer Katze und danach beschreibe das erstellte Bild.",
+    "language": "de",
+    "expect": {
+      "capabilities": ["image_generation", "file_analysis"],
+      "edges": ["image_generation->file_analysis"],
+      "forbid": ["chat"]
+    }
+  },
+  {
+    "id": "image_poem_vorlesen_1222",
+    "text": "Erstelle das Bild einer Katze, dann schreibe ein Gedicht darüber und lies es mir am Ende vor.",
+    "language": "de",
+    "expect": {
+      "capabilities": ["image_generation", "file_analysis", "text2sound"],
+      "edges": ["image_generation->file_analysis", "file_analysis->text2sound"],
+      "forbid": ["chat"]
+    }
+  },
+  {
+    "id": "describe_attached_image_as_audio_1237",
+    "text": "Beschreibe in einem Audio, was hier zu sehen ist.",
+    "language": "de",
+    "attach": { "type": "png", "path": "photo.png" },
+    "expect": {
+      "capabilities": ["file_analysis", "text2sound"],
+      "edges": ["file_analysis->text2sound"],
+      "forbid": ["image_generation"]
+    }
+  },
+  {
+    "id": "describe_attached_generated_image_as_audio_1237",
+    "text": "beschreibe in einem audio was hier zu sehen ist",
+    "language": "de",
+    "attach": { "type": "image", "path": "media_1_google_abc.png" },
+    "expect": {
+      "capabilities": ["file_analysis", "text2sound"],
+      "edges": ["file_analysis->text2sound"],
+      "forbid": ["image_generation"]
+    }
+  },
+  {
+    "id": "doc_summary_to_mp3",
+    "text": "What's in there? Summarize it into a short MP3.",
+    "language": "en",
+    "attach": { "type": "docx", "path": "report.docx", "file_text": "Quarterly report: revenue grew 12%, churn fell to 2.1%, hiring plan on track." },
+    "expect": {
+      "capabilities": ["text2sound"],
+      "forbid": ["image_generation"]
+    }
+  },
+  {
+    "id": "image_then_animate",
+    "text": "Create a picture of a sailboat on a lake, then animate it as a short video.",
+    "language": "en",
+    "expect": {
+      "capabilities": ["image_generation", "video_generation"],
+      "edges": ["image_generation->video_generation"]
+    }
+  },
+  {
+    "id": "pure_tts",
+    "text": "Read this aloud: Hello world, welcome to the demo.",
+    "language": "en",
+    "expect": {
+      "capabilities": ["text2sound"],
+      "forbid": ["chat", "image_generation"]
+    }
+  },
+  {
+    "id": "office_document",
+    "text": "Mach mir eine Excel-Tabelle mit den Monaten des Jahres und je einem Feiertag.",
+    "language": "de",
+    "expect": {
+      "capabilities": ["document_generation"],
+      "forbid": ["image_generation", "chat"]
+    }
+  },
+  {
+    "id": "calendar_event",
+    "text": "I need a meeting reminder for tomorrow at 9:00 with Sanam.",
+    "language": "en",
+    "options": { "client_country": "DE" },
+    "expect": {
+      "capabilities": ["calendar_event"],
+      "forbid": ["chat", "email_me"]
+    }
+  },
+  {
+    "id": "parallel_independent",
+    "text": "Summarize the concept of photosynthesis in two sentences and draw a cat.",
+    "language": "en",
+    "expect": {
+      "capabilities": ["image_generation", "compose_reply"],
+      "forbid": ["file_analysis"]
+    }
+  },
+  {
+    "id": "translate_then_speak",
+    "text": "Übersetze 'Das Leben ist schön' ins Englische und sprich es mir vor.",
+    "language": "de",
+    "expect": {
+      "capabilities": ["text2sound"],
+      "forbid": ["image_generation"]
+    }
+  }
+]
