@@ -218,7 +218,7 @@
         :is-guest-mode="isGuestMode"
         :quote="quoting.pendingQuote.value"
         @send="handleSendMessage"
-        @stop="handleStopStreaming"
+        @stop="handleUserStop"
         @guest-feature-gate="handleGuestFeatureGate"
         @clear-quote="quoting.clearPendingQuote"
       />
@@ -711,11 +711,20 @@ const handleOpenFeedbackDialogEvent = (event: Event) => {
   }
 }
 
-// Cleanup: Stop streaming when component unmounts (user leaves chat)
+// Detach (do NOT cancel) a running turn when the user navigates away or
+// switches chats (issues #1142 / #1223 / #1225). Closes the SSE connection and
+// clears local streaming state WITHOUT telling the backend to stop — the turn
+// finishes in the background and is restored by loadMessages() on return.
+// Explicit cancellation stays in handleUserStop() (the Stop button).
+function handleNavigateAway() {
+  finishStreamingTurnLocally()
+}
+
+// Cleanup: detach the running stream when the component unmounts (user leaves chat)
 onBeforeUnmount(() => {
   isViewUnmounted = true
   mediaJobsStore.unsubscribe()
-  handleStopStreaming()
+  handleNavigateAway()
   if (currentAudioStreamer) {
     currentAudioStreamer.stop()
     currentAudioStreamer = null
@@ -736,9 +745,12 @@ onBeforeUnmount(() => {
 watch(
   () => chatsStore.activeChatId,
   async (newChatId, oldChatId) => {
-    // CRITICAL: Stop any active streaming when switching chats
+    // Switching chats DETACHES a running turn instead of cancelling it
+    // (issue #1223): close the SSE connection and clear local streaming state,
+    // but let the backend finish the turn in the background. Returning to the
+    // chat restores the completed response via loadMessages().
     if (oldChatId !== newChatId && isStreaming.value) {
-      await handleStopStreaming()
+      handleNavigateAway()
     }
 
     // Cleanup: Delete previous chat if it was empty (no messages)
@@ -2882,10 +2894,14 @@ const streamAIResponse = async (
     currentStreamingChatId = undefined
   }
   // NOTE: Don't clean up in finally block! The streaming is async and still running.
-  // Cleanup happens in the 'complete' event handler or in handleStopStreaming()
+  // Cleanup happens in the 'complete' event handler or in handleUserStop()
 }
 
-const handleStopStreaming = async () => {
+// Explicit Stop button (issue #1225): the user WANTS to cancel the turn. Tell
+// the backend to stop (/stop-stream flags the turn via CancellationStore) and
+// persist the partial answer as cancelled (/save-cancelled). This is distinct
+// from navigating away, which detaches WITHOUT cancelling (handleNavigateAway).
+const handleUserStop = async () => {
   // CRITICAL: Abort signal FIRST to prevent any further chunk processing
   if (streamingAbortController) {
     streamingAbortController.abort()
@@ -2907,12 +2923,23 @@ const handleStopStreaming = async () => {
   const effectiveTrackId = streamingMessageForTrack?.taskPlan?.trackId ?? currentTrackId
 
   // Notify backend to stop streaming.
+  // Since detach-on-navigation (#1225) the backend ignores a bare disconnect,
+  // so closing the EventSource alone no longer cancels the turn — every
+  // explicit Stop must flag the turn via a cancel endpoint.
   // Guests have no auth session: the auth-guarded /stop-stream endpoint would
   // return 401 and the http client would force a "session expired" redirect to
-  // /login (issue #1037). For guests, closing the EventSource above is enough —
-  // the backend detects the abort via connection_aborted() in the stream loop.
+  // /login (issue #1037). Guests use the public guest endpoint instead, which
+  // authorizes the cancel with the server-issued guest session id.
   if (isGuestMode.value) {
-    // No backend notification needed for guests.
+    if (effectiveTrackId && guestStore.sessionId) {
+      try {
+        await chatApi.stopGuestStream(guestStore.sessionId, effectiveTrackId)
+      } catch (error) {
+        console.error('❌ Failed to notify backend (guest):', error)
+      }
+    } else {
+      console.warn('⚠️ No trackId or guest session - skipping backend notification')
+    }
   } else if (effectiveTrackId) {
     try {
       await chatApi.stopStream(effectiveTrackId)

@@ -651,6 +651,26 @@ export const chatApi = {
   },
 
   /**
+   * Stop streaming for a guest session — guest counterpart of stopStream().
+   *
+   * Uses the public /api/v1/guest/stop-stream endpoint (authorized by the
+   * server-issued session id) via plain fetch instead of httpClient, so a 401
+   * can never trigger the "session expired" login redirect for guests
+   * (issue #1037). Needed since detach-on-navigation (#1225): closing the
+   * EventSource alone no longer cancels the backend turn.
+   */
+  async stopGuestStream(guestSessionId: string, trackId: number): Promise<void> {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/guest/stop-stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: guestSessionId, trackId }),
+    })
+    if (!response.ok) {
+      throw new Error(`Failed to stop guest stream (HTTP ${response.status})`)
+    }
+  },
+
+  /**
    * Cancel a single multitask media node (per-card Stop button) without
    * stopping the rest of the turn.
    */

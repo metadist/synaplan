@@ -37,7 +37,7 @@ final readonly class TaskPlanner
         'translate' => 'Translate provided text into a target language (params.target).',
         'rag_query' => 'Answer using the user knowledge base (retrieval-augmented).',
         'web_search' => 'Search the web for current information.',
-        'file_analysis' => 'Analyze/describe/OCR an attached image or document and answer about it.',
+        'file_analysis' => 'Analyze/describe/OCR an image or document — either attached by the user or produced by a prior node ($nX.file) — and answer about it.',
         'image_generation' => 'Generate or edit an image from a prompt and/or reference images.',
         'video_generation' => 'Generate a video clip (params.duration, params.resolution).',
         'text2sound' => 'Synthesize speech/audio from text (params.format, e.g. mp3).',

@@ -9,6 +9,7 @@ use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
+use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
@@ -449,8 +450,15 @@ class StreamController extends AbstractController
             }
             ob_implicit_flush(1);
             set_time_limit(0);
-            // Stop execution when client disconnects
-            ignore_user_abort(false);
+            // Detach-on-navigation (issues #1142 / #1223 / #1225): keep the turn
+            // alive when the client disconnects (chat switch / page leave /
+            // reload). The turn finishes in the background and persists its
+            // result so it is there on return. sendSSE() already no-ops once the
+            // socket is gone, and an EXPLICIT Stop still aborts because it flags
+            // the turn via CancellationStore (checked in the stream callback and
+            // the media handlers). Only a genuine cancel — never a bare
+            // disconnect — ends the turn early.
+            ignore_user_abort(true);
 
             // Phase 0: per-request performance timer.
             // Lives only inside the callback so it doesn't measure connection
@@ -820,9 +828,18 @@ class StreamController extends AbstractController
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
                     // Stream callback - AI streams TEXT directly or structured data (reasoning)
-                    function ($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson, &$finishReason) {
-                        if (connection_aborted()) {
-                            throw new \RuntimeException('Client disconnected');
+                    function ($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson, &$finishReason, $trackId) {
+                        // Detach-on-navigation (issues #1142 / #1223 / #1225): a
+                        // bare client disconnect (chat switch, page leave, reload)
+                        // must NOT kill the turn — it keeps streaming silently
+                        // (sendSSE() no-ops once the socket is gone) so the finished
+                        // response is persisted and available on return. Only an
+                        // EXPLICIT Stop, which flags the turn via CancellationStore
+                        // through /stop-stream (or the guest counterpart
+                        // /api/v1/guest/stop-stream), aborts the inline text stream.
+                        if ('' !== (string) $trackId
+                            && $this->cancellationStore->isCancelled((string) $trackId)) {
+                            throw new StreamCancelledException('Stream cancelled by user');
                         }
 
                         // Handle structured chunk (reasoning models)
@@ -1774,16 +1791,15 @@ class StreamController extends AbstractController
                 }
 
                 $this->sendSSE('error', $errorData);
+            } catch (StreamCancelledException) {
+                // Explicit user cancel (/stop-stream flagged the turn) — not an
+                // error and not a disconnect. The frontend persists the partial
+                // answer via /save-cancelled, so just end the turn silently.
+                $this->logger->info('Stream stopped - cancelled by user', [
+                    'user_id' => $user->getId(),
+                    'track_id' => (string) $trackId,
+                ]);
             } catch (\Exception $e) {
-                // Don't send error if client disconnected intentionally
-                if ('Client disconnected' === $e->getMessage()) {
-                    $this->logger->info('Stream stopped - client disconnected', [
-                        'user_id' => $user->getId(),
-                    ]);
-
-                    return; // Silently stop
-                }
-
                 $this->logger->error('Streaming failed', [
                     'user_id' => $user->getId(),
                     'error' => $e->getMessage(),

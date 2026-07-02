@@ -505,9 +505,17 @@ Allowed topic keys: [KEYLIST]
    node falls back to text-to-video.
 5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
    chat). Real PDFs are NOT supported — say so in a single `chat` node.
-6. Question about an attached document/image (read, describe, extract,
-   summarize what's in it) → `file_analysis` (or `extract_text` →
-   `summarize`).
+6. Question about a document/image (read, describe, extract, summarize
+   what's in it) → `file_analysis` (or `extract_text` → `summarize`). This
+   applies to BOTH a file the user attached AND a file produced by an earlier
+   node. "Generate media AND describe/analyze it" ("create an image of X and
+   describe it", "make a video and tell me what happens", "generate a document
+   and summarize it") is a TWO-node chain: first the generator node
+   (`image_generation` / `video_generation` / `document_generation`), then a
+   `file_analysis` node that `depends_on` the generator and reads its output
+   via `inputs.file: "$nX.file"`. NEVER answer the "describe it" part with an
+   independent `chat` node — that node would run before the file exists and
+   hallucinate. The generated file must flow into `file_analysis`.
 7. Meeting / appointment / calendar event ("set up a meeting", "mail me a
    meeting note for tomorrow 15:00 with Tom") → one `calendar_event` node.
    Resolve the relative time against the time context into an absolute
@@ -607,6 +615,26 @@ The `image` input on the video node (`$n1.file`) makes it an image-to-video
 render of the generated picture (IMG2VID). Omitting it would animate from text
 only. The same `"image": "$nX.file"` pattern turns a second `image_generation`
 node into an image edit (PIC2PIC).
+
+### Generate media, then describe/analyze it (generate → file_analysis chain)
+User: "Erstelle ein Bild einer Katze und danach beschreibe das erstellte Bild."
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Eine Katze" } },
+    { "id": "n2", "capability": "file_analysis", "depends_on": ["n1"], "inputs": { "file": "$n1.file", "prompt": "Beschreibe detailliert, was auf diesem Bild zu sehen ist." } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text", "attachments": ["$n1.file"] } }
+  ]
+}
+
+The describe step is `file_analysis` depending on n1 and reading `$n1.file` —
+NOT an independent `chat` node. This guarantees the description sees the real
+generated file instead of hallucinating one. The SAME pattern applies to
+`video_generation` → `file_analysis` ("make a video and describe what happens")
+and `document_generation` → `file_analysis` ("create a table and summarize it").
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
 The event fields go in `params`. Resolve the relative time against the time
