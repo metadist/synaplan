@@ -5,7 +5,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
-import { useAuthStore } from '@/stores/auth'
+import { authReady, useAuthStore } from '@/stores/auth'
 import { useNotification } from '@/composables/useNotification'
 import {
   getConfigSchema,
