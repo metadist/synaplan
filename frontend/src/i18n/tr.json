@@ -68,7 +68,8 @@
     "widgetSessions": "Widget Oturumları",
     "widgetChats": "Widget Sohbetleri",
     "liveSupport": "Canlı Destek",
-    "addinConnect": "Outlook eklentisini bağla"
+    "addinConnect": "Outlook eklentisini bağla",
+    "mcpServers": "MCP Sunucuları"
   },
   "addinConnect": {
     "title": "Synaplan'a bağlan",
@@ -319,6 +320,7 @@
     "toolsChatWidget": "Sohbet Widgetı",
     "toolsDocSummary": "Özetleyici",
     "toolsMailHandler": "E-posta Otomasyonu",
+    "mcpServers": "MCP Sunucuları",
     "plugins": "Eklentiler",
     "files": "Dosyalar",
     "filesDescription": "Dosyalar ve bilgi",
@@ -2739,5 +2741,36 @@
     "subtitle": "Uygulamanın bu sürümü artık desteklenmiyor. Devam etmek için lütfen en son sürüme güncelleyin.",
     "minVersion": "Gerekli en düşük sürüm: {version}",
     "cta": "Şimdi güncelle"
+  },
+  "mcpServers": {
+    "title": "MCP Sunucuları",
+    "description": "Asistanın yanıt verirken kendi sistemlerinizden (CRM, wiki, dahili API'ler) veri çekebilmesi için harici MCP sunucularını bağlayın. Burada keşfedilen araçlar görev planlayıcısına sunulur.",
+    "clientDisabledHint": "Giden MCP istemcisi şu anda platform yapılandırmasında devre dışı. Bağlantılar hazırlanabilir, ancak etkinleştirilene kadar çağrı yapılmaz.",
+    "listTitle": "Bağlı sunucular",
+    "add": "Sunucu ekle",
+    "addTitle": "Yeni sunucu bağla",
+    "editTitle": "Sunucuyu düzenle",
+    "formHint": "URL, herkese açık bir HTTPS MCP uç noktası (Streamable HTTP) olmalıdır. Kimlik doğrulama değeri şifrelenmiş olarak saklanır ve bir daha gösterilmez.",
+    "empty": "Henüz bağlı MCP sunucusu yok.",
+    "nameLabel": "Ad",
+    "urlLabel": "Sunucu URL'si",
+    "authHeaderLabel": "Kimlik doğrulama başlığı adı (isteğe bağlı)",
+    "authTokenLabel": "Kimlik doğrulama başlığı değeri",
+    "authTokenPlaceholder": "örn. Bearer sk-…",
+    "enabledLabel": "Etkin",
+    "enabled": "Etkin",
+    "disabled": "Devre dışı",
+    "test": "Bağlantıyı test et",
+    "testing": "Test ediliyor…",
+    "testSuccess": "Bağlantı başarılı — {count} araç bulundu",
+    "testFailed": "Bağlantı başarısız",
+    "discoveredTools": "{count} araç bulundu:",
+    "saved": "Sunucu kaydedildi",
+    "saveFailed": "Sunucu kaydedilemedi",
+    "deleted": "Sunucu kaldırıldı",
+    "deleteFailed": "Sunucu kaldırılamadı",
+    "deleteTitle": "MCP sunucusunu kaldır",
+    "deleteMessage": "\"{name}\" bağlantısı kaldırılsın mı? Asistan artık bu sunucunun araçlarını kullanamaz.",
+    "loadFailed": "MCP sunucuları yüklenemedi"
   }
 }

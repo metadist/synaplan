@@ -22,7 +22,7 @@ import {
 } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
-// Response types are inferred from the generated Zod schemas (per AGENTS_DEV:
+// Response types are inferred from the generated Zod schemas (per AGENTS.md:
 // never hand-write interfaces for API responses). The request body type below
 // is NOT an API response, so it stays a plain interface.
 export type HiggsfieldEffectiveSource = 'user' | 'platform' | 'none'

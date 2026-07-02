@@ -1,0 +1,315 @@
+<template>
+  <div class="space-y-6" data-testid="page-config-mcp-servers">
+    <!-- Header -->
+    <div class="surface-card p-6" data-testid="section-mcp-overview">
+      <div class="flex items-start gap-3">
+        <div class="p-2 rounded-lg bg-[var(--brand)]/10">
+          <Icon icon="heroicons:server-stack" class="w-6 h-6 text-[var(--brand)]" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <h2 class="text-2xl font-semibold txt-primary mb-1">{{ $t('mcpServers.title') }}</h2>
+          <p class="txt-secondary text-sm leading-relaxed">{{ $t('mcpServers.description') }}</p>
+          <p
+            v-if="!clientEnabled"
+            class="text-sm mt-3 px-3 py-2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            data-testid="mcp-client-disabled-hint"
+          >
+            {{ $t('mcpServers.clientDisabledHint') }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server list -->
+    <div class="surface-card p-6" data-testid="section-mcp-list">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold txt-primary">{{ $t('mcpServers.listTitle') }}</h3>
+        <button
+          type="button"
+          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+          data-testid="btn-mcp-add"
+          @click="startCreate"
+        >
+          {{ $t('mcpServers.add') }}
+        </button>
+      </div>
+
+      <p v-if="!loading && servers.length === 0" class="txt-secondary text-sm">
+        {{ $t('mcpServers.empty') }}
+      </p>
+
+      <ul v-else class="divide-y divide-light-border/20 dark:divide-dark-border/20">
+        <li
+          v-for="server in servers"
+          :key="server.id"
+          class="py-3 flex flex-wrap items-center gap-3"
+          :data-testid="`mcp-server-${server.id}`"
+        >
+          <div class="flex-1 min-w-0">
+            <p class="txt-primary text-sm font-medium truncate">{{ server.name }}</p>
+            <p class="txt-secondary text-xs font-mono truncate">{{ server.url }}</p>
+          </div>
+          <span
+            class="text-xs px-2 py-1 rounded-full"
+            :class="
+              server.enabled
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                : 'bg-gray-500/10 txt-secondary'
+            "
+          >
+            {{ server.enabled ? $t('mcpServers.enabled') : $t('mcpServers.disabled') }}
+          </span>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="text-sm text-[var(--brand)] hover:underline"
+              :disabled="testingId === server.id"
+              :data-testid="`btn-mcp-test-${server.id}`"
+              @click="testServer(server)"
+            >
+              {{ testingId === server.id ? $t('mcpServers.testing') : $t('mcpServers.test') }}
+            </button>
+            <button
+              type="button"
+              class="text-sm text-[var(--brand)] hover:underline"
+              @click="startEdit(server)"
+            >
+              {{ $t('actions.edit') }}
+            </button>
+            <button
+              type="button"
+              class="text-sm text-red-500 hover:underline"
+              @click="removeServer(server)"
+            >
+              {{ $t('actions.delete') }}
+            </button>
+          </div>
+          <div v-if="toolsByServer[server.id ?? -1]" class="w-full pl-1">
+            <p class="text-xs txt-secondary mb-1">
+              {{
+                $t('mcpServers.discoveredTools', { count: toolsByServer[server.id ?? -1].length })
+              }}
+            </p>
+            <ul class="flex flex-wrap gap-2">
+              <li
+                v-for="tool in toolsByServer[server.id ?? -1]"
+                :key="tool.name"
+                class="text-xs px-2 py-1 rounded bg-[var(--brand)]/10 txt-primary font-mono"
+                :title="tool.description"
+              >
+                {{ tool.name }}
+              </li>
+            </ul>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Editor -->
+    <div v-if="editorOpen" class="surface-card p-6" data-testid="section-mcp-editor">
+      <h3 class="text-lg font-semibold txt-primary mb-1">
+        {{ editingId ? $t('mcpServers.editTitle') : $t('mcpServers.addTitle') }}
+      </h3>
+      <p class="txt-secondary text-sm mb-5">{{ $t('mcpServers.formHint') }}</p>
+
+      <div class="space-y-4">
+        <label class="block">
+          <span class="text-sm font-medium txt-primary">{{ $t('mcpServers.nameLabel') }}</span>
+          <input
+            v-model="form.name"
+            type="text"
+            class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-mcp-name"
+          />
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium txt-primary">{{ $t('mcpServers.urlLabel') }}</span>
+          <input
+            v-model="form.url"
+            type="url"
+            placeholder="https://example.com/mcp"
+            class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
+            data-testid="input-mcp-url"
+          />
+        </label>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <label class="block">
+            <span class="text-sm font-medium txt-primary">{{
+              $t('mcpServers.authHeaderLabel')
+            }}</span>
+            <input
+              v-model="form.authHeader"
+              type="text"
+              placeholder="Authorization"
+              class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
+              data-testid="input-mcp-auth-header"
+            />
+          </label>
+          <label class="block">
+            <span class="text-sm font-medium txt-primary">{{
+              $t('mcpServers.authTokenLabel')
+            }}</span>
+            <input
+              v-model="form.authToken"
+              type="password"
+              autocomplete="off"
+              :placeholder="editingHasToken ? '••••••••' : $t('mcpServers.authTokenPlaceholder')"
+              class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
+              data-testid="input-mcp-auth-token"
+            />
+          </label>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm txt-primary">
+          <input v-model="form.enabled" type="checkbox" class="accent-[var(--brand)]" />
+          {{ $t('mcpServers.enabledLabel') }}
+        </label>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 mt-6">
+        <button
+          type="button"
+          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+          :disabled="saving || !form.name.trim() || !form.url.trim()"
+          data-testid="btn-mcp-save"
+          @click="save"
+        >
+          {{ saving ? $t('actions.saving') : $t('actions.save') }}
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2 rounded-lg text-sm txt-secondary hover:txt-primary"
+          @click="closeEditor"
+        >
+          {{ $t('actions.cancel') }}
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted, reactive, ref } from 'vue'
+import { Icon } from '@iconify/vue'
+import { useI18n } from 'vue-i18n'
+import { useDialog } from '@/composables/useDialog'
+import { useNotification } from '@/composables/useNotification'
+import { mcpServersApi, type McpServer, type McpTool } from '@/services/api/mcpServersApi'
+
+const { t } = useI18n()
+const { confirm } = useDialog()
+const { success, error } = useNotification()
+
+const loading = ref(true)
+const saving = ref(false)
+const clientEnabled = ref(false)
+const servers = ref<McpServer[]>([])
+const toolsByServer = reactive<Record<number, McpTool[]>>({})
+const testingId = ref<number | null>(null)
+
+const editorOpen = ref(false)
+const editingId = ref<number | null>(null)
+const editingHasToken = ref(false)
+const form = reactive({ name: '', url: '', authHeader: '', authToken: '', enabled: true })
+
+const load = async () => {
+  loading.value = true
+  try {
+    const data = await mcpServersApi.list()
+    clientEnabled.value = data.clientEnabled
+    servers.value = data.servers
+  } catch {
+    error(t('mcpServers.loadFailed'))
+  } finally {
+    loading.value = false
+  }
+}
+
+const startCreate = () => {
+  editingId.value = null
+  editingHasToken.value = false
+  Object.assign(form, { name: '', url: '', authHeader: '', authToken: '', enabled: true })
+  editorOpen.value = true
+}
+
+const startEdit = (server: McpServer) => {
+  editingId.value = server.id ?? null
+  editingHasToken.value = server.has_auth_token ?? false
+  Object.assign(form, {
+    name: server.name ?? '',
+    url: server.url ?? '',
+    authHeader: server.auth_header ?? '',
+    authToken: '',
+    enabled: server.enabled ?? true,
+  })
+  editorOpen.value = true
+}
+
+const closeEditor = () => {
+  editorOpen.value = false
+}
+
+const save = async () => {
+  saving.value = true
+  try {
+    const payload = {
+      name: form.name.trim(),
+      url: form.url.trim(),
+      auth_header: form.authHeader.trim(),
+      enabled: form.enabled,
+      // Only send the secret when the user actually typed one — absent keeps
+      // the stored value.
+      ...(form.authToken !== '' ? { auth_token: form.authToken } : {}),
+    }
+    if (editingId.value !== null) {
+      await mcpServersApi.update(editingId.value, payload)
+    } else {
+      await mcpServersApi.create(payload)
+    }
+    success(t('mcpServers.saved'))
+    editorOpen.value = false
+    await load()
+  } catch (err) {
+    error(err instanceof Error && err.message ? err.message : t('mcpServers.saveFailed'))
+  } finally {
+    saving.value = false
+  }
+}
+
+const removeServer = async (server: McpServer) => {
+  const confirmed = await confirm({
+    title: t('mcpServers.deleteTitle'),
+    message: t('mcpServers.deleteMessage', { name: server.name ?? '' }),
+    confirmText: t('actions.delete'),
+    danger: true,
+  })
+  if (!confirmed || server.id === undefined) return
+
+  try {
+    await mcpServersApi.remove(server.id)
+    success(t('mcpServers.deleted'))
+    await load()
+  } catch {
+    error(t('mcpServers.deleteFailed'))
+  }
+}
+
+const testServer = async (server: McpServer) => {
+  if (server.id === undefined) return
+  testingId.value = server.id
+  try {
+    const result = await mcpServersApi.test(server.id)
+    if (result.success) {
+      toolsByServer[server.id] = result.tools
+      success(t('mcpServers.testSuccess', { count: result.tools.length }))
+    } else {
+      error(result.error || t('mcpServers.testFailed'))
+    }
+  } catch {
+    error(t('mcpServers.testFailed'))
+  } finally {
+    testingId.value = null
+  }
+}
+
+onMounted(load)
+</script>

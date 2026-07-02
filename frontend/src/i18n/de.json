@@ -69,7 +69,8 @@
     "widgetChats": "Widget-Chats",
     "widgetDetail": "Widget-Detail",
     "liveSupport": "Live-Support",
-    "addinConnect": "Outlook-Add-in verbinden"
+    "addinConnect": "Outlook-Add-in verbinden",
+    "mcpServers": "MCP-Server"
   },
   "addinConnect": {
     "title": "Mit Synaplan verbinden",
@@ -346,6 +347,7 @@
     "toolsChatWidget": "Chat-Widget",
     "toolsDocSummary": "Zusammenfasser",
     "toolsMailHandler": "E-Mail-Automatisierung",
+    "mcpServers": "MCP-Server",
     "plugins": "Plugins",
     "files": "Dateien",
     "filesDescription": "Dateien & Wissen",
@@ -3767,5 +3769,36 @@
     "subtitle": "Diese App-Version wird nicht mehr unterstützt. Bitte aktualisiere auf die neueste Version, um fortzufahren.",
     "minVersion": "Mindestens erforderliche Version: {version}",
     "cta": "Jetzt aktualisieren"
+  },
+  "mcpServers": {
+    "title": "MCP-Server",
+    "description": "Verbinde externe MCP-Server, damit der Assistent beim Antworten Daten aus deinen eigenen Systemen (CRM, Wiki, interne APIs) abrufen kann. Die hier entdeckten Tools stehen dem Task-Planner zur Verfügung.",
+    "clientDisabledHint": "Der ausgehende MCP-Client ist derzeit in der Plattformkonfiguration deaktiviert. Verbindungen können vorbereitet werden, es werden aber keine Aufrufe ausgeführt, bis er aktiviert ist.",
+    "listTitle": "Verbundene Server",
+    "add": "Server hinzufügen",
+    "addTitle": "Neuen Server verbinden",
+    "editTitle": "Server bearbeiten",
+    "formHint": "Die URL muss ein öffentlicher HTTPS-MCP-Endpunkt (Streamable HTTP) sein. Der Auth-Wert wird verschlüsselt gespeichert und nie wieder angezeigt.",
+    "empty": "Noch keine MCP-Server verbunden.",
+    "nameLabel": "Name",
+    "urlLabel": "Server-URL",
+    "authHeaderLabel": "Auth-Header-Name (optional)",
+    "authTokenLabel": "Auth-Header-Wert",
+    "authTokenPlaceholder": "z. B. Bearer sk-…",
+    "enabledLabel": "Aktiviert",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "test": "Verbindung testen",
+    "testing": "Teste…",
+    "testSuccess": "Verbindung OK — {count} Tool(s) gefunden",
+    "testFailed": "Verbindung fehlgeschlagen",
+    "discoveredTools": "{count} Tool(s) gefunden:",
+    "saved": "Server gespeichert",
+    "saveFailed": "Server konnte nicht gespeichert werden",
+    "deleted": "Server entfernt",
+    "deleteFailed": "Server konnte nicht entfernt werden",
+    "deleteTitle": "MCP-Server entfernen",
+    "deleteMessage": "Verbindung \"{name}\" entfernen? Der Assistent kann dessen Tools dann nicht mehr nutzen.",
+    "loadFailed": "MCP-Server konnten nicht geladen werden"
   }
 }

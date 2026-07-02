@@ -110,6 +110,7 @@ export function useNavItems() {
       { key: 'inbound', path: '/channels', label: t('nav.configInbound') },
       { key: 'chat-widget', path: '/channels/widgets', label: t('nav.toolsChatWidget') },
       { key: 'mail-handler', path: '/channels/email', label: t('nav.toolsMailHandler') },
+      { key: 'mcp-servers', path: '/channels/mcp', label: t('nav.mcpServers') },
       { key: 'api-keys', path: '/channels/api', label: t('nav.configApiKeys') },
       { key: 'api-docs', path: '/channels/api/docs', label: t('pageTitles.configApiDocs') },
     ]
