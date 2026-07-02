@@ -496,7 +496,10 @@
     "text": "Look up the customer Acme GmbH in our CRM and summarize their last order.",
     "language": "en",
     "expect": {
-      "forbid": ["mcp_fetch", "image_generation"]
+      "forbid": [
+        "mcp_fetch",
+        "image_generation"
+      ]
     }
   },
   {
@@ -521,6 +524,18 @@
         "text2sound"
       ],
       "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "email_search_not_offered_no_hallucination",
+    "text": "Search my emails for the Acme offer from last week and summarize it.",
+    "language": "en",
+    "expect": {
+      "forbid": [
+        "email_search",
+        "mcp_fetch",
         "image_generation"
       ]
     }

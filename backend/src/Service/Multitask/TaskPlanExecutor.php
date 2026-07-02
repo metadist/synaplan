@@ -48,7 +48,7 @@ final readonly class TaskPlanExecutor
      * must run through the DAG even as a lone single node (see
      * {@see shouldUseLegacyRouter()}).
      */
-    private const DAG_ONLY_CAPABILITIES = [Capability::CalendarEvent, Capability::UrlFetch, Capability::McpFetch];
+    private const DAG_ONLY_CAPABILITIES = [Capability::CalendarEvent, Capability::UrlFetch, Capability::McpFetch, Capability::EmailSearch];
 
     /**
      * Single-shot media generators that the legacy router already delivers

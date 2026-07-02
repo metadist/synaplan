@@ -570,6 +570,14 @@ Allowed topic keys: [KEYLIST]
    invent a server_id or tool name, and NEVER emit `mcp_fetch` when it is
    not in the capability list or no listed tool fits — use `chat` or
    `web_search` instead.
+9d. The user explicitly asks about their OWN emails/mailbox ("search my
+   emails for the Acme offer", "was hat mir Tom letzte Woche gemailt?") AND
+   the capability list above shows `email_search` with a connected mailbox
+   → an `email_search` node with `params.query` (keywords), optional
+   `params.from` (sender) and `params.since` (YYYY-MM-DD, resolve relative
+   times against the time context); feed `$nX.text` into the answering
+   node. NEVER emit `email_search` for generic questions or when it is not
+   in the capability list.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
    node, no `compose_reply` needed.
 11. A SINGLE media request with no follow-up step ("make an image of X",
@@ -771,6 +779,25 @@ User: "Look up the customer Acme GmbH in our CRM and summarize their last order.
 `params.server_id` and `params.tool` come EXACTLY from the listed connections
 (never invented), the tool arguments ride in `inputs.arguments`, and the
 answering node consumes `$n1.text` — the reply is grounded in the pulled data.
+
+### Search the user's own mailbox, then answer (email_search)
+User: "Search my emails for the Acme offer from last week and summarize it."
+(The capability list shows email_search with a connected mailbox; assume today is 2026-06-17.)
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "email_search", "params": { "query": "Acme offer", "since": "2026-06-10" } },
+    { "id": "n2", "capability": "summarize", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "style": "short" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+The mailbox is searched LIVE and read-only; the summary consumes the real
+hits via `$n1.text`. Without an explicit "my emails" intent this node is
+never emitted.
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
 The event fields go in `params`. Resolve the relative time against the time

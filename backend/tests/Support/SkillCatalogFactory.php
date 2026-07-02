@@ -9,6 +9,7 @@ use App\Service\Multitask\Execution\Runner\ChatRunner;
 use App\Service\Multitask\Execution\Runner\ComposeReplyRunner;
 use App\Service\Multitask\Execution\Runner\DocumentGenerationRunner;
 use App\Service\Multitask\Execution\Runner\EmailMeRunner;
+use App\Service\Multitask\Execution\Runner\EmailSearchRunner;
 use App\Service\Multitask\Execution\Runner\ExtractTextRunner;
 use App\Service\Multitask\Execution\Runner\FileAnalysisRunner;
 use App\Service\Multitask\Execution\Runner\McpFetchRunner;
@@ -41,6 +42,7 @@ final class SkillCatalogFactory
         WebSearchRunner::class,
         UrlFetchRunner::class,
         McpFetchRunner::class,
+        EmailSearchRunner::class,
         FileAnalysisRunner::class,
         MediaGenerationRunner::class,
         Text2SoundRunner::class,

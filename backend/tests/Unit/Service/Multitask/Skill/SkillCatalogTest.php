@@ -96,11 +96,13 @@ final class SkillCatalogTest extends TestCase
 
         $on = $catalog->renderCapabilityList();
         self::assertStringContainsString('- "url_fetch": ', $on);
-        // mcp_fetch is a DYNAMIC block (requiresDynamicNote): without a
-        // connected-server sub-catalog it stays invisible even when its flag
-        // is on — so exactly one capability line is missing here.
+        // mcp_fetch and email_search are DYNAMIC blocks (requiresDynamicNote):
+        // without a per-user sub-catalog / availability note they stay
+        // invisible even when their flags are on — so exactly two capability
+        // lines are missing here.
         self::assertStringNotContainsString('"mcp_fetch"', $on);
+        self::assertStringNotContainsString('"email_search"', $on);
         $lines = explode("\n", $on);
-        self::assertCount(count(Capability::cases()) - 1, $lines);
+        self::assertCount(count(Capability::cases()) - 2, $lines);
     }
 }

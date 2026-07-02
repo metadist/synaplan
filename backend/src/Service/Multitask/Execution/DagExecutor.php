@@ -541,7 +541,7 @@ final readonly class DagExecutor
      */
     private function successMetadata(TaskNode $node, NodeResult $result): array
     {
-        if (!in_array($node->capability, [Capability::WebSearch, Capability::UrlFetch, Capability::McpFetch], true)) {
+        if (!in_array($node->capability, [Capability::WebSearch, Capability::UrlFetch, Capability::McpFetch, Capability::EmailSearch], true)) {
             return [];
         }
 
@@ -553,6 +553,10 @@ final readonly class DagExecutor
         $sr = $result->metadata['search_results'] ?? null;
         if (is_array($sr) && is_array($sr['results'] ?? null)) {
             $extra['results_count'] = count($sr['results']);
+        } elseif (is_int($result->metadata['results_count'] ?? null)) {
+            // Data nodes without the web-search result shape (email_search)
+            // report their hit count directly.
+            $extra['results_count'] = $result->metadata['results_count'];
         }
 
         return $extra;
