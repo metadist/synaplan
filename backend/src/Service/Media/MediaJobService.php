@@ -242,6 +242,7 @@ final class MediaJobService
      */
     public function markCompleted(MediaJob $job, array $result): void
     {
+        $this->adoptFreshMessageBinding($job);
         $job->setResult($result)
             ->setPercent(100)
             ->setError(null)
@@ -257,6 +258,7 @@ final class MediaJobService
 
     public function markFailed(MediaJob $job, string $error): void
     {
+        $this->adoptFreshMessageBinding($job);
         $job->setError($this->truncateError($error))
             ->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_FAILED);
@@ -271,6 +273,7 @@ final class MediaJobService
 
     public function markCancelled(MediaJob $job): void
     {
+        $this->adoptFreshMessageBinding($job);
         $job->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_CANCELLED);
         $this->store->save($job);
@@ -278,6 +281,7 @@ final class MediaJobService
 
     public function markTimedOut(MediaJob $job, string $reason): void
     {
+        $this->adoptFreshMessageBinding($job);
         $job->setError($this->truncateError($reason))
             ->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_TIMED_OUT);
@@ -288,6 +292,36 @@ final class MediaJobService
             'reason' => $reason,
             'elapsed_seconds' => $job->getElapsedSeconds(),
         ]);
+    }
+
+    /**
+     * Re-adopt the stored message binding before a terminal save (#1239).
+     *
+     * The worker holds its MediaJob object in memory for the whole render.
+     * When StreamController rebinds the job to the freshly persisted OUT
+     * message DURING that render, the worker's terminal save would overwrite
+     * the rebind with its stale IN-message id — the terminal sync then hits
+     * the IN row, is (correctly) skipped by the #1218 direction guard, and the
+     * bubble/task card never resolves. Refreshing the binding right before the
+     * terminal transition makes the last write carry the freshest target.
+     * (A rebind landing inside the refresh→save window is still lost, but the
+     * window is milliseconds instead of the whole render.)
+     */
+    private function adoptFreshMessageBinding(MediaJob $job): void
+    {
+        $stored = $this->store->find($job->getJobKey());
+        if (null === $stored) {
+            return;
+        }
+        $storedMessageId = $stored->getMessageId();
+        if (null !== $storedMessageId && $storedMessageId !== $job->getMessageId()) {
+            $this->logger->info('MediaJob adopting rebound message id at terminal transition', [
+                'job_key' => $job->getJobKey(),
+                'stale_message_id' => $job->getMessageId(),
+                'message_id' => $storedMessageId,
+            ]);
+            $job->setMessageId($storedMessageId);
+        }
     }
 
     public function heartbeat(MediaJob $job): void

@@ -567,6 +567,43 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         }
     }
 
+    public function testTerminalSaveAdoptsReboundMessageIdFromStore(): void
+    {
+        // Issue #1239, worker-side half: a single-step image render holds its
+        // MediaJob in memory for the whole render. If StreamController rebinds
+        // the job to the OUT message DURING that render, the worker's terminal
+        // markCompleted() used to save the stale IN-message binding back over
+        // the rebind — the sync then hit the IN row and was skipped forever.
+        // The terminal transition must re-adopt the freshest stored binding.
+        $user = $this->createUser();
+        $incoming = $this->createIncomingMessage($user, 'erstelle das bild einer katze');
+        $outgoing = $this->createMessage($user);
+
+        $job = $this->jobService->create([
+            'userId' => $user->getId(),
+            'type' => MediaJob::TYPE_IMAGE,
+            'provider' => 'openai',
+            'prompt' => 'a cat',
+            'messageId' => $incoming->getId(),
+            'nodeId' => 'n1',
+            'options' => ['lang' => 'de'],
+        ]);
+        $this->createdJobKeys[] = $job->getJobKey();
+
+        // Rebind lands while the worker's in-memory copy still points at IN.
+        $this->jobService->rebindMessage($job->getJobKey(), $outgoing->getId());
+        self::assertSame($incoming->getId(), $job->getMessageId(), 'in-memory copy is intentionally stale');
+
+        $this->jobService->markCompleted($job, [
+            'file' => ['url' => '/api/v1/files/uploads/cat-race.png', 'type' => 'image'],
+        ]);
+
+        self::assertSame($outgoing->getId(), $job->getMessageId(), 'terminal save must adopt the rebound OUT binding');
+        $fresh = $this->store->find($job->getJobKey());
+        self::assertNotNull($fresh);
+        self::assertSame($outgoing->getId(), $fresh->getMessageId());
+    }
+
     public function testSyncImageJobRendersSavesAndAttachesToMessage(): void
     {
         $user = $this->createUser();
