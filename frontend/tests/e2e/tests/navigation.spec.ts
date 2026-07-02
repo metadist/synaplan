@@ -7,7 +7,6 @@ import { TIMEOUTS } from '../config/config'
 const NAV = selectors.nav
 const SET = selectors.settings
 const USR = selectors.userMenu
-const DLG = selectors.dialog
 
 /**
  * Mode is persisted in localStorage (`app_mode`) by the appMode store.
@@ -45,7 +44,7 @@ async function openFlyout(page: Page, railItemSelector: string) {
 }
 
 test.describe('Navigation: Sidebar basics (non-admin, easy mode)', () => {
-  test('@ci Easy mode shows Channels and AI Setup locked (Q6), Files and History stay usable', async ({
+  test('@ci Easy mode hides Channels and AI Setup, Files and History stay usable', async ({
     page,
     credentials,
   }) => {
@@ -60,43 +59,9 @@ test.describe('Navigation: Sidebar basics (non-admin, easy mode)', () => {
       await expect(page.locator(NAV.sidebarV2Files)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     })
 
-    await test.step('Assert: Channels + AI Setup are visible, not hidden (Q6)', async () => {
-      await expect(page.locator(NAV.sidebarV2Channels)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(page.locator(NAV.sidebarV2AiSetup)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    })
-
-    await test.step('Act+Assert: tapping a locked item offers the Advanced-mode switch', async () => {
-      await page.locator(NAV.sidebarV2Channels).click()
-      await expect(page.locator(DLG.confirmBtn)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      // Dismiss: stays in easy mode, no flyout opens
-      await page.locator(DLG.cancelBtn).click()
-      await expect(page.locator(NAV.navDropdown)).not.toBeVisible()
-      expect(await page.evaluate(() => localStorage.getItem('app_mode'))).toBe('easy')
-    })
-  })
-
-  test('@ci Locked Channels item switches to Advanced mode on confirm (Q6)', async ({
-    page,
-    credentials,
-  }) => {
-    await test.step('Arrange: login and switch to easy mode', async () => {
-      await login(page, credentials)
-      await ensureEasyMode(page)
-    })
-
-    await test.step('Act: tap Channels, confirm the switch', async () => {
-      await page.locator(NAV.sidebarV2Channels).click()
-      await expect(page.locator(DLG.confirmBtn)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await page.locator(DLG.confirmBtn).click()
-    })
-
-    await test.step('Assert: now in advanced mode and the Channels flyout opened', async () => {
-      await expect(page.locator(NAV.navDropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect
-        .poll(() => page.evaluate(() => localStorage.getItem('app_mode')), {
-          timeout: TIMEOUTS.SHORT,
-        })
-        .toBe('advanced')
+    await test.step('Assert: advanced-only items (Channels + AI Setup) are hidden', async () => {
+      await expect(page.locator(NAV.sidebarV2Channels)).not.toBeVisible()
+      await expect(page.locator(NAV.sidebarV2AiSetup)).not.toBeVisible()
     })
   })
 

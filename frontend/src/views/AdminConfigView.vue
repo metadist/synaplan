@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -48,6 +48,62 @@ const tabs = computed(() => {
     icon: tabIcons[id] || 'mdi:cog',
   }))
 })
+
+// Tabs are grouped into max 3 condensed dropdowns (same pattern as the
+// widget's AdvancedWidgetConfig) so the header never overflows horizontally.
+// Group membership is purely a UI concern; `activeTab` still drives content.
+const groupDefs = [
+  {
+    id: 'ai-data',
+    icon: 'mdi:robot',
+    labelKey: 'admin.config.tabGroups.aiData',
+    tabIds: ['ai', 'vectordb', 'processing'],
+  },
+  {
+    id: 'communication',
+    icon: 'mdi:message-text',
+    labelKey: 'admin.config.tabGroups.communication',
+    tabIds: ['email', 'channels'],
+  },
+  {
+    id: 'security',
+    icon: 'mdi:shield-key',
+    labelKey: 'admin.config.tabGroups.security',
+    tabIds: ['auth'],
+  },
+]
+
+const tabGroups = computed(() => {
+  const all = tabs.value
+  const assigned = new Set(groupDefs.flatMap((g) => g.tabIds))
+  const groups = groupDefs.map((def) => ({
+    ...def,
+    tabs: def.tabIds.flatMap((id) => all.filter((tab) => tab.id === id)),
+  }))
+  // New backend tabs not covered by the mapping stay reachable via group 1.
+  groups[0].tabs.push(...all.filter((tab) => !assigned.has(tab.id)))
+  return groups.filter((g) => g.tabs.length > 0)
+})
+
+// Which tab-group dropdown is currently open (null = all closed).
+const openGroup = ref<string | null>(null)
+const tabBarRef = ref<HTMLElement | null>(null)
+
+function toggleGroup(groupId: string) {
+  openGroup.value = openGroup.value === groupId ? null : groupId
+}
+
+function selectTab(tabId: string) {
+  activeTab.value = tabId
+  openGroup.value = null
+}
+
+function handleTabBarOutsideClick(event: MouseEvent) {
+  if (!openGroup.value) return
+  if (tabBarRef.value && !tabBarRef.value.contains(event.target as Node)) {
+    openGroup.value = null
+  }
+}
 
 const currentTab = computed(() => {
   if (!schema.value) return null
@@ -167,11 +223,18 @@ function copyRestartCommand() {
 
 // Check admin access
 onMounted(async () => {
+  // Close any open tab-group dropdown when clicking elsewhere.
+  document.addEventListener('click', handleTabBarOutsideClick)
+
   if (!authStore.isAdmin) {
     router.push('/admin')
     return
   }
   await loadConfig()
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleTabBarOutsideClick)
 })
 </script>
 
@@ -250,29 +313,74 @@ onMounted(async () => {
 
         <!-- Content -->
         <div v-else-if="schema" class="space-y-6">
-          <!-- Tabs -->
-          <div
-            class="flex gap-2 overflow-x-auto pb-2 border-b border-light-border/30 dark:border-dark-border/20"
-          >
-            <button
-              v-for="tab in tabs"
-              :key="tab.id"
-              :class="[
-                'flex items-center gap-2 px-4 py-3 font-medium transition-colors whitespace-nowrap rounded-t-lg',
-                activeTab === tab.id
-                  ? 'txt-primary bg-card border-b-2 border-[var(--brand)]'
-                  : 'txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5',
-              ]"
-              @click="activeTab = tab.id"
-            >
-              <Icon :icon="tab.icon" class="w-5 h-5" />
-              {{ tab.label }}
-            </button>
+          <!-- Tab group dropdowns (max 3, mirrors AdvancedWidgetConfig) -->
+          <div ref="tabBarRef" class="border-b border-light-border/30 dark:border-dark-border/20">
+            <div class="flex gap-1 sm:gap-2 py-2">
+              <div v-for="group in tabGroups" :key="group.id" class="relative flex-1 sm:flex-none">
+                <button
+                  type="button"
+                  :class="[
+                    'w-full sm:w-auto flex items-center justify-between gap-2 px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-colors',
+                    group.tabs.some((t) => t.id === activeTab)
+                      ? 'bg-[var(--brand)]/10 txt-brand'
+                      : 'txt-secondary hover:txt-primary hover-surface',
+                  ]"
+                  :data-testid="`btn-config-group-${group.id}`"
+                  @click="toggleGroup(group.id)"
+                >
+                  <span class="flex items-center gap-1.5 min-w-0">
+                    <Icon :icon="group.icon" class="w-4 h-4 flex-shrink-0" />
+                    <span class="truncate">{{ $t(group.labelKey) }}</span>
+                  </span>
+                  <Icon
+                    icon="heroicons:chevron-down"
+                    :class="[
+                      'w-4 h-4 flex-shrink-0 transition-transform',
+                      openGroup === group.id && 'rotate-180',
+                    ]"
+                  />
+                </button>
+
+                <!-- Dropdown menu -->
+                <div
+                  v-if="openGroup === group.id"
+                  class="absolute left-0 top-full mt-1 z-20 min-w-[12rem] surface-card rounded-lg shadow-xl border border-light-border/30 dark:border-dark-border/20 py-1"
+                  :data-testid="`menu-config-group-${group.id}`"
+                >
+                  <button
+                    v-for="tab in group.tabs"
+                    :key="tab.id"
+                    type="button"
+                    :class="[
+                      'w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+                      activeTab === tab.id
+                        ? 'txt-brand bg-[var(--brand)]/5'
+                        : 'txt-secondary hover:txt-primary hover-surface',
+                    ]"
+                    :data-testid="`btn-config-tab-${tab.id}`"
+                    @click="selectTab(tab.id)"
+                  >
+                    <Icon :icon="tab.icon" class="w-4 h-4 flex-shrink-0" />
+                    <span class="truncate">{{ tab.label }}</span>
+                    <Icon
+                      v-if="activeTab === tab.id"
+                      icon="heroicons:check"
+                      class="w-4 h-4 ml-auto flex-shrink-0"
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <!-- Tab Actions -->
-          <div v-if="canTestCurrentTab" class="flex justify-end">
+          <!-- Active tab title + actions -->
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
+              <Icon :icon="tabIcons[activeTab] || 'mdi:cog'" class="w-6 h-6 text-[var(--brand)]" />
+              {{ currentTab?.label }}
+            </h2>
             <button
+              v-if="canTestCurrentTab"
               type="button"
               :disabled="!!testingService"
               class="btn-secondary px-4 py-2 rounded-lg flex items-center gap-2"

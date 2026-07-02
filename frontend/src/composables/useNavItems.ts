@@ -35,9 +35,9 @@ export interface NavItem {
   requiresAuth?: boolean
   gateFeature?: string
   /**
-   * Q6: easy mode shows these items with a lock badge instead of hiding
-   * them; tapping offers a one-click switch to Advanced mode. appMode
-   * decorates the nav, it no longer filters it.
+   * Advanced-only items: hidden entirely while the app is in easy mode
+   * (signed-in users). Guests still see them gate-locked, since the guest
+   * lock is a conversion affordance, not an app-mode one.
    */
   lockedInEasyMode?: boolean
   children?: NavChild[]
@@ -197,6 +197,12 @@ export function useNavItems() {
       })
     }
 
+    // Easy mode hides advanced-only items instead of showing them locked.
+    // Guests keep seeing them (gate-locked) as a signup affordance.
+    if (appModeStore.isEasyMode && !isGuestMode.value) {
+      return items.filter((item) => !item.lockedInEasyMode)
+    }
+
     return items
   })
 
@@ -214,7 +220,12 @@ export function useNavItems() {
     return route.path.startsWith(item.path)
   }
 
-  /** Q6: item is shown but locked while the app is in easy mode. */
+  /**
+   * Easy-mode lock state. Since easy mode now filters advanced-only items
+   * out of `navItems` for signed-in users, this is false for every rendered
+   * item — kept so SidebarV2/MobileNav keep working with routes reached
+   * directly (e.g. a bookmarked /channels URL while in easy mode).
+   */
   const isItemLocked = (item: NavItem): boolean =>
     Boolean(item.lockedInEasyMode) && appModeStore.isEasyMode && !isGuestMode.value
 

@@ -293,6 +293,11 @@
       "testConnection": "Bağlantıyı Test Et",
       "testFailed": "Bağlantı testi başarısız",
       "commandCopied": "Komut panoya kopyalandı",
+      "tabGroups": {
+        "aiData": "AI ve Veri",
+        "communication": "İletişim",
+        "security": "Güvenlik ve Giriş"
+      },
       "restartBanner": {
         "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
         "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",
