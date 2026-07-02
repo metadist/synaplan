@@ -870,10 +870,15 @@ final readonly class MessageProcessor
                 'model_name' => $chatModelName,
             ]);
 
+            // Forward the processing options exactly like processStream() does:
+            // without them the DAG runners get an EMPTY NodeContext options array,
+            // so track_id/node_id never reach MediaGenerationHandler — async node
+            // jobs are then created without their node binding and the per-card
+            // Stop / terminal card heal (#1239) cannot address them.
             $clsForRoute = $classification;
             $response = $this->isMultitaskRoutingEnabled($message)
-                ? $this->taskPlanExecutor->execute($message, $conversationHistory, $clsForRoute, $statusCallback)
-                : $this->router->route($message, $conversationHistory, $clsForRoute, $statusCallback);
+                ? $this->taskPlanExecutor->execute($message, $conversationHistory, $clsForRoute, $statusCallback, $options)
+                : $this->router->route($message, $conversationHistory, $clsForRoute, $statusCallback, $options);
 
             $this->notify($statusCallback, 'complete', 'Response generated', [
                 'provider' => $response['metadata']['provider'] ?? 'unknown',

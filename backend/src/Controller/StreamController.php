@@ -2124,6 +2124,24 @@ class StreamController extends AbstractController
                 );
             }
 
+            // Mirror the streaming branch: rebind every async node job to the OUT
+            // message, and give a job that already finished while bound to the IN
+            // message (fast render losing the race, #1239) its missed terminal
+            // sync so the task card resolves instead of spinning forever.
+            if (null !== $outgoingMessage->getId()
+                && isset($metadata['task_plan_render']['cards'])
+                && is_array($metadata['task_plan_render']['cards'])) {
+                foreach ($metadata['task_plan_render']['cards'] as $card) {
+                    $cardJobKey = is_array($card) ? ($card['job_id'] ?? null) : null;
+                    if (is_string($cardJobKey) && '' !== $cardJobKey) {
+                        $rebound = $this->mediaJobService->rebindMessage($cardJobKey, $outgoingMessage->getId());
+                        if (null !== $rebound && $rebound->isTerminal()) {
+                            $this->mediaJobMessageSync->syncTerminalState($rebound);
+                        }
+                    }
+                }
+            }
+
             if (!empty($options['web_search'])) {
                 $message->setMeta('web_search_enabled', 'true');
             }
