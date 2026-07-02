@@ -14,6 +14,7 @@ use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\Media\MediaCancellationStore;
+use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
@@ -69,6 +70,7 @@ class StreamController extends AbstractController
         private DocumentGeneratorService $documentGenerator,
         private MediaCancellationStore $cancellationStore,
         private MediaJobService $mediaJobService,
+        private MediaJobMessageSync $mediaJobMessageSync,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
     ) {
@@ -1378,7 +1380,15 @@ class StreamController extends AbstractController
                     // on completion (otherwise it stays stuck on "running").
                     $mediaJobKey = $response['metadata']['media_job']['job_id'] ?? null;
                     if (is_string($mediaJobKey) && '' !== $mediaJobKey && null !== $outgoingMessage->getId()) {
-                        $this->mediaJobService->rebindMessage($mediaJobKey, $outgoingMessage->getId());
+                        $rebound = $this->mediaJobService->rebindMessage($mediaJobKey, $outgoingMessage->getId());
+                        // Second-chance sync (#1239): a fast render can finish
+                        // BEFORE this rebind, while still bound to the IN message
+                        // where the terminal sync is deliberately skipped (#1218).
+                        // Now that the job points at the OUT message, run the sync
+                        // it missed so the finished media reaches the bubble.
+                        if (null !== $rebound && $rebound->isTerminal()) {
+                            $this->mediaJobMessageSync->syncTerminalState($rebound);
+                        }
                     }
                 }
 
@@ -1410,15 +1420,20 @@ class StreamController extends AbstractController
                 // image as if the user had sent it (the "generated image appears as
                 // the user's prompt after reload" regression). Rebind every node
                 // job (the job_id lives on each task card) to the OUT message the
-                // user actually sees. rebindMessage is idempotent and a no-op on
-                // already-terminal jobs.
+                // user actually sees. A job that already finished while bound to
+                // the IN message (fast render losing the race, #1239) is rebound
+                // too and immediately given the terminal sync it skipped, so the
+                // task card resolves instead of spinning forever.
                 if (null !== $outgoingMessage->getId()
                     && isset($response['metadata']['task_plan_render']['cards'])
                     && is_array($response['metadata']['task_plan_render']['cards'])) {
                     foreach ($response['metadata']['task_plan_render']['cards'] as $card) {
                         $cardJobKey = is_array($card) ? ($card['job_id'] ?? null) : null;
                         if (is_string($cardJobKey) && '' !== $cardJobKey) {
-                            $this->mediaJobService->rebindMessage($cardJobKey, $outgoingMessage->getId());
+                            $rebound = $this->mediaJobService->rebindMessage($cardJobKey, $outgoingMessage->getId());
+                            if (null !== $rebound && $rebound->isTerminal()) {
+                                $this->mediaJobMessageSync->syncTerminalState($rebound);
+                            }
                         }
                     }
                 }
@@ -2107,6 +2122,24 @@ class StreamController extends AbstractController
                     'task_plan',
                     (string) json_encode($metadata['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
                 );
+            }
+
+            // Mirror the streaming branch: rebind every async node job to the OUT
+            // message, and give a job that already finished while bound to the IN
+            // message (fast render losing the race, #1239) its missed terminal
+            // sync so the task card resolves instead of spinning forever.
+            if (null !== $outgoingMessage->getId()
+                && isset($metadata['task_plan_render']['cards'])
+                && is_array($metadata['task_plan_render']['cards'])) {
+                foreach ($metadata['task_plan_render']['cards'] as $card) {
+                    $cardJobKey = is_array($card) ? ($card['job_id'] ?? null) : null;
+                    if (is_string($cardJobKey) && '' !== $cardJobKey) {
+                        $rebound = $this->mediaJobService->rebindMessage($cardJobKey, $outgoingMessage->getId());
+                        if (null !== $rebound && $rebound->isTerminal()) {
+                            $this->mediaJobMessageSync->syncTerminalState($rebound);
+                        }
+                    }
+                }
             }
 
             if (!empty($options['web_search'])) {

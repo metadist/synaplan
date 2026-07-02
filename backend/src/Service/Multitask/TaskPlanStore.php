@@ -90,4 +90,29 @@ final readonly class TaskPlanStore
             return 0;
         }
     }
+
+    /**
+     * Record the terminal outcome of an async media node after the turn ended.
+     *
+     * The DAG persists such nodes as 'running' (the background job outlives the
+     * request); when the job reaches its terminal state the worker heals the row
+     * via the job key stamped at persist time (#1239). Best-effort like the rest
+     * of this store — a miss only affects observability, never the user turn.
+     */
+    public function updateStatusByJobKey(string $jobKey, string $status): void
+    {
+        if ('' === $jobKey) {
+            return;
+        }
+
+        try {
+            $this->connection->update('BMESSAGE_TASKS', ['BSTATUS' => $status], ['BJOBKEY' => $jobKey]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanStore: failed to update node status by job key', [
+                'job_key' => $jobKey,
+                'status' => $status,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
 }
