@@ -50,6 +50,20 @@ final readonly class TaskPlanExecutor
      */
     private const DAG_ONLY_CAPABILITIES = [Capability::CalendarEvent];
 
+    /**
+     * Single-shot media generators that the legacy router already delivers
+     * silently as a one-node request (the `/pic`, `/vid`, `/tts`, officemaker
+     * experience). When a plan is just one of these plus a pass-through
+     * `compose_reply`, the `compose_reply` adds nothing — it is collapsed away
+     * so the request no longer spins up the DAG / task-card UI (issue #1072).
+     */
+    private const COLLAPSIBLE_MEDIA_CAPABILITIES = [
+        Capability::ImageGeneration,
+        Capability::VideoGeneration,
+        Capability::Text2Sound,
+        Capability::DocumentGeneration,
+    ];
+
     public function __construct(
         private InferenceRouter $router,
         private ClassificationPlanMapper $mapper,
@@ -215,7 +229,25 @@ final readonly class TaskPlanExecutor
         try {
             $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
-            return $this->planner->plan($message, $thread, $userId, $options);
+            $result = $this->planner->plan($message, $thread, $userId, $options);
+
+            $collapsed = $this->collapseRedundantSingleMediaPlan($result->plan, $classification);
+            if ($collapsed !== $result->plan) {
+                $this->logger->info('TaskPlanExecutor: collapsed single-media plan to legacy path (issue #1072)', [
+                    'message_id' => $message->getId(),
+                    'capability' => $collapsed->nodes[0]->capability->value,
+                ]);
+
+                return new TaskPlanResult(
+                    $collapsed,
+                    $result->fallback,
+                    $result->modelId,
+                    $result->rawResponse,
+                    $result->errors,
+                );
+            }
+
+            return $result;
         } catch (\Throwable $e) {
             $this->logger->warning('TaskPlanExecutor: planning failed, using single-node path', [
                 'message_id' => $message->getId(),
@@ -224,6 +256,80 @@ final readonly class TaskPlanExecutor
 
             return null;
         }
+    }
+
+    /**
+     * Collapse a redundant `[<single media generator>, compose_reply]` plan into
+     * the lone generator node (issue #1072).
+     *
+     * The planner tends to wrap a plain single-media request ("make an image of
+     * a sunset") in a two-node plan (`image_generation` + `compose_reply`) even
+     * though the `compose_reply` only passes the generated file straight
+     * through. That two-node shape flips `isSingleNode()` to false, spins up the
+     * DAG and shows a "Taskplan 1/1" card for what should be a silent one-shot
+     * generation — inconsistent with the identical `/pic` slash command.
+     *
+     * We rewrite it to a single-node plan so {@see shouldUseLegacyRouter()}
+     * delegates to the proven legacy {@see InferenceRouter} path (no task card),
+     * but ONLY when it is provably safe:
+     *   - exactly two nodes, the reply node being a `compose_reply`;
+     *   - the other is a root media generator (no upstream dependency — never an
+     *     image-edit / animate chain, which genuinely needs the DAG);
+     *   - the `compose_reply` depends solely on that media node (pure passthrough);
+     *   - the ORIGINAL classification maps to the SAME media capability, so the
+     *     legacy router (which runs on that classification, not the plan) still
+     *     produces the intended media. If the planner disagreed with the sorter
+     *     we keep the DAG so the media is not lost.
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function collapseRedundantSingleMediaPlan(TaskPlan $plan, array $classification): TaskPlan
+    {
+        if (2 !== count($plan->nodes)) {
+            return $plan;
+        }
+
+        $reply = $plan->nodeById($plan->replyNode);
+        if (null === $reply || Capability::ComposeReply !== $reply->capability) {
+            return $plan;
+        }
+
+        $media = null;
+        foreach ($plan->nodes as $node) {
+            if ($node->id !== $reply->id) {
+                $media = $node;
+            }
+        }
+
+        if (null === $media
+            || [] !== $media->dependsOn
+            || !in_array($media->capability, self::COLLAPSIBLE_MEDIA_CAPABILITIES, true)) {
+            return $plan;
+        }
+
+        // compose_reply must be a pure pass-through of that single media node.
+        if ([$media->id] !== $reply->dependsOn) {
+            return $plan;
+        }
+
+        // Guard: the legacy router runs on the original classification, so only
+        // collapse when that classification already targets this media.
+        if ($this->mapper->capabilityForClassification($classification) !== $media->capability) {
+            return $plan;
+        }
+
+        return TaskPlan::fromArray([
+            'version' => 1,
+            'language' => $plan->language,
+            'reply_node' => $media->id,
+            'tasks' => [[
+                'id' => $media->id,
+                'capability' => $media->capability->value,
+                'depends_on' => [],
+                'inputs' => $media->inputs,
+                'params' => $media->params,
+            ]],
+        ]);
     }
 
     /**
