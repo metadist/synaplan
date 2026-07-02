@@ -70,7 +70,8 @@
     "widgetDetail": "Widget Detail",
     "liveSupport": "Live Support",
     "addinConnect": "Connect Outlook Add-in",
-    "accountDeletion": "Account Deletion"
+    "accountDeletion": "Account Deletion",
+    "onboarding": "Welcome"
   },
   "addinConnect": {
     "title": "Connect to Synaplan",
@@ -3883,5 +3884,48 @@
   },
   "nativeServer": {
     "changeServer": "Change server"
+  },
+  "onboarding": {
+    "skip": "Skip",
+    "back": "Back",
+    "next": "Continue",
+    "getStarted": "Get started",
+    "stepLabel": "Step {step} of {total}",
+    "welcome": {
+      "title": "Welcome to {brand}",
+      "subtitle": "Your AI assistant for chat, images, and your own documents",
+      "featureChatTitle": "Chat with powerful AI",
+      "featureChatDesc": "Ask anything and get answers from the latest AI models",
+      "featureMediaTitle": "Create images and more",
+      "featureMediaDesc": "Turn a simple description into images, audio, or video",
+      "featureKnowledgeTitle": "Your documents, answered",
+      "featureKnowledgeDesc": "Upload files and ask questions about what's inside"
+    },
+    "server": {
+      "title": "Your server",
+      "subtitle": "The app connects to a Synaplan server. The standard server is right for most people — just continue.",
+      "defaultLabel": "Standard server",
+      "currentLabel": "Connected server",
+      "recommended": "Recommended",
+      "customToggle": "Use my own server",
+      "customHint": "Expert option: if your company or you run your own Synaplan server, enter its address here.",
+      "customPlaceholder": "https://your-server.example.com",
+      "connect": "Connect",
+      "connecting": "Checking connection…",
+      "connectError": "This server can't be reached. Check the address and try again."
+    },
+    "plans": {
+      "title": "How do you want to start?",
+      "subtitle": "Try it for free — you can upgrade anytime",
+      "guestTitle": "Just try it",
+      "guestDesc": "Start chatting right away, no account needed",
+      "guestCta": "Try without an account",
+      "popular": "Popular",
+      "continueWith": "Continue with {plan}",
+      "signUpNote": "You'll create a free account first, then complete your purchase.",
+      "registerCta": "Create a free account",
+      "loginHint": "Already have an account?",
+      "loginCta": "Sign in"
+    }
   }
 }

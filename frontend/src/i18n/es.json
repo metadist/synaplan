@@ -69,7 +69,8 @@
     "widgetChats": "Chats de Widget",
     "liveSupport": "Soporte en vivo",
     "addinConnect": "Conectar complemento de Outlook",
-    "accountDeletion": "Eliminación de cuenta"
+    "accountDeletion": "Eliminación de cuenta",
+    "onboarding": "Bienvenida"
   },
   "addinConnect": {
     "title": "Conectar a Synaplan",
@@ -2788,5 +2789,48 @@
   },
   "nativeServer": {
     "changeServer": "Cambiar servidor"
+  },
+  "onboarding": {
+    "skip": "Omitir",
+    "back": "Atrás",
+    "next": "Continuar",
+    "getStarted": "Empezar",
+    "stepLabel": "Paso {step} de {total}",
+    "welcome": {
+      "title": "Bienvenido a {brand}",
+      "subtitle": "Tu asistente de IA para chat, imágenes y tus propios documentos",
+      "featureChatTitle": "Chatea con una IA potente",
+      "featureChatDesc": "Pregunta lo que quieras y obtén respuestas de los últimos modelos de IA",
+      "featureMediaTitle": "Crea imágenes y más",
+      "featureMediaDesc": "Convierte una simple descripción en imágenes, audio o vídeo",
+      "featureKnowledgeTitle": "Respuestas de tus documentos",
+      "featureKnowledgeDesc": "Sube archivos y haz preguntas sobre su contenido"
+    },
+    "server": {
+      "title": "Tu servidor",
+      "subtitle": "La app se conecta a un servidor de Synaplan. El servidor estándar es el adecuado para la mayoría — simplemente continúa.",
+      "defaultLabel": "Servidor estándar",
+      "currentLabel": "Servidor conectado",
+      "recommended": "Recomendado",
+      "customToggle": "Usar mi propio servidor",
+      "customHint": "Opción para expertos: si tu empresa o tú tenéis un servidor de Synaplan propio, introduce aquí su dirección.",
+      "customPlaceholder": "https://tu-servidor.ejemplo.com",
+      "connect": "Conectar",
+      "connecting": "Comprobando la conexión…",
+      "connectError": "No se puede acceder a este servidor. Comprueba la dirección e inténtalo de nuevo."
+    },
+    "plans": {
+      "title": "¿Cómo quieres empezar?",
+      "subtitle": "Pruébalo gratis — puedes mejorar tu plan en cualquier momento",
+      "guestTitle": "Solo probarlo",
+      "guestDesc": "Empieza a chatear al instante, sin necesidad de cuenta",
+      "guestCta": "Probar sin cuenta",
+      "popular": "Popular",
+      "continueWith": "Continuar con {plan}",
+      "signUpNote": "Primero crearás una cuenta gratuita y después completarás la compra.",
+      "registerCta": "Crear una cuenta gratuita",
+      "loginHint": "¿Ya tienes una cuenta?",
+      "loginCta": "Iniciar sesión"
+    }
   }
 }

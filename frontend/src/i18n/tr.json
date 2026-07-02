@@ -69,7 +69,8 @@
     "widgetChats": "Widget Sohbetleri",
     "liveSupport": "Canlı Destek",
     "addinConnect": "Outlook eklentisini bağla",
-    "accountDeletion": "Hesap Silme"
+    "accountDeletion": "Hesap Silme",
+    "onboarding": "Hoş geldin"
   },
   "addinConnect": {
     "title": "Synaplan'a bağlan",
@@ -2789,5 +2790,48 @@
   },
   "nativeServer": {
     "changeServer": "Sunucuyu değiştir"
+  },
+  "onboarding": {
+    "skip": "Atla",
+    "back": "Geri",
+    "next": "Devam",
+    "getStarted": "Başlayalım",
+    "stepLabel": "Adım {step} / {total}",
+    "welcome": {
+      "title": "{brand} uygulamasına hoş geldin",
+      "subtitle": "Sohbet, görseller ve kendi belgelerin için AI asistanın",
+      "featureChatTitle": "Güçlü AI ile sohbet et",
+      "featureChatDesc": "Her şeyi sor, en yeni AI modellerinden yanıt al",
+      "featureMediaTitle": "Görseller ve daha fazlasını oluştur",
+      "featureMediaDesc": "Basit bir açıklamayı görsele, sese veya videoya dönüştür",
+      "featureKnowledgeTitle": "Belgelerinden yanıtlar",
+      "featureKnowledgeDesc": "Dosyalarını yükle ve içerikleri hakkında sorular sor"
+    },
+    "server": {
+      "title": "Sunucun",
+      "subtitle": "Uygulama bir Synaplan sunucusuna bağlanır. Standart sunucu çoğu kişi için uygundur — devam etmen yeterli.",
+      "defaultLabel": "Standart sunucu",
+      "currentLabel": "Bağlı sunucu",
+      "recommended": "Önerilen",
+      "customToggle": "Kendi sunucumu kullan",
+      "customHint": "Uzman seçeneği: Şirketin veya sen kendi Synaplan sunucunu çalıştırıyorsan adresini buraya gir.",
+      "customPlaceholder": "https://sunucun.ornek.com",
+      "connect": "Bağlan",
+      "connecting": "Bağlantı kontrol ediliyor…",
+      "connectError": "Bu sunucuya ulaşılamıyor. Adresi kontrol edip tekrar dene."
+    },
+    "plans": {
+      "title": "Nasıl başlamak istersin?",
+      "subtitle": "Ücretsiz dene — istediğin zaman yükseltebilirsin",
+      "guestTitle": "Sadece dene",
+      "guestDesc": "Hesap gerekmeden hemen sohbete başla",
+      "guestCta": "Hesapsız dene",
+      "popular": "Popüler",
+      "continueWith": "{plan} ile devam et",
+      "signUpNote": "Önce ücretsiz bir hesap oluşturur, ardından satın alma işlemini tamamlarsın.",
+      "registerCta": "Ücretsiz hesap oluştur",
+      "loginHint": "Zaten bir hesabın var mı?",
+      "loginCta": "Giriş yap"
+    }
   }
 }

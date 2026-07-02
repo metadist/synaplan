@@ -70,7 +70,8 @@
     "widgetDetail": "Widget-Detail",
     "liveSupport": "Live-Support",
     "addinConnect": "Outlook-Add-in verbinden",
-    "accountDeletion": "Konto löschen"
+    "accountDeletion": "Konto löschen",
+    "onboarding": "Willkommen"
   },
   "addinConnect": {
     "title": "Mit Synaplan verbinden",
@@ -3817,5 +3818,48 @@
   },
   "nativeServer": {
     "changeServer": "Server ändern"
+  },
+  "onboarding": {
+    "skip": "Überspringen",
+    "back": "Zurück",
+    "next": "Weiter",
+    "getStarted": "Los geht's",
+    "stepLabel": "Schritt {step} von {total}",
+    "welcome": {
+      "title": "Willkommen bei {brand}",
+      "subtitle": "Dein KI-Assistent für Chat, Bilder und deine eigenen Dokumente",
+      "featureChatTitle": "Mit leistungsstarker KI chatten",
+      "featureChatDesc": "Stelle jede Frage und erhalte Antworten von den neuesten KI-Modellen",
+      "featureMediaTitle": "Bilder und mehr erstellen",
+      "featureMediaDesc": "Verwandle eine einfache Beschreibung in Bilder, Audio oder Video",
+      "featureKnowledgeTitle": "Antworten aus deinen Dokumenten",
+      "featureKnowledgeDesc": "Lade Dateien hoch und stelle Fragen zu ihrem Inhalt"
+    },
+    "server": {
+      "title": "Dein Server",
+      "subtitle": "Die App verbindet sich mit einem Synaplan-Server. Der Standard-Server passt für die meisten — einfach weiter.",
+      "defaultLabel": "Standard-Server",
+      "currentLabel": "Verbundener Server",
+      "recommended": "Empfohlen",
+      "customToggle": "Eigenen Server verwenden",
+      "customHint": "Experten-Option: Wenn deine Firma oder du einen eigenen Synaplan-Server betreibt, gib hier seine Adresse ein.",
+      "customPlaceholder": "https://dein-server.beispiel.de",
+      "connect": "Verbinden",
+      "connecting": "Verbindung wird geprüft…",
+      "connectError": "Dieser Server ist nicht erreichbar. Prüfe die Adresse und versuche es erneut."
+    },
+    "plans": {
+      "title": "Wie möchtest du starten?",
+      "subtitle": "Probiere es kostenlos aus — upgraden kannst du jederzeit",
+      "guestTitle": "Einfach ausprobieren",
+      "guestDesc": "Sofort loschatten, ganz ohne Konto",
+      "guestCta": "Ohne Konto ausprobieren",
+      "popular": "Beliebt",
+      "continueWith": "Weiter mit {plan}",
+      "signUpNote": "Du erstellst zuerst ein kostenloses Konto und schließt den Kauf danach ab.",
+      "registerCta": "Kostenloses Konto erstellen",
+      "loginHint": "Du hast schon ein Konto?",
+      "loginCta": "Anmelden"
+    }
   }
 }

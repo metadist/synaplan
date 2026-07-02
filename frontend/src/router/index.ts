@@ -10,6 +10,8 @@ import { useConfigStore } from '@/stores/config'
 import { authReady } from '@/stores/auth'
 import { useGlobalErrorStore } from '@/stores/globalError'
 import { useGuestStore, GUEST_STORAGE_KEY } from '@/stores/guest'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { i18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
@@ -120,6 +122,15 @@ const router = createRouter({
       name: 'logged-out',
       component: () => import('@/views/LoggedOutView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.loggedOut' },
+    },
+    {
+      // MOBILE-APP SEAM (first-run onboarding): native-only first-run flow
+      // (welcome → server → plans). Web builds never navigate here — the
+      // beforeEach guard redirects the route away unless the flow applies.
+      path: '/onboarding',
+      name: 'onboarding',
+      component: () => import('@/views/OnboardingView.vue'),
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.onboarding' },
     },
     {
       // MOBILE-APP SEAM (Epic 9.1): public account-deletion info page. Google
@@ -646,6 +657,15 @@ router.beforeEach(async (to, from, next) => {
     // Admin route without admin privileges
     next(resolveDefaultRoute())
   } else if (to.name === 'chat' && !authenticated && !useGuestStore().isGuestMode) {
+    // MOBILE-APP SEAM (first-run onboarding): the very first entry navigation
+    // of a signed-out native user goes to the one-time onboarding flow
+    // (welcome → server → plans). `shouldShowOnboarding` is false on web, for
+    // signed-in users, after completion/skip, and for existing guest sessions
+    // — so this branch is a no-op everywhere except the app's true first run.
+    if (shouldShowOnboarding(authenticated)) {
+      next({ name: 'onboarding' })
+      return
+    }
     // A branded deployment may configure a custom public logged-out landing
     // (route name or free-form path): send first-time, not-signed-in visitors
     // there instead of the home/chat entry. Default-safe: when nothing valid is
@@ -657,6 +677,12 @@ router.beforeEach(async (to, from, next) => {
     } else {
       next()
     }
+  } else if (to.name === 'onboarding' && (!isNativeApp() || authenticated)) {
+    // MOBILE-APP SEAM (first-run onboarding): the flow is native-only and for
+    // signed-out users. Web or signed-in navigations bounce to their normal
+    // entry. No loop is possible: the chat branch above only redirects here
+    // while `shouldShowOnboarding` is true, which requires native + signed-out.
+    next(authenticated ? resolveDefaultRoute() : { name: 'chat' })
   } else if (isPublicRoute && isAuthenticated.value && to.name === 'login') {
     // Already logged in, redirect to home (but check for loops)
     const home = resolveDefaultRoute()
