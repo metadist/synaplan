@@ -1511,6 +1511,9 @@ const loadingModels = ref(false)
 const availableTools: ToolOption[] = [
   { value: 'files-search', label: 'Files Search', icon: 'heroicons:document-magnifying-glass' },
   { value: 'url-screenshot', label: 'URL Content', icon: 'heroicons:globe-alt' },
+  // Per-topic gate for external MCP data sources (Channels → MCP Servers).
+  // Default off — external calls are opt-in per topic (release 4.0 plan 09).
+  { value: 'mcp-data', label: 'MCP Data Sources', icon: 'heroicons:server-stack' },
 ]
 
 const groupedModels = computed(() => {
@@ -1682,6 +1685,7 @@ const loadPrompts = async () => {
       const tools: string[] = []
       if (metadata.tool_files ?? metadata.tool_files_search) tools.push('files-search')
       if (metadata.tool_url_screenshot) tools.push('url-screenshot')
+      if (metadata.tool_mcp) tools.push('mcp-data')
 
       return {
         ...p,
@@ -1813,6 +1817,7 @@ const handleSave = saveChanges(async () => {
 
     metadata.tool_files = (formData.value.availableTools || []).includes('files-search')
     metadata.tool_url_screenshot = (formData.value.availableTools || []).includes('url-screenshot')
+    metadata.tool_mcp = (formData.value.availableTools || []).includes('mcp-data')
 
     // Tri-state internet search (#1138): only persist an explicit boolean for
     // 'on'/'off'. 'auto' omits the key so the backend keeps the "classifier
@@ -1958,6 +1963,8 @@ const handleCreateNew = async () => {
     // classifier decides) instead of hard-forcing web search on every message.
     metadata.tool_files = true
     metadata.tool_url_screenshot = false
+    // External MCP calls are opt-in per topic (release 4.0 plan 09).
+    metadata.tool_mcp = false
 
     const requestPayload = {
       topic: newPromptTopic.value.trim().toLowerCase().replace(/\s+/g, '-'),

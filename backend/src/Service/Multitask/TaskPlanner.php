@@ -13,6 +13,7 @@ use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\Skill\SkillCatalog;
 use App\Service\Prompt\TimeContextBuilder;
+use App\Service\PromptService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -38,6 +39,7 @@ final readonly class TaskPlanner
         private UserRepository $userRepository,
         private TimeContextBuilder $timeContextBuilder,
         private SkillCatalog $skillCatalog,
+        private PromptService $promptService,
     ) {
     }
 
@@ -141,7 +143,10 @@ final readonly class TaskPlanner
 
         // Catalog-lite (release 4.0): the capability list is assembled from the
         // SkillDescriptors the runners declare — one source of truth per block.
-        $capabilityList = $this->skillCatalog->renderCapabilityList($userId);
+        // Dynamic blocks (mcp_fetch) additionally receive the resolved routing
+        // topic + its metadata so per-prompt gates (`tool_mcp`) decide whether
+        // their sub-catalog is injected at all (plan 09 §3.2).
+        $capabilityList = $this->skillCatalog->renderCapabilityList($userId, $this->catalogContext($userId, $options));
 
         $dynamicList = [];
         foreach ($topicsWithDesc as $item) {
@@ -155,6 +160,40 @@ final readonly class TaskPlanner
         $text = str_replace('[KEYLIST]', $keyList, $text);
 
         return $text."\n\n".$this->timeContextBlock($message, $options);
+    }
+
+    /**
+     * Render context for dynamic skill blocks: the turn's resolved routing
+     * topic (from the classification the executor forwards in the options)
+     * and that topic's BPROMPTMETA map. Failures degrade to an empty context
+     * — a metadata hiccup must never break planning.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function catalogContext(?int $userId, array $options): array
+    {
+        $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+        $topic = is_string($classification['topic'] ?? null) ? $classification['topic'] : '';
+        if ('' === $topic) {
+            return [];
+        }
+
+        $topicMetadata = [];
+        try {
+            $promptData = $this->promptService->getPromptWithMetadata($topic, $userId ?? 0);
+            if (null !== $promptData && is_array($promptData['metadata'] ?? null)) {
+                $topicMetadata = $promptData['metadata'];
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanner: failed to resolve topic metadata for the skill catalog (ignored)', [
+                'topic' => $topic,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return ['topic' => $topic, 'topic_metadata' => $topicMetadata];
     }
 
     /**

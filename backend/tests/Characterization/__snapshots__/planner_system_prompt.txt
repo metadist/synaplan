@@ -146,6 +146,15 @@ Allowed topic keys: "general" | "mediamaker" | "officemaker" | "docsummary" | "l
    mention the question does not depend on, and prefer `web_search` when no
    concrete URL is given. Only use `url_fetch` if it appears in the
    capability list above.
+9c. The request needs data from one of the user's CONNECTED systems and the
+   capability list above shows `mcp_fetch` with available connections
+   ("look up customer X in our CRM", "check the wiki for the onboarding
+   page") → an `mcp_fetch` node with `params.server_id` + `params.tool`
+   taken EXACTLY from the listed connections and the tool arguments in
+   `inputs.arguments`; feed `$nX.text` into the answering node. NEVER
+   invent a server_id or tool name, and NEVER emit `mcp_fetch` when it is
+   not in the capability list or no listed tool fits — use `chat` or
+   `web_search` instead.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
    node, no `compose_reply` needed.
 11. A SINGLE media request with no follow-up step ("make an image of X",
@@ -328,6 +337,25 @@ User: "Fasse mir diese Seite zusammen: https://example.com/artikel"
 
 The page content is FETCHED (`url_fetch`) and the summary consumes `$n1.text` —
 never answer about a URL's content from memory or invent what the page says.
+
+### Pull data from a connected system, then answer (mcp_fetch)
+User: "Look up the customer Acme GmbH in our CRM and summarize their last order."
+(The capability list shows: server_id 3 "Company CRM" — tools: search_customers(query), get_last_order(customer_id))
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "mcp_fetch", "inputs": { "arguments": { "query": "Acme GmbH" } }, "params": { "server_id": 3, "tool": "search_customers" } },
+    { "id": "n2", "capability": "chat", "depends_on": ["n1"], "inputs": { "text": "Summarize the last order of this customer based on the following data:\n$n1.text" }, "params": { "topic_id": "general" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+`params.server_id` and `params.tool` come EXACTLY from the listed connections
+(never invented), the tool arguments ride in `inputs.arguments`, and the
+answering node consumes `$n1.text` — the reply is grounded in the pulled data.
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
 The event fields go in `params`. Resolve the relative time against the time

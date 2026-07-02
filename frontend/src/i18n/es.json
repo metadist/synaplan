@@ -1134,6 +1134,7 @@
       "rag_query": "Respuesta de conocimiento",
       "web_search": "Búsqueda web",
       "url_fetch": "Leyendo página web",
+      "mcp_fetch": "Obteniendo datos conectados",
       "file_analysis": "Análisis de archivo",
       "image_generation": "Imagen",
       "video_generation": "Vídeo",

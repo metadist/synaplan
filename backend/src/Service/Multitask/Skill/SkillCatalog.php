@@ -55,8 +55,13 @@ final class SkillCatalog
     /**
      * Render the `[CAPABILITYLIST]` block: one `- "capability": summary` line
      * per capability, plus any per-user dynamic note a descriptor contributes.
+     *
+     * @param array<string, mixed> $context per-turn render context for dynamic
+     *                                      blocks: `topic` (resolved routing
+     *                                      topic) and `topic_metadata` (its
+     *                                      BPROMPTMETA key/value map)
      */
-    public function renderCapabilityList(?int $userId = null): string
+    public function renderCapabilityList(?int $userId = null, array $context = []): string
     {
         $lines = [];
         foreach (Capability::cases() as $capability) {
@@ -70,12 +75,19 @@ final class SkillCatalog
                 continue;
             }
 
-            $lines[] = '- "'.$capability->value.'": '.(null !== $descriptor ? $descriptor->summary : '');
-
             $note = null !== $descriptor && null !== $descriptor->dynamicNote
-                ? ($descriptor->dynamicNote)($userId)
+                ? ($descriptor->dynamicNote)($userId, $context)
                 : null;
-            if (is_string($note) && '' !== trim($note)) {
+            $hasNote = is_string($note) && '' !== trim($note);
+
+            // A dynamic block with nothing to offer this user/turn (no
+            // connected servers, topic not entitled) stays invisible.
+            if (null !== $descriptor && $descriptor->requiresDynamicNote && !$hasNote) {
+                continue;
+            }
+
+            $lines[] = '- "'.$capability->value.'": '.(null !== $descriptor ? $descriptor->summary : '');
+            if ($hasNote) {
                 $lines[] = rtrim($note);
             }
         }

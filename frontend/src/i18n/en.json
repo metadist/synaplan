@@ -3116,6 +3116,7 @@
       "rag_query": "Knowledge answer",
       "web_search": "Web search",
       "url_fetch": "Reading web page",
+      "mcp_fetch": "Fetching connected data",
       "file_analysis": "File analysis",
       "image_generation": "Image",
       "video_generation": "Video",

@@ -541,7 +541,7 @@ final readonly class DagExecutor
      */
     private function successMetadata(TaskNode $node, NodeResult $result): array
     {
-        if (!in_array($node->capability, [Capability::WebSearch, Capability::UrlFetch], true)) {
+        if (!in_array($node->capability, [Capability::WebSearch, Capability::UrlFetch, Capability::McpFetch], true)) {
             return [];
         }
 

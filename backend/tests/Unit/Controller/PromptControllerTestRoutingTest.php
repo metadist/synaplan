@@ -74,6 +74,12 @@ final class PromptControllerTestRoutingTest extends TestCase
                 $this->createMock(UserRepository::class),
                 new TimeContextBuilder(),
                 SkillCatalogFactory::real(),
+                new PromptService(
+                    $this->createMock(PromptRepository::class),
+                    $this->createMock(PromptMetaRepository::class),
+                    $this->createMock(EntityManagerInterface::class),
+                    new NullLogger(),
+                ),
             ),
         );
 

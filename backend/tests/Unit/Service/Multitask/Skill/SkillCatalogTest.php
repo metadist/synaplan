@@ -54,7 +54,7 @@ final class SkillCatalogTest extends TestCase
                 return [new SkillDescriptor(
                     Capability::WebSearch,
                     'Search the web.',
-                    static fn (?int $userId): string => "  Available for user {$userId}.",
+                    static fn (?int $userId, array $context): string => "  Available for user {$userId}.",
                 )];
             }
 
@@ -96,7 +96,11 @@ final class SkillCatalogTest extends TestCase
 
         $on = $catalog->renderCapabilityList();
         self::assertStringContainsString('- "url_fetch": ', $on);
+        // mcp_fetch is a DYNAMIC block (requiresDynamicNote): without a
+        // connected-server sub-catalog it stays invisible even when its flag
+        // is on — so exactly one capability line is missing here.
+        self::assertStringNotContainsString('"mcp_fetch"', $on);
         $lines = explode("\n", $on);
-        self::assertCount(count(Capability::cases()), $lines);
+        self::assertCount(count(Capability::cases()) - 1, $lines);
     }
 }

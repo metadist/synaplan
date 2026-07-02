@@ -937,6 +937,7 @@
       "rag_query": "Wissensantwort",
       "web_search": "Websuche",
       "url_fetch": "Webseite lesen",
+      "mcp_fetch": "Verbundene Daten abrufen",
       "file_analysis": "Dateianalyse",
       "image_generation": "Bild",
       "video_generation": "Video",

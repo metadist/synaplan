@@ -38,7 +38,7 @@ final readonly class McpToolRegistry
      * Cached tools of one server. Never throws — planning must not break on
      * an unreachable server.
      *
-     * @return list<array{name: string, description: string, inputSchema: array<string, mixed>}>
+     * @return list<array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>}>
      */
     public function toolsFor(McpServerConfig $server): array
     {
@@ -63,7 +63,7 @@ final readonly class McpToolRegistry
      * {@see McpClientException} propagate so the UI can show the reason, and
      * primes the cache on success.
      *
-     * @return list<array{name: string, description: string, inputSchema: array<string, mixed>}>
+     * @return list<array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>}>
      */
     public function refresh(McpServerConfig $server): array
     {
@@ -83,7 +83,7 @@ final readonly class McpToolRegistry
      * Every enabled server of a user with its cached tools — the shape the
      * planner sub-catalog renders from.
      *
-     * @return list<array{server: McpServerConfig, tools: list<array{name: string, description: string, inputSchema: array<string, mixed>}>}>
+     * @return list<array{server: McpServerConfig, tools: list<array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>}>}>
      */
     public function catalogForUser(int $userId): array
     {

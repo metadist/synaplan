@@ -39,6 +39,9 @@ enum Capability: string
     /** Fetch + read the content of specific URL(s) named in the request (UrlContentService). */
     case UrlFetch = 'url_fetch';
 
+    /** Pull data from one of the user's connected external MCP servers (McpClient, read-only v1). */
+    case McpFetch = 'mcp_fetch';
+
     /** Vision / OCR / document Q&A (FileAnalysisHandler). */
     case FileAnalysis = 'file_analysis';
 
@@ -80,7 +83,7 @@ enum Capability: string
         return match ($this) {
             self::ExtractText => 'extract',
             self::Chat, self::Summarize, self::Translate, self::RagQuery, self::FileAnalysis => 'text',
-            self::WebSearch, self::UrlFetch => 'search',
+            self::WebSearch, self::UrlFetch, self::McpFetch => 'search',
             self::ImageGeneration => 'image',
             self::VideoGeneration => 'video',
             self::Text2Sound => 'audio',

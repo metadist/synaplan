@@ -492,6 +492,14 @@
     }
   },
   {
+    "id": "mcp_not_offered_no_hallucination",
+    "text": "Look up the customer Acme GmbH in our CRM and summarize their last order.",
+    "language": "en",
+    "expect": {
+      "forbid": ["mcp_fetch", "image_generation"]
+    }
+  },
+  {
     "id": "websearch_current_info",
     "text": "Wie ist das Wetter morgen in Berlin?",
     "language": "de",

@@ -11,6 +11,7 @@ use App\Service\Multitask\Execution\Runner\DocumentGenerationRunner;
 use App\Service\Multitask\Execution\Runner\EmailMeRunner;
 use App\Service\Multitask\Execution\Runner\ExtractTextRunner;
 use App\Service\Multitask\Execution\Runner\FileAnalysisRunner;
+use App\Service\Multitask\Execution\Runner\McpFetchRunner;
 use App\Service\Multitask\Execution\Runner\MediaGenerationRunner;
 use App\Service\Multitask\Execution\Runner\Text2SoundRunner;
 use App\Service\Multitask\Execution\Runner\UrlFetchRunner;
@@ -39,6 +40,7 @@ final class SkillCatalogFactory
         ChatRunner::class,
         WebSearchRunner::class,
         UrlFetchRunner::class,
+        McpFetchRunner::class,
         FileAnalysisRunner::class,
         MediaGenerationRunner::class,
         Text2SoundRunner::class,

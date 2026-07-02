@@ -45,7 +45,7 @@ final readonly class McpClient
     /**
      * Discover the server's tools.
      *
-     * @return list<array{name: string, description: string, inputSchema: array<string, mixed>}>
+     * @return list<array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>}>
      */
     public function listTools(McpServerConfig $server): array
     {
@@ -60,6 +60,10 @@ final readonly class McpClient
                 'name' => $tool['name'],
                 'description' => is_string($tool['description'] ?? null) ? $tool['description'] : '',
                 'inputSchema' => is_array($tool['inputSchema'] ?? null) ? $tool['inputSchema'] : [],
+                // Spec tool annotations (readOnlyHint/destructiveHint/…) — the
+                // pull-only guard in McpFetchRunner refuses tools that declare
+                // themselves mutating (plan 09 §2.4).
+                'annotations' => is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [],
             ];
         }
 
