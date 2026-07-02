@@ -11,6 +11,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Skill\SkillDescriptor;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
@@ -45,6 +46,16 @@ final readonly class EmailMeRunner implements TaskRunner
     public function supportedCapabilities(): array
     {
         return [Capability::EmailMe];
+    }
+
+    /**
+     * @return list<SkillDescriptor>
+     */
+    public function describe(): array
+    {
+        return [
+            new SkillDescriptor(Capability::EmailMe, 'Email the results to the account owner as one multi-part mail (text + attachments from other nodes). ONLY when the user explicitly asks to be mailed/emailed the result ("mail it to me", "send it to my email"). Inputs: text, attachments. Never the reply node.'),
+        ];
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult

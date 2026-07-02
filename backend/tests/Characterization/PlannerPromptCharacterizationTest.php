@@ -12,6 +12,7 @@ use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Prompt\TimeContextBuilder;
+use App\Tests\Support\SkillCatalogFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
@@ -103,6 +104,10 @@ final class PlannerPromptCharacterizationTest extends TestCase
             new NullLogger(),
             $this->createMock(UserRepository::class),
             new TimeContextBuilder(new MockClock('2026-06-17 12:00:00', 'UTC')),
+            // The REAL runner-declared descriptors — this is what makes the
+            // snapshot prove the catalog-lite assembly is equivalent to the
+            // previous hard-coded CAPABILITY_DESCRIPTIONS array.
+            SkillCatalogFactory::real(),
         );
     }
 

@@ -10,6 +10,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\TtsTextSanitizer;
 use Psr\Log\LoggerInterface;
 
@@ -29,6 +30,16 @@ final readonly class Text2SoundRunner implements TaskRunner
     public function supportedCapabilities(): array
     {
         return [Capability::Text2Sound];
+    }
+
+    /**
+     * @return list<SkillDescriptor>
+     */
+    public function describe(): array
+    {
+        return [
+            new SkillDescriptor(Capability::Text2Sound, 'Synthesize speech/audio from text (params.format, e.g. mp3).'),
+        ];
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult

@@ -11,6 +11,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Skill\SkillDescriptor;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -37,6 +38,16 @@ final readonly class FileAnalysisRunner implements TaskRunner
     public function supportedCapabilities(): array
     {
         return [Capability::FileAnalysis];
+    }
+
+    /**
+     * @return list<SkillDescriptor>
+     */
+    public function describe(): array
+    {
+        return [
+            new SkillDescriptor(Capability::FileAnalysis, 'Analyze/describe/OCR an image or document — either attached by the user or produced by a prior node ($nX.file) — and answer about it.'),
+        ];
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Service\File\FileHelper;
+use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -33,27 +34,9 @@ final readonly class UrlContentService
     private const USER_AGENT = 'SynaplanBot/1.0 (+https://synaplan.com/bot)';
     private const ROBOTS_TXT_TIMEOUT = 3;
 
-    /** @var string[] */
-    private const BLOCKED_IP_RANGES = [
-        '127.',
-        '10.',
-        '0.',
-        '169.254.',
-        '::1',
-        'localhost',
-    ];
-
-    /** @var string[] */
-    private const BLOCKED_CIDR_PREFIXES = [
-        '172.16.', '172.17.', '172.18.', '172.19.',
-        '172.20.', '172.21.', '172.22.', '172.23.',
-        '172.24.', '172.25.', '172.26.', '172.27.',
-        '172.28.', '172.29.', '172.30.', '172.31.',
-        '192.168.',
-    ];
-
     public function __construct(
         private HttpClientInterface $httpClient,
+        private SsrfGuard $ssrfGuard,
         private LoggerInterface $logger,
     ) {
     }
@@ -696,44 +679,13 @@ final readonly class UrlContentService
         return false;
     }
 
+    /**
+     * SSRF protection is delegated to the shared {@see SsrfGuard} so the URL
+     * node, the outbound MCP client and this enrichment service enforce ONE
+     * identical policy (release-4.0 plan 09 §2.5).
+     */
     private function isBlockedUrl(string $url): bool
     {
-        $parsed = parse_url($url);
-        $host = $parsed['host'] ?? '';
-
-        if ('' === $host) {
-            return true;
-        }
-
-        $hostLower = strtolower($host);
-
-        foreach (self::BLOCKED_IP_RANGES as $range) {
-            if (str_starts_with($hostLower, strtolower($range)) || $hostLower === strtolower($range)) {
-                return true;
-            }
-        }
-
-        foreach (self::BLOCKED_CIDR_PREFIXES as $prefix) {
-            if (str_starts_with($host, $prefix)) {
-                return true;
-            }
-        }
-
-        // Resolve hostname to check for private IPs
-        $ip = gethostbyname($host);
-        if ($ip !== $host) {
-            foreach (self::BLOCKED_IP_RANGES as $range) {
-                if (str_starts_with($ip, $range)) {
-                    return true;
-                }
-            }
-            foreach (self::BLOCKED_CIDR_PREFIXES as $prefix) {
-                if (str_starts_with($ip, $prefix)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return $this->ssrfGuard->isBlockedUrl($url);
     }
 }

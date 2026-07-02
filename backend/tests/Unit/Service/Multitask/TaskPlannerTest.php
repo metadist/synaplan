@@ -14,6 +14,7 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Prompt\TimeContextBuilder;
+use App\Tests\Support\SkillCatalogFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -52,6 +53,7 @@ final class TaskPlannerTest extends TestCase
             $this->createMock(LoggerInterface::class),
             $this->createMock(UserRepository::class),
             new TimeContextBuilder(),
+            SkillCatalogFactory::real(),
         );
     }
 
