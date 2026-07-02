@@ -449,8 +449,15 @@ class StreamController extends AbstractController
             }
             ob_implicit_flush(1);
             set_time_limit(0);
-            // Stop execution when client disconnects
-            ignore_user_abort(false);
+            // Detach-on-navigation (issues #1142 / #1223 / #1225): keep the turn
+            // alive when the client disconnects (chat switch / page leave /
+            // reload). The turn finishes in the background and persists its
+            // result so it is there on return. sendSSE() already no-ops once the
+            // socket is gone, and an EXPLICIT Stop still aborts because it flags
+            // the turn via CancellationStore (checked in the stream callback and
+            // the media handlers). Only a genuine cancel — never a bare
+            // disconnect — ends the turn early.
+            ignore_user_abort(true);
 
             // Phase 0: per-request performance timer.
             // Lives only inside the callback so it doesn't measure connection
@@ -820,8 +827,16 @@ class StreamController extends AbstractController
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
                     // Stream callback - AI streams TEXT directly or structured data (reasoning)
-                    function ($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson, &$finishReason) {
-                        if (connection_aborted()) {
+                    function ($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson, &$finishReason, $trackId) {
+                        // Detach-on-navigation (issues #1142 / #1223 / #1225): a
+                        // bare client disconnect (chat switch, page leave, reload)
+                        // must NOT kill the turn — it keeps streaming silently
+                        // (sendSSE() no-ops once the socket is gone) so the finished
+                        // response is persisted and available on return. Only an
+                        // EXPLICIT Stop, which flags the turn via CancellationStore
+                        // through /stop-stream, aborts the inline text stream.
+                        if (null !== $trackId && '' !== (string) $trackId
+                            && $this->cancellationStore->isCancelled((string) $trackId)) {
                             throw new \RuntimeException('Client disconnected');
                         }
 
