@@ -9,6 +9,7 @@ use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
+use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
@@ -834,10 +835,11 @@ class StreamController extends AbstractController
                         // (sendSSE() no-ops once the socket is gone) so the finished
                         // response is persisted and available on return. Only an
                         // EXPLICIT Stop, which flags the turn via CancellationStore
-                        // through /stop-stream, aborts the inline text stream.
+                        // through /stop-stream (or the guest counterpart
+                        // /api/v1/guest/stop-stream), aborts the inline text stream.
                         if ('' !== (string) $trackId
                             && $this->cancellationStore->isCancelled((string) $trackId)) {
-                            throw new \RuntimeException('Client disconnected');
+                            throw new StreamCancelledException('Stream cancelled by user');
                         }
 
                         // Handle structured chunk (reasoning models)
@@ -1789,16 +1791,15 @@ class StreamController extends AbstractController
                 }
 
                 $this->sendSSE('error', $errorData);
+            } catch (StreamCancelledException) {
+                // Explicit user cancel (/stop-stream flagged the turn) — not an
+                // error and not a disconnect. The frontend persists the partial
+                // answer via /save-cancelled, so just end the turn silently.
+                $this->logger->info('Stream stopped - cancelled by user', [
+                    'user_id' => $user->getId(),
+                    'track_id' => (string) $trackId,
+                ]);
             } catch (\Exception $e) {
-                // Don't send error if client disconnected intentionally
-                if ('Client disconnected' === $e->getMessage()) {
-                    $this->logger->info('Stream stopped - client disconnected', [
-                        'user_id' => $user->getId(),
-                    ]);
-
-                    return; // Silently stop
-                }
-
                 $this->logger->error('Streaming failed', [
                     'user_id' => $user->getId(),
                     'error' => $e->getMessage(),

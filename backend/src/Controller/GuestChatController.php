@@ -8,8 +8,10 @@ use App\Entity\Chat;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\GuestSessionService;
+use App\Service\Media\MediaCancellationStore;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -31,6 +33,8 @@ class GuestChatController extends AbstractController
         private EntityManagerInterface $em,
         private MessageRepository $messageRepository,
         private SearchResultRepository $searchResultRepository,
+        private MediaCancellationStore $cancellationStore,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -256,6 +260,95 @@ class GuestChatController extends AbstractController
 
             throw $e;
         }
+    }
+
+    /**
+     * Stop a running guest stream (guest counterpart of /api/v1/messages/stop-stream).
+     *
+     * Since detach-on-navigation (#1225), closing the EventSource no longer
+     * aborts the backend turn — an explicit Stop must flag the turn via the
+     * MediaCancellationStore. Guests cannot call the auth-guarded
+     * /stop-stream (a 401 would force a login redirect, issue #1037), so this
+     * public endpoint authorizes the cancel with the server-issued guest
+     * session id and only accepts track ids that belong to that session's chat
+     * (a bare track id is a guessable timestamp — never trust it alone).
+     */
+    #[Route('/stop-stream', name: 'stop_stream', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/guest/stop-stream',
+        summary: 'Stop a streaming AI response for a guest session',
+        description: 'Explicitly stops an ongoing guest streaming response. The turn is only cancelled when the track id belongs to the guest session\'s chat.',
+        tags: ['Guest']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['sessionId', 'trackId'],
+            properties: [
+                new OA\Property(property: 'sessionId', type: 'string', description: 'Server-issued guest session ID', example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
+                new OA\Property(property: 'trackId', type: 'integer', description: 'Track ID of the running turn', example: 1234567890),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Stream stop acknowledged',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Stream stop requested'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Missing or invalid sessionId/trackId')]
+    #[OA\Response(response: 404, description: 'Session not found, or no turn with this trackId in this session')]
+    #[OA\Response(response: 410, description: 'Session expired')]
+    public function stopStream(Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true) ?? [];
+        $sessionId = $data['sessionId'] ?? null;
+        $trackId = isset($data['trackId']) && is_scalar($data['trackId']) ? trim((string) $data['trackId']) : '';
+
+        if (!$sessionId || !Uuid::isValid($sessionId)) {
+            return $this->json(['error' => 'Valid sessionId is required'], Response::HTTP_BAD_REQUEST);
+        }
+        if ('' === $trackId || !ctype_digit($trackId)) {
+            return $this->json(['error' => 'Valid trackId is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $session = $this->guestSessionService->getSession($sessionId);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($session->isExpired()) {
+            return $this->json(['error' => 'Session expired', 'reason' => 'expired'], Response::HTTP_GONE);
+        }
+        if (!$session->getChatId()) {
+            return $this->json(['error' => 'No chat in this session'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Ownership proof: the incoming message of the turn must live in this
+        // session's chat (it is persisted at the start of the stream callback).
+        $incomingMessage = $this->messageRepository->findOneBy([
+            'chatId' => $session->getChatId(),
+            'trackingId' => (int) $trackId,
+            'direction' => 'IN',
+        ]);
+        if (!$incomingMessage) {
+            return $this->json(['error' => 'No turn with this trackId in this session'], Response::HTTP_NOT_FOUND);
+        }
+
+        $this->cancellationStore->requestCancel($trackId);
+
+        $this->logger->info('Guest stop stream requested', [
+            'session_id' => substr($sessionId, 0, 12).'...',
+            'track_id' => $trackId,
+        ]);
+
+        return $this->json([
+            'success' => true,
+            'message' => 'Stream stop requested',
+        ]);
     }
 
     /**

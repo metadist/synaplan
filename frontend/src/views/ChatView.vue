@@ -2923,12 +2923,23 @@ const handleUserStop = async () => {
   const effectiveTrackId = streamingMessageForTrack?.taskPlan?.trackId ?? currentTrackId
 
   // Notify backend to stop streaming.
+  // Since detach-on-navigation (#1225) the backend ignores a bare disconnect,
+  // so closing the EventSource alone no longer cancels the turn — every
+  // explicit Stop must flag the turn via a cancel endpoint.
   // Guests have no auth session: the auth-guarded /stop-stream endpoint would
   // return 401 and the http client would force a "session expired" redirect to
-  // /login (issue #1037). For guests, closing the EventSource above is enough —
-  // the backend detects the abort via connection_aborted() in the stream loop.
+  // /login (issue #1037). Guests use the public guest endpoint instead, which
+  // authorizes the cancel with the server-issued guest session id.
   if (isGuestMode.value) {
-    // No backend notification needed for guests.
+    if (effectiveTrackId && guestStore.sessionId) {
+      try {
+        await chatApi.stopGuestStream(guestStore.sessionId, effectiveTrackId)
+      } catch (error) {
+        console.error('❌ Failed to notify backend (guest):', error)
+      }
+    } else {
+      console.warn('⚠️ No trackId or guest session - skipping backend notification')
+    }
   } else if (effectiveTrackId) {
     try {
       await chatApi.stopStream(effectiveTrackId)
