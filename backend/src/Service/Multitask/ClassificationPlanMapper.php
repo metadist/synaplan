@@ -64,11 +64,15 @@ final class ClassificationPlanMapper
 
     /**
      * Map a classification's intent (and media_type) to a plan capability.
-     * Used only for the persisted node label — never for execution routing.
+     *
+     * Used for the persisted node label AND — since #1072 — as the safety guard
+     * that lets {@see TaskPlanExecutor} collapse a redundant single-media plan
+     * back to the legacy single-node path only when the legacy classification
+     * would produce the SAME media. Never used to pick a model.
      *
      * @param array<string, mixed> $classification
      */
-    private function capabilityForClassification(array $classification): Capability
+    public function capabilityForClassification(array $classification): Capability
     {
         $intent = is_string($classification['intent'] ?? null) ? $classification['intent'] : 'chat';
 

@@ -530,6 +530,12 @@ Allowed topic keys: [KEYLIST]
    → parallel nodes with NO dependency between them, joined by `compose_reply`.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
    node, no `compose_reply` needed.
+11. A SINGLE media request with no follow-up step ("make an image of X",
+    "generate a video of Y", "read this aloud", "make an excel table") → ONE
+    generator node (`image_generation` / `video_generation` / `text2sound` /
+    `document_generation`). `reply_node` = that node. Do NOT add a
+    `compose_reply` — the generator's file is delivered on its own. Only add
+    `compose_reply` when there are 2+ nodes to combine (see rule 1).
 
 ## Canonical multi-step examples (MEMORIZE these patterns)
 
@@ -573,6 +579,20 @@ User: sends report.docx and writes "What's in there? Summarize it into a short M
   "reply_node": "n1",
   "tasks": [
     { "id": "n1", "capability": "text2sound", "inputs": { "text": "Hello world" }, "params": { "format": "mp3" } }
+  ]
+}
+
+### Single image, nothing else ("Erstelle ein Bild von einem Sonnenuntergang")
+A lone media request is ONE node — no `compose_reply` (rule 11). This mirrors the
+`/pic` command: the image is delivered directly, no task card. The SAME shape
+applies to a single `video_generation`, `text2sound` or `document_generation`.
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Ein Sonnenuntergang" } }
   ]
 }
 
