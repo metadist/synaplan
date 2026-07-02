@@ -314,10 +314,7 @@ onBeforeUnmount(() => {
         <!-- Content -->
         <div v-else-if="schema" class="space-y-6">
           <!-- Tab group dropdowns (max 3, mirrors AdvancedWidgetConfig) -->
-          <div
-            ref="tabBarRef"
-            class="border-b border-light-border/30 dark:border-dark-border/20"
-          >
+          <div ref="tabBarRef" class="border-b border-light-border/30 dark:border-dark-border/20">
             <div class="flex gap-1 sm:gap-2 py-2">
               <div v-for="group in tabGroups" :key="group.id" class="relative flex-1 sm:flex-none">
                 <button
