@@ -145,6 +145,17 @@ export class ChatHelper {
     await this.page
       .locator(selectors.chat.stateEmpty)
       .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+
+    // The empty state can render a tick before chatsStore.activeChatId is
+    // committed. sendMessage() clicks Send the moment the input is enabled, and
+    // if activeChatId is still null the send bails out with "No active chat
+    // selected" — no SSE, no bubble, and waitForAnswer() times out. Wait for the
+    // persisted active-chat id so the chat is guaranteed ready before we send.
+    await this.page.waitForFunction(
+      () => !!window.localStorage.getItem('synaplan_active_chat_id'),
+      undefined,
+      { timeout: TIMEOUTS.STANDARD }
+    )
   }
 
   async attachFile(file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
