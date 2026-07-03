@@ -351,12 +351,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $systemPrompt .= $this->buildTimeContext($user, $options);
 
         $modelMaxTokens = null;
+        $systemPromptFallback = null;
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);
             if ($model) {
                 $modelMaxTokens = $model->getMaxTokens();
                 $json = $model->getJson();
                 if (!$this->modelSupportsSystemMessages($json)) {
+                    // Model rejects the `system` role: carry the prompt into the
+                    // first user turn instead of dropping it (dropping discards
+                    // the whole topic prompt — broke officemaker on GPT-5.5 Pro).
+                    $systemPromptFallback = $systemPrompt;
                     $systemPrompt = null;
                 }
             }
@@ -396,6 +401,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'quoted_text' => $options['quoted_text'] ?? null,
             'quoted_message_id' => $options['quoted_message_id'] ?? null,
         ]);
+
+        if (null !== $systemPromptFallback) {
+            $messages = $this->prependSystemPromptToFirstUserMessage($messages, $systemPromptFallback);
+        }
 
         $aiOptions = [
             'provider' => $provider,
@@ -895,12 +904,16 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $systemPrompt .= $this->buildTimeContext($user, $options);
 
         // Check if model supports system messages (o1 models don't)
+        $systemPromptFallback = null;
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);
             if ($model) {
                 $json = $model->getJson();
                 if (!$this->modelSupportsSystemMessages($json)) {
-                    // Don't use system message - it will be prepended to first user message instead
+                    // Model rejects the `system` role: carry the prompt into the
+                    // first user turn instead of dropping it (dropping discards
+                    // the whole topic prompt — broke officemaker on GPT-5.5 Pro).
+                    $systemPromptFallback = $systemPrompt;
                     $systemPrompt = null;
                 }
             }
@@ -975,6 +988,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Build conversation history (TEXT only for streaming)
         $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
+
+        if (null !== $systemPromptFallback) {
+            $messages = $this->prependSystemPromptToFirstUserMessage($messages, $systemPromptFallback);
+        }
 
         // Call AI streaming - merge processing options with model config
         $aiOptions = array_merge([
@@ -1555,6 +1572,55 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         return true;
+    }
+
+    /**
+     * Fallback for models that reject the `system` role: fold the system
+     * prompt into the FIRST user turn so the instructions still reach the
+     * model. Before this, the prompt was silently dropped, which discarded
+     * the entire topic prompt (officemaker's JSON file contract, RAG context,
+     * language directive, …) and produced free-form answers instead of
+     * generated documents (GPT-5.5 Pro officemaker bug).
+     *
+     * @param list<array{role: string, content: string|array<int, mixed>}> $messages
+     *
+     * @return list<array{role: string, content: string|array<int, mixed>}>
+     */
+    private function prependSystemPromptToFirstUserMessage(array $messages, string $systemPrompt): array
+    {
+        if ('' === trim($systemPrompt)) {
+            return $messages;
+        }
+
+        foreach ($messages as $i => $msg) {
+            if ('user' !== $msg['role']) {
+                continue;
+            }
+
+            $content = $msg['content'];
+            if (is_string($content)) {
+                $messages[$i]['content'] = $systemPrompt."\n\n---\n\n".$content;
+            } elseif (is_array($content)) {
+                // Multimodal content: prepend to the first text part, or add
+                // a text part if the turn is image-only.
+                $prepended = false;
+                foreach ($content as $j => $part) {
+                    if (is_array($part) && 'text' === ($part['type'] ?? null) && is_string($part['text'] ?? null)) {
+                        $content[$j]['text'] = $systemPrompt."\n\n---\n\n".$part['text'];
+                        $prepended = true;
+                        break;
+                    }
+                }
+                if (!$prepended) {
+                    array_unshift($content, ['type' => 'text', 'text' => $systemPrompt]);
+                }
+                $messages[$i]['content'] = $content;
+            }
+
+            return $messages;
+        }
+
+        return $messages;
     }
 
     /**

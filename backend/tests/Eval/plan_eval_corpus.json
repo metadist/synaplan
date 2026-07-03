@@ -84,7 +84,8 @@
     "language": "en",
     "attach": { "type": "docx", "path": "report.docx", "file_text": "Quarterly report: revenue grew 12%, churn fell to 2.1%, hiring plan on track." },
     "expect": {
-      "capabilities": ["text2sound"],
+      "capabilities": ["file_analysis", "text2sound"],
+      "edges": ["file_analysis->text2sound"],
       "forbid": ["image_generation"]
     }
   },
@@ -130,7 +131,8 @@
     "text": "Summarize the concept of photosynthesis in two sentences and draw a cat.",
     "language": "en",
     "expect": {
-      "capabilities": ["image_generation", "compose_reply"],
+      "capabilities": ["chat", "image_generation", "compose_reply"],
+      "edges": ["chat->compose_reply", "image_generation->compose_reply"],
       "forbid": ["file_analysis"]
     }
   },
@@ -139,7 +141,8 @@
     "text": "Übersetze 'Das Leben ist schön' ins Englische und sprich es mir vor.",
     "language": "de",
     "expect": {
-      "capabilities": ["text2sound"],
+      "capabilities": ["chat", "text2sound"],
+      "edges": ["chat->text2sound"],
       "forbid": ["image_generation"]
     }
   }

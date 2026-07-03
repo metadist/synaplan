@@ -12,6 +12,7 @@ use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Prompt\TimeContextBuilder;
+use App\Tests\Characterization\Support\RoutingSnapshot;
 use App\Tests\Support\SkillCatalogFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -50,7 +51,7 @@ final class PlannerPromptCharacterizationTest extends TestCase
     {
         $rendered = $this->renderPrompt();
 
-        if (false !== getenv('UPDATE_ROUTING_SNAPSHOTS') && '' !== (string) getenv('UPDATE_ROUTING_SNAPSHOTS')) {
+        if (RoutingSnapshot::updateMode()) {
             if (!is_dir(dirname(self::SNAPSHOT_FILE))) {
                 mkdir(dirname(self::SNAPSHOT_FILE), 0o775, true);
             }

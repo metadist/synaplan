@@ -47,10 +47,25 @@ class StreamControllerTest extends WebTestCase
         $this->markTestSkipped('SSE streaming tests are not compatible with PHPUnit WebTestCase (output buffering issues)');
     }
 
-    public function testStreamOnlyAcceptsGetMethod(): void
+    public function testStreamAcceptsPostMethod(): void
+    {
+        // POST is the default transport for the web chat (the message rides
+        // in the JSON body, so long texts never exceed URL length limits).
+        // Unauthenticated POST must reach the controller (401, not 405).
+        $this->client->request(
+            'POST',
+            '/api/v1/messages/stream',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['message' => 'Test', 'chatId' => '1'])
+        );
+
+        $this->assertResponseStatusCodeSame(401);
+    }
+
+    public function testStreamRejectsOtherMethods(): void
     {
         // Method Not Allowed is a routing error — checked before auth.
-        $this->client->request('POST', '/api/v1/messages/stream');
+        $this->client->request('DELETE', '/api/v1/messages/stream');
 
         $this->assertResponseStatusCodeSame(405);
     }
