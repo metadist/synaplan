@@ -31,6 +31,7 @@ use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -76,13 +77,68 @@ class StreamController extends AbstractController
     ) {
     }
 
-    #[Route('/stream', name: 'stream', methods: ['GET'])]
+    /**
+     * Merge stream parameters from the query string and (for POST) the JSON
+     * body into one bag. Body values override query values; only scalar body
+     * values are accepted, and booleans are normalized to '1'/'0' so the
+     * existing `'1' === $params->get(...)` flag checks work for JSON `true`.
+     *
+     * @return InputBag<bool|float|int|string>
+     */
+    private function resolveStreamParams(Request $request): InputBag
+    {
+        $params = new InputBag($request->query->all());
+
+        if (!$request->isMethod('POST')) {
+            return $params;
+        }
+
+        $decoded = json_decode($request->getContent(), true);
+        if (!is_array($decoded)) {
+            return $params;
+        }
+
+        foreach ($decoded as $key => $value) {
+            if (is_bool($value)) {
+                $params->set((string) $key, $value ? '1' : '0');
+            } elseif (is_scalar($value)) {
+                $params->set((string) $key, (string) $value);
+            }
+        }
+
+        return $params;
+    }
+
+    #[Route('/stream', name: 'stream', methods: ['GET', 'POST'])]
     #[OA\Get(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response',
-        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments.',
+        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments. NOTE: the message rides in the URL, so long texts can exceed proxy request-line limits (HTTP 431/414) — prefer the POST variant for anything beyond a few KB.',
         security: [['Bearer' => []]],
         tags: ['Messages']
+    )]
+    #[OA\Post(
+        path: '/api/v1/messages/stream',
+        summary: 'Stream AI chat response (POST body)',
+        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
+        security: [['Bearer' => []]],
+        tags: ['Messages'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['message', 'chatId'],
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Summarize the following text: …'),
+                    new OA\Property(property: 'chatId', type: 'string', example: '123'),
+                    new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
+                    new OA\Property(property: 'reasoning', type: 'string', enum: ['0', '1'], example: '0'),
+                    new OA\Property(property: 'webSearch', type: 'string', enum: ['0', '1'], example: '0'),
+                    new OA\Property(property: 'modelId', type: 'string', example: '53'),
+                    new OA\Property(property: 'fileIds', type: 'string', example: '1,2,3'),
+                    new OA\Property(property: 'guestSession', type: 'string', example: 'gs_abc123'),
+                ]
+            )
+        )
     )]
     #[OA\Parameter(
         name: 'message',
@@ -201,6 +257,15 @@ class StreamController extends AbstractController
         Request $request,
         #[CurrentUser] ?User $user,
     ): Response {
+        // Unified parameter access for both transports: the legacy GET puts
+        // everything in the query string (EventSource can't POST), which
+        // breaks on long pasted texts — proxies reject oversized request
+        // lines with HTTP 431/414 before PHP ever runs. The POST variant
+        // carries the same parameters in a JSON body; body values override
+        // query parameters so a client can mix both (e.g. keep ?token= for
+        // the query authenticator while POSTing the message).
+        $params = $this->resolveStreamParams($request);
+
         // Widget-Mode: Check for Widget headers if no authenticated user
         $isWidgetMode = false;
         $isGuestMode = false;
@@ -267,8 +332,8 @@ class StreamController extends AbstractController
                     'task_prompt' => $fixedTaskPromptTopic,
                 ]);
             } else {
-                // Guest Mode: Check for guest session query parameter
-                $guestSessionId = $request->query->get('guestSession');
+                // Guest Mode: Check for guest session parameter (query or POST body)
+                $guestSessionId = $params->get('guestSession');
                 if ($guestSessionId) {
                     $guestSession = $this->guestSessionService->getSession($guestSessionId);
                     if ($guestSession && !$guestSession->isExpired()) {
@@ -309,29 +374,29 @@ class StreamController extends AbstractController
         // Check rate limit for authenticated users (not widget mode)
         // We'll check this inside the stream to send a proper SSE error event
 
-        $messageText = $request->query->get('message', '');
-        $trackId = $request->query->get('trackId', time());
-        $chatId = $request->query->get('chatId', null);
-        $includeReasoning = '1' === $request->query->get('reasoning', '0');
-        $webSearch = '1' === $request->query->get('webSearch', '0');
-        $modelId = $request->query->get('modelId', null);
+        $messageText = $params->get('message', '');
+        $trackId = $params->get('trackId', time());
+        $chatId = $params->get('chatId', null);
+        $includeReasoning = '1' === $params->get('reasoning', '0');
+        $webSearch = '1' === $params->get('webSearch', '0');
+        $modelId = $params->get('modelId', null);
 
-        $voiceReply = '1' === $request->query->get('voiceReply', '0');
-        $isAgain = '1' === $request->query->get('isAgain', '0');
-        $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
-        $promptTopic = $request->query->get('promptTopic');
-        $promptId = $request->query->get('promptId');
+        $voiceReply = '1' === $params->get('voiceReply', '0');
+        $isAgain = '1' === $params->get('isAgain', '0');
+        $fileIds = $params->get('fileIds', ''); // NEW: comma-separated list or single ID
+        $promptTopic = $params->get('promptTopic');
+        $promptId = $params->get('promptId');
         // Typed accessor: `get()` would hand back an array for `ragGroupKey[]=…`,
         // which then flows into a string-typed processing option and 500s
         // downstream. `getString()` rejects non-scalar input with a clean 400,
         // and we normalize the empty string to null so "no folder selected"
         // behaves the same as an absent parameter.
-        $ragGroupKey = $request->query->getString('ragGroupKey') ?: null;
+        $ragGroupKey = $params->getString('ragGroupKey') ?: null;
         // Quoted reference the user selected from an earlier message ("Mention
         // in chat"). `getString()` rejects array input with a clean 400. We trim
         // and cap the excerpt server-side so a crafted request cannot bloat the
         // stored meta or the AI prompt, and normalize empty to null.
-        $quotedText = trim($request->query->getString('quotedText'));
+        $quotedText = trim($params->getString('quotedText'));
         if (mb_strlen($quotedText) > self::MAX_QUOTED_TEXT_LENGTH) {
             $quotedText = mb_substr($quotedText, 0, self::MAX_QUOTED_TEXT_LENGTH);
         }
@@ -339,10 +404,10 @@ class StreamController extends AbstractController
         // `getInt()` rejects array input (e.g. `quotedMessageId[]=…`) with a clean
         // 400 instead of silently coercing it to 0/1 and resolving the wrong
         // message. 0 (absent/invalid) collapses to null.
-        $quotedMessageId = $request->query->getInt('quotedMessageId') ?: null;
-        $continueMessageId = $request->query->get('continueMessageId');
+        $quotedMessageId = $params->getInt('quotedMessageId') ?: null;
+        $continueMessageId = $params->get('continueMessageId');
         // Explicit opt-out from memory loading + extraction (used by public demo via synaplan.com/try-chat)
-        $disableMemories = '1' === $request->query->get('disableMemories', '0');
+        $disableMemories = '1' === $params->get('disableMemories', '0');
 
         // Parse fileIds (can be comma-separated string or single ID)
         $fileIdArray = [];
