@@ -65,7 +65,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.11.3",
     "@eslint/js": "10.0.1",
-    "@playwright/test": "1.61.0",
+    "@playwright/test": "1.61.1",
     "@tailwindcss/postcss": "4.3.1",
     "@types/dompurify": "3.2.0",
     "@types/katex": "0.16.8",

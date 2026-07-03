@@ -534,6 +534,17 @@ function mediaUrlKey(url: string): string {
 }
 
 /**
+ * True when a text part holds a document-generation result marker
+ * (`__FILE_GENERATED__:<name>` or `__FILE_GENERATION_FAILED__`). These are
+ * emitted by the backend for officemaker/document turns and translated to the
+ * user-facing download prompt / failure notice by `MessageText`.
+ */
+function isFileGenerationMarker(content: string | undefined): boolean {
+  if (!content) return false
+  return content.startsWith('__FILE_GENERATED__:') || content === '__FILE_GENERATION_FAILED__'
+}
+
+/**
  * Issue #1070: reconcile a live-streamed message with its persisted
  * version after SSE `complete`. The persisted version is authoritative
  * for files, generated media, and metadata; the streamed state stays
@@ -573,6 +584,33 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   )
   if (missingMedia.length > 0) {
     local.parts = [...local.parts, ...missingMedia]
+  }
+
+  // --- File-generation marker text (issue #1258) ----------------------
+  // A document/officemaker turn persists its response as a special marker
+  // (`__FILE_GENERATED__:<name>` / `__FILE_GENERATION_FAILED__`) that
+  // MessageText translates into the download prompt / failure notice. The
+  // streaming path assembles this text through a separate branch that can
+  // miss it — e.g. a multitask/DAG document node (no `generatedFile` in the
+  // `complete` payload) or a JSON body that never matched the replace
+  // heuristic — leaving the bubble without any response text until a reload.
+  //
+  // The persisted row is authoritative after `complete`, so adopt its marker
+  // text here. This keeps the streaming and reload paths from diverging (the
+  // structural fix from #1070): stale text/code parts (raw JSON, an empty
+  // body, or an already-translated duplicate) are dropped and the marker is
+  // prepended, while generated media/link parts are preserved.
+  const persistedMarker = persisted.parts.find(
+    (p) => p.type === 'text' && isFileGenerationMarker(p.content)
+  )
+  if (persistedMarker) {
+    const alreadyShown = local.parts.some(
+      (p) => p.type === 'text' && p.content === persistedMarker.content
+    )
+    if (!alreadyShown) {
+      const preserved = local.parts.filter((p) => p.type !== 'text' && p.type !== 'code')
+      local.parts = [persistedMarker, ...preserved]
+    }
   }
 
   // --- Files (attachments + generated documents) ----------------------

@@ -153,7 +153,11 @@
     },
     "expect": {
       "capabilities": [
+        "file_analysis",
         "text2sound"
+      ],
+      "edges": [
+        "file_analysis->text2sound"
       ],
       "forbid": [
         "image_generation"
@@ -225,8 +229,13 @@
     "language": "en",
     "expect": {
       "capabilities": [
+        "chat",
         "image_generation",
         "compose_reply"
+      ],
+      "edges": [
+        "chat->compose_reply",
+        "image_generation->compose_reply"
       ],
       "forbid": [
         "file_analysis"
@@ -256,7 +265,11 @@
     "language": "de",
     "expect": {
       "capabilities": [
+        "chat",
         "text2sound"
+      ],
+      "edges": [
+        "chat->text2sound"
       ],
       "forbid": [
         "image_generation"

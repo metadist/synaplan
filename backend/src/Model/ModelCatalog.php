@@ -861,6 +861,11 @@ class ModelCatalog
                 'params' => ['model' => 'gpt-5.5-pro'],
                 'features' => ['reasoning', 'vision'],
                 'supportsStreaming' => false,
+                // Responses API takes system prompts via `instructions` — only
+                // streaming is unsupported. Without this flag the legacy
+                // "no streaming ⇒ no system messages" heuristic silently drops
+                // every topic prompt (broke officemaker document generation).
+                'supportsSystemMessages' => true,
                 'meta' => [
                     'api' => 'responses',
                     'context_window' => '1050000',
@@ -890,6 +895,7 @@ class ModelCatalog
                 'params' => ['model' => 'gpt-5.5-pro'],
                 'features' => ['reasoning', 'vision'],
                 'supportsStreaming' => false,
+                'supportsSystemMessages' => true,
                 'meta' => [
                     'api' => 'responses',
                     'supports_images' => true,
