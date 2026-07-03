@@ -15,16 +15,58 @@
     </div>
 
     <!-- Top controls: language + skip -->
-    <div class="relative z-20 flex items-center justify-between px-6 pt-2">
+    <div class="relative z-30 flex items-center justify-between px-6 pt-2">
+      <!-- Language picker: a dropdown so the user can jump straight to their
+           language instead of cycling through all of them. -->
+      <div ref="languageMenuRef" class="relative">
+        <button
+          class="h-9 pl-2.5 pr-2 rounded-lg surface-card ring-1 ring-black/[0.06] dark:ring-white/[0.1] shadow-sm txt-primary text-sm font-medium inline-flex items-center gap-1.5 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
+          data-testid="btn-language-toggle"
+          :aria-expanded="languageMenuOpen"
+          aria-haspopup="listbox"
+          @click="languageMenuOpen = !languageMenuOpen"
+        >
+          <span aria-hidden="true">{{ currentLanguageOption.flag }}</span>
+          <span>{{ currentLanguageOption.label }}</span>
+          <Icon
+            :icon="languageMenuOpen ? 'mdi:chevron-up' : 'mdi:chevron-down'"
+            class="w-4 h-4 txt-secondary"
+            aria-hidden="true"
+          />
+        </button>
+        <Transition name="lang-menu">
+          <ul
+            v-if="languageMenuOpen"
+            class="absolute left-0 mt-2 w-44 rounded-xl surface-elevated ring-1 ring-black/[0.06] dark:ring-white/[0.1] shadow-lg overflow-hidden py-1"
+            role="listbox"
+            data-testid="menu-language"
+          >
+            <li v-for="lang in languages" :key="lang.value">
+              <button
+                class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                :class="
+                  lang.value === currentLanguage ? 'txt-primary font-semibold' : 'txt-secondary'
+                "
+                role="option"
+                :aria-selected="lang.value === currentLanguage"
+                :data-testid="`btn-language-${lang.value}`"
+                @click="selectLanguage(lang.value)"
+              >
+                <span class="text-base" aria-hidden="true">{{ lang.flag }}</span>
+                <span class="flex-1">{{ lang.label }}</span>
+                <Icon
+                  v-if="lang.value === currentLanguage"
+                  icon="mdi:check"
+                  class="w-4 h-4 text-brand"
+                  aria-hidden="true"
+                />
+              </button>
+            </li>
+          </ul>
+        </Transition>
+      </div>
       <button
-        class="h-9 px-3 rounded-lg icon-ghost text-xs font-medium"
-        data-testid="btn-language-toggle"
-        @click="cycleLanguage"
-      >
-        {{ currentLanguage.toUpperCase() }}
-      </button>
-      <button
-        class="h-9 px-3 rounded-lg icon-ghost text-sm font-medium txt-secondary"
+        class="h-9 px-3 rounded-lg surface-card ring-1 ring-black/[0.06] dark:ring-white/[0.1] shadow-sm text-sm font-medium txt-primary transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
         data-testid="btn-skip-onboarding"
         @click="skip"
       >
@@ -101,9 +143,10 @@
  * The router guard only sends true first-run native users here; finishing or
  * skipping persists completion so the flow never shows again.
  */
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Icon } from '@iconify/vue'
 import OnboardingWelcomeStep from '@/components/onboarding/OnboardingWelcomeStep.vue'
 import OnboardingServerStep from '@/components/onboarding/OnboardingServerStep.vue'
 import OnboardingPlansStep from '@/components/onboarding/OnboardingPlansStep.vue'
@@ -114,6 +157,13 @@ const router = useRouter()
 const { locale } = useI18n()
 
 const totalSteps = 3
+
+const languages = [
+  { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
+  { value: 'en', label: 'English', flag: '🇬🇧' },
+  { value: 'es', label: 'Español', flag: '🇪🇸' },
+  { value: 'tr', label: 'Türkçe', flag: '🇹🇷' },
+]
 
 // A server switch in step 2 reloads the WebView; resume where the user was.
 const step = ref(consumeOnboardingResumeStep() ?? 1)
@@ -132,13 +182,33 @@ const directionVars = computed(() =>
 )
 
 const currentLanguage = computed(() => locale.value)
+const currentLanguageOption = computed(
+  () => languages.find((lang) => lang.value === locale.value) ?? languages[1]
+)
 
-const cycleLanguage = () => {
-  const languages = ['de', 'en', 'es', 'tr']
-  const currentIndex = languages.indexOf(locale.value)
-  locale.value = languages[(currentIndex + 1) % languages.length]
-  localStorage.setItem('language', locale.value)
+const languageMenuOpen = ref(false)
+const languageMenuRef = ref<HTMLElement | null>(null)
+
+const selectLanguage = (value: string) => {
+  locale.value = value
+  localStorage.setItem('language', value)
+  languageMenuOpen.value = false
 }
+
+const handleClickOutsideLanguageMenu = (event: MouseEvent) => {
+  if (!languageMenuOpen.value) return
+  if (languageMenuRef.value && !languageMenuRef.value.contains(event.target as Node)) {
+    languageMenuOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutsideLanguageMenu)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutsideLanguageMenu)
+})
 
 function goTo(target: number) {
   if (target === step.value || target < 1 || target > totalSteps) {
@@ -202,6 +272,23 @@ function finishToRegister(planId?: string) {
   transform: translateX(var(--onb-leave-x, -20px));
 }
 
+/* Language dropdown menu: subtle scale + fade. */
+.lang-menu-enter-active {
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lang-menu-leave-active {
+  transition:
+    opacity 0.12s ease-in,
+    transform 0.12s ease-in;
+}
+.lang-menu-enter-from,
+.lang-menu-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+}
+
 /* Progress dots: the active dot stretches into a pill. */
 .onboarding-dot {
   height: 8px;
@@ -221,7 +308,9 @@ function finishToRegister(planId?: string) {
 @media (prefers-reduced-motion: reduce) {
   .onb-step-enter-active,
   .onb-step-leave-active,
-  .onboarding-dot {
+  .onboarding-dot,
+  .lang-menu-enter-active,
+  .lang-menu-leave-active {
     transition: none;
   }
   .onb-step-enter-from,

@@ -15,15 +15,18 @@
       {{ $t('onboarding.server.subtitle') }}
     </p>
 
-    <!-- Connected / default server card -->
-    <div
-      class="mt-8 p-4 rounded-2xl surface-card ring-1 text-left flex items-center gap-4 onb-enter-4"
+    <!-- Connected / default server card. Tapping it opens a plain-language
+         explanation of what this server is (requirement: describe the server). -->
+    <button
+      type="button"
+      class="mt-8 w-full p-4 rounded-2xl surface-card ring-1 text-left flex items-center gap-4 onb-enter-4 transition-all duration-200 hover:shadow-lg hover:shadow-brand/10 active:scale-[0.99]"
       :class="
         isOnCustomServer
-          ? 'ring-black/[0.04] dark:ring-white/[0.05]'
-          : 'ring-brand/30 dark:ring-brand/40'
+          ? 'ring-black/[0.04] dark:ring-white/[0.05] hover:ring-brand/30'
+          : 'ring-brand/30 dark:ring-brand/40 hover:ring-brand/50'
       "
       data-testid="section-current-server"
+      @click="activeInfo = 'standard'"
     >
       <div
         class="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0"
@@ -48,7 +51,12 @@
       >
         {{ $t('onboarding.server.recommended') }}
       </span>
-    </div>
+      <Icon
+        icon="mdi:information-outline"
+        class="w-5 h-5 txt-secondary flex-shrink-0"
+        aria-hidden="true"
+      />
+    </button>
 
     <!-- Expert affordance: own server -->
     <div v-if="serverControlAvailable" class="mt-4 text-left onb-enter-5">
@@ -69,6 +77,27 @@
           <p class="text-xs txt-secondary leading-relaxed">
             {{ $t('onboarding.server.customHint') }}
           </p>
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              class="text-xs font-medium text-brand hover:underline underline-offset-2 inline-flex items-center gap-1"
+              data-testid="btn-custom-server-info"
+              @click="activeInfo = 'custom'"
+            >
+              <Icon icon="mdi:information-outline" class="w-4 h-4" aria-hidden="true" />
+              {{ $t('onboarding.server.moreInfo') }}
+            </button>
+            <a
+              :href="SELF_HOST_DOCS_URL"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-xs font-medium text-brand hover:underline underline-offset-2 inline-flex items-center gap-1"
+              data-testid="link-custom-server-docs"
+            >
+              <Icon icon="mdi:book-open-variant-outline" class="w-4 h-4" aria-hidden="true" />
+              {{ $t('onboarding.server.helpSetup') }}
+            </a>
+          </div>
           <input
             v-model="customUrl"
             type="url"
@@ -113,7 +142,7 @@
       data-testid="btn-server-next"
       @click="emit('next')"
     >
-      {{ $t('onboarding.next') }}
+      {{ $t('onboarding.server.almostThere') }}
     </button>
     <button
       class="mt-3 w-full py-2 text-sm font-medium txt-secondary hover:txt-primary transition-colors onb-enter-6"
@@ -122,6 +151,17 @@
     >
       {{ $t('onboarding.back') }}
     </button>
+
+    <OnboardingInfoModal
+      :is-open="activeInfo !== null"
+      :icon="activeInfoContent.icon"
+      :title="activeInfoContent.title"
+      :description="activeInfoContent.description"
+      :points="activeInfoContent.points"
+      :link-label="activeInfoContent.linkLabel"
+      :link-url="activeInfoContent.linkUrl"
+      @close="activeInfo = null"
+    />
   </div>
 </template>
 
@@ -146,6 +186,10 @@ import {
   saveNativeServerUrl,
 } from '@/services/api/nativeServer'
 import { setOnboardingResumeStep, clearOnboardingResumeStep } from '@/composables/useOnboarding'
+import OnboardingInfoModal from '@/components/onboarding/OnboardingInfoModal.vue'
+
+/** Public repo where the self-hosting / own-server setup guide lives. */
+const SELF_HOST_DOCS_URL = 'https://github.com/metadist/synaplan'
 
 const emit = defineEmits<{ next: []; back: [] }>()
 
@@ -169,6 +213,47 @@ const showCustom = ref(false)
 const customUrl = ref('')
 const customError = ref('')
 const connecting = ref(false)
+
+/** Which server info modal is open (null = closed). */
+const activeInfo = ref<'standard' | 'custom' | null>(null)
+
+interface InfoContent {
+  icon: string
+  title: string
+  description: string
+  points: string[]
+  linkLabel: string
+  linkUrl: string
+}
+
+const activeInfoContent = computed<InfoContent>(() => {
+  if ('custom' === activeInfo.value) {
+    return {
+      icon: 'mdi:server-plus',
+      title: t('onboarding.server.customInfoTitle'),
+      description: t('onboarding.server.customInfoBody'),
+      points: [
+        t('onboarding.server.customInfoPoint1'),
+        t('onboarding.server.customInfoPoint2'),
+        t('onboarding.server.customInfoPoint3'),
+      ],
+      linkLabel: t('onboarding.server.helpSetup'),
+      linkUrl: SELF_HOST_DOCS_URL,
+    }
+  }
+  return {
+    icon: 'mdi:shield-check-outline',
+    title: t('onboarding.server.standardInfoTitle'),
+    description: t('onboarding.server.standardInfoBody'),
+    points: [
+      t('onboarding.server.standardInfoPoint1'),
+      t('onboarding.server.standardInfoPoint2'),
+      t('onboarding.server.standardInfoPoint3'),
+    ],
+    linkLabel: '',
+    linkUrl: '',
+  }
+})
 
 async function connectCustom() {
   const candidate = customUrl.value.trim()

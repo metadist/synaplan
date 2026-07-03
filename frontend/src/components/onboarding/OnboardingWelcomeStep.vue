@@ -11,27 +11,54 @@
       {{ $t('onboarding.welcome.subtitle') }}
     </p>
 
-    <div class="mt-10 space-y-4 text-left">
-      <div
+    <!-- One rotating showcase card instead of a stacked feature list: the three
+         value props cycle automatically (2026 onboarding best practice: show,
+         don't list — minimal reading, one screen, one action). Tapping the card
+         advances manually; auto-rotation pauses under prefers-reduced-motion. -->
+    <button
+      type="button"
+      class="mt-10 w-full p-6 rounded-2xl surface-card ring-1 ring-black/[0.04] dark:ring-white/[0.05] onb-enter-4 min-h-[11rem] flex flex-col items-center justify-center"
+      :aria-label="$t(activeFeature.titleKey)"
+      data-testid="btn-feature-showcase"
+      @click="advance"
+    >
+      <Transition name="feature" mode="out-in">
+        <div :key="activeIndex" class="flex flex-col items-center">
+          <div
+            class="w-14 h-14 rounded-2xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center feature-icon"
+          >
+            <Icon :icon="activeFeature.icon" class="w-7 h-7 text-brand" />
+          </div>
+          <p class="text-base font-semibold txt-primary mt-4">
+            {{ $t(activeFeature.titleKey) }}
+          </p>
+          <p class="text-sm txt-secondary mt-1.5 leading-relaxed">
+            {{ $t(activeFeature.descKey) }}
+          </p>
+        </div>
+      </Transition>
+    </button>
+
+    <!-- Feature dots: tiny progress indicator for the showcase (also tappable). -->
+    <div
+      class="mt-4 flex items-center justify-center gap-2 onb-enter-5"
+      data-testid="section-feature-dots"
+    >
+      <button
         v-for="(feature, index) in features"
         :key="feature.titleKey"
-        class="flex items-start gap-4 p-4 rounded-2xl surface-card ring-1 ring-black/[0.04] dark:ring-white/[0.05]"
-        :class="`onb-enter-${4 + index}`"
-      >
-        <div
-          class="w-10 h-10 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center flex-shrink-0"
-        >
-          <Icon :icon="feature.icon" class="w-5 h-5 text-brand" />
-        </div>
-        <div class="min-w-0">
-          <p class="text-sm font-semibold txt-primary">{{ $t(feature.titleKey) }}</p>
-          <p class="text-xs txt-secondary mt-0.5 leading-relaxed">{{ $t(feature.descKey) }}</p>
-        </div>
-      </div>
+        type="button"
+        class="feature-dot"
+        :class="{ 'feature-dot--active': index === activeIndex }"
+        :aria-label="$t(feature.titleKey)"
+        :aria-current="index === activeIndex ? 'true' : undefined"
+        :data-testid="`btn-feature-dot-${index}`"
+        @click="goTo(index)"
+      />
     </div>
 
     <button
-      class="mt-10 w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-7"
+      class="mt-8 w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-6"
       data-testid="btn-welcome-next"
       @click="emit('next')"
     >
@@ -42,11 +69,13 @@
 
 <script setup lang="ts">
 /**
- * MOBILE-APP SEAM (first-run onboarding), step 1: one welcome screen with the
- * value proposition — deliberately NOT a multi-slide feature tour (contextual
- * education already exists via HelpTour / promo tips).
+ * MOBILE-APP SEAM (first-run onboarding), step 1: one snappy welcome screen.
+ * The three value props live in a single auto-rotating showcase card instead of
+ * a stacked list — minimal reading, no decisions, one CTA. Rotation is paused
+ * for users who prefer reduced motion; a tap on the card or a dot advances
+ * manually and resets the timer.
  */
-import { computed } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
@@ -82,9 +111,97 @@ const features = [
     descKey: 'onboarding.welcome.featureKnowledgeDesc',
   },
 ]
+
+const ROTATE_INTERVAL_MS = 3200
+
+const activeIndex = ref(0)
+const activeFeature = computed(() => features[activeIndex.value])
+
+/** Auto-changing content is disorienting with reduced motion — rotate only on tap then. */
+const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+
+let rotateTimer: ReturnType<typeof setInterval> | null = null
+
+function startRotation() {
+  if (prefersReducedMotion) return
+  stopRotation()
+  rotateTimer = setInterval(() => {
+    activeIndex.value = (activeIndex.value + 1) % features.length
+  }, ROTATE_INTERVAL_MS)
+}
+
+function stopRotation() {
+  if (rotateTimer) {
+    clearInterval(rotateTimer)
+    rotateTimer = null
+  }
+}
+
+/** Manual advance (card tap) — also resets the timer so it doesn't double-jump. */
+function advance() {
+  activeIndex.value = (activeIndex.value + 1) % features.length
+  startRotation()
+}
+
+function goTo(index: number) {
+  activeIndex.value = index
+  startRotation()
+}
+
+startRotation()
+onUnmounted(stopRotation)
 </script>
 
 <style scoped>
+/* Showcase content swap: quick fade + slight rise. */
+.feature-enter-active {
+  transition:
+    opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.feature-leave-active {
+  transition:
+    opacity 0.18s ease-in,
+    transform 0.18s ease-in;
+}
+.feature-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.feature-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* Gentle breathing on the icon container — alive, not distracting. */
+@keyframes featurePulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+.feature-icon {
+  animation: featurePulse 3.2s ease-in-out infinite;
+}
+
+/* Showcase dots: same visual family as the step progress dots. */
+.feature-dot {
+  height: 6px;
+  width: 6px;
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--brand) 25%, transparent);
+  transition:
+    width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.3s ease;
+}
+.feature-dot--active {
+  width: 18px;
+  background-color: var(--brand);
+}
+
 /* Staggered enter, same family as the auth pages' entry animations. */
 @keyframes onbEnter {
   from {
@@ -114,9 +231,6 @@ const features = [
 .onb-enter-6 {
   animation: onbEnter 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.36s both;
 }
-.onb-enter-7 {
-  animation: onbEnter 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.42s both;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .onb-enter-1,
@@ -125,8 +239,17 @@ const features = [
   .onb-enter-4,
   .onb-enter-5,
   .onb-enter-6,
-  .onb-enter-7 {
+  .feature-icon {
     animation: none;
+  }
+  .feature-enter-active,
+  .feature-leave-active,
+  .feature-dot {
+    transition: none;
+  }
+  .feature-enter-from,
+  .feature-leave-to {
+    transform: none;
   }
 }
 </style>
