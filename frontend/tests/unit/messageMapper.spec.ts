@@ -448,5 +448,108 @@ describe('messageMapper (issue #1070)', () => {
       expect(local.taskPlan?.active).toBe(true)
       expect(local.taskPlan?.cards[0].text).toBe('Live streamed summary')
     })
+
+    it('adopts the persisted file-generation marker when the stream left raw JSON (#1258)', () => {
+      // Officemaker/document turn: the stream left the raw BFILEPATH JSON in
+      // the bubble (the `generatedFile` replace heuristic missed it), but the
+      // persisted row carries the authoritative `__FILE_GENERATED__` marker.
+      const local = localStreamedMessage({
+        parts: [
+          {
+            partId: 'p1',
+            type: 'code',
+            content: '{"BFILEPATH":"report.docx","BFILETEXT":"..."}',
+            language: 'json',
+          },
+        ],
+      })
+      const persisted = mapApiMessageRow(
+        baseRow({
+          text: '__FILE_GENERATED__:report.docx',
+          files: [{ id: 9, filename: 'report.docx', fileType: 'docx', filePath: '13/report.docx' }],
+        })
+      )
+
+      reconcileLocalMessage(local, persisted)
+
+      expect(local.parts).toEqual([{ type: 'text', content: '__FILE_GENERATED__:report.docx' }])
+      expect(local.files).toHaveLength(1)
+      expect(local.files![0].filename).toBe('report.docx')
+    })
+
+    it('adopts the persisted file-generation marker when the streamed bubble is empty (#1258)', () => {
+      const local = localStreamedMessage({ parts: [{ partId: 'p1', type: 'text', content: '' }] })
+      const persisted = mapApiMessageRow(baseRow({ text: '__FILE_GENERATED__:notes.docx' }))
+
+      reconcileLocalMessage(local, persisted)
+
+      expect(local.parts).toEqual([{ type: 'text', content: '__FILE_GENERATED__:notes.docx' }])
+    })
+
+    it('replaces already-translated file text with the marker so both paths converge (#1258)', () => {
+      // The streaming `generatedFile` branch already swapped in the translated
+      // prompt; reconcile normalizes it back to the marker (MessageText
+      // re-translates it identically), so the reload and stream paths match.
+      const local = localStreamedMessage({
+        parts: [
+          { partId: 'p1', type: 'text', content: "I've created the file 'report.docx' for you." },
+        ],
+      })
+      const persisted = mapApiMessageRow(baseRow({ text: '__FILE_GENERATED__:report.docx' }))
+
+      reconcileLocalMessage(local, persisted)
+
+      expect(local.parts).toEqual([{ type: 'text', content: '__FILE_GENERATED__:report.docx' }])
+    })
+
+    it('preserves generated media parts while adopting the file marker (#1258)', () => {
+      // A DAG turn produced both an image (already shown live) and a document;
+      // reconcile must keep the image part and only fix the missing text.
+      const local = localStreamedMessage({
+        parts: [
+          { partId: 'p1', type: 'text', content: '{"BFILEPATH":"summary.docx"}' },
+          {
+            partId: 'p2',
+            type: 'image',
+            url: 'http://localhost:8000/api/v1/files/uploads/13/cat.png',
+          },
+        ],
+      })
+      const persisted = mapApiMessageRow(baseRow({ text: '__FILE_GENERATED__:summary.docx' }))
+
+      reconcileLocalMessage(local, persisted)
+
+      expect(local.parts[0]).toEqual({ type: 'text', content: '__FILE_GENERATED__:summary.docx' })
+      const imageParts = local.parts.filter((p) => p.type === 'image')
+      expect(imageParts).toHaveLength(1)
+      expect(imageParts[0].partId).toBe('p2')
+    })
+
+    it('leaves the bubble untouched when it already shows the file marker (#1258)', () => {
+      const local = localStreamedMessage({
+        parts: [{ partId: 'p1', type: 'text', content: '__FILE_GENERATION_FAILED__' }],
+      })
+      const persisted = mapApiMessageRow(baseRow({ text: '__FILE_GENERATION_FAILED__' }))
+
+      reconcileLocalMessage(local, persisted)
+
+      // Same marker already shown — the stable partId must survive.
+      expect(local.parts).toHaveLength(1)
+      expect(local.parts[0].partId).toBe('p1')
+    })
+
+    it('does not touch streamed text for a normal (non-file) message (#1258)', () => {
+      const local = localStreamedMessage({
+        parts: [{ partId: 'p1', type: 'text', content: 'Live streamed answer.' }],
+      })
+      const persisted = mapApiMessageRow(baseRow({ text: 'Persisted answer (different).' }))
+
+      reconcileLocalMessage(local, persisted)
+
+      // No file marker in play — streamed text stays authoritative.
+      expect(local.parts).toEqual([
+        { partId: 'p1', type: 'text', content: 'Live streamed answer.' },
+      ])
+    })
   })
 })
