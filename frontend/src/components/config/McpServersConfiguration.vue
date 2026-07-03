@@ -74,14 +74,14 @@
               class="text-sm text-[var(--brand)] hover:underline"
               @click="startEdit(server)"
             >
-              {{ $t('actions.edit') }}
+              {{ $t('common.edit') }}
             </button>
             <button
               type="button"
               class="text-sm text-red-500 hover:underline"
               @click="removeServer(server)"
             >
-              {{ $t('actions.delete') }}
+              {{ $t('common.delete') }}
             </button>
           </div>
           <div v-if="toolsByServer[server.id ?? -1]" class="w-full pl-1">
@@ -173,14 +173,14 @@
           data-testid="btn-mcp-save"
           @click="save"
         >
-          {{ saving ? $t('actions.saving') : $t('actions.save') }}
+          {{ saving ? $t('common.saving') : $t('common.save') }}
         </button>
         <button
           type="button"
           class="px-4 py-2 rounded-lg text-sm txt-secondary hover:txt-primary"
           @click="closeEditor"
         >
-          {{ $t('actions.cancel') }}
+          {{ $t('common.cancel') }}
         </button>
       </div>
     </div>
@@ -279,7 +279,7 @@ const removeServer = async (server: McpServer) => {
   const confirmed = await confirm({
     title: t('mcpServers.deleteTitle'),
     message: t('mcpServers.deleteMessage', { name: server.name ?? '' }),
-    confirmText: t('actions.delete'),
+    confirmText: t('common.delete'),
     danger: true,
   })
   if (!confirmed || server.id === undefined) return

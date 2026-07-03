@@ -643,6 +643,8 @@
     "cancel": "İptal",
     "delete": "Sil",
     "save": "Kaydet",
+    "saving": "Kaydediliyor...",
+    "edit": "Düzenle",
     "close": "Kapat",
     "open": "Aç",
     "share": "Paylaş",

@@ -643,6 +643,8 @@
     "cancel": "Cancelar",
     "delete": "Eliminar",
     "save": "Guardar",
+    "saving": "Guardando...",
+    "edit": "Editar",
     "close": "Cerrar",
     "open": "Abrir",
     "share": "Compartir",
