@@ -266,6 +266,27 @@ final readonly class MessageClassifier
             $classification['media_type'] = $mediaType;
         }
 
+        // #1237: "describe the attached image as audio". The sorter sometimes
+        // keeps BTOPIC=mediamaker with BMEDIA=audio because the user names an
+        // audio OUTPUT format ("beschreibe in einem audio was hier zu sehen
+        // ist") — but with an image attachment this is a describe/analyze
+        // intent: MediaGenerationHandler would pass the attachment as a
+        // pic2pic reference and start an IMAGE generation that can only fail.
+        // Reroute deterministically to the describe path (topic `general`,
+        // vision chat); under multitask routing the planner then chains
+        // `file_analysis → text2sound` so the user still gets their audio.
+        if ('mediamaker' === $classification['topic']
+            && 'audio' === ($classification['media_type'] ?? null)
+            && $this->messageHasImageAttachment($message)) {
+            $this->logger->info('MessageClassifier: rerouting mediamaker/audio with image attachment to describe path (#1237)', [
+                'message_id' => $messageId,
+            ]);
+
+            $classification['topic'] = 'general';
+            $classification['intent'] = 'chat';
+            unset($classification['media_type']);
+        }
+
         // Pass through duration if detected (for video generation)
         $duration = $result['duration'] ?? null;
         if (null !== $duration) {
@@ -460,6 +481,32 @@ final readonly class MessageClassifier
             return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
                 || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true)
                 || in_array($ext, MessagePreProcessor::VIDEO_EXTENSIONS, true);
+        }
+
+        return false;
+    }
+
+    /**
+     * True if the message carries at least one image attachment. Accepts the
+     * generic kind `image` (as stored by generated-media pipelines, #1236) in
+     * addition to concrete extensions, and falls back to the legacy single-file
+     * columns for channel messages without File entities.
+     */
+    private function messageHasImageAttachment(Message $message): bool
+    {
+        foreach ($message->getFiles() as $file) {
+            $type = strtolower($file->getFileType() ?: '');
+            $ext = '' !== $type ? $type : strtolower(pathinfo($file->getFileName(), PATHINFO_EXTENSION));
+            if ('image' === $ext || in_array($ext, MessagePreProcessor::IMAGE_EXTENSIONS, true)) {
+                return true;
+            }
+        }
+
+        if ($message->getFile() > 0) {
+            $type = strtolower($message->getFileType() ?: '');
+            $ext = '' !== $type ? $type : strtolower(pathinfo((string) $message->getFilePath(), PATHINFO_EXTENSION));
+
+            return 'image' === $ext || in_array($ext, MessagePreProcessor::IMAGE_EXTENSIONS, true);
         }
 
         return false;

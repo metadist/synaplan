@@ -177,6 +177,40 @@
         "topic": "mediamaker",
         "web_search": false
     },
+    "sort_audio_describe_attached_generic_image": {
+        "intent": "chat",
+        "language": "de",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "general",
+        "web_search": false
+    },
+    "sort_audio_describe_attached_image": {
+        "intent": "chat",
+        "language": "de",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "general",
+        "web_search": false
+    },
+    "sort_audio_no_attachment_stays_mediamaker": {
+        "intent": "image_generation",
+        "language": "de",
+        "media_type": "audio",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "mediamaker",
+        "web_search": false
+    },
     "sort_custom_topic": {
         "intent": "chat",
         "language": "en",

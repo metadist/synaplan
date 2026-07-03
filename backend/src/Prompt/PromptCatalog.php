@@ -324,6 +324,11 @@ This is the list, use only this:
    - Summarize or inspect the image content
    - Answer questions about what the image shows
    - Compare images without creating a new one
+   - Describe/explain the image and get the answer AS AUDIO or read aloud
+     ("beschreibe in einem Audio, was hier zu sehen ist", "describe this
+     image as audio", "erkläre das Bild und lies es mir vor") — the audio
+     wish concerns the OUTPUT FORMAT of a describe intent, not media
+     creation. Do NOT set BTOPIC "mediamaker" and do NOT set BMEDIA.
 
    Examples with image attachments:
    - "Put the person from image 1 into the scene of image 2" → mediamaker
@@ -336,6 +341,8 @@ This is the list, use only this:
    - "Describe this photo" → general
    - "Read the text from this document" → general
    - "What differences do you see?" → general
+   - "Beschreibe in einem Audio, was hier zu sehen ist" → general (NOT mediamaker)
+   - "Describe this image as audio" → general (NOT mediamaker)
 
    If there are image attachments but no BTEXT, default to "general".
 
@@ -343,6 +350,10 @@ This is the list, use only this:
    - "video" - if user wants a video, film, clip, animation, or moving images
    - "audio" - if user wants audio, sound, voice, speech, TTS, or text-to-speech
    - "image" - if user wants an image, picture, photo, illustration, or any image editing/composition (this is the default)
+   IMPORTANT: "audio" means CREATING speech from text the user provides or asks
+   to be written. If the message asks to DESCRIBE/analyze an ATTACHED image —
+   even when the answer should come "as audio" / "vorgelesen" — rule 7 wins:
+   BTOPIC = "general" and no BMEDIA at all.
    Examples:
    - "Create a video of a car" → BMEDIA: "video"
    - "Make a video of a dog running" → BMEDIA: "video"
@@ -489,7 +500,11 @@ Allowed topic keys: [KEYLIST]
 2. Audio / TTS / "read aloud" / "vorlesen" / "MP3" / "narrate" / "speech" →
    `text2sound` node. If the user also asks for content to be generated
    first ("write X and read it"), GENERATE the content in a prior `chat`
-   node, then feed `$nX.text` into `text2sound`.
+   node, then feed `$nX.text` into `text2sound`. If the text to speak must
+   first be derived from an image or document ("describe the attached image
+   as audio", "beschreibe in einem Audio, was hier zu sehen ist"), chain
+   `file_analysis` → `text2sound` — NEVER `image_generation`: the user wants
+   the picture EXPLAINED, not a new picture.
 3. Image generate/edit → `image_generation`. To EDIT an image produced by an
    earlier node ("make a logo, then make it blue"), add a second
    `image_generation` node that depends on the first and references its file:
@@ -516,10 +531,20 @@ Allowed topic keys: [KEYLIST]
    via `inputs.file: "$nX.file"`. NEVER answer the "describe it" part with an
    independent `chat` node — that node would run before the file exists and
    hallucinate. The generated file must flow into `file_analysis`.
-7. Meeting / appointment / calendar event ("set up a meeting", "mail me a
-   meeting note for tomorrow 15:00 with Tom") → one `calendar_event` node.
-   Resolve the relative time against the time context into an absolute
-   ISO-8601 `start` + IANA `timezone`, fill title/attendees/location/duration.
+   The SAME chain applies to CREATIVE text ABOUT a file ("create an image of
+   a cat and write a poem about it", "erstelle ein Bild und schreibe ein
+   Gedicht darüber", "make a picture and tell a story about it"): the
+   creative step is a `file_analysis` node that `depends_on` the generator,
+   reads `inputs.file: "$nX.file"`, and carries the creative instruction in
+   `inputs.prompt` — the vision model then writes about the REAL image.
+   A parallel `chat` node would invent an image it has never seen.
+7. Meeting / appointment / calendar event / reminder for a specific time
+   ("set up a meeting", "mail me a meeting note for tomorrow 15:00 with Tom",
+   "I need a meeting reminder for tomorrow at 9:00 with Sanam", "erinnere
+   mich an den Termin morgen um 9") → one `calendar_event` node — NEVER a
+   `chat` node that merely talks about the appointment. Resolve the relative
+   time against the time context into an absolute ISO-8601 `start` + IANA
+   `timezone`, fill title/attendees/location/duration.
 8. "Mail it to me" / "email me the result" / "schick es mir per Mail" →
    ADD one `email_me` node that depends on the content nodes and consumes
    their outputs (`text` + `attachments`). ONLY when the user EXPLICITLY
@@ -655,6 +680,44 @@ NOT an independent `chat` node. This guarantees the description sees the real
 generated file instead of hallucinating one. The SAME pattern applies to
 `video_generation` → `file_analysis` ("make a video and describe what happens")
 and `document_generation` → `file_analysis` ("create a table and summarize it").
+
+### Image, then a poem about it, read aloud (creative text about generated media)
+User: "Erstelle das Bild einer Katze, schreibe ein Gedicht darüber und lies es mir am Ende vor."
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n4",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Eine Katze" } },
+    { "id": "n2", "capability": "file_analysis", "depends_on": ["n1"], "inputs": { "file": "$n1.file", "prompt": "Schreibe ein Gedicht über dieses Bild." } },
+    { "id": "n3", "capability": "text2sound", "depends_on": ["n2"], "inputs": { "text": "$n2.text" }, "params": { "format": "mp3" } },
+    { "id": "n4", "capability": "compose_reply", "depends_on": ["n1","n2","n3"], "inputs": { "text": "$n2.text", "attachments": ["$n1.file","$n3.file"] } }
+  ]
+}
+
+The poem node is `file_analysis` with the creative instruction in
+`inputs.prompt` — it depends on n1 and looks at the REAL generated image. It is
+NEVER a parallel `chat` node without the dependency: that node would run before
+the image exists and write about an image it has never seen.
+
+### Describe an ATTACHED image as audio
+User: (attaches photo.png) "Beschreibe in einem Audio, was hier zu sehen ist."
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "file_analysis", "inputs": { "files": "$message.files", "prompt": "Beschreibe, was auf diesem Bild zu sehen ist." } },
+    { "id": "n2", "capability": "text2sound", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "format": "mp3" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n1.text", "attachments": ["$n2.file"] } }
+  ]
+}
+
+The attached image is ANALYZED (`file_analysis` on `$message.files`) and the
+description is spoken (`text2sound`). NEVER route this to `image_generation` —
+the user wants the existing picture explained, not a new picture generated.
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
 The event fields go in `params`. Resolve the relative time against the time
