@@ -984,6 +984,186 @@ class ChatHandlerTest extends TestCase
         $this->handler->dispatchPendingMemoryExtraction($command);
     }
 
+    /**
+     * GPT-5.5 Pro officemaker regression: models whose JSON says
+     * `supportsStreaming: false` (and nothing else) are treated as "no
+     * system-role support" by the legacy heuristic. The system prompt —
+     * including the whole topic prompt — used to be silently DROPPED,
+     * so officemaker never received its JSON file contract and produced
+     * prose instead of a document. The prompt must now be folded into
+     * the first user turn instead.
+     */
+    public function testHandleFoldsSystemPromptIntoFirstUserTurnWhenModelRejectsSystemRole(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Erstelle mir ein Word-Dokument');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260703090000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('officemaker');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('OFFICEMAKER-PROMPT-MARKER: respond with {"BFILEPATH":...}');
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn(['prompt' => $prompt, 'metadata' => []]);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        // No supportsSystemMessages key → legacy "no streaming ⇒ no system role" heuristic fires.
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsStreaming' => false]);
+        $this->modelRepository->method('find')->with(206)->willReturn($model);
+
+        $capturedMessages = null;
+        $this->aiFacade
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$capturedMessages): array {
+                $capturedMessages = $messages;
+
+                return ['content' => '{"BFILEPATH":"doc.docx","BFILETEXT":"..."}', 'provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $this->handler->handle($message, [], ['topic' => 'officemaker', 'language' => 'de', 'model_id' => 206]);
+
+        self::assertIsArray($capturedMessages);
+        foreach ($capturedMessages as $msg) {
+            self::assertNotSame('system', $msg['role'], 'model without system-role support must not receive a system message');
+        }
+
+        $firstUser = null;
+        foreach ($capturedMessages as $msg) {
+            if ('user' === $msg['role']) {
+                $firstUser = $msg;
+                break;
+            }
+        }
+        self::assertNotNull($firstUser, 'there must be a user turn');
+        $content = is_string($firstUser['content']) ? $firstUser['content'] : (string) json_encode($firstUser['content']);
+        self::assertStringContainsString(
+            'OFFICEMAKER-PROMPT-MARKER',
+            $content,
+            'the system prompt must be folded into the first user turn instead of being dropped'
+        );
+        self::assertStringContainsString('Erstelle mir ein Word-Dokument', $content);
+    }
+
+    /**
+     * Companion to the catalog fix: an explicit `supportsSystemMessages: true`
+     * must override the legacy "no streaming ⇒ no system role" convention, so
+     * GPT-5.5 Pro (Responses API, takes system prompts via `instructions`)
+     * keeps its system message even though streaming is unsupported.
+     */
+    public function testHandleKeepsSystemRoleWhenExplicitFlagOverridesStreamingHeuristic(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Erstelle mir ein Word-Dokument');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260703090000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('officemaker');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('OFFICEMAKER-PROMPT-MARKER: respond with {"BFILEPATH":...}');
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn(['prompt' => $prompt, 'metadata' => []]);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsStreaming' => false, 'supportsSystemMessages' => true]);
+        $this->modelRepository->method('find')->with(206)->willReturn($model);
+
+        $capturedMessages = null;
+        $this->aiFacade
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$capturedMessages): array {
+                $capturedMessages = $messages;
+
+                return ['content' => 'ok', 'provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $this->handler->handle($message, [], ['topic' => 'officemaker', 'language' => 'de', 'model_id' => 206]);
+
+        self::assertIsArray($capturedMessages);
+        self::assertSame('system', $capturedMessages[0]['role']);
+        self::assertStringContainsString('OFFICEMAKER-PROMPT-MARKER', $capturedMessages[0]['content']);
+    }
+
+    /**
+     * Streaming variant of the fold-into-user-turn fallback: handleStream()
+     * had the identical silent-drop bug (its comment even claimed the prompt
+     * "will be prepended to first user message instead" — it never was).
+     */
+    public function testHandleStreamFoldsSystemPromptIntoFirstUserTurnWhenModelRejectsSystemRole(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Erstelle mir ein Word-Dokument');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('OFFICEMAKER-PROMPT-MARKER: respond with {"BFILEPATH":...}');
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn(['prompt' => $prompt, 'metadata' => []]);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getFeatures')->willReturn([]);
+        $model->method('getJson')->willReturn(['supportsStreaming' => false]);
+        $this->modelRepository->method('find')->with(206)->willReturn($model);
+
+        $capturedMessages = null;
+        $this->aiFacade
+            ->method('chatStream')
+            ->willReturnCallback(function (array $messages, callable $cb) use (&$capturedMessages): array {
+                $capturedMessages = $messages;
+                $cb('chunk');
+
+                return ['provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'officemaker', 'language' => 'de', 'model_id' => 206],
+            static function ($chunk): void {},
+        );
+
+        self::assertIsArray($capturedMessages);
+        foreach ($capturedMessages as $msg) {
+            self::assertNotSame('system', $msg['role']);
+        }
+        $firstUser = null;
+        foreach ($capturedMessages as $msg) {
+            if ('user' === $msg['role']) {
+                $firstUser = $msg;
+                break;
+            }
+        }
+        self::assertNotNull($firstUser);
+        $content = is_string($firstUser['content']) ? $firstUser['content'] : (string) json_encode($firstUser['content']);
+        self::assertStringContainsString('OFFICEMAKER-PROMPT-MARKER', $content);
+    }
+
     public function testFormatQuotedReferenceReturnsEmptyWhenNoQuote(): void
     {
         $this->assertSame('', $this->invokeFormatQuotedReference([]));
