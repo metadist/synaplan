@@ -1005,6 +1005,23 @@ class StreamController extends AbstractController
                     $responseText .= $reasoningBuffer;
                 }
 
+                // Flush any leftover JSON buffer into the response text.
+                //
+                // Google/Gemini document generation fix: Gemini follows the
+                // officemaker "respond with ONLY JSON" contract literally and
+                // its provider emits content as plain strings, so the FIRST
+                // chunk starts with '{' and the whole response lands in the
+                // JSON buffer. The inline unwrap above only handles BTEXT —
+                // a BFILEPATH/BFILETEXT document stayed buffered forever, the
+                // post-stream file-generation parse below never saw it, and
+                // the turn was persisted as an EMPTY message with no file.
+                $streamedVisibleText = $responseText;
+                if ($isBufferingJson && '' !== trim($jsonBuffer)) {
+                    $responseText .= $jsonBuffer;
+                    $jsonBuffer = '';
+                    $isBufferingJson = false;
+                }
+
                 if (!$result['success']) {
                     // Build user-friendly error message as AI response
                     $isDev = 'dev' === $this->getParameter('kernel.environment');
@@ -1304,6 +1321,23 @@ class StreamController extends AbstractController
                             'audio' => '__AUDIO_GENERATING__',
                             default => '__VIDEO_GENERATING__',
                         };
+                    }
+
+                    // A document request that produced neither a file nor any
+                    // text must not be saved as an empty bubble — surface the
+                    // failure marker the frontend translates
+                    // (message.fileGenerationFailed) instead.
+                    if ('' === trim($finalText) && 'officemaker' === ($classification['topic'] ?? '')) {
+                        $finalText = '__FILE_GENERATION_FAILED__';
+                        $this->logger->error('StreamController: document generation produced neither file nor text');
+                    }
+
+                    // When the whole response was buffered as JSON, the client
+                    // never received a single data chunk — push the failure
+                    // marker live so the bubble shows the translated error
+                    // instead of staying empty until a reload.
+                    if ('__FILE_GENERATION_FAILED__' === $finalText && '' === trim($streamedVisibleText)) {
+                        $this->sendSSE('data', ['chunk' => $finalText]);
                     }
 
                     $outgoingMessage->setText($finalText);
