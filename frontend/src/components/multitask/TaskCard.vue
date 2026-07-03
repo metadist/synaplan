@@ -100,12 +100,12 @@ const toggleCollapsed = () => {
 }
 
 // Copy-to-clipboard for text-bearing done cards (#1229). Media cards get
-// download/lightbox via TaskCardMedia instead.
+// download/lightbox via TaskCardMedia instead; search cards carry only a
+// compact summary (query + source count, no text) so there is nothing to copy.
 const { t } = useI18n()
 const { success: notifySuccess, error: notifyError } = useNotification()
 const canCopy = computed(
-  () =>
-    props.card.state === 'done' && !!props.card.text && (isProseKind.value || isSearchKind.value)
+  () => props.card.state === 'done' && !!props.card.text && isProseKind.value
 )
 const copyText = async () => {
   try {

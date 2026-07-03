@@ -31,18 +31,9 @@
       <DownloadLink @download="download" />
     </template>
 
-    <!-- Documents keep the plain download link -->
-    <a
-      v-else
-      :href="url"
-      target="_blank"
-      rel="noopener"
-      class="inline-flex items-center gap-2 text-sm"
-      style="color: var(--brand)"
-    >
-      <Icon icon="mdi:download" class="w-4 h-4" />
-      {{ $t('taskPlan.download') }}
-    </a>
+    <!-- Documents: same authenticated blob download as the other kinds — a
+         bare anchor to a cookie-authed API URL could save an HTML error page -->
+    <DownloadLink v-else @download="download" />
   </div>
 
   <!-- Image lightbox (Escape / click to close) — the MessageImage pattern -->
