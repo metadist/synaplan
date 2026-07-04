@@ -516,6 +516,29 @@
     }
   },
   {
+    "id": "mcp_knowledge_base_query",
+    "text": "please search my knowledge base one for information about the platform and what the company does",
+    "language": "en",
+    "requires": "mcp_connections",
+    "options": {
+      "classification": {
+        "topic": "general",
+        "source": "ai_sorting"
+      }
+    },
+    "expect": {
+      "capabilities": [
+        "mcp_fetch"
+      ],
+      "edges": [
+        "mcp_fetch->chat"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
     "id": "websearch_current_info",
     "text": "Wie ist das Wetter morgen in Berlin?",
     "language": "de",

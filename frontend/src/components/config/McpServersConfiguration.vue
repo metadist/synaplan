@@ -105,6 +105,76 @@
       </ul>
     </div>
 
+    <!-- Task usage: which tasks may pull data from the connected servers.
+         Connecting a server alone does nothing — every task (routing topic)
+         must opt in via its `tool_mcp` prompt metadata. Surfacing the flip
+         switches HERE closes the "I connected a server but nothing happens"
+         onboarding gap. -->
+    <div
+      v-if="servers.length > 0 && taskPrompts.length > 0"
+      class="surface-card p-6"
+      data-testid="section-mcp-usage"
+    >
+      <h3 class="text-lg font-semibold txt-primary mb-1">{{ $t('mcpServers.usageTitle') }}</h3>
+      <p class="txt-secondary text-sm leading-relaxed mb-4">
+        {{ $t('mcpServers.usageDescription') }}
+      </p>
+
+      <p
+        v-if="showNotUsedWarning"
+        class="text-sm mb-4 px-3 py-2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400"
+        data-testid="mcp-usage-warning"
+      >
+        {{ $t('mcpServers.usageNotUsedWarning') }}
+      </p>
+
+      <ul class="divide-y divide-light-border/20 dark:divide-dark-border/20">
+        <li
+          v-for="prompt in taskPrompts"
+          :key="prompt.id"
+          class="py-3 flex items-center gap-3"
+          :data-testid="`mcp-usage-${prompt.topic}`"
+        >
+          <div class="flex-1 min-w-0">
+            <p class="txt-primary text-sm font-medium truncate">{{ prompt.name }}</p>
+            <p class="txt-secondary text-xs truncate">{{ prompt.shortDescription }}</p>
+          </div>
+          <label class="inline-flex items-center gap-3 cursor-pointer flex-shrink-0">
+            <span class="text-xs txt-secondary">
+              {{
+                prompt.metadata?.tool_mcp === true
+                  ? $t('mcpServers.usageOn')
+                  : $t('mcpServers.usageOff')
+              }}
+            </span>
+            <span class="relative inline-flex">
+              <input
+                type="checkbox"
+                class="sr-only peer"
+                :checked="prompt.metadata?.tool_mcp === true"
+                :disabled="togglingPromptId === prompt.id"
+                :data-testid="`toggle-mcp-topic-${prompt.topic}`"
+                @change="toggleTopicMcp(prompt)"
+              />
+              <span
+                class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 transition-colors"
+              ></span>
+              <span
+                class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
+              ></span>
+            </span>
+          </label>
+        </li>
+      </ul>
+
+      <p class="text-xs txt-secondary mt-4">
+        {{ $t('mcpServers.usageAdvancedHint') }}
+        <RouterLink to="/ai/instructions" class="text-[var(--brand)] hover:underline">
+          {{ $t('mcpServers.usageAdvancedLink') }}
+        </RouterLink>
+      </p>
+    </div>
+
     <!-- Editor -->
     <div v-if="editorOpen" class="surface-card p-6" data-testid="section-mcp-editor">
       <h3 class="text-lg font-semibold txt-primary mb-1">
@@ -188,16 +258,21 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { mcpServersApi, type McpServer, type McpTool } from '@/services/api/mcpServersApi'
+import { promptsApi, type PromptMetadata, type TaskPrompt } from '@/services/api/promptsApi'
+import { useAuthStore } from '@/stores/auth'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { confirm } = useDialog()
 const { success, error } = useNotification()
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.isAdmin)
 
 const loading = ref(true)
 const saving = ref(false)
@@ -205,6 +280,18 @@ const clientEnabled = ref(false)
 const servers = ref<McpServer[]>([])
 const toolsByServer = reactive<Record<number, McpTool[]>>({})
 const testingId = ref<number | null>(null)
+
+// Task usage panel: routing topics with their `tool_mcp` opt-in state.
+const taskPrompts = ref<TaskPrompt[]>([])
+const togglingPromptId = ref<number | null>(null)
+
+const showNotUsedWarning = computed(
+  () =>
+    clientEnabled.value &&
+    servers.value.some((s) => s.enabled) &&
+    taskPrompts.value.length > 0 &&
+    !taskPrompts.value.some((p) => p.metadata?.tool_mcp === true)
+)
 
 const editorOpen = ref(false)
 const editingId = ref<number | null>(null)
@@ -221,6 +308,61 @@ const load = async () => {
     error(t('mcpServers.loadFailed'))
   } finally {
     loading.value = false
+  }
+}
+
+const loadTaskPrompts = async () => {
+  try {
+    const prompts = await promptsApi.getPrompts(locale.value || 'en')
+    // Widget assistants (w_*) are not routing topics; they cannot opt in.
+    taskPrompts.value = prompts.filter((p) => !p.topic.startsWith('w_'))
+  } catch {
+    // Non-fatal: the usage panel simply stays hidden.
+    taskPrompts.value = []
+  }
+}
+
+/**
+ * Flip the per-task "MCP Data Sources" opt-in (`tool_mcp` prompt metadata)
+ * directly from the connections page. Mirrors TaskPromptsConfiguration's
+ * save semantics: a plain user flipping a system default gets a personal
+ * override copy; user-owned prompts (and admins on system prompts) update
+ * in place. The full metadata map is sent because the backend replaces
+ * metadata wholesale on save.
+ */
+const toggleTopicMcp = async (prompt: TaskPrompt) => {
+  const next = !(prompt.metadata?.tool_mcp === true)
+  const metadata: PromptMetadata = { ...(prompt.metadata || {}), tool_mcp: next }
+  if (typeof metadata.aiModel !== 'number' || metadata.aiModel < 0) {
+    metadata.aiModel = 0
+  }
+
+  togglingPromptId.value = prompt.id
+  try {
+    let updated: TaskPrompt
+    if (prompt.isDefault && !prompt.isUserOverride && !isAdmin.value) {
+      updated = await promptsApi.createPrompt({
+        topic: prompt.topic,
+        shortDescription: prompt.shortDescription,
+        prompt: prompt.prompt,
+        language: prompt.language || 'en',
+        selectionRules: prompt.selectionRules ?? null,
+        metadata,
+      })
+      updated = { ...updated, isUserOverride: true }
+    } else {
+      updated = await promptsApi.updatePrompt(prompt.id, { metadata })
+    }
+
+    const index = taskPrompts.value.findIndex((p) => p.id === prompt.id)
+    if (index !== -1) {
+      taskPrompts.value[index] = { ...taskPrompts.value[index], ...updated }
+    }
+    success(next ? t('mcpServers.usageEnabled') : t('mcpServers.usageDisabled'))
+  } catch (err) {
+    error(err instanceof Error && err.message ? err.message : t('mcpServers.usageUpdateFailed'))
+  } finally {
+    togglingPromptId.value = null
   }
 }
 
@@ -311,5 +453,8 @@ const testServer = async (server: McpServer) => {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  void load()
+  void loadTaskPrompts()
+})
 </script>

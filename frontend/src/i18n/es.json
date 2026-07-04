@@ -2780,6 +2780,16 @@
     "deleteFailed": "No se pudo eliminar el servidor",
     "deleteTitle": "Eliminar servidor MCP",
     "deleteMessage": "¿Eliminar la conexión \"{name}\"? El asistente ya no podrá usar sus herramientas.",
-    "loadFailed": "No se pudieron cargar los servidores MCP"
+    "loadFailed": "No se pudieron cargar los servidores MCP",
+    "usageTitle": "Qué tareas pueden usar estos servidores",
+    "usageDescription": "Cada tarea decide por sí misma si el asistente puede obtener datos de tus servidores conectados al responder. Actívalo para cada tarea que deba usarlos — para preguntas de chat normales es \"General Chat\".",
+    "usageNotUsedWarning": "Tus servidores conectados aún no se usan: ninguna tarea permite fuentes de datos MCP. Activa al menos una tarea abajo, de lo contrario el asistente nunca llamará a estos servidores.",
+    "usageOn": "Permitido",
+    "usageOff": "No",
+    "usageEnabled": "Fuentes de datos MCP activadas para esta tarea",
+    "usageDisabled": "Fuentes de datos MCP desactivadas para esta tarea",
+    "usageUpdateFailed": "No se pudo actualizar la tarea",
+    "usageAdvancedHint": "Más opciones por tarea (restricciones de servidores, instrucciones, modelos):",
+    "usageAdvancedLink": "Instrucciones de IA"
   }
 }

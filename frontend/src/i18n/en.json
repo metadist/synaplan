@@ -3873,6 +3873,16 @@
     "deleteFailed": "Could not remove the server",
     "deleteTitle": "Remove MCP server",
     "deleteMessage": "Remove the connection \"{name}\"? The assistant will no longer be able to use its tools.",
-    "loadFailed": "Could not load MCP servers"
+    "loadFailed": "Could not load MCP servers",
+    "usageTitle": "Which tasks may use these servers",
+    "usageDescription": "Each task decides on its own whether the assistant may pull data from your connected servers while answering. Enable it for every task that should use them — for normal chat questions that is \"General Chat\".",
+    "usageNotUsedWarning": "Your connected servers are not used yet: no task allows MCP data sources. Enable at least one task below, otherwise the assistant will never call these servers.",
+    "usageOn": "Allowed",
+    "usageOff": "Off",
+    "usageEnabled": "MCP data sources enabled for this task",
+    "usageDisabled": "MCP data sources disabled for this task",
+    "usageUpdateFailed": "Could not update the task",
+    "usageAdvancedHint": "More options per task (server restrictions, instructions, models):",
+    "usageAdvancedLink": "AI Instructions"
   }
 }

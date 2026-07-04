@@ -51,6 +51,16 @@ safety net when no row exists and the seeder has not run. Calls still
 require a connected server (Channels → MCP Servers) and the per-topic
 "MCP Data Sources" opt-in.
 
+**Release defaults for the `general` topic** (`PromptCatalog`, bootstrap-only
+— written once when the prompt row is first created, never resurrected over
+an operator's change): `tool_mcp = 1` (MCP data sources ON, so a freshly
+connected server works for normal chat out of the box). Web search is left
+on **auto**: `tool_internet` is deliberately not seeded, because an absent
+key is the tri-state "auto" (the classifier's per-message vote decides and
+the manual search toggle keeps working), whereas a seeded `0` would be a
+hard disable that beats even the per-message toggle
+(`WebSearchTopicPolicy` rule 1).
+
 ## The skill catalog (how the planner learns about blocks)
 
 Each `TaskRunner` declares its capabilities via `describe()` returning
@@ -74,11 +84,28 @@ node. The runner re-checks every gate at run time (defense in depth).
 
 - **Channels → MCP Servers** (`/channels/mcp`): connect external MCP servers
   (Streamable HTTP URL + optional auth header, encrypted at rest), test the
-  connection, browse discovered tools.
+  connection, browse discovered tools. The page also shows a **task usage
+  panel**: one flip switch per routing topic that toggles the topic's
+  `tool_mcp` opt-in directly (a plain user flipping a system default gets a
+  personal override prompt, mirroring the AI Instructions save semantics),
+  plus a warning when servers are connected but no topic allows them —
+  closing the "I connected a server but nothing happens" onboarding gap.
 - **Channels → Email Automation**: the existing IMAP accounts double as the
   `email_search` corpus.
 - **AI Instructions → prompt → Available tools → MCP Data Sources**: the
-  per-topic opt-in for `mcp_fetch`.
+  per-topic opt-in for `mcp_fetch` (same flag as the usage panel, with the
+  full editor around it).
+
+## Classifier interplay (fast-path)
+
+A message classified by the fast-path heuristic (`source =
+fast_path_heuristic`) never reaches the planner — `TaskPlanExecutor` only
+plans for `ai_sorting` / `attachment_document_or_audio`. Short messages that
+reference the user's own knowledge base or a connected system ("search my
+knowledge base…", "look up X in our CRM", "meine Wissensdatenbank…")
+therefore defer to the AI sorter via the `$dataSourceTriggers` list in
+`MessageClassifier::canFastPathClassify()`; otherwise a connected MCP server
+could silently never be consulted while the fast-path flag is on.
 
 ## Testing instruments
 
@@ -91,3 +118,8 @@ node. The runner re-checks every gate at run time (defense in depth).
   (compound prompts, multilingual variants, negative must-not-trigger cases;
   asserts required/forbidden capabilities + dependency edges). Run it before
   and after every planner-prompt change; not part of the CI gate.
+  Cases needing per-user state declare `"requires": "mcp_connections"` and
+  are SKIPPED (not failed) when the resolved user has no entitled MCP
+  catalog — run those with `--user=<id>` against an account that has a
+  connected server and a `tool_mcp`-enabled topic
+  (`--filter=mcp --user=1` on the dev stack).

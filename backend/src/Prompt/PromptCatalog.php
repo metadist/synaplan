@@ -38,7 +38,7 @@ class PromptCatalog
      *    - tools:memory_*      ← memory extraction/parsing
      *    - tools:feedback_*    ← feedback contradiction checks
      *
-     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string}>
+     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string, metadata?: array<string, string>}>
      */
     public static function all(): array
     {
@@ -51,6 +51,19 @@ class PromptCatalog
                 'language' => 'en',
                 'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no other topic matches.',
                 'prompt' => self::generalPrompt(),
+                // Release defaults for the catch-all chat topic (seeded only
+                // when the prompt row is first created — bootstrap-only, an
+                // operator's later change is never overwritten):
+                //   - MCP data sources ON (`tool_mcp=1`) — a freshly connected
+                //     server (Channels → MCP Servers) works for normal chat
+                //     questions out of the box, no hidden per-topic toggle hunt.
+                //   - Web search on AUTO — `tool_internet` is deliberately NOT
+                //     seeded: an absent key is the "auto" state (the
+                //     classifier's per-message vote decides, and the user's
+                //     manual search toggle keeps working). Seeding `0` would
+                //     be WebSearchTopicPolicy rule 1, a hard disable that
+                //     even beats the per-message toggle.
+                'metadata' => ['tool_mcp' => '1'],
             ],
             [
                 'topic' => 'mediamaker',
@@ -165,6 +178,14 @@ class PromptCatalog
      * system prompts but never touches BSELECTION_RULES so admins can keep their
      * custom rule overrides.
      *
+     * Catalog `metadata` (BPROMPTMETA) is BOOTSTRAP-ONLY: it is written once
+     * when the prompt row is first inserted and never again. Re-seeding an
+     * existing prompt must not resurrect a default the operator changed —
+     * including keys the UI deliberately REMOVED (the Internet Search "auto"
+     * state deletes `tool_internet` entirely, so even an insert-if-missing
+     * per key would silently flip "auto" back to the seeded value on every
+     * container start).
+     *
      * @return array{inserted: list<string>, updated: list<string>} topic keys per outcome
      */
     public static function seed(Connection $connection): array
@@ -189,6 +210,15 @@ class PromptCatalog
                     'INSERT INTO BPROMPTS (BOWNERID, BLANG, BTOPIC, BSHORTDESC, BPROMPT) VALUES (0, ?, ?, ?, ?)',
                     [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']]
                 );
+                $promptId = (int) $connection->lastInsertId();
+
+                foreach ($prompt['metadata'] ?? [] as $key => $value) {
+                    $connection->executeStatement(
+                        'INSERT INTO BPROMPTMETA (BPROMPTID, BMETAKEY, BMETAVALUE, BCREATED) VALUES (?, ?, ?, ?)',
+                        [$promptId, $key, $value, time()]
+                    );
+                }
+
                 $inserted[] = $prompt['topic'];
             }
         }

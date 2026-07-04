@@ -2781,6 +2781,16 @@
     "deleteFailed": "Sunucu kaldırılamadı",
     "deleteTitle": "MCP sunucusunu kaldır",
     "deleteMessage": "\"{name}\" bağlantısı kaldırılsın mı? Asistan artık bu sunucunun araçlarını kullanamaz.",
-    "loadFailed": "MCP sunucuları yüklenemedi"
+    "loadFailed": "MCP sunucuları yüklenemedi",
+    "usageTitle": "Bu sunucuları hangi görevler kullanabilir",
+    "usageDescription": "Her görev, asistanın yanıt verirken bağlı sunucularınızdan veri çekip çekemeyeceğine kendisi karar verir. Kullanması gereken her görev için etkinleştirin — normal sohbet soruları için bu \"General Chat\" görevidir.",
+    "usageNotUsedWarning": "Bağlı sunucularınız henüz kullanılmıyor: hiçbir görev MCP veri kaynaklarına izin vermiyor. Aşağıda en az bir görevi etkinleştirin, aksi halde asistan bu sunucuları asla çağırmaz.",
+    "usageOn": "İzinli",
+    "usageOff": "Kapalı",
+    "usageEnabled": "Bu görev için MCP veri kaynakları etkinleştirildi",
+    "usageDisabled": "Bu görev için MCP veri kaynakları devre dışı bırakıldı",
+    "usageUpdateFailed": "Görev güncellenemedi",
+    "usageAdvancedHint": "Görev başına daha fazla seçenek (sunucu kısıtlamaları, talimatlar, modeller):",
+    "usageAdvancedLink": "AI Talimatları"
   }
 }

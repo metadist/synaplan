@@ -3807,6 +3807,16 @@
     "deleteFailed": "Server konnte nicht entfernt werden",
     "deleteTitle": "MCP-Server entfernen",
     "deleteMessage": "Verbindung \"{name}\" entfernen? Der Assistent kann dessen Tools dann nicht mehr nutzen.",
-    "loadFailed": "MCP-Server konnten nicht geladen werden"
+    "loadFailed": "MCP-Server konnten nicht geladen werden",
+    "usageTitle": "Welche Aufgaben dürfen diese Server nutzen",
+    "usageDescription": "Jede Aufgabe entscheidet selbst, ob der Assistent beim Antworten Daten aus deinen verbundenen Servern abrufen darf. Aktiviere es für jede Aufgabe, die sie nutzen soll — für normale Chat-Fragen ist das \"General Chat\".",
+    "usageNotUsedWarning": "Deine verbundenen Server werden noch nicht genutzt: Keine Aufgabe erlaubt MCP-Datenquellen. Aktiviere unten mindestens eine Aufgabe, sonst ruft der Assistent diese Server nie auf.",
+    "usageOn": "Erlaubt",
+    "usageOff": "Aus",
+    "usageEnabled": "MCP-Datenquellen für diese Aufgabe aktiviert",
+    "usageDisabled": "MCP-Datenquellen für diese Aufgabe deaktiviert",
+    "usageUpdateFailed": "Aufgabe konnte nicht aktualisiert werden",
+    "usageAdvancedHint": "Weitere Optionen pro Aufgabe (Server-Einschränkungen, Anweisungen, Modelle):",
+    "usageAdvancedLink": "KI-Anweisungen"
   }
 }

@@ -1512,7 +1512,9 @@ const availableTools: ToolOption[] = [
   { value: 'files-search', label: 'Files Search', icon: 'heroicons:document-magnifying-glass' },
   { value: 'url-screenshot', label: 'URL Content', icon: 'heroicons:globe-alt' },
   // Per-topic gate for external MCP data sources (Channels → MCP Servers).
-  // Default off — external calls are opt-in per topic (release 4.0 plan 09).
+  // Opt-in per topic (release 4.0 plan 09); the seeded `general` topic ships
+  // with it ON so a freshly connected server works for normal chat questions
+  // out of the box (PromptCatalog release defaults).
   { value: 'mcp-data', label: 'MCP Data Sources', icon: 'heroicons:server-stack' },
 ]
 
