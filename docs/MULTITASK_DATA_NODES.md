@@ -34,12 +34,22 @@ Every data node obeys the same rules (plan 09 §2):
 | ---------- | ------ | ------ | ---------------- | ------- |
 | `web_search` | `WebSearchRunner` | Brave web search | – (provider config) | on |
 | `url_fetch` | `UrlFetchRunner` | A specific URL named in the message (`UrlContentService`: robots.txt/noindex compliant) | `MULTITASK.URL_FETCH_ENABLED` | **on** |
-| `mcp_fetch` | `McpFetchRunner` | The user's connected external MCP servers (`McpClient`, Streamable HTTP) | `MCP.CLIENT_ENABLED` + `MULTITASK.MCP_FETCH_ENABLED` + per-topic `tool_mcp` prompt metadata (optional `mcp_servers` id allowlist) | off |
+| `mcp_fetch` | `McpFetchRunner` | The user's connected external MCP servers (`McpClient`, Streamable HTTP) | `MCP.CLIENT_ENABLED` + `MULTITASK.MCP_FETCH_ENABLED` + per-topic `tool_mcp` prompt metadata (optional `mcp_servers` id allowlist) | **on** (seeded) |
 | `email_search` | `EmailSearchRunner` | Live read-only IMAP search over the user's `InboundEmailHandler` accounts | `MULTITASK.EMAIL_SEARCH_ENABLED` | off |
 | `rag_query` | `ChatRunner` | User knowledge base (Qdrant) | – | on |
 
 Flags resolve per-user row → global row → built-in default (see
 `MultitaskRoutingConfig::isFeatureEnabled`).
+
+The outbound MCP client rolls out via seed rows, not a code default:
+`McpConfigSeeder` (`MCP.CLIENT_ENABLED = 1`, `MCP.NODE_TIMEOUT = 15`) and
+`MultitaskConfigSeeder` (`MULTITASK.MCP_FETCH_ENABLED = 1`) run inside
+`app:seed` on every container start, insert-if-missing — so a deploy
+activates the client, while an operator's explicit `0` override survives
+every deploy (the kill switch). The built-in code default stays OFF as the
+safety net when no row exists and the seeder has not run. Calls still
+require a connected server (Channels → MCP Servers) and the per-topic
+"MCP Data Sources" opt-in.
 
 ## The skill catalog (how the planner learns about blocks)
 
