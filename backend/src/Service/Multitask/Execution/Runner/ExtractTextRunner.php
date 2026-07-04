@@ -9,6 +9,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Skill\SkillDescriptor;
 
 /**
  * `extract_text` runner.
@@ -23,6 +24,16 @@ final readonly class ExtractTextRunner implements TaskRunner
     public function supportedCapabilities(): array
     {
         return [Capability::ExtractText];
+    }
+
+    /**
+     * @return list<SkillDescriptor>
+     */
+    public function describe(): array
+    {
+        return [
+            new SkillDescriptor(Capability::ExtractText, 'Extract text from an attached document or audio file (no model choice needed).'),
+        ];
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult

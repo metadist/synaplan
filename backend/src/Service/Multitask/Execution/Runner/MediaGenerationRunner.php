@@ -12,6 +12,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Skill\SkillDescriptor;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -36,6 +37,17 @@ final readonly class MediaGenerationRunner implements TaskRunner
     public function supportedCapabilities(): array
     {
         return [Capability::ImageGeneration, Capability::VideoGeneration];
+    }
+
+    /**
+     * @return list<SkillDescriptor>
+     */
+    public function describe(): array
+    {
+        return [
+            new SkillDescriptor(Capability::ImageGeneration, 'Generate or edit an image from a prompt and/or reference images.'),
+            new SkillDescriptor(Capability::VideoGeneration, 'Generate a video clip (params.duration, params.resolution).'),
+        ];
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult

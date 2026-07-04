@@ -31,6 +31,10 @@ final readonly class MultitaskConfigSeeder
             ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,  'value' => '1'],
             ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_SHADOW_MODE,      'value' => '0'],
             ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_PARALLEL_ENABLED, 'value' => '0'],
+            // mcp_fetch rollout: the DAG data node ships ON (paired with
+            // MCP.CLIENT_ENABLED in McpConfigSeeder). Insert-if-missing, so an
+            // operator's explicit OFF row is preserved across deploys.
+            ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_MCP_FETCH_ENABLED, 'value' => '1'],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'multitask_config', $rows);

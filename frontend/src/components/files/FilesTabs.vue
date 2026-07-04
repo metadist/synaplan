@@ -79,7 +79,7 @@ const props = defineProps<{
   active: FilesTab
 }>()
 
-// Tailwind-only tab styling (AGENTS_DEV: no component-scoped CSS). The `-mb-px`
+// Tailwind-only tab styling (AGENTS.md: no component-scoped CSS). The `-mb-px`
 // pulls the active 2px bottom border over the nav's own border for the
 // classic tab look; brand color comes from the CSS token.
 const BASE_TAB =

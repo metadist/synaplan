@@ -1,30 +1,36 @@
 import { describe, it, expect } from 'vitest'
-import { dedupeTaskPlanProse } from '@/utils/taskPlanDisplay'
+import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import type { TaskPlanState } from '@/stores/history'
 
+/**
+ * #1229 smart collapse: prose cards whose text is already contained in the
+ * final answer body are MARKED redundant (the card collapses to its header);
+ * cards with unique content are left untouched. Replaces the old
+ * dedupeTaskPlanProse approach of blanking the card text.
+ */
 const plan = (cards: TaskPlanState['cards']): TaskPlanState => ({
   active: false,
   replyNode: 'n3',
   cards,
 })
 
-describe('dedupeTaskPlanProse', () => {
+describe('markRedundantTaskPlanProse', () => {
   it('returns null for a missing plan', () => {
-    expect(dedupeTaskPlanProse(null, ['anything'])).toBeNull()
-    expect(dedupeTaskPlanProse(undefined, ['anything'])).toBeNull()
+    expect(markRedundantTaskPlanProse(null, ['anything'])).toBeNull()
+    expect(markRedundantTaskPlanProse(undefined, ['anything'])).toBeNull()
   })
 
   it('returns the same plan untouched when the body has no text', () => {
     const p = plan([
       { nodeId: 'n1', capability: 'chat', kind: 'text', state: 'done', text: 'Poem' },
     ])
-    expect(dedupeTaskPlanProse(p, [])).toBe(p)
-    expect(dedupeTaskPlanProse(p, ['   '])).toBe(p)
+    expect(markRedundantTaskPlanProse(p, [])).toBe(p)
+    expect(markRedundantTaskPlanProse(p, ['   '])).toBe(p)
   })
 
-  it('clears a card whose text is duplicated by the body answer (poem → TTS)', () => {
+  it('marks a card redundant when its text is duplicated by the body (poem → TTS)', () => {
     const poem = 'Roses are red,\nviolets are blue.'
-    const result = dedupeTaskPlanProse(
+    const result = markRedundantTaskPlanProse(
       plan([
         { nodeId: 'n1', capability: 'chat', kind: 'text', state: 'done', text: poem },
         { nodeId: 'n2', capability: 'text2sound', kind: 'audio', state: 'failed' },
@@ -32,47 +38,60 @@ describe('dedupeTaskPlanProse', () => {
       [poem]
     )
 
-    expect(result?.cards[0].text).toBe('')
-    // The audio card is untouched (no prose to dedupe).
-    expect(result?.cards[1].capability).toBe('text2sound')
+    expect(result?.cards[0].redundant).toBe(true)
+    // The text itself STAYS (the card collapses; expanding shows it again).
+    expect(result?.cards[0].text).toBe(poem)
+    expect(result?.cards[1].redundant).toBeUndefined()
   })
 
-  it('tolerates trailing-whitespace differences between card and body', () => {
-    const result = dedupeTaskPlanProse(
+  it('uses containment, not equality — a connector sentence around the card text still collapses it', () => {
+    const poem = 'Roses are red, violets are blue.'
+    const result = markRedundantTaskPlanProse(
+      plan([{ nodeId: 'n1', capability: 'chat', kind: 'text', state: 'done', text: poem }]),
+      [`Here is your poem:\n\n${poem}\n\nEnjoy!`]
+    )
+    expect(result?.cards[0].redundant).toBe(true)
+  })
+
+  it('tolerates whitespace differences between card and body', () => {
+    const result = markRedundantTaskPlanProse(
       plan([
-        { nodeId: 'n1', capability: 'chat', kind: 'text', state: 'done', text: 'The answer\n' },
+        { nodeId: 'n1', capability: 'chat', kind: 'text', state: 'done', text: 'The  answer\n' },
       ]),
       ['The answer']
     )
-    expect(result?.cards[0].text).toBe('')
+    expect(result?.cards[0].redundant).toBe(true)
   })
 
-  it('keeps an intermediate card whose text is not the final answer (summarize → translate)', () => {
-    // Reply node passes the translation through; the summary only lives on its
-    // own card and must stay visible.
-    const summary = 'Short summary of the note.'
-    const translation = 'Kurze Zusammenfassung der Notiz.'
-    const result = dedupeTaskPlanProse(
-      plan([
-        { nodeId: 'n1', capability: 'summarize', kind: 'text', state: 'done', text: summary },
-        { nodeId: 'n2', capability: 'translate', kind: 'text', state: 'done', text: translation },
-      ]),
-      [translation]
-    )
-
-    expect(result?.cards[0].text).toBe(summary)
-    expect(result?.cards[1].text).toBe('')
-  })
-
-  it('returns the same reference when nothing matches', () => {
+  it('keeps a card with UNIQUE content untouched (short connector reply)', () => {
     const p = plan([
-      { nodeId: 'n1', capability: 'chat', kind: 'text', state: 'done', text: 'Something else' },
+      {
+        nodeId: 'n1',
+        capability: 'chat',
+        kind: 'text',
+        state: 'done',
+        text: 'A long unique poem that only lives in the card.',
+      },
     ])
-    expect(dedupeTaskPlanProse(p, ['A different body answer'])).toBe(p)
+    const result = markRedundantTaskPlanProse(p, ['Here is the poem and a document for you.'])
+
+    expect(result).toBe(p)
+    expect(result?.cards[0].redundant).toBeUndefined()
   })
 
-  it('returns the same plan when it has no cards', () => {
-    const p = plan([])
-    expect(dedupeTaskPlanProse(p, ['body'])).toBe(p)
+  it('never downgrades an already-set backend flag', () => {
+    const p = plan([
+      {
+        nodeId: 'n1',
+        capability: 'chat',
+        kind: 'text',
+        state: 'done',
+        text: 'Unique text',
+        redundant: true,
+      },
+    ])
+    const result = markRedundantTaskPlanProse(p, ['Completely different body'])
+
+    expect(result?.cards[0].redundant).toBe(true)
   })
 })

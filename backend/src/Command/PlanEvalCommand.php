@@ -6,7 +6,9 @@ namespace App\Command;
 
 use App\Entity\Message;
 use App\Service\Multitask\Plan\TaskPlan;
+use App\Service\Multitask\Skill\SkillCatalog;
 use App\Service\Multitask\TaskPlanner;
+use App\Service\PromptService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -43,6 +45,8 @@ final class PlanEvalCommand extends Command
 
     public function __construct(
         private readonly TaskPlanner $planner,
+        private readonly SkillCatalog $skillCatalog,
+        private readonly PromptService $promptService,
         #[Autowire('%kernel.project_dir%')]
         private readonly string $projectDir,
     ) {
@@ -93,6 +97,21 @@ final class PlanEvalCommand extends Command
                 continue;
             }
             if (is_string($filter) && '' !== $filter && !str_contains($case['id'], $filter)) {
+                continue;
+            }
+
+            // Cases that need per-user state (e.g. a connected MCP server
+            // with an entitled topic) declare it via `requires`; when the
+            // environment can't satisfy it the case is SKIPPED, not failed,
+            // so the corpus stays green on machines without that setup.
+            $unmet = $this->unmetRequirement($case, $userId);
+            if (null !== $unmet) {
+                $rows[] = [
+                    $case['id'],
+                    '<comment>SKIP</comment>',
+                    '',
+                    $unmet,
+                ];
                 continue;
             }
 
@@ -180,6 +199,55 @@ final class PlanEvalCommand extends Command
         }
 
         return [true, '', $shape];
+    }
+
+    /**
+     * Resolve a case's `requires` declaration. Currently supported:
+     *
+     *   - "mcp_connections": the rendered capability catalog for the resolved
+     *     user + the case's classification topic must offer `mcp_fetch` with
+     *     at least one connection (i.e. the user has a reachable MCP server
+     *     and the topic opted in via `tool_mcp`). Mirrors exactly what
+     *     TaskPlanner::catalogContext() feeds the SkillCatalog.
+     *
+     * @param array<string, mixed> $case
+     *
+     * @return string|null a human-readable skip reason, or null when all requirements are met
+     */
+    private function unmetRequirement(array $case, ?int $userId): ?string
+    {
+        $requires = $case['requires'] ?? null;
+        if (!is_string($requires) || 'mcp_connections' !== $requires) {
+            return null;
+        }
+
+        $options = is_array($case['options'] ?? null) ? $case['options'] : [];
+        $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+        $topic = is_string($classification['topic'] ?? null) ? $classification['topic'] : '';
+        if ('' === $topic) {
+            return 'requires=mcp_connections needs options.classification.topic';
+        }
+
+        $topicMetadata = [];
+        try {
+            $promptData = $this->promptService->getPromptWithMetadata($topic, $userId ?? 0);
+            if (null !== $promptData && is_array($promptData['metadata'] ?? null)) {
+                $topicMetadata = $promptData['metadata'];
+            }
+        } catch (\Throwable) {
+            // Fall through — the catalog check below decides.
+        }
+
+        $catalog = $this->skillCatalog->renderCapabilityList($userId, [
+            'topic' => $topic,
+            'topic_metadata' => $topicMetadata,
+        ]);
+
+        if (!str_contains($catalog, 'mcp_fetch')) {
+            return 'no MCP connections for this user/topic — connect a server and enable "MCP Data Sources" for the topic (try --user=<id>)';
+        }
+
+        return null;
     }
 
     /** Whether any node of capability $toCap depends on any node of capability $fromCap. */

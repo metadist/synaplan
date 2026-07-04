@@ -718,6 +718,37 @@ final readonly class MessageClassifier
             }
         }
 
+        // Connected-data-source triggers. A message that references the
+        // user's own knowledge base or a connected external system (CRM,
+        // wiki, MCP server) must reach the AI sorter: the fast-path emits
+        // source=fast_path_heuristic, which TaskPlanExecutor treats as
+        // "single-node, no planning" — so a shortcut here would make the
+        // multitask planner (and with it the `mcp_fetch` data node)
+        // unreachable no matter what the user configured under
+        // Channels → MCP Servers. Deferring costs one extra sorter call.
+        static $dataSourceTriggers = [
+            // English
+            'knowledge base', 'knowledgebase', ' my documents', ' my files',
+            ' my notes', ' my crm', ' our crm', ' the crm', ' my wiki', ' our wiki',
+            'mcp ', ' mcp',
+            // German
+            'wissensdatenbank', 'wissensbasis', 'meine dokumente', 'meinen dokumenten',
+            'meine dateien', 'meinen dateien', 'meine notizen', 'unser crm', 'unser wiki',
+            // Spanish
+            'base de conocimiento', 'mis documentos', 'mis archivos', 'nuestro crm',
+            // French
+            'base de connaissances', 'mes documents', 'mes fichiers',
+            // Italian
+            'base di conoscenza', 'i miei documenti',
+            // Turkish
+            'bilgi taban', 'belgelerim', 'dosyalarım',
+        ];
+        foreach ($dataSourceTriggers as $trigger) {
+            if (str_contains($lower, $trigger)) {
+                return false;
+            }
+        }
+
         // Note: there is no `$searchTriggers` blocklist here. The fast-path
         // deliberately answers trivial chats without a web search — under the
         // "trust the model" policy a fast-pathed message carries no BWEBSEARCH

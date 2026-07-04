@@ -6,13 +6,17 @@ namespace App\Tests\Characterization;
 
 use App\AI\Service\AiFacade;
 use App\Prompt\PromptCatalog;
+use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Prompt\TimeContextBuilder;
+use App\Service\PromptService;
 use App\Tests\Characterization\Support\RoutingSnapshot;
+use App\Tests\Support\SkillCatalogFactory;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
@@ -104,6 +108,16 @@ final class PlannerPromptCharacterizationTest extends TestCase
             new NullLogger(),
             $this->createMock(UserRepository::class),
             new TimeContextBuilder(new MockClock('2026-06-17 12:00:00', 'UTC')),
+            // The REAL runner-declared descriptors — this is what makes the
+            // snapshot prove the catalog-lite assembly is equivalent to the
+            // previous hard-coded CAPABILITY_DESCRIPTIONS array.
+            SkillCatalogFactory::real(),
+            new PromptService(
+                $this->createMock(PromptRepository::class),
+                $this->createMock(PromptMetaRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
         );
     }
 

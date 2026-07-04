@@ -43,6 +43,11 @@ final class DagExecutorTest extends TestCase
                 return Capability::cases();
             }
 
+            public function describe(): array
+            {
+                return [];
+            }
+
             public function run(TaskNode $node, NodeContext $context): NodeResult
             {
                 return ($this->fn)($node, $context);

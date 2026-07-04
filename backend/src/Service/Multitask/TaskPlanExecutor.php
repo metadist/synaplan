@@ -48,7 +48,7 @@ final readonly class TaskPlanExecutor
      * must run through the DAG even as a lone single node (see
      * {@see shouldUseLegacyRouter()}).
      */
-    private const DAG_ONLY_CAPABILITIES = [Capability::CalendarEvent];
+    private const DAG_ONLY_CAPABILITIES = [Capability::CalendarEvent, Capability::UrlFetch, Capability::McpFetch, Capability::EmailSearch];
 
     /**
      * Single-shot media generators that the legacy router already delivers
@@ -229,7 +229,9 @@ final readonly class TaskPlanExecutor
         try {
             $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
-            $result = $this->planner->plan($message, $thread, $userId, $options);
+            // Forward the classification so dynamic skill blocks (mcp_fetch)
+            // can resolve the matched topic's per-prompt gates at plan time.
+            $result = $this->planner->plan($message, $thread, $userId, $options + ['classification' => $classification]);
 
             $collapsed = $this->collapseRedundantSingleMediaPlan($result->plan, $classification);
             if ($collapsed !== $result->plan) {

@@ -74,6 +74,36 @@ final class ResultAssemblerTest extends TestCase
         $this->assertNotContains('n3', $cardIds);
     }
 
+    public function testRedundantFlagMarksProseContainedInTheFinalAnswer(): void
+    {
+        // #1229 smart collapse: n1's text is passed through by the reply node
+        // (with a connector around it) → the card is redundant; a card whose
+        // text is NOT part of the answer stays unflagged.
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'chat', 'inputs' => ['text' => 'write a poem']],
+                ['id' => 'n2', 'capability' => 'summarize', 'inputs' => ['text' => 'unrelated']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n1', 'n2'], 'inputs' => ['text' => '$n1.text']],
+            ],
+        ]);
+        $ctx = $this->context();
+
+        $poem = "Roses are red,\nviolets are blue.";
+        $ctx->setResult('n1', NodeResult::ok($poem));
+        $ctx->setResult('n2', NodeResult::ok('A completely different unique summary.'));
+        $ctx->setResult('n3', NodeResult::ok("Here is your poem:\n\n{$poem}"));
+
+        $cards = $this->assembler->assemble($plan, $ctx)['metadata']['task_plan_render']['cards'];
+
+        $n1 = array_values(array_filter($cards, fn ($c) => 'n1' === $c['nodeId']))[0];
+        $this->assertTrue($n1['redundant'] ?? false, 'pass-through prose must be flagged redundant');
+        $this->assertSame($poem, $n1['text'], 'the text itself stays on the card');
+
+        $n2 = array_values(array_filter($cards, fn ($c) => 'n2' === $c['nodeId']))[0];
+        $this->assertArrayNotHasKey('redundant', $n2, 'unique prose must stay unflagged');
+    }
+
     public function testTaskPlanRenderCardShapeIsCorrect(): void
     {
         $plan = $this->plan();

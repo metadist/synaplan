@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\Multitask;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\Prompt;
+use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
@@ -14,10 +15,14 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Prompt\TimeContextBuilder;
+use App\Service\PromptService;
+use App\Tests\Support\SkillCatalogFactory;
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 final class TaskPlannerTest extends TestCase
 {
@@ -52,6 +57,13 @@ final class TaskPlannerTest extends TestCase
             $this->createMock(LoggerInterface::class),
             $this->createMock(UserRepository::class),
             new TimeContextBuilder(),
+            SkillCatalogFactory::real(),
+            new PromptService(
+                $this->createMock(PromptRepository::class),
+                $this->createMock(PromptMetaRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
         );
     }
 

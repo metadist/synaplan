@@ -38,7 +38,7 @@ class PromptCatalog
      *    - tools:memory_*      ← memory extraction/parsing
      *    - tools:feedback_*    ← feedback contradiction checks
      *
-     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string}>
+     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string, metadata?: array<string, string>}>
      */
     public static function all(): array
     {
@@ -51,6 +51,19 @@ class PromptCatalog
                 'language' => 'en',
                 'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no other topic matches.',
                 'prompt' => self::generalPrompt(),
+                // Release defaults for the catch-all chat topic (seeded only
+                // when the prompt row is first created — bootstrap-only, an
+                // operator's later change is never overwritten):
+                //   - MCP data sources ON (`tool_mcp=1`) — a freshly connected
+                //     server (Channels → MCP Servers) works for normal chat
+                //     questions out of the box, no hidden per-topic toggle hunt.
+                //   - Web search on AUTO — `tool_internet` is deliberately NOT
+                //     seeded: an absent key is the "auto" state (the
+                //     classifier's per-message vote decides, and the user's
+                //     manual search toggle keeps working). Seeding `0` would
+                //     be WebSearchTopicPolicy rule 1, a hard disable that
+                //     even beats the per-message toggle.
+                'metadata' => ['tool_mcp' => '1'],
             ],
             [
                 'topic' => 'mediamaker',
@@ -165,6 +178,14 @@ class PromptCatalog
      * system prompts but never touches BSELECTION_RULES so admins can keep their
      * custom rule overrides.
      *
+     * Catalog `metadata` (BPROMPTMETA) is BOOTSTRAP-ONLY: it is written once
+     * when the prompt row is first inserted and never again. Re-seeding an
+     * existing prompt must not resurrect a default the operator changed —
+     * including keys the UI deliberately REMOVED (the Internet Search "auto"
+     * state deletes `tool_internet` entirely, so even an insert-if-missing
+     * per key would silently flip "auto" back to the seeded value on every
+     * container start).
+     *
      * @return array{inserted: list<string>, updated: list<string>} topic keys per outcome
      */
     public static function seed(Connection $connection): array
@@ -189,6 +210,15 @@ class PromptCatalog
                     'INSERT INTO BPROMPTS (BOWNERID, BLANG, BTOPIC, BSHORTDESC, BPROMPT) VALUES (0, ?, ?, ?, ?)',
                     [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']]
                 );
+                $promptId = (int) $connection->lastInsertId();
+
+                foreach ($prompt['metadata'] ?? [] as $key => $value) {
+                    $connection->executeStatement(
+                        'INSERT INTO BPROMPTMETA (BPROMPTID, BMETAKEY, BMETAVALUE, BCREATED) VALUES (?, ?, ?, ?)',
+                        [$promptId, $key, $value, time()]
+                    );
+                }
+
                 $inserted[] = $prompt['topic'];
             }
         }
@@ -553,6 +583,31 @@ Allowed topic keys: [KEYLIST]
    the `email_me` node. (Exception: a meeting invite alone → rule 7.)
 9. Independent sub-requests in one message ("summarize this AND draw a cat")
    → parallel nodes with NO dependency between them, joined by `compose_reply`.
+9b. The user asks to read/summarize/use the content of a SPECIFIC URL written
+   in the message ("load https://…", "was steht auf dieser Seite?",
+   "summarize this article: https://…") → a `url_fetch` node (put the URL in
+   `inputs.urls`), then feed `$nX.text` into the answering node
+   (`summarize`/`chat`/`translate`). Do NOT emit `url_fetch` for a bare link
+   mention the question does not depend on, and prefer `web_search` when no
+   concrete URL is given. Only use `url_fetch` if it appears in the
+   capability list above.
+9c. The request needs data from one of the user's CONNECTED systems and the
+   capability list above shows `mcp_fetch` with available connections
+   ("look up customer X in our CRM", "check the wiki for the onboarding
+   page") → an `mcp_fetch` node with `params.server_id` + `params.tool`
+   taken EXACTLY from the listed connections and the tool arguments in
+   `inputs.arguments`; feed `$nX.text` into the answering node. NEVER
+   invent a server_id or tool name, and NEVER emit `mcp_fetch` when it is
+   not in the capability list or no listed tool fits — use `chat` or
+   `web_search` instead.
+9d. The user explicitly asks about their OWN emails/mailbox ("search my
+   emails for the Acme offer", "was hat mir Tom letzte Woche gemailt?") AND
+   the capability list above shows `email_search` with a connected mailbox
+   → an `email_search` node with `params.query` (keywords), optional
+   `params.from` (sender) and `params.since` (YYYY-MM-DD, resolve relative
+   times against the time context); feed `$nX.text` into the answering
+   node. NEVER emit `email_search` for generic questions or when it is not
+   in the capability list.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
    node, no `compose_reply` needed.
 11. A SINGLE media request with no follow-up step ("make an image of X",
@@ -718,6 +773,61 @@ User: (attaches photo.png) "Beschreibe in einem Audio, was hier zu sehen ist."
 The attached image is ANALYZED (`file_analysis` on `$message.files`) and the
 description is spoken (`text2sound`). NEVER route this to `image_generation` —
 the user wants the existing picture explained, not a new picture generated.
+
+### Read a specific URL, then summarize it
+User: "Fasse mir diese Seite zusammen: https://example.com/artikel"
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "url_fetch", "inputs": { "urls": "https://example.com/artikel" } },
+    { "id": "n2", "capability": "summarize", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "style": "short" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+The page content is FETCHED (`url_fetch`) and the summary consumes `$n1.text` —
+never answer about a URL's content from memory or invent what the page says.
+
+### Pull data from a connected system, then answer (mcp_fetch)
+User: "Look up the customer Acme GmbH in our CRM and summarize their last order."
+(The capability list shows: server_id 3 "Company CRM" — tools: search_customers(query), get_last_order(customer_id))
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "mcp_fetch", "inputs": { "arguments": { "query": "Acme GmbH" } }, "params": { "server_id": 3, "tool": "search_customers" } },
+    { "id": "n2", "capability": "chat", "depends_on": ["n1"], "inputs": { "text": "Summarize the last order of this customer based on the following data:\n$n1.text" }, "params": { "topic_id": "general" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+`params.server_id` and `params.tool` come EXACTLY from the listed connections
+(never invented), the tool arguments ride in `inputs.arguments`, and the
+answering node consumes `$n1.text` — the reply is grounded in the pulled data.
+
+### Search the user's own mailbox, then answer (email_search)
+User: "Search my emails for the Acme offer from last week and summarize it."
+(The capability list shows email_search with a connected mailbox; assume today is 2026-06-17.)
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "email_search", "params": { "query": "Acme offer", "since": "2026-06-10" } },
+    { "id": "n2", "capability": "summarize", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "style": "short" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+The mailbox is searched LIVE and read-only; the summary consumes the real
+hits via `$n1.text`. Without an explicit "my emails" intent this node is
+never emitted.
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
 The event fields go in `params`. Resolve the relative time against the time
