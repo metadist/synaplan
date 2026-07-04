@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Controller;
 
+use App\Entity\Config;
 use App\Entity\McpServerConfig;
 use App\Entity\User;
 use App\Tests\Trait\AuthenticatedTestTrait;
@@ -25,6 +26,9 @@ class McpServerConfigControllerTest extends WebTestCase
     /** @var list<int> */
     private array $createdIds = [];
 
+    /** @var list<int> */
+    private array $createdConfigIds = [];
+
     protected function setUp(): void
     {
         $this->client = static::createClient();
@@ -44,6 +48,12 @@ class McpServerConfigControllerTest extends WebTestCase
         $em = $this->client->getContainer()->get('doctrine')->getManager();
         foreach ($this->createdIds as $id) {
             $entity = $em->find(McpServerConfig::class, $id);
+            if ($entity) {
+                $em->remove($entity);
+            }
+        }
+        foreach ($this->createdConfigIds as $id) {
+            $entity = $em->find(Config::class, $id);
             if ($entity) {
                 $em->remove($entity);
             }
@@ -149,7 +159,22 @@ class McpServerConfigControllerTest extends WebTestCase
 
     public function testConnectionTestIsBlockedWhileClientDisabled(): void
     {
-        // No MCP.CLIENT_ENABLED row exists in the test DB → built-in default OFF.
+        // Pin the master switch OFF for THIS user explicitly. The test used
+        // to rely on "no MCP.CLIENT_ENABLED row exists → built-in default
+        // OFF", which broke the moment McpConfigSeeder started seeding the
+        // global row to 1 in CI's `app:seed` step (green locally, red in CI
+        // — the classic ambient-state trap). A per-user row overrides the
+        // seeded global row, so this is deterministic in every environment.
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        $optOut = (new Config())
+            ->setOwnerId((int) $this->user->getId())
+            ->setGroup('MCP')
+            ->setSetting('CLIENT_ENABLED')
+            ->setValue('0');
+        $em->persist($optOut);
+        $em->flush();
+        $this->createdConfigIds[] = (int) $optOut->getId();
+
         $created = $this->request('POST', '/api/v1/mcp-servers', [
             'name' => 'Gated',
             'url' => 'https://gated.example.com/mcp',
