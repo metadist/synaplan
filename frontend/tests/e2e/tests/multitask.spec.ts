@@ -192,21 +192,31 @@ test.describe('@ci @multitask Multi-task routing', () => {
     await login(page, credentials)
     const chat = new ChatHelper(page)
 
-    const toggleToolsPanel = async (open: boolean) => {
-      await page.locator(selectors.chat.toolsToggle).click()
-      await page
-        .locator(selectors.chat.toolsPanel)
-        .waitFor({ state: open ? 'visible' : 'hidden', timeout: TIMEOUTS.SHORT })
+    const openPlusMenu = async () => {
+      const panel = page.locator(selectors.chat.plusPanel)
+      if (!(await panel.isVisible().catch(() => false))) {
+        await page.locator(selectors.chat.plusToggle).click()
+        await panel.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+      }
     }
 
     await test.step('Arrange: start a new chat and enable voice reply', async () => {
       await chat.startNewChat()
-      await toggleToolsPanel(true)
+      // Tools now lives inside the "+" menu.
+      await openPlusMenu()
+      await page.locator(selectors.chat.toolsToggle).click()
+      await page
+        .locator(selectors.chat.toolsPanel)
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
       await page.locator(selectors.chat.toolVoiceReply).click()
       await expect(page.locator(selectors.chat.toolsActiveBadge)).toBeVisible({
         timeout: TIMEOUTS.SHORT,
       })
-      await toggleToolsPanel(false)
+      // Close the "+" menu (and the nested Tools panel with it).
+      await page.locator(selectors.chat.plusToggle).click()
+      await page
+        .locator(selectors.chat.plusPanel)
+        .waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
     })
 
     const previousCount = await chat.conversationBubbles().count()

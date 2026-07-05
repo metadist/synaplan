@@ -40,9 +40,6 @@ export const selectors = {
   },
   settings: {
     page: '[data-testid="page-settings"]',
-    appModeSection: '[data-testid="section-app-mode"]',
-    btnModeEasy: '[data-testid="btn-mode-easy"]',
-    btnModeAdvanced: '[data-testid="btn-mode-advanced"]',
     languageSection: '[data-testid="section-language-settings"]',
     languageGrid: '[data-testid="grid-language-options"]',
     btnLanguage: (lang: string) => `[data-testid="btn-language-${lang}"]`,
@@ -120,7 +117,12 @@ export const selectors = {
     chatBtnToggle: '[data-testid="btn-chat-toggle"]',
     textInput: '[data-testid="input-chat-message"]',
     sendBtn: '[data-testid="btn-chat-send"]',
-    attachBtn: '[data-testid="btn-chat-attach"]',
+    /** "+" menu trigger in the composer (holds attach + Model/Tools/Knowledge) */
+    plusToggle: '[data-testid="btn-chat-plus"]',
+    /** "+" menu panel (opens upward) */
+    plusPanel: '[data-testid="dropdown-plus-panel"]',
+    /** Attach-files row inside the "+" menu */
+    attachBtn: '[data-testid="btn-plus-attach"]',
     fileInput: '[data-testid="input-chat-file"]',
     messageContainer: '[data-testid="message-container"]',
     aiAnswerBubble: '[data-testid="assistant-message-bubble"]',
@@ -151,8 +153,6 @@ export const selectors = {
     againDropdown: '[data-testid="btn-message-again"]',
     againDropdownPanel: '[data-testid="dropdown-again-models"]',
     againDropdownItem: 'button.dropdown-item',
-    /** Action row under the input (§4.7): exactly Model / Tools / Knowledge folder */
-    secondaryActions: '[data-testid="section-chat-secondary-actions"]',
     modelToggle: '[data-testid="btn-model-toggle"]',
     toolsToggle: '[data-testid="btn-tools-toggle"]',
     toolsPanel: '[data-testid="dropdown-tools-panel"]',

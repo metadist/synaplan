@@ -355,6 +355,28 @@
     "more": "Daha fazla",
     "moreDescription": "Diğer bölümler ve hesap"
   },
+  "guest": {
+    "featureGate": {
+      "title": "Bu özellik bir hesap gerektirir",
+      "subtitle": "Tüm özellikleri açmak için ücretsiz bir hesap oluşturun",
+      "features": {
+        "files": "Yapay zekan için bilgi tabanı olarak belgeler yükle",
+        "memories": "Yapay zekan kişiselleştirilmiş yanıtlar için önemli bilgileri hatırlar",
+        "settings": "Yapay zeka modellerini, komutları ve entegrasyonları yapılandır",
+        "statistics": "Kullanımını, maliyetlerini ve sohbet geçmişini takip et",
+        "general": "Tüm premium özelliklere ve araçlara eriş",
+        "models": "Birden fazla yapay zeka modeli arasından seç ve deneyimini özelleştir",
+        "tools": "Görsel ve video oluşturma gibi gelişmiş araçları kullan",
+        "enhance": "Daha iyi yanıtlar için yapay zeka destekli mesaj iyileştirme",
+        "channels": "WhatsApp'ı, e-postayı ve web sitesi sohbet widget'ını Synaplan'a bağla.",
+        "aiSetup": "Yapay zeka modellerini, komutları ve yönlendirmeyi iş akışına göre yapılandır.",
+        "attach": "Yapay zekan için bilgi tabanı olarak belge ve görsel yükle.",
+        "knowledge": "Odaklı yanıtlar için bir sohbeti bilgi klasörlerinden biriyle sınırla."
+      },
+      "registerButton": "Ücretsiz hesap oluştur",
+      "loginButton": "Zaten hesabın var mı? Giriş yap"
+    }
+  },
   "chatInput": {
     "placeholder": "Mesajınızı yazın...",
     "provider": "Sağlayıcı",

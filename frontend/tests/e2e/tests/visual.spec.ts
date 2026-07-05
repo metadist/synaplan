@@ -45,12 +45,13 @@ test.describe('@visual UI guard — capped snapshots', () => {
     await page.emulateMedia({ colorScheme: 'light' })
   })
 
-  test('chat-input action row', async ({ page, credentials }) => {
+  test('chat-input "+" menu', async ({ page, credentials }) => {
     await login(page, credentials)
     await ensureAdvancedMode(page)
-    const row = page.locator('[data-testid="section-chat-secondary-actions"]')
-    await expect(row).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    await expect(row).toHaveScreenshot('chat-input-action-row.png', SNAPSHOT_OPTS)
+    await page.locator(selectors.chat.plusToggle).click()
+    const panel = page.locator(selectors.chat.plusPanel)
+    await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await expect(panel).toHaveScreenshot('chat-input-plus-menu.png', SNAPSHOT_OPTS)
   })
 
   test('files page header (upload form card)', async ({ page, credentials }) => {

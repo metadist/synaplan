@@ -12,7 +12,7 @@
         <div
           class="relative w-full max-w-xs rounded-2xl overflow-hidden shadow-2xl surface-card animate-hint-enter"
           role="dialog"
-          aria-modal="false"
+          aria-modal="true"
         >
           <button
             class="absolute top-2.5 right-2.5 icon-ghost w-7 h-7 flex items-center justify-center rounded-lg"

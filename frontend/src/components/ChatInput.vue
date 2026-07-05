@@ -176,6 +176,17 @@
                   $t('chatInput.plusMenu.tools')
                 }}</span>
               </button>
+              <button
+                type="button"
+                class="dropdown-item"
+                data-testid="btn-plus-knowledge"
+                @click="handlePlusGate('knowledge')"
+              >
+                <Icon icon="mdi:folder-outline" class="w-5 h-5 flex-shrink-0" />
+                <span class="text-sm font-medium flex-1 text-left">{{
+                  $t('chatInput.plusMenu.knowledge')
+                }}</span>
+              </button>
             </template>
 
             <template v-else>
@@ -349,6 +360,11 @@ const togglePlusMenu = () => {
 
 const handlePlusAttach = () => {
   plusMenuOpen.value = false
+  // Guests get the attach-specific hint (not the generic "files" copy).
+  if (isGuestMode.value) {
+    emit('guestFeatureGate', 'attach')
+    return
+  }
   triggerFileUpload()
 }
 
