@@ -90,6 +90,14 @@
     "errorIssuanceFailed": "Synaplan no pudo emitir una clave de API para esta cuenta."
   },
   "welcome": "Bienvenido",
+  "examplePrompts": {
+    "heading": "Prueba una de estas",
+    "items": {
+      "poemMp3": "Crea un poema sobre un gato y conviértelo en un MP3.",
+      "everglades": "Escribe un artículo sobre los Everglades de Florida y ponlo en un documento de Word para descargar.",
+      "retreat": "Crea una invitación en vídeo para un retiro de empresa de un día en Londres y escribe el programa debajo."
+    }
+  },
   "marketingNews": {
     "heading": "Lo último de Synaplan",
     "readMore": "Leer más"
@@ -347,10 +355,40 @@
     "more": "Más",
     "moreDescription": "Más secciones y cuenta"
   },
+  "guest": {
+    "featureGate": {
+      "title": "Esta función requiere una cuenta",
+      "subtitle": "Crea una cuenta gratuita para desbloquear todas las funciones",
+      "features": {
+        "files": "Sube documentos como base de conocimiento para tu IA",
+        "memories": "Tu IA recuerda información importante para respuestas personalizadas",
+        "settings": "Configura modelos de IA, prompts e integraciones",
+        "statistics": "Controla tu uso, costes e historial de chats",
+        "general": "Accede a todas las funciones y herramientas premium",
+        "models": "Elige entre varios modelos de IA y personaliza tu experiencia",
+        "tools": "Usa herramientas avanzadas como generación de imágenes y vídeos",
+        "enhance": "Mejora de mensajes con IA para obtener mejores respuestas",
+        "channels": "Conecta WhatsApp, el correo electrónico y el widget de chat de tu sitio web con Synaplan.",
+        "aiSetup": "Configura modelos de IA, prompts y enrutamiento según tu flujo de trabajo.",
+        "attach": "Sube documentos e imágenes para usarlos como base de conocimiento para tu IA.",
+        "knowledge": "Limita un chat a una de tus carpetas de conocimiento para obtener respuestas más precisas."
+      },
+      "registerButton": "Crear cuenta gratuita",
+      "loginButton": "¿Ya tienes una cuenta? Inicia sesión"
+    }
+  },
   "chatInput": {
     "placeholder": "Escribe tu mensaje...",
     "provider": "Proveedor",
     "model": "Modelo",
+    "modelCaption": "Modelo: {name}",
+    "plusMenu": {
+      "label": "Añadir",
+      "attach": "Adjuntar archivos",
+      "model": "Modelo",
+      "tools": "Herramientas",
+      "knowledge": "Carpeta de conocimiento"
+    },
     "configureModel": "Configurar Modelo de IA",
     "attach": "Adjuntar",
     "uploadFile": "Subir",

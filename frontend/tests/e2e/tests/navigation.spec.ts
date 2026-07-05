@@ -9,21 +9,11 @@ const SET = selectors.settings
 const USR = selectors.userMenu
 
 /**
- * Mode is persisted in localStorage (`app_mode`) by the appMode store.
- * Setting it directly + reloading is the fastest, most robust way to
- * arrange the desired mode for tests that don't specifically exercise
- * the Preferences UI itself (those tests live below and click through
- * the Preferences page).
+ * "Easy Mode" was removed in Release 4.0 — the full (advanced) navigation is
+ * now the only mode. This just waits until the sidebar's advanced-only rail
+ * items are present, so tests that rely on Channels/AI Setup are stable.
  */
-async function ensureEasyMode(page: Page) {
-  await page.evaluate(() => localStorage.setItem('app_mode', 'easy'))
-  await page.reload()
-  await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-}
-
-async function ensureAdvancedMode(page: Page) {
-  await page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
-  await page.reload()
+async function ensureNavReady(page: Page) {
   await expect(page.locator(NAV.sidebarV2Channels)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
@@ -43,25 +33,21 @@ async function openFlyout(page: Page, railItemSelector: string) {
   return flyout
 }
 
-test.describe('Navigation: Sidebar basics (non-admin, easy mode)', () => {
-  test('@ci Easy mode hides Channels and AI Setup, Files and History stay usable', async ({
+test.describe('Navigation: Sidebar basics (non-admin)', () => {
+  test('@ci Sidebar shows all primary rail items (Channels + AI Setup always present)', async ({
     page,
     credentials,
   }) => {
-    await test.step('Arrange: login and switch to easy mode', async () => {
+    await test.step('Arrange: login', async () => {
       await login(page, credentials)
-      await ensureEasyMode(page)
     })
 
-    await test.step('Assert: primary items visible', async () => {
+    await test.step('Assert: primary + advanced items all visible (no Easy Mode)', async () => {
       await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator(NAV.sidebarV2ChatNav)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator(NAV.sidebarV2Files)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    })
-
-    await test.step('Assert: advanced-only items (Channels + AI Setup) are hidden', async () => {
-      await expect(page.locator(NAV.sidebarV2Channels)).not.toBeVisible()
-      await expect(page.locator(NAV.sidebarV2AiSetup)).not.toBeVisible()
+      await expect(page.locator(NAV.sidebarV2Channels)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(page.locator(NAV.sidebarV2AiSetup)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     })
   })
 
@@ -122,32 +108,11 @@ test.describe('Navigation: Sidebar basics (non-admin, easy mode)', () => {
   })
 })
 
-test.describe('Navigation: Advanced mode (non-admin)', () => {
-  test('@ci Mode toggle (Preferences) switches between easy and advanced', async ({
-    page,
-    credentials,
-  }) => {
-    await test.step('Arrange: login and switch to easy mode', async () => {
-      await login(page, credentials)
-      await ensureEasyMode(page)
-    })
-
-    await test.step('Act: open Preferences and pick Advanced', async () => {
-      await openPreferences(page)
-      await page.locator(SET.btnModeAdvanced).click()
-    })
-
-    await test.step('Assert: app mode persisted after going back', async () => {
-      await page.goto('/')
-      await expect(page.locator(NAV.sidebarV2Channels)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-      expect(await page.evaluate(() => localStorage.getItem('app_mode'))).toBe('advanced')
-    })
-  })
-
+test.describe('Navigation: Rail flyouts (non-admin)', () => {
   test('@ci Channels flyout opens with child links', async ({ page, credentials }) => {
-    await test.step('Arrange: login and ensure advanced mode', async () => {
+    await test.step('Arrange: login and wait for nav', async () => {
       await login(page, credentials)
-      await ensureAdvancedMode(page)
+      await ensureNavReady(page)
     })
 
     await test.step('Act+Assert: Channels flyout shows its links', async () => {
@@ -162,7 +127,7 @@ test.describe('Navigation: Advanced mode (non-admin)', () => {
   test('@ci AI Setup flyout opens with child links', async ({ page, credentials }) => {
     await test.step('Arrange: login and ensure advanced mode', async () => {
       await login(page, credentials)
-      await ensureAdvancedMode(page)
+      await ensureNavReady(page)
     })
 
     await test.step('Act+Assert: AI Setup flyout shows its links', async () => {
@@ -175,7 +140,7 @@ test.describe('Navigation: Advanced mode (non-admin)', () => {
   test('@ci Channels flyout navigates to Chat Widget page', async ({ page, credentials }) => {
     await test.step('Arrange: login, ensure advanced, open flyout', async () => {
       await login(page, credentials)
-      await ensureAdvancedMode(page)
+      await ensureNavReady(page)
       await openFlyout(page, NAV.sidebarV2Channels)
     })
 
@@ -193,7 +158,7 @@ test.describe('Navigation: Advanced mode (non-admin)', () => {
   test('@ci AI Setup flyout navigates to AI Models page', async ({ page, credentials }) => {
     await test.step('Arrange: login, ensure advanced, open flyout', async () => {
       await login(page, credentials)
-      await ensureAdvancedMode(page)
+      await ensureNavReady(page)
       await openFlyout(page, NAV.sidebarV2AiSetup)
     })
 

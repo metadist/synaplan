@@ -9,7 +9,6 @@ import {
   SignalIcon,
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
-import { useAppModeStore } from '../stores/appMode'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { getFeaturesStatus } from '../services/featuresService'
@@ -34,12 +33,6 @@ export interface NavItem {
   isUpgrade?: boolean
   requiresAuth?: boolean
   gateFeature?: string
-  /**
-   * Advanced-only items: hidden entirely while the app is in easy mode
-   * (signed-in users). Guests still see them gate-locked, since the guest
-   * lock is a conversion affordance, not an app-mode one.
-   */
-  lockedInEasyMode?: boolean
   children?: NavChild[]
 }
 
@@ -56,7 +49,6 @@ export function useNavItems() {
   const { t } = useI18n()
   const route = useRoute()
   const authStore = useAuthStore()
-  const appModeStore = useAppModeStore()
   const configStore = useConfigStore()
 
   const isGuestMode = computed(() => !authStore.isAuthenticated)
@@ -122,8 +114,7 @@ export function useNavItems() {
       description: t('nav.channelsDescription'),
       icon: SignalIcon,
       requiresAuth: true,
-      gateFeature: 'settings',
-      lockedInEasyMode: true,
+      gateFeature: 'channels',
       children: isGuestMode.value ? undefined : channelsChildren,
     })
 
@@ -142,8 +133,7 @@ export function useNavItems() {
       description: t('nav.aiSetupDescription'),
       icon: CpuChipIcon,
       requiresAuth: true,
-      gateFeature: 'settings',
-      lockedInEasyMode: true,
+      gateFeature: 'aiSetup',
       children: isGuestMode.value ? undefined : aiSetupChildren,
     })
 
@@ -154,7 +144,6 @@ export function useNavItems() {
         label: t('nav.plugins'),
         icon: PuzzlePieceIcon,
         requiresAuth: true,
-        lockedInEasyMode: true,
         children: isGuestMode.value
           ? undefined
           : configStore.plugins.map((plugin: { name?: string }) => ({
@@ -198,12 +187,6 @@ export function useNavItems() {
       })
     }
 
-    // Easy mode hides advanced-only items instead of showing them locked.
-    // Guests keep seeing them (gate-locked) as a signup affordance.
-    if (appModeStore.isEasyMode && !isGuestMode.value) {
-      return items.filter((item) => !item.lockedInEasyMode)
-    }
-
     return items
   })
 
@@ -221,14 +204,5 @@ export function useNavItems() {
     return route.path.startsWith(item.path)
   }
 
-  /**
-   * Easy-mode lock state. Since easy mode now filters advanced-only items
-   * out of `navItems` for signed-in users, this is false for every rendered
-   * item — kept so SidebarV2/MobileNav keep working with routes reached
-   * directly (e.g. a bookmarked /channels URL while in easy mode).
-   */
-  const isItemLocked = (item: NavItem): boolean =>
-    Boolean(item.lockedInEasyMode) && appModeStore.isEasyMode && !isGuestMode.value
-
-  return { navItems, isItemActive, isItemLocked, isGuestMode, loadFeatureStatus }
+  return { navItems, isItemActive, isGuestMode, loadFeatureStatus }
 }

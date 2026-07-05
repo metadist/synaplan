@@ -51,12 +51,6 @@
       <span class="v2-rail-label text-[10px] font-medium leading-tight">
         {{ $t('nav.files') }}
       </span>
-      <Icon
-        v-if="isGuestMode"
-        icon="mdi:lock-outline"
-        class="absolute top-1 right-3 w-3.5 h-3.5 text-amber-500"
-        aria-hidden="true"
-      />
     </button>
 
     <button
@@ -111,7 +105,7 @@
                 class="w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
                 :class="[
                   isItemActive(item) ? 'text-[var(--brand)]' : 'txt-primary',
-                  ((item.requiresAuth && isGuestMode) || isItemLocked(item)) && 'opacity-60',
+                  item.requiresAuth && isGuestMode && 'opacity-60',
                 ]"
                 :title="item.description || item.label"
                 :data-testid="`btn-mobile-more-${item.key}`"
@@ -120,13 +114,6 @@
                 <component :is="item.icon" class="w-5 h-5 flex-shrink-0" aria-hidden="true" />
                 <span class="flex-1 text-left text-sm font-medium truncate">{{ item.label }}</span>
                 <Icon
-                  v-if="(item.requiresAuth && isGuestMode) || isItemLocked(item)"
-                  icon="mdi:lock-outline"
-                  class="w-4 h-4 text-amber-500 flex-shrink-0"
-                  aria-hidden="true"
-                />
-                <Icon
-                  v-else
                   icon="mdi:chevron-down"
                   class="w-5 h-5 flex-shrink-0 transition-transform txt-secondary"
                   :class="expandedSection === item.key && 'rotate-180'"
@@ -282,8 +269,8 @@
   <!-- Memories Dialog (account block entry) -->
   <MemoriesDialog :is-open="isMemoriesDialogOpen" @close="isMemoriesDialogOpen = false" />
 
-  <!-- Guest Feature Gate Modal -->
-  <GuestFeatureGateModal
+  <!-- Guest hint popover -->
+  <GuestHintPopover
     :is-open="featureGateOpen"
     :feature-key="featureGateKey"
     @close="featureGateOpen = false"
@@ -306,29 +293,23 @@ import {
   UserCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { useI18n } from 'vue-i18n'
-import { useAppModeStore } from '../stores/appMode'
 import { useAuthStore } from '../stores/auth'
 import { useChatsStore } from '../stores/chats'
 import { useConfigStore } from '../stores/config'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAuth } from '../composables/useAuth'
-import { useDialog } from '../composables/useDialog'
 import { useNavItems, type NavItem } from '../composables/useNavItems'
-import GuestFeatureGateModal from './guest/GuestFeatureGateModal.vue'
+import GuestHintPopover from './guest/GuestHintPopover.vue'
 import MemoriesDialog from './MemoriesDialog.vue'
 
-const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const appModeStore = useAppModeStore()
 const configStore = useConfigStore()
 const chatsStore = useChatsStore()
 const sidebarStore = useSidebarStore()
-const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
-const { navItems, isItemActive, isItemLocked, isGuestMode } = useNavItems()
+const { navItems, isItemActive, isGuestMode } = useNavItems()
 
 const moreOpen = ref(false)
 const expandedSection = ref<string | null>(null)
@@ -379,18 +360,6 @@ const handleSectionClick = async (item: NavItem) => {
     return
   }
 
-  // Q6: locked in easy mode — same one-click switch as the rail.
-  if (isItemLocked(item)) {
-    const confirmed = await dialog.confirm({
-      title: t('settings.appMode.lockedTitle'),
-      message: t('settings.appMode.lockedMessage', { feature: item.label }),
-      confirmText: t('settings.appMode.switchCta'),
-      cancelText: t('common.cancel'),
-    })
-    if (!confirmed) return
-    appModeStore.setMode('advanced')
-  }
-
   if (item.children && item.children.length > 0) {
     expandedSection.value = expandedSection.value === item.key ? null : item.key
     return
@@ -437,7 +406,7 @@ const handleLogout = async () => {
 watch(moreOpen, (open) => {
   if (open) {
     const active = moreSections.value.find((item) => isItemActive(item))
-    expandedSection.value = active && !isItemLocked(active) ? active.key : null
+    expandedSection.value = active ? active.key : null
   }
 })
 

@@ -48,7 +48,7 @@
           'v2-rail-icon w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5 relative',
           isItemActive(item) && 'v2-rail-icon--active',
           item.isUpgrade && 'text-amber-500 dark:text-amber-400',
-          ((item.requiresAuth && isGuestMode) || isItemLocked(item)) && 'opacity-50',
+          item.requiresAuth && isGuestMode && 'opacity-60',
         ]"
         :title="item.description || item.label"
         :data-testid="`btn-sidebar-v2-nav-${item.key}`"
@@ -60,12 +60,6 @@
         >
           {{ item.label }}
         </span>
-        <Icon
-          v-if="(item.requiresAuth && isGuestMode) || isItemLocked(item)"
-          icon="mdi:lock-outline"
-          class="absolute top-0.5 right-1.5 w-3.5 h-3.5 text-amber-500"
-          aria-hidden="true"
-        />
       </button>
     </nav>
 
@@ -588,8 +582,8 @@
   <!-- Memories Dialog -->
   <MemoriesDialog :is-open="isMemoriesDialogOpen" @close="isMemoriesDialogOpen = false" />
 
-  <!-- Guest Feature Gate Modal -->
-  <GuestFeatureGateModal
+  <!-- Guest hint popover -->
+  <GuestHintPopover
     :is-open="featureGateOpen"
     :feature-key="featureGateKey"
     @close="featureGateOpen = false"
@@ -612,7 +606,6 @@ import {
 import { Icon } from '@iconify/vue'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAuthStore } from '../stores/auth'
-import { useAppModeStore } from '../stores/appMode'
 import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
 import { useNavItems, type NavChild, type NavItem } from '../composables/useNavItems'
@@ -623,18 +616,17 @@ import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import MemoriesDialog from './MemoriesDialog.vue'
 import ChatShareModal from './ChatShareModal.vue'
-import GuestFeatureGateModal from './guest/GuestFeatureGateModal.vue'
+import GuestHintPopover from './guest/GuestHintPopover.vue'
 
 const { t } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 const sidebarStore = useSidebarStore()
 const authStore = useAuthStore()
-const appModeStore = useAppModeStore()
 const configStore = useConfigStore()
 const chatsStore = useChatsStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
-const { navItems, isItemActive, isItemLocked, isGuestMode, loadFeatureStatus } = useNavItems()
+const { navItems, isItemActive, isGuestMode, loadFeatureStatus } = useNavItems()
 const { theme } = useTheme()
 const route = useRoute()
 const router = useRouter()
@@ -778,27 +770,13 @@ const handleQuickNewChat = async () => {
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
 
-const handleNavClick = async (item: NavItem) => {
+const handleNavClick = (item: NavItem) => {
   userMenuOpen.value = false
 
   if (item.requiresAuth && isGuestMode.value) {
     featureGateKey.value = item.gateFeature || 'general'
     featureGateOpen.value = true
     return
-  }
-
-  // Q6: locked in easy mode — offer the one-click switch to Advanced mode
-  // (mirrors the guest gate pattern), then continue with the original click.
-  if (isItemLocked(item)) {
-    closeFlyout()
-    const confirmed = await dialog.confirm({
-      title: t('settings.appMode.lockedTitle'),
-      message: t('settings.appMode.lockedMessage', { feature: item.label }),
-      confirmText: t('settings.appMode.switchCta'),
-      cancelText: t('common.cancel'),
-    })
-    if (!confirmed) return
-    appModeStore.setMode('advanced')
   }
 
   if (item.path === '/') {

@@ -235,23 +235,25 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await expect(sheet).toBeHidden({ timeout: TIMEOUTS.SHORT })
   })
 
-  test('chat-input action row does not navigate (menu collision guard)', async ({
+  test('chat-input "+" menu does not navigate (menu collision guard)', async ({
     page,
     credentials,
   }) => {
     await login(page, credentials)
     await ensureAdvancedMode(page)
 
-    const actionRow = page.locator('[data-testid="section-chat-secondary-actions"]')
-    await expect(actionRow).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    // The per-message controls now live inside the "+" menu.
+    await page.locator(CHAT.plusToggle).click()
+    const panel = page.locator(CHAT.plusPanel)
+    await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
 
-    // Contract §4.7 #1: the action row picks context / toggles behaviour but
-    // never navigates — so it must contain no link elements at all.
-    await expect(actionRow.locator('a, [role="link"]')).toHaveCount(0)
+    // Contract: the menu picks context / toggles behaviour but never navigates —
+    // so the panel itself must contain no link elements (navigation lives inside
+    // the sub-pickers as clearly marked link rows).
+    await expect(panel.locator('a, [role="link"]')).toHaveCount(0)
 
-    // Phase 3 removed the standalone manage-folders navigation pill (it lives
-    // inside the folder picker as a marked link row now). Its return = red CI.
-    await expect(actionRow.locator('[data-testid="btn-manage-knowledge-groups"]')).toHaveCount(0)
+    // The standalone manage-folders navigation pill must not come back.
+    await expect(panel.locator('[data-testid="btn-manage-knowledge-groups"]')).toHaveCount(0)
   })
 
   test('history sheet (chat list) opens within the viewport', async ({ page, credentials }) => {

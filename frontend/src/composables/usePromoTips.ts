@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useAppModeStore } from '@/stores/appMode'
 import { useChatsStore } from '@/stores/chats'
 
 export interface PromoTip {
@@ -105,7 +104,6 @@ const allTips: PromoTip[] = [
 
 export function usePromoTips() {
   const authStore = useAuthStore()
-  const appModeStore = useAppModeStore()
   const chatsStore = useChatsStore()
 
   const state = ref(loadState())
@@ -118,11 +116,11 @@ export function usePromoTips() {
 
       switch (tip.id) {
         case 'chat-widget':
-          return appModeStore.isAdvancedMode
+          return true
         case 'ai-config':
-          return appModeStore.isAdvancedMode
+          return true
         case 'doc-summary':
-          return appModeStore.isAdvancedMode
+          return true
         case 'upgrade-pro':
           return !authStore.isPro && !authStore.isAdmin
         case 'files-upload':

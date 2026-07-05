@@ -159,6 +159,11 @@ export class ChatHelper {
   }
 
   async attachFile(file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
+    // Attach now lives inside the "+" menu.
+    await this.page.locator(selectors.chat.plusToggle).click()
+    await this.page
+      .locator(selectors.chat.plusPanel)
+      .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     await this.page.locator(selectors.chat.attachBtn).click()
 
     const modal = this.page.locator(selectors.fileSelection.modal)
