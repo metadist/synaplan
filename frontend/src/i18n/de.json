@@ -91,6 +91,14 @@
     "errorIssuanceFailed": "Synaplan konnte für dieses Konto keinen API-Schlüssel ausstellen."
   },
   "welcome": "Willkommen bei Synaplan",
+  "examplePrompts": {
+    "heading": "Probiere eines davon",
+    "items": {
+      "poemMp3": "Schreibe ein Gedicht über eine Katze und wandle es in eine MP3 um.",
+      "everglades": "Schreibe einen Artikel über die Everglades in Florida und lege ihn als Word-Dokument zum Download an.",
+      "retreat": "Erstelle eine Video-Einladung für ein eintägiges Firmen-Retreat in London und schreibe den Ablaufplan darunter."
+    }
+  },
   "marketingNews": {
     "heading": "Neues von Synaplan",
     "readMore": "Mehr lesen"
@@ -379,6 +387,14 @@
     "placeholder": "Schreibe deine Nachricht hier...",
     "provider": "Anbieter",
     "model": "Modell",
+    "modelCaption": "Modell: {name}",
+    "plusMenu": {
+      "label": "Hinzufügen",
+      "attach": "Dateien anhängen",
+      "model": "Modell",
+      "tools": "Tools",
+      "knowledge": "Wissensordner"
+    },
     "configureModel": "KI-Modell konfigurieren",
     "knowledgeGroup": "Wissensordner",
     "knowledgeGroupNone": "Kein Wissensordner",
@@ -3719,7 +3735,11 @@
         "general": "Zugang zu allen Premium-Funktionen und Tools",
         "models": "Wähle aus mehreren KI-Modellen und passe dein Erlebnis an",
         "tools": "Nutze erweiterte Tools wie Bild- und Videogenerierung",
-        "enhance": "KI-gestützte Nachrichtenverbesserung für bessere Antworten"
+        "enhance": "KI-gestützte Nachrichtenverbesserung für bessere Antworten",
+        "channels": "Verbinde WhatsApp, E-Mail und dein Website-Chat-Widget mit Synaplan.",
+        "aiSetup": "Konfiguriere KI-Modelle, Prompts und Routing passend zu deinem Workflow.",
+        "attach": "Lade Dokumente und Bilder hoch, um sie als Wissensbasis für deine KI zu nutzen.",
+        "knowledge": "Beschränke einen Chat auf einen deiner Wissensordner für gezielte Antworten."
       },
       "registerButton": "Kostenlosen Account erstellen",
       "loginButton": "Bereits einen Account? Einloggen"

@@ -15,7 +15,11 @@
     inset itself.
   -->
   <div
-    class="sticky bottom-0 bg-chat-input-area md:pb-[env(safe-area-inset-bottom)]"
+    :class="
+      isCentered
+        ? 'bg-chat-input-area'
+        : 'sticky bottom-0 bg-chat-input-area md:pb-[env(safe-area-inset-bottom)]'
+    "
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
@@ -109,32 +113,89 @@
           </div>
         </div>
 
-        <!-- Fixed file upload button (positioned absolutely) -->
+        <!-- Plus menu: attach + per-message controls (Model / Tools / Knowledge).
+             Exempt from the guest lock rule — the menu always opens; gated items
+             inside surface the guest hint popover. -->
         <div
-          class="absolute bottom-2 left-1 md:left-[6px] pointer-events-none"
-          data-testid="section-chat-attachments"
+          ref="plusMenuRef"
+          class="absolute bottom-2 left-1 md:left-[6px]"
+          data-testid="section-chat-plus"
         >
           <button
             type="button"
             :class="[
-              'surface-chip icon-ghost h-[36px] min-w-[36px] flex items-center justify-center rounded-lg pointer-events-auto relative',
-              isGuestMode && 'opacity-50',
+              'surface-chip icon-ghost h-[36px] min-w-[36px] flex items-center justify-center rounded-lg relative',
+              plusMenuOpen && 'pill--active',
             ]"
-            :aria-label="$t('chatInput.attach')"
+            :aria-label="$t('chatInput.plusMenu.label')"
+            :aria-expanded="plusMenuOpen"
             :disabled="uploading"
-            data-testid="btn-chat-attach"
-            @click="triggerFileUpload"
+            data-testid="btn-chat-plus"
+            @click="togglePlusMenu"
           >
             <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
-            <template v-else>
-              <PlusIcon class="w-5 h-5" />
-              <Icon
-                v-if="isGuestMode"
-                icon="mdi:lock-outline"
-                class="w-2.5 h-2.5 absolute -top-0.5 -right-0.5 text-amber-500"
-              />
-            </template>
+            <PlusIcon v-else class="w-5 h-5" />
           </button>
+
+          <div
+            v-if="plusMenuOpen"
+            class="dropdown-up left-0 min-w-[220px] flex flex-col gap-1"
+            data-testid="dropdown-plus-panel"
+          >
+            <button
+              type="button"
+              class="dropdown-item"
+              data-testid="btn-plus-attach"
+              @click="handlePlusAttach"
+            >
+              <Icon icon="mdi:paperclip" class="w-5 h-5 flex-shrink-0" />
+              <span class="text-sm font-medium">{{ $t('chatInput.plusMenu.attach') }}</span>
+            </button>
+
+            <template v-if="isGuestMode">
+              <button
+                type="button"
+                class="dropdown-item"
+                data-testid="btn-plus-model"
+                @click="handlePlusGate('models')"
+              >
+                <Icon icon="mdi:tune-vertical" class="w-5 h-5 flex-shrink-0" />
+                <span class="text-sm font-medium flex-1 text-left">{{
+                  $t('chatInput.plusMenu.model')
+                }}</span>
+                <span class="text-xs txt-muted">{{ $t('chatInput.modelDropdown.default') }}</span>
+              </button>
+              <button
+                type="button"
+                class="dropdown-item"
+                data-testid="btn-plus-tools"
+                @click="handlePlusGate('tools')"
+              >
+                <Icon icon="mdi:toolbox-outline" class="w-5 h-5 flex-shrink-0" />
+                <span class="text-sm font-medium flex-1 text-left">{{
+                  $t('chatInput.plusMenu.tools')
+                }}</span>
+              </button>
+            </template>
+
+            <template v-else>
+              <ModelDropdown v-model="selectedModelId" />
+              <ToolsDropdown
+                :active-command="activeCommand"
+                :thinking-enabled="thinkingEnabled"
+                :voice-reply="voiceReply"
+                :supports-reasoning="supportsReasoning"
+                :enhance-enabled="enhanceEnabled"
+                :enhance-loading="enhanceLoading"
+                :enhance-available="message.trim().length > 0"
+                @insert-command="handleInsertCommand"
+                @toggle-thinking="toggleThinking"
+                @toggle-voice-reply="toggleVoiceReply"
+                @toggle-enhance="toggleEnhance"
+              />
+              <KnowledgeFolderPicker v-model="selectedGroupKey" :groups="knowledgeGroups" />
+            </template>
+          </div>
 
           <input
             type="file"
@@ -156,29 +217,17 @@
             type="button"
             :class="[
               'h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto relative',
-              isGuestMode && 'opacity-50',
-              !isGuestMode && enhanceEnabled && 'pill pill--active',
-              !isGuestMode && !enhanceEnabled && 'icon-ghost',
-              !isGuestMode && enhanceLoading && 'pill--loading',
-              isGuestMode && 'icon-ghost',
+              enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
+              enhanceLoading && 'pill--loading',
             ]"
-            :disabled="!isGuestMode && enhanceLoading"
+            :disabled="enhanceLoading"
             :aria-label="$t('chatInput.enhance')"
             :title="$t('chatInput.enhance')"
             data-testid="btn-chat-enhance"
             @click="toggleEnhance"
           >
-            <Icon
-              v-if="!isGuestMode && enhanceLoading"
-              icon="mdi:loading"
-              class="w-5 h-5 animate-spin"
-            />
+            <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
             <SparklesIcon v-else class="w-5 h-5" />
-            <Icon
-              v-if="isGuestMode"
-              icon="mdi:lock-outline"
-              class="w-2.5 h-2.5 absolute -top-0.5 -right-0.5 text-amber-500"
-            />
           </button>
 
           <button
@@ -214,83 +263,14 @@
         </div>
       </div>
 
-      <!-- Main controls below the input — Advanced mode only, including the
-           Easy Mode toggle. Switching to Easy hides this whole row; the way
-           back to Advanced is Settings → App Mode. -->
+      <!-- Selected-model caption: tiny hint shown only when the user picked a
+           specific model (the Model control now lives inside the + menu). -->
       <div
-        v-if="!appModeStore.isEasyMode"
-        class="mt-3 flex items-center gap-2"
-        data-testid="section-chat-secondary-actions"
+        v-if="selectedModelId !== null && selectedModelName"
+        class="mt-1 text-center text-[8px] leading-none txt-muted"
+        data-testid="chat-model-caption"
       >
-        <!-- §4.7: exactly three pills — Model, Tools, Knowledge folder.
-             Thinking + Voice reply live INSIDE the Tools dropdown as toggles;
-             "Manage folders…" lives INSIDE the folder picker. Labels stay
-             visible on mobile (no hidden sm:inline). -->
-
-        <!-- Model dropdown: show gated pill in guest mode -->
-        <template v-if="isGuestMode">
-          <button
-            type="button"
-            class="pill flex-shrink-0 opacity-50 relative"
-            @click="emit('guestFeatureGate', 'models')"
-          >
-            <Icon icon="mdi:tune-vertical" class="w-4 h-4 md:w-5 md:h-5" />
-            <span class="text-xs md:text-sm font-medium">Model</span>
-            <Icon icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
-          </button>
-        </template>
-        <ModelDropdown v-else v-model="selectedModelId" class="flex-shrink-0" />
-
-        <!-- Tools dropdown: show gated pill in guest mode -->
-        <template v-if="isGuestMode">
-          <button
-            type="button"
-            class="pill flex-shrink-0 opacity-50 relative"
-            @click="emit('guestFeatureGate', 'tools')"
-          >
-            <Icon icon="mdi:toolbox-outline" class="w-4 h-4 md:w-5 md:h-5" />
-            <span class="text-xs md:text-sm font-medium">Tools</span>
-            <Icon icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
-          </button>
-        </template>
-        <ToolsDropdown
-          v-else
-          :active-command="activeCommand"
-          :thinking-enabled="thinkingEnabled"
-          :voice-reply="voiceReply"
-          :supports-reasoning="supportsReasoning"
-          :enhance-enabled="enhanceEnabled"
-          :enhance-loading="enhanceLoading"
-          :enhance-available="message.trim().length > 0"
-          class="flex-shrink-0"
-          @insert-command="handleInsertCommand"
-          @toggle-thinking="toggleThinking"
-          @toggle-voice-reply="toggleVoiceReply"
-          @toggle-enhance="toggleEnhance"
-        />
-
-        <!-- Knowledge-base folder (RAG group) picker: scope the chat to a
-             folder. Signed-in users only; its panel carries the "Manage
-             folders…" link row to the Files page. -->
-        <KnowledgeFolderPicker
-          v-if="!isGuestMode"
-          v-model="selectedGroupKey"
-          :groups="knowledgeGroups"
-          class="flex-shrink-0"
-        />
-
-        <!-- Switch to Easy Mode. One-way from here: this whole row is hidden
-             in Easy mode, so Advanced is re-enabled via Settings → App Mode. -->
-        <button
-          type="button"
-          class="pill flex-shrink-0 ml-auto"
-          :title="$t('settings.appMode.easy')"
-          data-testid="btn-toggle-app-mode"
-          @click="appModeStore.setMode('easy')"
-        >
-          <Icon icon="mdi:feather" class="w-4 h-4" />
-          <span class="text-xs font-medium">{{ $t('settings.appMode.easy') }}</span>
-        </button>
+        {{ $t('chatInput.modelCaption', { name: selectedModelName }) }}
       </div>
     </div>
 
@@ -304,7 +284,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onUnmounted, type Ref } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, type Ref } from 'vue'
 import {
   PaperAirplaneIcon,
   XMarkIcon,
@@ -334,7 +314,6 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
-import { useAppModeStore } from '@/stores/appMode'
 import { useAuthStore } from '@/stores/auth'
 import QuoteChip from './QuoteChip.vue'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
@@ -350,6 +329,8 @@ interface UploadedFile {
 interface Props {
   isStreaming?: boolean
   isGuestMode?: boolean
+  /** Centered empty-state variant: drops the sticky-bottom positioning. */
+  centered?: boolean
   quote?: QuotedReference | null
 }
 
@@ -357,6 +338,31 @@ const props = defineProps<Props>()
 
 const isStreaming = computed(() => props.isStreaming ?? false)
 const isGuestMode = computed(() => props.isGuestMode ?? false)
+const isCentered = computed(() => props.centered ?? false)
+
+const plusMenuOpen = ref(false)
+const plusMenuRef = ref<HTMLElement | null>(null)
+
+const togglePlusMenu = () => {
+  plusMenuOpen.value = !plusMenuOpen.value
+}
+
+const handlePlusAttach = () => {
+  plusMenuOpen.value = false
+  triggerFileUpload()
+}
+
+const handlePlusGate = (key: string) => {
+  plusMenuOpen.value = false
+  emit('guestFeatureGate', key)
+}
+
+const handlePlusClickOutside = (e: MouseEvent) => {
+  if (!plusMenuOpen.value) return
+  const target = e.target as HTMLElement
+  if (plusMenuRef.value && plusMenuRef.value.contains(target)) return
+  plusMenuOpen.value = false
+}
 
 const message = ref('')
 const originalMessage = ref('')
@@ -399,7 +405,6 @@ const autoSendPending = ref(false)
 const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
-const appModeStore = useAppModeStore()
 const authStore = useAuthStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
@@ -534,6 +539,12 @@ const currentChatModel = computed(() => {
   }
 
   return chatModels.find((model) => model.id === resolvedModelId) ?? null
+})
+
+// Name of the explicitly-picked model (null selection = "Default", no caption).
+const selectedModelName = computed(() => {
+  if (selectedModelId.value === null) return ''
+  return currentChatModel.value?.name ?? ''
 })
 
 const supportsReasoning = computed(() => {
@@ -685,6 +696,7 @@ const sendMessage = () => {
   emit('send', messageToSend, options)
   message.value = ''
   uploadedFiles.value = []
+  plusMenuOpen.value = false
   paletteVisible.value = false
   mentionPaletteVisible.value = false
   mentionQuery.value = ''
@@ -985,8 +997,13 @@ const clearSilenceTimer = () => {
   }
 }
 
+onMounted(() => {
+  document.addEventListener('click', handlePlusClickOutside)
+})
+
 onUnmounted(() => {
   clearSilenceTimer()
+  document.removeEventListener('click', handlePlusClickOutside)
   if (uploadAbortController.value) {
     uploadAbortController.value.abort()
     uploadAbortController.value = null
@@ -1326,15 +1343,23 @@ const setInputText = (text: string) => {
   message.value = text
 }
 
-// Expose textarea ref, uploadFiles, and setInputText for parent component
+// Prefill + send in one step (e.g., landing example prompts).
+const submitText = (text: string) => {
+  message.value = text
+  nextTick(() => sendMessage())
+}
+
+// Expose textarea ref, uploadFiles, setInputText, submitText for parent component
 // ATTENTION: needs to be typed when using vue-tsc -b
 defineExpose<{
   textareaRef: Ref<InstanceType<typeof Textarea> | null>
   uploadFiles: (files: File[]) => Promise<void>
   setInputText: (text: string) => void
+  submitText: (text: string) => void
 }>({
   textareaRef,
   uploadFiles,
   setInputText,
+  submitText,
 })
 </script>

@@ -117,7 +117,7 @@
 
           <div
             v-else-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
-            class="flex flex-col items-center justify-center h-full px-6 py-8 gap-8 overflow-y-auto scroll-thin"
+            class="flex flex-col items-center justify-center min-h-[68vh] px-6 py-8 gap-6"
             data-testid="state-empty"
           >
             <div class="text-center">
@@ -129,6 +129,27 @@
               </p>
             </div>
 
+            <!-- Centered hero composer: the input starts high on the empty
+                 screen and docks to the bottom on first send (see bottom
+                 ChatInput, rendered only when there are messages). -->
+            <div class="w-full max-w-2xl">
+              <ChatInput
+                ref="chatInputRef"
+                centered
+                :is-streaming="isStreaming"
+                :is-guest-mode="isGuestMode"
+                :quote="quoting.pendingQuote.value"
+                @send="handleSendMessage"
+                @stop="handleUserStop"
+                @guest-feature-gate="handleGuestFeatureGate"
+                @clear-quote="quoting.clearPendingQuote"
+              />
+            </div>
+
+            <ExamplePrompts
+              v-if="!authStore.isAuthenticated && !configStore.marketingNews.enabled"
+              @pick="handleExamplePick"
+            />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
 
@@ -213,6 +234,7 @@
       />
 
       <ChatInput
+        v-if="!isEmptyLanding"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
@@ -276,8 +298,8 @@
     <!-- Guest Signup Modal (shown when guest message limit is reached) -->
     <GuestSignupModal :is-open="showGuestSignupModal" @close="showGuestSignupModal = false" />
 
-    <!-- Guest Feature Gate Modal (shown when guest tries to access a restricted feature) -->
-    <GuestFeatureGateModal
+    <!-- Guest hint popover (shown when a guest taps a restricted feature) -->
+    <GuestHintPopover
       :is-open="featureGateOpen"
       :feature-key="featureGateKey"
       @close="featureGateOpen = false"
@@ -354,6 +376,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
+import ExamplePrompts from '@/components/ExamplePrompts.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
@@ -408,7 +431,7 @@ import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
 import PromoTipBanner from '@/components/PromoTipBanner.vue'
 import GuestBanner from '@/components/guest/GuestBanner.vue'
 import GuestSignupModal from '@/components/guest/GuestSignupModal.vue'
-import GuestFeatureGateModal from '@/components/guest/GuestFeatureGateModal.vue'
+import GuestHintPopover from '@/components/guest/GuestHintPopover.vue'
 import { usePromoTips } from '@/composables/usePromoTips'
 import { useDateFormat } from '@/composables/useDateFormat'
 
@@ -462,9 +485,23 @@ const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
 
+// Empty landing: no messages, not loading, and not the guest-error state.
+// Drives the centered hero composer (rendered inside state-empty) and hides the
+// bottom sticky composer so there is only ever one live ChatInput instance.
+const isEmptyLanding = computed(
+  () =>
+    !(guestStore.initFailed && !authStore.isAuthenticated) &&
+    historyStore.messages.length === 0 &&
+    !historyStore.isLoadingMessages
+)
+
 function handleGuestFeatureGate(key: string) {
   featureGateKey.value = key
   featureGateOpen.value = true
+}
+
+function handleExamplePick(prompt: string) {
+  chatInputRef.value?.submitText(prompt)
 }
 
 const handlePromoAction = (route: string) => {

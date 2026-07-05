@@ -91,6 +91,14 @@
     "errorIssuanceFailed": "Synaplan could not issue an API key for this account."
   },
   "welcome": "Welcome",
+  "examplePrompts": {
+    "heading": "Try one of these",
+    "items": {
+      "poemMp3": "Create a poem about a cat and convert it into an MP3.",
+      "everglades": "Write an article about the Florida Everglades and put it into a Word document for download.",
+      "retreat": "Make a video invitation for a one-day company retreat in London, and write the schedule below it."
+    }
+  },
   "marketingNews": {
     "heading": "Latest from Synaplan",
     "readMore": "Read more"
@@ -382,6 +390,14 @@
     "placeholder": "Type your message...",
     "provider": "Provider",
     "model": "Model",
+    "modelCaption": "Model: {name}",
+    "plusMenu": {
+      "label": "Add",
+      "attach": "Attach files",
+      "model": "Model",
+      "tools": "Tools",
+      "knowledge": "Knowledge folder"
+    },
     "configureModel": "Configure AI Model",
     "knowledgeGroup": "Knowledge folder",
     "knowledgeGroupNone": "No knowledge folder",
@@ -3785,7 +3801,11 @@
         "general": "Access all premium features and tools",
         "models": "Choose from multiple AI models and customize your experience",
         "tools": "Use advanced tools like image generation and video creation",
-        "enhance": "AI-powered message enhancement for better responses"
+        "enhance": "AI-powered message enhancement for better responses",
+        "channels": "Connect WhatsApp, email and your website chat widget to Synaplan.",
+        "aiSetup": "Configure AI models, prompts and routing to fit your workflow.",
+        "attach": "Upload documents and images to use as a knowledge base for your AI.",
+        "knowledge": "Scope a chat to one of your knowledge folders for focused answers."
       },
       "registerButton": "Create free account",
       "loginButton": "Already have an account? Log in"

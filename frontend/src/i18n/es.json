@@ -90,6 +90,14 @@
     "errorIssuanceFailed": "Synaplan no pudo emitir una clave de API para esta cuenta."
   },
   "welcome": "Bienvenido",
+  "examplePrompts": {
+    "heading": "Prueba una de estas",
+    "items": {
+      "poemMp3": "Crea un poema sobre un gato y conviértelo en un MP3.",
+      "everglades": "Escribe un artículo sobre los Everglades de Florida y ponlo en un documento de Word para descargar.",
+      "retreat": "Crea una invitación en vídeo para un retiro de empresa de un día en Londres y escribe el programa debajo."
+    }
+  },
   "marketingNews": {
     "heading": "Lo último de Synaplan",
     "readMore": "Leer más"
@@ -351,6 +359,14 @@
     "placeholder": "Escribe tu mensaje...",
     "provider": "Proveedor",
     "model": "Modelo",
+    "modelCaption": "Modelo: {name}",
+    "plusMenu": {
+      "label": "Añadir",
+      "attach": "Adjuntar archivos",
+      "model": "Modelo",
+      "tools": "Herramientas",
+      "knowledge": "Carpeta de conocimiento"
+    },
     "configureModel": "Configurar Modelo de IA",
     "attach": "Adjuntar",
     "uploadFile": "Subir",
