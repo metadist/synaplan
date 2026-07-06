@@ -23,7 +23,7 @@
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
-    <div class="max-w-4xl mx-auto px-4 py-2 md:py-4">
+    <div class="max-w-4xl mx-auto py-2 md:py-4" :class="{ 'px-4': !isCentered }">
       <!-- Active Command and File Display (above input) -->
       <div
         v-if="activeCommand || uploadedFiles.length > 0 || quote"
@@ -70,9 +70,12 @@
         </button>
       </div>
 
+      <!-- Attached banner (e.g. guest message counter) glued to the input's top edge. -->
+      <slot name="banner" />
+
       <div
         class="relative surface-card"
-        :class="{ 'ring-2 ring-primary': isDragging }"
+        :class="[{ 'ring-2 ring-primary': isDragging }, bannerVisible ? 'max-sm:!rounded-t-none' : '']"
         data-testid="comp-chat-input-shell"
         @dragover.prevent="handleDragOver"
         @dragleave.prevent="handleDragLeave"
@@ -343,6 +346,13 @@ interface Props {
   /** Centered empty-state variant: drops the sticky-bottom positioning. */
   centered?: boolean
   quote?: QuotedReference | null
+  /**
+   * A banner is attached to the input's top edge via the #banner slot. On mobile
+   * the banner spans the full input width, so we square off the shell's top
+   * corners (max-sm only) to read as one seamless card. Rounded corners stay on
+   * md+ where the banner is a compact centered pill on the flat top edge.
+   */
+  bannerVisible?: boolean
 }
 
 const props = defineProps<Props>()

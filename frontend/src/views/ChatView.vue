@@ -28,11 +28,15 @@
 
       <div
         ref="chatContainer"
-        class="flex-1 overflow-y-auto bg-chat overscroll-contain"
+        class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain"
+        :class="{ 'flex flex-col items-center': isEmptyLanding }"
         data-testid="section-messages"
         @scroll="handleScroll"
       >
-        <div class="max-w-4xl mx-auto py-6 px-4">
+        <div
+          class="max-w-4xl mx-auto py-6 px-4"
+          :class="{ 'my-auto w-full': isEmptyLanding }"
+        >
           <!-- Loading indicator for infinite scroll -->
           <div
             v-if="historyStore.isLoadingMessages"
@@ -117,7 +121,7 @@
 
           <div
             v-else-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
-            class="flex flex-col items-center justify-center min-h-[68vh] px-6 py-8 gap-6"
+            class="flex flex-col items-center justify-center px-6 py-8 gap-6"
             data-testid="state-empty"
           >
             <div class="text-center">
@@ -138,12 +142,22 @@
                 centered
                 :is-streaming="isStreaming"
                 :is-guest-mode="isGuestMode"
+                :banner-visible="isGuestMode && guestStore.shouldShowBanner"
                 :quote="quoting.pendingQuote.value"
                 @send="handleSendMessage"
                 @stop="handleUserStop"
                 @guest-feature-gate="handleGuestFeatureGate"
                 @clear-quote="quoting.clearPendingQuote"
-              />
+              >
+                <template v-if="isGuestMode" #banner>
+                  <GuestBanner
+                    :visible="guestStore.shouldShowBanner"
+                    :remaining="guestStore.remainingMessages"
+                    :max-messages="guestStore.maxMessages"
+                    @dismiss="guestStore.dismissBanner()"
+                  />
+                </template>
+              </ChatInput>
             </div>
 
             <ExamplePrompts
@@ -208,15 +222,6 @@
         </div>
       </div>
 
-      <!-- Guest Banner (shown for unauthenticated trial users) -->
-      <GuestBanner
-        v-if="isGuestMode"
-        :visible="guestStore.shouldShowBanner"
-        :remaining="guestStore.remainingMessages"
-        :max-messages="guestStore.maxMessages"
-        @dismiss="guestStore.dismissBanner()"
-      />
-
       <!-- Contextual Promo Tips -->
       <PromoTipBanner
         :tip="promoTips.currentTip.value"
@@ -238,12 +243,22 @@
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
+        :banner-visible="isGuestMode && guestStore.shouldShowBanner"
         :quote="quoting.pendingQuote.value"
         @send="handleSendMessage"
         @stop="handleUserStop"
         @guest-feature-gate="handleGuestFeatureGate"
         @clear-quote="quoting.clearPendingQuote"
-      />
+      >
+        <template v-if="isGuestMode" #banner>
+          <GuestBanner
+            :visible="guestStore.shouldShowBanner"
+            :remaining="guestStore.remainingMessages"
+            :max-messages="guestStore.maxMessages"
+            @dismiss="guestStore.dismissBanner()"
+          />
+        </template>
+      </ChatInput>
 
       <!--
         Phase 3e: backgrounded memory extraction status pill.

@@ -1,9 +1,9 @@
 <template>
   <Transition name="slide-down">
-    <div v-if="visible" class="flex justify-center mx-4 mt-2 mb-0">
+    <div v-if="visible" class="flex justify-center">
       <div
         data-testid="guest-banner"
-        class="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-brand/20 bg-brand/5 dark:bg-brand/10 backdrop-blur-sm"
+        class="inline-flex w-full justify-center items-center gap-1.5 px-2.5 py-1.5 rounded-t-2xl rounded-b-none border border-b-0 border-brand/20 bg-brand/5 dark:bg-brand/10 backdrop-blur-sm sm:w-auto sm:gap-2.5 sm:px-3"
       >
         <div class="hidden sm:flex items-center gap-1">
           <span
@@ -26,7 +26,7 @@
         <router-link
           to="/register"
           data-testid="guest-banner-signup"
-          class="group relative text-xs font-semibold text-white whitespace-nowrap px-3 py-1 rounded-full bg-brand shadow-sm overflow-hidden transition-shadow duration-300 hover:shadow-md hover:shadow-brand/40"
+          class="group relative text-xs font-semibold text-white whitespace-nowrap px-2.5 py-1 rounded-full bg-brand shadow-sm overflow-hidden transition-shadow duration-300 hover:shadow-md hover:shadow-brand/40 sm:px-3"
         >
           <span class="relative z-10">{{ $t('guest.banner.signUp') }}</span>
           <span class="cta-shimmer" />
