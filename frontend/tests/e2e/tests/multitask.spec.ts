@@ -194,20 +194,24 @@ test.describe('@ci @multitask Multi-task routing', () => {
 
     const openPlusMenu = async () => {
       const panel = page.locator(selectors.chat.plusPanel)
-      if (!(await panel.isVisible().catch(() => false))) {
-        await page.locator(selectors.chat.plusToggle).click()
-        await panel.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-      }
+      if (await panel.isVisible()) return
+      await page.locator(selectors.chat.plusToggle).click()
+      await panel.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator(selectors.chat.attachBtn)).toBeVisible({
+        timeout: TIMEOUTS.SHORT,
+      })
     }
 
     await test.step('Arrange: start a new chat and enable voice reply', async () => {
       await chat.startNewChat()
-      // Tools now lives inside the "+" menu.
       await openPlusMenu()
       await page.locator(selectors.chat.toolsToggle).click()
       await page
         .locator(selectors.chat.toolsPanel)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+      await expect(page.locator(selectors.chat.toolVoiceReply)).toBeVisible({
+        timeout: TIMEOUTS.SHORT,
+      })
       await page.locator(selectors.chat.toolVoiceReply).click()
       await expect(page.locator(selectors.chat.toolsActiveBadge)).toBeVisible({
         timeout: TIMEOUTS.SHORT,
