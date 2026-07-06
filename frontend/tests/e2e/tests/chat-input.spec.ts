@@ -15,41 +15,21 @@ import { TIMEOUTS } from '../config/config'
 
 const CHAT = selectors.chat
 
-/**
- * Open the "+" menu and wait for its panel.
- *
- * The toggle is a plain boolean flip, so on a freshly-hydrated composer the
- * first click can land before Vue has wired up `@click`, leaving the panel
- * closed and flaking CI. Retry the toggle (only while the panel is still
- * closed, so we never accidentally toggle it back shut) until it actually
- * opens.
- */
+/** Open the "+" menu and wait for its content to settle. */
 async function openPlusMenu(page: Page) {
   const panel = page.locator(CHAT.plusPanel)
-  const toggle = page.locator(CHAT.plusToggle)
-  await expect(async () => {
-    if (await panel.isVisible().catch(() => false)) return
-    await toggle.click()
-    await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  }).toPass({ timeout: TIMEOUTS.STANDARD })
+  if (await panel.isVisible()) return panel
+  await page.locator(CHAT.plusToggle).click()
+  await expect(panel).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  await expect(panel.locator(CHAT.attachBtn)).toBeVisible({ timeout: TIMEOUTS.SHORT })
   return panel
 }
 
-/**
- * Open the "+" menu, then the Tools dropdown inside it, and wait for its panel.
- * Same retry rationale as {@link openPlusMenu} — the Tools toggle is also a
- * boolean flip, so guard on visibility before each click.
- */
-async function openToolsMenu(page: Page) {
+/** Open the Tools dropdown inside the "+" menu and wait for it to settle. */
+async function openToolsDropdown(page: Page) {
   await openPlusMenu(page)
-  const toolsPanel = page.locator(CHAT.toolsPanel)
-  const toolsToggle = page.locator(CHAT.toolsToggle)
-  await expect(async () => {
-    if (await toolsPanel.isVisible().catch(() => false)) return
-    await toolsToggle.click()
-    await expect(toolsPanel).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  }).toPass({ timeout: TIMEOUTS.STANDARD })
-  return toolsPanel
+  await page.locator(CHAT.toolsToggle).click()
+  await expect(page.locator(CHAT.toolsPanel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
 }
 
 test.describe('Chat input: "+" menu (§5)', () => {
@@ -75,7 +55,8 @@ test.describe('Chat input: "+" menu (§5)', () => {
   test('@ci Tools dropdown lists command tools, toggles and the Summarizer link', async ({
     page,
   }) => {
-    const panel = await openToolsMenu(page)
+    await openToolsDropdown(page)
+    const panel = page.locator(CHAT.toolsPanel)
 
     await expect(panel.locator('[data-testid="btn-tool-web-search"]')).toBeVisible()
     await expect(panel.locator('[data-testid="btn-tool-image-gen"]')).toBeVisible()
@@ -91,7 +72,7 @@ test.describe('Chat input: "+" menu (§5)', () => {
     await openPlusMenu(page)
     await expect(page.locator(CHAT.toolsActiveBadge)).toHaveCount(0)
 
-    await openToolsMenu(page)
+    await openToolsDropdown(page)
     const voiceRow = page.locator(CHAT.toolVoiceReply)
     await expect(voiceRow).toBeVisible({ timeout: TIMEOUTS.SHORT })
     await voiceRow.click()
@@ -117,17 +98,18 @@ test.describe('Chat input: "+" menu (§5)', () => {
       // No in-shell sparkles button crowding the narrow input…
       await expect(page.locator(CHAT.enhanceButton)).toHaveCount(0)
       // …the control lives in the Tools dropdown (inside the "+" menu) instead.
-      await openToolsMenu(page)
+      await openToolsDropdown(page)
       await expect(page.locator(CHAT.toolEnhance)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     } else {
       await expect(page.locator(CHAT.enhanceButton)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await openToolsMenu(page)
+      await openToolsDropdown(page)
       await expect(page.locator(CHAT.toolEnhance)).toBeHidden()
     }
   })
 
   test('@ci Summarizer link row navigates to the summarizer tool (Q3)', async ({ page }) => {
-    await openToolsMenu(page)
+    await openToolsDropdown(page)
+    await expect(page.locator(CHAT.toolSummarizerLink)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     await page.locator(CHAT.toolSummarizerLink).click()
     await expect(page).toHaveURL(/\/ai\/summarizer/, { timeout: TIMEOUTS.STANDARD })
   })
