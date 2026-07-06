@@ -68,7 +68,7 @@ class PromptCatalog
             [
                 'topic' => 'mediamaker',
                 'language' => 'en',
-                'shortDescription' => 'Media-generation topic that handles all create/edit requests for images, videos and audio.',
+                'shortDescription' => 'Media-generation topic that handles all create/edit requests for images, videos and audio — including combined requests that ALSO ask for accompanying text (e.g. "make a video invitation and write the schedule below it").',
                 'prompt' => self::mediaMakerPrompt(),
             ],
 
@@ -313,6 +313,19 @@ This is the list, use only this:
 
 [DYNAMICLIST]
 
+   **Media creation wins over accompanying text work**: A request that
+   COMBINES creating media (a video, image, or audio) with writing text to go
+   with it ("make a video invitation ... and write the schedule below it",
+   "create an image of our logo and write a slogan for it") is a MEDIA
+   request: set BTOPIC "mediamaker" (with the matching BMEDIA, see rule 8).
+   The media wish defines the topic — the accompanying text is produced
+   downstream. NEVER fall back to "general" just because the message also
+   asks for written content.
+   Examples:
+   - "Make a video invitation for a company retreat, and write the schedule below it" → BTOPIC: "mediamaker", BMEDIA: "video"
+   - "Create an image of a mountain and write a short story about it" → BTOPIC: "mediamaker", BMEDIA: "image"
+   - "Write a poem and read it to me as MP3" → BTOPIC: "mediamaker", BMEDIA: "audio"
+
 3. **Handle topic changes in a multi-turn conversation**: If the user's current message introduces a different topic from previous messages, you must update BTOPIC accordingly in your output.
 
 4. If there is an attachment, the description is in the BFILETEXT field.
@@ -387,6 +400,7 @@ This is the list, use only this:
    Examples:
    - "Create a video of a car" → BMEDIA: "video"
    - "Make a video of a dog running" → BMEDIA: "video"
+   - "Make a video invitation for our retreat and write the schedule below it" → BMEDIA: "video"
    - "Generate an image of a cat" → BMEDIA: "image"
    - "Create a picture of a sunset" → BMEDIA: "image"
    - "Combine these two photos" → BMEDIA: "image"
@@ -583,6 +597,15 @@ Allowed topic keys: [KEYLIST]
    the `email_me` node. (Exception: a meeting invite alone → rule 7.)
 9. Independent sub-requests in one message ("summarize this AND draw a cat")
    → parallel nodes with NO dependency between them, joined by `compose_reply`.
+   This INCLUDES "generate media AND write accompanying text" when the text
+   is NOT about the media file's own content ("make a video invitation for
+   our retreat and write the schedule below it", "create a logo and write a
+   tagline for the launch"): one generator node (`video_generation` /
+   `image_generation` / ...) plus a parallel `chat` node with the scoped text
+   instruction, joined by `compose_reply`. Only use the rule-6
+   `file_analysis` chain when the text must describe or react to what is IN
+   the generated file. NEVER collapse such a combo into a single `chat` node
+   — the media part must come from its generator.
 9b. The user asks to read/summarize/use the content of a SPECIFIC URL written
    in the message ("load https://…", "was steht auf dieser Seite?",
    "summarize this article: https://…") → a `url_fetch` node (put the URL in
@@ -755,6 +778,25 @@ The poem node is `file_analysis` with the creative instruction in
 `inputs.prompt` — it depends on n1 and looks at the REAL generated image. It is
 NEVER a parallel `chat` node without the dependency: that node would run before
 the image exists and write about an image it has never seen.
+
+### Video invitation + independent text below it (media + parallel chat)
+User: "Make a video invitation for a one-day company retreat in London, and write the schedule below it."
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "video_generation", "inputs": { "prompt": "An inviting, festive video invitation for a one-day company retreat in London" } },
+    { "id": "n2", "capability": "chat", "inputs": { "text": "Write the schedule for a one-day company retreat in London." }, "params": { "topic_id": "general" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text", "attachments": ["$n1.file"] } }
+  ]
+}
+
+The schedule is INDEPENDENT text (rule 9) — it is not about the video file's
+content, so the `chat` node runs in parallel with NO dependency on n1 (rule 6's
+`file_analysis` chain would be wrong here). NEVER answer this with a single
+`chat` node: the video must come from `video_generation`.
 
 ### Describe an ATTACHED image as audio
 User: (attaches photo.png) "Beschreibe in einem Audio, was hier zu sehen ist."

@@ -20,10 +20,11 @@ use App\Repository\ConfigRepository;
  *
  * Built-in defaults (used when NO row exists at all — e.g. a fresh OSS clone
  * before `app:seed` runs):
- *   - ROUTING_ENABLED  → true   (new installs / dev / new signups get the new
- *                                routing instantly; existing users on the live
- *                                platform are grandfathered to OFF by a one-time
- *                                data migration, giving them a switch they own)
+ *   - ROUTING_ENABLED  → true   (the platform default. Live users were briefly
+ *                                grandfathered to OFF by Version20260607000000;
+ *                                Version20260706130000 removed those per-user
+ *                                rows again, so everyone follows the global
+ *                                switch unless an explicit per-user row is set)
  *   - SHADOW_MODE      → false
  *   - PARALLEL_ENABLED → false
  *
