@@ -188,7 +188,12 @@ const config = {
     // an unconfigured deployment is still store-compliant; white-label brands
     // may point at their own deletion page.
     get accountDeletionUrl(): string {
-      return getConfigSync().branding?.accountDeletionUrl || '/account-deletion'
+      // Defensive read: older backend deployments omit a `type` on this field in
+      // their OpenAPI spec, so the generated schema types it as `{}` instead of
+      // `string`. A plain `|| fallback` would then return the object. Narrow to a
+      // non-empty string explicitly so the value is correct regardless of drift.
+      const url = getConfigSync().branding?.accountDeletionUrl
+      return typeof url === 'string' && url ? url : '/account-deletion'
     },
     get landingPage(): string {
       return getConfigSync().branding?.landingPage ?? ''
