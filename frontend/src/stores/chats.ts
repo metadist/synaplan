@@ -4,6 +4,7 @@ import { httpClient } from '@/services/api/httpClient'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useConfigStore } from '@/stores/config'
 import { authService } from '@/services/authService'
+import { hasSessionHint } from '@/services/sessionHint'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
@@ -12,11 +13,15 @@ const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 const HISTORY_PAGE_SIZE = 20
 
 // Helper function to check authentication and redirect if needed
-// Uses authService which holds user info in memory (not localStorage)
+// Uses authService which holds user info in memory (not localStorage).
+// The redirect reason is only `session_expired` when this browser has a prior
+// successful login (session hint) — a never-logged-in guest gets the neutral
+// `auth_required`, so they never see the misleading "session expired" message.
 function checkAuthOrRedirect(): boolean {
   if (!authService.isAuthenticated()) {
     console.warn('🔒 Not authenticated - redirecting to login')
-    window.location.href = '/login?reason=session_expired'
+    const reason = hasSessionHint() ? 'session_expired' : 'auth_required'
+    window.location.href = `/login?reason=${reason}`
     return false
   }
   return true

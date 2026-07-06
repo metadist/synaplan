@@ -3,7 +3,7 @@
     <Transition name="dialog-fade">
       <div
         v-if="dialog.isOpen"
-        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+        class="modal-overlay fixed inset-0 z-[10000] flex items-center justify-center p-4"
         data-testid="modal-dialog-root"
         @click.self="handleBackdropClick"
       >

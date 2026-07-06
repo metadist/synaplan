@@ -8,6 +8,7 @@ import {
   reconcileLocalMessage,
 } from '@/utils/messageMapper'
 import { authService } from '@/services/authService'
+import { hasSessionHint } from '@/services/sessionHint'
 
 // Re-export so existing consumers keep importing from the store module.
 // The implementation moved to utils/messageMapper.ts (issue #1070) so the
@@ -19,7 +20,10 @@ export { parseContentWithThinking }
 function checkAuthOrRedirect(): boolean {
   if (!authService.isAuthenticated()) {
     console.warn('🔒 Not authenticated - redirecting to login')
-    window.location.href = '/login?reason=session_expired'
+    // Only genuine expired sessions (prior login on this browser) get the
+    // "session expired" message; never-logged-in guests get `auth_required`.
+    const reason = hasSessionHint() ? 'session_expired' : 'auth_required'
+    window.location.href = `/login?reason=${reason}`
     return false
   }
   return true

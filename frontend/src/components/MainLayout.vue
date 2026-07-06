@@ -57,6 +57,18 @@
       <Bars3Icon v-else class="w-6 h-6" aria-hidden="true" />
     </button>
 
+    <!-- Guest login shortcut (top-right) — mirrors the drawer toggle on the
+         left. Only for signed-out users; hidden while the drawer is open. -->
+    <button
+      v-if="showLoginButton"
+      class="v2-login-cta fixed right-3 z-40 md:hidden inline-flex items-center gap-1.5 h-10 px-4 rounded-full btn-primary shadow-lg text-sm font-semibold active:scale-95 transition-transform"
+      data-testid="btn-mobile-login-cta"
+      @click="goToLogin"
+    >
+      <ArrowRightOnRectangleIcon class="w-5 h-5" aria-hidden="true" />
+      <span>{{ $t('auth.signIn') }}</span>
+    </button>
+
     <!-- Help system host -->
     <HelpHost />
 
@@ -66,21 +78,32 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { useSidebarStore } from '../stores/sidebar'
+import { useAuthStore } from '../stores/auth'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import SidebarV2 from './SidebarV2.vue'
 import MobileNav from './MobileNav.vue'
 import HelpHost from './help/HelpHost.vue'
 import JobsTrayLauncher from './jobs/JobsTrayLauncher.vue'
 
-const route = useRoute()
+const router = useRouter()
 const sidebarStore = useSidebarStore()
+const authStore = useAuthStore()
 
-/** Edge zone (px) from the left where a closed-drawer open-swipe may start. */
-const EDGE_ZONE_PX = 24
+// Signed-out users get a prominent login shortcut in the top bar. Hidden while
+// the drawer is open so it never overlaps the sliding content / close button.
+const showLoginButton = computed(
+  () => !authStore.isAuthenticated && !sidebarStore.mobileDrawerOpen
+)
+
+const goToLogin = () => {
+  fireHaptic()
+  router.push('/login')
+}
+
 /** Minimum horizontal travel (px) that counts as a swipe. */
 const SWIPE_THRESHOLD_PX = 60
 
@@ -115,10 +138,10 @@ const onTouchStart = (event: TouchEvent) => {
   if (!touch) return
   touchStartX = touch.clientX
   touchStartY = touch.clientY
-  // Closed: only an edge swipe from the left opens the drawer, so we never
-  // hijack normal horizontal gestures inside the content. Open: a swipe from
-  // anywhere may close it.
-  touchTracking = sidebarStore.mobileDrawerOpen || touch.clientX <= EDGE_ZONE_PX
+  // Track every horizontal gesture on the content layer: a left-to-right swipe
+  // starting anywhere opens the drawer, a right-to-left swipe closes it. The
+  // vertical-dominance check in onTouchEnd keeps normal scrolling untouched.
+  touchTracking = true
 }
 
 const onTouchEnd = (event: TouchEvent) => {
@@ -140,11 +163,19 @@ const onTouchEnd = (event: TouchEvent) => {
   }
 }
 
-// Navigating away (via a drawer entry) always closes the drawer.
-watch(
-  () => route.fullPath,
-  () => sidebarStore.closeMobileDrawer()
-)
+// Close the drawer on EVERY navigation, from a single place. Doing it in a
+// global guard (rather than a route watcher that fires after the destination
+// has mounted) means the close always starts at the same point in the
+// navigation lifecycle — before the new page renders. The slide is a
+// GPU-composited transform, so it keeps animating smoothly while the
+// destination renders, giving a consistent close regardless of what triggered
+// the navigation (drawer link, browser back, in-page link, jobs tray, ...).
+const removeNavGuard = router.beforeEach((_to, _from, next) => {
+  if (sidebarStore.mobileDrawerOpen) {
+    sidebarStore.closeMobileDrawer()
+  }
+  next()
+})
 
 const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && sidebarStore.mobileDrawerOpen) {
@@ -152,8 +183,121 @@ const handleEscape = (event: KeyboardEvent) => {
   }
 }
 
-onMounted(() => document.addEventListener('keydown', handleEscape))
-onBeforeUnmount(() => document.removeEventListener('keydown', handleEscape))
+const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]'
+
+/** Interactive targets that must keep their own tap behavior in the top band. */
+const INTERACTIVE_SELECTOR = `button, a, [role="button"], [role="tab"], ${EDITABLE_SELECTOR}`
+
+/**
+ * Height (px) of the tap-to-top band at the very top of the screen: the iOS
+ * safe area (notch / Dynamic Island / status bar) plus a small buffer. Measured
+ * from a probe because `env()` only resolves in CSS, and re-measured on resize
+ * (orientation change flips the inset).
+ */
+let topTapBandPx = 40
+
+const measureTopTapBand = () => {
+  const probe = document.createElement('div')
+  probe.style.cssText =
+    'position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none;'
+  document.body.appendChild(probe)
+  topTapBandPx = probe.getBoundingClientRect().height + 40
+  probe.remove()
+}
+
+/**
+ * Tapping the very top of the screen scrolls the current page back to the top —
+ * the familiar iOS status-bar-tap behavior, which the native WKWebView does not
+ * provide for our inner overflow containers (the document itself never scrolls).
+ */
+const scrollToTopOnBandTap = (event: PointerEvent) => {
+  if (!isMobileViewport()) return
+  if (event.clientY > topTapBandPx) return
+  const target = event.target as HTMLElement | null
+  if (target && target.closest(INTERACTIVE_SELECTOR)) return
+
+  const main = document.querySelector<HTMLElement>('[data-testid="section-primary-content"]')
+  if (!main) return
+  const containers: HTMLElement[] = [main, ...main.querySelectorAll<HTMLElement>('.overflow-y-auto')]
+  containers
+    .filter((el) => el.scrollTop > 0)
+    .forEach((el) => el.scrollTo({ top: 0, behavior: 'smooth' }))
+}
+
+/**
+ * Dismiss the on-screen keyboard when the user *taps* outside the focused
+ * field. iOS keeps a text control focused (keyboard up) until it is explicitly
+ * blurred, so a tap on empty page area would otherwise never close it.
+ *
+ * Crucially we must distinguish a TAP from a SCROLL: blurring on `pointerdown`
+ * would kill the keyboard the moment the user starts scrolling the chat. So we
+ * record the start position and only blur on `pointerup` when the pointer
+ * barely moved (a genuine tap). A scroll/drag moves past the tolerance and
+ * leaves the keyboard open — the keyboard then only closes on a real tap or the
+ * native swipe-down-through-keyboard gesture.
+ */
+const KEYBOARD_TAP_MOVE_TOLERANCE_PX = 10
+
+let keyboardTapStartX = 0
+let keyboardTapStartY = 0
+let keyboardTapCandidate = false
+
+const isEditableEl = (el: HTMLElement | null): boolean =>
+  !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+
+const onKeyboardDismissPointerDown = (event: PointerEvent) => {
+  keyboardTapCandidate = false
+  if (!isEditableEl(document.activeElement as HTMLElement | null)) return
+  const target = event.target as HTMLElement | null
+  // A press that starts inside an editable control is never a dismiss.
+  if (target && target.closest(EDITABLE_SELECTOR)) return
+  keyboardTapStartX = event.clientX
+  keyboardTapStartY = event.clientY
+  keyboardTapCandidate = true
+}
+
+const onKeyboardDismissPointerUp = (event: PointerEvent) => {
+  if (!keyboardTapCandidate) return
+  keyboardTapCandidate = false
+  // Moved too far → this was a scroll/drag, not a tap: keep the keyboard open.
+  if (
+    Math.abs(event.clientX - keyboardTapStartX) > KEYBOARD_TAP_MOVE_TOLERANCE_PX ||
+    Math.abs(event.clientY - keyboardTapStartY) > KEYBOARD_TAP_MOVE_TOLERANCE_PX
+  ) {
+    return
+  }
+  const active = document.activeElement as HTMLElement | null
+  if (!isEditableEl(active)) return
+  const target = event.target as HTMLElement | null
+  // Tapped into another editable control — let it keep focus.
+  if (target && target.closest(EDITABLE_SELECTOR)) return
+  active!.blur()
+}
+
+// A touch that turns into a scroll fires pointercancel (not pointerup) once the
+// browser claims the gesture — reset so no stray blur happens afterwards.
+const onKeyboardDismissPointerCancel = () => {
+  keyboardTapCandidate = false
+}
+
+onMounted(() => {
+  measureTopTapBand()
+  document.addEventListener('keydown', handleEscape)
+  document.addEventListener('pointerdown', onKeyboardDismissPointerDown)
+  document.addEventListener('pointerup', onKeyboardDismissPointerUp)
+  document.addEventListener('pointercancel', onKeyboardDismissPointerCancel)
+  document.addEventListener('pointerdown', scrollToTopOnBandTap)
+  window.addEventListener('resize', measureTopTapBand)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleEscape)
+  document.removeEventListener('pointerdown', onKeyboardDismissPointerDown)
+  document.removeEventListener('pointerup', onKeyboardDismissPointerUp)
+  document.removeEventListener('pointercancel', onKeyboardDismissPointerCancel)
+  document.removeEventListener('pointerdown', scrollToTopOnBandTap)
+  window.removeEventListener('resize', measureTopTapBand)
+  removeNavGuard()
+})
 </script>
 
 <style scoped>
@@ -161,7 +305,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', handleEscape))
   position: relative;
 }
 
-.v2-drawer-toggle {
+.v2-drawer-toggle,
+.v2-login-cta {
   /* Sit inside the iOS safe area / notch, within the reserved top band. */
   top: calc(env(safe-area-inset-top, 0px) + 10px);
   touch-action: manipulation;

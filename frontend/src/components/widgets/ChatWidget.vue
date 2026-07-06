@@ -608,7 +608,7 @@
                   />
                 </svg>
                 <!-- Send icon when not sending -->
-                <PaperAirplaneIcon
+                <ArrowUpIcon
                   v-else
                   :class="['w-5 h-5', canSend ? 'text-white' : 'text-gray-400']"
                 />
@@ -649,7 +649,7 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   XMarkIcon,
   PaperClipIcon,
-  PaperAirplaneIcon,
+  ArrowUpIcon,
   DocumentIcon,
   SunIcon,
   MoonIcon,

@@ -1,7 +1,7 @@
 <template>
   <Teleport to="#app">
     <div
-      class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      class="modal-overlay fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
       @click.self="$emit('close')"
     >
       <div class="w-full max-w-md surface-card rounded-xl overflow-hidden">

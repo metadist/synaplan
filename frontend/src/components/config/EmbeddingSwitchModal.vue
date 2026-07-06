@@ -3,7 +3,7 @@
     <Transition name="modal">
       <div
         v-if="open"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
         data-testid="modal-embedding-switch"
       >
         <div
@@ -13,7 +13,7 @@
         ></div>
 
         <div
-          class="relative surface-elevated max-w-2xl w-full p-6 animate-in max-h-[90vh] overflow-y-auto"
+          class="modal-panel relative surface-elevated max-w-2xl w-full p-6 animate-in overflow-y-auto"
           data-testid="modal-body"
         >
           <!-- Header -->

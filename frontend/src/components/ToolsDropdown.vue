@@ -187,6 +187,7 @@ import { Icon } from '@iconify/vue'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { getFeaturesStatus, DevOnlyFeatureError, type Feature } from '@/services/featuresService'
 import { useRouter } from 'vue-router'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 
 interface Props {
   activeCommand?: string | null
@@ -285,6 +286,7 @@ const loadFeaturesStatus = async () => {
 }
 
 const toggleOpen = () => {
+  triggerHapticImpact('light')
   isOpen.value = !isOpen.value
   if (isOpen.value && Object.keys(featuresStatus.value).length === 0) {
     loadFeaturesStatus()

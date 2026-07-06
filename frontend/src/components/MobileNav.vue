@@ -17,7 +17,7 @@
       <!-- Primary actions -->
       <nav class="flex flex-col gap-1" :aria-label="$t('nav.menu')">
         <button
-          class="v2-drawer-item"
+          class="v2-drawer-item v2-drawer-item--primary"
           :class="{ 'opacity-60': isCreatingChat }"
           :disabled="isCreatingChat"
           data-testid="btn-mobile-nav-new"
@@ -48,7 +48,7 @@
           :class="(moreExpanded || moreActive || accountActive) && 'v2-drawer-item--active'"
           :aria-expanded="moreExpanded"
           data-testid="btn-mobile-nav-more"
-          @click="moreExpanded = !moreExpanded"
+          @click="toggleMore"
         >
           <Bars3Icon class="w-5 h-5" aria-hidden="true" />
           <span class="flex-1 text-left">{{ $t('nav.more') }}</span>
@@ -176,8 +176,12 @@
                   </button>
                   <button
                     v-if="isMemoryServiceAvailable"
-                    class="v2-drawer-account txt-primary"
-                    :class="{ 'opacity-60': !memoriesEnabledForUser }"
+                    class="v2-drawer-account"
+                    :class="[
+                      isPathActive('/memories') ? 'v2-drawer-account--active' : 'txt-primary',
+                      { 'opacity-60': !memoriesEnabledForUser },
+                    ]"
+                    :data-nav-active="isPathActive('/memories') ? 'true' : undefined"
                     data-testid="btn-mobile-more-memories"
                     @click="handleOpenMemories"
                   >
@@ -400,9 +404,6 @@
     @unshared="chatsStore.loadChatHistory(true)"
   />
 
-  <!-- Memories Dialog (account block entry) -->
-  <MemoriesDialog :is-open="isMemoriesDialogOpen" @close="isMemoriesDialogOpen = false" />
-
   <!-- Guest hint popover -->
   <GuestHintPopover
     :is-open="featureGateOpen"
@@ -436,13 +437,13 @@ import { useAuthStore } from '../stores/auth'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useConfigStore } from '../stores/config'
 import { useSidebarStore } from '../stores/sidebar'
+import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { useAuth } from '../composables/useAuth'
 import { useNavItems, type NavItem } from '../composables/useNavItems'
 import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
-import MemoriesDialog from './MemoriesDialog.vue'
 import ChatShareModal from './ChatShareModal.vue'
 
 const { t } = useI18n()
@@ -460,7 +461,6 @@ const { navItems, isItemActive, isGuestMode } = useNavItems()
 const moreExpanded = ref(false)
 const expandedSection = ref<string | null>(null)
 const isCreatingChat = ref(false)
-const isMemoriesDialogOpen = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
 
@@ -526,6 +526,11 @@ const handleFilesClick = () => {
   router.push('/files')
 }
 
+const toggleMore = () => {
+  triggerHapticImpact('light')
+  moreExpanded.value = !moreExpanded.value
+}
+
 const handleSectionClick = async (item: NavItem) => {
   if (item.requiresAuth && isGuestMode.value) {
     featureGateKey.value = item.gateFeature || 'general'
@@ -533,6 +538,7 @@ const handleSectionClick = async (item: NavItem) => {
     return
   }
   if (item.children && item.children.length > 0) {
+    triggerHapticImpact('light')
     expandedSection.value = expandedSection.value === item.key ? null : item.key
     return
   }
@@ -546,13 +552,15 @@ const handleNavigate = async (path: string) => {
 }
 
 const handleOpenMemories = () => {
-  // Opens a dialog rather than navigating, so close the drawer explicitly.
   closeDrawer()
   if (!memoriesEnabledForUser.value) {
     router.push('/profile?highlight=memories')
     return
   }
-  isMemoriesDialogOpen.value = true
+  // Navigate to the dedicated memories page instead of opening a modal — the
+  // drawer closes, the item shows active (isPathActive) and the global
+  // router.afterEach haptic fires, consistent with every other nav item.
+  router.push('/memories')
 }
 
 const handleLogout = async () => {
@@ -609,6 +617,7 @@ const handleChatSelect = (chatId: number) => {
 }
 
 const toggleChatMenu = (chatId: number, event: MouseEvent) => {
+  triggerHapticImpact('light')
   if (chatMenuOpenId.value === chatId) {
     chatMenuOpenId.value = null
     return
@@ -707,7 +716,11 @@ watch(
   (open) => {
     if (open) {
       chatMenuOpenId.value = null
-      chatsStore.loadChatHistory(true)
+      // Guests have no authenticated chat history — calling the protected
+      // endpoint would trigger checkAuthOrRedirect and bounce them to /login.
+      if (!isGuestMode.value) {
+        chatsStore.loadChatHistory(true)
+      }
       nextTick(() => {
         setupObserver()
         scrollActiveIntoView()
@@ -758,6 +771,16 @@ onBeforeUnmount(() => {
 }
 .v2-drawer-item--active {
   color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+
+/* Primary action ("New chat"): highlighted with a brand-colored border so it
+   stands out from the plain nav items — no filled background. */
+.v2-drawer-item--primary {
+  border: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);
+  color: var(--brand);
+}
+.v2-drawer-item--primary:hover {
   background: color-mix(in srgb, var(--brand) 8%, transparent);
 }
 

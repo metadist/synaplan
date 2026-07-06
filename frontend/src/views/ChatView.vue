@@ -28,7 +28,7 @@
 
       <div
         ref="chatContainer"
-        class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain"
+        class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
         :class="{ 'flex flex-col items-center': isEmptyLanding }"
         data-testid="section-messages"
         @scroll="handleScroll"
@@ -762,6 +762,26 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', handleViewportResize)
 }
 
+// Native keyboard bridge (app/synaplan-native.js) fires this on show/hide with
+// Keyboard.resize:'none', where visualViewport never changes — so this is the
+// only signal that the keyboard opened. When the user is pinned to the bottom
+// we re-pin after the inset-driven padding is applied, keeping the latest
+// message right above the composer. rAF guarantees the new scrollHeight is
+// measured (the padding var was set synchronously just before this event).
+const handleKeyboardInsetChange = () => {
+  if (!autoScroll.value || !chatContainer.value) return
+  if (historyStore.messages.some((m) => m.isStreaming)) {
+    followStreamingScroll()
+    return
+  }
+  requestAnimationFrame(() => {
+    if (!chatContainer.value) return
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    expectedScrollTop = chatContainer.value.scrollTop
+  })
+}
+window.addEventListener('synaplan:keyboardinset', handleKeyboardInsetChange)
+
 // Window event handler for memory dialog (used by MessageText.vue)
 const handleOpenMemoryDialogEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ memory: UserMemory }>
@@ -804,6 +824,7 @@ onBeforeUnmount(() => {
   if (window.visualViewport) {
     window.visualViewport.removeEventListener('resize', handleViewportResize)
   }
+  window.removeEventListener('synaplan:keyboardinset', handleKeyboardInsetChange)
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('focus', prefetchSseToken)

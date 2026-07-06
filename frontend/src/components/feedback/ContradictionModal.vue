@@ -100,12 +100,12 @@ function handleCancel() {
     <Transition name="modal">
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-4"
+        class="modal-overlay fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-4"
         @click.self="handleCancel"
       >
         <div class="absolute inset-0 bg-black/50" />
         <div
-          class="relative w-full max-w-2xl rounded-2xl shadow-xl surface-elevated overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]"
+          class="modal-panel relative w-full max-w-2xl rounded-2xl shadow-xl surface-elevated overflow-hidden flex flex-col"
           role="dialog"
           aria-modal="true"
           :aria-labelledby="'contradiction-modal-title'"

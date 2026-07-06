@@ -10,7 +10,7 @@
     >
       <div
         v-if="visible"
-        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+        class="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4"
         @click.self="close"
       >
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" />

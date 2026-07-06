@@ -11,6 +11,7 @@ import { authReady } from '@/stores/auth'
 import { useGlobalErrorStore } from '@/stores/globalError'
 import { useGuestStore, GUEST_STORAGE_KEY } from '@/stores/guest'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { i18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -452,7 +453,14 @@ const router = createRouter({
 })
 
 // Update document title after each navigation
-router.afterEach((to) => {
+router.afterEach((to, from) => {
+  // Confirm every page change with a light haptic pulse (no-op on web / when the
+  // native bridge is absent). Only on a real path change, never on the initial
+  // load or in-place query/hash updates.
+  if (to.path !== from.path) {
+    triggerHapticImpact('light')
+  }
+
   const titleKey = to.meta.titleKey as string | undefined
   if (titleKey) {
     const t = i18n.global.t

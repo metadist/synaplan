@@ -86,6 +86,7 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useI18n } from 'vue-i18n'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import type { AIModel } from '@/types/ai-models'
 
 const props = defineProps<{
@@ -125,6 +126,7 @@ const selectedModelName = computed(() => {
 })
 
 const toggleOpen = () => {
+  triggerHapticImpact('light')
   isOpen.value = !isOpen.value
 }
 

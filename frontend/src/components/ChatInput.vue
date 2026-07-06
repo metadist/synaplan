@@ -6,14 +6,20 @@
 
     The composer is the bottom-most element on every breakpoint (the mobile
     push-drawer is an overlay, not a bottom bar), so it owns the iOS home-
-    indicator inset itself via `pb-[env(safe-area-inset-bottom)]`. In Chrome's
-    responsive emulator this resolves to 0px, so no gap appears there.
+    indicator inset. That inset lives in `.chat-composer-sticky` (style.css) and
+    collapses to 0 while the keyboard is up so the input sits right above it —
+    driven by `--keyboard-inset-height` (native) with `--kb-open` as the web
+    fallback, because Keyboard.resize:'none' means visualViewport never shrinks
+    in the native app.
   -->
   <div
     :class="
       isCentered
         ? 'bg-chat-input-area'
-        : 'sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]'
+        : [
+            'chat-composer-sticky bg-chat-input-area',
+            { 'chat-composer-sticky--kb-open': keyboardOpen },
+          ]
     "
     data-testid="comp-chat-input"
     @paste="handlePaste"
@@ -99,9 +105,11 @@
           @close="mentionPaletteVisible = false"
         />
 
-        <!-- Scrollable container with padding for scrollbar alignment -->
+        <!-- Scrollable container with padding for scrollbar alignment.
+             py-2 (16px) + textarea min-h-[40px] = 56px single-line shell, so the
+             44px action buttons sit with an even 6px inset on every edge. -->
         <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
-          <div class="pl-[48px] py-1.5" :style="{ paddingRight: `${textareaPaddingRightPx}px` }">
+          <div class="pl-[56px] py-2" :style="{ paddingRight: `${textareaPaddingRightPx}px` }">
             <!-- Textarea -->
             <Textarea
               ref="textareaRef"
@@ -122,13 +130,13 @@
              inside surface the guest hint popover. -->
         <div
           ref="plusMenuRef"
-          class="absolute bottom-2 left-1 md:left-[6px]"
+          class="absolute bottom-[6px] left-[6px]"
           data-testid="section-chat-plus"
         >
           <button
             type="button"
             :class="[
-              'surface-chip icon-ghost h-[36px] min-w-[36px] flex items-center justify-center rounded-lg relative',
+              'surface-chip icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl relative',
               plusMenuOpen && 'pill--active',
             ]"
             :aria-label="$t('chatInput.plusMenu.label')"
@@ -222,9 +230,10 @@
           />
         </div>
 
-        <!-- Fixed action buttons (positioned absolutely) -->
+        <!-- Fixed action buttons (positioned absolutely). Same 6px inset as the
+             plus button, and a 6px inter-button gap so every spacing is even. -->
         <div
-          class="absolute bottom-1 right-2 md:right-3 flex items-center gap-2 pointer-events-none"
+          class="absolute bottom-[6px] right-[6px] flex items-center gap-1.5 pointer-events-none"
           data-testid="section-chat-primary-actions"
         >
           <button
@@ -262,18 +271,16 @@
           </button>
 
           <button
+            v-if="!isMobile || canSend || isStreaming"
             type="button"
             :disabled="!isStreaming && !canSend"
-            :class="[
-              'h-[44px] min-w-[44px] flex items-center justify-center btn-primary pointer-events-auto transition-all',
-              isStreaming ? 'rounded' : 'rounded-xl',
-            ]"
+            class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary rounded-xl pointer-events-auto transition-all"
             :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
             data-testid="btn-chat-send"
             @click="isStreaming ? emit('stop') : sendMessage()"
           >
             <div v-if="isStreaming" class="w-4 h-4 bg-white rounded-sm"></div>
-            <PaperAirplaneIcon v-else class="w-5 h-5" />
+            <ArrowUpIcon v-else class="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -301,7 +308,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted, type Ref } from 'vue'
 import {
-  PaperAirplaneIcon,
+  ArrowUpIcon,
   XMarkIcon,
   SparklesIcon,
   MicrophoneIcon,
@@ -319,7 +326,9 @@ import { parseCommand } from '../commands/parse'
 import { useCommandsStore, type Command } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
+import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { chatApi } from '@/services/api/chatApi'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import type { FileItem } from '@/services/filesService'
 import { getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
@@ -362,10 +371,15 @@ const isStreaming = computed(() => props.isStreaming ?? false)
 const isGuestMode = computed(() => props.isGuestMode ?? false)
 const isCentered = computed(() => props.centered ?? false)
 
+// Drop the home-indicator safe-area padding while the soft keyboard is open —
+// the keyboard already covers that area, so the extra inset would leave a gap.
+const keyboardOpen = useKeyboardOpen()
+
 const plusMenuOpen = ref(false)
 const plusMenuRef = ref<HTMLElement | null>(null)
 
 const togglePlusMenu = () => {
+  triggerHapticImpact('light')
   plusMenuOpen.value = !plusMenuOpen.value
 }
 

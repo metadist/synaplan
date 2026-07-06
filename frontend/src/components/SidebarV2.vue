@@ -324,12 +324,12 @@
     <Transition name="modal">
       <div
         v-if="chatModalOpen"
-        class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+        class="modal-overlay fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
         data-testid="modal-chat-manager-backdrop"
         @click.self="chatModalOpen = false"
       >
         <div
-          class="w-full sm:max-w-xl max-h-[90vh] sm:max-h-[70vh] flex flex-col rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden bg-white/95 dark:bg-[#0e1628]/95 backdrop-blur-xl border-t sm:border border-white/20 dark:border-white/[0.08] sm:m-4"
+          class="modal-panel w-full sm:max-w-xl flex flex-col rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden bg-white/95 dark:bg-[#0e1628]/95 backdrop-blur-xl border-t sm:border border-white/20 dark:border-white/[0.08] sm:m-4"
           data-testid="modal-chat-manager"
           @click.stop
         >
@@ -605,6 +605,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useSidebarStore } from '../stores/sidebar'
+import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
@@ -687,6 +688,7 @@ onBeforeUnmount(() => {
 })
 
 const toggleUserMenu = () => {
+  triggerHapticImpact('light')
   if (!userMenuOpen.value && userBtnRef.value) {
     const rect = userBtnRef.value.getBoundingClientRect()
     const dropdownHeight = 280
@@ -963,6 +965,7 @@ const handleChatShare = (chatId: number) => {
 }
 
 const toggleChatMenu = (chatId: number, event: MouseEvent) => {
+  triggerHapticImpact('light')
   if (chatMenuOpenId.value === chatId) {
     chatMenuOpenId.value = null
     return

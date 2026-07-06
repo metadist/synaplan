@@ -3,6 +3,15 @@ import { ref, computed } from 'vue'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 
 export const GUEST_STORAGE_KEY = 'synaplan_guest_session'
+export const GUEST_BANNER_DISMISSED_KEY = 'synaplan_guest_banner_dismissed'
+
+function loadBannerDismissed(): boolean {
+  try {
+    return localStorage.getItem(GUEST_BANNER_DISMISSED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 export const useGuestStore = defineStore('guest', () => {
   const sessionId = ref<string | null>(null)
@@ -14,7 +23,9 @@ export const useGuestStore = defineStore('guest', () => {
   const initFailed = ref(false)
   const rateLimited = ref(false)
   const sessionExpired = ref(false)
-  const bannerDismissed = ref(false)
+  // Persisted so a dismissed banner stays gone across app restarts / reloads
+  // for the same browser profile (cleared only on logout / session reset).
+  const bannerDismissed = ref(loadBannerDismissed())
 
   const remainingMessages = computed(() => Math.max(0, maxMessages.value - messageCount.value))
   const isGuestMode = computed(() => !!sessionId.value)
@@ -163,10 +174,20 @@ export const useGuestStore = defineStore('guest', () => {
 
   function dismissBanner(): void {
     bannerDismissed.value = true
+    try {
+      localStorage.setItem(GUEST_BANNER_DISMISSED_KEY, '1')
+    } catch {
+      // localStorage unavailable - dismissal just won't persist this session
+    }
   }
 
   function showBanner(): void {
     bannerDismissed.value = false
+    try {
+      localStorage.removeItem(GUEST_BANNER_DISMISSED_KEY)
+    } catch {
+      // ignore
+    }
   }
 
   function $reset(): void {
@@ -182,6 +203,7 @@ export const useGuestStore = defineStore('guest', () => {
     bannerDismissed.value = false
     try {
       localStorage.removeItem(GUEST_STORAGE_KEY)
+      localStorage.removeItem(GUEST_BANNER_DISMISSED_KEY)
     } catch {
       // ignore
     }
