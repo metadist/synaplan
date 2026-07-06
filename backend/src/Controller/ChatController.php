@@ -36,19 +36,26 @@ class ChatController extends AbstractController
     #[Route('', name: 'list', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/chats',
-        summary: 'List all chats for authenticated user',
+        summary: 'List chats for authenticated user',
+        description: 'Returns the user\'s chats ordered by last activity. Pagination is opt-in: pass a `limit` query parameter to page through the list (used by the mobile history drawer). Without `limit` the full list is returned for backwards compatibility.',
         tags: ['Chats'],
+        parameters: [
+            new OA\Parameter(name: 'limit', in: 'query', required: false, description: 'When present, enables pagination and caps the page size.', schema: new OA\Schema(type: 'integer', default: 20, minimum: 1, maximum: 100)),
+            new OA\Parameter(name: 'offset', in: 'query', required: false, description: 'Number of chats to skip (only used when `limit` is present).', schema: new OA\Schema(type: 'integer', default: 0, minimum: 0)),
+        ],
         responses: [
             new OA\Response(
                 response: 200,
                 description: 'List of user chats',
                 content: new OA\JsonContent(
+                    required: ['success', 'chats', 'total', 'offset', 'limit', 'hasMore'],
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(
                             property: 'chats',
                             type: 'array',
                             items: new OA\Items(
+                                required: ['id', 'title', 'createdAt', 'updatedAt', 'messageCount', 'isShared'],
                                 properties: [
                                     new OA\Property(property: 'id', type: 'integer', example: 1),
                                     new OA\Property(property: 'title', type: 'string', example: 'My Chat'),
@@ -56,22 +63,56 @@ class ChatController extends AbstractController
                                     new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
                                     new OA\Property(property: 'messageCount', type: 'integer', example: 5),
                                     new OA\Property(property: 'isShared', type: 'boolean', example: false),
+                                    new OA\Property(property: 'source', type: 'string', nullable: true, example: 'web'),
+                                    new OA\Property(property: 'firstMessagePreview', type: 'string', nullable: true, example: 'How do I reset my password?'),
+                                    new OA\Property(
+                                        property: 'widgetSession',
+                                        type: 'object',
+                                        nullable: true,
+                                        properties: [
+                                            new OA\Property(property: 'widgetId', type: 'string'),
+                                            new OA\Property(property: 'widgetName', type: 'string', nullable: true),
+                                            new OA\Property(property: 'sessionId', type: 'string'),
+                                            new OA\Property(property: 'messageCount', type: 'integer'),
+                                            new OA\Property(property: 'lastMessage', type: 'integer', nullable: true),
+                                            new OA\Property(property: 'created', type: 'integer'),
+                                            new OA\Property(property: 'expires', type: 'integer'),
+                                        ]
+                                    ),
                                 ]
                             )
                         ),
+                        new OA\Property(property: 'total', type: 'integer', example: 42),
+                        new OA\Property(property: 'offset', type: 'integer', example: 0),
+                        new OA\Property(property: 'limit', type: 'integer', example: 20),
+                        new OA\Property(property: 'hasMore', type: 'boolean', example: true),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
-    public function list(#[CurrentUser] ?User $user): JsonResponse
+    public function list(#[CurrentUser] ?User $user, Request $request): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $chats = $this->chatRepository->findByUser($user->getId());
+        // Pagination is opt-in so existing callers (desktop rail, chat switching)
+        // keep receiving the full list. The mobile history drawer passes `limit`
+        // to page through the chats with infinite scroll.
+        $paginate = $request->query->has('limit');
+        $limit = max(1, min((int) $request->query->get('limit', 20), 100));
+        $offset = max(0, (int) $request->query->get('offset', 0));
+
+        if ($paginate) {
+            $chats = $this->chatRepository->findByUserPaginated($user->getId(), $limit, $offset);
+            $total = $this->chatRepository->countByUser($user->getId());
+        } else {
+            $chats = $this->chatRepository->findByUser($user->getId());
+            $total = count($chats);
+        }
+
         $chatIds = array_map(static fn (Chat $chat) => $chat->getId(), $chats);
         $sessionMap = $this->widgetSessionService->getSessionMapForChats($chatIds);
 
@@ -103,7 +144,14 @@ class ChatController extends AbstractController
             ];
         }, $chats);
 
-        return $this->json(['success' => true, 'chats' => $result]);
+        return $this->json([
+            'success' => true,
+            'chats' => $result,
+            'total' => $total,
+            'offset' => $paginate ? $offset : 0,
+            'limit' => $paginate ? $limit : count($result),
+            'hasMore' => $paginate ? ($offset + count($result)) < $total : false,
+        ]);
     }
 
     #[Route('', name: 'create', methods: ['POST'])]

@@ -24,6 +24,36 @@ class ChatRepository extends ServiceEntityRepository
     }
 
     /**
+     * A single page of a user's chats, most-recently-updated first.
+     *
+     * Used by the mobile history drawer's infinite scroll. `countByUser()`
+     * provides the total so the client can decide whether more pages exist.
+     *
+     * @return list<Chat>
+     */
+    public function findByUserPaginated(int $userId, int $limit, int $offset): array
+    {
+        return $this->createQueryBuilder('c')
+            ->where('c.userId = :userId')
+            ->setParameter('userId', $userId)
+            ->orderBy('c.updatedAt', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function countByUser(int $userId): int
+    {
+        return (int) $this->createQueryBuilder('c')
+            ->select('COUNT(c.id)')
+            ->where('c.userId = :userId')
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
      * Most-recently-updated chats for a user, each paired with its message count,
      * resolved in a single SQL-limited query.
      *

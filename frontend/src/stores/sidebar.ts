@@ -12,6 +12,25 @@ export const useSidebarStore = defineStore('sidebar', () => {
    */
   const chatSheetOpen = ref(false)
 
+  /**
+   * Mobile push-drawer (primary navigation on small screens). Opening it slides
+   * the content column to the right and reveals the drawer (nav buttons + chat
+   * history) underneath. Desktop is unaffected.
+   */
+  const mobileDrawerOpen = ref(false)
+
+  const openMobileDrawer = () => {
+    mobileDrawerOpen.value = true
+  }
+
+  const closeMobileDrawer = () => {
+    mobileDrawerOpen.value = false
+  }
+
+  const toggleMobileDrawer = () => {
+    mobileDrawerOpen.value = !mobileDrawerOpen.value
+  }
+
   const openChatSheet = () => {
     chatSheetOpen.value = true
   }
@@ -82,6 +101,7 @@ export const useSidebarStore = defineStore('sidebar', () => {
     showChats,
     chatDisclosure,
     chatSheetOpen,
+    mobileDrawerOpen,
     toggle,
     close,
     open,
@@ -91,5 +111,8 @@ export const useSidebarStore = defineStore('sidebar', () => {
     openChatSheet,
     closeChatSheet,
     toggleChatSheet,
+    openMobileDrawer,
+    closeMobileDrawer,
+    toggleMobileDrawer,
   }
 })

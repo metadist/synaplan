@@ -374,7 +374,8 @@
     "adminSystemConfig": "Sistem Yapılandırması",
     "profile": "Profil",
     "more": "Daha fazla",
-    "moreDescription": "Diğer bölümler ve hesap"
+    "moreDescription": "Diğer bölümler ve hesap",
+    "menu": "Menü"
   },
   "guest": {
     "featureGate": {

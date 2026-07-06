@@ -374,7 +374,8 @@
     "adminSystemConfig": "Configuración del Sistema",
     "profile": "Perfil",
     "more": "Más",
-    "moreDescription": "Más secciones y cuenta"
+    "moreDescription": "Más secciones y cuenta",
+    "menu": "Menú"
   },
   "guest": {
     "featureGate": {

@@ -401,7 +401,8 @@
     "adminFeatureStatus": "Feature-Status",
     "adminSystemConfig": "Systemkonfiguration",
     "more": "Mehr",
-    "moreDescription": "Weitere Bereiche und Konto"
+    "moreDescription": "Weitere Bereiche und Konto",
+    "menu": "Menü"
   },
   "chatInput": {
     "attach": "Anhängen",

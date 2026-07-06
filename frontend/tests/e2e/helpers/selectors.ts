@@ -55,13 +55,21 @@ export const selectors = {
     sidebarExpand: '[data-testid="btn-sidebar-expand"]',
     /** V2 sidebar: single plus button to start new chat (no toggle/dropdown) */
     sidebarV2NewChat: '[data-testid="btn-sidebar-v2-new-chat"]',
-    /** §4.3 #2: mobile bottom tab bar (replaces the off-canvas drawer) */
-    mobileBar: '[data-testid="nav-mobile-bottom"]',
+    /** §4.3: mobile push-drawer (replaces the bottom tab bar) */
+    mobileDrawer: '[data-testid="nav-mobile-drawer"]',
+    /** Fixed top-left toggle that opens/closes the push-drawer */
+    mobileDrawerToggle: '[data-testid="btn-mobile-drawer-toggle"]',
+    /** Tap-catcher over the peeking content that closes the drawer */
+    mobileDrawerScrim: '[data-testid="btn-mobile-drawer-scrim"]',
     mobileNew: '[data-testid="btn-mobile-nav-new"]',
-    mobileHistory: '[data-testid="btn-mobile-nav-history"]',
     mobileFiles: '[data-testid="btn-mobile-nav-files"]',
     mobileMore: '[data-testid="btn-mobile-nav-more"]',
+    /** Inline "More" section that expands under the primary buttons */
     mobileMoreSheet: '[data-testid="sheet-mobile-more"]',
+    /** In-drawer chat history (paginated, infinite scroll) */
+    mobileHistoryList: '[data-testid="list-mobile-history"]',
+    mobileHistoryRow: '[data-testid="row-mobile-history"]',
+    mobileHistorySentinel: '[data-testid="sentinel-mobile-history"]',
     /**
      * V2 sidebar nav testids use STABLE KEYS (`btn-sidebar-v2-nav-<key>`,
      * `link-sidebar-v2-<key>`) — decoupled from route paths so URL migrations

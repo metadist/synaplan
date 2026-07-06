@@ -405,7 +405,8 @@
     "adminFeatureStatus": "Feature Status",
     "adminSystemConfig": "System Config",
     "more": "More",
-    "moreDescription": "More sections and account"
+    "moreDescription": "More sections and account",
+    "menu": "Menu"
   },
   "chatInput": {
     "placeholder": "Type your message...",

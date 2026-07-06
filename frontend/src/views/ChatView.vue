@@ -33,10 +33,7 @@
         data-testid="section-messages"
         @scroll="handleScroll"
       >
-        <div
-          class="max-w-4xl mx-auto py-6 px-4"
-          :class="{ 'my-auto w-full': isEmptyLanding }"
-        >
+        <div class="max-w-4xl mx-auto py-6 px-4" :class="{ 'my-auto w-full': isEmptyLanding }">
           <!-- Loading indicator for infinite scroll -->
           <div
             v-if="historyStore.isLoadingMessages"
@@ -133,10 +130,11 @@
               </p>
             </div>
 
-            <!-- Centered hero composer: the input starts high on the empty
-                 screen and docks to the bottom on first send (see bottom
-                 ChatInput, rendered only when there are messages). -->
-            <div class="w-full max-w-2xl">
+            <!-- Centered hero composer (md+ only): the input starts high on the
+                 empty screen and docks to the bottom on first send. On mobile
+                 the composer lives at the bottom instead (see below), while this
+                 welcome copy stays centered. -->
+            <div v-if="showHeroComposer" class="w-full max-w-2xl">
               <ChatInput
                 ref="chatInputRef"
                 centered
@@ -239,7 +237,7 @@
       />
 
       <ChatInput
-        v-if="!isEmptyLanding"
+        v-if="showBottomComposer"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
@@ -510,6 +508,22 @@ const isEmptyLanding = computed(
     !historyStore.isLoadingMessages
 )
 
+// Mobile breakpoint (< md, matches Tailwind's `md`). Initialised synchronously
+// so the correct composer renders on first paint (no hero→bottom flash).
+const isMobileViewport = ref(
+  typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+)
+let mobileMql: MediaQueryList | null = null
+const handleMobileMqlChange = (event: MediaQueryListEvent) => {
+  isMobileViewport.value = event.matches
+}
+
+// On mobile the composer always docks at the bottom (messenger-style) while the
+// welcome copy stays centered; on md+ the empty screen keeps its centered hero
+// composer. Exactly one ChatInput instance is ever mounted.
+const showHeroComposer = computed(() => isEmptyLanding.value && !isMobileViewport.value)
+const showBottomComposer = computed(() => !isEmptyLanding.value || isMobileViewport.value)
+
 function handleGuestFeatureGate(key: string) {
   featureGateKey.value = key
   featureGateOpen.value = true
@@ -719,6 +733,11 @@ onMounted(async () => {
   prefetchSseToken()
   window.addEventListener('focus', prefetchSseToken)
   document.addEventListener('visibilitychange', handleVisibilityChangeForToken)
+
+  // Track the mobile breakpoint so the composer docks at the bottom on phones.
+  mobileMql = window.matchMedia('(max-width: 767px)')
+  isMobileViewport.value = mobileMql.matches
+  mobileMql.addEventListener('change', handleMobileMqlChange)
 })
 
 const handleVisibilityChangeForToken = () => {
@@ -789,6 +808,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('focus', prefetchSseToken)
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
+  mobileMql?.removeEventListener('change', handleMobileMqlChange)
   clearDeleteDialogTimer()
   clearMemoryPollTimers()
 })

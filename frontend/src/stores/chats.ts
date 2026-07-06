@@ -1,11 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
+import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useConfigStore } from '@/stores/config'
 import { authService } from '@/services/authService'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
+
+/** Page size for the mobile history drawer's infinite scroll. */
+const HISTORY_PAGE_SIZE = 20
 
 // Helper function to check authentication and redirect if needed
 // Uses authService which holds user info in memory (not localStorage)
@@ -54,6 +58,16 @@ export const useChatsStore = defineStore('chats', () => {
   const activeChatId = ref<number | null>(readActiveChatId())
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  /**
+   * Paginated history for the mobile drawer. Kept separate from `chats` so the
+   * global list (chat switching, desktop rail, `ensureValidActiveChat`) is not
+   * affected by the incremental, page-by-page loading of the drawer.
+   */
+  const historyChats = ref<Chat[]>([])
+  const historyLoading = ref(false)
+  const historyHasMore = ref(true)
+  const historyOffset = ref(0)
 
   const normalizeChat = (chat: unknown): Chat => {
     const c = chat as Chat
@@ -131,6 +145,46 @@ export const useChatsStore = defineStore('chats', () => {
       console.error('Error loading chats:', err)
     } finally {
       loading.value = false
+    }
+  }
+
+  /**
+   * Load one page of the paginated chat history for the mobile drawer.
+   *
+   * @param reset When true, start over at offset 0 and replace the list
+   *   (e.g. when the drawer opens or after a mutation). Otherwise append the
+   *   next page for infinite scroll. No-op while a page is in flight, or when
+   *   there is nothing more to load (unless resetting).
+   */
+  async function loadChatHistory(reset = false) {
+    if (!checkAuthOrRedirect()) return
+    if (historyLoading.value) return
+    if (!reset && !historyHasMore.value) return
+
+    const offset = reset ? 0 : historyOffset.value
+    historyLoading.value = true
+
+    try {
+      const data = await httpClient(`/api/v1/chats?limit=${HISTORY_PAGE_SIZE}&offset=${offset}`, {
+        schema: GetApiChatsListResponseSchema,
+      })
+      const page = (data.chats ?? []).map((chat) => normalizeChat(chat))
+
+      if (reset) {
+        historyChats.value = page
+      } else {
+        // Dedup by id so an item that shifted pages (a chat updated between
+        // requests) is never rendered twice.
+        const seen = new Set(historyChats.value.map((c) => c.id))
+        historyChats.value = [...historyChats.value, ...page.filter((c) => !seen.has(c.id))]
+      }
+
+      historyOffset.value = offset + page.length
+      historyHasMore.value = data.hasMore
+    } catch (err: unknown) {
+      console.error('Error loading chat history:', err)
+    } finally {
+      historyLoading.value = false
     }
   }
 
@@ -367,6 +421,10 @@ export const useChatsStore = defineStore('chats', () => {
 
   function $reset() {
     chats.value = []
+    historyChats.value = []
+    historyOffset.value = 0
+    historyHasMore.value = true
+    historyLoading.value = false
     updateActiveChatSelection(null)
     loading.value = false
     error.value = null
@@ -378,7 +436,11 @@ export const useChatsStore = defineStore('chats', () => {
     activeChat,
     loading,
     error,
+    historyChats,
+    historyLoading,
+    historyHasMore,
     loadChats,
+    loadChatHistory,
     createChat,
     findOrCreateEmptyChat,
     updateChatTitle,

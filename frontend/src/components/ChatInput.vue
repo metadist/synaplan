@@ -4,26 +4,24 @@
     the bottom of the scroll area and, on iOS, follows the soft keyboard via
     the visual viewport.
 
-    Safe-area inset is applied at md+ ONLY. On mobile the bottom tab bar
-    (MobileNav → .v2-mobile-tabbar) renders *below* this input and already
-    carries `padding-bottom: env(safe-area-inset-bottom)`. Adding the inset
-    here too would double-count the iOS home indicator and leave a ~34px dead
-    gap (≈ the Safari address-bar height) between the pill row and the tab bar
-    — visible on real iPhones, but invisible in Chrome's responsive emulator
-    where `env(safe-area-inset-bottom)` resolves to 0px. At md+ there is no
-    tab bar and the input sits at the window's bottom edge, so it owns the
-    inset itself.
+    The composer is the bottom-most element on every breakpoint (the mobile
+    push-drawer is an overlay, not a bottom bar), so it owns the iOS home-
+    indicator inset itself via `pb-[env(safe-area-inset-bottom)]`. In Chrome's
+    responsive emulator this resolves to 0px, so no gap appears there.
   -->
   <div
     :class="
       isCentered
         ? 'bg-chat-input-area'
-        : 'sticky bottom-0 bg-chat-input-area md:pb-[env(safe-area-inset-bottom)]'
+        : 'sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]'
     "
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
-    <div class="max-w-4xl mx-auto py-2 md:py-4" :class="{ 'px-4': !isCentered }">
+    <!-- On mobile the horizontal padding matches the drawer toggle's left
+         offset (left-3 = 12px) so the composer aligns with the menu button and
+         uses the full width; md+ keeps the roomier px-4. -->
+    <div class="max-w-4xl mx-auto py-2 md:py-4" :class="{ 'px-3 md:px-4': !isCentered }">
       <!-- Active Command and File Display (above input) -->
       <div
         v-if="activeCommand || uploadedFiles.length > 0 || quote"
@@ -75,7 +73,10 @@
 
       <div
         class="relative surface-card"
-        :class="[{ 'ring-2 ring-primary': isDragging }, bannerVisible ? 'max-sm:!rounded-t-none' : '']"
+        :class="[
+          { 'ring-2 ring-primary': isDragging },
+          bannerVisible ? 'max-sm:!rounded-t-none' : '',
+        ]"
         data-testid="comp-chat-input-shell"
         @dragover.prevent="handleDragOver"
         @dragleave.prevent="handleDragLeave"
