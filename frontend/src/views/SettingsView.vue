@@ -13,46 +13,6 @@
 
         <!-- General Settings Content -->
         <div class="space-y-6" data-testid="section-general-settings">
-          <!-- App Mode -->
-          <div class="surface-card p-6" data-testid="section-app-mode">
-            <h2 class="text-lg font-semibold txt-primary mb-2">
-              {{ $t('settings.appMode.title') }}
-            </h2>
-            <p class="txt-secondary text-sm mb-4">{{ $t('settings.appMode.description') }}</p>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <button
-                :class="[
-                  'p-4 rounded-lg border-2 transition-all text-left',
-                  appModeStore.isEasyMode
-                    ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
-                    : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
-                ]"
-                data-testid="btn-mode-easy"
-                @click="appModeStore.setMode('easy')"
-              >
-                <div class="font-semibold txt-primary mb-1">{{ $t('settings.appMode.easy') }}</div>
-                <div class="text-sm txt-secondary">{{ $t('settings.appMode.easyDesc') }}</div>
-              </button>
-
-              <button
-                :class="[
-                  'p-4 rounded-lg border-2 transition-all text-left',
-                  appModeStore.isAdvancedMode
-                    ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
-                    : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
-                ]"
-                data-testid="btn-mode-advanced"
-                @click="appModeStore.setMode('advanced')"
-              >
-                <div class="font-semibold txt-primary mb-1">
-                  {{ $t('settings.appMode.advanced') }}
-                </div>
-                <div class="text-sm txt-secondary">{{ $t('settings.appMode.advancedDesc') }}</div>
-              </button>
-            </div>
-          </div>
-
           <!-- Language -->
           <div class="surface-card p-6" data-testid="section-language-settings">
             <h2 class="text-lg font-semibold txt-primary mb-2">
@@ -187,14 +147,12 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuth } from '@/composables/useAuth'
 import { useAuthStore } from '@/stores/auth'
-import { useAppModeStore } from '@/stores/appMode'
 import { useTheme } from '@/composables/useTheme'
 import MainLayout from '@/components/MainLayout.vue'
 import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const appModeStore = useAppModeStore()
 const { theme, setTheme } = useTheme()
 const { isImpersonating } = useAuth()
 const { locale } = useI18n()

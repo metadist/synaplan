@@ -102,7 +102,7 @@ services:
 
   # Ollama Test (Optional - Integration Profile)
   ollama_test:
-    image: ollama/ollama:latest@sha256:bfc9c6d53cc6989aa5131a6fde6b162b2802d4d337657f3253b5f69579bddeee
+    image: ollama/ollama:latest@sha256:f1a705f2bd113fb8d15f85f7c217f0dc5f6bebda6b0cc42b82c3ad165ffcb9dc
     container_name: synaplan-ollama-test
     ports:
       - "11436:11434"
@@ -196,7 +196,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak_test:
-    image: quay.io/keycloak/keycloak:26.6@sha256:5fdbf2dbb5897cc34e82de49d13e23db011f9925089dbc555fc095f2c8bc1dac
+    image: quay.io/keycloak/keycloak:26.6@sha256:0aae0de7fca85525f727d3354df17896092de8bb26ae4c12d89c77e5df8cbce4
     container_name: synaplan-keycloak-test
     depends_on:
       keycloak_certs:
@@ -229,7 +229,7 @@ services:
       - synaplan-test-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.6@sha256:5fdbf2dbb5897cc34e82de49d13e23db011f9925089dbc555fc095f2c8bc1dac
+    image: quay.io/keycloak/keycloak:26.6@sha256:0aae0de7fca85525f727d3354df17896092de8bb26ae4c12d89c77e5df8cbce4
     container_name: synaplan-keycloak-setup-test
     depends_on:
       keycloak_test:

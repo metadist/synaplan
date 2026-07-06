@@ -9,7 +9,6 @@ import {
   SignalIcon,
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
-import { useAppModeStore } from '../stores/appMode'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { getFeaturesStatus } from '../services/featuresService'
@@ -34,12 +33,6 @@ export interface NavItem {
   isUpgrade?: boolean
   requiresAuth?: boolean
   gateFeature?: string
-  /**
-   * Q6: easy mode shows these items with a lock badge instead of hiding
-   * them; tapping offers a one-click switch to Advanced mode. appMode
-   * decorates the nav, it no longer filters it.
-   */
-  lockedInEasyMode?: boolean
   children?: NavChild[]
 }
 
@@ -56,7 +49,6 @@ export function useNavItems() {
   const { t } = useI18n()
   const route = useRoute()
   const authStore = useAuthStore()
-  const appModeStore = useAppModeStore()
   const configStore = useConfigStore()
 
   const isGuestMode = computed(() => !authStore.isAuthenticated)
@@ -110,6 +102,7 @@ export function useNavItems() {
       { key: 'inbound', path: '/channels', label: t('nav.configInbound') },
       { key: 'chat-widget', path: '/channels/widgets', label: t('nav.toolsChatWidget') },
       { key: 'mail-handler', path: '/channels/email', label: t('nav.toolsMailHandler') },
+      { key: 'mcp-servers', path: '/channels/mcp', label: t('nav.mcpServers') },
       { key: 'api-keys', path: '/channels/api', label: t('nav.configApiKeys') },
       { key: 'api-docs', path: '/channels/api/docs', label: t('pageTitles.configApiDocs') },
     ]
@@ -121,8 +114,7 @@ export function useNavItems() {
       description: t('nav.channelsDescription'),
       icon: SignalIcon,
       requiresAuth: true,
-      gateFeature: 'settings',
-      lockedInEasyMode: true,
+      gateFeature: 'channels',
       children: isGuestMode.value ? undefined : channelsChildren,
     })
 
@@ -141,8 +133,7 @@ export function useNavItems() {
       description: t('nav.aiSetupDescription'),
       icon: CpuChipIcon,
       requiresAuth: true,
-      gateFeature: 'settings',
-      lockedInEasyMode: true,
+      gateFeature: 'aiSetup',
       children: isGuestMode.value ? undefined : aiSetupChildren,
     })
 
@@ -153,7 +144,6 @@ export function useNavItems() {
         label: t('nav.plugins'),
         icon: PuzzlePieceIcon,
         requiresAuth: true,
-        lockedInEasyMode: true,
         children: isGuestMode.value
           ? undefined
           : configStore.plugins.map((plugin: { name?: string }) => ({
@@ -214,9 +204,5 @@ export function useNavItems() {
     return route.path.startsWith(item.path)
   }
 
-  /** Q6: item is shown but locked while the app is in easy mode. */
-  const isItemLocked = (item: NavItem): boolean =>
-    Boolean(item.lockedInEasyMode) && appModeStore.isEasyMode && !isGuestMode.value
-
-  return { navItems, isItemActive, isItemLocked, isGuestMode, loadFeatureStatus }
+  return { navItems, isItemActive, isGuestMode, loadFeatureStatus }
 }

@@ -861,6 +861,11 @@ class ModelCatalog
                 'params' => ['model' => 'gpt-5.5-pro'],
                 'features' => ['reasoning', 'vision'],
                 'supportsStreaming' => false,
+                // Responses API takes system prompts via `instructions` — only
+                // streaming is unsupported. Without this flag the legacy
+                // "no streaming ⇒ no system messages" heuristic silently drops
+                // every topic prompt (broke officemaker document generation).
+                'supportsSystemMessages' => true,
                 'meta' => [
                     'api' => 'responses',
                     'context_window' => '1050000',
@@ -890,6 +895,7 @@ class ModelCatalog
                 'params' => ['model' => 'gpt-5.5-pro'],
                 'features' => ['reasoning', 'vision'],
                 'supportsStreaming' => false,
+                'supportsSystemMessages' => true,
                 'meta' => [
                     'api' => 'responses',
                     'supports_images' => true,
@@ -1246,6 +1252,56 @@ class ModelCatalog
                 'description' => 'Claude Fable 5 for image analysis and vision tasks. Anthropic\'s most capable widely released vision model.',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'claude-fable-5'],
+                'meta' => ['supports_images' => true],
+            ],
+        ],
+        [
+            // Snapshot 2026-06-30 (https://www.anthropic.com/news/claude-sonnet-5).
+            // Claude Sonnet 5 — Anthropic's most agentic Sonnet yet; performance
+            // close to Opus 4.8 at a lower price. Uses adaptive thinking and
+            // effort levels, and (like Opus 4.7+) no longer accepts `temperature`.
+            // Introductory API pricing through 2026-08-31 is $2/MTok in and
+            // $10/MTok out; standard pricing (authored here) is $3/MTok in and
+            // $15/MTok out.
+            'id' => 249,
+            'service' => 'Anthropic',
+            'name' => 'Claude Sonnet 5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-sonnet-5',
+            'priceIn' => 3,
+            'inUnit' => 'per1M',
+            'priceOut' => 15,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Sonnet 5 - Anthropic\'s most agentic Sonnet model. Plans, uses tools (browsers, terminals) and runs autonomously with performance close to Opus 4.8 at a lower price. Adaptive thinking. 1M context, 64K max output.',
+                'max_tokens' => 64000,
+                'params' => ['model' => 'claude-sonnet-5'],
+                'features' => ['vision', 'reasoning'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '64000'],
+            ],
+        ],
+        [
+            'id' => 250,
+            'service' => 'Anthropic',
+            'name' => 'Claude Sonnet 5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-sonnet-5',
+            'priceIn' => 3,
+            'inUnit' => 'per1M',
+            'priceOut' => 15,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Sonnet 5 for image analysis and vision tasks. Agentic Sonnet-tier vision with near-Opus capability.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-sonnet-5'],
                 'meta' => ['supports_images' => true],
             ],
         ],

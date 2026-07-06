@@ -58,7 +58,9 @@ interface WidgetConfig {
   allowFileUpload?: boolean
   fileUploadLimit?: number
   lazy?: boolean
-  vueUrl?: string | null // undefined = default CDN, null = skip, string = custom URL
+  // Vue is bundled into widget.js. undefined/null = use the bundled Vue (no
+  // external load); a non-empty string = load Vue from that URL instead.
+  vueUrl?: string | null
   fullscreenMode?: boolean
   allowFullscreen?: boolean
   hideButton?: boolean
@@ -79,8 +81,6 @@ interface WidgetConfig {
   poweredByLabel?: string
   poweredByUrl?: string
 }
-
-const DEFAULT_VUE_CDN = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js'
 
 class SynaplanWidget {
   private config: WidgetConfig | null = null
@@ -535,30 +535,29 @@ class SynaplanWidget {
   private async ensureVueLoaded(): Promise<void> {
     const vueUrl = this.config?.vueUrl
 
-    // null = skip Vue loading (Vue is either bundled or already in page)
-    if (vueUrl === null) {
-      // Check if Vue is available as global (for legacy support)
-      if (!(window as Window & { Vue?: unknown }).Vue) {
-        // Vue is not global, but that's okay - it might be bundled as ES module
-        // The dynamic import will handle it
-        console.debug('Vue.js not found as global, assuming ES module bundle')
-      }
+    // Vue is bundled into widget.js (via the inlined `import('vue')` below), so
+    // by default we must NOT fetch it from an external CDN. Doing so was both
+    // pointless (createApp comes from the bundle, not the global) and a hard
+    // failure point: any host with a CSP that blocks cdn.jsdelivr.net — or a
+    // flaky CDN — would reject here and take the whole widget down with a
+    // "Failed to load Synaplan Widget" ("await in loadChat") error.
+    //
+    // Only load an external Vue when the caller EXPLICITLY opts in by passing a
+    // non-empty `vueUrl` string. undefined (default) and null both skip loading.
+    if (typeof vueUrl !== 'string' || vueUrl.length === 0) {
       return
     }
 
-    // Check if Vue is already loaded globally
+    // Explicit external Vue requested — respect an already-present global.
     if ((window as Window & { Vue?: unknown }).Vue) {
       return
     }
 
-    // Load Vue from specified URL or default CDN
-    const url = vueUrl || DEFAULT_VUE_CDN
-
     return new Promise((resolve, reject) => {
       const script = document.createElement('script')
-      script.src = url
+      script.src = vueUrl
       script.onload = () => resolve()
-      script.onerror = () => reject(new Error(`Failed to load Vue.js from ${url}`))
+      script.onerror = () => reject(new Error(`Failed to load Vue.js from ${vueUrl}`))
       document.head.appendChild(script)
     })
   }

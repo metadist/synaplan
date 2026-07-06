@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import { applyMediaJobUpdateToMessage } from '@/utils/messageMapper'
-import type { Message } from '@/stores/history'
+import type { Message, TaskPlanState } from '@/stores/history'
 
 /**
  * Sprint C: the shared helper that applies a realtime/poll media-job update to a
@@ -20,7 +21,30 @@ function makeMessage(overrides: Partial<Message> = {}): Message {
   } as Message
 }
 
+function makeTaskPlan(overrides: Partial<TaskPlanState> = {}): TaskPlanState {
+  return {
+    active: false,
+    replyNode: 'n3',
+    cards: [
+      {
+        nodeId: 'n1',
+        capability: 'image_generation',
+        kind: 'image',
+        state: 'running',
+        jobId: 'job-1',
+      },
+      { nodeId: 'n2', capability: 'chat', kind: 'text', state: 'done', text: 'Miau.' },
+    ],
+    ...overrides,
+  }
+}
+
 describe('applyMediaJobUpdateToMessage', () => {
+  beforeEach(() => {
+    // normalizeMediaUrl (task-card patch path) reads the config store.
+    setActivePinia(createPinia())
+  })
+
   it('flips the job to done and appends the generated media part', () => {
     const m = makeMessage()
     applyMediaJobUpdateToMessage(m, {
@@ -78,5 +102,76 @@ describe('applyMediaJobUpdateToMessage', () => {
     expect(m.mediaJob?.state).toBe('failed')
     expect(m.mediaJob?.error).toBe('Your video took too long.')
     expect(m.parts.some((p) => p.type === 'video')).toBe(false)
+  })
+
+  // Multitask node jobs (#1239): the task card is the surface — the update
+  // patches the card and must NOT set the single-task banner or append a
+  // duplicate bubble-level media part next to the card.
+  describe('multitask node job (node_id set)', () => {
+    it('resolves the matching task card to done with the file url', () => {
+      const m = makeMessage({ mediaJob: undefined, taskPlan: makeTaskPlan() })
+      applyMediaJobUpdateToMessage(m, {
+        job_id: 'job-1',
+        message_id: 305,
+        node_id: 'n1',
+        type: 'image',
+        state: 'done',
+        file: { url: '/api/v1/files/uploads/cat.png', type: 'image' },
+      })
+
+      const card = m.taskPlan?.cards.find((c) => c.nodeId === 'n1')
+      expect(card?.state).toBe('done')
+      expect(card?.url).toContain('cat.png')
+      expect(m.mediaJob).toBeUndefined()
+      expect(m.parts.some((p) => p.type === 'image')).toBe(false)
+    })
+
+    it('marks the card failed with the error text', () => {
+      const m = makeMessage({ mediaJob: undefined, taskPlan: makeTaskPlan() })
+      applyMediaJobUpdateToMessage(m, {
+        job_id: 'job-1',
+        message_id: 305,
+        node_id: 'n1',
+        type: 'image',
+        state: 'failed',
+        error: 'Image generation failed.',
+      })
+
+      const card = m.taskPlan?.cards.find((c) => c.nodeId === 'n1')
+      expect(card?.state).toBe('failed')
+      expect(card?.error).toBe('Image generation failed.')
+      expect(m.mediaJob).toBeUndefined()
+    })
+
+    it('never resurrects a user-cancelled card', () => {
+      const plan = makeTaskPlan()
+      plan.cards[0].state = 'cancelled'
+      const m = makeMessage({ mediaJob: undefined, taskPlan: plan })
+      applyMediaJobUpdateToMessage(m, {
+        job_id: 'job-1',
+        message_id: 305,
+        node_id: 'n1',
+        type: 'image',
+        state: 'failed',
+        error: 'aborted',
+      })
+
+      expect(m.taskPlan?.cards[0].state).toBe('cancelled')
+    })
+
+    it('falls back to the single-task path when no card matches the node id', () => {
+      const m = makeMessage({ taskPlan: makeTaskPlan() })
+      applyMediaJobUpdateToMessage(m, {
+        job_id: 'job-9',
+        message_id: 305,
+        node_id: 'n9',
+        type: 'video',
+        state: 'done',
+        file: { url: '/api/v1/files/uploads/x.mp4', type: 'video' },
+      })
+
+      expect(m.mediaJob?.state).toBe('done')
+      expect(m.parts.some((p) => p.type === 'video')).toBe(true)
+    })
   })
 })

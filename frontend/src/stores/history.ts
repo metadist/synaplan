@@ -238,6 +238,12 @@ export interface TaskCard {
   elapsedSeconds?: number
   /** Async media job key when the node detached to a background worker. */
   jobId?: string
+  /**
+   * #1229 smart collapse: the card's prose is already contained in the final
+   * answer body, so the card collapses to its header (set by ResultAssembler
+   * at assembly time and by markRedundantTaskPlanProse client-side).
+   */
+  redundant?: boolean
 }
 
 export interface TaskPlanState {

@@ -310,15 +310,15 @@ class FileController extends AbstractController
     #[Route('/{id}/index-prompt', name: 'index_prompt', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/files/{id}/index-prompt',
-        summary: 'Add an AI-generated file\'s generation prompt to the knowledge base',
-        description: 'For files created by the AI, vectorizes the original generation prompt so the artefact becomes searchable by what the user asked for.',
+        summary: 'Add an AI-generated file to the knowledge base (AI description)',
+        description: 'Vectorizes an AI DESCRIPTION of the generated artefact so it becomes searchable by its actual content (#1224). The stored generation prompt is only a fallback when no description can be derived.',
         tags: ['Files'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         responses: [
-            new OA\Response(response: 200, description: 'Prompt indexed'),
+            new OA\Response(response: 200, description: 'File indexed'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'File not found'),
-            new OA\Response(response: 422, description: 'No generation prompt available'),
+            new OA\Response(response: 422, description: 'No searchable content available'),
             new OA\Response(response: 500, description: 'Vectorization failed'),
         ]
     )]
@@ -333,27 +333,24 @@ class FileController extends AbstractController
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Resolve the generation prompt from the originating message: the
-        // resolved media prompt (BMESSAGEMETA.media_prompt) if present, else the
-        // user's original request text.
-        $prompt = '';
-        $messageId = $file->getMessageId();
-        if (null !== $messageId) {
-            $message = $this->messageRepository->find($messageId);
-            if ($message) {
-                $prompt = (string) ($message->getMeta('media_prompt') ?? '');
-                if ('' === trim($prompt)) {
-                    $prompt = $message->getText();
-                }
+        // #1224: the searchable content must be the AI DESCRIPTION of the
+        // artefact, not the technical generation prompt — the prompt describes
+        // the wish, the description describes the actual content, and only the
+        // latter makes the file findable by what is visible/audible in it.
+        // describeVectorizeAndSort() derives that description from the real
+        // file (vision for images, transcript for audio/video, text for
+        // documents), so it is the primary path for EVERY generated artefact.
+        $result = $this->uploadService->describeVectorizeAndSort($file, $user);
+
+        // Degraded fallback: when no description can be derived (vision model
+        // unavailable, undecodable file), fall back to the stored generation
+        // prompt so the action still yields a searchable entry.
+        if (!$result['success'] && 'rate_limited' !== ($result['errorType'] ?? null)) {
+            $prompt = $this->resolveGenerationPrompt($file);
+            if ('' !== trim($prompt)) {
+                $result = $this->uploadService->indexGenerationPrompt($file, $user, $prompt);
             }
         }
-
-        // No stored generation prompt (e.g. a generated/imported image with no
-        // originating prompt) — fall back to describing the actual file so the
-        // action still makes it searchable instead of failing.
-        $result = '' === trim($prompt)
-            ? $this->uploadService->describeVectorizeAndSort($file, $user)
-            : $this->uploadService->indexGenerationPrompt($file, $user, $prompt);
 
         if ($result['success']) {
             return $this->json($result);
@@ -367,6 +364,28 @@ class FileController extends AbstractController
         };
 
         return $this->json($result, $statusCode);
+    }
+
+    /**
+     * The stored generation prompt of an AI-generated file: the resolved media
+     * prompt (BMESSAGEMETA.media_prompt) if present, else the originating
+     * message text. Fallback content only (#1224).
+     */
+    private function resolveGenerationPrompt(File $file): string
+    {
+        $messageId = $file->getMessageId();
+        if (null === $messageId) {
+            return '';
+        }
+
+        $message = $this->messageRepository->find($messageId);
+        if (!$message) {
+            return '';
+        }
+
+        $prompt = (string) ($message->getMeta('media_prompt') ?? '');
+
+        return '' !== trim($prompt) ? $prompt : $message->getText();
     }
 
     #[Route('/{id}/download', name: 'download', methods: ['GET'])]

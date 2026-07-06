@@ -57,8 +57,32 @@ export interface MediaJobUpdate {
  *
  * Shared by the realtime `mediaJobs` store (push) and ChatView's completion
  * handler so the push and poll paths can never diverge.
+ *
+ * Multitask node jobs (the update carries a `node_id` matching a task card)
+ * patch the CARD instead (#1239): the card is the surface for DAG media — the
+ * single-task banner and a bubble-level media part would be wrong/duplicative
+ * next to it.
  */
 export function applyMediaJobUpdateToMessage(message: Message, update: MediaJobUpdate): void {
+  if (update.node_id && message.taskPlan) {
+    const card = message.taskPlan.cards.find((c) => c.nodeId === update.node_id)
+    if (card) {
+      // A user-cancelled card is terminal on the client (same rule as the SSE
+      // task_update handler) — never overwrite it with a late job state.
+      if (card.state !== 'cancelled' && isTaskCardState(update.state)) {
+        card.state = update.state
+      }
+      if (update.error) {
+        card.error = update.error
+      }
+      if (update.file?.url) {
+        card.url = normalizeMediaUrl(update.file.url)
+        card.mediaType = update.file.type ?? update.type
+      }
+      return
+    }
+  }
+
   message.mediaJob = {
     ...(message.mediaJob ?? {}),
     jobId: update.job_id,
@@ -280,6 +304,8 @@ export interface ApiLoadedMessageRow {
       /** Compact web-search summary fields (search cards only) */
       query?: string
       resultsCount?: number
+      /** #1229 smart collapse: card prose is contained in the answer body. */
+      redundant?: boolean
     }>
   } | null
   /** Background async media job (Release 4.0). */
@@ -386,7 +412,6 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   // media parts in the bubble (same dedup logic as reconcileLocalMessage).
   let taskPlanState: TaskPlanState | null = null
   const cardMediaUrls = new Set<string>()
-  const cardTexts = new Set<string>()
   if (m.taskPlan && m.taskPlan.cards.length > 0) {
     const cards = m.taskPlan.cards.map((c) => {
       const kind: TaskCardKind = isTaskCardKind(c.kind) ? c.kind : 'text'
@@ -395,10 +420,6 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
       if (c.url) {
         cardUrl = normalizeMediaUrl(buildUploadUrl(c.url))
         cardMediaUrls.add(mediaUrlKey(cardUrl))
-      }
-      const cardText = (c.text ?? '').trim()
-      if (cardText) {
-        cardTexts.add(normalizeCardText(cardText))
       }
       return {
         nodeId: c.nodeId,
@@ -412,6 +433,10 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         query: c.query,
         resultsCount: c.resultsCount,
         jobId: typeof c.job_id === 'string' ? c.job_id : undefined,
+        // #1229 smart collapse: assembly-time redundancy flag. The body stays
+        // the canonical answer surface; the duplicated card collapses (the
+        // previous #1165 approach of REMOVING the body text is retired).
+        redundant: c.redundant === true,
       }
     })
     taskPlanState = {
@@ -423,24 +448,12 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
 
   // Remove any plain-media parts whose URL already appears on a restored card
   // so the user sees each piece of media exactly once (card is the primary surface).
-  //
-  // Issue #1165: also drop text parts whose content is identical to a card's
-  // text. On reload `ResultAssembler` persists the reply-node output both as
-  // the message `content` AND inside the task cards, so a node's text would
-  // otherwise appear twice (once in the card, once in the body below it). The
-  // card is the primary surface, so the duplicated body text is removed.
-  const needsDedup = cardMediaUrls.size > 0 || cardTexts.size > 0
-  const deduplicatedParts = needsDedup
-    ? parts.filter((p) => {
-        if (isMediaPartType(p.type) && p.url && cardMediaUrls.has(mediaUrlKey(p.url))) {
-          return false
-        }
-        if (p.type === 'text' && p.content && cardTexts.has(normalizeCardText(p.content))) {
-          return false
-        }
-        return true
-      })
-    : parts
+  const deduplicatedParts =
+    cardMediaUrls.size > 0
+      ? parts.filter(
+          (p) => !(isMediaPartType(p.type) && p.url && cardMediaUrls.has(mediaUrlKey(p.url)))
+        )
+      : parts
 
   // Reconstruct tool metadata from topic field for user messages
   // Also clean command prefix from message content
@@ -521,13 +534,14 @@ function mediaUrlKey(url: string): string {
 }
 
 /**
- * Comparison key for card vs. body text dedup (issue #1165). The persisted
- * message `content` and a card's `text` come from the same node output but can
- * differ in trailing/leading whitespace or newline runs, so both sides are
- * trimmed and inner whitespace is collapsed before comparison.
+ * True when a text part holds a document-generation result marker
+ * (`__FILE_GENERATED__:<name>` or `__FILE_GENERATION_FAILED__`). These are
+ * emitted by the backend for officemaker/document turns and translated to the
+ * user-facing download prompt / failure notice by `MessageText`.
  */
-function normalizeCardText(text: string): string {
-  return text.trim().replace(/\s+/g, ' ')
+function isFileGenerationMarker(content: string | undefined): boolean {
+  if (!content) return false
+  return content.startsWith('__FILE_GENERATED__:') || content === '__FILE_GENERATION_FAILED__'
 }
 
 /**
@@ -570,6 +584,33 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   )
   if (missingMedia.length > 0) {
     local.parts = [...local.parts, ...missingMedia]
+  }
+
+  // --- File-generation marker text (issue #1258) ----------------------
+  // A document/officemaker turn persists its response as a special marker
+  // (`__FILE_GENERATED__:<name>` / `__FILE_GENERATION_FAILED__`) that
+  // MessageText translates into the download prompt / failure notice. The
+  // streaming path assembles this text through a separate branch that can
+  // miss it — e.g. a multitask/DAG document node (no `generatedFile` in the
+  // `complete` payload) or a JSON body that never matched the replace
+  // heuristic — leaving the bubble without any response text until a reload.
+  //
+  // The persisted row is authoritative after `complete`, so adopt its marker
+  // text here. This keeps the streaming and reload paths from diverging (the
+  // structural fix from #1070): stale text/code parts (raw JSON, an empty
+  // body, or an already-translated duplicate) are dropped and the marker is
+  // prepended, while generated media/link parts are preserved.
+  const persistedMarker = persisted.parts.find(
+    (p) => p.type === 'text' && isFileGenerationMarker(p.content)
+  )
+  if (persistedMarker) {
+    const alreadyShown = local.parts.some(
+      (p) => p.type === 'text' && p.content === persistedMarker.content
+    )
+    if (!alreadyShown) {
+      const preserved = local.parts.filter((p) => p.type !== 'text' && p.type !== 'code')
+      local.parts = [persistedMarker, ...preserved]
+    }
   }
 
   // --- Files (attachments + generated documents) ----------------------

@@ -37,6 +37,11 @@ final class RunMediaNodeCommandTest extends TestCase
                 return [Capability::ImageGeneration, Capability::Text2Sound];
             }
 
+            public function describe(): array
+            {
+                return [];
+            }
+
             public function run(TaskNode $node, NodeContext $context): NodeResult
             {
                 return ($this->fn)($node, $context);

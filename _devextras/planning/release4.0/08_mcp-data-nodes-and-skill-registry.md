@@ -1,6 +1,6 @@
 # Feature 8 — MCP Data Nodes + a Skill Registry for the DAG
 
-**Release:** 4.0 · **Priority:** P1 · **Status:** Draft for discussion (started 2026-06-30)
+**Release:** 4.0 · **Priority:** P1 · **Status:** Decisions locked 2026-07-02 (Option A `mcp_fetch`, pull-only v1, Streamable HTTP, catalog-lite prompt builder) — sprint plan absorbed into [`09_external-data-nodes.md`](./09_external-data-nodes.md)
 **Related:** [`00_master_plan.md`](./00_master_plan.md),
 [`06_self-aware-routing.md`](./06_self-aware-routing.md) (also touches the planner
 prompt), the multitask engine in `backend/src/Service/Multitask/`, the MCP

@@ -35,6 +35,30 @@ final class PromptCatalogTest extends TestCase
         $this->assertContains('tools:enhance', $topics);
     }
 
+    /**
+     * Release defaults for the catch-all `general` topic: MCP data sources ON
+     * (a freshly connected server works for normal chat out of the box) and
+     * web search on AUTO — the `tool_internet` key must be ABSENT, because an
+     * absent key is the tri-state "auto" (classifier decides, manual search
+     * toggle keeps working) while a seeded `0` would be a hard disable that
+     * beats even the per-message toggle (WebSearchTopicPolicy rule 1).
+     */
+    public function testGeneralTopicShipsWithMcpOnAndWebSearchAuto(): void
+    {
+        $general = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('general' === $entry['topic']) {
+                $general = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($general);
+        $metadata = $general['metadata'] ?? [];
+        $this->assertSame('1', $metadata['tool_mcp'] ?? null, 'general must seed tool_mcp=1 (MCP on by default)');
+        $this->assertArrayNotHasKey('tool_internet', $metadata, 'general must NOT seed tool_internet — absent = auto (classifier decides)');
+    }
+
     public function testTopicsAreUniquePerLanguage(): void
     {
         $seen = [];

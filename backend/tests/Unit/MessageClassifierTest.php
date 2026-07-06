@@ -652,6 +652,77 @@ class MessageClassifierTest extends TestCase
         $this->assertFalse($result['skip_sorting']);
     }
 
+    /**
+     * MCP data nodes (release 4.0): a fast-pathed message carries
+     * source=fast_path_heuristic, which TaskPlanExecutor treats as
+     * "single-node, no planning" — the multitask planner (and with it the
+     * `mcp_fetch` node) becomes unreachable. Short requests that reference
+     * the user's own knowledge base or a connected system must therefore
+     * defer to the AI sorter, no matter how short they are.
+     *
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function dataSourceRequestProvider(): iterable
+    {
+        // The exact phrasing from the reported gap ("Knowledge Base One" is
+        // the user's connected MCP server name).
+        yield 'en: knowledge base' => ['please search my knowledge base one for information about the platform', 'en'];
+        yield 'en: our crm' => ['look up Acme GmbH in our crm', 'en'];
+        yield 'en: my documents' => ['what do my documents say about onboarding', 'en'];
+        yield 'de: wissensdatenbank' => ['durchsuche meine wissensdatenbank nach dem onboarding', 'de'];
+        yield 'de: meine dokumente' => ['was steht in meine dokumente zum thema urlaub', 'de'];
+        yield 'es: base de conocimiento' => ['busca en mi base de conocimiento sobre la empresa', 'es'];
+        yield 'tr: bilgi taban' => ['bilgi tabanımda platform hakkında ara', 'tr'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('dataSourceRequestProvider')]
+    public function testFastPathYieldsToAiSorterOnDataSourceRequests(string $text, string $lang): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            if ('QDRANT_SEARCH' === $group) {
+                return '0';
+            }
+
+            // Fast-path is default-OFF; opt IN explicitly so the trigger
+            // list (not the flag) is what routes to the sorter here.
+            return 'CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting ? '1' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'general', 'language' => $lang]);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(301);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn($lang);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        // ai_sorting is exactly the source TaskPlanExecutor requires to run
+        // the planner — the precondition for an mcp_fetch node.
+        $this->assertSame('ai_sorting', $result['source'], sprintf('"%s" must reach the AI sorter so the planner can consider mcp_fetch', $text));
+        $this->assertFalse($result['skip_sorting']);
+    }
+
     #[\PHPUnit\Framework\Attributes\DataProvider('germanMediaImperativeProvider')]
     public function testFastPathYieldsToAiSorterOnGermanGenerateImperatives(string $text): void
     {

@@ -171,7 +171,7 @@ export interface UploadResponse {
 // Zod schemas are the single source of truth for the file API data shapes:
 // each schema both validates the JSON at runtime (where we call `.parse()`)
 // and produces the static TypeScript type via `z.infer` — so the types can
-// never drift from the validation (AGENTS_DEV.md "Type Safety & Validation").
+// never drift from the validation (AGENTS.md "Type Safety & Validation").
 export const fileSourceSchema = z.enum([
   'web_upload',
   'chat_attachment',

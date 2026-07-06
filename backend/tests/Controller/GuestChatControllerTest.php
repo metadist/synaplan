@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\Chat;
 use App\Entity\GuestSession;
+use App\Entity\Message;
+use App\Service\Media\MediaCancellationStore;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Uid\Uuid;
@@ -14,16 +17,29 @@ class GuestChatControllerTest extends WebTestCase
     private $client;
     private $em;
 
+    /** @var list<int> Chat IDs created by a test, deleted in tearDown */
+    private array $createdChatIds = [];
+
     protected function setUp(): void
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
         $this->em = $this->client->getContainer()->get('doctrine')->getManager();
+        $this->createdChatIds = [];
     }
 
     protected function tearDown(): void
     {
         if ($this->em->isOpen()) {
+            if ([] !== $this->createdChatIds) {
+                $this->em->createQuery('DELETE FROM App\Entity\Message m WHERE m.chatId IN (:ids)')
+                    ->setParameter('ids', $this->createdChatIds)
+                    ->execute();
+                $this->em->createQuery('DELETE FROM App\Entity\Chat c WHERE c.id IN (:ids)')
+                    ->setParameter('ids', $this->createdChatIds)
+                    ->execute();
+            }
+
             $this->em->createQuery('DELETE FROM App\Entity\GuestSession gs')
                 ->execute();
         }
@@ -175,6 +191,110 @@ class GuestChatControllerTest extends WebTestCase
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+    }
+
+    /**
+     * Attach a chat with one persisted IN message (the running turn) to the session.
+     *
+     * @return array{chatId: int, trackId: int}
+     */
+    private function attachChatWithIncomingMessage(string $sessionId): array
+    {
+        $session = $this->em->getRepository(GuestSession::class)->findOneBy(['sessionId' => $sessionId]);
+        $this->assertNotNull($session);
+
+        $now = new \DateTime();
+        $chat = new Chat();
+        $chat->setUserId(0);
+        $chat->setTitle('Guest Chat • test');
+        $chat->setSource('guest');
+        $chat->setCreatedAt($now);
+        $chat->setUpdatedAt($now);
+        $this->em->persist($chat);
+        $this->em->flush();
+
+        $chatId = $chat->getId();
+        $this->createdChatIds[] = $chatId;
+        $session->setChatId($chatId);
+
+        $trackId = random_int(1_000_000_000, 9_999_999_999);
+        $message = new Message();
+        $message->setUserId(0);
+        $message->setChat($chat);
+        $message->setTrackingId($trackId);
+        $message->setDirection('IN');
+        $message->setUnixTimestamp(time());
+        $message->setDateTime(date('YmdHis'));
+        $message->setText('Guest question');
+        $this->em->persist($message);
+        $this->em->flush();
+
+        return ['chatId' => $chatId, 'trackId' => $trackId];
+    }
+
+    private function requestStopStream(array $body): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/v1/guest/stop-stream',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode($body)
+        );
+    }
+
+    public function testStopStreamReturns400ForInvalidSessionId(): void
+    {
+        $this->requestStopStream(['sessionId' => 'not-a-uuid', 'trackId' => 123]);
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
+    public function testStopStreamReturns400ForMissingTrackId(): void
+    {
+        $created = $this->createGuestSession();
+
+        $this->requestStopStream(['sessionId' => $created['sessionId']]);
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
+    public function testStopStreamReturns404ForNonexistentSession(): void
+    {
+        $this->requestStopStream(['sessionId' => Uuid::v4()->toRfc4122(), 'trackId' => 123]);
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+    }
+
+    public function testStopStreamReturns404WhenTrackDoesNotBelongToSession(): void
+    {
+        $created = $this->createGuestSession();
+        $turn = $this->attachChatWithIncomingMessage($created['sessionId']);
+
+        // A valid session must not be able to cancel someone else's turn.
+        $foreignTrackId = $turn['trackId'] + 1;
+        $this->requestStopStream(['sessionId' => $created['sessionId'], 'trackId' => $foreignTrackId]);
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+
+        $cancellationStore = static::getContainer()->get(MediaCancellationStore::class);
+        $this->assertFalse($cancellationStore->isCancelled((string) $foreignTrackId));
+    }
+
+    public function testStopStreamFlagsCancellationForOwnTurn(): void
+    {
+        $created = $this->createGuestSession();
+        $turn = $this->attachChatWithIncomingMessage($created['sessionId']);
+
+        $this->requestStopStream(['sessionId' => $created['sessionId'], 'trackId' => $turn['trackId']]);
+
+        $this->assertResponseIsSuccessful();
+        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertTrue($data['success']);
+
+        $cancellationStore = static::getContainer()->get(MediaCancellationStore::class);
+        $this->assertTrue($cancellationStore->isCancelled((string) $turn['trackId']));
     }
 
     public function testGuestEndpointsDoNotRequireAuthentication(): void

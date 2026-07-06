@@ -224,6 +224,12 @@ const router = createRouter({
       meta: { requiresAuth: true, helpId: 'tools.mailHandler', titleKey: 'pageTitles.mailHandler' },
     },
     {
+      path: '/channels/mcp',
+      name: 'channels-mcp',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.mcpServers' },
+    },
+    {
       path: '/channels/api',
       name: 'channels-api',
       component: () => import('@/views/ConfigView.vue'),

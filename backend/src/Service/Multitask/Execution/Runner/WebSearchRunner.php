@@ -11,6 +11,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\Search\BraveSearchService;
 use Psr\Log\LoggerInterface;
 
@@ -38,6 +39,16 @@ final readonly class WebSearchRunner implements TaskRunner
     public function supportedCapabilities(): array
     {
         return [Capability::WebSearch];
+    }
+
+    /**
+     * @return list<SkillDescriptor>
+     */
+    public function describe(): array
+    {
+        return [
+            new SkillDescriptor(Capability::WebSearch, 'Search the web for current information.'),
+        ];
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult

@@ -9,10 +9,12 @@ use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
+use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\Media\MediaCancellationStore;
+use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
@@ -29,6 +31,7 @@ use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -68,18 +71,74 @@ class StreamController extends AbstractController
         private DocumentGeneratorService $documentGenerator,
         private MediaCancellationStore $cancellationStore,
         private MediaJobService $mediaJobService,
+        private MediaJobMessageSync $mediaJobMessageSync,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
     ) {
     }
 
-    #[Route('/stream', name: 'stream', methods: ['GET'])]
+    /**
+     * Merge stream parameters from the query string and (for POST) the JSON
+     * body into one bag. Body values override query values; only scalar body
+     * values are accepted, and booleans are normalized to '1'/'0' so the
+     * existing `'1' === $params->get(...)` flag checks work for JSON `true`.
+     *
+     * @return InputBag<bool|float|int|string>
+     */
+    private function resolveStreamParams(Request $request): InputBag
+    {
+        $params = new InputBag($request->query->all());
+
+        if (!$request->isMethod('POST')) {
+            return $params;
+        }
+
+        $decoded = json_decode($request->getContent(), true);
+        if (!is_array($decoded)) {
+            return $params;
+        }
+
+        foreach ($decoded as $key => $value) {
+            if (is_bool($value)) {
+                $params->set((string) $key, $value ? '1' : '0');
+            } elseif (is_scalar($value)) {
+                $params->set((string) $key, (string) $value);
+            }
+        }
+
+        return $params;
+    }
+
+    #[Route('/stream', name: 'stream', methods: ['GET', 'POST'])]
     #[OA\Get(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response',
-        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments.',
+        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments. NOTE: the message rides in the URL, so long texts can exceed proxy request-line limits (HTTP 431/414) — prefer the POST variant for anything beyond a few KB.',
         security: [['Bearer' => []]],
         tags: ['Messages']
+    )]
+    #[OA\Post(
+        path: '/api/v1/messages/stream',
+        summary: 'Stream AI chat response (POST body)',
+        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
+        security: [['Bearer' => []]],
+        tags: ['Messages'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['message', 'chatId'],
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Summarize the following text: …'),
+                    new OA\Property(property: 'chatId', type: 'string', example: '123'),
+                    new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
+                    new OA\Property(property: 'reasoning', type: 'string', enum: ['0', '1'], example: '0'),
+                    new OA\Property(property: 'webSearch', type: 'string', enum: ['0', '1'], example: '0'),
+                    new OA\Property(property: 'modelId', type: 'string', example: '53'),
+                    new OA\Property(property: 'fileIds', type: 'string', example: '1,2,3'),
+                    new OA\Property(property: 'guestSession', type: 'string', example: 'gs_abc123'),
+                ]
+            )
+        )
     )]
     #[OA\Parameter(
         name: 'message',
@@ -198,6 +257,15 @@ class StreamController extends AbstractController
         Request $request,
         #[CurrentUser] ?User $user,
     ): Response {
+        // Unified parameter access for both transports: the legacy GET puts
+        // everything in the query string (EventSource can't POST), which
+        // breaks on long pasted texts — proxies reject oversized request
+        // lines with HTTP 431/414 before PHP ever runs. The POST variant
+        // carries the same parameters in a JSON body; body values override
+        // query parameters so a client can mix both (e.g. keep ?token= for
+        // the query authenticator while POSTing the message).
+        $params = $this->resolveStreamParams($request);
+
         // Widget-Mode: Check for Widget headers if no authenticated user
         $isWidgetMode = false;
         $isGuestMode = false;
@@ -264,8 +332,8 @@ class StreamController extends AbstractController
                     'task_prompt' => $fixedTaskPromptTopic,
                 ]);
             } else {
-                // Guest Mode: Check for guest session query parameter
-                $guestSessionId = $request->query->get('guestSession');
+                // Guest Mode: Check for guest session parameter (query or POST body)
+                $guestSessionId = $params->get('guestSession');
                 if ($guestSessionId) {
                     $guestSession = $this->guestSessionService->getSession($guestSessionId);
                     if ($guestSession && !$guestSession->isExpired()) {
@@ -306,29 +374,29 @@ class StreamController extends AbstractController
         // Check rate limit for authenticated users (not widget mode)
         // We'll check this inside the stream to send a proper SSE error event
 
-        $messageText = $request->query->get('message', '');
-        $trackId = $request->query->get('trackId', time());
-        $chatId = $request->query->get('chatId', null);
-        $includeReasoning = '1' === $request->query->get('reasoning', '0');
-        $webSearch = '1' === $request->query->get('webSearch', '0');
-        $modelId = $request->query->get('modelId', null);
+        $messageText = $params->get('message', '');
+        $trackId = $params->get('trackId', time());
+        $chatId = $params->get('chatId', null);
+        $includeReasoning = '1' === $params->get('reasoning', '0');
+        $webSearch = '1' === $params->get('webSearch', '0');
+        $modelId = $params->get('modelId', null);
 
-        $voiceReply = '1' === $request->query->get('voiceReply', '0');
-        $isAgain = '1' === $request->query->get('isAgain', '0');
-        $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
-        $promptTopic = $request->query->get('promptTopic');
-        $promptId = $request->query->get('promptId');
+        $voiceReply = '1' === $params->get('voiceReply', '0');
+        $isAgain = '1' === $params->get('isAgain', '0');
+        $fileIds = $params->get('fileIds', ''); // NEW: comma-separated list or single ID
+        $promptTopic = $params->get('promptTopic');
+        $promptId = $params->get('promptId');
         // Typed accessor: `get()` would hand back an array for `ragGroupKey[]=…`,
         // which then flows into a string-typed processing option and 500s
         // downstream. `getString()` rejects non-scalar input with a clean 400,
         // and we normalize the empty string to null so "no folder selected"
         // behaves the same as an absent parameter.
-        $ragGroupKey = $request->query->getString('ragGroupKey') ?: null;
+        $ragGroupKey = $params->getString('ragGroupKey') ?: null;
         // Quoted reference the user selected from an earlier message ("Mention
         // in chat"). `getString()` rejects array input with a clean 400. We trim
         // and cap the excerpt server-side so a crafted request cannot bloat the
         // stored meta or the AI prompt, and normalize empty to null.
-        $quotedText = trim($request->query->getString('quotedText'));
+        $quotedText = trim($params->getString('quotedText'));
         if (mb_strlen($quotedText) > self::MAX_QUOTED_TEXT_LENGTH) {
             $quotedText = mb_substr($quotedText, 0, self::MAX_QUOTED_TEXT_LENGTH);
         }
@@ -336,10 +404,10 @@ class StreamController extends AbstractController
         // `getInt()` rejects array input (e.g. `quotedMessageId[]=…`) with a clean
         // 400 instead of silently coercing it to 0/1 and resolving the wrong
         // message. 0 (absent/invalid) collapses to null.
-        $quotedMessageId = $request->query->getInt('quotedMessageId') ?: null;
-        $continueMessageId = $request->query->get('continueMessageId');
+        $quotedMessageId = $params->getInt('quotedMessageId') ?: null;
+        $continueMessageId = $params->get('continueMessageId');
         // Explicit opt-out from memory loading + extraction (used by public demo via synaplan.com/try-chat)
-        $disableMemories = '1' === $request->query->get('disableMemories', '0');
+        $disableMemories = '1' === $params->get('disableMemories', '0');
 
         // Parse fileIds (can be comma-separated string or single ID)
         $fileIdArray = [];
@@ -449,8 +517,15 @@ class StreamController extends AbstractController
             }
             ob_implicit_flush(1);
             set_time_limit(0);
-            // Stop execution when client disconnects
-            ignore_user_abort(false);
+            // Detach-on-navigation (issues #1142 / #1223 / #1225): keep the turn
+            // alive when the client disconnects (chat switch / page leave /
+            // reload). The turn finishes in the background and persists its
+            // result so it is there on return. sendSSE() already no-ops once the
+            // socket is gone, and an EXPLICIT Stop still aborts because it flags
+            // the turn via CancellationStore (checked in the stream callback and
+            // the media handlers). Only a genuine cancel — never a bare
+            // disconnect — ends the turn early.
+            ignore_user_abort(true);
 
             // Phase 0: per-request performance timer.
             // Lives only inside the callback so it doesn't measure connection
@@ -820,9 +895,18 @@ class StreamController extends AbstractController
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
                     // Stream callback - AI streams TEXT directly or structured data (reasoning)
-                    function ($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson, &$finishReason) {
-                        if (connection_aborted()) {
-                            throw new \RuntimeException('Client disconnected');
+                    function ($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson, &$finishReason, $trackId) {
+                        // Detach-on-navigation (issues #1142 / #1223 / #1225): a
+                        // bare client disconnect (chat switch, page leave, reload)
+                        // must NOT kill the turn — it keeps streaming silently
+                        // (sendSSE() no-ops once the socket is gone) so the finished
+                        // response is persisted and available on return. Only an
+                        // EXPLICIT Stop, which flags the turn via CancellationStore
+                        // through /stop-stream (or the guest counterpart
+                        // /api/v1/guest/stop-stream), aborts the inline text stream.
+                        if ('' !== (string) $trackId
+                            && $this->cancellationStore->isCancelled((string) $trackId)) {
+                            throw new StreamCancelledException('Stream cancelled by user');
                         }
 
                         // Handle structured chunk (reasoning models)
@@ -984,6 +1068,23 @@ class StreamController extends AbstractController
                     $reasoningBuffer .= '</think>';
                     $this->sendSSE('data', ['chunk' => $reasoningBuffer]);
                     $responseText .= $reasoningBuffer;
+                }
+
+                // Flush any leftover JSON buffer into the response text.
+                //
+                // Google/Gemini document generation fix: Gemini follows the
+                // officemaker "respond with ONLY JSON" contract literally and
+                // its provider emits content as plain strings, so the FIRST
+                // chunk starts with '{' and the whole response lands in the
+                // JSON buffer. The inline unwrap above only handles BTEXT —
+                // a BFILEPATH/BFILETEXT document stayed buffered forever, the
+                // post-stream file-generation parse below never saw it, and
+                // the turn was persisted as an EMPTY message with no file.
+                $streamedVisibleText = $responseText;
+                if ($isBufferingJson && '' !== trim($jsonBuffer)) {
+                    $responseText .= $jsonBuffer;
+                    $jsonBuffer = '';
+                    $isBufferingJson = false;
                 }
 
                 if (!$result['success']) {
@@ -1287,6 +1388,23 @@ class StreamController extends AbstractController
                         };
                     }
 
+                    // A document request that produced neither a file nor any
+                    // text must not be saved as an empty bubble — surface the
+                    // failure marker the frontend translates
+                    // (message.fileGenerationFailed) instead.
+                    if ('' === trim($finalText) && 'officemaker' === ($classification['topic'] ?? '')) {
+                        $finalText = '__FILE_GENERATION_FAILED__';
+                        $this->logger->error('StreamController: document generation produced neither file nor text');
+                    }
+
+                    // When the whole response was buffered as JSON, the client
+                    // never received a single data chunk — push the failure
+                    // marker live so the bubble shows the translated error
+                    // instead of staying empty until a reload.
+                    if ('__FILE_GENERATION_FAILED__' === $finalText && '' === trim($streamedVisibleText)) {
+                        $this->sendSSE('data', ['chunk' => $finalText]);
+                    }
+
                     $outgoingMessage->setText($finalText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
@@ -1361,7 +1479,15 @@ class StreamController extends AbstractController
                     // on completion (otherwise it stays stuck on "running").
                     $mediaJobKey = $response['metadata']['media_job']['job_id'] ?? null;
                     if (is_string($mediaJobKey) && '' !== $mediaJobKey && null !== $outgoingMessage->getId()) {
-                        $this->mediaJobService->rebindMessage($mediaJobKey, $outgoingMessage->getId());
+                        $rebound = $this->mediaJobService->rebindMessage($mediaJobKey, $outgoingMessage->getId());
+                        // Second-chance sync (#1239): a fast render can finish
+                        // BEFORE this rebind, while still bound to the IN message
+                        // where the terminal sync is deliberately skipped (#1218).
+                        // Now that the job points at the OUT message, run the sync
+                        // it missed so the finished media reaches the bubble.
+                        if (null !== $rebound && $rebound->isTerminal()) {
+                            $this->mediaJobMessageSync->syncTerminalState($rebound);
+                        }
                     }
                 }
 
@@ -1380,6 +1506,35 @@ class StreamController extends AbstractController
                         'task_plan',
                         (string) json_encode($response['metadata']['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
                     );
+                }
+
+                // Multi-task async media (DAG): image/video generation nodes create
+                // their MediaJob with the INCOMING user message id (the runner's
+                // synthetic message reuses the real IN id, and the OUT message does
+                // not exist yet). Unlike the single-task path above, these node jobs
+                // are NOT surfaced on the top-level `metadata['media_job']`, so
+                // without rebinding them here the background worker's
+                // MediaJobMessageSync would sync the finished media onto the USER
+                // (IN) bubble — clearing the prompt text and showing the generated
+                // image as if the user had sent it (the "generated image appears as
+                // the user's prompt after reload" regression). Rebind every node
+                // job (the job_id lives on each task card) to the OUT message the
+                // user actually sees. A job that already finished while bound to
+                // the IN message (fast render losing the race, #1239) is rebound
+                // too and immediately given the terminal sync it skipped, so the
+                // task card resolves instead of spinning forever.
+                if (null !== $outgoingMessage->getId()
+                    && isset($response['metadata']['task_plan_render']['cards'])
+                    && is_array($response['metadata']['task_plan_render']['cards'])) {
+                    foreach ($response['metadata']['task_plan_render']['cards'] as $card) {
+                        $cardJobKey = is_array($card) ? ($card['job_id'] ?? null) : null;
+                        if (is_string($cardJobKey) && '' !== $cardJobKey) {
+                            $rebound = $this->mediaJobService->rebindMessage($cardJobKey, $outgoingMessage->getId());
+                            if (null !== $rebound && $rebound->isTerminal()) {
+                                $this->mediaJobMessageSync->syncTerminalState($rebound);
+                            }
+                        }
+                    }
                 }
 
                 $this->persistOriginalMediaMeta(
@@ -1750,16 +1905,15 @@ class StreamController extends AbstractController
                 }
 
                 $this->sendSSE('error', $errorData);
+            } catch (StreamCancelledException) {
+                // Explicit user cancel (/stop-stream flagged the turn) — not an
+                // error and not a disconnect. The frontend persists the partial
+                // answer via /save-cancelled, so just end the turn silently.
+                $this->logger->info('Stream stopped - cancelled by user', [
+                    'user_id' => $user->getId(),
+                    'track_id' => (string) $trackId,
+                ]);
             } catch (\Exception $e) {
-                // Don't send error if client disconnected intentionally
-                if ('Client disconnected' === $e->getMessage()) {
-                    $this->logger->info('Stream stopped - client disconnected', [
-                        'user_id' => $user->getId(),
-                    ]);
-
-                    return; // Silently stop
-                }
-
                 $this->logger->error('Streaming failed', [
                     'user_id' => $user->getId(),
                     'error' => $e->getMessage(),
@@ -2067,6 +2221,24 @@ class StreamController extends AbstractController
                     'task_plan',
                     (string) json_encode($metadata['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
                 );
+            }
+
+            // Mirror the streaming branch: rebind every async node job to the OUT
+            // message, and give a job that already finished while bound to the IN
+            // message (fast render losing the race, #1239) its missed terminal
+            // sync so the task card resolves instead of spinning forever.
+            if (null !== $outgoingMessage->getId()
+                && isset($metadata['task_plan_render']['cards'])
+                && is_array($metadata['task_plan_render']['cards'])) {
+                foreach ($metadata['task_plan_render']['cards'] as $card) {
+                    $cardJobKey = is_array($card) ? ($card['job_id'] ?? null) : null;
+                    if (is_string($cardJobKey) && '' !== $cardJobKey) {
+                        $rebound = $this->mediaJobService->rebindMessage($cardJobKey, $outgoingMessage->getId());
+                        if (null !== $rebound && $rebound->isTerminal()) {
+                            $this->mediaJobMessageSync->syncTerminalState($rebound);
+                        }
+                    }
+                }
             }
 
             if (!empty($options['web_search'])) {

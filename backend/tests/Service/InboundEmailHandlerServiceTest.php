@@ -598,6 +598,199 @@ class InboundEmailHandlerServiceTest extends TestCase
         $this->assertSame('Bestellung über 12€', $result['plain']);
     }
 
+    // ────────────────────────────────────────────────────────────────
+    // routeEmailToDepartment() — AI routing orchestration
+    // ────────────────────────────────────────────────────────────────
+
+    public function testRouteEmailRoutesToValidDepartment(): void
+    {
+        $handler = $this->createHandlerWithDepartments();
+        $this->stubPromptAndModel();
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturn(['content' => 'sales@example.com']);
+
+        $result = $this->service->routeEmailToDepartment($handler, 'New order inquiry', 'I want to buy...');
+
+        $this->assertSame('sales@example.com', $result);
+    }
+
+    public function testRouteEmailAcceptsCaseInsensitiveDepartmentMatch(): void
+    {
+        $handler = $this->createHandlerWithDepartments();
+        $this->stubPromptAndModel();
+
+        $this->aiFacade->method('chat')
+            ->willReturn(['content' => 'SUPPORT@EXAMPLE.COM']);
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Help', 'Broken widget');
+
+        $this->assertSame('SUPPORT@EXAMPLE.COM', $result);
+    }
+
+    public function testRouteEmailDiscardsWhenAiReturnsDiscard(): void
+    {
+        $handler = $this->createHandlerWithDepartments();
+        $this->stubPromptAndModel();
+
+        $this->aiFacade->method('chat')
+            ->willReturn(['content' => 'DISCARD']);
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Newsletter spam', 'Unsubscribe...');
+
+        $this->assertNull($result);
+    }
+
+    public function testRouteEmailDiscardsIsCaseInsensitive(): void
+    {
+        $handler = $this->createHandlerWithDepartments();
+        $this->stubPromptAndModel();
+
+        $this->aiFacade->method('chat')
+            ->willReturn(['content' => 'discard']);
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Spam', 'Buy pills...');
+
+        $this->assertNull($result);
+    }
+
+    public function testRouteEmailFallsBackToDefaultForUnknownAiResponse(): void
+    {
+        $handler = $this->createHandlerWithDepartments();
+        $this->stubPromptAndModel();
+
+        $this->aiFacade->method('chat')
+            ->willReturn(['content' => 'nonexistent@example.com']);
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Hello', 'Some email');
+
+        $this->assertSame('support@example.com', $result, 'Should fall back to default department');
+    }
+
+    /**
+     * LLMs sometimes return verbose answers instead of just an email address.
+     * The routing must not silently forward to a wrong address.
+     */
+    public function testRouteEmailFallsBackToDefaultForVerboseAiResponse(): void
+    {
+        $handler = $this->createHandlerWithDepartments();
+        $this->stubPromptAndModel();
+
+        $this->aiFacade->method('chat')
+            ->willReturn(['content' => 'I recommend routing to sales@example.com because it mentions a purchase.']);
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Order', 'I want to buy...');
+
+        $this->assertSame('support@example.com', $result, 'Verbose AI response is not a valid email match');
+    }
+
+    public function testRouteEmailFallsBackToDefaultWhenAiThrows(): void
+    {
+        $handler = $this->createHandlerWithDepartments();
+        $this->stubPromptAndModel();
+
+        $this->aiFacade->method('chat')
+            ->willThrowException(new \RuntimeException('Provider timeout'));
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Urgent', 'Help!');
+
+        $this->assertSame('support@example.com', $result, 'AI failure must not lose the email');
+    }
+
+    public function testRouteEmailFallsBackToDefaultWhenNoPromptFound(): void
+    {
+        $handler = $this->createHandlerWithDepartments();
+
+        $this->promptRepository->method('findByTopic')->willReturn(null);
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Hello', 'Body');
+
+        $this->assertSame('support@example.com', $result);
+    }
+
+    public function testRouteEmailFallsBackToDefaultWhenNoModelConfigured(): void
+    {
+        $handler = $this->createHandlerWithDepartments();
+
+        $prompt = new \App\Entity\Prompt();
+        $prompt->setTopic('tools:mailhandler');
+        $prompt->setPrompt('Route this email. Departments: [TARGETLIST]');
+        $this->promptRepository->method('findByTopic')->willReturn($prompt);
+
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Hello', 'Body');
+
+        $this->assertSame('support@example.com', $result);
+    }
+
+    public function testRouteEmailReturnsNullWhenNoDepartments(): void
+    {
+        $handler = new InboundEmailHandler();
+        $handler->setUserId(1);
+        $handler->setDepartments([]);
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Hello', 'Body');
+
+        $this->assertNull($result, 'No departments configured → nothing to route to');
+    }
+
+    public function testRouteEmailTrimsWhitespaceFromAiResponse(): void
+    {
+        $handler = $this->createHandlerWithDepartments();
+        $this->stubPromptAndModel();
+
+        $this->aiFacade->method('chat')
+            ->willReturn(['content' => "  sales@example.com  \n"]);
+
+        $result = $this->service->routeEmailToDepartment($handler, 'Order', 'Buy stuff');
+
+        $this->assertSame('sales@example.com', $result);
+    }
+
+    private function createHandlerWithDepartments(): InboundEmailHandler
+    {
+        $handler = new InboundEmailHandler();
+        $handler->setUserId(1);
+        $handler->setDepartments([
+            ['id' => '1', 'email' => 'sales@example.com', 'rules' => 'Sales inquiries', 'isDefault' => false],
+            ['id' => '2', 'email' => 'support@example.com', 'rules' => 'Technical support', 'isDefault' => true],
+            ['id' => '3', 'email' => 'info@example.com', 'rules' => 'General questions', 'isDefault' => false],
+        ]);
+
+        return $handler;
+    }
+
+    /**
+     * Stubs the prompt lookup and model config so AI routing can proceed
+     * to the actual AiFacade call (which is stubbed separately per test).
+     */
+    private function stubPromptAndModel(): void
+    {
+        $prompt = new \App\Entity\Prompt();
+        $prompt->setTopic('tools:mailhandler');
+        $prompt->setPrompt('Route this email to the correct department. Departments: [TARGETLIST]');
+        $this->promptRepository->method('findByTopic')->willReturn($prompt);
+
+        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4');
+
+        // Issue #1177 added a pre-flight cost-budget gate before the AI call:
+        // the handler owner must exist and be within budget, otherwise routing
+        // falls back to the default department without consulting the AI.
+        // Stub the gate as "owner exists, within budget" so these tests keep
+        // exercising the AI-driven routing paths.
+        $this->userRepository->method('find')->willReturn($this->createMock(\App\Entity\User::class));
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => true]);
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Private test helpers (MIME / decode)
+    // ────────────────────────────────────────────────────────────────
+
     /**
      * @param array<int, object>       $parts
      * @param callable(string): string $fetchBody

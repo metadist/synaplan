@@ -117,7 +117,7 @@
 
           <div
             v-else-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
-            class="flex flex-col items-center justify-center h-full px-6 py-8 gap-8 overflow-y-auto scroll-thin"
+            class="flex flex-col items-center justify-center min-h-[68vh] px-6 py-8 gap-6"
             data-testid="state-empty"
           >
             <div class="text-center">
@@ -129,6 +129,27 @@
               </p>
             </div>
 
+            <!-- Centered hero composer: the input starts high on the empty
+                 screen and docks to the bottom on first send (see bottom
+                 ChatInput, rendered only when there are messages). -->
+            <div class="w-full max-w-2xl">
+              <ChatInput
+                ref="chatInputRef"
+                centered
+                :is-streaming="isStreaming"
+                :is-guest-mode="isGuestMode"
+                :quote="quoting.pendingQuote.value"
+                @send="handleSendMessage"
+                @stop="handleUserStop"
+                @guest-feature-gate="handleGuestFeatureGate"
+                @clear-quote="quoting.clearPendingQuote"
+              />
+            </div>
+
+            <ExamplePrompts
+              v-if="!authStore.isAuthenticated && !configStore.marketingNews.enabled"
+              @pick="handleExamplePick"
+            />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
 
@@ -213,12 +234,13 @@
       />
 
       <ChatInput
+        v-if="!isEmptyLanding"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
         :quote="quoting.pendingQuote.value"
         @send="handleSendMessage"
-        @stop="handleStopStreaming"
+        @stop="handleUserStop"
         @guest-feature-gate="handleGuestFeatureGate"
         @clear-quote="quoting.clearPendingQuote"
       />
@@ -276,8 +298,8 @@
     <!-- Guest Signup Modal (shown when guest message limit is reached) -->
     <GuestSignupModal :is-open="showGuestSignupModal" @close="showGuestSignupModal = false" />
 
-    <!-- Guest Feature Gate Modal (shown when guest tries to access a restricted feature) -->
-    <GuestFeatureGateModal
+    <!-- Guest hint popover (shown when a guest taps a restricted feature) -->
+    <GuestHintPopover
       :is-open="featureGateOpen"
       :feature-key="featureGateKey"
       @close="featureGateOpen = false"
@@ -354,6 +376,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
+import ExamplePrompts from '@/components/ExamplePrompts.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
@@ -408,7 +431,7 @@ import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
 import PromoTipBanner from '@/components/PromoTipBanner.vue'
 import GuestBanner from '@/components/guest/GuestBanner.vue'
 import GuestSignupModal from '@/components/guest/GuestSignupModal.vue'
-import GuestFeatureGateModal from '@/components/guest/GuestFeatureGateModal.vue'
+import GuestHintPopover from '@/components/guest/GuestHintPopover.vue'
 import { usePromoTips } from '@/composables/usePromoTips'
 import { useDateFormat } from '@/composables/useDateFormat'
 
@@ -462,9 +485,23 @@ const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
 
+// Empty landing: no messages, not loading, and not the guest-error state.
+// Drives the centered hero composer (rendered inside state-empty) and hides the
+// bottom sticky composer so there is only ever one live ChatInput instance.
+const isEmptyLanding = computed(
+  () =>
+    !(guestStore.initFailed && !authStore.isAuthenticated) &&
+    historyStore.messages.length === 0 &&
+    !historyStore.isLoadingMessages
+)
+
 function handleGuestFeatureGate(key: string) {
   featureGateKey.value = key
   featureGateOpen.value = true
+}
+
+function handleExamplePick(prompt: string) {
+  chatInputRef.value?.submitText(prompt)
 }
 
 const handlePromoAction = (route: string) => {
@@ -711,11 +748,20 @@ const handleOpenFeedbackDialogEvent = (event: Event) => {
   }
 }
 
-// Cleanup: Stop streaming when component unmounts (user leaves chat)
+// Detach (do NOT cancel) a running turn when the user navigates away or
+// switches chats (issues #1142 / #1223 / #1225). Closes the SSE connection and
+// clears local streaming state WITHOUT telling the backend to stop — the turn
+// finishes in the background and is restored by loadMessages() on return.
+// Explicit cancellation stays in handleUserStop() (the Stop button).
+function handleNavigateAway() {
+  finishStreamingTurnLocally()
+}
+
+// Cleanup: detach the running stream when the component unmounts (user leaves chat)
 onBeforeUnmount(() => {
   isViewUnmounted = true
   mediaJobsStore.unsubscribe()
-  handleStopStreaming()
+  handleNavigateAway()
   if (currentAudioStreamer) {
     currentAudioStreamer.stop()
     currentAudioStreamer = null
@@ -736,9 +782,12 @@ onBeforeUnmount(() => {
 watch(
   () => chatsStore.activeChatId,
   async (newChatId, oldChatId) => {
-    // CRITICAL: Stop any active streaming when switching chats
+    // Switching chats DETACHES a running turn instead of cancelling it
+    // (issue #1223): close the SSE connection and clear local streaming state,
+    // but let the backend finish the turn in the background. Returning to the
+    // chat restores the completed response via loadMessages().
     if (oldChatId !== newChatId && isStreaming.value) {
-      await handleStopStreaming()
+      handleNavigateAway()
     }
 
     // Cleanup: Delete previous chat if it was empty (no messages)
@@ -2882,10 +2931,14 @@ const streamAIResponse = async (
     currentStreamingChatId = undefined
   }
   // NOTE: Don't clean up in finally block! The streaming is async and still running.
-  // Cleanup happens in the 'complete' event handler or in handleStopStreaming()
+  // Cleanup happens in the 'complete' event handler or in handleUserStop()
 }
 
-const handleStopStreaming = async () => {
+// Explicit Stop button (issue #1225): the user WANTS to cancel the turn. Tell
+// the backend to stop (/stop-stream flags the turn via CancellationStore) and
+// persist the partial answer as cancelled (/save-cancelled). This is distinct
+// from navigating away, which detaches WITHOUT cancelling (handleNavigateAway).
+const handleUserStop = async () => {
   // CRITICAL: Abort signal FIRST to prevent any further chunk processing
   if (streamingAbortController) {
     streamingAbortController.abort()
@@ -2907,12 +2960,23 @@ const handleStopStreaming = async () => {
   const effectiveTrackId = streamingMessageForTrack?.taskPlan?.trackId ?? currentTrackId
 
   // Notify backend to stop streaming.
+  // Since detach-on-navigation (#1225) the backend ignores a bare disconnect,
+  // so closing the EventSource alone no longer cancels the turn — every
+  // explicit Stop must flag the turn via a cancel endpoint.
   // Guests have no auth session: the auth-guarded /stop-stream endpoint would
   // return 401 and the http client would force a "session expired" redirect to
-  // /login (issue #1037). For guests, closing the EventSource above is enough —
-  // the backend detects the abort via connection_aborted() in the stream loop.
+  // /login (issue #1037). Guests use the public guest endpoint instead, which
+  // authorizes the cancel with the server-issued guest session id.
   if (isGuestMode.value) {
-    // No backend notification needed for guests.
+    if (effectiveTrackId && guestStore.sessionId) {
+      try {
+        await chatApi.stopGuestStream(guestStore.sessionId, effectiveTrackId)
+      } catch (error) {
+        console.error('❌ Failed to notify backend (guest):', error)
+      }
+    } else {
+      console.warn('⚠️ No trackId or guest session - skipping backend notification')
+    }
   } else if (effectiveTrackId) {
     try {
       await chatApi.stopStream(effectiveTrackId)

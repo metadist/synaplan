@@ -44,6 +44,16 @@ final class NodeContext
     private ?string $currentNodeId = null;
 
     /**
+     * Ids of media-generation nodes that MUST render synchronously in-turn
+     * because another node depends on their file output (a downstream
+     * `file_analysis` reads the bytes, `compose_reply` attaches them). Async
+     * detach would leave those dependents blocked forever (#1218).
+     *
+     * @var array<string, true>
+     */
+    private array $inlineMediaNodeIds = [];
+
+    /**
      * @param array<int, Message|array{role: string, content: string}> $thread
      *                                                                                   Message entities in-process; plain `{role, content}`
      *                                                                                   snapshots inside a media-node subprocess (entities cannot
@@ -112,6 +122,26 @@ final class NodeContext
         if (null !== $this->progressSink && '' !== $nodeId) {
             ($this->progressSink)($nodeId, $progress);
         }
+    }
+
+    /**
+     * Register the media-generation node ids that must render inline (blocking)
+     * instead of detaching to an async job — see {@see $inlineMediaNodeIds}.
+     *
+     * @param list<string> $nodeIds
+     */
+    public function setInlineMediaNodeIds(array $nodeIds): void
+    {
+        $this->inlineMediaNodeIds = array_fill_keys($nodeIds, true);
+    }
+
+    /**
+     * Whether the given media node has a dependent and therefore must generate
+     * synchronously so the produced file is available to it in the same turn.
+     */
+    public function mustRunMediaInline(string $nodeId): bool
+    {
+        return isset($this->inlineMediaNodeIds[$nodeId]);
     }
 
     public function setResult(string $nodeId, NodeResult $result): void

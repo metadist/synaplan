@@ -1,0 +1,579 @@
+[
+  {
+    "id": "plain_question",
+    "text": "Wer bist du?",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "chat"
+      ],
+      "forbid": [
+        "image_generation",
+        "text2sound",
+        "web_search"
+      ]
+    }
+  },
+  {
+    "id": "single_image",
+    "text": "Erstelle ein Bild von einem Sonnenuntergang",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "image_generation"
+      ],
+      "forbid": [
+        "chat",
+        "file_analysis"
+      ]
+    }
+  },
+  {
+    "id": "poem_then_mp3",
+    "text": "Schreib mir ein Liebesgedicht und lies es mir als MP3 vor.",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "chat",
+        "text2sound",
+        "compose_reply"
+      ],
+      "edges": [
+        "chat->text2sound"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "poem_mp3_image_email",
+    "text": "Write a spring poem, read it aloud and make a fitting picture with it. Mail everything to me.",
+    "language": "en",
+    "expect": {
+      "capabilities": [
+        "chat",
+        "text2sound",
+        "image_generation",
+        "email_me",
+        "compose_reply"
+      ],
+      "edges": [
+        "chat->text2sound",
+        "chat->email_me"
+      ]
+    }
+  },
+  {
+    "id": "image_then_describe",
+    "text": "Erstelle ein Bild einer Katze und danach beschreibe das erstellte Bild.",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "image_generation",
+        "file_analysis"
+      ],
+      "edges": [
+        "image_generation->file_analysis"
+      ],
+      "forbid": [
+        "chat"
+      ]
+    }
+  },
+  {
+    "id": "image_poem_vorlesen_1222",
+    "text": "Erstelle das Bild einer Katze, dann schreibe ein Gedicht darüber und lies es mir am Ende vor.",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "image_generation",
+        "file_analysis",
+        "text2sound"
+      ],
+      "edges": [
+        "image_generation->file_analysis",
+        "file_analysis->text2sound"
+      ],
+      "forbid": [
+        "chat"
+      ]
+    }
+  },
+  {
+    "id": "describe_attached_image_as_audio_1237",
+    "text": "Beschreibe in einem Audio, was hier zu sehen ist.",
+    "language": "de",
+    "attach": {
+      "type": "png",
+      "path": "photo.png"
+    },
+    "expect": {
+      "capabilities": [
+        "file_analysis",
+        "text2sound"
+      ],
+      "edges": [
+        "file_analysis->text2sound"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "describe_attached_generated_image_as_audio_1237",
+    "text": "beschreibe in einem audio was hier zu sehen ist",
+    "language": "de",
+    "attach": {
+      "type": "image",
+      "path": "media_1_google_abc.png"
+    },
+    "expect": {
+      "capabilities": [
+        "file_analysis",
+        "text2sound"
+      ],
+      "edges": [
+        "file_analysis->text2sound"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "doc_summary_to_mp3",
+    "text": "What's in there? Summarize it into a short MP3.",
+    "language": "en",
+    "attach": {
+      "type": "docx",
+      "path": "report.docx",
+      "file_text": "Quarterly report: revenue grew 12%, churn fell to 2.1%, hiring plan on track."
+    },
+    "expect": {
+      "capabilities": [
+        "file_analysis",
+        "text2sound"
+      ],
+      "edges": [
+        "file_analysis->text2sound"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "image_then_animate",
+    "text": "Create a picture of a sailboat on a lake, then animate it as a short video.",
+    "language": "en",
+    "expect": {
+      "capabilities": [
+        "image_generation",
+        "video_generation"
+      ],
+      "edges": [
+        "image_generation->video_generation"
+      ]
+    }
+  },
+  {
+    "id": "pure_tts",
+    "text": "Read this aloud: Hello world, welcome to the demo.",
+    "language": "en",
+    "expect": {
+      "capabilities": [
+        "text2sound"
+      ],
+      "forbid": [
+        "chat",
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "office_document",
+    "text": "Mach mir eine Excel-Tabelle mit den Monaten des Jahres und je einem Feiertag.",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "document_generation"
+      ],
+      "forbid": [
+        "image_generation",
+        "chat"
+      ]
+    }
+  },
+  {
+    "id": "calendar_event",
+    "text": "I need a meeting reminder for tomorrow at 9:00 with Sanam.",
+    "language": "en",
+    "options": {
+      "client_country": "DE"
+    },
+    "expect": {
+      "capabilities": [
+        "calendar_event"
+      ],
+      "forbid": [
+        "chat",
+        "email_me"
+      ]
+    }
+  },
+  {
+    "id": "parallel_independent",
+    "text": "Summarize the concept of photosynthesis in two sentences and draw a cat.",
+    "language": "en",
+    "expect": {
+      "capabilities": [
+        "chat",
+        "image_generation",
+        "compose_reply"
+      ],
+      "edges": [
+        "chat->compose_reply",
+        "image_generation->compose_reply"
+      ],
+      "forbid": [
+        "file_analysis"
+      ]
+    }
+  },
+  {
+    "id": "url_fetch_summarize",
+    "text": "Fasse mir diese Seite zusammen: https://www.synaplan.com/",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "url_fetch"
+      ],
+      "edges": [
+        "url_fetch->summarize"
+      ],
+      "forbid": [
+        "web_search",
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "translate_then_speak",
+    "text": "Übersetze 'Das Leben ist schön' ins Englische und sprich es mir vor.",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "chat",
+        "text2sound"
+      ],
+      "edges": [
+        "chat->text2sound"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "poem_then_mp3_en",
+    "text": "Write a short love poem and read it to me as an MP3.",
+    "language": "en",
+    "expect": {
+      "capabilities": [
+        "chat",
+        "text2sound"
+      ],
+      "edges": [
+        "chat->text2sound"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "poem_then_speak_es",
+    "text": "Escribe un poema corto sobre el mar y léemelo en voz alta.",
+    "language": "es",
+    "expect": {
+      "capabilities": [
+        "chat",
+        "text2sound"
+      ],
+      "edges": [
+        "chat->text2sound"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "single_image_tr",
+    "text": "Bir kedi resmi oluştur",
+    "language": "tr",
+    "expect": {
+      "capabilities": [
+        "image_generation"
+      ],
+      "forbid": [
+        "chat",
+        "file_analysis"
+      ]
+    }
+  },
+  {
+    "id": "image_edit_chain",
+    "text": "Erstelle ein Logo mit einem Fuchs und mach es danach blau.",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "image_generation"
+      ],
+      "edges": [
+        "image_generation->image_generation"
+      ],
+      "forbid": [
+        "chat"
+      ]
+    }
+  },
+  {
+    "id": "video_then_describe",
+    "text": "Generate a short video of a rocket launch and tell me what happens in it.",
+    "language": "en",
+    "expect": {
+      "capabilities": [
+        "video_generation",
+        "file_analysis"
+      ],
+      "edges": [
+        "video_generation->file_analysis"
+      ],
+      "forbid": [
+        "chat"
+      ]
+    }
+  },
+  {
+    "id": "video_with_params",
+    "text": "Erstelle ein 8 Sekunden Video von einem Zug in 4K",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "video_generation"
+      ],
+      "forbid": [
+        "image_generation",
+        "chat"
+      ]
+    }
+  },
+  {
+    "id": "email_explicit",
+    "text": "Fasse die wichtigsten Regeln für gutes Zeitmanagement zusammen und schicke mir das Ergebnis per E-Mail.",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "email_me"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "email_trap_write_a_mail",
+    "text": "Schreibe eine höfliche E-Mail-Antwort an meinen Kollegen, der nach dem Projektstatus fragt.",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "chat"
+      ],
+      "forbid": [
+        "email_me",
+        "text2sound"
+      ]
+    }
+  },
+  {
+    "id": "calendar_mail_me_exception",
+    "text": "Mail me a meeting note for tomorrow 15:00 with Tom.",
+    "language": "en",
+    "options": {
+      "client_country": "DE"
+    },
+    "expect": {
+      "capabilities": [
+        "calendar_event"
+      ],
+      "forbid": [
+        "chat"
+      ]
+    }
+  },
+  {
+    "id": "audio_topic_not_tts",
+    "text": "Was ist der Unterschied zwischen MP3 und WAV Dateien?",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "chat"
+      ],
+      "forbid": [
+        "text2sound",
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "bare_link_no_urlfetch",
+    "text": "Mein Blog ist übrigens https://blog.example.com — wie gewinne ich generell mehr Leser?",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "chat"
+      ],
+      "forbid": [
+        "url_fetch",
+        "web_search"
+      ]
+    }
+  },
+  {
+    "id": "pdf_not_supported",
+    "text": "Erstelle mir ein PDF mit meinem Lebenslauf.",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "chat"
+      ],
+      "forbid": [
+        "document_generation",
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "image_talk_not_generation",
+    "text": "Warum wirken Bilder mit goldenem Schnitt harmonischer?",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "chat"
+      ],
+      "forbid": [
+        "image_generation",
+        "file_analysis"
+      ]
+    }
+  },
+  {
+    "id": "attached_doc_summary_plus_image",
+    "text": "Fasse das Dokument kurz zusammen und erstelle ein passendes Titelbild dazu.",
+    "language": "de",
+    "attach": {
+      "type": "docx",
+      "path": "bericht.docx",
+      "file_text": "Jahresbericht über die Entwicklung des Stadtparks: neue Spielplätze, mehr Bäume, höhere Besucherzahlen."
+    },
+    "expect": {
+      "capabilities": [
+        "image_generation"
+      ],
+      "forbid": []
+    }
+  },
+  {
+    "id": "attached_image_describe_text",
+    "text": "Beschreibe, was auf diesem Bild zu sehen ist.",
+    "language": "de",
+    "attach": {
+      "type": "png",
+      "path": "photo.png"
+    },
+    "expect": {
+      "capabilities": [
+        "file_analysis"
+      ],
+      "forbid": [
+        "image_generation",
+        "text2sound"
+      ]
+    }
+  },
+  {
+    "id": "mcp_not_offered_no_hallucination",
+    "text": "Look up the customer Acme GmbH in our CRM and summarize their last order.",
+    "language": "en",
+    "expect": {
+      "forbid": [
+        "mcp_fetch",
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "mcp_knowledge_base_query",
+    "text": "please search my knowledge base one for information about the platform and what the company does",
+    "language": "en",
+    "requires": "mcp_connections",
+    "options": {
+      "classification": {
+        "topic": "general",
+        "source": "ai_sorting"
+      }
+    },
+    "expect": {
+      "capabilities": [
+        "mcp_fetch"
+      ],
+      "edges": [
+        "mcp_fetch->chat"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "websearch_current_info",
+    "text": "Wie ist das Wetter morgen in Berlin?",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "web_search"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "translate_then_speak_variant",
+    "text": "Translate 'Der Apfel fällt nicht weit vom Stamm' into English and read the translation aloud.",
+    "language": "en",
+    "expect": {
+      "capabilities": [
+        "text2sound"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "email_search_not_offered_no_hallucination",
+    "text": "Search my emails for the Acme offer from last week and summarize it.",
+    "language": "en",
+    "expect": {
+      "forbid": [
+        "email_search",
+        "mcp_fetch",
+        "image_generation"
+      ]
+    }
+  }
+]

@@ -21,6 +21,7 @@ use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
+use App\Tests\Support\SkillCatalogFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -72,6 +73,13 @@ final class PromptControllerTestRoutingTest extends TestCase
                 new NullLogger(),
                 $this->createMock(UserRepository::class),
                 new TimeContextBuilder(),
+                SkillCatalogFactory::real(),
+                new PromptService(
+                    $this->createMock(PromptRepository::class),
+                    $this->createMock(PromptMetaRepository::class),
+                    $this->createMock(EntityManagerInterface::class),
+                    new NullLogger(),
+                ),
             ),
         );
 

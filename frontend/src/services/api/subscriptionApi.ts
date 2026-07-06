@@ -84,11 +84,11 @@ export interface PortalSession {
  * MOBILE-APP SEAM (Epic 5.4): result of server-side IAP receipt validation.
  * The server is the single source of truth — the app shows the outcome but
  * never grants a tier itself. Inferred from the generated schema (per
- * AGENTS_DEV: never hand-write interfaces for API responses).
+ * AGENTS.md: never hand-write interfaces for API responses).
  */
 export type IapVerifyResult = z.infer<typeof PostIapVerifyResponseSchema>
 
-// Inferred from the generated Zod schemas (per AGENTS_DEV: never hand-write
+// Inferred from the generated Zod schemas (per AGENTS.md: never hand-write
 // interfaces for API responses).
 export type TopupSession = z.infer<typeof PostSubscriptionTopupResponseSchema>
 

@@ -12,6 +12,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\RAG\VectorSearchService;
 use Psr\Log\LoggerInterface;
 
@@ -47,6 +48,19 @@ final readonly class ChatRunner implements TaskRunner
     public function supportedCapabilities(): array
     {
         return [Capability::Chat, Capability::Summarize, Capability::Translate, Capability::RagQuery];
+    }
+
+    /**
+     * @return list<SkillDescriptor>
+     */
+    public function describe(): array
+    {
+        return [
+            new SkillDescriptor(Capability::Chat, 'Answer with text. Use params.topic_id to bind a specific task topic/system prompt.'),
+            new SkillDescriptor(Capability::Summarize, 'Summarize provided text.'),
+            new SkillDescriptor(Capability::Translate, 'Translate provided text into a target language (params.target).'),
+            new SkillDescriptor(Capability::RagQuery, 'Answer using the user knowledge base (retrieval-augmented).'),
+        ];
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult

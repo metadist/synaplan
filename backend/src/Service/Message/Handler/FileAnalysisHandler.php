@@ -1075,19 +1075,29 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         ?string $text,
         ?string $status,
     ): array {
-        $normalizedType = strtolower((string) $type);
-        $isImage = in_array($normalizedType, MessagePreProcessor::IMAGE_EXTENSIONS, true);
-        $isAudio = in_array($normalizedType, MessagePreProcessor::AUDIO_EXTENSIONS, true);
-        $isDocument = in_array($normalizedType, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
-        $isVideo = in_array($normalizedType, MessagePreProcessor::VIDEO_EXTENSIONS, true);
-
         // Normalize path to be relative to the upload directory (var/uploads).
         // DB values should be stored relative; older/legacy values may contain "/uploads/" or full URLs.
         $path = $this->normalizeRelativeUploadPath((string) $rawPath);
+        $resolvedName = (string) ($name ?? basename($path));
+
+        // Resolve the routing discriminator. Freshly uploaded files store a
+        // concrete extension in BFILETYPE ("png", "pdf", …), but the
+        // generated-media pipelines store a generic kind ("image", "audio",
+        // "video", "document"). Those generic kinds are not in the
+        // *_EXTENSIONS lists, so without normalization a generated PNG (or a
+        // DAG `file_analysis` node consuming one) was mis-routed to
+        // "unsupported" even though its filename/MIME clearly identify it —
+        // the error even listed PNG as supported, which was contradictory
+        // (issue #1236).
+        $resolvedType = $this->resolveFileType((string) $type, $resolvedName, $path);
+        $isImage = in_array($resolvedType, MessagePreProcessor::IMAGE_EXTENSIONS, true);
+        $isAudio = in_array($resolvedType, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+        $isDocument = in_array($resolvedType, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
+        $isVideo = in_array($resolvedType, MessagePreProcessor::VIDEO_EXTENSIONS, true);
 
         return [
             'id' => $id,
-            'name' => (string) ($name ?? basename($path)),
+            'name' => $resolvedName,
             'type' => (string) $type,
             'path' => $path,
             'text' => (string) ($text ?? ''),
@@ -1097,6 +1107,56 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'is_document' => $isDocument,
             'is_video' => $isVideo,
         ];
+    }
+
+    /**
+     * Resolve the routing discriminator for a file.
+     *
+     * Returns the concrete file extension whenever one can be determined so
+     * the `is_*` flags in {@see buildFileInfo()} line up with the
+     * `*_EXTENSIONS` lists. A concrete extension in BFILETYPE is trusted
+     * as-is; a generic media kind ("image"/"audio"/"video"/"document") or a
+     * missing type is recovered from the filename/path, falling back to a
+     * representative extension for the kind (issue #1236).
+     */
+    private function resolveFileType(string $type, string $name, string $path): string
+    {
+        $type = strtolower(trim($type));
+
+        // A concrete extension already lines up with the *_EXTENSIONS lists.
+        if ('' !== $type && !$this->isGenericFileKind($type)) {
+            return $type;
+        }
+
+        // Generic kind (or missing type): recover the real extension from the
+        // filename first, then the stored path.
+        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if ('' === $extension) {
+            $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        }
+        if ('' !== $extension) {
+            return $extension;
+        }
+
+        // No usable extension anywhere — map the generic kind onto a
+        // representative extension so a typeless generated file is still
+        // routed to the correct handler instead of "unsupported".
+        return match ($type) {
+            'image' => 'png',
+            'audio' => 'mp3',
+            'video' => 'mp4',
+            'document' => 'txt',
+            default => $type,
+        };
+    }
+
+    /**
+     * Whether the BFILETYPE value is a generic media kind (as stored by the
+     * generated-media pipelines) rather than a concrete file extension.
+     */
+    private function isGenericFileKind(string $type): bool
+    {
+        return in_array($type, ['image', 'audio', 'video', 'document'], true);
     }
 
     /**

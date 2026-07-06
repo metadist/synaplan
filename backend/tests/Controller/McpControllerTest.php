@@ -48,6 +48,25 @@ final class McpControllerTest extends WebTestCase
         );
     }
 
+    public function testUnknownSessionReturnsJsonRpcErrorNot500(): void
+    {
+        // Issue #1110 — a syntactically invalid / never-initialized session id
+        // must yield a clean JSON-RPC -32600 error, not a raw 500.
+        $result = $this->jsonRpc(
+            [
+                'jsonrpc' => '2.0',
+                'id' => 1,
+                'method' => 'tools/list',
+                'params' => new \stdClass(),
+            ],
+            'fake-session-id-that-does-not-exist',
+        );
+
+        self::assertLessThan(500, $this->client->getResponse()->getStatusCode(), json_encode($result));
+        self::assertArrayHasKey('error', $result, json_encode($result));
+        self::assertSame(-32600, $result['error']['code']);
+    }
+
     public function testProtectedResourceMetadataIsPublic(): void
     {
         $this->client->request('GET', '/.well-known/oauth-protected-resource/mcp');

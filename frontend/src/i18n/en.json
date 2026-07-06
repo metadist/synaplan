@@ -71,7 +71,8 @@
     "liveSupport": "Live Support",
     "addinConnect": "Connect Outlook Add-in",
     "accountDeletion": "Account Deletion",
-    "onboarding": "Welcome"
+    "onboarding": "Welcome",
+    "mcpServers": "MCP Servers"
   },
   "addinConnect": {
     "title": "Connect to Synaplan",
@@ -92,6 +93,14 @@
     "errorIssuanceFailed": "Synaplan could not issue an API key for this account."
   },
   "welcome": "Welcome",
+  "examplePrompts": {
+    "heading": "Try one of these",
+    "items": {
+      "poemMp3": "Create a poem about a cat and convert it into an MP3.",
+      "everglades": "Write an article about the Florida Everglades and put it into a Word document for download.",
+      "retreat": "Make a video invitation for a one-day company retreat in London, and write the schedule below it."
+    }
+  },
   "marketingNews": {
     "heading": "Latest from Synaplan",
     "readMore": "Read more"
@@ -343,6 +352,11 @@
       "testConnection": "Test Connection",
       "testFailed": "Connection test failed",
       "commandCopied": "Command copied to clipboard",
+      "tabGroups": {
+        "aiData": "AI & Data",
+        "communication": "Communication",
+        "security": "Security & Login"
+      },
       "liveBadge": "Live",
       "liveHint": "Changes take effect immediately, no restart required.",
       "restartBanner": {
@@ -367,6 +381,7 @@
     "toolsChatWidget": "Chat Widget",
     "toolsDocSummary": "Summarizer",
     "toolsMailHandler": "Email Automation",
+    "mcpServers": "MCP Servers",
     "plugins": "Plugins",
     "files": "Files",
     "filesDescription": "Files & knowledge",
@@ -396,6 +411,14 @@
     "placeholder": "Type your message...",
     "provider": "Provider",
     "model": "Model",
+    "modelCaption": "Model: {name}",
+    "plusMenu": {
+      "label": "Add",
+      "attach": "Attach files",
+      "model": "Model",
+      "tools": "Tools",
+      "knowledge": "Knowledge folder"
+    },
     "configureModel": "Configure AI Model",
     "knowledgeGroup": "Knowledge folder",
     "knowledgeGroupNone": "No knowledge folder",
@@ -781,8 +804,8 @@
     "describeSortDone": "Now searchable by AI.",
     "describeSortDoneGroup": "Now searchable by AI · filed in \"{group}\".",
     "describeSortFailed": "Couldn't make this file searchable.",
-    "indexPromptAction": "Add generation prompt to knowledge base",
-    "indexPromptDone": "Generation prompt added to your knowledge base.",
+    "indexPromptAction": "Add to knowledge base",
+    "indexPromptDone": "Added to your knowledge base.",
     "emptyState": {
       "title": "No files yet",
       "description": "Upload files to get started. You can organize them into folders.",
@@ -3162,6 +3185,9 @@
       "translate": "Translation",
       "rag_query": "Knowledge answer",
       "web_search": "Web search",
+      "url_fetch": "Reading web page",
+      "mcp_fetch": "Fetching connected data",
+      "email_search": "Searching your emails",
       "file_analysis": "File analysis",
       "image_generation": "Image",
       "video_generation": "Video",
@@ -3169,7 +3195,13 @@
       "document_generation": "Document",
       "calendar_event": "Calendar invite",
       "email_me": "Email result"
-    }
+    },
+    "copyText": "Copy text",
+    "copied": "Copied to clipboard",
+    "copyFailed": "Could not copy",
+    "expand": "Show text",
+    "collapse": "Hide text",
+    "redundantCollapsed": "This text is part of the answer below."
   },
   "processing": {
     "started": "Starting processing...",
@@ -3823,7 +3855,11 @@
         "general": "Access all premium features and tools",
         "models": "Choose from multiple AI models and customize your experience",
         "tools": "Use advanced tools like image generation and video creation",
-        "enhance": "AI-powered message enhancement for better responses"
+        "enhance": "AI-powered message enhancement for better responses",
+        "channels": "Connect WhatsApp, email and your website chat widget to Synaplan.",
+        "aiSetup": "Configure AI models, prompts and routing to fit your workflow.",
+        "attach": "Upload documents and images to use as a knowledge base for your AI.",
+        "knowledge": "Scope a chat to one of your knowledge folders for focused answers."
       },
       "registerButton": "Create free account",
       "loginButton": "Already have an account? Log in"
@@ -3940,5 +3976,46 @@
       "loginHint": "Already have an account?",
       "loginCta": "Sign in"
     }
+  },
+  "mcpServers": {
+    "title": "MCP Servers",
+    "description": "Connect external MCP servers so the assistant can pull data from your own systems (CRM, wiki, internal APIs) while answering. Tools discovered here become available to the task planner.",
+    "clientDisabledHint": "The outbound MCP client is currently disabled by the platform configuration. Connections can be prepared, but no calls will be made until it is enabled.",
+    "listTitle": "Connected servers",
+    "add": "Add server",
+    "addTitle": "Connect a new server",
+    "editTitle": "Edit server",
+    "formHint": "The URL must be a public HTTPS MCP endpoint (Streamable HTTP). The auth value is stored encrypted and never shown again.",
+    "empty": "No MCP servers connected yet.",
+    "nameLabel": "Name",
+    "urlLabel": "Server URL",
+    "authHeaderLabel": "Auth header name (optional)",
+    "authTokenLabel": "Auth header value",
+    "authTokenPlaceholder": "e.g. Bearer sk-…",
+    "enabledLabel": "Enabled",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "test": "Test connection",
+    "testing": "Testing…",
+    "testSuccess": "Connection OK — {count} tool(s) discovered",
+    "testFailed": "Connection failed",
+    "discoveredTools": "{count} tool(s) discovered:",
+    "saved": "Server saved",
+    "saveFailed": "Could not save the server",
+    "deleted": "Server removed",
+    "deleteFailed": "Could not remove the server",
+    "deleteTitle": "Remove MCP server",
+    "deleteMessage": "Remove the connection \"{name}\"? The assistant will no longer be able to use its tools.",
+    "loadFailed": "Could not load MCP servers",
+    "usageTitle": "Which tasks may use these servers",
+    "usageDescription": "Each task decides on its own whether the assistant may pull data from your connected servers while answering. Enable it for every task that should use them — for normal chat questions that is \"General Chat\".",
+    "usageNotUsedWarning": "Your connected servers are not used yet: no task allows MCP data sources. Enable at least one task below, otherwise the assistant will never call these servers.",
+    "usageOn": "Allowed",
+    "usageOff": "Off",
+    "usageEnabled": "MCP data sources enabled for this task",
+    "usageDisabled": "MCP data sources disabled for this task",
+    "usageUpdateFailed": "Could not update the task",
+    "usageAdvancedHint": "More options per task (server restrictions, instructions, models):",
+    "usageAdvancedLink": "AI Instructions"
   }
 }

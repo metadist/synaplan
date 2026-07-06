@@ -54,9 +54,16 @@ function buildTimestampPlugin(mode: string): Plugin {
 /**
  * Vite configuration for building widget as ES module
  *
- * Builds a single widget.js ES module with automatic code-splitting:
- * - widget.js: Main entry point with button logic
- * - Chunks: Dynamically imported Vue components (lazy-loaded)
+ * Builds ONE fully self-contained widget.js ES module (no code-splitting):
+ * - All dynamic imports (Vue, ChatWidget, i18n, styles) are inlined into
+ *   widget.js via `inlineDynamicImports`.
+ *
+ * Why no chunks: the widget is embedded on third-party sites and we redeploy
+ * daily. Hash-named chunks (`chunks/ChatWidget-<hash>.js`) are deleted on every
+ * build (`emptyOutDir`), so any cached/edge-cached widget.js that still points
+ * at an old hash would 404 at runtime ("Failed to fetch dynamically imported
+ * module"). A single self-contained file has zero runtime dependencies, so a
+ * stale cached widget.js keeps working across redeploys.
  *
  * Watch Mode Configuration:
  * - Use --watch CLI flag for development (configured in docker-compose.yml)
@@ -105,7 +112,10 @@ export default defineConfig(({ mode }) => ({
       output: {
         format: 'es',
         entryFileNames: '[name].js',
-        chunkFileNames: 'chunks/[name]-[hash].js',
+        // Inline every dynamic import into widget.js so the embed has NO
+        // external chunk dependencies. This is the fix for the post-deploy
+        // "chunks/*.js 404" failures on customer sites (e.g. roatel.com).
+        inlineDynamicImports: true,
         assetFileNames: 'assets/[name]-[hash][extname]',
         strictExecutionOrder: true,
       },

@@ -23,7 +23,7 @@ use Doctrine\Migrations\AbstractMigration;
  * behaviour rolls out everywhere. The ANONYMOUS row is intentionally left intact.
  *
  * Pure, idempotent addSql (no Schema introspection) — safe on the prod Galera
- * cluster (see AGENTS_DEV.md "Production Platform Specifics").
+ * cluster (see AGENTS.md "Production Platform Specifics").
  */
 final class Version20260625120000 extends AbstractMigration
 {

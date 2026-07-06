@@ -311,6 +311,97 @@ final class TaskPlanExecutorTest extends TestCase
         self::assertSame(['content' => 'file summary'], $result);
     }
 
+    public function testSingleMediaPlusComposeReplyCollapsesToLegacyRouter(): void
+    {
+        // Issue #1072: the planner wraps a plain single-media request
+        // ("make an image of a sunset") in [image_generation, compose_reply].
+        // That redundant compose_reply must be collapsed so the request runs
+        // the silent legacy path (no DAG, no task card) — like /pic.
+        $wrapped = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'image_generation', 'inputs' => ['prompt' => 'a sunset']],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'inputs' => ['text' => 'Here is your image.', 'attachments' => ['$n1.file']]],
+            ],
+        ]);
+        $this->planner->method('plan')->willReturn(new TaskPlanResult($wrapped, fallback: false, modelId: 76));
+
+        // Collapsed to single-node → DAG must NOT run; legacy router answers.
+        $this->dagExecutor->expects(self::never())->method('execute');
+        $this->router->expects(self::once())->method('routeStream')->willReturn(['content' => 'IMAGE']);
+
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'image_generation', 'media_type' => 'image', 'topic' => 'mediamaker', 'language' => 'en', 'source' => 'ai_sorting'],
+            static function (): void {},
+        );
+
+        self::assertSame(['content' => 'IMAGE'], $result);
+    }
+
+    public function testSingleMediaPlanNotCollapsedWhenClassificationDisagrees(): void
+    {
+        // Guard: the legacy router runs on the ORIGINAL classification. If the
+        // sorter said "chat" but the planner produced an image, collapsing to
+        // the legacy path would lose the image — so the DAG must still run.
+        $wrapped = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'image_generation', 'inputs' => ['prompt' => 'a sunset']],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'inputs' => ['text' => 'Here is your image.', 'attachments' => ['$n1.file']]],
+            ],
+        ]);
+        $this->planner->method('plan')->willReturn(new TaskPlanResult($wrapped, fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Here is your image',
+            'files' => [['path' => '/api/v1/files/uploads/img.png', 'type' => 'image']],
+            'node_statuses' => ['n1' => 'done', 'n2' => 'done'],
+        ]));
+
+        // classification intent = chat → does NOT map to image_generation.
+        $this->router->expects(self::never())->method('routeStream');
+
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting'],
+            static function (): void {},
+        );
+
+        self::assertSame('image', $result['metadata']['file']['type']);
+    }
+
+    public function testMediaEditChainIsNotCollapsed(): void
+    {
+        // A dependent media node ("make a logo, then make it blue") is a genuine
+        // two-step chain — it must keep running the DAG, not be collapsed.
+        $chain = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'image_generation', 'inputs' => ['prompt' => 'a logo']],
+                ['id' => 'n2', 'capability' => 'image_generation', 'depends_on' => ['n1'], 'inputs' => ['prompt' => 'make it blue', 'image' => '$n1.file']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n2'], 'inputs' => ['attachments' => ['$n2.file']]],
+            ],
+        ]);
+        $this->planner->method('plan')->willReturn(new TaskPlanResult($chain, fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Here is the blue logo',
+            'files' => [['path' => '/api/v1/files/uploads/logo.png', 'type' => 'image']],
+            'node_statuses' => ['n1' => 'done', 'n2' => 'done', 'n3' => 'done'],
+        ]));
+        $this->router->expects(self::never())->method('routeStream');
+
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'image_generation', 'media_type' => 'image', 'language' => 'en', 'source' => 'ai_sorting'],
+            static function (): void {},
+        );
+
+        self::assertSame('image', $result['metadata']['file']['type']);
+    }
+
     public function testSingleCalendarEventNodeRunsDagNotLegacyRouter(): void
     {
         // A lone calendar_event has NO legacy router equivalent — running it

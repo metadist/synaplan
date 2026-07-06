@@ -74,6 +74,36 @@ final class ResultAssemblerTest extends TestCase
         $this->assertNotContains('n3', $cardIds);
     }
 
+    public function testRedundantFlagMarksProseContainedInTheFinalAnswer(): void
+    {
+        // #1229 smart collapse: n1's text is passed through by the reply node
+        // (with a connector around it) → the card is redundant; a card whose
+        // text is NOT part of the answer stays unflagged.
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'chat', 'inputs' => ['text' => 'write a poem']],
+                ['id' => 'n2', 'capability' => 'summarize', 'inputs' => ['text' => 'unrelated']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n1', 'n2'], 'inputs' => ['text' => '$n1.text']],
+            ],
+        ]);
+        $ctx = $this->context();
+
+        $poem = "Roses are red,\nviolets are blue.";
+        $ctx->setResult('n1', NodeResult::ok($poem));
+        $ctx->setResult('n2', NodeResult::ok('A completely different unique summary.'));
+        $ctx->setResult('n3', NodeResult::ok("Here is your poem:\n\n{$poem}"));
+
+        $cards = $this->assembler->assemble($plan, $ctx)['metadata']['task_plan_render']['cards'];
+
+        $n1 = array_values(array_filter($cards, fn ($c) => 'n1' === $c['nodeId']))[0];
+        $this->assertTrue($n1['redundant'] ?? false, 'pass-through prose must be flagged redundant');
+        $this->assertSame($poem, $n1['text'], 'the text itself stays on the card');
+
+        $n2 = array_values(array_filter($cards, fn ($c) => 'n2' === $c['nodeId']))[0];
+        $this->assertArrayNotHasKey('redundant', $n2, 'unique prose must stay unflagged');
+    }
+
     public function testTaskPlanRenderCardShapeIsCorrect(): void
     {
         $plan = $this->plan();
@@ -133,6 +163,63 @@ final class ResultAssemblerTest extends TestCase
 
         $n2 = array_values(array_filter($cards, fn ($c) => 'n2' === $c['nodeId']))[0];
         $this->assertSame('skipped', $n2['state']);
+    }
+
+    /**
+     * Issue #1218 (root cause): a node still `Running` (async media detached to a
+     * background job) or `Pending` (blocked by such a dependency) means the plan
+     * is IN PROGRESS — it must NOT be reported as `all_failed`, otherwise
+     * TaskPlanExecutor discards the plan and re-runs the legacy router, producing
+     * a SECOND (duplicate) generation.
+     */
+    public function testRunningNodeIsNotReportedAsAllFailed(): void
+    {
+        $plan = $this->plan();
+        $ctx = $this->context();
+
+        // n1 detaches async → Running; n2/n3 stay Pending (blocked by n1).
+        $ctx->setResult('n1', NodeResult::running(['media_job' => ['job_id' => 'abc', 'type' => 'image']]));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertFalse($result['all_failed']);
+    }
+
+    /**
+     * The genuinely dead plan — every node settled Failed/Skipped, nothing
+     * running and nothing succeeded — still reports `all_failed` so the legacy
+     * fallback can produce an answer.
+     */
+    public function testAllSettledUnsuccessfulIsReportedAsAllFailed(): void
+    {
+        $plan = $this->plan();
+        $ctx = $this->context();
+
+        $ctx->setResult('n1', NodeResult::failed('boom'));
+        $ctx->setResult('n2', NodeResult::skipped('dependency failed'));
+        $ctx->setResult('n3', NodeResult::skipped('dependency failed'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertTrue($result['all_failed']);
+    }
+
+    /**
+     * A single successful node is enough to keep the assembled result out of the
+     * all-failed fallback path.
+     */
+    public function testOneSuccessfulNodeIsNotAllFailed(): void
+    {
+        $plan = $this->plan();
+        $ctx = $this->context();
+
+        $ctx->setResult('n1', NodeResult::ok('Summary text'));
+        $ctx->setResult('n2', NodeResult::failed('TTS provider unavailable'));
+        $ctx->setResult('n3', NodeResult::ok('Summary text'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertFalse($result['all_failed']);
     }
 
     /**

@@ -36,6 +36,15 @@ enum Capability: string
     /** Web search (BraveSearchService + SearchQueryGenerator). */
     case WebSearch = 'web_search';
 
+    /** Fetch + read the content of specific URL(s) named in the request (UrlContentService). */
+    case UrlFetch = 'url_fetch';
+
+    /** Pull data from one of the user's connected external MCP servers (McpClient, read-only v1). */
+    case McpFetch = 'mcp_fetch';
+
+    /** Live read-only IMAP search over the user's connected mailboxes (InboundEmailHandler accounts). */
+    case EmailSearch = 'email_search';
+
     /** Vision / OCR / document Q&A (FileAnalysisHandler). */
     case FileAnalysis = 'file_analysis';
 
@@ -77,7 +86,7 @@ enum Capability: string
         return match ($this) {
             self::ExtractText => 'extract',
             self::Chat, self::Summarize, self::Translate, self::RagQuery, self::FileAnalysis => 'text',
-            self::WebSearch => 'search',
+            self::WebSearch, self::UrlFetch, self::McpFetch, self::EmailSearch => 'search',
             self::ImageGeneration => 'image',
             self::VideoGeneration => 'video',
             self::Text2Sound => 'audio',

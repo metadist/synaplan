@@ -794,8 +794,8 @@
     outline: none;
   }
   .dark .icon-ghost {
-    color: #c6c6c9;
-    opacity: 0.7;
+    color: #d6d7db;
+    opacity: 0.85;
   }
   .dark .icon-ghost:hover,
   .dark .icon-ghost:focus-visible {

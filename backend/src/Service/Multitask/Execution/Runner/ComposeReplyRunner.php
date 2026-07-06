@@ -9,6 +9,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Skill\SkillDescriptor;
 
 /**
  * `compose_reply` runner — the terminal assembly node. Gathers the reply text
@@ -24,6 +25,16 @@ final readonly class ComposeReplyRunner implements TaskRunner
     public function supportedCapabilities(): array
     {
         return [Capability::ComposeReply];
+    }
+
+    /**
+     * @return list<SkillDescriptor>
+     */
+    public function describe(): array
+    {
+        return [
+            new SkillDescriptor(Capability::ComposeReply, 'Assemble final reply: text + N file attachments from other nodes.'),
+        ];
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult

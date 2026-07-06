@@ -9,10 +9,11 @@ use App\Entity\Message;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
-use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\Plan\TaskPlanValidator;
+use App\Service\Multitask\Skill\SkillCatalog;
 use App\Service\Prompt\TimeContextBuilder;
+use App\Service\PromptService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -29,24 +30,6 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class TaskPlanner
 {
-    /** Human-readable catalogue injected into the planner prompt ([CAPABILITYLIST]). */
-    private const CAPABILITY_DESCRIPTIONS = [
-        'extract_text' => 'Extract text from an attached document or audio file (no model choice needed).',
-        'chat' => 'Answer with text. Use params.topic_id to bind a specific task topic/system prompt.',
-        'summarize' => 'Summarize provided text.',
-        'translate' => 'Translate provided text into a target language (params.target).',
-        'rag_query' => 'Answer using the user knowledge base (retrieval-augmented).',
-        'web_search' => 'Search the web for current information.',
-        'file_analysis' => 'Analyze/describe/OCR an attached image or document and answer about it.',
-        'image_generation' => 'Generate or edit an image from a prompt and/or reference images.',
-        'video_generation' => 'Generate a video clip (params.duration, params.resolution).',
-        'text2sound' => 'Synthesize speech/audio from text (params.format, e.g. mp3).',
-        'document_generation' => 'Generate an Office document (CSV/XLSX/DOCX/PPTX).',
-        'calendar_event' => 'Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve relative times against the current time context below.',
-        'email_me' => 'Email the results to the account owner as one multi-part mail (text + attachments from other nodes). ONLY when the user explicitly asks to be mailed/emailed the result ("mail it to me", "send it to my email"). Inputs: text, attachments. Never the reply node.',
-        'compose_reply' => 'Assemble final reply: text + N file attachments from other nodes.',
-    ];
-
     public function __construct(
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
@@ -55,6 +38,8 @@ final readonly class TaskPlanner
         private LoggerInterface $logger,
         private UserRepository $userRepository,
         private TimeContextBuilder $timeContextBuilder,
+        private SkillCatalog $skillCatalog,
+        private PromptService $promptService,
     ) {
     }
 
@@ -156,10 +141,12 @@ final readonly class TaskPlanner
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
         $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
 
-        $capabilityList = [];
-        foreach (Capability::values() as $cap) {
-            $capabilityList[] = '- "'.$cap.'": '.(self::CAPABILITY_DESCRIPTIONS[$cap] ?? '');
-        }
+        // Catalog-lite (release 4.0): the capability list is assembled from the
+        // SkillDescriptors the runners declare — one source of truth per block.
+        // Dynamic blocks (mcp_fetch) additionally receive the resolved routing
+        // topic + its metadata so per-prompt gates (`tool_mcp`) decide whether
+        // their sub-catalog is injected at all (plan 09 §3.2).
+        $capabilityList = $this->skillCatalog->renderCapabilityList($userId, $this->catalogContext($userId, $options));
 
         $dynamicList = [];
         foreach ($topicsWithDesc as $item) {
@@ -168,11 +155,45 @@ final readonly class TaskPlanner
 
         $keyList = implode(' | ', array_map(static fn (string $t): string => '"'.$t.'"', $topics));
 
-        $text = str_replace('[CAPABILITYLIST]', implode("\n", $capabilityList), $template);
+        $text = str_replace('[CAPABILITYLIST]', $capabilityList, $template);
         $text = str_replace('[DYNAMICLIST]', implode("\n", $dynamicList), $text);
         $text = str_replace('[KEYLIST]', $keyList, $text);
 
         return $text."\n\n".$this->timeContextBlock($message, $options);
+    }
+
+    /**
+     * Render context for dynamic skill blocks: the turn's resolved routing
+     * topic (from the classification the executor forwards in the options)
+     * and that topic's BPROMPTMETA map. Failures degrade to an empty context
+     * — a metadata hiccup must never break planning.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function catalogContext(?int $userId, array $options): array
+    {
+        $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+        $topic = is_string($classification['topic'] ?? null) ? $classification['topic'] : '';
+        if ('' === $topic) {
+            return [];
+        }
+
+        $topicMetadata = [];
+        try {
+            $promptData = $this->promptService->getPromptWithMetadata($topic, $userId ?? 0);
+            if (null !== $promptData && is_array($promptData['metadata'] ?? null)) {
+                $topicMetadata = $promptData['metadata'];
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanner: failed to resolve topic metadata for the skill catalog (ignored)', [
+                'topic' => $topic,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return ['topic' => $topic, 'topic_metadata' => $topicMetadata];
     }
 
     /**

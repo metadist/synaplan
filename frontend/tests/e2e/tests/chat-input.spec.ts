@@ -1,12 +1,12 @@
 /**
- * Chat-input action row — phase 3 of the navigation/UX redesign
- * (_devextras/planning/20260611-navigation-ia-cleanup.md §4.7).
+ * Chat-input controls — Release 4.0 lean composer
+ * (_devextras/planning/release4.0/10_landing-streamline-guest-ux.md §5).
  *
- * Contract: the row holds exactly three pills — Model, Tools, Knowledge
- * folder. Thinking and Voice reply are toggle rows INSIDE the Tools
- * dropdown (state surfaces on the pill as a dot, Q8); the only navigation
- * lives inside the pickers as clearly marked link rows (Manage folders…,
- * Summarizer).
+ * The old always-visible action row is gone. Per-message controls (Model,
+ * Tools, Knowledge folder) plus "Attach files" now live inside the "+" menu.
+ * The menu always opens; Thinking/Voice reply/Enhance remain toggle rows
+ * INSIDE the Tools dropdown, and the only navigation lives inside the pickers
+ * as clearly marked link rows (Manage folders…, Summarizer).
  */
 import { test, expect, type Page } from '../test-setup'
 import { login } from '../helpers/auth'
@@ -15,36 +15,40 @@ import { TIMEOUTS } from '../config/config'
 
 const CHAT = selectors.chat
 
-async function ensureAdvancedMode(page: Page) {
-  await page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
-  await page.reload()
-  await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+/** Open the "+" menu and wait for its panel. */
+async function openPlusMenu(page: Page) {
+  const panel = page.locator(CHAT.plusPanel)
+  if (!(await panel.isVisible().catch(() => false))) {
+    await page.locator(CHAT.plusToggle).click()
+    await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  }
+  return panel
 }
 
-test.describe('Chat input: action row (§4.7)', () => {
+test.describe('Chat input: "+" menu (§5)', () => {
   test.beforeEach(async ({ page, credentials }) => {
     await login(page, credentials)
-    await ensureAdvancedMode(page)
-    await expect(page.locator(CHAT.secondaryActions)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await expect(page.locator(CHAT.plusToggle)).toBeVisible({ timeout: TIMEOUTS.SHORT })
   })
 
-  test('@ci row holds exactly the three pills — Model, Tools, Knowledge folder', async ({
-    page,
-  }) => {
-    const row = page.locator(CHAT.secondaryActions)
-    await expect(row.locator(CHAT.modelToggle)).toBeVisible()
-    await expect(row.locator(CHAT.toolsToggle)).toBeVisible()
-    await expect(row.locator(CHAT.knowledgeFolderBtn)).toBeVisible()
+  test('@ci "+" menu holds Attach, Model, Tools and Knowledge folder', async ({ page }) => {
+    const panel = await openPlusMenu(page)
+    await expect(panel.locator(CHAT.attachBtn)).toBeVisible()
+    await expect(panel.locator(CHAT.modelToggle)).toBeVisible()
+    await expect(panel.locator(CHAT.toolsToggle)).toBeVisible()
+    await expect(panel.locator(CHAT.knowledgeFolderBtn)).toBeVisible()
 
     // The retired standalone pills must not come back.
-    await expect(row.locator('[data-testid="btn-chat-thinking"]')).toHaveCount(0)
-    await expect(row.locator('[data-testid="btn-chat-voice-reply"]')).toHaveCount(0)
-    await expect(row.locator('[data-testid="btn-manage-knowledge-groups"]')).toHaveCount(0)
+    await expect(panel.locator('[data-testid="btn-chat-thinking"]')).toHaveCount(0)
+    await expect(panel.locator('[data-testid="btn-chat-voice-reply"]')).toHaveCount(0)
+    await expect(panel.locator('[data-testid="btn-manage-knowledge-groups"]')).toHaveCount(0)
   })
 
   test('@ci Tools dropdown lists command tools, toggles and the Summarizer link', async ({
     page,
   }) => {
+    await openPlusMenu(page)
     await page.locator(CHAT.toolsToggle).click()
     const panel = page.locator(CHAT.toolsPanel)
     await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
@@ -60,6 +64,7 @@ test.describe('Chat input: action row (§4.7)', () => {
   test('@ci Voice-reply toggle flips state and surfaces as a dot on the pill (Q8)', async ({
     page,
   }) => {
+    await openPlusMenu(page)
     await expect(page.locator(CHAT.toolsActiveBadge)).toHaveCount(0)
 
     await page.locator(CHAT.toolsToggle).click()
@@ -87,11 +92,13 @@ test.describe('Chat input: action row (§4.7)', () => {
     if (isMobile) {
       // No in-shell sparkles button crowding the narrow input…
       await expect(page.locator(CHAT.enhanceButton)).toHaveCount(0)
-      // …the control lives in the Tools dropdown instead.
+      // …the control lives in the Tools dropdown (inside the "+" menu) instead.
+      await openPlusMenu(page)
       await page.locator(CHAT.toolsToggle).click()
       await expect(page.locator(CHAT.toolEnhance)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     } else {
       await expect(page.locator(CHAT.enhanceButton)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await openPlusMenu(page)
       await page.locator(CHAT.toolsToggle).click()
       await expect(page.locator(CHAT.toolsPanel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator(CHAT.toolEnhance)).toBeHidden()
@@ -99,6 +106,7 @@ test.describe('Chat input: action row (§4.7)', () => {
   })
 
   test('@ci Summarizer link row navigates to the summarizer tool (Q3)', async ({ page }) => {
+    await openPlusMenu(page)
     await page.locator(CHAT.toolsToggle).click()
     await page.locator(CHAT.toolSummarizerLink).click()
     await expect(page).toHaveURL(/\/ai\/summarizer/, { timeout: TIMEOUTS.STANDARD })
@@ -107,6 +115,7 @@ test.describe('Chat input: action row (§4.7)', () => {
   test('@ci Knowledge-folder picker opens with None option and Manage link to Files', async ({
     page,
   }) => {
+    await openPlusMenu(page)
     await page.locator(CHAT.knowledgeFolderBtn).click()
     const panel = page.locator(CHAT.knowledgeFolderPanel)
     await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })

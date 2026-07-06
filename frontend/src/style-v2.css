@@ -33,14 +33,17 @@
   --v2-border-hover: rgba(0, 63, 199, 0.36);
 }
 
-/* Dark + V2 */
+/* Dark + V2
+ * Contrast-tuned: secondary text (placeholders, hints, labels) and borders
+ * were too faint against the near-black surfaces — lifted for readability. */
 .design-v2.dark {
   --bg-app: #050a16;
   --bg-sidebar: rgba(10, 16, 30, 0.7);
   --bg-chat: #050a16;
   --bg-card: rgba(16, 24, 42, 0.9);
   --bg-chip: rgba(255, 255, 255, 0.04);
-  --border-light: rgba(107, 143, 214, 0.08);
+  --txt-secondary: #b8bdc7;
+  --border-light: rgba(107, 143, 214, 0.16);
   --brand-alpha-light: rgba(107, 143, 214, 0.1);
 
   --v2-glow: rgba(107, 143, 214, 0.1);
@@ -234,8 +237,8 @@
     border-color 0.3s ease;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell'] {
-  background: rgba(255, 255, 255, 0.025) !important;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
   box-shadow:
     0 2px 12px rgba(0, 0, 0, 0.15),
     0 0 8px var(--v2-glow) !important;
@@ -255,9 +258,10 @@
     0 0 20px var(--v2-glow-strong) !important;
 }
 
-/* Floating chat input area — remove separate background band */
+/* Chat input area — same background as the messages area above,
+   so there is no visible color band at the bottom of the chat. */
 .design-v2 [data-testid='comp-chat-input'] {
-  background: transparent !important;
+  background: var(--bg-chat) !important;
 }
 
 /* ----------------------------------------------------------
@@ -275,9 +279,9 @@
   transition: all 0.2s ease;
 }
 .design-v2.dark .pill {
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #d4d4d8;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #e4e5e9;
 }
 .design-v2 .pill:hover {
   background: rgba(0, 63, 199, 0.1);
@@ -766,6 +770,10 @@
    ---------------------------------------------------------- */
 
 /* Text inputs, selects, textareas inside V2 */
+/* Every field gets a real, visible border: Tailwind preflight resets
+   border-width to 0, so fields without an explicit `border` class used to
+   render borderless — set width+style here, a tad darker than the field
+   background so the outline is always readable. */
 .design-v2 input[type='text'],
 .design-v2 input[type='email'],
 .design-v2 input[type='password'],
@@ -775,8 +783,10 @@
 .design-v2 input[type='tel'],
 .design-v2 select,
 .design-v2 textarea {
-  background: rgba(0, 0, 0, 0.02) !important;
-  border-color: rgba(0, 0, 0, 0.1) !important;
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: rgba(0, 0, 0, 0.22) !important;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
@@ -804,8 +814,8 @@
 .design-v2.dark input[type='tel'],
 .design-v2.dark select,
 .design-v2.dark textarea {
-  background: rgba(255, 255, 255, 0.03) !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }
 .design-v2.dark input[type='text']:focus,
 .design-v2.dark input[type='email']:focus,

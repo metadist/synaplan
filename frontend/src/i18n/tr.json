@@ -70,7 +70,8 @@
     "liveSupport": "Canlı Destek",
     "addinConnect": "Outlook eklentisini bağla",
     "accountDeletion": "Hesap Silme",
-    "onboarding": "Hoş geldin"
+    "onboarding": "Hoş geldin",
+    "mcpServers": "MCP Sunucuları"
   },
   "addinConnect": {
     "title": "Synaplan'a bağlan",
@@ -91,6 +92,14 @@
     "errorIssuanceFailed": "Synaplan bu hesap için bir API anahtarı veremedi."
   },
   "welcome": "Hoş Geldiniz",
+  "examplePrompts": {
+    "heading": "Bunlardan birini deneyin",
+    "items": {
+      "poemMp3": "Bir kedi hakkında şiir yaz ve onu MP3'e dönüştür.",
+      "everglades": "Florida Everglades hakkında bir makale yaz ve indirilebilir bir Word belgesine koy.",
+      "retreat": "Londra'da bir günlük şirket kampı için video davetiye oluştur ve programı altına yaz."
+    }
+  },
   "marketingNews": {
     "heading": "Synaplan'dan en yeniler",
     "readMore": "Devamını oku"
@@ -314,6 +323,11 @@
       "testConnection": "Bağlantıyı Test Et",
       "testFailed": "Bağlantı testi başarısız",
       "commandCopied": "Komut panoya kopyalandı",
+      "tabGroups": {
+        "aiData": "AI ve Veri",
+        "communication": "İletişim",
+        "security": "Güvenlik ve Giriş"
+      },
       "restartBanner": {
         "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
         "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",
@@ -335,6 +349,7 @@
     "toolsChatWidget": "Sohbet Widgetı",
     "toolsDocSummary": "Özetleyici",
     "toolsMailHandler": "E-posta Otomasyonu",
+    "mcpServers": "MCP Sunucuları",
     "plugins": "Eklentiler",
     "files": "Dosyalar",
     "filesDescription": "Dosyalar ve bilgi",
@@ -361,10 +376,40 @@
     "more": "Daha fazla",
     "moreDescription": "Diğer bölümler ve hesap"
   },
+  "guest": {
+    "featureGate": {
+      "title": "Bu özellik bir hesap gerektirir",
+      "subtitle": "Tüm özellikleri açmak için ücretsiz bir hesap oluşturun",
+      "features": {
+        "files": "Yapay zekan için bilgi tabanı olarak belgeler yükle",
+        "memories": "Yapay zekan kişiselleştirilmiş yanıtlar için önemli bilgileri hatırlar",
+        "settings": "Yapay zeka modellerini, komutları ve entegrasyonları yapılandır",
+        "statistics": "Kullanımını, maliyetlerini ve sohbet geçmişini takip et",
+        "general": "Tüm premium özelliklere ve araçlara eriş",
+        "models": "Birden fazla yapay zeka modeli arasından seç ve deneyimini özelleştir",
+        "tools": "Görsel ve video oluşturma gibi gelişmiş araçları kullan",
+        "enhance": "Daha iyi yanıtlar için yapay zeka destekli mesaj iyileştirme",
+        "channels": "WhatsApp'ı, e-postayı ve web sitesi sohbet widget'ını Synaplan'a bağla.",
+        "aiSetup": "Yapay zeka modellerini, komutları ve yönlendirmeyi iş akışına göre yapılandır.",
+        "attach": "Yapay zekan için bilgi tabanı olarak belge ve görsel yükle.",
+        "knowledge": "Odaklı yanıtlar için bir sohbeti bilgi klasörlerinden biriyle sınırla."
+      },
+      "registerButton": "Ücretsiz hesap oluştur",
+      "loginButton": "Zaten hesabın var mı? Giriş yap"
+    }
+  },
   "chatInput": {
     "placeholder": "Mesajınızı yazın...",
     "provider": "Sağlayıcı",
     "model": "Model",
+    "modelCaption": "Model: {name}",
+    "plusMenu": {
+      "label": "Ekle",
+      "attach": "Dosya ekle",
+      "model": "Model",
+      "tools": "Araçlar",
+      "knowledge": "Bilgi klasörü"
+    },
     "configureModel": "AI Modelini Yapılandır",
     "attach": "Ekle",
     "uploadFile": "Yükle",
@@ -657,6 +702,8 @@
     "cancel": "İptal",
     "delete": "Sil",
     "save": "Kaydet",
+    "saving": "Kaydediliyor...",
+    "edit": "Düzenle",
     "close": "Kapat",
     "open": "Aç",
     "share": "Paylaş",
@@ -1176,6 +1223,9 @@
       "translate": "Çeviri",
       "rag_query": "Bilgi yanıtı",
       "web_search": "Web araması",
+      "url_fetch": "Web sayfası okunuyor",
+      "mcp_fetch": "Bağlı veriler alınıyor",
+      "email_search": "E-postalarınızda aranıyor",
       "file_analysis": "Dosya analizi",
       "image_generation": "Görsel",
       "video_generation": "Video",
@@ -1183,7 +1233,13 @@
       "document_generation": "Belge",
       "calendar_event": "Takvim daveti",
       "email_me": "E-posta gönderimi"
-    }
+    },
+    "copyText": "Metni kopyala",
+    "copied": "Panoya kopyalandı",
+    "copyFailed": "Kopyalanamadı",
+    "expand": "Metni göster",
+    "collapse": "Metni gizle",
+    "redundantCollapsed": "Bu metin aşağıdaki yanıtın bir parçasıdır."
   },
   "processing": {
     "started": "İşlem başlatılıyor...",
@@ -1551,8 +1607,8 @@
     "describeSortDone": "Artık yapay zekâ ile aranabilir.",
     "describeSortDoneGroup": "Artık yapay zekâ ile aranabilir · \"{group}\" içine eklendi.",
     "describeSortFailed": "Bu dosya aranabilir yapılamadı.",
-    "indexPromptAction": "Üretim istemini bilgi tabanına ekle",
-    "indexPromptDone": "Üretim istemi bilgi tabanınıza eklendi.",
+    "indexPromptAction": "Bilgi tabanına ekle",
+    "indexPromptDone": "Bilgi tabanınıza eklendi.",
     "emptyState": {
       "title": "Henüz dosya yok",
       "description": "Başlamak için dosya yükle. Dosyaları klasörler halinde düzenleyebilirsin.",
@@ -2846,5 +2902,46 @@
       "loginHint": "Zaten bir hesabın var mı?",
       "loginCta": "Giriş yap"
     }
+  },
+  "mcpServers": {
+    "title": "MCP Sunucuları",
+    "description": "Asistanın yanıt verirken kendi sistemlerinizden (CRM, wiki, dahili API'ler) veri çekebilmesi için harici MCP sunucularını bağlayın. Burada keşfedilen araçlar görev planlayıcısına sunulur.",
+    "clientDisabledHint": "Giden MCP istemcisi şu anda platform yapılandırmasında devre dışı. Bağlantılar hazırlanabilir, ancak etkinleştirilene kadar çağrı yapılmaz.",
+    "listTitle": "Bağlı sunucular",
+    "add": "Sunucu ekle",
+    "addTitle": "Yeni sunucu bağla",
+    "editTitle": "Sunucuyu düzenle",
+    "formHint": "URL, herkese açık bir HTTPS MCP uç noktası (Streamable HTTP) olmalıdır. Kimlik doğrulama değeri şifrelenmiş olarak saklanır ve bir daha gösterilmez.",
+    "empty": "Henüz bağlı MCP sunucusu yok.",
+    "nameLabel": "Ad",
+    "urlLabel": "Sunucu URL'si",
+    "authHeaderLabel": "Kimlik doğrulama başlığı adı (isteğe bağlı)",
+    "authTokenLabel": "Kimlik doğrulama başlığı değeri",
+    "authTokenPlaceholder": "örn. Bearer sk-…",
+    "enabledLabel": "Etkin",
+    "enabled": "Etkin",
+    "disabled": "Devre dışı",
+    "test": "Bağlantıyı test et",
+    "testing": "Test ediliyor…",
+    "testSuccess": "Bağlantı başarılı — {count} araç bulundu",
+    "testFailed": "Bağlantı başarısız",
+    "discoveredTools": "{count} araç bulundu:",
+    "saved": "Sunucu kaydedildi",
+    "saveFailed": "Sunucu kaydedilemedi",
+    "deleted": "Sunucu kaldırıldı",
+    "deleteFailed": "Sunucu kaldırılamadı",
+    "deleteTitle": "MCP sunucusunu kaldır",
+    "deleteMessage": "\"{name}\" bağlantısı kaldırılsın mı? Asistan artık bu sunucunun araçlarını kullanamaz.",
+    "loadFailed": "MCP sunucuları yüklenemedi",
+    "usageTitle": "Bu sunucuları hangi görevler kullanabilir",
+    "usageDescription": "Her görev, asistanın yanıt verirken bağlı sunucularınızdan veri çekip çekemeyeceğine kendisi karar verir. Kullanması gereken her görev için etkinleştirin — normal sohbet soruları için bu \"General Chat\" görevidir.",
+    "usageNotUsedWarning": "Bağlı sunucularınız henüz kullanılmıyor: hiçbir görev MCP veri kaynaklarına izin vermiyor. Aşağıda en az bir görevi etkinleştirin, aksi halde asistan bu sunucuları asla çağırmaz.",
+    "usageOn": "İzinli",
+    "usageOff": "Kapalı",
+    "usageEnabled": "Bu görev için MCP veri kaynakları etkinleştirildi",
+    "usageDisabled": "Bu görev için MCP veri kaynakları devre dışı bırakıldı",
+    "usageUpdateFailed": "Görev güncellenemedi",
+    "usageAdvancedHint": "Görev başına daha fazla seçenek (sunucu kısıtlamaları, talimatlar, modeller):",
+    "usageAdvancedLink": "AI Talimatları"
   }
 }

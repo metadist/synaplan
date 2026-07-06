@@ -38,7 +38,7 @@ class PromptCatalog
      *    - tools:memory_*      ← memory extraction/parsing
      *    - tools:feedback_*    ← feedback contradiction checks
      *
-     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string}>
+     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string, metadata?: array<string, string>}>
      */
     public static function all(): array
     {
@@ -51,6 +51,19 @@ class PromptCatalog
                 'language' => 'en',
                 'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no other topic matches.',
                 'prompt' => self::generalPrompt(),
+                // Release defaults for the catch-all chat topic (seeded only
+                // when the prompt row is first created — bootstrap-only, an
+                // operator's later change is never overwritten):
+                //   - MCP data sources ON (`tool_mcp=1`) — a freshly connected
+                //     server (Channels → MCP Servers) works for normal chat
+                //     questions out of the box, no hidden per-topic toggle hunt.
+                //   - Web search on AUTO — `tool_internet` is deliberately NOT
+                //     seeded: an absent key is the "auto" state (the
+                //     classifier's per-message vote decides, and the user's
+                //     manual search toggle keeps working). Seeding `0` would
+                //     be WebSearchTopicPolicy rule 1, a hard disable that
+                //     even beats the per-message toggle.
+                'metadata' => ['tool_mcp' => '1'],
             ],
             [
                 'topic' => 'mediamaker',
@@ -165,6 +178,14 @@ class PromptCatalog
      * system prompts but never touches BSELECTION_RULES so admins can keep their
      * custom rule overrides.
      *
+     * Catalog `metadata` (BPROMPTMETA) is BOOTSTRAP-ONLY: it is written once
+     * when the prompt row is first inserted and never again. Re-seeding an
+     * existing prompt must not resurrect a default the operator changed —
+     * including keys the UI deliberately REMOVED (the Internet Search "auto"
+     * state deletes `tool_internet` entirely, so even an insert-if-missing
+     * per key would silently flip "auto" back to the seeded value on every
+     * container start).
+     *
      * @return array{inserted: list<string>, updated: list<string>} topic keys per outcome
      */
     public static function seed(Connection $connection): array
@@ -189,6 +210,15 @@ class PromptCatalog
                     'INSERT INTO BPROMPTS (BOWNERID, BLANG, BTOPIC, BSHORTDESC, BPROMPT) VALUES (0, ?, ?, ?, ?)',
                     [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']]
                 );
+                $promptId = (int) $connection->lastInsertId();
+
+                foreach ($prompt['metadata'] ?? [] as $key => $value) {
+                    $connection->executeStatement(
+                        'INSERT INTO BPROMPTMETA (BPROMPTID, BMETAKEY, BMETAVALUE, BCREATED) VALUES (?, ?, ?, ?)',
+                        [$promptId, $key, $value, time()]
+                    );
+                }
+
                 $inserted[] = $prompt['topic'];
             }
         }
@@ -324,6 +354,11 @@ This is the list, use only this:
    - Summarize or inspect the image content
    - Answer questions about what the image shows
    - Compare images without creating a new one
+   - Describe/explain the image and get the answer AS AUDIO or read aloud
+     ("beschreibe in einem Audio, was hier zu sehen ist", "describe this
+     image as audio", "erkläre das Bild und lies es mir vor") — the audio
+     wish concerns the OUTPUT FORMAT of a describe intent, not media
+     creation. Do NOT set BTOPIC "mediamaker" and do NOT set BMEDIA.
 
    Examples with image attachments:
    - "Put the person from image 1 into the scene of image 2" → mediamaker
@@ -336,6 +371,8 @@ This is the list, use only this:
    - "Describe this photo" → general
    - "Read the text from this document" → general
    - "What differences do you see?" → general
+   - "Beschreibe in einem Audio, was hier zu sehen ist" → general (NOT mediamaker)
+   - "Describe this image as audio" → general (NOT mediamaker)
 
    If there are image attachments but no BTEXT, default to "general".
 
@@ -343,6 +380,10 @@ This is the list, use only this:
    - "video" - if user wants a video, film, clip, animation, or moving images
    - "audio" - if user wants audio, sound, voice, speech, TTS, or text-to-speech
    - "image" - if user wants an image, picture, photo, illustration, or any image editing/composition (this is the default)
+   IMPORTANT: "audio" means CREATING speech from text the user provides or asks
+   to be written. If the message asks to DESCRIBE/analyze an ATTACHED image —
+   even when the answer should come "as audio" / "vorgelesen" — rule 7 wins:
+   BTOPIC = "general" and no BMEDIA at all.
    Examples:
    - "Create a video of a car" → BMEDIA: "video"
    - "Make a video of a dog running" → BMEDIA: "video"
@@ -489,7 +530,11 @@ Allowed topic keys: [KEYLIST]
 2. Audio / TTS / "read aloud" / "vorlesen" / "MP3" / "narrate" / "speech" →
    `text2sound` node. If the user also asks for content to be generated
    first ("write X and read it"), GENERATE the content in a prior `chat`
-   node, then feed `$nX.text` into `text2sound`.
+   node, then feed `$nX.text` into `text2sound`. If the text to speak must
+   first be derived from an image or document ("describe the attached image
+   as audio", "beschreibe in einem Audio, was hier zu sehen ist"), chain
+   `file_analysis` → `text2sound` — NEVER `image_generation`: the user wants
+   the picture EXPLAINED, not a new picture.
 3. Image generate/edit → `image_generation`. To EDIT an image produced by an
    earlier node ("make a logo, then make it blue"), add a second
    `image_generation` node that depends on the first and references its file:
@@ -505,13 +550,31 @@ Allowed topic keys: [KEYLIST]
    node falls back to text-to-video.
 5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
    chat). Real PDFs are NOT supported — say so in a single `chat` node.
-6. Question about an attached document/image (read, describe, extract,
-   summarize what's in it) → `file_analysis` (or `extract_text` →
-   `summarize`).
-7. Meeting / appointment / calendar event ("set up a meeting", "mail me a
-   meeting note for tomorrow 15:00 with Tom") → one `calendar_event` node.
-   Resolve the relative time against the time context into an absolute
-   ISO-8601 `start` + IANA `timezone`, fill title/attendees/location/duration.
+6. Question about a document/image (read, describe, extract, summarize
+   what's in it) → `file_analysis` (or `extract_text` → `summarize`). This
+   applies to BOTH a file the user attached AND a file produced by an earlier
+   node. "Generate media AND describe/analyze it" ("create an image of X and
+   describe it", "make a video and tell me what happens", "generate a document
+   and summarize it") is a TWO-node chain: first the generator node
+   (`image_generation` / `video_generation` / `document_generation`), then a
+   `file_analysis` node that `depends_on` the generator and reads its output
+   via `inputs.file: "$nX.file"`. NEVER answer the "describe it" part with an
+   independent `chat` node — that node would run before the file exists and
+   hallucinate. The generated file must flow into `file_analysis`.
+   The SAME chain applies to CREATIVE text ABOUT a file ("create an image of
+   a cat and write a poem about it", "erstelle ein Bild und schreibe ein
+   Gedicht darüber", "make a picture and tell a story about it"): the
+   creative step is a `file_analysis` node that `depends_on` the generator,
+   reads `inputs.file: "$nX.file"`, and carries the creative instruction in
+   `inputs.prompt` — the vision model then writes about the REAL image.
+   A parallel `chat` node would invent an image it has never seen.
+7. Meeting / appointment / calendar event / reminder for a specific time
+   ("set up a meeting", "mail me a meeting note for tomorrow 15:00 with Tom",
+   "I need a meeting reminder for tomorrow at 9:00 with Sanam", "erinnere
+   mich an den Termin morgen um 9") → one `calendar_event` node — NEVER a
+   `chat` node that merely talks about the appointment. Resolve the relative
+   time against the time context into an absolute ISO-8601 `start` + IANA
+   `timezone`, fill title/attendees/location/duration.
 8. "Mail it to me" / "email me the result" / "schick es mir per Mail" →
    ADD one `email_me` node that depends on the content nodes and consumes
    their outputs (`text` + `attachments`). ONLY when the user EXPLICITLY
@@ -520,8 +583,39 @@ Allowed topic keys: [KEYLIST]
    the `email_me` node. (Exception: a meeting invite alone → rule 7.)
 9. Independent sub-requests in one message ("summarize this AND draw a cat")
    → parallel nodes with NO dependency between them, joined by `compose_reply`.
+9b. The user asks to read/summarize/use the content of a SPECIFIC URL written
+   in the message ("load https://…", "was steht auf dieser Seite?",
+   "summarize this article: https://…") → a `url_fetch` node (put the URL in
+   `inputs.urls`), then feed `$nX.text` into the answering node
+   (`summarize`/`chat`/`translate`). Do NOT emit `url_fetch` for a bare link
+   mention the question does not depend on, and prefer `web_search` when no
+   concrete URL is given. Only use `url_fetch` if it appears in the
+   capability list above.
+9c. The request needs data from one of the user's CONNECTED systems and the
+   capability list above shows `mcp_fetch` with available connections
+   ("look up customer X in our CRM", "check the wiki for the onboarding
+   page") → an `mcp_fetch` node with `params.server_id` + `params.tool`
+   taken EXACTLY from the listed connections and the tool arguments in
+   `inputs.arguments`; feed `$nX.text` into the answering node. NEVER
+   invent a server_id or tool name, and NEVER emit `mcp_fetch` when it is
+   not in the capability list or no listed tool fits — use `chat` or
+   `web_search` instead.
+9d. The user explicitly asks about their OWN emails/mailbox ("search my
+   emails for the Acme offer", "was hat mir Tom letzte Woche gemailt?") AND
+   the capability list above shows `email_search` with a connected mailbox
+   → an `email_search` node with `params.query` (keywords), optional
+   `params.from` (sender) and `params.since` (YYYY-MM-DD, resolve relative
+   times against the time context); feed `$nX.text` into the answering
+   node. NEVER emit `email_search` for generic questions or when it is not
+   in the capability list.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
    node, no `compose_reply` needed.
+11. A SINGLE media request with no follow-up step ("make an image of X",
+    "generate a video of Y", "read this aloud", "make an excel table") → ONE
+    generator node (`image_generation` / `video_generation` / `text2sound` /
+    `document_generation`). `reply_node` = that node. Do NOT add a
+    `compose_reply` — the generator's file is delivered on its own. Only add
+    `compose_reply` when there are 2+ nodes to combine (see rule 1).
 
 ## Canonical multi-step examples (MEMORIZE these patterns)
 
@@ -568,6 +662,20 @@ User: sends report.docx and writes "What's in there? Summarize it into a short M
   ]
 }
 
+### Single image, nothing else ("Erstelle ein Bild von einem Sonnenuntergang")
+A lone media request is ONE node — no `compose_reply` (rule 11). This mirrors the
+`/pic` command: the image is delivered directly, no task card. The SAME shape
+applies to a single `video_generation`, `text2sound` or `document_generation`.
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Ein Sonnenuntergang" } }
+  ]
+}
+
 ### Poem + MP3 + image, mailed to the user
 User: "Write a spring poem, read it aloud and make a fitting image with it. Mail it to me."
 
@@ -607,6 +715,119 @@ The `image` input on the video node (`$n1.file`) makes it an image-to-video
 render of the generated picture (IMG2VID). Omitting it would animate from text
 only. The same `"image": "$nX.file"` pattern turns a second `image_generation`
 node into an image edit (PIC2PIC).
+
+### Generate media, then describe/analyze it (generate → file_analysis chain)
+User: "Erstelle ein Bild einer Katze und danach beschreibe das erstellte Bild."
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Eine Katze" } },
+    { "id": "n2", "capability": "file_analysis", "depends_on": ["n1"], "inputs": { "file": "$n1.file", "prompt": "Beschreibe detailliert, was auf diesem Bild zu sehen ist." } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text", "attachments": ["$n1.file"] } }
+  ]
+}
+
+The describe step is `file_analysis` depending on n1 and reading `$n1.file` —
+NOT an independent `chat` node. This guarantees the description sees the real
+generated file instead of hallucinating one. The SAME pattern applies to
+`video_generation` → `file_analysis` ("make a video and describe what happens")
+and `document_generation` → `file_analysis` ("create a table and summarize it").
+
+### Image, then a poem about it, read aloud (creative text about generated media)
+User: "Erstelle das Bild einer Katze, schreibe ein Gedicht darüber und lies es mir am Ende vor."
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n4",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Eine Katze" } },
+    { "id": "n2", "capability": "file_analysis", "depends_on": ["n1"], "inputs": { "file": "$n1.file", "prompt": "Schreibe ein Gedicht über dieses Bild." } },
+    { "id": "n3", "capability": "text2sound", "depends_on": ["n2"], "inputs": { "text": "$n2.text" }, "params": { "format": "mp3" } },
+    { "id": "n4", "capability": "compose_reply", "depends_on": ["n1","n2","n3"], "inputs": { "text": "$n2.text", "attachments": ["$n1.file","$n3.file"] } }
+  ]
+}
+
+The poem node is `file_analysis` with the creative instruction in
+`inputs.prompt` — it depends on n1 and looks at the REAL generated image. It is
+NEVER a parallel `chat` node without the dependency: that node would run before
+the image exists and write about an image it has never seen.
+
+### Describe an ATTACHED image as audio
+User: (attaches photo.png) "Beschreibe in einem Audio, was hier zu sehen ist."
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "file_analysis", "inputs": { "files": "$message.files", "prompt": "Beschreibe, was auf diesem Bild zu sehen ist." } },
+    { "id": "n2", "capability": "text2sound", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "format": "mp3" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n1.text", "attachments": ["$n2.file"] } }
+  ]
+}
+
+The attached image is ANALYZED (`file_analysis` on `$message.files`) and the
+description is spoken (`text2sound`). NEVER route this to `image_generation` —
+the user wants the existing picture explained, not a new picture generated.
+
+### Read a specific URL, then summarize it
+User: "Fasse mir diese Seite zusammen: https://example.com/artikel"
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "url_fetch", "inputs": { "urls": "https://example.com/artikel" } },
+    { "id": "n2", "capability": "summarize", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "style": "short" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+The page content is FETCHED (`url_fetch`) and the summary consumes `$n1.text` —
+never answer about a URL's content from memory or invent what the page says.
+
+### Pull data from a connected system, then answer (mcp_fetch)
+User: "Look up the customer Acme GmbH in our CRM and summarize their last order."
+(The capability list shows: server_id 3 "Company CRM" — tools: search_customers(query), get_last_order(customer_id))
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "mcp_fetch", "inputs": { "arguments": { "query": "Acme GmbH" } }, "params": { "server_id": 3, "tool": "search_customers" } },
+    { "id": "n2", "capability": "chat", "depends_on": ["n1"], "inputs": { "text": "Summarize the last order of this customer based on the following data:\n$n1.text" }, "params": { "topic_id": "general" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+`params.server_id` and `params.tool` come EXACTLY from the listed connections
+(never invented), the tool arguments ride in `inputs.arguments`, and the
+answering node consumes `$n1.text` — the reply is grounded in the pulled data.
+
+### Search the user's own mailbox, then answer (email_search)
+User: "Search my emails for the Acme offer from last week and summarize it."
+(The capability list shows email_search with a connected mailbox; assume today is 2026-06-17.)
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "email_search", "params": { "query": "Acme offer", "since": "2026-06-10" } },
+    { "id": "n2", "capability": "summarize", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "style": "short" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+The mailbox is searched LIVE and read-only; the summary consumes the real
+hits via `$n1.text`. Without an explicit "my emails" intent this node is
+never emitted.
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
 The event fields go in `params`. Resolve the relative time against the time

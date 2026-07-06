@@ -344,6 +344,150 @@ export type { StreamUpdatePayload }
 
 export type GuestStreamCallback = (data: StreamUpdatePayload) => void
 
+/**
+ * POST-based SSE transport for /api/v1/messages/stream.
+ *
+ * EventSource is GET-only, so the legacy transport carried the whole message
+ * (plus the auth token) in the URL. Long pasted texts blew the proxy
+ * request-line limit (HTTP 431) before the backend ever saw the request, and
+ * the old onerror handler masked that as a silent "complete" — the user got
+ * an empty bubble. Sending the parameters as a JSON body removes the length
+ * limit, keeps the message text and token out of access logs, and lets us
+ * report connection failures as real errors.
+ *
+ * Auth mirrors sseTokenFetchInit(): web sends the session cookie, native
+ * sends the stored Bearer token. On a 401 (expired 5-min access cookie) we
+ * refresh once and retry.
+ *
+ * Returns a cleanup function that aborts the request. Aborting only detaches
+ * the client — the backend keeps streaming and persists the result
+ * (detach-on-navigation, #1225); an explicit Stop goes through /stop-stream.
+ */
+function openStreamPost(
+  body: Record<string, string>,
+  onUpdate: (data: StreamUpdatePayload) => void
+): () => void {
+  const controller = new AbortController()
+  let completionReceived = false
+  let isStopped = false
+
+  const authInit = sseTokenFetchInit()
+  const doFetch = () =>
+    fetch(`${getApiBaseUrl()}/api/v1/messages/stream`, {
+      method: 'POST',
+      credentials: authInit.credentials,
+      headers: {
+        ...(authInit.headers ?? {}),
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+
+  const processEvent = (eventChunk: string) => {
+    const jsonStr = eventChunk
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trim())
+      .filter(Boolean)
+      .join('')
+
+    if (!jsonStr) return
+
+    try {
+      const data = JSON.parse(jsonStr) as StreamUpdatePayload
+      completionReceived = completionReceived || data.status === 'complete'
+      onUpdate(data)
+    } catch (error) {
+      console.error('Failed to parse SSE data:', error, 'Raw data:', jsonStr)
+    }
+  }
+
+  ;(async () => {
+    try {
+      let response = await doFetch()
+
+      // Expired access cookie: refresh once, then retry. Mirrors the 401
+      // handling the old EventSource path did via /auth/token.
+      if (response.status === 401) {
+        const refreshed = await refreshAccessToken()
+        if (refreshed && !isStopped) {
+          response = await doFetch()
+        }
+      }
+
+      if (isStopped) return
+
+      if (!response.ok) {
+        console.error(`🚫 Stream connection failed (HTTP ${response.status})`)
+        onUpdate(
+          response.status === 401
+            ? {
+                status: 'error',
+                error: 'Authentication required. Please log in again to continue.',
+                message: 'Your session has expired. Please refresh the page and log in again.',
+              }
+            : { status: 'error', error: `Connection failed (HTTP ${response.status})` }
+        )
+        return
+      }
+
+      if (!response.body) {
+        onUpdate({ status: 'error', error: 'Streaming not supported by this browser' })
+        return
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const events = buffer.split('\n\n')
+          buffer = events.pop() ?? ''
+
+          for (const eventChunk of events) {
+            if (isStopped) return
+            processEvent(eventChunk)
+          }
+        }
+
+        if (!isStopped && buffer.trim() !== '') {
+          processEvent(buffer)
+        }
+      } finally {
+        reader.cancel().catch(() => {
+          // ignore cancellation errors
+        })
+      }
+
+      // Stream closed without a terminal event: the backend always ends a
+      // turn with 'complete' or 'error', so this is a dropped connection or
+      // a crashed worker — surface it instead of leaving an empty bubble.
+      if (!completionReceived && !isStopped) {
+        console.error('❌ Stream ended without completion event')
+        onUpdate({ status: 'error', error: 'Connection interrupted' })
+      }
+    } catch (error) {
+      if (isStopped || (error instanceof DOMException && error.name === 'AbortError')) {
+        return
+      }
+      console.error('🚫 Stream setup error:', error)
+      onUpdate({ status: 'error', error: 'Failed to connect' })
+    }
+  })()
+
+  return () => {
+    isStopped = true
+    controller.abort()
+  }
+}
+
 export const chatApi = {
   async sendMessage(userId: number, message: string, trackId?: number): Promise<unknown> {
     // Mock data temporarily disabled - direct backend communication
@@ -405,117 +549,9 @@ export const chatApi = {
       paramsObj.fileIds = opts.fileIds.join(',')
     }
 
-    const params = new URLSearchParams(paramsObj)
-    const baseUrl = `${getApiBaseUrl()}/api/v1/messages/stream?${params}`
-
-    let eventSource: EventSource | null = null
-    let completionReceived = false
-    let isStopped = false // Flag to prevent processing after manual stop
-
-    // Get SSE token and start stream (async IIFE, but return cleanup sync)
-    ;(async () => {
-      try {
-        if (isStopped) return
-
-        const token = await getSseToken()
-        if (!token) {
-          console.error('🚫 No SSE token available - authentication required')
-          opts.onUpdate({
-            status: 'error',
-            error: 'Authentication required. Please log in again to continue.',
-            message: 'Your session has expired. Please refresh the page and log in again.',
-          })
-          return
-        }
-
-        const url = `${baseUrl}&token=${token}`
-
-        if (isStopped) return
-
-        // Open EventSource directly - no preflight check!
-        // The preflight fetch was causing duplicate messages because it triggered
-        // the backend to save the user message, and then EventSource did it again.
-        // Rate limit errors are now handled via SSE error events from backend.
-        eventSource = new EventSource(url)
-
-        eventSource.onopen = () => {
-          console.log('✅ SSE connection opened')
-        }
-
-        eventSource.onmessage = (event) => {
-          // CRITICAL: Don't process any events after stop
-          if (isStopped) {
-            console.log('⏹️ Ignoring SSE event - stream was stopped')
-            return
-          }
-
-          try {
-            const data = JSON.parse(event.data) as StreamUpdatePayload
-            completionReceived = data.status === 'complete'
-            opts.onUpdate(data)
-
-            // Close connection on completion
-            if (data.status === 'complete') {
-              eventSource?.close()
-            } else if (data.status === 'error') {
-              eventSource?.close()
-            }
-          } catch (error) {
-            console.error('Failed to parse SSE data:', error, 'Raw data:', event.data)
-          }
-        }
-
-        eventSource.onerror = () => {
-          // Don't process errors after manual stop
-          if (isStopped) {
-            console.log('⏹️ Ignoring SSE error - stream was stopped')
-            return
-          }
-
-          console.log(
-            'SSE error event received, readyState:',
-            eventSource?.readyState,
-            'completionReceived:',
-            completionReceived
-          )
-
-          // If we already received completion, this is just normal stream end
-          if (completionReceived) {
-            console.log('✅ Stream ended after completion (normal)')
-            eventSource?.close()
-            return
-          }
-
-          // SSE CLOSED (2) or CONNECTING (0) - Connection closed by server
-          if (
-            eventSource?.readyState === EventSource.CLOSED ||
-            eventSource?.readyState === EventSource.CONNECTING
-          ) {
-            console.log('⚠️ SSE connection closed by server (treating as completion)')
-            eventSource?.close()
-            opts.onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
-            return
-          }
-
-          // SSE OPEN (1) - Only treat as error if still open and something went wrong
-          if (eventSource?.readyState === EventSource.OPEN) {
-            console.error('❌ SSE connection error during active stream')
-            eventSource?.close()
-            opts.onUpdate({ status: 'error', error: 'Connection interrupted' })
-          }
-        }
-      } catch (error) {
-        console.error('🚫 Stream setup error:', error)
-        opts.onUpdate({ status: 'error', error: 'Failed to connect' })
-      }
-    })()
-
-    // Return cleanup function that sets the stop flag and closes connection
-    return () => {
-      console.log('🛑 Closing EventSource and setting stop flag')
-      isStopped = true
-      eventSource?.close()
-    }
+    // POST transport: parameters travel in the JSON body, so long pasted
+    // texts never hit URL length limits and no auth token leaks into the URL.
+    return openStreamPost(paramsObj, opts.onUpdate)
   },
 
   async getHistory(limit = 50, trackId?: number): Promise<unknown> {
@@ -651,6 +687,26 @@ export const chatApi = {
   },
 
   /**
+   * Stop streaming for a guest session — guest counterpart of stopStream().
+   *
+   * Uses the public /api/v1/guest/stop-stream endpoint (authorized by the
+   * server-issued session id) via plain fetch instead of httpClient, so a 401
+   * can never trigger the "session expired" login redirect for guests
+   * (issue #1037). Needed since detach-on-navigation (#1225): closing the
+   * EventSource alone no longer cancels the backend turn.
+   */
+  async stopGuestStream(guestSessionId: string, trackId: number): Promise<void> {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/guest/stop-stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: guestSessionId, trackId }),
+    })
+    if (!response.ok) {
+      throw new Error(`Failed to stop guest stream (HTTP ${response.status})`)
+    }
+  },
+
+  /**
    * Cancel a single multitask media node (per-card Stop button) without
    * stopping the rest of the turn.
    */
@@ -683,57 +739,8 @@ export const chatApi = {
     if (opts.quotedText) paramsObj.quotedText = opts.quotedText
     if (opts.quotedMessageId) paramsObj.quotedMessageId = opts.quotedMessageId.toString()
 
-    const params = new URLSearchParams(paramsObj)
-    const url = `${getApiBaseUrl()}/api/v1/messages/stream?${params}`
-
-    let eventSource: EventSource | null = null
-    let completionReceived = false
-    let isStopped = false
-
-    eventSource = new EventSource(url)
-
-    eventSource.onmessage = (event) => {
-      if (isStopped) return
-
-      try {
-        const data = JSON.parse(event.data) as StreamUpdatePayload
-        completionReceived = data.status === 'complete'
-        opts.onUpdate(data)
-
-        if (data.status === 'complete' || data.status === 'error') {
-          eventSource?.close()
-        }
-      } catch (error) {
-        console.error('Failed to parse guest SSE data:', error)
-      }
-    }
-
-    eventSource.onerror = () => {
-      if (isStopped) return
-
-      if (completionReceived) {
-        eventSource?.close()
-        return
-      }
-
-      if (
-        eventSource?.readyState === EventSource.CLOSED ||
-        eventSource?.readyState === EventSource.CONNECTING
-      ) {
-        eventSource?.close()
-        opts.onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
-        return
-      }
-
-      if (eventSource?.readyState === EventSource.OPEN) {
-        eventSource?.close()
-        opts.onUpdate({ status: 'error', error: 'Connection interrupted' })
-      }
-    }
-
-    return () => {
-      isStopped = true
-      eventSource?.close()
-    }
+    // Same POST transport as streamMessage: the guest session id authorizes
+    // the request via the guestSession body property.
+    return openStreamPost(paramsObj, opts.onUpdate)
   },
 }

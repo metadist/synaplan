@@ -32,6 +32,10 @@
           <APIKeysConfiguration />
         </div>
 
+        <div v-else-if="currentPage === 'mcp-servers'" data-testid="section-mcp-servers">
+          <McpServersConfiguration />
+        </div>
+
         <div
           v-else-if="currentPage === 'api-documentation'"
           data-testid="section-api-documentation"
@@ -54,6 +58,7 @@ import TaskPromptsConfiguration from '@/components/config/TaskPromptsConfigurati
 import SortingPromptConfiguration from '@/components/config/SortingPromptConfiguration.vue'
 import APIKeysConfiguration from '@/components/config/APIKeysConfiguration.vue'
 import ApiDocumentation from '@/components/config/ApiDocumentation.vue'
+import McpServersConfiguration from '@/components/config/McpServersConfiguration.vue'
 
 const route = useRoute()
 
@@ -63,6 +68,7 @@ const currentPage = computed(() => {
   const path = route.path
   if (path.startsWith('/channels/api/docs')) return 'api-documentation'
   if (path.startsWith('/channels/api')) return 'api-keys'
+  if (path.startsWith('/channels/mcp')) return 'mcp-servers'
   if (path.startsWith('/channels')) return 'inbound'
   if (path.startsWith('/ai/providers/higgsfield')) return 'ai-provider-higgsfield'
   if (path.startsWith('/ai/models')) return 'ai-models'

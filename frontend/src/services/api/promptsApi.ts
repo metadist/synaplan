@@ -7,6 +7,10 @@ export interface PromptMetadata {
   tool_internet?: boolean
   tool_files?: boolean
   tool_url_screenshot?: boolean
+  /** Per-topic gate for the mcp_fetch data node (external MCP servers). */
+  tool_mcp?: boolean
+  /** Optional comma-separated McpServerConfig ids restricting tool_mcp. */
+  mcp_servers?: string
   tool_transfer?: boolean
   widgetBehaviorRules?: string | WidgetBehaviorRules
   widgetBehaviorVersion?: string | number

@@ -135,6 +135,7 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
             $container->get(GeneratedFileRegistrar::class),
             new MediaJobRealtimeNotifier($this->realtimePublisher, $this->jobService, $jobLogger),
             $usageRecorder,
+            $container->get(\App\Service\Multitask\TaskPlanStore::class),
             $this->em,
             $jobLogger,
         );
@@ -406,6 +407,201 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         if ($outgoing->getFiles()->count() > 0) {
             $this->createdFileIds[] = $outgoing->getFiles()->first()->getId();
         }
+    }
+
+    public function testCompletedJobStillBoundToIncomingMessageNeverClobbersPrompt(): void
+    {
+        // Issue #1218: the job is created bound to the INCOMING message id and
+        // only rebound to the OUT message once StreamController has persisted
+        // it. If a fast image render completes on the worker BEFORE that rebind,
+        // the terminal sync hits the IN row. It must NOT clear the user's prompt
+        // (data loss) nor pin the generated image to their own bubble — the
+        // direction guard leaves the IN message completely untouched.
+        $user = $this->createUser();
+        $incoming = $this->createIncomingMessage($user, 'erstelle ein Bild einer Katze und beschreibe es');
+
+        $job = $this->jobService->create([
+            'userId' => $user->getId(),
+            'type' => MediaJob::TYPE_IMAGE,
+            'provider' => 'openai',
+            'prompt' => 'a cat',
+            'model' => 'gpt-image-1',
+            'messageId' => $incoming->getId(), // rebind lost the race → still IN
+            'options' => ['lang' => 'de'],
+        ]);
+        $this->createdJobKeys[] = $job->getJobKey();
+        $this->jobService->markCompleted($job, [
+            'file' => ['url' => '/api/v1/files/uploads/cat.png', 'type' => 'image'],
+            'provider' => 'openai',
+            'model' => 'gpt-image-1',
+        ]);
+
+        $this->messageSync->syncTerminalState($job);
+
+        $this->em->refresh($incoming);
+        self::assertSame('erstelle ein Bild einer Katze und beschreibe es', $incoming->getText(), 'IN prompt must be preserved');
+        self::assertSame(0, $incoming->getFiles()->count(), 'generated image must not attach to the IN message');
+        self::assertNull($incoming->getMeta('media_job'), 'no media_job meta must be written to the IN message');
+
+        // The realtime push must also be suppressed while bound to IN: it carries
+        // the IN message_id + file, so publishing it would make the client patch
+        // the user bubble and append the image there — the same "image on the
+        // user's message" bug through realtime (Copilot review, PR #1219).
+        $pushedForIncoming = array_values(array_filter(
+            $this->publishedEvents,
+            static fn (array $e): bool => 'media_job.update' === $e['event'] && ($e['payload']['message_id'] ?? null) === $incoming->getId(),
+        ));
+        self::assertSame([], $pushedForIncoming, 'no media_job.update may be pushed for the IN message');
+    }
+
+    public function testTerminalJobLateRebindSyncsOutMessageAndHealsTaskCard(): void
+    {
+        // Issue #1239: an async DAG image node finishes BEFORE StreamController
+        // persists the OUT message. The terminal sync correctly skips the IN
+        // message (#1218 direction guard) — but the later rebind must then give
+        // the job its missed sync against the OUT message: heal the persisted
+        // task card to `done` with the file, attach the File entity, update the
+        // BMESSAGE_TASKS row, and NEVER touch the assembled reply text or set
+        // the single-task `media_job` banner meta on a DAG turn.
+        $user = $this->createUser();
+        $incoming = $this->createIncomingMessage($user, 'erstelle das bild einer katze dann schreibe ein gedicht darüber');
+
+        $job = $this->jobService->create([
+            'userId' => $user->getId(),
+            'type' => MediaJob::TYPE_IMAGE,
+            'provider' => 'google',
+            'prompt' => 'a cat',
+            'model' => 'gemini-image',
+            'messageId' => $incoming->getId(),
+            'nodeId' => 'n1',
+            'options' => ['lang' => 'de'],
+        ]);
+        $this->createdJobKeys[] = $job->getJobKey();
+        $this->jobService->markCompleted($job, [
+            'file' => ['url' => '/api/v1/files/uploads/cat-1239.png', 'type' => 'image'],
+            'provider' => 'google',
+            'model' => 'gemini-image',
+        ]);
+
+        // Worker sync fires while still bound to IN → skipped (existing guard).
+        $this->messageSync->syncTerminalState($job);
+        $this->em->refresh($incoming);
+        self::assertSame(0, $incoming->getFiles()->count());
+
+        // StreamController persists the OUT message: assembled reply text + the
+        // per-node render state with the image card still 'running'.
+        $assembledText = "Hier ist dein Gedicht über die Katze.\n\nMiau.";
+        $outgoing = $this->createMessage($user);
+        $outgoing->setText($assembledText);
+        $outgoing->setMeta('task_plan', (string) json_encode([
+            'reply_node' => 'n3',
+            'cards' => [
+                ['nodeId' => 'n1', 'capability' => 'image_generation', 'kind' => 'image', 'state' => 'running', 'job_id' => $job->getJobKey()],
+                ['nodeId' => 'n2', 'capability' => 'chat', 'kind' => 'text', 'state' => 'done', 'text' => 'Miau.'],
+            ],
+        ], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE));
+        $this->em->flush();
+
+        // The DAG also persisted the node row as running, stamped with the job key.
+        $connection = $this->em->getConnection();
+        $connection->insert('BMESSAGE_TASKS', [
+            'BMESSAGEID' => $incoming->getId(),
+            'BNODEID' => 'n1',
+            'BCAPABILITY' => 'image_generation',
+            'BDEPENDSON' => '[]',
+            'BSTATUS' => 'running',
+            'BJOBKEY' => $job->getJobKey(),
+        ]);
+
+        try {
+            // StreamController's rebind loop: terminal job → rebind + missed sync.
+            $rebound = $this->jobService->rebindMessage($job->getJobKey(), $outgoing->getId());
+            self::assertNotNull($rebound, 'terminal jobs must still be rebindable');
+            self::assertTrue($rebound->isTerminal());
+            self::assertSame($outgoing->getId(), $rebound->getMessageId());
+            $this->messageSync->syncTerminalState($rebound);
+
+            $this->em->refresh($outgoing);
+
+            // The assembled reply text survives — the single-task "clear text on
+            // done" mutation must not run for node jobs.
+            self::assertSame($assembledText, $outgoing->getText());
+            // No single-task banner meta on a DAG turn.
+            self::assertNull($outgoing->getMeta('media_job'));
+
+            // The generated file is attached for reload + Files world.
+            self::assertGreaterThan(0, $outgoing->getFiles()->count());
+            if ($outgoing->getFiles()->count() > 0) {
+                $this->createdFileIds[] = $outgoing->getFiles()->first()->getId();
+            }
+
+            // The persisted card resolved to done with the file URL.
+            $taskPlan = json_decode((string) $outgoing->getMeta('task_plan'), true);
+            self::assertIsArray($taskPlan);
+            $imageCard = $taskPlan['cards'][0];
+            self::assertSame('done', $imageCard['state']);
+            self::assertSame('/api/v1/files/uploads/cat-1239.png', $imageCard['url']);
+            self::assertSame('image', $imageCard['type']);
+            // The unrelated card is untouched.
+            self::assertSame('done', $taskPlan['cards'][1]['state']);
+            self::assertSame('Miau.', $taskPlan['cards'][1]['text']);
+
+            // The observability row healed too.
+            $rowStatus = $connection->fetchOne(
+                'SELECT BSTATUS FROM BMESSAGE_TASKS WHERE BJOBKEY = ?',
+                [$job->getJobKey()],
+            );
+            self::assertSame('done', $rowStatus);
+
+            // The realtime push carries the node id so the live card resolves.
+            $nodePush = array_values(array_filter(
+                $this->publishedEvents,
+                static fn (array $e): bool => 'media_job.update' === $e['event']
+                    && 'n1' === ($e['payload']['node_id'] ?? null)
+                    && 'done' === ($e['payload']['state'] ?? null),
+            ));
+            self::assertNotEmpty($nodePush, 'terminal node sync must push a media_job.update with the node id');
+            self::assertSame($outgoing->getId(), $nodePush[0]['payload']['message_id']);
+        } finally {
+            $connection->delete('BMESSAGE_TASKS', ['BJOBKEY' => $job->getJobKey()]);
+        }
+    }
+
+    public function testTerminalSaveAdoptsReboundMessageIdFromStore(): void
+    {
+        // Issue #1239, worker-side half: a single-step image render holds its
+        // MediaJob in memory for the whole render. If StreamController rebinds
+        // the job to the OUT message DURING that render, the worker's terminal
+        // markCompleted() used to save the stale IN-message binding back over
+        // the rebind — the sync then hit the IN row and was skipped forever.
+        // The terminal transition must re-adopt the freshest stored binding.
+        $user = $this->createUser();
+        $incoming = $this->createIncomingMessage($user, 'erstelle das bild einer katze');
+        $outgoing = $this->createMessage($user);
+
+        $job = $this->jobService->create([
+            'userId' => $user->getId(),
+            'type' => MediaJob::TYPE_IMAGE,
+            'provider' => 'openai',
+            'prompt' => 'a cat',
+            'messageId' => $incoming->getId(),
+            'nodeId' => 'n1',
+            'options' => ['lang' => 'de'],
+        ]);
+        $this->createdJobKeys[] = $job->getJobKey();
+
+        // Rebind lands while the worker's in-memory copy still points at IN.
+        $this->jobService->rebindMessage($job->getJobKey(), $outgoing->getId());
+        self::assertSame($incoming->getId(), $job->getMessageId(), 'in-memory copy is intentionally stale');
+
+        $this->jobService->markCompleted($job, [
+            'file' => ['url' => '/api/v1/files/uploads/cat-race.png', 'type' => 'image'],
+        ]);
+
+        self::assertSame($outgoing->getId(), $job->getMessageId(), 'terminal save must adopt the rebound OUT binding');
+        $fresh = $this->store->find($job->getJobKey());
+        self::assertNotNull($fresh);
+        self::assertSame($outgoing->getId(), $fresh->getMessageId());
     }
 
     public function testSyncImageJobRendersSavesAndAttachesToMessage(): void
@@ -727,6 +923,23 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         $message->setMessageType('WW');
         $message->setText('');
         $message->setDirection('OUT');
+        $this->em->persist($message);
+        $this->em->flush();
+        $this->createdMessageIds[] = $message->getId();
+
+        return $message;
+    }
+
+    private function createIncomingMessage(User $user, string $text): Message
+    {
+        $message = new Message();
+        $message->setUserId($user->getId());
+        $message->setTrackingId(0);
+        $message->setUnixTimestamp(time());
+        $message->setDateTime(date('YmdHis'));
+        $message->setMessageType('WW');
+        $message->setText($text);
+        $message->setDirection('IN');
         $this->em->persist($message);
         $this->em->flush();
         $this->createdMessageIds[] = $message->getId();
