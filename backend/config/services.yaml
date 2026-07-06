@@ -698,6 +698,10 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    App\Controller\GuestChatController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     App\Service\File\ThumbnailService:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'

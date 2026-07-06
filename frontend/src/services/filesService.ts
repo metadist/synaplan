@@ -836,6 +836,31 @@ export const downloadFile = async (fileId: number, filename: string): Promise<vo
 }
 
 /**
+ * Download a file from a guest (anonymous trial) chat.
+ *
+ * Guests cannot use the authenticated download endpoint — this public
+ * endpoint authorizes the download via the server-issued guest session ID.
+ *
+ * @param sessionId Server-issued guest session ID
+ * @param fileId File ID
+ * @param filename Original filename for download
+ */
+export const downloadGuestFile = async (
+  sessionId: string,
+  fileId: number,
+  filename: string
+): Promise<void> => {
+  const blob = await httpClient<Blob>(
+    `/api/v1/guest/files/${encodeURIComponent(sessionId)}/${fileId}/download`,
+    {
+      responseType: 'blob',
+    }
+  )
+
+  await saveOrDownloadBlob(blob, filename)
+}
+
+/**
  * Make file public and generate share link
  *
  * @param fileId File ID
@@ -1080,6 +1105,7 @@ export default {
   getFileGroups,
   getFileContent,
   downloadFile,
+  downloadGuestFile,
   shareFile,
   unshareFile,
   getShareInfo,

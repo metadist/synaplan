@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\Chat;
+use App\Entity\File;
 use App\Entity\GuestSession;
 use App\Entity\Message;
 use App\Service\Media\MediaCancellationStore;
@@ -20,18 +21,38 @@ class GuestChatControllerTest extends WebTestCase
     /** @var list<int> Chat IDs created by a test, deleted in tearDown */
     private array $createdChatIds = [];
 
+    /** @var list<int> File IDs created by a test, deleted in tearDown */
+    private array $createdFileIds = [];
+
+    /** @var list<string> Absolute paths of files written to disk by a test */
+    private array $createdDiskPaths = [];
+
     protected function setUp(): void
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
         $this->em = $this->client->getContainer()->get('doctrine')->getManager();
         $this->createdChatIds = [];
+        $this->createdFileIds = [];
+        $this->createdDiskPaths = [];
     }
 
     protected function tearDown(): void
     {
         if ($this->em->isOpen()) {
             if ([] !== $this->createdChatIds) {
+                // Detach message↔file join rows before deleting the messages
+                // (the M2M join table has no ORM-level cascade for DQL DELETE).
+                $messages = $this->em->createQuery('SELECT m FROM App\Entity\Message m WHERE m.chatId IN (:ids)')
+                    ->setParameter('ids', $this->createdChatIds)
+                    ->getResult();
+                foreach ($messages as $message) {
+                    foreach ($message->getFiles() as $file) {
+                        $message->removeFile($file);
+                    }
+                }
+                $this->em->flush();
+
                 $this->em->createQuery('DELETE FROM App\Entity\Message m WHERE m.chatId IN (:ids)')
                     ->setParameter('ids', $this->createdChatIds)
                     ->execute();
@@ -40,8 +61,20 @@ class GuestChatControllerTest extends WebTestCase
                     ->execute();
             }
 
+            if ([] !== $this->createdFileIds) {
+                $this->em->createQuery('DELETE FROM App\Entity\File f WHERE f.id IN (:ids)')
+                    ->setParameter('ids', $this->createdFileIds)
+                    ->execute();
+            }
+
             $this->em->createQuery('DELETE FROM App\Entity\GuestSession gs')
                 ->execute();
+        }
+
+        foreach ($this->createdDiskPaths as $path) {
+            if (file_exists($path)) {
+                unlink($path);
+            }
         }
 
         parent::tearDown();
@@ -295,6 +328,118 @@ class GuestChatControllerTest extends WebTestCase
 
         $cancellationStore = static::getContainer()->get(MediaCancellationStore::class);
         $this->assertTrue($cancellationStore->isCancelled((string) $turn['trackId']));
+    }
+
+    /**
+     * Attach a generated File entity (and its bytes on disk) to an OUT message
+     * in the session's chat — the persisted state after a successful
+     * officemaker turn.
+     *
+     * @return array{fileId: int, filename: string, content: string}
+     */
+    private function attachGeneratedFileToChat(string $sessionId, int $chatId): array
+    {
+        $chat = $this->em->getRepository(Chat::class)->find($chatId);
+        $this->assertNotNull($chat);
+
+        $filename = 'guest_generated_test.txt';
+        $relativePath = 'guest_test/'.uniqid('', true).'_'.$filename;
+        $content = 'Generated document body for the guest download test.';
+
+        $uploadDir = static::getContainer()->getParameter('kernel.project_dir').'/var/uploads';
+        $absolutePath = $uploadDir.'/'.$relativePath;
+        if (!is_dir(dirname($absolutePath))) {
+            mkdir(dirname($absolutePath), 0777, true);
+        }
+        file_put_contents($absolutePath, $content);
+        $this->createdDiskPaths[] = $absolutePath;
+
+        $file = new File();
+        $file->setUserId(0);
+        $file->setFilePath($relativePath);
+        $file->setFileType('txt');
+        $file->setFileName($filename);
+        $file->setFileSize(strlen($content));
+        $file->setFileMime('text/plain');
+        $file->setFileText($content);
+        $file->setSource('generated');
+        $this->em->persist($file);
+
+        $outMessage = new Message();
+        $outMessage->setUserId(0);
+        $outMessage->setChat($chat);
+        $outMessage->setTrackingId(random_int(1_000_000_000, 9_999_999_999));
+        $outMessage->setDirection('OUT');
+        $outMessage->setUnixTimestamp(time());
+        $outMessage->setDateTime(date('YmdHis'));
+        $outMessage->setText('__FILE_GENERATED__:'.$filename);
+        $outMessage->addFile($file);
+        $this->em->persist($outMessage);
+        $this->em->flush();
+
+        $this->createdFileIds[] = $file->getId();
+
+        return ['fileId' => $file->getId(), 'filename' => $filename, 'content' => $content];
+    }
+
+    public function testGetMessagesIncludesAttachedFiles(): void
+    {
+        $created = $this->createGuestSession();
+        $turn = $this->attachChatWithIncomingMessage($created['sessionId']);
+        $generated = $this->attachGeneratedFileToChat($created['sessionId'], $turn['chatId']);
+        $this->em->flush();
+
+        $this->client->request('GET', "/api/v1/guest/messages/{$created['sessionId']}");
+
+        $this->assertResponseIsSuccessful();
+        $data = json_decode($this->client->getResponse()->getContent(), true);
+
+        $outMessages = array_values(array_filter($data['messages'], fn ($m) => 'OUT' === $m['direction']));
+        $this->assertCount(1, $outMessages);
+        $this->assertCount(1, $outMessages[0]['files']);
+        $this->assertSame($generated['fileId'], (int) $outMessages[0]['files'][0]['id']);
+        $this->assertSame($generated['filename'], $outMessages[0]['files'][0]['filename']);
+        $this->assertSame('txt', $outMessages[0]['files'][0]['fileType']);
+    }
+
+    public function testDownloadFileReturnsAttachment(): void
+    {
+        $created = $this->createGuestSession();
+        $turn = $this->attachChatWithIncomingMessage($created['sessionId']);
+        $generated = $this->attachGeneratedFileToChat($created['sessionId'], $turn['chatId']);
+        $this->em->flush();
+
+        $this->client->request('GET', "/api/v1/guest/files/{$created['sessionId']}/{$generated['fileId']}/download");
+
+        $this->assertResponseIsSuccessful();
+        $response = $this->client->getResponse();
+        $this->assertInstanceOf(\Symfony\Component\HttpFoundation\BinaryFileResponse::class, $response);
+        $this->assertStringContainsString('attachment', (string) $response->headers->get('Content-Disposition'));
+        $this->assertStringContainsString($generated['filename'], (string) $response->headers->get('Content-Disposition'));
+        $this->assertSame($generated['content'], file_get_contents($response->getFile()->getPathname()));
+    }
+
+    public function testDownloadFileDeniedWhenFileNotInSessionChat(): void
+    {
+        // Session A owns the file; session B must not be able to download it.
+        $sessionA = $this->createGuestSession();
+        $turnA = $this->attachChatWithIncomingMessage($sessionA['sessionId']);
+        $generated = $this->attachGeneratedFileToChat($sessionA['sessionId'], $turnA['chatId']);
+
+        $sessionB = $this->createGuestSession();
+        $this->attachChatWithIncomingMessage($sessionB['sessionId']);
+        $this->em->flush();
+
+        $this->client->request('GET', "/api/v1/guest/files/{$sessionB['sessionId']}/{$generated['fileId']}/download");
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+    }
+
+    public function testDownloadFileReturns404ForUnknownSession(): void
+    {
+        $this->client->request('GET', '/api/v1/guest/files/'.Uuid::v4()->toRfc4122().'/123/download');
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testGuestEndpointsDoNotRequireAuthentication(): void
