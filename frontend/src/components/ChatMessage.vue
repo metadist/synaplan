@@ -252,7 +252,25 @@
                   {{ $t('processing.generatingFileTitle') }}
                 </div>
                 <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.generatingFileDesc') }}
+                  <template v-if="processingMetadata?.stage === 'writing'">
+                    {{
+                      processingMetadata?.filename
+                        ? $t('processing.generatingFileWritingNamed', {
+                            filename: processingMetadata.filename,
+                          })
+                        : $t('processing.generatingFileWriting')
+                    }}
+                  </template>
+                  <template v-else-if="processingMetadata?.stage === 'converting'">
+                    {{
+                      $t('processing.generatingFileConverting', {
+                        filename: processingMetadata?.filename ?? '',
+                      })
+                    }}
+                  </template>
+                  <template v-else>
+                    {{ processingMetadata?.customMessage || $t('processing.generatingFileDesc') }}
+                  </template>
                 </div>
               </template>
               <template v-else-if="processingStatus === 'thinking'">
@@ -1013,6 +1031,9 @@ interface Props {
     customMessage?: string
     results_count?: number
     handler?: string
+    /** Document generation progress (status === 'generating_file'). */
+    stage?: string
+    filename?: string
   } | null
   files?: MessageFile[] // Attached files
   searchResults?: Array<{
@@ -1611,6 +1632,16 @@ const downloadFile = async (file: MessageFile) => {
   }
   try {
     const filesService = await import('@/services/filesService')
+    // Guests cannot use the authenticated download endpoint — route the
+    // download through the public guest endpoint (session-authorized).
+    const { useAuthStore } = await import('@/stores/auth')
+    const { useGuestStore } = await import('@/stores/guest')
+    const authStore = useAuthStore()
+    const guestStore = useGuestStore()
+    if (!authStore.isAuthenticated && guestStore.sessionId) {
+      await filesService.downloadGuestFile(guestStore.sessionId, file.id, file.filename)
+      return
+    }
     await filesService.downloadFile(file.id, file.filename)
   } catch (error) {
     console.error('Download failed:', error)
