@@ -10,11 +10,7 @@ export interface TaskPrompt {
 }
 
 export type AvailableTool =
-  | 'internet-search'
-  | 'files-search'
-  | 'url-screenshot'
-  | 'image-generation'
-  | 'video-generation'
+  'internet-search' | 'files-search' | 'url-screenshot' | 'image-generation' | 'video-generation'
 
 export const mockTaskPrompts: TaskPrompt[] = [
   {
