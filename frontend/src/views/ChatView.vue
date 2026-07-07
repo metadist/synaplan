@@ -382,7 +382,6 @@ import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
   useHistoryStore,
-  parseContentWithThinking,
   isTaskCardKind,
   isTaskCardState,
   type Message,
@@ -410,7 +409,11 @@ import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
-import { parseMediaJobPayload, applyMediaJobUpdateToMessage } from '@/utils/messageMapper'
+import {
+  parseMediaJobPayload,
+  applyMediaJobUpdateToMessage,
+  mapApiMessageRow,
+} from '@/utils/messageMapper'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
@@ -611,38 +614,11 @@ onMounted(async () => {
       const rawMessages = await guestStore.loadMessages()
       if (rawMessages.length > 0) {
         historyStore.clear()
-        const loaded: Message[] = rawMessages.map((m) => {
-          const role: 'user' | 'assistant' = m.direction === 'IN' ? 'user' : 'assistant'
-          const parts = parseContentWithThinking(m.text || '', role)
-          const models = m.aiModels as Message['aiModels']
-          const chatModel = models?.chat
-          // Attached files (e.g. AI-generated documents) so the download
-          // badge survives a page reload in guest mode.
-          const files: Message['files'] =
-            m.files && m.files.length > 0
-              ? m.files.map((f) => ({
-                  id: f.id,
-                  filename: f.filename,
-                  fileType: f.fileType,
-                  filePath: f.filePath,
-                  fileSize: f.fileSize ?? undefined,
-                  fileMime: f.fileMime ?? undefined,
-                }))
-              : undefined
-          return {
-            id: `backend-${m.id}`,
-            role,
-            parts,
-            timestamp: new Date(m.timestamp * 1000),
-            provider: chatModel?.provider ?? m.provider ?? undefined,
-            modelLabel: chatModel?.model ?? m.provider ?? (role === 'assistant' ? 'AI' : undefined),
-            backendMessageId: m.id,
-            aiModels: models ?? null,
-            webSearch: (m.webSearch as Message['webSearch']) ?? null,
-            searchResults: (m.searchResults as Message['searchResults']) ?? null,
-            files,
-          }
-        })
+        // Use the SAME row mapper as the authenticated reload path (issue
+        // #1070) so guests keep full parity: task-plan cards and generated
+        // media (video/image/audio) survive a reload instead of collapsing to
+        // the plain answer text.
+        const loaded: Message[] = rawMessages.map((m) => mapApiMessageRow(m))
         historyStore.messages.push(...loaded)
         await nextTick()
         scrollToBottom()
@@ -1824,6 +1800,96 @@ const streamAIResponse = async (
             processingMetadata.value = data.metadata || {}
           } else if (data.status === 'processing') {
             // Processing/routing — no UI update needed
+          } else if (data.status === 'plan') {
+            // Multitask routing: a multi-node plan was recognized. Render a task
+            // card per node — the same live surface authenticated users get, so
+            // a guest sees e.g. the generated video card (issue: anonymous
+            // task-plan flow). Single-node turns never emit this.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const tasks = data.metadata?.plan
+            if (message && Array.isArray(tasks) && tasks.length > 0) {
+              processingStatus.value = ''
+              processingMetadata.value = {}
+              message.wasMultitask = true
+              message.taskPlan = {
+                active: true,
+                trackId: currentTrackId,
+                replyNode:
+                  typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
+                cards: tasks.map((t) => ({
+                  nodeId: t.node_id,
+                  capability: t.capability,
+                  kind: isTaskCardKind(t.kind) ? t.kind : 'text',
+                  state: 'pending' as const,
+                })),
+              }
+            }
+          } else if (data.status === 'plan_discarded') {
+            // The DAG failed entirely; the backend falls back to a single-bubble
+            // answer. Retract the now-misleading failed cards.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.taskPlan = null
+              message.wasMultitask = false
+            }
+          } else if (data.status === 'task_update') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && card.state === 'cancelled') {
+              // keep cancelled — a user-cancelled step is terminal on the client
+            } else if (card && isTaskCardState(data.metadata?.state)) {
+              card.state = data.metadata.state
+              if (typeof data.metadata?.error === 'string' && data.metadata.error) {
+                card.error = data.metadata.error
+              }
+              if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
+                card.prompt = data.metadata.prompt
+              }
+              if (typeof data.metadata?.query === 'string' && data.metadata.query) {
+                card.query = data.metadata.query
+              }
+              if (typeof data.metadata?.results_count === 'number') {
+                card.resultsCount = data.metadata.results_count
+              }
+            }
+          } else if (data.status === 'task_chunk') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.chunk === 'string') {
+              card.text = (card.text ?? '') + data.metadata.chunk
+            }
+          } else if (data.status === 'task_file') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.url === 'string') {
+              card.url = normalizeMediaUrl(data.metadata.url)
+              card.mediaType =
+                typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
+            }
+          } else if (data.status === 'task_progress') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && card.state !== 'cancelled') {
+              if (typeof data.metadata?.percent === 'number') {
+                card.progressPercent = data.metadata.percent
+              }
+              if (typeof data.metadata?.provider_status === 'string') {
+                card.providerStatus = data.metadata.provider_status
+              }
+              if (typeof data.metadata?.elapsed_seconds === 'number') {
+                card.elapsedSeconds = data.metadata.elapsed_seconds
+              }
+            }
+          } else if (
+            data.status === 'data' &&
+            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
+          ) {
+            // Multitask mode: the task cards are the live surface. Still
+            // accumulate the assembled reply text (compose_reply is hidden and
+            // has no card) so the 'complete' flush renders the answer body.
+            if (data.chunk) {
+              fullContent += data.chunk
+            }
           } else if (data.status === 'data' && data.chunk) {
             if (processingStatus.value) {
               processingStatus.value = ''
@@ -1876,6 +1942,13 @@ const streamAIResponse = async (
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
               applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
+
+              // Multitask: the DAG finished — freeze the task cards (video/image/
+              // audio already carry their url via task_file) so they render as
+              // final rather than actively animating.
+              if (message.taskPlan) {
+                message.taskPlan.active = false
+              }
 
               if (data.messageId) {
                 message.backendMessageId = data.messageId
