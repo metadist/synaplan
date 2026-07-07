@@ -35,6 +35,6 @@ const emit = defineEmits<{
 const examples = [
   { id: 'poemMp3', icon: 'mdi:music-note' },
   { id: 'everglades', icon: 'mdi:file-word-box' },
-  { id: 'retreat', icon: 'mdi:movie-open' },
+  { id: 'cabinImage', icon: 'mdi:image' },
 ] as const
 </script>

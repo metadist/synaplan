@@ -1824,6 +1824,104 @@ const streamAIResponse = async (
             processingMetadata.value = data.metadata || {}
           } else if (data.status === 'processing') {
             // Processing/routing — no UI update needed
+          } else if (data.status === 'plan') {
+            // Multitask routing: a multi-node plan was recognized. Render a task
+            // card per node. Mirrors the authenticated handler so anonymous
+            // (guest) users see the exact same DAG surface (issue: guest media
+            // rendered as text-only because these events were dropped).
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const tasks = data.metadata?.plan
+            if (message && Array.isArray(tasks) && tasks.length > 0) {
+              processingStatus.value = ''
+              processingMetadata.value = {}
+              message.wasMultitask = true
+              message.taskPlan = {
+                active: true,
+                trackId: currentTrackId,
+                replyNode:
+                  typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
+                cards: tasks.map((tk) => ({
+                  nodeId: tk.node_id,
+                  capability: tk.capability,
+                  kind: isTaskCardKind(tk.kind) ? tk.kind : 'text',
+                  state: 'pending' as const,
+                })),
+              }
+            }
+          } else if (data.status === 'plan_discarded') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.taskPlan = null
+              message.wasMultitask = false
+            }
+          } else if (data.status === 'task_update') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && card.state === 'cancelled') {
+              // keep cancelled
+            } else if (card && isTaskCardState(data.metadata?.state)) {
+              card.state = data.metadata.state
+              if (typeof data.metadata?.error === 'string' && data.metadata.error) {
+                card.error = data.metadata.error
+              }
+              if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
+                card.prompt = data.metadata.prompt
+              }
+              if (typeof data.metadata?.query === 'string' && data.metadata.query) {
+                card.query = data.metadata.query
+              }
+              if (typeof data.metadata?.results_count === 'number') {
+                card.resultsCount = data.metadata.results_count
+              }
+            }
+          } else if (data.status === 'task_chunk') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.chunk === 'string') {
+              card.text = (card.text ?? '') + data.metadata.chunk
+            }
+          } else if (data.status === 'task_file') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.url === 'string') {
+              card.url = normalizeMediaUrl(data.metadata.url)
+              card.mediaType =
+                typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
+            }
+          } else if (data.status === 'task_progress') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && card.state !== 'cancelled') {
+              if (typeof data.metadata?.percent === 'number') {
+                card.progressPercent = data.metadata.percent
+              }
+              if (typeof data.metadata?.provider_status === 'string') {
+                card.providerStatus = data.metadata.provider_status
+              }
+              if (typeof data.metadata?.elapsed_seconds === 'number') {
+                card.elapsedSeconds = data.metadata.elapsed_seconds
+              }
+            }
+          } else if (
+            data.status === 'data' &&
+            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
+          ) {
+            // Multitask: the assembled reply text streams once after the DAG
+            // finishes (the task cards are the live surface). Accumulate it so the
+            // 'complete' flush renders it.
+            if (data.chunk) {
+              fullContent += data.chunk
+            }
+          } else if (
+            (data.status === 'file' ||
+              data.status === 'audio' ||
+              data.status === 'tts_generating' ||
+              data.status === 'links') &&
+            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
+          ) {
+            // Multitask: task cards are the live media surface, so suppress the
+            // normal single-bubble media events (they still persist on the OUT
+            // message and re-render from history on reload).
           } else if (data.status === 'data' && data.chunk) {
             if (processingStatus.value) {
               processingStatus.value = ''
@@ -1849,6 +1947,55 @@ const streamAIResponse = async (
                 message.parts.unshift(reasoningPart)
               }
               reasoningPart.content += data.chunk
+            }
+          } else if (data.status === 'file') {
+            // Single-capability media (image / video / audio) delivered outside a
+            // DAG. Without this branch the generated file never rendered for
+            // guests — they only saw the "Generated image:" text chunk.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.url) {
+              const absoluteUrl = normalizeMediaUrl(data.url)
+              if (data.type === 'image' || data.type === 'video' || data.type === 'audio') {
+                pushMediaPart(message, data.type, absoluteUrl)
+              }
+            }
+          } else if (data.status === 'tts_generating') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.parts.push({ type: 'tts_loading' })
+            }
+          } else if (data.status === 'audio') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.url) {
+              const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
+              if (loadingIdx !== -1) {
+                message.parts.splice(loadingIdx, 1)
+              }
+              pushMediaPart(message, 'audio', normalizeMediaUrl(data.url))
+            }
+          } else if (data.status === 'links') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.links) {
+              message.parts.push({
+                type: 'links',
+                items: data.links.map((l) => {
+                  try {
+                    return {
+                      title: l.title || l.url,
+                      url: l.url,
+                      desc: l.description,
+                      host: new URL(l.url).hostname,
+                    }
+                  } catch {
+                    return {
+                      title: l.title || l.url,
+                      url: l.url,
+                      desc: l.description,
+                      host: l.url,
+                    }
+                  }
+                }),
+              })
             }
           } else if (data.status === 'complete') {
             if (streamingRafId !== null) {
@@ -1876,6 +2023,14 @@ const streamAIResponse = async (
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
               applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
+
+              // Multitask turn finished: stop the live task-card spinners. Guests
+              // cannot reconcile against the persisted message (that endpoint is
+              // auth-only), so the terminal card states already streamed via
+              // task_update are authoritative here.
+              if (message.taskPlan) {
+                message.taskPlan.active = false
+              }
 
               if (data.messageId) {
                 message.backendMessageId = data.messageId
@@ -1949,6 +2104,10 @@ const streamAIResponse = async (
             }
             processingStatus.value = ''
             processingMetadata.value = {}
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message?.taskPlan) {
+              message.taskPlan.active = false
+            }
             historyStore.finishStreamingMessage(messageId)
           }
         },
