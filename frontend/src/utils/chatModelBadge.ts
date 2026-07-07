@@ -15,20 +15,10 @@
 export type ChatBadgeMediaHint = 'vision' | 'image' | 'video' | 'audio' | null
 
 export type ChatBadgeLabel =
-  | 'Chat Model'
-  | 'Vision Model'
-  | 'Image Model'
-  | 'Video Model'
-  | 'Audio Model'
-  | 'Analyze Model'
+  'Chat Model' | 'Vision Model' | 'Image Model' | 'Video Model' | 'Audio Model' | 'Analyze Model'
 
 export type ChatBadgeIcon =
-  | 'mdi:chat'
-  | 'mdi:eye'
-  | 'mdi:image'
-  | 'mdi:video'
-  | 'mdi:music'
-  | 'mdi:file-search'
+  'mdi:chat' | 'mdi:eye' | 'mdi:image' | 'mdi:video' | 'mdi:music' | 'mdi:file-search'
 
 /**
  * Decide which label to render under the *chat* badge.

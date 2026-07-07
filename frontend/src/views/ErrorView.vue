@@ -111,8 +111,7 @@
             <pre
               class="text-xs txt-secondary font-mono bg-black/5 dark:bg-white/5 p-3 rounded overflow-x-auto max-h-[300px] overflow-y-auto scroll-thin"
               data-testid="text-error-stack"
-              >{{ props.error.stack }}</pre
-            >
+              >{{ props.error.stack }}</pre>
           </div>
         </Transition>
       </div>

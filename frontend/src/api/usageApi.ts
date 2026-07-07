@@ -11,12 +11,7 @@ import { useConfigStore } from '@/stores/config'
 // backend response shape until that happens.
 
 export type SubscriptionStatus =
-  | 'active'
-  | 'free'
-  | 'past_due'
-  | 'cancelled'
-  | 'anonymous'
-  | 'inactive'
+  'active' | 'free' | 'past_due' | 'cancelled' | 'anonymous' | 'inactive'
 
 export interface UsageStats {
   user_level: string

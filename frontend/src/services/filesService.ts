@@ -649,12 +649,7 @@ const uploadFilesBatch = async (
 }
 
 export type FileSortOrder =
-  | 'date_desc'
-  | 'date_asc'
-  | 'name_asc'
-  | 'name_desc'
-  | 'size_asc'
-  | 'size_desc'
+  'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'size_asc' | 'size_desc'
 
 export interface FileListOptions {
   groupKey?: string
