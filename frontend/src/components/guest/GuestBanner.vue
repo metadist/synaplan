@@ -1,9 +1,9 @@
 <template>
   <Transition name="slide-down">
-    <div v-if="visible" class="flex justify-center mx-4 mt-2 mb-0">
+    <div v-if="visible" class="flex justify-center mx-4 mt-2 mb-[5px]">
       <div
         data-testid="guest-banner"
-        class="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-brand/20 bg-brand/5 dark:bg-brand/10 backdrop-blur-sm"
+        class="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-gray-400/60 dark:border-gray-500/60 bg-black/[0.03] dark:bg-white/[0.06] backdrop-blur-sm"
       >
         <div class="hidden sm:flex items-center gap-1">
           <span
@@ -17,11 +17,11 @@
           />
         </div>
 
-        <span class="text-xs txt-secondary whitespace-nowrap">
+        <span class="text-xs font-medium txt-primary whitespace-nowrap">
           {{ $t('guest.banner.remaining', { count: remaining }) }}
         </span>
 
-        <span class="w-px h-3.5 bg-gray-300 dark:bg-gray-600" />
+        <span class="w-px h-3.5 bg-gray-400 dark:bg-gray-500" />
 
         <router-link
           to="/register"
