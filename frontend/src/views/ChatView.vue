@@ -1802,9 +1802,10 @@ const streamAIResponse = async (
             // Processing/routing — no UI update needed
           } else if (data.status === 'plan') {
             // Multitask routing: a multi-node plan was recognized. Render a task
-            // card per node — the same live surface authenticated users get, so
-            // a guest sees e.g. the generated video card (issue: anonymous
-            // task-plan flow). Single-node turns never emit this.
+            // card per node. Mirrors the authenticated handler so anonymous
+            // (guest) users see the exact same DAG surface — e.g. the generated
+            // video card (issue: guest media rendered as text-only because these
+            // events were dropped). Single-node turns never emit this.
             const message = historyStore.messages.find((m) => m.id === messageId)
             const tasks = data.metadata?.plan
             if (message && Array.isArray(tasks) && tasks.length > 0) {
@@ -1816,10 +1817,10 @@ const streamAIResponse = async (
                 trackId: currentTrackId,
                 replyNode:
                   typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
-                cards: tasks.map((t) => ({
-                  nodeId: t.node_id,
-                  capability: t.capability,
-                  kind: isTaskCardKind(t.kind) ? t.kind : 'text',
+                cards: tasks.map((tk) => ({
+                  nodeId: tk.node_id,
+                  capability: tk.capability,
+                  kind: isTaskCardKind(tk.kind) ? tk.kind : 'text',
                   state: 'pending' as const,
                 })),
               }
@@ -1890,6 +1891,16 @@ const streamAIResponse = async (
             if (data.chunk) {
               fullContent += data.chunk
             }
+          } else if (
+            (data.status === 'file' ||
+              data.status === 'audio' ||
+              data.status === 'tts_generating' ||
+              data.status === 'links') &&
+            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
+          ) {
+            // Multitask: task cards are the live media surface, so suppress the
+            // normal single-bubble media events (they still persist on the OUT
+            // message and re-render from history on reload).
           } else if (data.status === 'data' && data.chunk) {
             if (processingStatus.value) {
               processingStatus.value = ''
@@ -1915,6 +1926,55 @@ const streamAIResponse = async (
                 message.parts.unshift(reasoningPart)
               }
               reasoningPart.content += data.chunk
+            }
+          } else if (data.status === 'file') {
+            // Single-capability media (image / video / audio) delivered outside a
+            // DAG. Without this branch the generated file never rendered for
+            // guests — they only saw the "Generated image:" text chunk.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.url) {
+              const absoluteUrl = normalizeMediaUrl(data.url)
+              if (data.type === 'image' || data.type === 'video' || data.type === 'audio') {
+                pushMediaPart(message, data.type, absoluteUrl)
+              }
+            }
+          } else if (data.status === 'tts_generating') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.parts.push({ type: 'tts_loading' })
+            }
+          } else if (data.status === 'audio') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.url) {
+              const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
+              if (loadingIdx !== -1) {
+                message.parts.splice(loadingIdx, 1)
+              }
+              pushMediaPart(message, 'audio', normalizeMediaUrl(data.url))
+            }
+          } else if (data.status === 'links') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.links) {
+              message.parts.push({
+                type: 'links',
+                items: data.links.map((l) => {
+                  try {
+                    return {
+                      title: l.title || l.url,
+                      url: l.url,
+                      desc: l.description,
+                      host: new URL(l.url).hostname,
+                    }
+                  } catch {
+                    return {
+                      title: l.title || l.url,
+                      url: l.url,
+                      desc: l.description,
+                      host: l.url,
+                    }
+                  }
+                }),
+              })
             }
           } else if (data.status === 'complete') {
             if (streamingRafId !== null) {
@@ -1945,7 +2005,10 @@ const streamAIResponse = async (
 
               // Multitask: the DAG finished — freeze the task cards (video/image/
               // audio already carry their url via task_file) so they render as
-              // final rather than actively animating.
+              // final rather than actively animating. Guests cannot reconcile
+              // against the persisted message (that endpoint is auth-only), so the
+              // terminal card states already streamed via task_update are
+              // authoritative here.
               if (message.taskPlan) {
                 message.taskPlan.active = false
               }
@@ -2022,6 +2085,10 @@ const streamAIResponse = async (
             }
             processingStatus.value = ''
             processingMetadata.value = {}
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message?.taskPlan) {
+              message.taskPlan.active = false
+            }
             historyStore.finishStreamingMessage(messageId)
           }
         },
