@@ -382,7 +382,6 @@ import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
   useHistoryStore,
-  parseContentWithThinking,
   isTaskCardKind,
   isTaskCardState,
   type Message,
@@ -410,7 +409,11 @@ import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
-import { parseMediaJobPayload, applyMediaJobUpdateToMessage } from '@/utils/messageMapper'
+import {
+  parseMediaJobPayload,
+  applyMediaJobUpdateToMessage,
+  mapApiMessageRow,
+} from '@/utils/messageMapper'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
@@ -611,38 +614,11 @@ onMounted(async () => {
       const rawMessages = await guestStore.loadMessages()
       if (rawMessages.length > 0) {
         historyStore.clear()
-        const loaded: Message[] = rawMessages.map((m) => {
-          const role: 'user' | 'assistant' = m.direction === 'IN' ? 'user' : 'assistant'
-          const parts = parseContentWithThinking(m.text || '', role)
-          const models = m.aiModels as Message['aiModels']
-          const chatModel = models?.chat
-          // Attached files (e.g. AI-generated documents) so the download
-          // badge survives a page reload in guest mode.
-          const files: Message['files'] =
-            m.files && m.files.length > 0
-              ? m.files.map((f) => ({
-                  id: f.id,
-                  filename: f.filename,
-                  fileType: f.fileType,
-                  filePath: f.filePath,
-                  fileSize: f.fileSize ?? undefined,
-                  fileMime: f.fileMime ?? undefined,
-                }))
-              : undefined
-          return {
-            id: `backend-${m.id}`,
-            role,
-            parts,
-            timestamp: new Date(m.timestamp * 1000),
-            provider: chatModel?.provider ?? m.provider ?? undefined,
-            modelLabel: chatModel?.model ?? m.provider ?? (role === 'assistant' ? 'AI' : undefined),
-            backendMessageId: m.id,
-            aiModels: models ?? null,
-            webSearch: (m.webSearch as Message['webSearch']) ?? null,
-            searchResults: (m.searchResults as Message['searchResults']) ?? null,
-            files,
-          }
-        })
+        // Use the SAME row mapper as the authenticated reload path (issue
+        // #1070) so guests keep full parity: task-plan cards and generated
+        // media (video/image/audio) survive a reload instead of collapsing to
+        // the plain answer text.
+        const loaded: Message[] = rawMessages.map((m) => mapApiMessageRow(m))
         historyStore.messages.push(...loaded)
         await nextTick()
         scrollToBottom()
@@ -1827,8 +1803,9 @@ const streamAIResponse = async (
           } else if (data.status === 'plan') {
             // Multitask routing: a multi-node plan was recognized. Render a task
             // card per node. Mirrors the authenticated handler so anonymous
-            // (guest) users see the exact same DAG surface (issue: guest media
-            // rendered as text-only because these events were dropped).
+            // (guest) users see the exact same DAG surface — e.g. the generated
+            // video card (issue: guest media rendered as text-only because these
+            // events were dropped). Single-node turns never emit this.
             const message = historyStore.messages.find((m) => m.id === messageId)
             const tasks = data.metadata?.plan
             if (message && Array.isArray(tasks) && tasks.length > 0) {
@@ -1849,6 +1826,8 @@ const streamAIResponse = async (
               }
             }
           } else if (data.status === 'plan_discarded') {
+            // The DAG failed entirely; the backend falls back to a single-bubble
+            // answer. Retract the now-misleading failed cards.
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
               message.taskPlan = null
@@ -1858,7 +1837,7 @@ const streamAIResponse = async (
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
             if (card && card.state === 'cancelled') {
-              // keep cancelled
+              // keep cancelled — a user-cancelled step is terminal on the client
             } else if (card && isTaskCardState(data.metadata?.state)) {
               card.state = data.metadata.state
               if (typeof data.metadata?.error === 'string' && data.metadata.error) {
@@ -1906,9 +1885,9 @@ const streamAIResponse = async (
             data.status === 'data' &&
             historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
           ) {
-            // Multitask: the assembled reply text streams once after the DAG
-            // finishes (the task cards are the live surface). Accumulate it so the
-            // 'complete' flush renders it.
+            // Multitask mode: the task cards are the live surface. Still
+            // accumulate the assembled reply text (compose_reply is hidden and
+            // has no card) so the 'complete' flush renders the answer body.
             if (data.chunk) {
               fullContent += data.chunk
             }
@@ -2024,10 +2003,12 @@ const streamAIResponse = async (
             if (message) {
               applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
 
-              // Multitask turn finished: stop the live task-card spinners. Guests
-              // cannot reconcile against the persisted message (that endpoint is
-              // auth-only), so the terminal card states already streamed via
-              // task_update are authoritative here.
+              // Multitask: the DAG finished — freeze the task cards (video/image/
+              // audio already carry their url via task_file) so they render as
+              // final rather than actively animating. Guests cannot reconcile
+              // against the persisted message (that endpoint is auth-only), so the
+              // terminal card states already streamed via task_update are
+              // authoritative here.
               if (message.taskPlan) {
                 message.taskPlan.active = false
               }

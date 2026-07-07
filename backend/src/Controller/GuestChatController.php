@@ -7,9 +7,9 @@ namespace App\Controller;
 use App\Entity\Chat;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
-use App\Repository\SearchResultRepository;
 use App\Service\GuestSessionService;
 use App\Service\Media\MediaCancellationStore;
+use App\Service\Message\MessageApiFormatter;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -35,9 +35,9 @@ class GuestChatController extends AbstractController
         private GuestSessionService $guestSessionService,
         private EntityManagerInterface $em,
         private MessageRepository $messageRepository,
-        private SearchResultRepository $searchResultRepository,
         private FileRepository $fileRepository,
         private MediaCancellationStore $cancellationStore,
+        private MessageApiFormatter $messageApiFormatter,
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
@@ -410,143 +410,18 @@ class GuestChatController extends AbstractController
             ->getQuery()
             ->getResult();
 
-        // Build in-memory index of IN messages for preceding-message lookup
-        $inMessages = [];
-        foreach ($messages as $m) {
-            if ('IN' === $m->getDirection()) {
-                $inMessages[] = $m;
-            }
-        }
-
-        // Collect IN messages that precede OUT messages with web search data
-        $inMessagesNeedingResults = [];
-        $outToInMap = []; // outMessageId => inMessage
-        foreach ($messages as $m) {
-            if ('OUT' !== $m->getDirection()) {
-                continue;
-            }
-            $searchQuery = $m->getMeta('web_search_query');
-            $searchResultsCount = $m->getMeta('web_search_results_count');
-            if (!$searchQuery && !$searchResultsCount) {
-                continue;
-            }
-            // Find the closest preceding IN message in-memory
-            $preceding = null;
-            foreach ($inMessages as $inMsg) {
-                if ($inMsg->getUnixTimestamp() < $m->getUnixTimestamp()) {
-                    $preceding = $inMsg;
-                } else {
-                    break;
-                }
-            }
-            if ($preceding) {
-                $outToInMap[$m->getId()] = $preceding;
-                $inMessagesNeedingResults[$preceding->getId()] = $preceding;
-            }
-        }
-
-        // Batch-load all needed search results in a single query
-        $searchResultsByMessageId = $this->searchResultRepository
-            ->findByMessages(array_values($inMessagesNeedingResults));
-
-        $messageData = array_map(function ($m) use ($outToInMap, $searchResultsByMessageId) {
-            $aiModels = [];
-            $webSearchData = null;
-            $searchResultsData = [];
-
-            // Attached files (e.g. AI-generated documents) — same shape as
-            // MessageApiFormatter so the download badge also renders for
-            // guests after a page reload.
-            $filesData = [];
-            if ($m->hasFiles()) {
-                foreach ($m->getFiles() as $file) {
-                    $filesData[] = [
-                        'id' => $file->getId(),
-                        'filename' => $file->getFileName(),
-                        'fileType' => $file->getFileType(),
-                        'filePath' => $file->getFilePath(),
-                        'fileSize' => $file->getFileSize(),
-                        'fileMime' => $file->getFileMime(),
-                    ];
-                }
-            }
-
-            if ('OUT' === $m->getDirection()) {
-                $chatProvider = $m->getMeta('ai_chat_provider');
-                $chatModel = $m->getMeta('ai_chat_model');
-                $chatModelIdMeta = $m->getMeta('ai_chat_model_id');
-                if ($chatProvider || $chatModel) {
-                    $aiModels['chat'] = [
-                        'provider' => $chatProvider,
-                        'model' => $chatModel,
-                        'model_id' => $chatModelIdMeta ? (int) $chatModelIdMeta : null,
-                    ];
-                }
-
-                $sortingProvider = $m->getMeta('ai_sorting_provider');
-                $sortingModel = $m->getMeta('ai_sorting_model');
-                $sortingModelId = $m->getMeta('ai_sorting_model_id');
-                if ($sortingProvider || $sortingModel) {
-                    $aiModels['sorting'] = [
-                        'provider' => $sortingProvider,
-                        'model' => $sortingModel,
-                        'model_id' => $sortingModelId ? (int) $sortingModelId : null,
-                    ];
-                }
-
-                // Audio (TTS) model — separate from chat so the badge after
-                // a page reload also shows the actual TTS model (#583).
-                $audioProvider = $m->getMeta('ai_audio_provider');
-                $audioModel = $m->getMeta('ai_audio_model');
-                $audioModelId = $m->getMeta('ai_audio_model_id');
-                if ($audioProvider || $audioModel) {
-                    $aiModels['audio'] = [
-                        'provider' => $audioProvider,
-                        'model' => $audioModel,
-                        'model_id' => $audioModelId ? (int) $audioModelId : null,
-                    ];
-                }
-
-                $searchQuery = $m->getMeta('web_search_query');
-                $searchResultsCount = $m->getMeta('web_search_results_count');
-                if ($searchQuery || $searchResultsCount) {
-                    $webSearchData = [
-                        'query' => $searchQuery,
-                        'resultsCount' => $searchResultsCount ? (int) $searchResultsCount : 0,
-                    ];
-
-                    $incomingMessage = $outToInMap[$m->getId()] ?? null;
-                    if ($incomingMessage) {
-                        $results = $searchResultsByMessageId[$incomingMessage->getId()] ?? [];
-                        foreach ($results as $sr) {
-                            $searchResultsData[] = [
-                                'title' => $sr->getTitle(),
-                                'url' => $sr->getUrl(),
-                                'description' => $sr->getDescription(),
-                                'published' => $sr->getPublished(),
-                                'source' => $sr->getSource(),
-                                'thumbnail' => $sr->getThumbnail(),
-                            ];
-                        }
-                    }
-                }
-            }
-
-            return [
-                'id' => $m->getId(),
-                'text' => $m->getText(),
-                'direction' => $m->getDirection(),
-                'timestamp' => $m->getUnixTimestamp(),
-                'provider' => $m->getProviderIndex(),
-                'topic' => $m->getTopic(),
-                'language' => $m->getLanguage(),
-                'createdAt' => $m->getDateTime(),
-                'aiModels' => !empty($aiModels) ? $aiModels : null,
-                'webSearch' => $webSearchData,
-                'searchResults' => !empty($searchResultsData) ? $searchResultsData : null,
-                'files' => $filesData,
-            ];
-        }, $messages);
+        // Serialize through the SAME formatter as the authenticated chat-history
+        // endpoint (issue #1070) so the guest reload path reaches full parity:
+        // task-plan cards, the `multitask` flag, generated media (video/image/
+        // audio), and background media jobs all survive a page reload. Without
+        // this the guest lost every task-plan card — most visibly the video from
+        // the "video invitation" example prompt (it only rendered live and
+        // vanished on reload). AI-generated files are public-serve
+        // (StaticUploadController) so the card media URLs load without auth.
+        $messageData = array_map(
+            fn ($m) => $this->messageApiFormatter->format($m),
+            $messages
+        );
 
         return $this->json([
             'success' => true,

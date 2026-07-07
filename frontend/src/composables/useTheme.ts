@@ -1,6 +1,8 @@
 import { ref, watchEffect } from 'vue'
 type Theme = 'light' | 'dark' | 'system'
-const theme = ref<Theme>((localStorage.getItem('theme') as Theme) || 'system')
+// Default to bright (light) mode when the user hasn't picked a theme yet.
+// A stored preference (light / dark / system) always wins.
+const theme = ref<Theme>((localStorage.getItem('theme') as Theme) || 'light')
 
 const apply = () => {
   const root = document.documentElement

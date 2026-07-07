@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getApiBaseUrl } from '@/services/api/httpClient'
+import type { ApiLoadedMessageRow } from '@/utils/messageMapper'
 
 export const GUEST_STORAGE_KEY = 'synaplan_guest_session'
 
@@ -127,29 +128,11 @@ export const useGuestStore = defineStore('guest', () => {
     }
   }
 
-  async function loadMessages(): Promise<
-    Array<{
-      id: number
-      text: string
-      direction: string
-      timestamp: number
-      provider: string | null
-      topic: string | null
-      language: string | null
-      createdAt: string | null
-      aiModels: Record<string, unknown> | null
-      webSearch: Record<string, unknown> | null
-      searchResults: Array<Record<string, unknown>> | null
-      files: Array<{
-        id: number
-        filename: string
-        fileType: string
-        filePath: string
-        fileSize: number | null
-        fileMime: string | null
-      }> | null
-    }>
-  > {
+  // Returns the canonical API message shape (same serializer as the
+  // authenticated chat-history endpoint, issue #1070) so the guest reload path
+  // can map rows through `mapApiMessageRow` and keep full parity — including
+  // task-plan cards and generated media (video/image/audio).
+  async function loadMessages(): Promise<ApiLoadedMessageRow[]> {
     if (!sessionId.value || !chatId.value) return []
 
     try {

@@ -18,6 +18,7 @@ const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
 
 const FONT_LINK_ID = 'brand-font-link'
 const HEADING_STYLE_ID = 'brand-heading-font'
+const BRAND_COLOR_STYLE_ID = 'brand-color-vars'
 
 export function applyBrandingTheme(): void {
   applyColors()
@@ -31,13 +32,7 @@ function applyColors(): void {
   // Primary only overrides when it's a valid, non-default hex (preserves the
   // tuned light/dark stylesheet values for the stock brand).
   if (HEX_COLOR.test(primaryColor) && primaryColor.toLowerCase() !== DEFAULT_PRIMARY) {
-    root.style.setProperty('--brand', primaryColor)
-    root.style.setProperty('--brand-hover', `color-mix(in srgb, ${primaryColor} 88%, black)`)
-    root.style.setProperty('--brand-light', `color-mix(in srgb, ${primaryColor} 55%, white)`)
-    root.style.setProperty(
-      '--brand-alpha-light',
-      `color-mix(in srgb, ${primaryColor} 10%, transparent)`
-    )
+    applyBrandColorVars(primaryColor)
   }
 
   // Secondary/accent are additive, opt-in variables (unset by default).
@@ -47,6 +42,42 @@ function applyColors(): void {
   if (HEX_COLOR.test(accentColor)) {
     root.style.setProperty('--brand-accent', accentColor)
   }
+}
+
+/**
+ * Inject the brand palette as a stylesheet (NOT inline styles on <html>).
+ *
+ * Inline styles win over every stylesheet rule, so setting `--brand` inline
+ * forced the SAME raw primary color in both light and dark — on the near-black
+ * dark surfaces a saturated brand (e.g. a deep indigo) then reads as a harsh
+ * "pink/purple" on the send + active buttons. A stylesheet lets the dark theme
+ * use a lightened, dark-mode-friendly tint, mirroring how the stock brand
+ * (#003fc7) becomes #6d9ae0 in dark. `html.dark` / `html:not(.dark)` keep a
+ * higher specificity than the base `.dark` / `:root` rules so this always wins,
+ * and it re-resolves automatically when the theme class toggles at runtime.
+ */
+function applyBrandColorVars(primary: string): void {
+  const light = [
+    `--brand:${primary}`,
+    `--brand-hover:color-mix(in srgb, ${primary} 88%, black)`,
+    `--brand-light:color-mix(in srgb, ${primary} 55%, white)`,
+    `--brand-alpha-light:color-mix(in srgb, ${primary} 10%, transparent)`,
+  ].join(';')
+
+  const dark = [
+    `--brand:color-mix(in srgb, ${primary} 58%, white)`,
+    `--brand-hover:color-mix(in srgb, ${primary} 46%, white)`,
+    `--brand-light:color-mix(in srgb, ${primary} 40%, white)`,
+    `--brand-alpha-light:color-mix(in srgb, ${primary} 20%, transparent)`,
+  ].join(';')
+
+  let styleEl = document.getElementById(BRAND_COLOR_STYLE_ID) as HTMLStyleElement | null
+  if (!styleEl) {
+    styleEl = document.createElement('style')
+    styleEl.id = BRAND_COLOR_STYLE_ID
+    document.head.appendChild(styleEl)
+  }
+  styleEl.textContent = `html:not(.dark){${light}}html.dark{${dark}}`
 }
 
 function applyFonts(): void {
