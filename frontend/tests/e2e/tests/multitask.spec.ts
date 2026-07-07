@@ -195,8 +195,13 @@ test.describe('@ci @multitask Multi-task routing', () => {
     const openPlusMenu = async () => {
       const panel = page.locator(selectors.chat.plusPanel)
       if (await panel.isVisible()) return
-      await page.locator(selectors.chat.plusToggle).click()
-      await panel.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      const toggle = page.locator(selectors.chat.plusToggle)
+      await expect(toggle).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(async () => {
+        if (await panel.isVisible()) return
+        await toggle.click()
+        await expect(panel).toBeVisible({ timeout: 2000 })
+      }).toPass({ timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(selectors.chat.attachBtn)).toBeVisible({
         timeout: TIMEOUTS.SHORT,
       })
