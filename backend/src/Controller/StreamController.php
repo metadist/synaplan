@@ -892,10 +892,18 @@ class StreamController extends AbstractController
                 $isBufferingJson = false;
                 $finishReason = null;
 
+                // Document generation progress: while the model writes the
+                // whole {BFILEPATH, BFILETEXT} JSON into the buffer, no data
+                // chunk reaches the client. Announce the phase (and the
+                // filename as soon as it is parseable) so the bubble shows a
+                // live "writing document" status instead of staying empty.
+                $fileGenAnnounced = false;
+                $fileGenFilename = null;
+
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
                     // Stream callback - AI streams TEXT directly or structured data (reasoning)
-                    function ($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson, &$finishReason, $trackId) {
+                    function ($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson, &$finishReason, &$fileGenAnnounced, &$fileGenFilename, $trackId) {
                         // Detach-on-navigation (issues #1142 / #1223 / #1225): a
                         // bare client disconnect (chat switch, page leave, reload)
                         // must NOT kill the turn — it keeps streaming silently
@@ -988,6 +996,25 @@ class StreamController extends AbstractController
 
                             if ($isBufferingJson) {
                                 $jsonBuffer .= $chunk;
+
+                                // Streamed document generation: surface progress
+                                // while the JSON payload is being written.
+                                if (!$fileGenAnnounced && str_contains($jsonBuffer, 'BFILEPATH')) {
+                                    $fileGenAnnounced = true;
+                                    $this->sendSSE('generating_file', [
+                                        'metadata' => ['stage' => 'writing'],
+                                    ]);
+                                }
+                                if ($fileGenAnnounced && null === $fileGenFilename
+                                    && preg_match('/"BFILEPATH"\s*:\s*"([^"]+)"/', $jsonBuffer, $fileGenMatch)) {
+                                    $fileGenFilename = $fileGenMatch[1];
+                                    $this->sendSSE('generating_file', [
+                                        'metadata' => [
+                                            'stage' => 'writing',
+                                            'filename' => $fileGenFilename,
+                                        ],
+                                    ]);
+                                }
 
                                 // Check if JSON is complete (has closing brace)
                                 if (str_contains($jsonBuffer, '}')) {
@@ -1329,10 +1356,14 @@ class StreamController extends AbstractController
                                     'filename' => $jsonData['BFILEPATH'],
                                 ]);
 
-                                $this->sendSSE('generating', [
-                                    'message' => 'Datei wird generiert...',
+                                // The document text is complete — now convert it
+                                // into the actual office file. The frontend
+                                // translates the stage; never send hardcoded
+                                // user-facing strings from here.
+                                $this->sendSSE('generating_file', [
                                     'metadata' => [
-                                        'customMessage' => 'Erstelle Datei: '.$jsonData['BFILEPATH'],
+                                        'stage' => 'converting',
+                                        'filename' => $jsonData['BFILEPATH'],
                                     ],
                                 ]);
 
@@ -1398,10 +1429,13 @@ class StreamController extends AbstractController
                     }
 
                     // When the whole response was buffered as JSON, the client
-                    // never received a single data chunk — push the failure
-                    // marker live so the bubble shows the translated error
-                    // instead of staying empty until a reload.
-                    if ('__FILE_GENERATION_FAILED__' === $finalText && '' === trim($streamedVisibleText)) {
+                    // never received a single data chunk — push the final
+                    // marker live (success AND failure) so the bubble shows
+                    // the translated result instead of staying empty until a
+                    // reload. MessageText translates both markers.
+                    if ('' === trim($streamedVisibleText)
+                        && ('__FILE_GENERATION_FAILED__' === $finalText
+                            || str_starts_with($finalText, '__FILE_GENERATED__:'))) {
                         $this->sendSSE('data', ['chunk' => $finalText]);
                     }
 

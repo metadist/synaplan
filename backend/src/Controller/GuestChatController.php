@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\Chat;
+use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\GuestSessionService;
@@ -13,9 +14,11 @@ use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Uid\Uuid;
 
@@ -33,8 +36,10 @@ class GuestChatController extends AbstractController
         private EntityManagerInterface $em,
         private MessageRepository $messageRepository,
         private SearchResultRepository $searchResultRepository,
+        private FileRepository $fileRepository,
         private MediaCancellationStore $cancellationStore,
         private LoggerInterface $logger,
+        private string $uploadDir,
     ) {
     }
 
@@ -449,6 +454,23 @@ class GuestChatController extends AbstractController
             $webSearchData = null;
             $searchResultsData = [];
 
+            // Attached files (e.g. AI-generated documents) — same shape as
+            // MessageApiFormatter so the download badge also renders for
+            // guests after a page reload.
+            $filesData = [];
+            if ($m->hasFiles()) {
+                foreach ($m->getFiles() as $file) {
+                    $filesData[] = [
+                        'id' => $file->getId(),
+                        'filename' => $file->getFileName(),
+                        'fileType' => $file->getFileType(),
+                        'filePath' => $file->getFilePath(),
+                        'fileSize' => $file->getFileSize(),
+                        'fileMime' => $file->getFileMime(),
+                    ];
+                }
+            }
+
             if ('OUT' === $m->getDirection()) {
                 $chatProvider = $m->getMeta('ai_chat_provider');
                 $chatModel = $m->getMeta('ai_chat_model');
@@ -522,6 +544,7 @@ class GuestChatController extends AbstractController
                 'aiModels' => !empty($aiModels) ? $aiModels : null,
                 'webSearch' => $webSearchData,
                 'searchResults' => !empty($searchResultsData) ? $searchResultsData : null,
+                'files' => $filesData,
             ];
         }, $messages);
 
@@ -529,5 +552,84 @@ class GuestChatController extends AbstractController
             'success' => true,
             'messages' => $messageData,
         ]);
+    }
+
+    /**
+     * Download a file that was generated in a guest chat.
+     *
+     * PUBLIC endpoint — authorized by the server-issued guest session ID
+     * instead of user auth (same pattern as the widget file download).
+     * The file must be attached to a message inside the session's chat.
+     */
+    #[Route('/files/{sessionId}/{fileId}/download', name: 'file_download', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/guest/files/{sessionId}/{fileId}/download',
+        summary: 'Download a file from a guest chat session',
+        tags: ['Guest']
+    )]
+    #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'fileId', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(response: 200, description: 'File content')]
+    #[OA\Response(response: 403, description: 'File not associated with this session')]
+    #[OA\Response(response: 404, description: 'Session or file not found')]
+    #[OA\Response(response: 410, description: 'Session expired')]
+    public function downloadFile(string $sessionId, int $fileId): Response
+    {
+        if (!Uuid::isValid($sessionId)) {
+            return $this->json(['error' => 'Invalid session ID'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $session = $this->guestSessionService->getSession($sessionId);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($session->isExpired()) {
+            return $this->json(['error' => 'Session expired', 'reason' => 'expired'], Response::HTTP_GONE);
+        }
+
+        $chatId = $session->getChatId();
+        if (!$chatId) {
+            return $this->json(['error' => 'No chat in this session'], Response::HTTP_NOT_FOUND);
+        }
+
+        $file = $this->fileRepository->find($fileId);
+        if (!$file) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Ownership proof: the file must be attached to a message inside this
+        // session's chat. A bare file id is guessable — never trust it alone.
+        if (!$this->messageRepository->isFileInChat($chatId, $fileId)) {
+            $this->logger->warning('Guest file download: file not in session chat', [
+                'session_id' => substr($sessionId, 0, 12).'...',
+                'file_id' => $fileId,
+                'chat_id' => $chatId,
+            ]);
+
+            return $this->json(['error' => 'File not associated with this session'], Response::HTTP_FORBIDDEN);
+        }
+
+        $filePath = $file->getFilePath();
+        if (!$filePath) {
+            return $this->json(['error' => 'File path not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $absolutePath = $this->uploadDir.'/'.$filePath;
+        if (!file_exists($absolutePath)) {
+            $this->logger->error('Guest file download: file not on disk', [
+                'file_id' => $fileId,
+                'path' => $absolutePath,
+            ]);
+
+            return $this->json(['error' => 'File not found on disk'], Response::HTTP_NOT_FOUND);
+        }
+
+        $response = new BinaryFileResponse($absolutePath);
+        $response->setContentDisposition(
+            ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+            $file->getFileName()
+        );
+
+        return $response;
     }
 }

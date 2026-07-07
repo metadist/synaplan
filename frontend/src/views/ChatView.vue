@@ -645,6 +645,19 @@ onMounted(async () => {
           const parts = parseContentWithThinking(m.text || '', role)
           const models = m.aiModels as Message['aiModels']
           const chatModel = models?.chat
+          // Attached files (e.g. AI-generated documents) so the download
+          // badge survives a page reload in guest mode.
+          const files: Message['files'] =
+            m.files && m.files.length > 0
+              ? m.files.map((f) => ({
+                  id: f.id,
+                  filename: f.filename,
+                  fileType: f.fileType,
+                  filePath: f.filePath,
+                  fileSize: f.fileSize ?? undefined,
+                  fileMime: f.fileMime ?? undefined,
+                }))
+              : undefined
           return {
             id: `backend-${m.id}`,
             role,
@@ -656,6 +669,7 @@ onMounted(async () => {
             aiModels: models ?? null,
             webSearch: (m.webSearch as Message['webSearch']) ?? null,
             searchResults: (m.searchResults as Message['searchResults']) ?? null,
+            files,
           }
         })
         historyStore.messages.push(...loaded)
@@ -1850,9 +1864,6 @@ const streamAIResponse = async (
               customMessage: data.message || undefined,
               ...(data.metadata || {}),
             }
-            if (data.message && (data.message.includes('Datei') || data.message.includes('file'))) {
-              processingStatus.value = 'generating_file'
-            }
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.metadata) {
               const prov = data.metadata.provider
@@ -1861,6 +1872,12 @@ const streamAIResponse = async (
               if (typeof mname === 'string') message.modelLabel = mname
               applyMediaJobToMessage(message, data.metadata)
             }
+          } else if (data.status === 'generating_file') {
+            // Staged document generation progress (officemaker): the backend
+            // announces `writing` while the model produces the document text
+            // and `converting` while the office file is built.
+            processingStatus.value = 'generating_file'
+            processingMetadata.value = data.metadata || {}
           } else if (data.status === 'processing') {
             // Processing/routing — no UI update needed
           } else if (data.status === 'data' && data.chunk) {
@@ -1915,6 +1932,46 @@ const streamAIResponse = async (
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
               applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
+
+              if (data.messageId) {
+                message.backendMessageId = data.messageId
+              }
+
+              // Generated file (e.g. officemaker Word document): attach the
+              // download badge and replace the raw JSON / marker with the
+              // translated confirmation — mirrors the authenticated handler.
+              if (data.generatedFile) {
+                if (!message.files) {
+                  message.files = []
+                }
+                message.files.push({
+                  id: data.generatedFile.id,
+                  filename: data.generatedFile.filename,
+                  filePath: data.generatedFile.path,
+                  fileSize: data.generatedFile.size,
+                  fileType: data.generatedFile.type,
+                  fileMime: data.generatedFile.mime,
+                })
+
+                const hasJsonOrMarker =
+                  message.parts.length === 0 ||
+                  (message.parts[0].type === 'code' &&
+                    message.parts[0].content?.includes('BFILEPATH')) ||
+                  (message.parts[0].type === 'text' &&
+                    message.parts[0].content?.includes('__FILE_GENERATED__'))
+
+                if (hasJsonOrMarker) {
+                  message.parts = [
+                    {
+                      type: 'text',
+                      content: t('message.fileGenerated', {
+                        filename: data.generatedFile.filename,
+                      }),
+                    },
+                  ]
+                }
+              }
+
               if (
                 data.searchResults &&
                 Array.isArray(data.searchResults) &&
@@ -2110,11 +2167,6 @@ const streamAIResponse = async (
               ...(data.metadata || {}),
             }
 
-            // Check if this is a file generation (backend sends 'Datei wird generiert...')
-            if (data.message && (data.message.includes('Datei') || data.message.includes('file'))) {
-              processingStatus.value = 'generating_file'
-            }
-
             // Update message with real model from backend (instead of store model)
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.metadata) {
@@ -2128,6 +2180,12 @@ const streamAIResponse = async (
               }
               applyMediaJobToMessage(message, data.metadata)
             }
+          } else if (data.status === 'generating_file') {
+            // Staged document generation progress (officemaker): the backend
+            // announces `writing` while the model produces the document text
+            // and `converting` while the office file is built.
+            processingStatus.value = 'generating_file'
+            processingMetadata.value = data.metadata || {}
           } else if (data.status === 'processing') {
             // Processing/routing messages - improved logging
           } else if (data.status === 'thinking') {

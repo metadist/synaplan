@@ -310,10 +310,11 @@ final readonly class SystemConfigService
      */
     private function applyConfigSideEffects(string $group, string $key, string $value, ?int $actingUserId = null): void
     {
-        // Multi-task routing master switch: existing users were grandfathered to
-        // an explicit per-user OFF row (migration Version20260607000000), which
-        // overrides this global flag. Drop the acting admin's own override so the
-        // value they just set actually applies to their own account immediately.
+        // Multi-task routing master switch: a per-user row overrides this global
+        // flag (the Version20260607000000 grandfather rows are gone since
+        // Version20260706130000, but hand-set overrides can still exist). Drop
+        // the acting admin's own override so the value they just set actually
+        // applies to their own account immediately.
         if (MultitaskRoutingConfig::CONFIG_GROUP === $group
             && MultitaskRoutingConfig::KEY_ROUTING_ENABLED === $key
             && null !== $actingUserId && $actingUserId > 0
@@ -706,7 +707,7 @@ final readonly class SystemConfigService
             'MULTITASK_ROUTING_ENABLED' => [
                 'tab' => 'routing', 'section' => 'multitask', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Route messages through the multi-task planner (turns a request into a small DAG of capability tasks). When OFF, the legacy single-topic AI sorter handles routing. Global default; existing users keep their own setting until they opt in.',
+                'description' => 'Route messages through the multi-task planner (turns a request into a small DAG of capability tasks). When OFF, the legacy single-topic AI sorter handles routing. Global default for all users; an explicit per-user BCONFIG row still overrides it.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,

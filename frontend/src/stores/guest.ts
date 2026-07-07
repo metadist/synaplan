@@ -151,6 +151,14 @@ export const useGuestStore = defineStore('guest', () => {
       aiModels: Record<string, unknown> | null
       webSearch: Record<string, unknown> | null
       searchResults: Array<Record<string, unknown>> | null
+      files: Array<{
+        id: number
+        filename: string
+        fileType: string
+        filePath: string
+        fileSize: number | null
+        fileMime: string | null
+      }> | null
     }>
   > {
     if (!sessionId.value || !chatId.value) return []

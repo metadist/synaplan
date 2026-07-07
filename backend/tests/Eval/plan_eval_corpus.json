@@ -358,6 +358,21 @@
     }
   },
   {
+    "id": "video_invitation_plus_schedule",
+    "text": "Make a video invitation for a one-day company retreat in London, and write the schedule below it.",
+    "language": "en",
+    "expect": {
+      "capabilities": [
+        "video_generation",
+        "chat",
+        "compose_reply"
+      ],
+      "forbid": [
+        "image_generation"
+      ]
+    }
+  },
+  {
     "id": "video_with_params",
     "text": "Erstelle ein 8 Sekunden Video von einem Zug in 4K",
     "language": "de",
