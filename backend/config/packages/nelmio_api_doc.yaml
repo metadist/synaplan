@@ -3,7 +3,9 @@ nelmio_api_doc:
         info:
             title: Synaplan API
             description: Synaplan AI Assistant API Documentation
-            version: 1.0.0
+            # Sourced from APP_VERSION (git tag, set at build time), matching the
+            # runtime config's build.version. Falls back to 'dev' locally.
+            version: '%env(default:app_version_default:APP_VERSION)%'
         servers:
             - url: http://localhost:8000
               description: Local development server

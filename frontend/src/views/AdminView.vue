@@ -18,7 +18,7 @@
           v-for="tab in tabs"
           :key="tab.id"
           :class="[
-            'px-4 py-3 font-medium transition-colors relative whitespace-nowrap flex-shrink-0',
+            'px-4 py-3 font-medium text-xs sm:text-sm transition-colors relative whitespace-nowrap flex-shrink-0',
             activeTab === tab.id
               ? 'txt-primary border-b-2 border-[var(--brand)]'
               : 'txt-secondary hover:txt-primary',
@@ -27,7 +27,7 @@
           @click="activeTab = tab.id"
         >
           <div class="flex items-center gap-2">
-            <Icon :icon="tab.icon" class="w-5 h-5" />
+            <Icon :icon="tab.icon" class="w-4 h-4 flex-shrink-0" />
             {{ tab.label }}
           </div>
         </button>
