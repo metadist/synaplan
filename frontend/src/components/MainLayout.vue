@@ -69,6 +69,14 @@
       <span>{{ $t('auth.signIn') }}</span>
     </button>
 
+    <!-- Incognito toggle (top-right, mobile) — mirrors the drawer toggle on
+         the left. Signed-in users on the chat route only (guests have the
+         login CTA in that spot and no incognito). Desktop gets its own
+         floating instance inside ChatView. -->
+    <div v-if="showIncognitoToggle" class="v2-incognito-toggle fixed right-3 z-40 md:hidden">
+      <IncognitoToggle />
+    </div>
+
     <!-- Help system host -->
     <HelpHost />
 
@@ -79,7 +87,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAuthStore } from '../stores/auth'
@@ -88,15 +96,20 @@ import SidebarV2 from './SidebarV2.vue'
 import MobileNav from './MobileNav.vue'
 import HelpHost from './help/HelpHost.vue'
 import JobsTrayLauncher from './jobs/JobsTrayLauncher.vue'
+import IncognitoToggle from './IncognitoToggle.vue'
 
+const route = useRoute()
 const router = useRouter()
 const sidebarStore = useSidebarStore()
 const authStore = useAuthStore()
 
 // Signed-out users get a prominent login shortcut in the top bar. Hidden while
 // the drawer is open so it never overlaps the sliding content / close button.
-const showLoginButton = computed(
-  () => !authStore.isAuthenticated && !sidebarStore.mobileDrawerOpen
+const showLoginButton = computed(() => !authStore.isAuthenticated && !sidebarStore.mobileDrawerOpen)
+
+// Incognito toggle (mobile, top-right): signed-in users on the chat route only.
+const showIncognitoToggle = computed(
+  () => authStore.isAuthenticated && route.name === 'chat' && !sidebarStore.mobileDrawerOpen
 )
 
 const goToLogin = () => {
@@ -112,6 +125,25 @@ let touchStartY = 0
 let touchTracking = false
 
 const isMobileViewport = () => window.matchMedia('(max-width: 767px)').matches
+
+/**
+ * Walk up from the touch target: if any ancestor can actually scroll
+ * horizontally (wide table, code block, carousel, …), the horizontal gesture
+ * belongs to THAT element, not the drawer. Without this, dragging such content
+ * left↔right is misread as a drawer swipe and pops the menu open (issue: menu
+ * opens while scrolling a table sideways).
+ */
+const startedInHorizontalScroller = (target: EventTarget | null): boolean => {
+  let node: Element | null = target instanceof Element ? target : null
+  while (node && node !== document.body) {
+    if (node.scrollWidth > node.clientWidth) {
+      const overflowX = window.getComputedStyle(node).overflowX
+      if (overflowX === 'auto' || overflowX === 'scroll') return true
+    }
+    node = node.parentElement
+  }
+  return false
+}
 
 const fireHaptic = () => triggerHapticImpact('light')
 
@@ -130,7 +162,7 @@ const handleToggle = () => {
 }
 
 const onTouchStart = (event: TouchEvent) => {
-  if (!isMobileViewport()) {
+  if (!isMobileViewport() || startedInHorizontalScroller(event.target)) {
     touchTracking = false
     return
   }
@@ -218,7 +250,10 @@ const scrollToTopOnBandTap = (event: PointerEvent) => {
 
   const main = document.querySelector<HTMLElement>('[data-testid="section-primary-content"]')
   if (!main) return
-  const containers: HTMLElement[] = [main, ...main.querySelectorAll<HTMLElement>('.overflow-y-auto')]
+  const containers: HTMLElement[] = [
+    main,
+    ...main.querySelectorAll<HTMLElement>('.overflow-y-auto'),
+  ]
   containers
     .filter((el) => el.scrollTop > 0)
     .forEach((el) => el.scrollTo({ top: 0, behavior: 'smooth' }))
@@ -306,7 +341,8 @@ onBeforeUnmount(() => {
 }
 
 .v2-drawer-toggle,
-.v2-login-cta {
+.v2-login-cta,
+.v2-incognito-toggle {
   /* Sit inside the iOS safe area / notch, within the reserved top band. */
   top: calc(env(safe-area-inset-top, 0px) + 10px);
   touch-action: manipulation;

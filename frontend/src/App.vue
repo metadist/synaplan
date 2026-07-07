@@ -51,6 +51,7 @@ import { initOtaUpdates } from '@/services/otaUpdates'
 import { initBiometricLock } from '@/composables/useBiometricLock'
 import { initNativeStatusBar } from '@/services/nativeStatusBar'
 import { initNativeBackButton } from '@/services/nativeBackButton'
+import { initKeyboardScrollAssist } from '@/services/keyboardScrollAssist'
 import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
 useTheme()
@@ -120,6 +121,10 @@ void initBiometricLock()
 // give Android a sane hardware back-button behavior. Both no-op on web.
 void initNativeStatusBar()
 void initNativeBackButton()
+// Lift any focused input above the soft keyboard (Keyboard.resize:'none' means
+// the WebView does not shrink, so ordinary form/dialog fields would otherwise
+// stay hidden behind it). No-op on web.
+initKeyboardScrollAssist()
 
 // Update page title when language changes
 const route = useRoute()

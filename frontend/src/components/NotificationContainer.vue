@@ -1,7 +1,11 @@
 <template>
   <Teleport to="#app">
     <div
-      class="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none"
+      class="fixed z-[9999] flex flex-col gap-3 pointer-events-none"
+      :style="{
+        top: 'calc(env(safe-area-inset-top, 0px) + 1rem)',
+        right: 'calc(env(safe-area-inset-right, 0px) + 1rem)',
+      }"
       data-testid="comp-notification-container"
     >
       <TransitionGroup
