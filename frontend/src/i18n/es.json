@@ -1,4 +1,16 @@
 {
+  "incognito": {
+    "toggleStart": "Iniciar chat de incógnito",
+    "toggleEnd": "Finalizar chat de incógnito",
+    "bannerTitle": "Chat de incógnito",
+    "bannerText": "Esta conversación no se guarda. Tus recuerdos y conocimientos guardados se siguen usando, pero no se memoriza nada nuevo.",
+    "emptyTitle": "Chat de incógnito",
+    "emptyHint": "Los mensajes y archivos de esta sesión no se guardan y desaparecen cuando la finalizas.",
+    "endConfirmTitle": "¿Finalizar el chat de incógnito?",
+    "endConfirmMessage": "La conversación se descartará de forma permanente y los archivos de esta sesión se eliminarán.",
+    "endConfirmButton": "Finalizar y descartar",
+    "ended": "Chat de incógnito finalizado"
+  },
   "jobs": {
     "kind": {
       "video": "vídeo",

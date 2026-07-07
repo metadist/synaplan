@@ -118,7 +118,13 @@ const props = defineProps<{
 const router = useRouter()
 
 const tabs: TabDef[] = [
-  { name: 'files', path: '/files', labelKey: 'files.tabBrowse', icon: FolderIcon, testid: 'tab-files-browse' },
+  {
+    name: 'files',
+    path: '/files',
+    labelKey: 'files.tabBrowse',
+    icon: FolderIcon,
+    testid: 'tab-files-browse',
+  },
   {
     name: 'incoming',
     path: '/files/incoming',
@@ -133,8 +139,20 @@ const tabs: TabDef[] = [
     icon: SparklesIcon,
     testid: 'tab-files-generated',
   },
-  { name: 'search', path: '/files/search', labelKey: 'files.tabSearch', icon: MagnifyingGlassIcon, testid: 'tab-files-search' },
-  { name: 'vectors', path: '/files/vectors', labelKey: 'files.tabVectors', icon: CircleStackIcon, testid: 'tab-files-vectors' },
+  {
+    name: 'search',
+    path: '/files/search',
+    labelKey: 'files.tabSearch',
+    icon: MagnifyingGlassIcon,
+    testid: 'tab-files-search',
+  },
+  {
+    name: 'vectors',
+    path: '/files/vectors',
+    labelKey: 'files.tabVectors',
+    icon: CircleStackIcon,
+    testid: 'tab-files-vectors',
+  },
 ]
 
 const activeTab = computed(() => tabs.find((tab) => tab.name === props.active) ?? tabs[0])

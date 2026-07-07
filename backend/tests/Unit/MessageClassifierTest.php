@@ -134,6 +134,49 @@ class MessageClassifierTest extends TestCase
         $this->assertEquals(5, $result['model_id']);
     }
 
+    /**
+     * Incognito turns run through the classifier as TRANSIENT messages whose
+     * id is null (they are never persisted). The prompt/model override lookups
+     * key on the message id, so a null id must short-circuit them instead of
+     * blowing up with a TypeError (`checkPromptOverride(): Argument #1
+     * ($messageId) must be of type int, null given`) — which manifested as a
+     * "Connection interrupted" mid-stream in the incognito chat.
+     */
+    public function testClassifyTransientMessageWithoutIdSkipsOverrideLookups(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(null);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Hi, wie gehts?');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getDateTime')->willReturn('20260707150000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+
+        // A null message id can never have persisted meta — the classifier must
+        // not even query the repository for overrides.
+        $this->messageMetaRepository->expects($this->never())->method('findOneBy');
+
+        $this->messageSorter
+            ->expects($this->once())
+            ->method('classify')
+            ->willReturn([
+                'topic' => 'CHAT',
+                'language' => 'de',
+                'sorting_model_id' => 5,
+                'sorting_provider' => 'ollama',
+                'sorting_model_name' => 'llama3',
+            ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertEquals('CHAT', $result['topic']);
+        $this->assertEquals('de', $result['language']);
+        $this->assertEquals('ai_sorting', $result['source']);
+    }
+
     public function testClassifyDetectsVidCommand(): void
     {
         $message = $this->createMock(Message::class);

@@ -1,4 +1,16 @@
 {
+  "incognito": {
+    "toggleStart": "Start incognito chat",
+    "toggleEnd": "End incognito chat",
+    "bannerTitle": "Incognito chat",
+    "bannerText": "This conversation is not saved. Your saved memories and knowledge are still used, but nothing new is remembered.",
+    "emptyTitle": "Incognito chat",
+    "emptyHint": "Messages and files from this session are not saved and disappear when you end it.",
+    "endConfirmTitle": "End incognito chat?",
+    "endConfirmMessage": "The conversation will be discarded permanently and files from this session will be deleted.",
+    "endConfirmButton": "End and discard",
+    "ended": "Incognito chat ended"
+  },
   "jobs": {
     "kind": {
       "video": "video",

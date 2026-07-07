@@ -7,9 +7,11 @@ namespace App\Tests\Unit\Controller;
 use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
 use App\Message\ExtractMemoriesCommand;
+use App\Repository\FileRepository;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
+use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
@@ -81,6 +83,7 @@ final class StreamControllerDeferredMemoryDispatchTest extends TestCase
             $this->createMock(MediaCancellationStore::class),
             $this->createMock(MediaJobService::class),
             $this->createMock(MediaJobMessageSync::class),
+            new GeneratedFileRegistrar($this->createMock(FileRepository::class), new NullLogger(), '/tmp/upload'),
         );
     }
 

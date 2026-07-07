@@ -649,12 +649,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
                 // Register the generated audio as a BFILES row (see image/video
                 // branch) so inline TTS output appears in the Generated gallery.
+                // Incognito sessions mark it ephemeral for post-session cleanup.
                 $this->generatedFileRegistrar->register(
                     $message->getUserId(),
                     $relativePath,
                     $mediaType,
                     $message->getId(),
                     $result['provider'] ?? $provider,
+                    ephemeral: !empty($options['incognito']),
                 );
 
                 // Clean, localized confirmation (the audio player + download is the
@@ -784,7 +786,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
             if (str_starts_with($mediaUrl, 'data:')) {
                 // Data URL from AI provider - decode and save to disk
-                $localPath = $this->saveDataUrlAsFile($mediaUrl, $message->getId(), $message->getUserId(), $provider);
+                // (message id is only used for the filename; 0 for transient
+                // incognito messages)
+                $localPath = $this->saveDataUrlAsFile($mediaUrl, $message->getId() ?? 0, $message->getUserId(), $provider);
                 if (!$localPath) {
                     throw new \Exception("Failed to save generated {$mediaType} data URL to disk");
                 }
@@ -794,7 +798,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 ]);
             } else {
                 // External URL - download to disk
-                $localPath = $this->downloadMedia($mediaUrl, $message->getId(), $message->getUserId(), $provider, $mediaType);
+                $localPath = $this->downloadMedia($mediaUrl, $message->getId() ?? 0, $message->getUserId(), $provider, $mediaType);
                 if (!$localPath) {
                     throw new \Exception("Failed to download {$mediaType} from: {$mediaUrl}");
                 }
@@ -812,12 +816,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // this via MediaJobMessageSync; the inline (synchronous) path must do
             // it here too, otherwise users on inline rendering never see their
             // chat-generated media in the file world. Best-effort + idempotent.
+            // Incognito sessions mark it ephemeral for post-session cleanup.
             $this->generatedFileRegistrar->register(
                 $message->getUserId(),
                 $localPath,
                 $mediaType,
                 $message->getId(),
                 $result['provider'] ?? $provider,
+                ephemeral: !empty($options['incognito']),
             );
 
             // Generate thumbnail for video files
@@ -1408,6 +1414,16 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     ): void {
         $userText = trim($message->getText());
         if ('' === $userText) {
+            return;
+        }
+
+        // Incognito: memories are read-only — extraction would write
+        // conversation content to Qdrant, which the mode forbids.
+        if (!empty($options['incognito'])) {
+            $this->logger->debug('MediaGenerationHandler: Skipping memory extraction (incognito)', [
+                'user_id' => $message->getUserId(),
+            ]);
+
             return;
         }
 

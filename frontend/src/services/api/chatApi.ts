@@ -345,6 +345,17 @@ export type { StreamUpdatePayload }
 export type GuestStreamCallback = (data: StreamUpdatePayload) => void
 
 /**
+ * One prior turn of an incognito conversation. The backend has no stored chat
+ * to load context from, so the frontend ships the in-memory transcript
+ * (oldest first) with every stream request; the server caps it at ~30
+ * entries / 15k chars (mirror of its regular chat-history budget).
+ */
+export interface IncognitoHistoryEntry {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/**
  * POST-based SSE transport for /api/v1/messages/stream.
  *
  * EventSource is GET-only, so the legacy transport carried the whole message
@@ -364,7 +375,7 @@ export type GuestStreamCallback = (data: StreamUpdatePayload) => void
  * (detach-on-navigation, #1225); an explicit Stop goes through /stop-stream.
  */
 function openStreamPost(
-  body: Record<string, string>,
+  body: Record<string, string | IncognitoHistoryEntry[]>,
   onUpdate: (data: StreamUpdatePayload) => void
 ): () => void {
   const controller = new AbortController()
@@ -515,7 +526,8 @@ export const chatApi = {
     userId: number
     message: string
     trackId?: number
-    chatId: number
+    /** Optional in incognito mode — no chat row exists on the server. */
+    chatId?: number
     onUpdate: (data: StreamUpdatePayload) => void
     includeReasoning?: boolean
     webSearch?: boolean
@@ -527,13 +539,21 @@ export const chatApi = {
     ragGroupKey?: string
     quotedText?: string
     quotedMessageId?: number
+    /** Incognito mode: the turn is processed fully in-memory on the server. */
+    incognito?: boolean
+    /** Incognito only: the in-memory transcript (oldest first) for context. */
+    history?: IncognitoHistoryEntry[]
   }): () => void {
-    const paramsObj: Record<string, string> = {
+    const paramsObj: Record<string, string | IncognitoHistoryEntry[]> = {
       message: opts.message,
-      chatId: opts.chatId.toString(),
       userId: opts.userId.toString(),
     }
 
+    if (opts.chatId) paramsObj.chatId = opts.chatId.toString()
+    if (opts.incognito) {
+      paramsObj.incognito = '1'
+      paramsObj.history = opts.history ?? []
+    }
     if (opts.trackId) paramsObj.trackId = opts.trackId.toString()
     if (opts.includeReasoning) paramsObj.reasoning = '1'
     if (opts.webSearch) paramsObj.webSearch = '1'
@@ -610,7 +630,14 @@ export const chatApi = {
    */
   async uploadChatFile(
     file: File,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: {
+      /**
+       * Incognito session upload: the backend marks the file ephemeral so it
+       * never surfaces in file listings and is deleted after the session.
+       */
+      incognito?: boolean
+    }
   ): Promise<{
     success: boolean
     file_id: number
@@ -628,6 +655,9 @@ export const chatApi = {
   }> {
     const formData = new FormData()
     formData.append('file', file)
+    if (options?.incognito) {
+      formData.append('incognito', '1')
+    }
 
     return httpClient('/api/v1/messages/upload-file', {
       method: 'POST',
@@ -642,7 +672,8 @@ export const chatApi = {
    */
   async transcribeAudio(
     audioBlob: Blob,
-    filename?: string
+    filename?: string,
+    options?: { incognito?: boolean }
   ): Promise<{
     success: boolean
     file_id: number
@@ -658,6 +689,9 @@ export const chatApi = {
 
     const formData = new FormData()
     formData.append('file', audioBlob, resolvedFilename)
+    if (options?.incognito) {
+      formData.append('incognito', '1')
+    }
 
     return httpClient('/api/v1/messages/upload-file', {
       method: 'POST',

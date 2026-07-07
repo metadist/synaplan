@@ -203,7 +203,16 @@ final readonly class MessageProcessor
             // Get conversation history for context - STREAMING VERSION
             // Priority: Use chatId if available (chat window context), otherwise fall back to trackingId
             $perfTimer->start('history');
-            if ($message->getChatId()) {
+            if (!empty($options['incognito'])) {
+                // Incognito: nothing is persisted, so the client ships the
+                // conversation history in the request (already capped by
+                // StreamController). Build transient Message objects that the
+                // classifier and handlers consume like DB entities.
+                $conversationHistory = $this->buildIncognitoHistory($message, $options['incognito_history'] ?? []);
+                $this->logger->debug('Using request-supplied incognito history for streaming', [
+                    'history_count' => count($conversationHistory),
+                ]);
+            } elseif ($message->getChatId()) {
                 $conversationHistory = $this->messageRepository->findChatHistory(
                     $message->getUserId(),
                     $message->getChatId(),
@@ -371,9 +380,10 @@ final readonly class MessageProcessor
                     // Brave Search will handle it gracefully and fall back if needed
                     $country = strtolower($language);
 
+                    // Incognito: never log the user's message content.
                     $this->logger->info('🔍 Performing web search', [
-                        'original_question' => $message->getText(),
-                        'optimized_query' => $searchQuery,
+                        'original_question' => empty($options['incognito']) ? $message->getText() : '[incognito]',
+                        'optimized_query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
                         'language' => $language,
                         'country' => $country,
                         'message_id' => $message->getId(),
@@ -388,8 +398,13 @@ final readonly class MessageProcessor
                     $perfTimer->stop('search_brave');
 
                     // Save search results to database
-                    if ($searchResults && !empty($searchResults['results']) && $this->searchResultRepository) {
-                        $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
+                    if ($searchResults && !empty($searchResults['results'])) {
+                        // Incognito: the transient message has no id — results
+                        // stay in-memory only (still streamed to the client and
+                        // injected into the AI context) and are never persisted.
+                        if ($this->searchResultRepository && null !== $message->getId()) {
+                            $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
+                        }
 
                         // Surface the actual sources (not just the count) the
                         // moment the search returns, so the client can render the
@@ -406,7 +421,7 @@ final readonly class MessageProcessor
                         ]);
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
-                            'query' => $searchQuery,
+                            'query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
                             'has_repository' => null !== $this->searchResultRepository,
                         ]);
                         $searchResults = null; // Reset to null if no results
@@ -593,7 +608,13 @@ final readonly class MessageProcessor
 
             // Get conversation history for context - NON-STREAMING VERSION
             // Priority: Use chatId if available (chat window context), otherwise fall back to trackingId
-            if ($message->getChatId()) {
+            if (!empty($options['incognito'])) {
+                // Incognito: see processStream() — history comes from the request.
+                $conversationHistory = $this->buildIncognitoHistory($message, $options['incognito_history'] ?? []);
+                $this->logger->debug('Using request-supplied incognito history for non-streaming', [
+                    'history_count' => count($conversationHistory),
+                ]);
+            } elseif ($message->getChatId()) {
                 $conversationHistory = $this->messageRepository->findChatHistory(
                     $message->getUserId(),
                     $message->getChatId(),
@@ -788,9 +809,10 @@ final readonly class MessageProcessor
                     $language = $classification['language'] ?? 'en';
                     $country = strtolower($language);
 
+                    // Incognito: never log the user's message content.
                     $this->logger->info('🔍 Performing web search', [
-                        'original_question' => $message->getText(),
-                        'optimized_query' => $searchQuery,
+                        'original_question' => empty($options['incognito']) ? $message->getText() : '[incognito]',
+                        'optimized_query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
                         'language' => $language,
                         'country' => $country,
                         'message_id' => $message->getId(),
@@ -801,8 +823,11 @@ final readonly class MessageProcessor
                         'search_lang' => $language,
                     ]);
 
-                    if ($searchResults && !empty($searchResults['results']) && $this->searchResultRepository) {
-                        $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
+                    if ($searchResults && !empty($searchResults['results'])) {
+                        // Incognito: see processStream() — results stay in-memory.
+                        if ($this->searchResultRepository && null !== $message->getId()) {
+                            $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
+                        }
 
                         // Surface the actual sources (not just the count) the
                         // moment the search returns, so the client can render the
@@ -819,7 +844,7 @@ final readonly class MessageProcessor
                         ]);
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
-                            'query' => $searchQuery,
+                            'query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
                             'has_repository' => null !== $this->searchResultRepository,
                         ]);
                         $searchResults = null;
@@ -1055,13 +1080,18 @@ final readonly class MessageProcessor
                 return;
             }
 
+            // Incognito/transient messages have no id — the plan could never be
+            // persisted, so skip the (paid) planner AI call entirely.
+            if (null === $message->getId()) {
+                return;
+            }
+
             $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
             $result = $this->taskPlanner->plan($message, $conversationHistory, $userId);
 
+            // The early return above guarantees a persisted message here.
             $messageId = $message->getId();
-            if (null !== $messageId) {
-                $this->taskPlanStore->persist($messageId, $result->plan, $result->modelId);
-            }
+            $this->taskPlanStore->persist($messageId, $result->plan, $result->modelId);
 
             $this->logger->info('MessageProcessor: shadow task plan generated', [
                 'message_id' => $messageId,
@@ -1078,6 +1108,50 @@ final readonly class MessageProcessor
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Build transient Message entities from the request-supplied incognito
+     * history so downstream consumers (classifier, ChatHandler thread builder)
+     * see the same shape as a DB-loaded chat history. The entities are NEVER
+     * persisted — their ids stay null.
+     *
+     * @param array<int, array{role: string, content: string}> $history oldest first, already capped by StreamController
+     *
+     * @return Message[]
+     */
+    private function buildIncognitoHistory(Message $currentMessage, array $history): array
+    {
+        $entities = [];
+        $baseTimestamp = time() - count($history) - 1;
+
+        foreach (array_values($history) as $index => $entry) {
+            $role = $entry['role'];
+            $content = $entry['content'];
+            if ('' === $content) {
+                continue;
+            }
+
+            $historyMessage = new Message();
+            $historyMessage->setUserId($currentMessage->getUserId());
+            $historyMessage->setTrackingId($currentMessage->getTrackingId());
+            $historyMessage->setProviderIndex('WEB');
+            // Monotonic timestamps keep the thread order stable for consumers
+            // that sort by time.
+            $historyMessage->setUnixTimestamp($baseTimestamp + $index);
+            $historyMessage->setDateTime(date('YmdHis', $baseTimestamp + $index));
+            $historyMessage->setMessageType('WEB');
+            $historyMessage->setFile(0);
+            $historyMessage->setTopic('CHAT');
+            $historyMessage->setLanguage($currentMessage->getLanguage() ?: 'en');
+            $historyMessage->setText($content);
+            $historyMessage->setDirection('assistant' === $role ? 'OUT' : 'IN');
+            $historyMessage->setStatus('complete');
+
+            $entities[] = $historyMessage;
+        }
+
+        return $entities;
     }
 
     /**

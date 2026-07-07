@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useConfigStore } from '@/stores/config'
+import { useIncognitoStore } from '@/stores/incognito'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -185,7 +186,10 @@ export const useChatsStore = defineStore('chats', () => {
       }
 
       historyOffset.value = offset + page.length
-      historyHasMore.value = data.hasMore
+      // `hasMore` is optional in the API contract (older/prod OpenAPI specs omit
+      // it, where the generated schema types it as `unknown`). Treat a missing
+      // flag as "no more pages" so the type stays boolean across all specs.
+      historyHasMore.value = data.hasMore === true
     } catch (err: unknown) {
       console.error('Error loading chat history:', err)
     } finally {
@@ -253,6 +257,17 @@ export const useChatsStore = defineStore('chats', () => {
    */
   async function findOrCreateEmptyChat(): Promise<Chat | null> {
     if (!checkAuthOrRedirect()) return null
+
+    // Starting a brand-new chat always leaves incognito: the "New Chat" button
+    // must land the user in a normal, persisted conversation. We cannot rely on
+    // the activeChatId watcher for this — an incognito session usually reuses an
+    // empty underlying chat, so the id stays unchanged and the watcher never
+    // fires. Ending the session here (fire-and-forget; file cleanup runs in the
+    // background) flips the flag so ChatView restores the normal surface.
+    const incognitoStore = useIncognitoStore()
+    if (incognitoStore.active) {
+      void incognitoStore.endSession()
+    }
 
     // Find all empty chats (not widget sessions, no messages, default title)
     const emptyChats = chats.value.filter((chat) => isChatEmpty(chat))

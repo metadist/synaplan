@@ -136,7 +136,7 @@
           <button
             type="button"
             :class="[
-              'surface-chip icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl relative',
+              'surface-chip icon-ghost h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl relative',
               plusMenuOpen && 'pill--active',
             ]"
             :aria-label="$t('chatInput.plusMenu.label')"
@@ -240,7 +240,7 @@
             v-if="showEnhanceInInput"
             type="button"
             :class="[
-              'h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto relative',
+              'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto relative',
               enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
               enhanceLoading && 'pill--loading',
             ]"
@@ -258,7 +258,7 @@
             v-if="showMicrophoneButton"
             type="button"
             :class="[
-              'h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto',
+              'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto',
               isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost',
             ]"
             :aria-label="$t('chatInput.voice')"
@@ -274,7 +274,7 @@
             v-if="!isMobile || canSend || isStreaming"
             type="button"
             :disabled="!isStreaming && !canSend"
-            class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary rounded-xl pointer-events-auto transition-all"
+            class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl pointer-events-auto transition-all"
             :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
             data-testid="btn-chat-send"
             @click="isStreaming ? emit('stop') : sendMessage()"
@@ -339,6 +339,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
 import { useAuthStore } from '@/stores/auth'
+import { useIncognitoStore } from '@/stores/incognito'
 import QuoteChip from './QuoteChip.vue'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
 
@@ -447,6 +448,7 @@ const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const authStore = useAuthStore()
+const incognitoStore = useIncognitoStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -517,11 +519,13 @@ const useWebSpeech = computed(() => {
   return isWebSpeechSupported()
 })
 
-// Input persistence - auto-save with proper debouncing
+// Input persistence - auto-save with proper debouncing. Disabled during an
+// incognito session: drafts must never survive in localStorage.
 const { clearInput: clearPersistedInput } = useAutoPersist(
   message,
   'chat',
-  computed(() => chatsStore.activeChatId)
+  computed(() => chatsStore.activeChatId),
+  computed(() => incognitoStore.active)
 )
 
 const emit = defineEmits<{
@@ -973,7 +977,15 @@ const uploadFiles = async (files: File[]) => {
     uploadedFiles.value.push(tempFile)
 
     try {
-      const result = await chatApi.uploadChatFile(file, controller.signal)
+      // Incognito sessions mark the upload ephemeral (hidden from the file
+      // manager, auto-deleted after the session) and track the id for the
+      // session-end cleanup.
+      const result = await chatApi.uploadChatFile(file, controller.signal, {
+        incognito: incognitoStore.active,
+      })
+      if (incognitoStore.active) {
+        incognitoStore.registerFile(result.file_id)
+      }
 
       // Issue #729: when the synchronous extraction at upload time fails
       // (corrupted DOCX, password-protected PDF, etc.), surface a clear
@@ -1288,8 +1300,14 @@ const transcribeAudio = async (audioBlob: Blob) => {
   uploading.value = true
 
   try {
-    // Upload for transcription (WhisperCPP on backend)
-    const result = await chatApi.transcribeAudio(audioBlob)
+    // Upload for transcription (WhisperCPP on backend). Incognito recordings
+    // are ephemeral and tracked for the session-end cleanup.
+    const result = await chatApi.transcribeAudio(audioBlob, undefined, {
+      incognito: incognitoStore.active,
+    })
+    if (incognitoStore.active) {
+      incognitoStore.registerFile(result.file_id)
+    }
 
     if (result.text) {
       message.value += (message.value ? ' ' : '') + result.text
