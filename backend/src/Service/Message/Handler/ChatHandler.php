@@ -865,6 +865,20 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Append the rolling conversation summary (older turns condensed by
+        // MessageProcessor) so long threads keep their topic / the user's
+        // position while the verbatim thread below stays inside the memory
+        // window. Injected into the SYSTEM role like memories/feedback so it is
+        // also carried into the first user turn for models without system-message
+        // support (the o1 fallback below runs after this block).
+        $conversationSummary = $options['conversation_summary'] ?? '';
+        if (is_string($conversationSummary) && '' !== trim($conversationSummary)) {
+            $systemPrompt .= $this->formatConversationSummaryForPrompt($conversationSummary);
+            $this->logger->info('ChatHandler: Conversation summary appended to system prompt', [
+                'summary_length' => \strlen($conversationSummary),
+            ]);
+        }
+
         // Append live API data from widget flow api-type responses
         $apiContext = $options['api_context'] ?? '';
         if ('' !== $apiContext) {
@@ -1914,6 +1928,24 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         return 'file';
+    }
+
+    /**
+     * Format the rolling conversation summary block for the system prompt.
+     *
+     * The summary condenses OLDER turns (gradient compression, built by
+     * ConversationSummaryService); the most recent turns are still replayed
+     * verbatim in the thread below, so the model is told not to double-count.
+     */
+    private function formatConversationSummaryForPrompt(string $summary): string
+    {
+        $formatted = "\n\n---\n\n";
+        $formatted .= "## Summary of earlier conversation (older messages, condensed)\n\n";
+        $formatted .= 'This is background context recapping earlier parts of THIS conversation that are no longer shown verbatim. ';
+        $formatted .= "The most recent messages appear in full below — do not repeat this summary back to the user or mention that it exists:\n\n";
+        $formatted .= trim($summary)."\n";
+
+        return $formatted;
     }
 
     /**

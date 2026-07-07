@@ -46,6 +46,7 @@ final readonly class MessageProcessor
         private TaskPlanner $taskPlanner,
         private TaskPlanStore $taskPlanStore,
         private TaskPlanExecutor $taskPlanExecutor,
+        private ConversationSummaryService $conversationSummaryService,
     ) {
     }
 
@@ -436,6 +437,41 @@ final readonly class MessageProcessor
                         $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
                     }
                 }
+            }
+
+            // Step 2.9: Rolling conversation summary.
+            //
+            // Condense the OLDER turns of the chat into a compact summary that
+            // ChatHandler injects into the system prompt, while the newest turns
+            // are still replayed verbatim. This lets long threads keep their
+            // topic / the user's position "7-8 answers later" while the combined
+            // context stays inside the configured 10-15k character memory window.
+            //
+            // Only for the chat-style path with a persisted chat (needs the full
+            // history via chatId); other intents simply ignore the option. The
+            // service never throws into the turn — on failure it leaves the
+            // standard windowed history untouched.
+            $summaryIntent = $classification['intent'] ?? 'chat';
+            $summaryChatId = $message->getChatId();
+            if ('chat' === $summaryIntent && null !== $summaryChatId && $summaryChatId > 0) {
+                $perfTimer->start('summary');
+                $fullHistory = $this->messageRepository->findAllByChatId(
+                    $message->getUserId(),
+                    $summaryChatId,
+                );
+                $rolling = $this->conversationSummaryService->buildRollingContext(
+                    $fullHistory,
+                    $message->getUserId(),
+                    $summaryChatId,
+                );
+                if ($rolling->applied) {
+                    $options['conversation_summary'] = $rolling->summary;
+                    $conversationHistory = $rolling->recentMessages;
+                    $this->notify($statusCallback, 'summarizing', 'Condensing earlier conversation...', [
+                        'summarized_messages' => $rolling->summarizedCount,
+                    ]);
+                }
+                $perfTimer->stop('summary');
             }
 
             // Step 3: Inference (AI Response) mit STREAMING
