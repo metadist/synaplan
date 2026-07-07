@@ -50,7 +50,10 @@
         data-testid="grid-tile"
       >
         <div
-          class="aspect-video w-full overflow-hidden bg-gray-100 dark:bg-gray-800 relative flex items-center justify-center"
+          :class="[
+            'w-full overflow-hidden bg-gray-100 dark:bg-gray-800 relative flex items-center justify-center',
+            kindOf(file) === 'audio' ? 'p-2' : 'aspect-video',
+          ]"
         >
           <img
             v-if="kindOf(file) === 'image'"
@@ -59,9 +62,20 @@
             class="w-full h-full object-cover transition-transform group-hover:scale-105"
             loading="lazy"
           />
+          <MessageVideo
+            v-else-if="kindOf(file) === 'video'"
+            :url="downloadUrl(file.id)"
+            :poster="file.thumb_url ?? undefined"
+            class="!my-0 w-full"
+          />
+          <MessageAudio
+            v-else-if="kindOf(file) === 'audio'"
+            :url="downloadUrl(file.id)"
+            class="!my-0 w-full"
+          />
           <Icon v-else :icon="kindIcon(file)" class="w-10 h-10 text-gray-400" />
           <div
-            v-if="kindOf(file) !== 'image'"
+            v-if="!isInlineMediaKind(file)"
             class="absolute bottom-2 right-2 bg-black/60 p-1 rounded backdrop-blur-sm"
           >
             <Icon :icon="kindIcon(file)" class="text-white w-4 h-4" />
@@ -133,6 +147,8 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
+import MessageVideo from '@/components/MessageVideo.vue'
+import MessageAudio from '@/components/MessageAudio.vue'
 import filesService, { type FileItem, type FileOriginKind } from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useNotification } from '@/composables/useNotification'
@@ -185,6 +201,13 @@ const kindOf = (file: FileItem): FileOriginKind => {
   if (/mp3|wav|ogg|m4a|audio/.test(type)) return 'audio'
   if (/ics/.test(type)) return 'calendar'
   return 'document'
+}
+
+// Image/video/audio render an inline player (or thumbnail), so the corner
+// kind-badge is only useful for the icon-only kinds (calendar/document/unknown).
+const isInlineMediaKind = (file: FileItem): boolean => {
+  const kind = kindOf(file)
+  return 'image' === kind || 'video' === kind || 'audio' === kind
 }
 
 const kindIcon = (file: FileItem): string => {

@@ -17,7 +17,7 @@
         <p class="txt-secondary mb-4">{{ apiSpec.info?.description || '' }}</p>
         <div class="flex items-center gap-4 text-sm">
           <span class="txt-secondary">{{ $t('channels.apiDocumentation.version') }}</span>
-          <span class="pill pill--active">{{ apiSpec.info?.version || '1.0.0' }}</span>
+          <span class="pill pill--active">{{ apiSpec.info?.version || 'dev' }}</span>
         </div>
       </div>
 
