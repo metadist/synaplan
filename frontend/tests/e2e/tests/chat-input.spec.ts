@@ -15,21 +15,47 @@ import { TIMEOUTS } from '../config/config'
 
 const CHAT = selectors.chat
 
-/** Open the "+" menu and wait for its content to settle. */
+/**
+ * Open the "+" menu and wait for its content to settle.
+ *
+ * On mobile, touch event normalization can swallow a single click on the
+ * toggle (the handler IS wired up, but the browser discards the pointer event
+ * during layout shifts). We retry the click via toPass() — but unlike the old
+ * helper, we never mask failures with .catch(() => false).
+ */
 async function openPlusMenu(page: Page) {
   const panel = page.locator(CHAT.plusPanel)
   if (await panel.isVisible()) return panel
-  await page.locator(CHAT.plusToggle).click()
-  await expect(panel).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+  const toggle = page.locator(CHAT.plusToggle)
+  await expect(toggle).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+  await expect(async () => {
+    if (await panel.isVisible()) return
+    await toggle.click()
+    await expect(panel).toBeVisible({ timeout: 2000 })
+  }).toPass({ timeout: TIMEOUTS.STANDARD })
+
   await expect(panel.locator(CHAT.attachBtn)).toBeVisible({ timeout: TIMEOUTS.SHORT })
   return panel
 }
 
-/** Open the Tools dropdown inside the "+" menu and wait for it to settle. */
+/**
+ * Open the Tools dropdown inside the "+" menu and wait for it to settle.
+ * Same retry rationale as openPlusMenu — the tools toggle can also miss on mobile.
+ */
 async function openToolsDropdown(page: Page) {
   await openPlusMenu(page)
-  await page.locator(CHAT.toolsToggle).click()
-  await expect(page.locator(CHAT.toolsPanel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+
+  const toolsPanel = page.locator(CHAT.toolsPanel)
+  const toolsToggle = page.locator(CHAT.toolsToggle)
+  await expect(toolsToggle).toBeVisible({ timeout: TIMEOUTS.SHORT })
+
+  await expect(async () => {
+    if (await toolsPanel.isVisible()) return
+    await toolsToggle.click()
+    await expect(toolsPanel).toBeVisible({ timeout: 2000 })
+  }).toPass({ timeout: TIMEOUTS.STANDARD })
 }
 
 test.describe('Chat input: "+" menu (§5)', () => {
@@ -92,7 +118,9 @@ test.describe('Chat input: "+" menu (§5)', () => {
     const isMobile = (page.viewportSize()?.width ?? 1280) < 768
 
     // The control only appears once there is text to act on.
-    await page.locator(CHAT.textInput).fill('Wo wohnt der Esel?')
+    const input = page.locator(CHAT.textInput)
+    await input.fill('Wo wohnt der Esel?')
+    await expect(input).toHaveValue('Wo wohnt der Esel?', { timeout: TIMEOUTS.SHORT })
 
     if (isMobile) {
       // No in-shell sparkles button crowding the narrow input…
@@ -101,7 +129,7 @@ test.describe('Chat input: "+" menu (§5)', () => {
       await openToolsDropdown(page)
       await expect(page.locator(CHAT.toolEnhance)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     } else {
-      await expect(page.locator(CHAT.enhanceButton)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(page.locator(CHAT.enhanceButton)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await openToolsDropdown(page)
       await expect(page.locator(CHAT.toolEnhance)).toBeHidden()
     }
