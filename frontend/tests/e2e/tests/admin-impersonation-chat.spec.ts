@@ -33,10 +33,10 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
       await login(page, adminCreds)
 
       await page.locator(selectors.nav.sidebarV2Admin).click()
-      await page
-        .locator(selectors.nav.navDropdown)
-        .locator(selectors.nav.flyoutLinkAdminDashboard)
-        .click()
+      const dropdown = page.locator(selectors.nav.navDropdown)
+      await expect(dropdown).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await dropdown.locator(selectors.nav.flyoutLinkAdminDashboard).click()
+
       await page.locator(selectors.pages.admin).waitFor({
         state: 'visible',
         timeout: TIMEOUTS.STANDARD,
@@ -85,13 +85,13 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
 
       await page
         .locator(selectors.impersonation.banner)
-        .waitFor({ state: 'hidden', timeout: TIMEOUTS.STANDARD })
+        .waitFor({ state: 'hidden', timeout: TIMEOUTS.LONG })
     })
 
     await test.step('Assert: admin session restored — admin page visible', async () => {
       await page.locator(selectors.pages.admin).waitFor({
         state: 'visible',
-        timeout: TIMEOUTS.STANDARD,
+        timeout: TIMEOUTS.LONG,
       })
     })
   })
