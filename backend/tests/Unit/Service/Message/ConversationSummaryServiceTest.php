@@ -60,8 +60,8 @@ class ConversationSummaryServiceTest extends TestCase
         $msg->method('getId')->willReturn($id);
         $msg->method('getDirection')->willReturn($direction);
         $msg->method('getText')->willReturn($text);
-        $msg->method('getFileText')->willReturn(null);
-        $msg->method('getFileType')->willReturn(null);
+        $msg->method('getFileText')->willReturn('');
+        $msg->method('getFileType')->willReturn('');
 
         return $msg;
     }

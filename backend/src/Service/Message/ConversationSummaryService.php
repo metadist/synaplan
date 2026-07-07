@@ -231,7 +231,7 @@ final readonly class ConversationSummaryService
         $text = (string) $msg->getText();
 
         $fileText = $msg->getFileText();
-        if (is_string($fileText) && '' !== $fileText) {
+        if ('' !== $fileText) {
             $text .= ' [attached '.((string) $msg->getFileType()).': '.$this->clip($fileText, 500).']';
         }
 
@@ -240,13 +240,7 @@ final readonly class ConversationSummaryService
 
     private function messageLength(Message $msg): int
     {
-        $len = mb_strlen((string) $msg->getText());
-        $fileText = $msg->getFileText();
-        if (is_string($fileText)) {
-            $len += mb_strlen($fileText);
-        }
-
-        return $len;
+        return mb_strlen((string) $msg->getText()) + mb_strlen($msg->getFileText());
     }
 
     private function clip(string $value, int $maxChars): string
