@@ -163,11 +163,13 @@
                 data-testid="dropdown-plus-panel"
               >
                 <!-- Same `.pill` chip style as the Model/Tools/Knowledge triggers
-                 below it, so all four rows in this list look consistent
-                 (previously this used the flat `.dropdown-item` row style). -->
+                 below it (previously this used the flat `.dropdown-item` row
+                 style). Unlike those rows it has no secondary value to push
+                 right, so `self-start` keeps it sized to its content instead
+                 of stretching across the panel like the full-width rows. -->
                 <button
                   type="button"
-                  class="pill text-xs md:text-sm"
+                  class="pill text-xs md:text-sm self-start"
                   data-testid="btn-plus-attach"
                   @click="handlePlusAttach"
                 >
