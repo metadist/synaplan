@@ -10,9 +10,12 @@
         <p class="txt-secondary">{{ $t('admin.description') }}</p>
       </div>
 
-      <!-- Tabs h -->
-      <div
-        class="flex gap-2 mb-6 border-b border-light-border/30 dark:border-dark-border/20 overflow-x-auto scroll-thin"
+      <!-- Tabs (desktop/tablet): horizontal row, fits without a mobile-unfriendly
+           scrollbar on md+. On phones this is replaced by the dropdown below
+           (same pattern as FilesTabs.vue). -->
+      <nav
+        class="hidden md:flex gap-2 mb-6 border-b border-light-border/30 dark:border-dark-border/20 overflow-x-auto scroll-thin"
+        :aria-label="$t('admin.title')"
       >
         <button
           v-for="tab in tabs"
@@ -31,6 +34,50 @@
             {{ tab.label }}
           </div>
         </button>
+      </nav>
+
+      <!-- Tabs (mobile): a single dropdown replaces the tab row (same pattern
+           as FilesTabs.vue). The trigger shows the current section; the panel
+           lists every destination. -->
+      <div ref="tabDropdownRef" class="md:hidden relative mb-6">
+        <button
+          type="button"
+          class="dropdown-trigger surface-card w-full justify-between border border-light-border/20 dark:border-dark-border/10"
+          :aria-expanded="tabMenuOpen"
+          aria-haspopup="menu"
+          data-testid="tab-admin-mobile-trigger"
+          @click="toggleTabMenu"
+        >
+          <span class="flex items-center gap-2 txt-primary font-medium">
+            <Icon :icon="activeTabDef.icon" class="w-5 h-5" />
+            <span>{{ activeTabDef.label }}</span>
+          </span>
+          <Icon
+            icon="mdi:chevron-down"
+            class="w-5 h-5 transition-transform"
+            :class="{ 'rotate-180': tabMenuOpen }"
+          />
+        </button>
+
+        <div
+          v-if="tabMenuOpen"
+          class="dropdown-panel absolute left-0 right-0 top-full mt-1 z-30 flex flex-col gap-1"
+          role="menu"
+          data-testid="tab-admin-mobile-menu"
+        >
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            type="button"
+            role="menuitem"
+            :class="['dropdown-item', activeTab === tab.id && 'dropdown-item--active']"
+            :data-testid="`tab-${tab.id}-mobile`"
+            @click="selectMobileTab(tab.id)"
+          >
+            <Icon :icon="tab.icon" class="w-5 h-5 flex-shrink-0" />
+            <span class="flex-1 text-left">{{ tab.label }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- Tab Content -->
@@ -703,10 +750,11 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, ref, computed, onMounted, watch } from 'vue'
+import { defineAsyncComponent, ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import { useEscapeKey } from '@/composables/useEscapeKey'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import RegistrationChart from '@/components/admin/RegistrationChart.vue'
 import UsageChart from '@/components/admin/UsageChart.vue'
 import {
@@ -768,6 +816,38 @@ const tabs = computed<AdminTab[]>(() => {
   }
   return baseTabs
 })
+
+// Mobile tab dropdown (single dropdown, mirrors FilesTabs.vue)
+const activeTabDef = computed(() => tabs.value.find((tab) => tab.id === activeTab.value) ?? tabs.value[0])
+const tabMenuOpen = ref(false)
+const tabDropdownRef = ref<HTMLElement | null>(null)
+
+function toggleTabMenu() {
+  triggerHapticImpact('light')
+  tabMenuOpen.value = !tabMenuOpen.value
+}
+
+function closeTabMenu() {
+  if (!tabMenuOpen.value) return
+  triggerHapticImpact('light')
+  tabMenuOpen.value = false
+}
+
+function selectMobileTab(tabId: TabId) {
+  closeTabMenu()
+  activeTab.value = tabId
+}
+
+function handleTabMenuOutsideClick(event: MouseEvent) {
+  if (!tabMenuOpen.value) return
+  if (tabDropdownRef.value && !tabDropdownRef.value.contains(event.target as Node)) {
+    tabMenuOpen.value = false
+  }
+}
+
+function handleTabMenuEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') tabMenuOpen.value = false
+}
 
 // Overview
 const overview = ref<SystemOverview | null>(null)
@@ -1100,5 +1180,12 @@ function formatDate(dateStr: string): string {
 onMounted(() => {
   loadOverview()
   loadRegistrationAnalytics()
+  document.addEventListener('click', handleTabMenuOutsideClick)
+  document.addEventListener('keydown', handleTabMenuEscape)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleTabMenuOutsideClick)
+  document.removeEventListener('keydown', handleTabMenuEscape)
 })
 </script>
