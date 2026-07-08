@@ -104,6 +104,7 @@
     "errorIssuanceFailed": "Synaplan konnte für dieses Konto keinen API-Schlüssel ausstellen."
   },
   "welcome": "Willkommen bei Synaplan",
+  "welcomeUser": "Willkommen, {name}",
   "examplePrompts": {
     "heading": "Probiere eines davon",
     "items": {

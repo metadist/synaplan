@@ -104,6 +104,7 @@
     "errorIssuanceFailed": "Synaplan could not issue an API key for this account."
   },
   "welcome": "Welcome",
+  "welcomeUser": "Welcome, {name}",
   "examplePrompts": {
     "heading": "Try one of these",
     "items": {

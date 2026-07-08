@@ -140,7 +140,7 @@
                 <Icon icon="mdi:incognito" class="w-6 h-6 txt-brand" aria-hidden="true" />
               </div>
               <h2 class="text-2xl font-semibold txt-primary mb-2">
-                {{ incognitoStore.active ? $t('incognito.emptyTitle') : $t('welcome') }}
+                {{ incognitoStore.active ? $t('incognito.emptyTitle') : welcomeGreeting }}
               </h2>
               <p class="txt-secondary">
                 {{
@@ -541,6 +541,14 @@ const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
 
 const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGuestMode)
+
+// Personalizes the empty-state heading with the user's first name (Personal
+// Information -> First Name) when they've set one; falls back to the
+// generic greeting for guests and users without a first name on file.
+const welcomeGreeting = computed(() => {
+  const firstName = authStore.user?.firstName?.trim()
+  return firstName ? t('welcomeUser', { name: firstName }) : t('welcome')
+})
 const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')

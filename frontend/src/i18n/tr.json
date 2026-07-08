@@ -103,6 +103,7 @@
     "errorIssuanceFailed": "Synaplan bu hesap için bir API anahtarı veremedi."
   },
   "welcome": "Hoş Geldiniz",
+  "welcomeUser": "Hoş geldin, {name}",
   "examplePrompts": {
     "heading": "Bunlardan birini deneyin",
     "items": {

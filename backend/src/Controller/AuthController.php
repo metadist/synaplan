@@ -927,6 +927,7 @@ class AuthController extends AbstractController
                         new OA\Property(property: 'created', type: 'string', example: '2024-01-15 10:30:00'),
                         new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
                         new OA\Property(property: 'memoriesEnabled', type: 'boolean', example: true),
+                        new OA\Property(property: 'firstName', type: 'string', nullable: true, description: 'First name from Personal Information; null until the user sets it.', example: 'John'),
                     ]
                 ),
                 new OA\Property(
@@ -952,6 +953,8 @@ class AuthController extends AbstractController
         }
 
         $impersonator = $this->impersonationService->resolveImpersonatorFromActiveSession($request);
+        $userDetails = $user->getUserDetails();
+        $firstName = trim((string) ($userDetails['firstName'] ?? $userDetails['first_name'] ?? ''));
 
         return $this->json([
             'success' => true,
@@ -963,6 +966,7 @@ class AuthController extends AbstractController
                 'created' => $user->getCreated(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'firstName' => '' !== $firstName ? $firstName : null,
             ],
             'impersonator' => $impersonator ? [
                 'id' => $impersonator->getId(),

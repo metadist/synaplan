@@ -103,6 +103,7 @@
     "errorIssuanceFailed": "Synaplan no pudo emitir una clave de API para esta cuenta."
   },
   "welcome": "Bienvenido",
+  "welcomeUser": "Bienvenido, {name}",
   "examplePrompts": {
     "heading": "Prueba una de estas",
     "items": {
