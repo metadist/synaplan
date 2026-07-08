@@ -91,6 +91,7 @@
         <div class="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
           <!-- Progress Bar -->
           <div
+            ref="progressBarRef"
             class="h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden cursor-pointer"
             @click.stop="seek"
             @mousedown.stop.prevent="startDragging"
@@ -202,6 +203,7 @@ const config = useConfigStore()
 const { setActive, clearActive } = useAudioPlayback()
 
 const audioRef = ref<HTMLAudioElement>()
+const progressBarRef = ref<HTMLElement>()
 const isPlaying = ref(false)
 const isMuted = ref(false)
 const progress = ref(0)
@@ -389,9 +391,17 @@ const updateProgress = () => {
 }
 
 const seek = (event: MouseEvent) => {
-  if (!audioRef.value || hasFailed.value) return
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  const percent = (event.clientX - rect.left) / rect.width
+  // Read the geometry from the progress-bar element itself, NOT
+  // `event.currentTarget`: during a drag `seek()` is invoked from the
+  // document-level `mousemove` listener, where `currentTarget` is `document`
+  // (no `getBoundingClientRect`). Relying on it threw a TypeError on every
+  // move, which the global error handler turned into a full-screen error /
+  // redirect while scrubbing.
+  const bar = progressBarRef.value
+  if (!audioRef.value || hasFailed.value || !bar) return
+  const rect = bar.getBoundingClientRect()
+  if (rect.width <= 0) return
+  const percent = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
   const total = audioRef.value.duration
   if (!isFinite(total) || total <= 0) return
   audioRef.value.currentTime = percent * total
