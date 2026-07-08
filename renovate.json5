@@ -11,6 +11,7 @@
   "prCreation": "immediate",
   "dependencyDashboard": true,
   "labels": ["dependencies"],
+  "ignorePaths": ["_devextras/mail-handler-test/**"],
   "packageRules": [
     {
       "description": "Catch-all composer patch/minor FIRST — later rules override groupName for Framework/QA",
