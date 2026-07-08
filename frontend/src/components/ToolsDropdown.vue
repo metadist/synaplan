@@ -2,7 +2,7 @@
   <div ref="dropdownRef" class="relative" data-testid="comp-tools-dropdown">
     <button
       type="button"
-      :class="['pill', isOpen && 'pill--active']"
+      :class="['pill touch-manipulation', isOpen && 'pill--active']"
       :aria-label="$t('chatInput.tools.label')"
       data-testid="btn-tools-toggle"
       @click="toggleOpen"
