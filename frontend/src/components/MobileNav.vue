@@ -487,10 +487,10 @@ const moreActive = computed(() => moreSections.value.some((item) => isItemActive
 
 // Account-block entries live inside the "More" panel but outside navItems, so
 // they need their own active tracking to keep "More" expanded and highlight the
-// row the user is on (Profile, Statistics, Preferences, Subscription).
+// row the user is on (Profile, Memories, Statistics, Preferences, Subscription).
 const isPathActive = (path: string) => route.path.startsWith(path)
 const accountActive = computed(() =>
-  ['/profile', '/statistics', '/settings', '/subscription'].some(isPathActive)
+  ['/profile', '/memories', '/statistics', '/settings', '/subscription'].some(isPathActive)
 )
 
 // Widget sessions live in their dedicated view — never in the main history.
