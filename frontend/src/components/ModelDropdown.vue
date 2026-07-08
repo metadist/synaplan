@@ -17,7 +17,10 @@
     </button>
     <div
       v-if="isOpen"
-      class="dropdown-up left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[60vh] overflow-y-auto scroll-thin"
+      :class="[
+        direction === 'up' ? 'dropdown-up' : 'dropdown-down',
+        'left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[60vh] overflow-y-auto scroll-thin',
+      ]"
       data-testid="dropdown-model-panel"
       @keydown.escape="closeDropdown"
     >
@@ -86,6 +89,7 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useI18n } from 'vue-i18n'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
+import { useDropdownDirection } from '@/composables/useDropdownDirection'
 import type { AIModel } from '@/types/ai-models'
 
 const props = defineProps<{
@@ -101,6 +105,7 @@ const aiConfigStore = useAiConfigStore()
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
+const { direction, updateDirection } = useDropdownDirection(dropdownRef)
 
 const chatModels = computed(() => {
   const models = aiConfigStore.models.CHAT || []
@@ -125,6 +130,7 @@ const selectedModelName = computed(() => {
 })
 
 const toggleOpen = () => {
+  if (!isOpen.value) updateDirection()
   isOpen.value = !isOpen.value
 }
 

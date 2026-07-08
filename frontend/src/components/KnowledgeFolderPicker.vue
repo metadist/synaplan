@@ -18,7 +18,10 @@
 
     <div
       v-if="isOpen"
-      class="dropdown-up left-0 w-[calc(100vw-2rem)] sm:w-72 max-h-[50vh] overflow-y-auto scroll-thin"
+      :class="[
+        direction === 'up' ? 'dropdown-up' : 'dropdown-down',
+        'left-0 w-[calc(100vw-2rem)] sm:w-72 max-h-[50vh] overflow-y-auto scroll-thin',
+      ]"
       data-testid="dropdown-knowledge-folder"
       @keydown.escape="close"
     >
@@ -76,6 +79,7 @@ import {
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useDropdownDirection } from '@/composables/useDropdownDirection'
 
 interface Props {
   /** Selected knowledge-folder (RAG group) key; '' = none. */
@@ -94,12 +98,14 @@ const router = useRouter()
 
 const rootRef = ref<HTMLElement | null>(null)
 const isOpen = ref(false)
+const { direction, updateDirection } = useDropdownDirection(rootRef)
 
 const selectedLabel = computed(() =>
   props.modelValue !== '' ? props.modelValue : t('chatInput.knowledgeGroup')
 )
 
 const toggleOpen = () => {
+  if (!isOpen.value) updateDirection()
   isOpen.value = !isOpen.value
 }
 
