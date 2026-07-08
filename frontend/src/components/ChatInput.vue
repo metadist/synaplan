@@ -84,195 +84,225 @@
           @close="mentionPaletteVisible = false"
         />
 
-        <!-- Scrollable container with padding for scrollbar alignment.
-             py-2 (16px) + textarea min-h-[40px] = 56px single-line shell, so the
-             44px action buttons sit with an even 6px inset on every edge. -->
-        <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
-          <!-- The tool badge sits inline at the very start of the input (where
-               the caret begins). It stays pinned to the front even when text is
-               already present; wrapped text flows in the column beside it. -->
-          <div
-            class="pl-[56px] py-2 flex items-center gap-2"
-            :style="{ paddingRight: `${textareaPaddingRightPx}px` }"
-          >
+        <!--
+          Composer body. On mobile (< md) this is a vertical stack: the textarea
+          spans the full width on top and a control bar sits below it, both inside
+          the same card. On md+ it collapses to a plain block and the two control
+          clusters return to their absolute bottom-left / bottom-right overlay
+          (via `md:contents` on the control bar).
+        -->
+        <div class="flex flex-col md:block">
+          <!-- Textarea row. Mobile: full width with the same 6px horizontal inset
+               as the control bar below. md+: py-2 (16px) + textarea min-h-[40px] =
+               56px shell, with room reserved for the overlaid plus button (left)
+               and action buttons (right). -->
+          <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
+            <div
+              class="flex items-center gap-2 px-1.5 py-2 md:pl-[56px]"
+              :style="isMobile ? undefined : { paddingRight: `${textareaPaddingRightPx}px` }"
+            >
+              <!-- Inline badge pinned to the caret start — desktop only. On mobile
+                   the badge moves next to the plus button in the control bar.
+                   (`.tool-badge` sets display unlayered and would beat a `hidden`
+                   utility, so we gate visibility with v-if, not CSS.) -->
+              <ToolBadge
+                v-if="activeTool && !isMobile"
+                :tool="activeTool"
+                class="flex-shrink-0"
+                @remove="clearTool"
+              />
+              <!-- Textarea -->
+              <Textarea
+                ref="textareaRef"
+                v-model="message"
+                :placeholder="isMobile ? 'Message...' : $t('chatInput.placeholder')"
+                :rows="1"
+                class="flex-1 min-w-0"
+                data-testid="input-chat-message"
+                @keydown="handleKeyDown"
+                @focus="isFocused = true"
+                @blur="isFocused = false"
+              />
+            </div>
+          </div>
+
+          <!-- Control bar. Mobile: a real row below the textarea (plus + badge on
+               the left, actions on the right). md+: `display: contents` so the
+               plus group and action group fall back to their absolute overlay
+               positions relative to the card. -->
+          <div class="flex items-center gap-2 px-1.5 pb-1.5 md:contents">
+            <!-- Plus menu: attach + per-message controls (Model / Tools / Knowledge).
+             Exempt from the guest lock rule — the menu always opens; gated items
+             inside surface the guest hint popover. -->
+            <div
+              ref="plusMenuRef"
+              class="relative flex-shrink-0 md:absolute md:bottom-[6px] md:left-[6px]"
+              data-testid="section-chat-plus"
+            >
+              <button
+                type="button"
+                :class="[
+                  'surface-chip icon-ghost h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl relative',
+                  plusMenuOpen && 'pill--active',
+                ]"
+                :aria-label="$t('chatInput.plusMenu.label')"
+                :aria-expanded="plusMenuOpen"
+                :disabled="uploading"
+                data-testid="btn-chat-plus"
+                @click="togglePlusMenu"
+              >
+                <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
+                <PlusIcon v-else class="w-5 h-5" />
+              </button>
+
+              <div
+                v-if="plusMenuOpen"
+                class="dropdown-up left-0 min-w-[220px] flex flex-col gap-1"
+                data-testid="dropdown-plus-panel"
+              >
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  data-testid="btn-plus-attach"
+                  @click="handlePlusAttach"
+                >
+                  <Icon icon="mdi:paperclip" class="w-5 h-5 flex-shrink-0" />
+                  <span class="text-sm font-medium">{{ $t('chatInput.plusMenu.attach') }}</span>
+                </button>
+
+                <template v-if="isGuestMode">
+                  <button
+                    type="button"
+                    class="dropdown-item"
+                    data-testid="btn-plus-model"
+                    @click="handlePlusGate('models')"
+                  >
+                    <Icon icon="mdi:tune-vertical" class="w-5 h-5 flex-shrink-0" />
+                    <span class="text-sm font-medium flex-1 text-left">{{
+                      $t('chatInput.plusMenu.model')
+                    }}</span>
+                    <span class="text-xs txt-muted">{{
+                      $t('chatInput.modelDropdown.default')
+                    }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="dropdown-item"
+                    data-testid="btn-plus-tools"
+                    @click="handlePlusGate('tools')"
+                  >
+                    <Icon icon="mdi:toolbox-outline" class="w-5 h-5 flex-shrink-0" />
+                    <span class="text-sm font-medium flex-1 text-left">{{
+                      $t('chatInput.plusMenu.tools')
+                    }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="dropdown-item"
+                    data-testid="btn-plus-knowledge"
+                    @click="handlePlusGate('knowledge')"
+                  >
+                    <Icon icon="mdi:folder-outline" class="w-5 h-5 flex-shrink-0" />
+                    <span class="text-sm font-medium flex-1 text-left">{{
+                      $t('chatInput.plusMenu.knowledge')
+                    }}</span>
+                  </button>
+                </template>
+
+                <template v-else>
+                  <ModelDropdown v-model="selectedModelId" />
+                  <ToolsDropdown
+                    :active-command="activeTool"
+                    :thinking-enabled="thinkingEnabled"
+                    :voice-reply="voiceReply"
+                    :supports-reasoning="supportsReasoning"
+                    :enhance-enabled="enhanceEnabled"
+                    :enhance-loading="enhanceLoading"
+                    :enhance-available="message.trim().length > 0"
+                    @insert-command="handleInsertCommand"
+                    @toggle-thinking="toggleThinking"
+                    @toggle-voice-reply="toggleVoiceReply"
+                    @toggle-enhance="toggleEnhance"
+                  />
+                  <KnowledgeFolderPicker v-model="selectedGroupKey" :groups="knowledgeGroups" />
+                </template>
+              </div>
+
+              <input
+                type="file"
+                multiple
+                class="hidden"
+                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
+                data-testid="input-chat-file"
+                @change="handleFileSelect"
+              />
+            </div>
+
+            <!-- Mobile-only badge, right of the plus button. -->
             <ToolBadge
-              v-if="activeTool"
+              v-if="activeTool && isMobile"
               :tool="activeTool"
               class="flex-shrink-0"
               @remove="clearTool"
             />
-            <!-- Textarea -->
-            <Textarea
-              ref="textareaRef"
-              v-model="message"
-              :placeholder="isMobile ? 'Message...' : $t('chatInput.placeholder')"
-              :rows="1"
-              class="flex-1 min-w-0"
-              data-testid="input-chat-message"
-              @keydown="handleKeyDown"
-              @focus="isFocused = true"
-              @blur="isFocused = false"
-            />
-          </div>
-        </div>
 
-        <!-- Plus menu: attach + per-message controls (Model / Tools / Knowledge).
-             Exempt from the guest lock rule — the menu always opens; gated items
-             inside surface the guest hint popover. -->
-        <div
-          ref="plusMenuRef"
-          class="absolute bottom-[6px] left-[6px]"
-          data-testid="section-chat-plus"
-        >
-          <button
-            type="button"
-            :class="[
-              'surface-chip icon-ghost h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl relative',
-              plusMenuOpen && 'pill--active',
-            ]"
-            :aria-label="$t('chatInput.plusMenu.label')"
-            :aria-expanded="plusMenuOpen"
-            :disabled="uploading"
-            data-testid="btn-chat-plus"
-            @click="togglePlusMenu"
-          >
-            <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
-            <PlusIcon v-else class="w-5 h-5" />
-          </button>
+            <!-- Spacer pushes the actions to the right edge on mobile (removed on md+). -->
+            <div class="flex-1 md:hidden"></div>
 
-          <div
-            v-if="plusMenuOpen"
-            class="dropdown-up left-0 min-w-[220px] flex flex-col gap-1"
-            data-testid="dropdown-plus-panel"
-          >
-            <button
-              type="button"
-              class="dropdown-item"
-              data-testid="btn-plus-attach"
-              @click="handlePlusAttach"
+            <!-- Action buttons. Mobile: right side of the control bar. md+: absolute
+             bottom-right overlay (same 6px inset as the plus button, 6px gap). -->
+            <div
+              class="flex flex-shrink-0 items-center gap-1.5 md:pointer-events-none md:absolute md:bottom-[6px] md:right-[6px]"
+              data-testid="section-chat-primary-actions"
             >
-              <Icon icon="mdi:paperclip" class="w-5 h-5 flex-shrink-0" />
-              <span class="text-sm font-medium">{{ $t('chatInput.plusMenu.attach') }}</span>
-            </button>
+              <button
+                v-if="showEnhanceInInput"
+                type="button"
+                :class="[
+                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto relative',
+                  enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
+                  enhanceLoading && 'pill--loading',
+                ]"
+                :disabled="enhanceLoading"
+                :aria-label="$t('chatInput.enhance')"
+                :title="$t('chatInput.enhance')"
+                data-testid="btn-chat-enhance"
+                @click="toggleEnhance"
+              >
+                <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
+                <SparklesIcon v-else class="w-5 h-5" />
+              </button>
 
-            <template v-if="isGuestMode">
               <button
+                v-if="showMicrophoneButton"
                 type="button"
-                class="dropdown-item"
-                data-testid="btn-plus-model"
-                @click="handlePlusGate('models')"
+                :class="[
+                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto',
+                  isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost',
+                ]"
+                :aria-label="$t('chatInput.voice')"
+                :title="useWebSpeech ? $t('chatInput.voiceRealtime') : $t('chatInput.voiceWhisper')"
+                data-testid="btn-chat-voice"
+                @click="toggleRecording"
               >
-                <Icon icon="mdi:tune-vertical" class="w-5 h-5 flex-shrink-0" />
-                <span class="text-sm font-medium flex-1 text-left">{{
-                  $t('chatInput.plusMenu.model')
-                }}</span>
-                <span class="text-xs txt-muted">{{ $t('chatInput.modelDropdown.default') }}</span>
+                <Icon v-if="isRecording" icon="mdi:stop" class="w-5 h-5 text-white" />
+                <MicrophoneIcon v-else class="w-5 h-5" />
               </button>
-              <button
-                type="button"
-                class="dropdown-item"
-                data-testid="btn-plus-tools"
-                @click="handlePlusGate('tools')"
-              >
-                <Icon icon="mdi:toolbox-outline" class="w-5 h-5 flex-shrink-0" />
-                <span class="text-sm font-medium flex-1 text-left">{{
-                  $t('chatInput.plusMenu.tools')
-                }}</span>
-              </button>
-              <button
-                type="button"
-                class="dropdown-item"
-                data-testid="btn-plus-knowledge"
-                @click="handlePlusGate('knowledge')"
-              >
-                <Icon icon="mdi:folder-outline" class="w-5 h-5 flex-shrink-0" />
-                <span class="text-sm font-medium flex-1 text-left">{{
-                  $t('chatInput.plusMenu.knowledge')
-                }}</span>
-              </button>
-            </template>
 
-            <template v-else>
-              <ModelDropdown v-model="selectedModelId" />
-              <ToolsDropdown
-                :active-command="activeTool"
-                :thinking-enabled="thinkingEnabled"
-                :voice-reply="voiceReply"
-                :supports-reasoning="supportsReasoning"
-                :enhance-enabled="enhanceEnabled"
-                :enhance-loading="enhanceLoading"
-                :enhance-available="message.trim().length > 0"
-                @insert-command="handleInsertCommand"
-                @toggle-thinking="toggleThinking"
-                @toggle-voice-reply="toggleVoiceReply"
-                @toggle-enhance="toggleEnhance"
-              />
-              <KnowledgeFolderPicker v-model="selectedGroupKey" :groups="knowledgeGroups" />
-            </template>
+              <button
+                v-if="!isMobile || canSend || isStreaming"
+                type="button"
+                :disabled="!isStreaming && !canSend"
+                class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl pointer-events-auto transition-all"
+                :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
+                data-testid="btn-chat-send"
+                @click="isStreaming ? emit('stop') : sendMessage()"
+              >
+                <div v-if="isStreaming" class="w-4 h-4 bg-white rounded-sm"></div>
+                <ArrowUpIcon v-else class="w-5 h-5" />
+              </button>
+            </div>
           </div>
-
-          <input
-            type="file"
-            multiple
-            class="hidden"
-            accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
-            data-testid="input-chat-file"
-            @change="handleFileSelect"
-          />
-        </div>
-
-        <!-- Fixed action buttons (positioned absolutely). Same 6px inset as the
-             plus button, and a 6px inter-button gap so every spacing is even. -->
-        <div
-          class="absolute bottom-[6px] right-[6px] flex items-center gap-1.5 pointer-events-none"
-          data-testid="section-chat-primary-actions"
-        >
-          <button
-            v-if="showEnhanceInInput"
-            type="button"
-            :class="[
-              'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto relative',
-              enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
-              enhanceLoading && 'pill--loading',
-            ]"
-            :disabled="enhanceLoading"
-            :aria-label="$t('chatInput.enhance')"
-            :title="$t('chatInput.enhance')"
-            data-testid="btn-chat-enhance"
-            @click="toggleEnhance"
-          >
-            <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
-            <SparklesIcon v-else class="w-5 h-5" />
-          </button>
-
-          <button
-            v-if="showMicrophoneButton"
-            type="button"
-            :class="[
-              'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto',
-              isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost',
-            ]"
-            :aria-label="$t('chatInput.voice')"
-            :title="useWebSpeech ? $t('chatInput.voiceRealtime') : $t('chatInput.voiceWhisper')"
-            data-testid="btn-chat-voice"
-            @click="toggleRecording"
-          >
-            <Icon v-if="isRecording" icon="mdi:stop" class="w-5 h-5 text-white" />
-            <MicrophoneIcon v-else class="w-5 h-5" />
-          </button>
-
-          <button
-            v-if="!isMobile || canSend || isStreaming"
-            type="button"
-            :disabled="!isStreaming && !canSend"
-            class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl pointer-events-auto transition-all"
-            :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
-            data-testid="btn-chat-send"
-            @click="isStreaming ? emit('stop') : sendMessage()"
-          >
-            <div v-if="isStreaming" class="w-4 h-4 bg-white rounded-sm"></div>
-            <ArrowUpIcon v-else class="w-5 h-5" />
-          </button>
         </div>
       </div>
 
