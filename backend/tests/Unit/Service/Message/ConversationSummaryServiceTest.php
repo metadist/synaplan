@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\Message;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Repository\ConfigRepository;
+use App\Repository\MessageRepository;
 use App\Service\Message\ConversationSummaryConfigService;
 use App\Service\Message\ConversationSummaryService;
 use App\Service\ModelConfigService;
@@ -22,11 +23,13 @@ class ConversationSummaryServiceTest extends TestCase
 {
     private AiFacade&MockObject $aiFacade;
     private ModelConfigService&MockObject $modelConfigService;
+    private MessageRepository&MockObject $messageRepository;
 
     protected function setUp(): void
     {
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
+        $this->messageRepository = $this->createMock(MessageRepository::class);
         $this->modelConfigService->method('getSummaryModelConfig')->willReturn([
             'provider' => 'groq',
             'model' => 'gpt-oss-120b',
@@ -49,6 +52,7 @@ class ConversationSummaryServiceTest extends TestCase
             $this->aiFacade,
             $this->modelConfigService,
             $config,
+            $this->messageRepository,
             new ArrayAdapter(),
             new NullLogger(),
         );
@@ -84,11 +88,12 @@ class ConversationSummaryServiceTest extends TestCase
     public function testDisabledReturnsNotApplied(): void
     {
         $this->aiFacade->expects($this->never())->method('chat');
+        $this->messageRepository->expects($this->never())->method('findAllByChatId');
 
         $service = $this->makeService(['ENABLED' => '0']);
         $history = $this->makeLongHistory();
 
-        $result = $service->buildRollingContext($history, 7, 100);
+        $result = $service->buildRollingContext($history, count($history), 7, 100);
 
         self::assertFalse($result->applied);
         self::assertNull($result->summary);
@@ -98,18 +103,21 @@ class ConversationSummaryServiceTest extends TestCase
     public function testNullChatIdReturnsNotApplied(): void
     {
         $this->aiFacade->expects($this->never())->method('chat');
+        $this->messageRepository->expects($this->never())->method('findAllByChatId');
 
         $service = $this->makeService();
         $history = $this->makeLongHistory();
 
-        $result = $service->buildRollingContext($history, 7, null);
+        $result = $service->buildRollingContext($history, count($history), 7, null);
 
         self::assertFalse($result->applied);
     }
 
-    public function testShortHistoryThatFitsIsNotSummarized(): void
+    public function testShortHistoryThatFitsIsNotSummarizedAndNeverLoadsFullHistory(): void
     {
         $this->aiFacade->expects($this->never())->method('chat');
+        // Everything fits the verbatim window → no older span → no full-history load.
+        $this->messageRepository->expects($this->never())->method('findAllByChatId');
 
         // Default recent budget is 8000 chars; a couple of tiny turns fit easily.
         $service = $this->makeService();
@@ -118,7 +126,7 @@ class ConversationSummaryServiceTest extends TestCase
             $this->makeMessage(2, 'OUT', 'hello there'),
         ];
 
-        $result = $service->buildRollingContext($history, 7, 100);
+        $result = $service->buildRollingContext($history, count($history), 7, 100);
 
         self::assertFalse($result->applied);
         self::assertSame($history, $result->recentMessages);
@@ -126,6 +134,9 @@ class ConversationSummaryServiceTest extends TestCase
 
     public function testLongHistoryIsCondensedWithGradientAndRecentKeptVerbatim(): void
     {
+        $history = $this->makeLongHistory();
+        $this->messageRepository->method('findAllByChatId')->willReturn($history);
+
         $captured = null;
         $capturedOptions = null;
         $this->aiFacade
@@ -140,9 +151,8 @@ class ConversationSummaryServiceTest extends TestCase
 
         // Force a small verbatim window so an older span forms (min clamp 1000).
         $service = $this->makeService(['RECENT_VERBATIM_CHARS' => '1000']);
-        $history = $this->makeLongHistory();
 
-        $result = $service->buildRollingContext($history, 7, 100);
+        $result = $service->buildRollingContext($history, count($history), 7, 100);
 
         self::assertTrue($result->applied);
         self::assertSame('CONDENSED ROLLING SUMMARY', $result->summary);
@@ -174,34 +184,43 @@ class ConversationSummaryServiceTest extends TestCase
 
     public function testSummarizerFailureFallsBackToFullHistory(): void
     {
+        $history = $this->makeLongHistory();
+        $this->messageRepository->method('findAllByChatId')->willReturn($history);
+
         $this->aiFacade
             ->expects($this->once())
             ->method('chat')
             ->willThrowException(new \RuntimeException('provider down'));
 
         $service = $this->makeService(['RECENT_VERBATIM_CHARS' => '1000']);
-        $history = $this->makeLongHistory();
 
-        $result = $service->buildRollingContext($history, 7, 100);
+        $result = $service->buildRollingContext($history, count($history), 7, 100);
 
         self::assertFalse($result->applied);
         self::assertNull($result->summary);
         self::assertSame($history, $result->recentMessages);
     }
 
-    public function testStableOlderSpanIsCachedAcrossCalls(): void
+    public function testStableOlderSpanIsCachedAndSkipsFullHistoryLoadOnHit(): void
     {
-        // AI must be hit only once even though we summarize the same span twice.
+        $history = $this->makeLongHistory();
+
+        // The full history must be hydrated only ONCE (first turn, cache miss);
+        // the second turn serves the cached summary from the recent window alone.
+        $this->messageRepository
+            ->expects($this->once())
+            ->method('findAllByChatId')
+            ->willReturn($history);
+
         $this->aiFacade
             ->expects($this->once())
             ->method('chat')
             ->willReturn(['content' => 'CACHED SUMMARY', 'provider' => 'groq', 'model' => 'gpt-oss-120b']);
 
         $service = $this->makeService(['RECENT_VERBATIM_CHARS' => '1000']);
-        $history = $this->makeLongHistory();
 
-        $first = $service->buildRollingContext($history, 7, 100);
-        $second = $service->buildRollingContext($history, 7, 100);
+        $first = $service->buildRollingContext($history, count($history), 7, 100);
+        $second = $service->buildRollingContext($history, count($history), 7, 100);
 
         self::assertTrue($first->applied);
         self::assertTrue($second->applied);

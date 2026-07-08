@@ -6,6 +6,7 @@ namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
+use App\Repository\MessageRepository;
 use App\Service\ModelConfigService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -37,52 +38,72 @@ final readonly class ConversationSummaryService
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private ConversationSummaryConfigService $config,
+        private MessageRepository $messageRepository,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
     ) {
     }
 
     /**
-     * @param Message[] $fullHistory full chat history, chronological (oldest first)
+     * Build the rolling context WITHOUT loading the whole chat up front.
+     *
+     * The caller passes the recent window it already loaded for classification
+     * ({@see MessageRepository::findChatHistory()}) plus a cheap total message
+     * count. The verbatim tail is derived from that window (it is always the
+     * newest messages), and the full history is only queried on a genuine cache
+     * miss — so long chats that hit the cache pay a single COUNT per turn, not a
+     * full-history hydration (PR #1282 review, point 1).
+     *
+     * @param Message[] $recentWindow      recent window already loaded by the caller, chronological (oldest first)
+     * @param int       $totalMessageCount total messages in the chat (cheap COUNT)
      */
-    public function buildRollingContext(array $fullHistory, ?int $userId, ?int $chatId): RollingSummaryResult
+    public function buildRollingContext(array $recentWindow, int $totalMessageCount, ?int $userId, ?int $chatId): RollingSummaryResult
     {
-        if (!$this->config->isEnabled() || null === $chatId || [] === $fullHistory) {
-            return RollingSummaryResult::notApplied($fullHistory);
+        if (!$this->config->isEnabled() || null === $chatId || [] === $recentWindow) {
+            return RollingSummaryResult::notApplied($recentWindow);
         }
 
-        $fullHistory = array_values($fullHistory);
-
-        // Split newest→oldest into a verbatim "recent" tail and an "older" head.
+        $recentWindow = array_values($recentWindow);
         $recentBudget = $this->config->getRecentVerbatimChars();
-        $recentReversed = [];
-        $recentChars = 0;
-        foreach (array_reverse($fullHistory) as $msg) {
-            $len = $this->messageLength($msg);
-            if (count($recentReversed) > 0 && ($recentChars + $len) > $recentBudget) {
-                break;
-            }
-            $recentReversed[] = $msg;
-            $recentChars += $len;
+
+        // Verbatim tail = newest messages within the char budget. Always a subset
+        // of the recent window, so no full-history query is needed to compute it.
+        $tail = $this->recentTail($recentWindow, $recentBudget);
+        $tailCount = count($tail);
+
+        // Messages before the tail (the summarization source). Derived from the
+        // cheap COUNT — never from loading the whole history.
+        $olderCount = $totalMessageCount - $tailCount;
+        if ($olderCount <= 0) {
+            return RollingSummaryResult::notApplied($recentWindow);
         }
 
-        /** @var list<Message> $recentMessages */
-        $recentMessages = array_reverse($recentReversed);
-        $olderCount = count($fullHistory) - count($recentMessages);
+        // Newest "older" message id (the per-span cache key). When the tail did
+        // not consume the entire loaded window the boundary message is already in
+        // memory, so a cache hit needs NO full-history query.
+        $olderLastId = $tailCount < count($recentWindow)
+            ? (int) $recentWindow[count($recentWindow) - $tailCount - 1]->getId()
+            : null;
 
-        // Everything already fits verbatim → behave exactly like today.
+        if (null !== $olderLastId) {
+            $cached = $this->readCachedSummary($chatId, $olderLastId, $olderCount);
+            if (null !== $cached) {
+                return new RollingSummaryResult(true, $cached, $tail, $olderCount);
+            }
+        }
+
+        // Cache miss (or the boundary was outside the loaded window): load the
+        // full history once to build the summary source.
+        $fullHistory = array_values($this->messageRepository->findAllByChatId($userId ?? 0, $chatId));
+        $tail = $this->recentTail($fullHistory, $recentBudget);
+        $olderCount = count($fullHistory) - count($tail);
         if ($olderCount <= 0) {
             return RollingSummaryResult::notApplied($fullHistory);
         }
 
         /** @var list<Message> $older */
         $older = array_slice($fullHistory, 0, $olderCount);
-
-        // Bound cost on very long chats: keep the most recent slice of the older span.
-        $maxSource = $this->config->getMaxSourceMessages();
-        if (count($older) > $maxSource) {
-            $older = array_slice($older, -$maxSource);
-        }
+        $olderLastId = (int) $older[array_key_last($older)]->getId();
 
         $olderChars = 0;
         foreach ($older as $msg) {
@@ -92,28 +113,55 @@ final readonly class ConversationSummaryService
             return RollingSummaryResult::notApplied($fullHistory);
         }
 
-        $summary = $this->summarizeOlder($older, $userId, $chatId);
+        $summary = $this->summarizeOlder($older, $olderLastId, $olderCount, $userId, $chatId);
         if (null === $summary || '' === trim($summary)) {
             return RollingSummaryResult::notApplied($fullHistory);
         }
 
-        return new RollingSummaryResult(true, $summary, $recentMessages, count($older));
+        return new RollingSummaryResult(true, $summary, $tail, $olderCount);
     }
 
     /**
-     * Summarize the older span with gradient compression, using a per-span cache.
+     * Newest messages within the verbatim char budget, chronological (oldest first).
+     *
+     * @param Message[] $history chronological (oldest first)
+     *
+     * @return list<Message>
+     */
+    private function recentTail(array $history, int $budget): array
+    {
+        $reversed = [];
+        $chars = 0;
+        foreach (array_reverse(array_values($history)) as $msg) {
+            $len = $this->messageLength($msg);
+            if (count($reversed) > 0 && ($chars + $len) > $budget) {
+                break;
+            }
+            $reversed[] = $msg;
+            $chars += $len;
+        }
+
+        return array_reverse($reversed);
+    }
+
+    /**
+     * Summarize the older span with gradient compression, storing it in the
+     * per-span cache. {@see $olderCount} is the UNCAPPED older-span size so the
+     * key matches the cheap cache-hit lookup in {@see buildRollingContext()}.
      *
      * @param list<Message> $older
      */
-    private function summarizeOlder(array $older, ?int $userId, int $chatId): ?string
+    private function summarizeOlder(array $older, int $olderLastId, int $olderCount, ?int $userId, int $chatId): ?string
     {
-        $lastOlder = $older[array_key_last($older)];
         $summaryMax = $this->config->getSummaryMaxChars();
         $tiers = $this->config->getTiers();
 
-        $fingerprint = md5(implode(':', [$summaryMax, $tiers, $this->config->getRecentVerbatimChars()]));
-        $cacheKey = sprintf('conv_summary.%d.%d.%d.%s', $chatId, (int) $lastOlder->getId(), count($older), $fingerprint);
+        // Bound cost on very long chats: only the most recent slice of the older
+        // span feeds the summarizer (the cache key still uses the full count).
+        $maxSource = $this->config->getMaxSourceMessages();
+        $source = count($older) > $maxSource ? array_slice($older, -$maxSource) : $older;
 
+        $cacheKey = $this->cacheKey($chatId, $olderLastId, $olderCount);
         $item = $this->cache->getItem($cacheKey);
         if ($item->isHit()) {
             $cached = $item->get();
@@ -127,7 +175,7 @@ final readonly class ConversationSummaryService
 
             $messages = [
                 ['role' => 'system', 'content' => $this->buildSummarizerSystemPrompt($summaryMax)],
-                ['role' => 'user', 'content' => $this->buildSourceText($older, $tiers)],
+                ['role' => 'user', 'content' => $this->buildSourceText($source, $tiers)],
             ];
 
             $response = $this->aiFacade->chat($messages, $userId, [
@@ -149,7 +197,7 @@ final readonly class ConversationSummaryService
 
             $this->logger->info('ConversationSummaryService: built rolling summary', [
                 'chat_id' => $chatId,
-                'older_count' => count($older),
+                'older_count' => $olderCount,
                 'summary_chars' => mb_strlen($summary),
                 'provider' => $modelConfig['provider'] ?? null,
                 'model' => $modelConfig['model'] ?? null,
@@ -165,6 +213,37 @@ final readonly class ConversationSummaryService
 
             return null;
         }
+    }
+
+    /**
+     * Look up a cached summary for a stable older-span without loading history.
+     */
+    private function readCachedSummary(int $chatId, int $olderLastId, int $olderCount): ?string
+    {
+        $item = $this->cache->getItem($this->cacheKey($chatId, $olderLastId, $olderCount));
+        if ($item->isHit()) {
+            $cached = $item->get();
+            if (is_string($cached) && '' !== $cached) {
+                return $cached;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Per-span cache key. Config knobs that change the summary shape are folded
+     * into a fingerprint so a settings change invalidates stale summaries.
+     */
+    private function cacheKey(int $chatId, int $olderLastId, int $olderCount): string
+    {
+        $fingerprint = md5(implode(':', [
+            $this->config->getSummaryMaxChars(),
+            $this->config->getTiers(),
+            $this->config->getRecentVerbatimChars(),
+        ]));
+
+        return sprintf('conv_summary.%d.%d.%d.%s', $chatId, $olderLastId, $olderCount, $fingerprint);
     }
 
     private function buildSummarizerSystemPrompt(int $summaryMax): string
@@ -230,7 +309,7 @@ final readonly class ConversationSummaryService
         $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
         $text = (string) $msg->getText();
 
-        $fileText = $msg->getFileText();
+        $fileText = (string) $msg->getFileText();
         if ('' !== $fileText) {
             $text .= ' [attached '.((string) $msg->getFileType()).': '.$this->clip($fileText, 500).']';
         }

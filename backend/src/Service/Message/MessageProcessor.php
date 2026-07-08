@@ -455,12 +455,16 @@ final readonly class MessageProcessor
             $summaryChatId = $message->getChatId();
             if ('chat' === $summaryIntent && null !== $summaryChatId && $summaryChatId > 0) {
                 $perfTimer->start('summary');
-                $fullHistory = $this->messageRepository->findAllByChatId(
+                // Reuse the recent window already loaded above and pass a cheap
+                // COUNT instead of re-loading the whole chat: the service only
+                // hydrates the full history on an actual cache miss (PR #1282).
+                $totalMessages = $this->messageRepository->countByChatId(
                     $message->getUserId(),
                     $summaryChatId,
                 );
                 $rolling = $this->conversationSummaryService->buildRollingContext(
-                    $fullHistory,
+                    $conversationHistory,
+                    $totalMessages,
                     $message->getUserId(),
                     $summaryChatId,
                 );
