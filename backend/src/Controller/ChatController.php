@@ -123,7 +123,10 @@ class ChatController extends AbstractController
             $messages = $chat->getMessages();
             foreach ($messages as $message) {
                 if ('IN' === $message->getDirection()) {
-                    $content = $message->getText() ?? '';
+                    // Tool commands (/pic, /vid, …) are kept in the stored message
+                    // text for backend routing, but the raw prefix must never leak
+                    // into the chat list preview — only the user's actual query.
+                    $content = $this->stripToolCommandPrefix($message->getText() ?? '');
                     $firstMessagePreview = mb_strlen($content) > 30
                         ? mb_substr($content, 0, 30).'…'
                         : $content;
@@ -152,6 +155,18 @@ class ChatController extends AbstractController
             'limit' => $paginate ? $limit : count($result),
             'hasMore' => $paginate ? ($offset + count($result)) < $total : false,
         ]);
+    }
+
+    /**
+     * Strip a leading tool-command prefix ("/pic ", "/vid ", "/search ", …) from
+     * a stored user message. The frontend keeps these prefixes in the message
+     * text sent to the backend (needed for routing), so previews built from raw
+     * message text must strip them explicitly — mirrors the same cleanup in
+     * SharedChatPageController::cleanSlashCommands().
+     */
+    private function stripToolCommandPrefix(string $text): string
+    {
+        return preg_replace('/^\/(?:pic|vid|audio|tts|image|video|search)\s*/i', '', $text) ?? $text;
     }
 
     #[Route('', name: 'create', methods: ['POST'])]
