@@ -28,11 +28,8 @@
          offset (left-3 = 12px) so the composer aligns with the menu button and
          uses the full width; md+ keeps the roomier px-4. -->
     <div class="max-w-4xl mx-auto py-2 md:py-4" :class="{ 'px-3 md:px-4': !isCentered }">
-      <!-- Active Command and File Display (above input) -->
-      <div
-        v-if="activeCommand || uploadedFiles.length > 0 || quote"
-        class="mb-3 flex flex-wrap gap-2"
-      >
+      <!-- File and Quote Display (above input) -->
+      <div v-if="uploadedFiles.length > 0 || quote" class="mb-3 flex flex-wrap gap-2">
         <!-- Quoted reference chip -->
         <QuoteChip v-if="quote" :quote="quote" @remove="emit('clearQuote')" />
 
@@ -54,24 +51,6 @@
             <XMarkIcon class="w-4 h-4" />
           </button>
         </div>
-
-        <!-- Active Command -->
-        <button
-          v-if="activeCommand"
-          type="button"
-          :class="[
-            'pill text-xs flex items-center gap-2',
-            isCommandValid
-              ? 'pill--active'
-              : 'bg-orange-500/10 border-orange-500/30 text-orange-600 dark:text-orange-400',
-          ]"
-          data-testid="btn-chat-command-clear"
-          @click="clearCommand"
-        >
-          <Icon :icon="commandIcon" class="w-4 h-4" />
-          <span class="font-mono font-semibold">/{{ activeCommand }}</span>
-          <XMarkIcon class="w-4 h-4" />
-        </button>
       </div>
 
       <!-- Attached banner (e.g. guest message counter) glued to the input's top edge. -->
@@ -109,14 +88,26 @@
              py-2 (16px) + textarea min-h-[40px] = 56px single-line shell, so the
              44px action buttons sit with an even 6px inset on every edge. -->
         <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
-          <div class="pl-[56px] py-2" :style="{ paddingRight: `${textareaPaddingRightPx}px` }">
+          <!-- The tool badge sits inline at the very start of the input (where
+               the caret begins). It stays pinned to the front even when text is
+               already present; wrapped text flows in the column beside it. -->
+          <div
+            class="pl-[56px] py-2 flex items-center gap-2"
+            :style="{ paddingRight: `${textareaPaddingRightPx}px` }"
+          >
+            <ToolBadge
+              v-if="activeTool"
+              :tool="activeTool"
+              class="flex-shrink-0"
+              @remove="clearTool"
+            />
             <!-- Textarea -->
             <Textarea
               ref="textareaRef"
               v-model="message"
               :placeholder="isMobile ? 'Message...' : $t('chatInput.placeholder')"
               :rows="1"
-              class="flex-1"
+              class="flex-1 min-w-0"
               data-testid="input-chat-message"
               @keydown="handleKeyDown"
               @focus="isFocused = true"
@@ -204,7 +195,7 @@
             <template v-else>
               <ModelDropdown v-model="selectedModelId" />
               <ToolsDropdown
-                :active-command="activeCommand"
+                :active-command="activeTool"
                 :thinking-enabled="thinkingEnabled"
                 :voice-reply="voiceReply"
                 :supports-reasoning="supportsReasoning"
@@ -319,11 +310,12 @@ import Textarea from './Textarea.vue'
 import CommandPalette from './CommandPalette.vue'
 import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
+import ToolBadge from './ToolBadge.vue'
 import ModelDropdown from './ModelDropdown.vue'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import { parseCommand } from '../commands/parse'
-import { useCommandsStore, type Command } from '@/stores/commands'
+import { type Command } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
 import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
@@ -422,7 +414,16 @@ const mentionPaletteRef = ref<InstanceType<typeof FileMentionPalette> | null>(nu
 const mentionQuery = ref('')
 const textareaRef = ref<InstanceType<typeof Textarea> | null>(null)
 
-const activeCommand = ref<string | null>(null)
+// Tools that render as a removable badge inside the input (Cursor-style chips)
+// instead of injecting a "/command" into the textarea. The message text stays
+// clean and only holds the user's query; the "/command" is reconstructed at
+// send time so the ChatView/backend contract is unchanged.
+type ChatTool = 'search' | 'pic' | 'vid'
+const TOOL_COMMANDS: readonly ChatTool[] = ['search', 'pic', 'vid'] as const
+const isToolCommand = (name: string): name is ChatTool =>
+  (TOOL_COMMANDS as readonly string[]).includes(name)
+
+const activeTool = ref<ChatTool | null>(null)
 const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
@@ -547,26 +548,19 @@ const emit = defineEmits<{
   clearQuote: []
 }>()
 
-const commandsStore = useCommandsStore()
-
-const isCommandValid = computed(() => {
-  if (!activeCommand.value) return false
-  return commandsStore.commands.some((cmd) => cmd.name === activeCommand.value)
-})
-
-const commandIcon = computed(() => {
-  if (!activeCommand.value) return 'mdi:help-circle'
-  const cmd = commandsStore.commands.find((c) => c.name === activeCommand.value)
-  return cmd?.icon || 'mdi:help-circle'
-})
-
 const canSend = computed(() => {
   const trimmedMessage = message.value.trim()
   const hasMessage = trimmedMessage.length > 0
   const hasFiles = uploadedFiles.value.length > 0
   const filesReady = uploadedFiles.value.every((f) => !f.processing)
 
-  // Prevent sending if only a command is present (e.g., just "/pic" without arguments)
+  // A tool badge (search/image/video) needs a query or description to act on,
+  // so an active tool with an empty textarea (and no files) can't be sent.
+  if (activeTool.value && !hasMessage && !hasFiles) {
+    return false
+  }
+
+  // Prevent sending if only a raw command is typed (e.g., just "/pic" without arguments)
   const isOnlyCommand = trimmedMessage.startsWith('/') && !trimmedMessage.includes(' ')
   if (isOnlyCommand && !hasFiles) {
     return false
@@ -630,16 +624,13 @@ watch(
       const parsed = parseCommand(newValue)
 
       if (parsed) {
-        activeCommand.value = parsed.command
         // Hide palette if user has started typing arguments (command + space)
         paletteVisible.value = !hasSpace || parsed.args.length === 0
       } else {
-        activeCommand.value = null
         paletteVisible.value = true
       }
     } else {
       paletteVisible.value = false
-      activeCommand.value = null
     }
 
     // Detect @mention trigger: match @ preceded by start-of-string or whitespace, at end of input.
@@ -722,11 +713,19 @@ const sendMessage = () => {
     return
   }
 
-  const hasWebSearch = activeCommand.value === 'search'
+  const hasWebSearch = activeTool.value === 'search'
 
-  // Send the full message with command to backend (it needs it for /pic and /vid)
-  // The UI cleanup will happen in ChatView before adding to history
-  const messageToSend = message.value
+  // Reconstruct the "/command query" string from the active tool badge so the
+  // ChatView/backend contract stays identical to the old slash-command flow.
+  // The textarea only holds the query; ChatView strips the prefix for display
+  // and uses the webSearch flag for /search (see handleSendMessage).
+  const query = message.value
+  let messageToSend = query
+  if (activeTool.value === 'pic' || activeTool.value === 'vid') {
+    messageToSend = `/${activeTool.value} ${query}`.trim()
+  } else if (activeTool.value === 'search') {
+    messageToSend = `/search ${query}`.trim()
+  }
 
   const options = {
     includeReasoning: thinkingEnabled.value,
@@ -745,7 +744,7 @@ const sendMessage = () => {
   paletteVisible.value = false
   mentionPaletteVisible.value = false
   mentionQuery.value = ''
-  activeCommand.value = null
+  activeTool.value = null
   voiceReply.value = false
   emit('clearQuote')
   // Reset enhance state after sending
@@ -770,41 +769,53 @@ const toggleVoiceReply = () => {
   voiceReply.value = !voiceReply.value
 }
 
+// Selecting a command from the "/" autocomplete palette. The three tools
+// (search/pic/vid) become a badge and strip the typed "/query" from the input;
+// any other command (e.g. /tts) keeps the legacy inline-text behaviour.
 const handleCommandSelect = (cmd: Command) => {
-  if (cmd.requiresArgs) {
+  paletteVisible.value = false
+  if (isToolCommand(cmd.name)) {
+    setActiveTool(cmd.name)
+    // Drop the partial "/cmd" the user was typing so only the query remains.
+    message.value = ''
+  } else if (cmd.requiresArgs) {
     message.value = `${cmd.usage.split('[')[0].trim()} `
   } else {
     message.value = cmd.usage
   }
-  paletteVisible.value = false
-  activeCommand.value = cmd.name
   // Focus textarea after command selection
   nextTick(() => {
     textareaRef.value?.focus()
   })
 }
 
+// Picking a tool from the "+" -> Tools menu. Toggles the badge without touching
+// the textarea; the user then types their query as plain text.
 const handleInsertCommand = (cmd: Command) => {
-  if (cmd.requiresArgs) {
+  if (isToolCommand(cmd.name)) {
+    setActiveTool(cmd.name)
+  } else if (cmd.requiresArgs) {
     message.value = `${cmd.usage.split('[')[0].trim()} `
   } else {
     message.value = cmd.usage
   }
-  activeCommand.value = cmd.name
-  // Focus textarea after command insertion
+  // Focus textarea after selection
   nextTick(() => {
     textareaRef.value?.focus()
   })
+}
+
+// Single active tool at a time: selecting the active tool again clears it.
+const setActiveTool = (tool: ChatTool) => {
+  activeTool.value = activeTool.value === tool ? null : tool
 }
 
 const closePalette = () => {
   paletteVisible.value = false
 }
 
-const clearCommand = () => {
-  activeCommand.value = null
-  message.value = ''
-  paletteVisible.value = false
+const clearTool = () => {
+  activeTool.value = null
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -822,6 +833,19 @@ const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault()
       e.stopPropagation()
       mentionPaletteRef.value.handleKeyDown(e)
+      return
+    }
+  }
+
+  // Backspace at the very start of an empty input removes the active tool badge
+  // (Cursor-style chip deletion), so the user never has to reach for the X.
+  if (e.key === 'Backspace' && activeTool.value) {
+    const target = e.target as HTMLTextAreaElement
+    const atStart =
+      message.value.length === 0 || (target.selectionStart === 0 && target.selectionEnd === 0)
+    if (atStart) {
+      e.preventDefault()
+      clearTool()
       return
     }
   }

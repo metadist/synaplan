@@ -167,6 +167,7 @@ export interface Message {
     resultsCount?: number
   } | null // Web search metadata
   tool?: {
+    command?: string
     icon: string
     label: string
   } | null // Tool metadata (e.g., web search, file generation)

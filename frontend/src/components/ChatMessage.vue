@@ -371,9 +371,12 @@
                 </div>
               </template>
 
-              <!-- Tool Badge (replaces Web Search Badge for better consistency) -->
+              <!-- Tool badge: small colored chip matching the composer badge. -->
+              <ToolBadge v-if="messageToolBadge" :tool="messageToolBadge" :removable="false" />
+
+              <!-- Fallback for legacy/unknown tools without a mapped badge. -->
               <div
-                v-if="tool"
+                v-else-if="tool"
                 class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] dark:text-[var(--brand-light)] text-sm"
               >
                 <Icon :icon="tool.icon" class="w-4 h-4 flex-shrink-0" />
@@ -975,6 +978,7 @@ import {
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import ToolBadge from '@/components/ToolBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
@@ -1070,6 +1074,7 @@ interface Props {
     resultsCount?: number
   } | null // Web search metadata
   tool?: {
+    command?: string
     icon: string
     label: string
   } | null // Tool metadata (e.g., web search, file generation)
@@ -1134,6 +1139,13 @@ const sourcesExpanded = ref(true)
 // Carousel state for search results
 const carouselPage = ref(0) // Which "page" we're on (0-based)
 const highlightedSource = ref<number | null>(null)
+
+// Map the sent-message tool metadata to the small colored composer badge
+// (search/pic/vid). Unknown/legacy tools fall back to the generic tool badge.
+const messageToolBadge = computed<'search' | 'pic' | 'vid' | null>(() => {
+  const cmd = props.tool?.command
+  return cmd === 'search' || cmd === 'pic' || cmd === 'vid' ? cmd : null
+})
 
 // Calculate total badges count (files + webSearch/tool)
 const totalBadgesCount = computed(() => {

@@ -25,7 +25,7 @@
       data-testid="dropdown-tools-panel"
       @keydown.escape="closeDropdown"
     >
-      <!-- Command tools: insert a /command into the input -->
+      <!-- Command tools: toggle a removable tool badge inside the chat input -->
       <button
         v-for="tool in commandTools"
         ref="itemRefs"
@@ -209,7 +209,7 @@ const emit = defineEmits<{
   toggleEnhance: []
 }>()
 
-/** Feature-gated tools that insert a slash command into the input. */
+/** Feature-gated tools that toggle a removable badge in the chat input. */
 const commandTools = [
   {
     id: 'web-search',
