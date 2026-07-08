@@ -385,8 +385,7 @@
                   >
                     <pre
                       class="whitespace-pre-wrap font-mono text-xs txt-primary leading-relaxed"
-                      >{{ sortingPrompt.promptContent }}</pre
-                    >
+                      >{{ sortingPrompt.promptContent }}</pre>
                   </div>
 
                   <textarea

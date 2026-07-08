@@ -50,6 +50,17 @@ services:
       # helped). service_started returns immediately, so the stack self-heals.
       backend:
         condition: service_started
+    # Vite dev server readiness: npm ci + schema generation + server start can
+    # take 1-3 min (longer on a cold first boot while the backend is still
+    # running migrations). Without this healthcheck the container shows
+    # "Started" immediately, which is misleading — the dev server is not yet
+    # listening. start_period matches the schema script's 5-min poll ceiling.
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5173',r=>{r.resume();process.exit(r.statusCode<400?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
     restart: unless-stopped
     networks:
       - synaplan-network

@@ -124,7 +124,7 @@
           <button
             type="button"
             :class="[
-              'surface-chip icon-ghost h-[36px] min-w-[36px] flex items-center justify-center rounded-lg relative',
+              'surface-chip icon-ghost h-[36px] min-w-[36px] flex items-center justify-center rounded-lg relative touch-manipulation',
               plusMenuOpen && 'pill--active',
             ]"
             :aria-label="$t('chatInput.plusMenu.label')"

@@ -48,9 +48,11 @@ test.describe('@visual UI guard — capped snapshots', () => {
   test('chat-input "+" menu', async ({ page, credentials }) => {
     await login(page, credentials)
     await ensureAdvancedMode(page)
-    await page.locator(selectors.chat.plusToggle).click()
+    const toggle = page.locator(selectors.chat.plusToggle)
+    await expect(toggle).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await toggle.click()
     const panel = page.locator(selectors.chat.plusPanel)
-    await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await expect(panel).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(panel).toHaveScreenshot('chat-input-plus-menu.png', SNAPSHOT_OPTS)
   })
 

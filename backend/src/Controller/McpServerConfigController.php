@@ -393,7 +393,7 @@ final class McpServerConfigController extends AbstractController
             $server->setName(trim($data['name']));
         }
         if (is_string($data['url'] ?? null)) {
-            $server->setUrl(trim($data['url']));
+            $server->setUrl(rtrim(trim($data['url']), '/'));
         }
         if (array_key_exists('auth_header', $data) && is_string($data['auth_header'])) {
             $server->setAuthHeader(trim($data['auth_header']));

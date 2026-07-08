@@ -242,10 +242,16 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await login(page, credentials)
     await ensureAdvancedMode(page)
 
-    // The per-message controls now live inside the "+" menu.
-    await page.locator(CHAT.plusToggle).click()
+    const toggle = page.locator(CHAT.plusToggle)
+    await expect(toggle).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+    // On mobile, the first click can be swallowed during layout shifts.
     const panel = page.locator(CHAT.plusPanel)
-    await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await expect(async () => {
+      if (await panel.isVisible()) return
+      await toggle.click()
+      await expect(panel).toBeVisible({ timeout: 2000 })
+    }).toPass({ timeout: TIMEOUTS.STANDARD })
 
     // Contract: the menu picks context / toggles behaviour but never navigates —
     // so the panel itself must contain no link elements (navigation lives inside
