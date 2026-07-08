@@ -725,6 +725,109 @@ class ModelConfigServiceTest extends TestCase
         );
     }
 
+    /**
+     * The rolling conversation summarizer must honour an explicit
+     * DEFAULTMODEL.SUMMARY override before anything else — this is how an
+     * operator points the condensing step at e.g. a GPT-OSS-120B model.
+     */
+    public function testGetSummaryModelConfigPrefersExplicitSummaryModel(): void
+    {
+        $userId = 5;
+        $summaryModelId = 300;
+
+        $summaryConfig = $this->createMock(Config::class);
+        $summaryConfig->method('getValue')->willReturn((string) $summaryModelId);
+
+        // First lookup (user SUMMARY) wins — no fallback lookups happen.
+        $this->configRepository
+            ->expects($this->once())
+            ->method('findOneBy')
+            ->with([
+                'ownerId' => $userId,
+                'group' => 'DEFAULTMODEL',
+                'setting' => 'SUMMARY',
+            ])
+            ->willReturn($summaryConfig);
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('gpt-oss-120b');
+
+        $this->modelRepository
+            ->method('find')
+            ->with($summaryModelId)
+            ->willReturn($model);
+
+        $this->assertSame([
+            'model' => 'gpt-oss-120b',
+            'provider' => 'groq',
+            'model_id' => $summaryModelId,
+        ], $this->service->getSummaryModelConfig($userId));
+    }
+
+    /**
+     * With no SUMMARY override the summarizer defaults to the sorting (SORT)
+     * model — the cheap/fast model requested for condensing by default.
+     */
+    public function testGetSummaryModelConfigFallsBackToSortModel(): void
+    {
+        $userId = 9;
+        $sortModelId = 73;
+
+        $sortConfig = $this->createMock(Config::class);
+        $sortConfig->method('getValue')->willReturn((string) $sortModelId);
+
+        // Chain: user SUMMARY → global SUMMARY → user SORT (returns here).
+        $this->configRepository
+            ->expects($this->exactly(3))
+            ->method('findOneBy')
+            ->willReturnCallback(function (array $criteria) use ($userId, $sortConfig) {
+                static $calls = 0;
+                ++$calls;
+
+                $expected = [
+                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARY'],
+                    ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARY'],
+                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT'],
+                ];
+
+                self::assertSame($expected[$calls - 1], $criteria, "Summary fallback step {$calls}");
+
+                return 3 === $calls ? $sortConfig : null;
+            });
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b');
+
+        $this->modelRepository
+            ->method('find')
+            ->with($sortModelId)
+            ->willReturn($model);
+
+        $this->assertSame([
+            'model' => 'llama-3.3-70b',
+            'provider' => 'groq',
+            'model_id' => $sortModelId,
+        ], $this->service->getSummaryModelConfig($userId));
+    }
+
+    public function testGetSummaryModelConfigReturnsNullsWhenNothingConfigured(): void
+    {
+        $this->configRepository
+            ->method('findOneBy')
+            ->willReturn(null);
+
+        $this->modelRepository
+            ->expects($this->never())
+            ->method('find');
+
+        $this->assertSame(
+            ['model' => null, 'provider' => null, 'model_id' => null],
+            $this->service->getSummaryModelConfig(3)
+        );
+    }
+
     public function testGetEffectiveUserIdForMessageWithWebChannelUnverifiedUser(): void
     {
         $userId = 25;

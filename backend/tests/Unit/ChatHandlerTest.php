@@ -458,6 +458,80 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
+     * Rolling conversation summary: when MessageProcessor condenses older turns
+     * and passes them via options['conversation_summary'], ChatHandler must fold
+     * that text into the SYSTEM prompt so long threads keep their context.
+     */
+    public function testHandleStreamInjectsConversationSummaryIntoSystemPrompt(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('And what about the second point?');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(function ($messages, $cb, $userId, $options) use (&$captured) {
+                $captured = $messages;
+                $cb('ok');
+
+                return ['provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function (): void {},
+            null,
+            ['conversation_summary' => 'Earlier: the user argued for option A and asked to compare prices.'],
+        );
+
+        self::assertNotNull($captured);
+        $systemPrompt = $captured[0]['content'] ?? '';
+        self::assertSame('system', $captured[0]['role'] ?? '');
+        self::assertStringContainsString('Summary of earlier conversation', $systemPrompt);
+        self::assertStringContainsString('option A', $systemPrompt);
+    }
+
+    public function testHandleStreamWithoutConversationSummaryLeavesSystemPromptClean(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Hello');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(function ($messages, $cb, $userId, $options) use (&$captured) {
+                $captured = $messages;
+                $cb('ok');
+
+                return ['provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function (): void {},
+        );
+
+        self::assertNotNull($captured);
+        self::assertStringNotContainsString('Summary of earlier conversation', $captured[0]['content'] ?? '');
+    }
+
+    /**
      * Issue #615: the non-streaming `handle()` path serves email
      * (`smart+...@synaplan.net`) and the generic API webhook. Before the
      * fix, neither loaded user memories nor extracted new ones. This
