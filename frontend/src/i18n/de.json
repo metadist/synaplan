@@ -8,8 +8,7 @@
     "emptyHint": "Nachrichten und Dateien aus dieser Sitzung werden nicht gespeichert und verschwinden, wenn du sie beendest.",
     "endConfirmTitle": "Inkognito-Chat beenden?",
     "endConfirmMessage": "Die Unterhaltung wird endgültig verworfen und Dateien aus dieser Sitzung werden gelöscht.",
-    "endConfirmButton": "Beenden und verwerfen",
-    "ended": "Inkognito-Chat beendet"
+    "endConfirmButton": "Beenden und verwerfen"
   },
   "jobs": {
     "kind": {

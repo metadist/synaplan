@@ -8,8 +8,7 @@
     "emptyHint": "Messages and files from this session are not saved and disappear when you end it.",
     "endConfirmTitle": "End incognito chat?",
     "endConfirmMessage": "The conversation will be discarded permanently and files from this session will be deleted.",
-    "endConfirmButton": "End and discard",
-    "ended": "Incognito chat ended"
+    "endConfirmButton": "End and discard"
   },
   "jobs": {
     "kind": {

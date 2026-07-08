@@ -8,8 +8,7 @@
     "emptyHint": "Los mensajes y archivos de esta sesión no se guardan y desaparecen cuando la finalizas.",
     "endConfirmTitle": "¿Finalizar el chat de incógnito?",
     "endConfirmMessage": "La conversación se descartará de forma permanente y los archivos de esta sesión se eliminarán.",
-    "endConfirmButton": "Finalizar y descartar",
-    "ended": "Chat de incógnito finalizado"
+    "endConfirmButton": "Finalizar y descartar"
   },
   "jobs": {
     "kind": {

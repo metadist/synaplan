@@ -8,8 +8,7 @@
     "emptyHint": "Bu oturumdaki mesajlar ve dosyalar kaydedilmez ve oturumu bitirdiğinde kaybolur.",
     "endConfirmTitle": "Gizli sohbet bitirilsin mi?",
     "endConfirmMessage": "Konuşma kalıcı olarak silinecek ve bu oturumdaki dosyalar kaldırılacak.",
-    "endConfirmButton": "Bitir ve sil",
-    "ended": "Gizli sohbet sona erdi"
+    "endConfirmButton": "Bitir ve sil"
   },
   "jobs": {
     "kind": {

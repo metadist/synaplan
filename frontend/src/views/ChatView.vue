@@ -917,11 +917,12 @@ watch(
     historyStore.clear()
 
     if (!active) {
-      // Session ended: restore the persisted chat.
+      // Session ended: restore the persisted chat. No toast here — the UI
+      // already reflects the change (toggle state + restored chat), so a
+      // confirmation toast would just be noise.
       if (chatsStore.activeChatId) {
         await historyStore.loadMessages(chatsStore.activeChatId)
       }
-      showSuccessToast(t('incognito.ended'))
     }
 
     await nextTick()
