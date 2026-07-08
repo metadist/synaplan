@@ -141,24 +141,6 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Count messages in a chat (ownership-enforced). Cheap indexed COUNT used to
-     * decide whether the rolling conversation summary needs the full history at
-     * all, without hydrating every row on each turn (PR #1282 review).
-     */
-    public function countByChatId(int $userId, int $chatId): int
-    {
-        return (int) $this->createQueryBuilder('m')
-            ->select('COUNT(m.id)')
-            ->join('m.chat', 'c')
-            ->where('m.chatId = :chatId')
-            ->andWhere('c.userId = :userId')
-            ->setParameter('chatId', $chatId)
-            ->setParameter('userId', $userId)
-            ->getQuery()
-            ->getSingleScalarResult();
-    }
-
-    /**
      * Find all messages for a chat, ordered chronologically. No character or count limits.
      * Used for summary analysis where we need the complete conversation.
      *

@@ -458,9 +458,12 @@ final readonly class MessageProcessor
                 // Reuse the recent window already loaded above and pass a cheap
                 // COUNT instead of re-loading the whole chat: the service only
                 // hydrates the full history on an actual cache miss (PR #1282).
+                // excludeFailed:false so the count matches findAllByChatId(),
+                // which the summarizer loads (no status filtering) — otherwise the
+                // older-span size would drift and defeat the cache.
                 $totalMessages = $this->messageRepository->countByChatId(
-                    $message->getUserId(),
                     $summaryChatId,
+                    excludeFailed: false,
                 );
                 $rolling = $this->conversationSummaryService->buildRollingContext(
                     $conversationHistory,
