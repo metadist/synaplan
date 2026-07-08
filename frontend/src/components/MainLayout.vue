@@ -149,6 +149,14 @@ const fireHaptic = () => triggerHapticImpact('light')
 
 const openDrawer = () => {
   fireHaptic()
+  // Swiping the drawer open while a text field is focused (e.g. the chat
+  // input) must dismiss the on-screen keyboard first — a drag gesture moves
+  // well past the tap-dismiss tolerance below, so it never triggered a blur
+  // and the keyboard stayed open over the newly revealed drawer.
+  const active = document.activeElement as HTMLElement | null
+  if (isEditableEl(active)) {
+    active!.blur()
+  }
   sidebarStore.openMobileDrawer()
 }
 

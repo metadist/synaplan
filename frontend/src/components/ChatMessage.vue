@@ -658,9 +658,18 @@
               v-if="role === 'assistant' && hasMessageMetadata && !isProcessing"
               class="relative"
             >
+              <!-- Mobile: same `.pill` chip look as the message action buttons
+                   (e.g. "Not correct"), icon-only. Desktop keeps the original
+                   compact circular icon button — `.pill` is an unlayered class
+                   that would beat `md:` Tailwind variants for the same
+                   properties, so we branch the whole class list instead. -->
               <button
                 type="button"
-                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs transition-colors bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 txt-tertiary hover:txt-primary"
+                :class="
+                  isMobileViewport
+                    ? 'pill'
+                    : 'inline-flex items-center justify-center w-6 h-6 rounded-full text-xs transition-colors bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 txt-tertiary hover:txt-primary'
+                "
                 :aria-label="t('chatMessage.messageDetails')"
                 data-testid="btn-message-info"
                 @click.stop="infoPopoverOpen = !infoPopoverOpen"
@@ -1706,13 +1715,21 @@ const handleThumbnailError = (event: Event) => {
   }
 }
 
+// Same breakpoint as ChatInput's isMobile (innerWidth < 768). Drives the
+// info/lightbulb trigger's mobile-only pill styling below.
+const mobileMq = window.matchMedia('(max-width: 767px)')
+const isMobileViewport = ref(mobileMq.matches)
+const onMobileMqChange = (e: MediaQueryListEvent) => (isMobileViewport.value = e.matches)
+
 // Add event listener for reference clicks
 onMounted(() => {
   document.addEventListener('click', handleReferenceClick)
+  mobileMq.addEventListener('change', onMobileMqChange)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleReferenceClick)
+  mobileMq.removeEventListener('change', onMobileMqChange)
   clearLongRunningTimer()
 })
 </script>

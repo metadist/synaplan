@@ -92,13 +92,14 @@
           (via `md:contents` on the control bar).
         -->
         <div class="flex flex-col md:block">
-          <!-- Textarea row. Mobile: full width with the same 6px horizontal inset
-               as the control bar below. md+: py-2 (16px) + textarea min-h-[40px] =
+          <!-- Textarea row. Mobile: full width with a comfortable 12px horizontal
+               inset (matches the control bar below) so text never sits flush
+               against the card edge. md+: py-2 (16px) + textarea min-h-[40px] =
                56px shell, with room reserved for the overlaid plus button (left)
                and action buttons (right). -->
           <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
             <div
-              class="flex items-center gap-2 px-1.5 py-2 md:pl-[56px]"
+              class="flex items-center gap-2 px-3 py-2.5 md:pl-[56px] md:py-2"
               :style="isMobile ? undefined : { paddingRight: `${textareaPaddingRightPx}px` }"
             >
               <!-- Inline badge pinned to the caret start — desktop only. On mobile
@@ -127,10 +128,11 @@
           </div>
 
           <!-- Control bar. Mobile: a real row below the textarea (plus + badge on
-               the left, actions on the right). md+: `display: contents` so the
-               plus group and action group fall back to their absolute overlay
-               positions relative to the card. -->
-          <div class="flex items-center gap-2 px-1.5 pb-1.5 md:contents">
+               the left, actions on the right), same 12px inset as the textarea
+               row above. md+: `display: contents` so the plus group and action
+               group fall back to their absolute overlay positions relative to
+               the card. -->
+          <div class="flex items-center gap-2 px-3 pb-2.5 md:contents">
             <!-- Plus menu: attach + per-message controls (Model / Tools / Knowledge).
              Exempt from the guest lock rule — the menu always opens; gated items
              inside surface the guest hint popover. -->
@@ -160,52 +162,54 @@
                 class="dropdown-up left-0 min-w-[220px] flex flex-col gap-1"
                 data-testid="dropdown-plus-panel"
               >
+                <!-- Same `.pill` chip style as the Model/Tools/Knowledge triggers
+                 below it, so all four rows in this list look consistent
+                 (previously this used the flat `.dropdown-item` row style). -->
                 <button
                   type="button"
-                  class="dropdown-item"
+                  class="pill text-xs md:text-sm"
                   data-testid="btn-plus-attach"
                   @click="handlePlusAttach"
                 >
-                  <Icon icon="mdi:paperclip" class="w-5 h-5 flex-shrink-0" />
-                  <span class="text-sm font-medium">{{ $t('chatInput.plusMenu.attach') }}</span>
+                  <Icon icon="mdi:paperclip" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                  <span class="font-medium">{{ $t('chatInput.plusMenu.attach') }}</span>
                 </button>
 
+                <!-- Guest-mode rows: same `.pill` chip style as "Attach files"
+                     above (and the real Model/Tools/Knowledge triggers in the
+                     authenticated branch below) for a consistent list. -->
                 <template v-if="isGuestMode">
                   <button
                     type="button"
-                    class="dropdown-item"
+                    class="pill text-xs md:text-sm justify-between"
                     data-testid="btn-plus-model"
                     @click="handlePlusGate('models')"
                   >
-                    <Icon icon="mdi:tune-vertical" class="w-5 h-5 flex-shrink-0" />
-                    <span class="text-sm font-medium flex-1 text-left">{{
-                      $t('chatInput.plusMenu.model')
-                    }}</span>
+                    <span class="inline-flex items-center gap-1.5">
+                      <Icon icon="mdi:tune-vertical" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                      <span class="font-medium">{{ $t('chatInput.plusMenu.model') }}</span>
+                    </span>
                     <span class="text-xs txt-muted">{{
                       $t('chatInput.modelDropdown.default')
                     }}</span>
                   </button>
                   <button
                     type="button"
-                    class="dropdown-item"
+                    class="pill text-xs md:text-sm"
                     data-testid="btn-plus-tools"
                     @click="handlePlusGate('tools')"
                   >
-                    <Icon icon="mdi:toolbox-outline" class="w-5 h-5 flex-shrink-0" />
-                    <span class="text-sm font-medium flex-1 text-left">{{
-                      $t('chatInput.plusMenu.tools')
-                    }}</span>
+                    <Icon icon="mdi:toolbox-outline" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                    <span class="font-medium">{{ $t('chatInput.plusMenu.tools') }}</span>
                   </button>
                   <button
                     type="button"
-                    class="dropdown-item"
+                    class="pill text-xs md:text-sm"
                     data-testid="btn-plus-knowledge"
                     @click="handlePlusGate('knowledge')"
                   >
-                    <Icon icon="mdi:folder-outline" class="w-5 h-5 flex-shrink-0" />
-                    <span class="text-sm font-medium flex-1 text-left">{{
-                      $t('chatInput.plusMenu.knowledge')
-                    }}</span>
+                    <Icon icon="mdi:folder-outline" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                    <span class="font-medium">{{ $t('chatInput.plusMenu.knowledge') }}</span>
                   </button>
                 </template>
 

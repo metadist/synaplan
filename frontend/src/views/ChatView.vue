@@ -1001,8 +1001,16 @@ async function generateChatTitleFromFirstMessage(firstMessage: string) {
   const userMessages = historyStore.messages.filter((m) => m.role === 'user')
   if (userMessages.length !== 1) return
 
-  // Generate title from first message (take first 50 chars)
+  // Generate title from first message (take first 50 chars). Strip a leading
+  // tool-command prefix ("/pic ", "/vid ", "/search ") first — `firstMessage`
+  // is the raw content sent to the backend, which keeps the prefix for
+  // pic/vid routing (see handleSendMessage), so without this the sidebar
+  // title showed e.g. "/pic Haus" instead of just "Haus".
   let title = firstMessage.trim()
+  const commandMatch = title.match(/^\/(search|pic|vid)\s+(.*)$/)
+  if (commandMatch) {
+    title = commandMatch[2].trim()
+  }
   if (title.length > 50) {
     title = title.substring(0, 47) + '...'
   }
