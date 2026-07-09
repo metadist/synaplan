@@ -196,7 +196,22 @@
           {{ $t('config.aiModels.availableModelsTitle') }}
         </h2>
 
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Search / Filter -->
+          <div class="relative">
+            <MagnifyingGlassIcon
+              class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
+            />
+            <input
+              v-model="modelSearch"
+              type="search"
+              :placeholder="$t('config.aiModels.searchPlaceholder')"
+              :aria-label="$t('config.aiModels.searchPlaceholder')"
+              class="w-full sm:w-64 pl-9 pr-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              data-testid="input-model-search"
+            />
+          </div>
+
           <!-- Show Rating Toggle -->
           <label class="flex items-center gap-2 cursor-pointer group">
             <input
@@ -433,6 +448,7 @@ import {
   FunnelIcon,
   ListBulletIcon,
   LockClosedIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
@@ -505,6 +521,7 @@ const defaultConfig = ref<Record<Capability, number | null>>({
 })
 const originalConfig = ref<Record<Capability, number | null>>({ ...defaultConfig.value })
 const selectedPurpose = ref<Capability | null>(null)
+const modelSearch = ref('')
 const highlightedCapability = ref<Capability | 'ALL' | null>(null)
 const capabilityRefs = ref<Record<Capability, HTMLElement | null>>(
   {} as Record<Capability, HTMLElement | null>
@@ -956,12 +973,17 @@ const allModels = computed<ModelWithPurposes[]>(() =>
 )
 
 const filteredModels = computed<ModelWithPurposes[]>(() => {
-  if (selectedPurpose.value === null) {
-    return allModels.value
-  }
-  return allModels.value.filter((model) =>
-    model.purposes.some((chip) => chip.purpose === selectedPurpose.value)
-  )
+  const query = modelSearch.value.trim().toLowerCase()
+  return allModels.value.filter((model) => {
+    if (
+      selectedPurpose.value !== null &&
+      !model.purposes.some((chip) => chip.purpose === selectedPurpose.value)
+    ) {
+      return false
+    }
+    if (query === '') return true
+    return model.name.toLowerCase().includes(query) || model.service.toLowerCase().includes(query)
+  })
 })
 
 /**
@@ -1035,7 +1057,7 @@ const paginatedModels = computed(() => {
   return sortedModels.value.slice(start, start + MODELS_PER_PAGE)
 })
 
-watch([selectedPurpose, sortBy, sortDirection], () => {
+watch([selectedPurpose, sortBy, sortDirection, modelSearch], () => {
   modelsPage.value = 1
 })
 
