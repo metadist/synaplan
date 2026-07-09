@@ -1,7 +1,9 @@
 # Hosting-Partner Requirements — Synaplan Core Work Items
 
 **Date:** 2026-07-09
-**Status:** Planned — not started
+**Status:** In progress — CORE-1 (provider + endpoint registry + admin CRUD/UI)
+and CORE-2 (user provisioning + per-user key minting + usage endpoint) are
+largely implemented in PR #1299; CORE-3, CORE-4, and CORE-5 are not started.
 **Origin:** Q&A exchange with a hosting company that wants to run the Synaplan
 Nextcloud app (`synaplan-nextcloud` repo) for its customers. This document
 extracts every requirement that must be solved in **Synaplan core** (this
@@ -19,8 +21,8 @@ Nextcloud app itself (per-user key storage in NC, sync workers, NC admin UI).
 
 | ID | Item | Status today | Effort | Priority |
 |----|------|--------------|--------|----------|
-| CORE-1 | Generic "OpenAI Compatible" provider in BMODELS (custom URL + auth) | Missing | L | **P1** |
-| CORE-2 | Admin API key (service account) + programmatic user provisioning | Missing | M | **P1** |
+| CORE-1 | Generic "OpenAI Compatible" provider in BMODELS (custom URL + auth) | In progress (PR #1299) | L | **P1** |
+| CORE-2 | Admin API key (service account) + programmatic user provisioning | In progress (PR #1299) | M | **P1** |
 | CORE-3 | API-key scope enforcement (per-user keys exist, scopes are decorative) | Partial | M | **P2** |
 | CORE-4 | Knowledge-file lifecycle: overwrite, delete-after-embed, "stale" state | Partial | M | **P1** |
 | CORE-5 | Per-user knowledge isolation — verification + contract documentation | Implemented | S | **P2** |

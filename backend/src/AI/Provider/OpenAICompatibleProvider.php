@@ -9,7 +9,6 @@ use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
-use OpenAI;
 use OpenAI\Contracts\ClientContract;
 use Psr\Log\LoggerInterface;
 
