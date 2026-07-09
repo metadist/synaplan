@@ -981,9 +981,7 @@ const filteredModels = computed<ModelWithPurposes[]>(() => {
       return false
     }
     if (query === '') return true
-    return (
-      model.name.toLowerCase().includes(query) || model.service.toLowerCase().includes(query)
-    )
+    return model.name.toLowerCase().includes(query) || model.service.toLowerCase().includes(query)
   })
 })
 
