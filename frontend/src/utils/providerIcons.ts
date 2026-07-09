@@ -1,7 +1,14 @@
 export const getProviderIcon = (provider: string): string => {
   const providerLower = provider.toLowerCase()
+  const providerCompact = providerLower.replace(/[\s_-]/g, '')
 
-  if (providerLower.includes('openai')) {
+  // MUST come before the generic `openai` check: "openaicompatible" contains
+  // "openai". These are self-hosted/local engines, not OpenAI. The chat avatar
+  // renders a dedicated green-gradient component (see ServiceIcon.vue); this
+  // icon is only the fallback for any consumer that uses the raw name.
+  if (providerCompact.includes('openaicompatible')) {
+    return 'mdi:server-network'
+  } else if (providerLower.includes('openai')) {
     return 'simple-icons:openai'
   } else if (providerLower.includes('anthropic')) {
     return 'simple-icons:anthropic'
@@ -44,7 +51,11 @@ export const getProviderIcon = (provider: string): string => {
 export const getProviderFlag = (provider: string): string => {
   const p = provider.toLowerCase()
 
-  if (p.includes('ollama') || p.includes('piper') || p.includes('synaplan')) {
+  if (p.replace(/[\s_-]/g, '').includes('openaicompatible')) {
+    // Operator-defined, self-hosted endpoint — no fixed country. Use the
+    // neutral "world" badge (and NOT the US flag the `openai` branch returns).
+    return 'circle-flags:un'
+  } else if (p.includes('ollama') || p.includes('piper') || p.includes('synaplan')) {
     // Ollama and the self-hosted Synaplan/Piper TTS are German-hosted.
     return 'circle-flags:de'
   } else if (p.includes('mistral')) {
