@@ -154,6 +154,15 @@ const config = {
     get accentColor(): string {
       return getConfigSync().branding?.accentColor ?? ''
     },
+    get primaryColorDark(): string {
+      return getConfigSync().branding?.primaryColorDark ?? ''
+    },
+    get secondaryColorDark(): string {
+      return getConfigSync().branding?.secondaryColorDark ?? ''
+    },
+    get accentColorDark(): string {
+      return getConfigSync().branding?.accentColorDark ?? ''
+    },
     get fontFamily(): string {
       return getConfigSync().branding?.fontFamily ?? ''
     },

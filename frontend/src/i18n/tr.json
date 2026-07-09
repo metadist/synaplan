@@ -307,6 +307,10 @@
         "communication": "İletişim",
         "security": "Güvenlik ve Giriş"
       },
+      "brandingMode": {
+        "light": "AÇIK mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler açık modda geçerlidir. Koyu mod renklerini düzenlemek için uygulamayı koyu moda geçirin.",
+        "dark": "KOYU mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler koyu modda geçerlidir. Açık mod renklerini düzenlemek için uygulamayı açık moda geçirin."
+      },
       "restartBanner": {
         "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
         "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",

@@ -26,6 +26,11 @@ final readonly class BrandingService
     public const KEY_PRIMARY_COLOR = 'BRAND_PRIMARY_COLOR';
     public const KEY_SECONDARY_COLOR = 'BRAND_SECONDARY_COLOR';
     public const KEY_ACCENT_COLOR = 'BRAND_ACCENT_COLOR';
+    // Dark-mode color overrides. Empty = the frontend derives a dark-friendly
+    // tint from the light color (color-mix with white), exactly as before.
+    public const KEY_PRIMARY_COLOR_DARK = 'BRAND_PRIMARY_COLOR_DARK';
+    public const KEY_SECONDARY_COLOR_DARK = 'BRAND_SECONDARY_COLOR_DARK';
+    public const KEY_ACCENT_COLOR_DARK = 'BRAND_ACCENT_COLOR_DARK';
     public const KEY_FONT_FAMILY = 'BRAND_FONT_FAMILY';
     public const KEY_HEADING_FONT_FAMILY = 'BRAND_HEADING_FONT_FAMILY';
     public const KEY_FONT_URL = 'BRAND_FONT_URL';
@@ -50,6 +55,9 @@ final readonly class BrandingService
     public const DEFAULT_PRIMARY_COLOR = '#003fc7';
     public const DEFAULT_SECONDARY_COLOR = '';
     public const DEFAULT_ACCENT_COLOR = '';
+    public const DEFAULT_PRIMARY_COLOR_DARK = '';
+    public const DEFAULT_SECONDARY_COLOR_DARK = '';
+    public const DEFAULT_ACCENT_COLOR_DARK = '';
     public const DEFAULT_FONT_FAMILY = '';
     public const DEFAULT_HEADING_FONT_FAMILY = '';
     public const DEFAULT_FONT_URL = '';
@@ -74,6 +82,9 @@ final readonly class BrandingService
      *     primaryColor: string,
      *     secondaryColor: string,
      *     accentColor: string,
+     *     primaryColorDark: string,
+     *     secondaryColorDark: string,
+     *     accentColorDark: string,
      *     fontFamily: string,
      *     headingFontFamily: string,
      *     fontUrl: string,
@@ -98,6 +109,9 @@ final readonly class BrandingService
             'primaryColor' => $this->value(self::KEY_PRIMARY_COLOR, self::DEFAULT_PRIMARY_COLOR),
             'secondaryColor' => $this->value(self::KEY_SECONDARY_COLOR, self::DEFAULT_SECONDARY_COLOR),
             'accentColor' => $this->value(self::KEY_ACCENT_COLOR, self::DEFAULT_ACCENT_COLOR),
+            'primaryColorDark' => $this->value(self::KEY_PRIMARY_COLOR_DARK, self::DEFAULT_PRIMARY_COLOR_DARK),
+            'secondaryColorDark' => $this->value(self::KEY_SECONDARY_COLOR_DARK, self::DEFAULT_SECONDARY_COLOR_DARK),
+            'accentColorDark' => $this->value(self::KEY_ACCENT_COLOR_DARK, self::DEFAULT_ACCENT_COLOR_DARK),
             'fontFamily' => $this->value(self::KEY_FONT_FAMILY, self::DEFAULT_FONT_FAMILY),
             'headingFontFamily' => $this->value(self::KEY_HEADING_FONT_FAMILY, self::DEFAULT_HEADING_FONT_FAMILY),
             'fontUrl' => $this->value(self::KEY_FONT_URL, self::DEFAULT_FONT_URL),

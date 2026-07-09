@@ -7,6 +7,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotification } from '@/composables/useNotification'
+import { useTheme } from '@/composables/useTheme'
 import {
   getConfigSchema,
   getConfigValues,
@@ -20,6 +21,21 @@ const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 const { success, error: showError } = useNotification()
+const { isDark } = useTheme()
+
+// Branding colors are stored per theme mode: the admin edits the set matching
+// the mode the app is currently rendered in (a hint below the tab title says
+// which one). The other mode's fields are hidden to avoid ambiguity.
+const LIGHT_MODE_BRANDING_FIELDS = [
+  'BRAND_PRIMARY_COLOR',
+  'BRAND_SECONDARY_COLOR',
+  'BRAND_ACCENT_COLOR',
+]
+const DARK_MODE_BRANDING_FIELDS = [
+  'BRAND_PRIMARY_COLOR_DARK',
+  'BRAND_SECONDARY_COLOR_DARK',
+  'BRAND_ACCENT_COLOR_DARK',
+]
 
 // State
 const loading = ref(true)
@@ -112,8 +128,13 @@ const currentTab = computed(() => {
 
 const currentSections = computed(() => {
   if (!currentTab.value || !schema.value) return []
+  const hiddenModeFields = isDark.value ? LIGHT_MODE_BRANDING_FIELDS : DARK_MODE_BRANDING_FIELDS
   return Object.entries(currentTab.value.sections).map(([id, section]) => {
-    const fields = section.fields.map((fieldKey) => ({
+    const visibleFieldKeys =
+      activeTab.value === 'branding'
+        ? section.fields.filter((fieldKey) => !hiddenModeFields.includes(fieldKey))
+        : section.fields
+    const fields = visibleFieldKeys.map((fieldKey) => ({
       key: fieldKey,
       schema: schema.value!.fields[fieldKey],
       value: values.value[fieldKey] || { value: '', isSet: false, isMasked: false },
@@ -393,6 +414,21 @@ onBeforeUnmount(() => {
               {{ $t('admin.config.testConnection') }}
             </button>
           </div>
+
+          <!-- Branding is edited per theme mode: tell the admin which set they are changing -->
+          <p
+            v-if="activeTab === 'branding'"
+            class="flex items-center gap-2 text-sm txt-secondary -mt-3"
+            data-testid="branding-mode-hint"
+          >
+            <Icon
+              :icon="isDark ? 'mdi:weather-night' : 'mdi:white-balance-sunny'"
+              class="w-4 h-4 flex-shrink-0 text-[var(--brand)]"
+            />
+            {{
+              isDark ? $t('admin.config.brandingMode.dark') : $t('admin.config.brandingMode.light')
+            }}
+          </p>
 
           <!-- Sections -->
           <div class="space-y-8">

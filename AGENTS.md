@@ -142,7 +142,17 @@ const config = await httpClient('/api/v1/config/runtime', {
 
 - Use CSS variables and utility classes from `frontend/src/style.css` (`var(--bg-card)`, `var(--txt-primary)`, `surface-card`, `btn-primary`, …) — **never Tailwind colors directly**, never one-off custom CSS classes.
 - Tailwind utilities for layout/spacing are fine; dark mode must work (tokens handle it).
+- The V2 glass design (`frontend/src/style-v2.css`, active via the `.design-v2` class) overrides many tokens/utilities — a surface can look fine in V1 and be broken in V2.
 - See `docs/FRONTEND_CONVENTIONS.md` for the token/utility reference.
+
+### Color contrast & theme consistency (MANDATORY)
+
+Every UI surface must be readable in **both light and dark theme** (and in the V2 design variant). Poor contrast is a bug, not a style preference.
+
+- **Text must meet WCAG AA against its actual rendered background**: ≥ 4.5:1 for normal text, ≥ 3:1 for large text and icons — in BOTH themes. If you can't eyeball it, measure it (DevTools → element → contrast ratio).
+- **Never recolor a shared utility (`.pill`, `.txt-secondary`, `.icon-ghost`, …) via a broad ancestor-scoped override** (e.g. "everything inside the composer gets dark ink"). Overlays that render inside that DOM subtree — dropdowns, drop-ups, palettes, modals — have their OWN panel background and will inherit ink meant for a different surface. This exact bug shipped once: the white dark-mode composer forced `#3b4353` text onto the near-black `+`-menu panel (~1.6:1, unreadable). Scope recolors to the surface itself and restore theme colors for any overlay panels nested inside (see `style-v2.css` §19b).
+- **One color definition per concept, defined for both themes**: when adding a color, define the light AND dark value in the same change (token pair in `:root` + `.dark`, or a rule pair like `.foo` + `.dark .foo`). A light-only or dark-only color is incomplete work.
+- **Verify before done**: any change touching colors, surfaces, dropdowns, or the chat composer must be checked visually in light mode, dark mode, and V2 (toggle `.dark` / use the theme switch) before it's considered finished.
 
 ### Vue 3 / Composition API
 

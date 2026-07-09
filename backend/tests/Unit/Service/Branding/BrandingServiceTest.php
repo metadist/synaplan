@@ -41,6 +41,9 @@ final class BrandingServiceTest extends TestCase
         // New revision fields default to empty (= keep current look / no gate).
         $this->assertSame('', $branding['secondaryColor']);
         $this->assertSame('', $branding['accentColor']);
+        $this->assertSame('', $branding['primaryColorDark']);
+        $this->assertSame('', $branding['secondaryColorDark']);
+        $this->assertSame('', $branding['accentColorDark']);
         $this->assertSame('', $branding['fontFamily']);
         $this->assertSame('', $branding['headingFontFamily']);
         $this->assertSame('', $branding['fontUrl']);
@@ -57,6 +60,9 @@ final class BrandingServiceTest extends TestCase
                 BrandingService::KEY_FONT_URL => 'https://fonts.example/inter.css',
                 BrandingService::KEY_SECONDARY_COLOR => '#112233',
                 BrandingService::KEY_ACCENT_COLOR => '#445566',
+                BrandingService::KEY_PRIMARY_COLOR_DARK => '#6d9ae0',
+                BrandingService::KEY_SECONDARY_COLOR_DARK => '#778899',
+                BrandingService::KEY_ACCENT_COLOR_DARK => '#aabbcc',
                 BrandingService::KEY_LANDING_PAGE => 'login',
                 BrandingService::KEY_DEFAULT_ROUTE => 'chat',
                 BrandingService::KEY_PRIVACY_URL => 'https://brand.example/privacy',
@@ -74,6 +80,9 @@ final class BrandingServiceTest extends TestCase
         $this->assertSame('https://fonts.example/inter.css', $branding['fontUrl']);
         $this->assertSame('#112233', $branding['secondaryColor']);
         $this->assertSame('#445566', $branding['accentColor']);
+        $this->assertSame('#6d9ae0', $branding['primaryColorDark']);
+        $this->assertSame('#778899', $branding['secondaryColorDark']);
+        $this->assertSame('#aabbcc', $branding['accentColorDark']);
         $this->assertSame('login', $branding['landingPage']);
         $this->assertSame('chat', $branding['defaultRoute']);
     }

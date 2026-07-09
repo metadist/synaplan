@@ -65,7 +65,7 @@ final readonly class SystemConfigService
                 'label' => 'Branding',
                 'sections' => [
                     'identity' => ['label' => 'Brand Identity', 'fields' => ['BRAND_NAME', 'BRAND_TAGLINE', 'BRAND_HOMEPAGE_URL']],
-                    'colors' => ['label' => 'Colors', 'fields' => ['BRAND_PRIMARY_COLOR', 'BRAND_SECONDARY_COLOR', 'BRAND_ACCENT_COLOR']],
+                    'colors' => ['label' => 'Colors', 'fields' => ['BRAND_PRIMARY_COLOR', 'BRAND_SECONDARY_COLOR', 'BRAND_ACCENT_COLOR', 'BRAND_PRIMARY_COLOR_DARK', 'BRAND_SECONDARY_COLOR_DARK', 'BRAND_ACCENT_COLOR_DARK']],
                     'fonts' => ['label' => 'Fonts', 'fields' => ['BRAND_FONT_FAMILY', 'BRAND_HEADING_FONT_FAMILY', 'BRAND_FONT_URL']],
                     'logos' => ['label' => 'Logos & Icon', 'fields' => ['BRAND_LOGO_URL', 'BRAND_LOGO_DARK_URL', 'BRAND_ICON_URL']],
                     'legal' => ['label' => 'Legal Links', 'fields' => ['BRAND_PRIVACY_URL', 'BRAND_TERMS_URL']],
@@ -783,6 +783,27 @@ final readonly class SystemConfigService
                 'description' => 'Optional accent color as a hex value. Leave empty to keep the default palette.',
                 'default' => BrandingService::DEFAULT_ACCENT_COLOR,
                 'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_ACCENT_COLOR,
+            ],
+            'BRAND_PRIMARY_COLOR_DARK' => [
+                'tab' => 'branding', 'section' => 'colors', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Primary accent color used in DARK mode as a hex value. Leave empty to auto-derive a dark-friendly tint from the light primary color.',
+                'default' => BrandingService::DEFAULT_PRIMARY_COLOR_DARK,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_PRIMARY_COLOR_DARK,
+            ],
+            'BRAND_SECONDARY_COLOR_DARK' => [
+                'tab' => 'branding', 'section' => 'colors', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Optional secondary color used in DARK mode as a hex value. Leave empty to reuse the light secondary color.',
+                'default' => BrandingService::DEFAULT_SECONDARY_COLOR_DARK,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_SECONDARY_COLOR_DARK,
+            ],
+            'BRAND_ACCENT_COLOR_DARK' => [
+                'tab' => 'branding', 'section' => 'colors', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Optional accent color used in DARK mode as a hex value. Leave empty to reuse the light accent color.',
+                'default' => BrandingService::DEFAULT_ACCENT_COLOR_DARK,
+                'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_ACCENT_COLOR_DARK,
             ],
             'BRAND_FONT_FAMILY' => [
                 'tab' => 'branding', 'section' => 'fonts', 'type' => 'text',
