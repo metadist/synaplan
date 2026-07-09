@@ -109,10 +109,12 @@
 /**
  * MOBILE-APP SEAM (first-run onboarding): own-server modal.
  *
- * All server logic (normalize, probe, persist, reload) stays app-owned behind
- * the `nativeServer.ts` seam. A successful save reloads the WebView, so the
- * onboarding resume step is written to page 1 BEFORE saving and rolled back if
- * the probe rejects the server.
+ * All server logic (normalize, probe, persist) stays app-owned behind the
+ * `nativeServer.ts` seam. `saveNativeServerUrl()` only persists — it does not
+ * reload the WebView, so this modal explicitly calls `reloadNativeApp()` once
+ * the save succeeds. The onboarding resume step is written to page 1 BEFORE
+ * saving and rolled back if the probe rejects the server. No sign-out step is
+ * needed here (there is no session yet before onboarding completes).
  */
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
@@ -121,6 +123,7 @@ import {
   getNativeServerUrl,
   getNativeDefaultServerUrl,
   saveNativeServerUrl,
+  reloadNativeApp,
 } from '@/services/api/nativeServer'
 import { setOnboardingResumeStep, clearOnboardingResumeStep } from '@/composables/useOnboarding'
 
@@ -161,8 +164,8 @@ async function connect() {
   }
   error.value = ''
   connecting.value = true
-  // A successful save reloads the WebView immediately — remember to resume at
-  // page 1 BEFORE saving, and roll it back if the probe rejects the server.
+  // Remember to resume at page 1 BEFORE saving (the reload below is about to
+  // happen), and roll it back if the probe rejects the server.
   setOnboardingResumeStep(1)
   try {
     const result = await saveNativeServerUrl(candidate)
@@ -171,9 +174,8 @@ async function connect() {
       error.value = result.error || t('onboarding.server.connectError')
       return
     }
-    // Reload is imminent; nothing else to do. If the shell ever resolves
-    // without reloading, closing the modal is still the right outcome.
     emit('saved')
+    reloadNativeApp()
   } finally {
     connecting.value = false
   }

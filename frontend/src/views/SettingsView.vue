@@ -118,6 +118,9 @@
               </div>
             </div>
           </div>
+
+          <!-- App server (native shell only, every authenticated user) -->
+          <NativeServerControl v-if="isNativeServerControlAvailable()" />
         </div>
       </div>
     </div>
@@ -130,6 +133,8 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import MainLayout from '@/components/MainLayout.vue'
+import NativeServerControl from '@/components/NativeServerControl.vue'
+import { isNativeServerControlAvailable } from '@/services/api/nativeServer'
 import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()

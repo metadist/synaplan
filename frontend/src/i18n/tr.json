@@ -195,24 +195,6 @@
       "usage": "Kullanım",
       "appServer": "Uygulama sunucusu"
     },
-    "appServer": {
-      "title": "Uygulama sunucusu",
-      "description": "Bu uygulamanın hangi Synaplan sunucusuna bağlanacağını seç. Bunu yalnızca kendi Synaplan sunucunu çalıştırıyorsan değiştir.",
-      "unavailable": "Sunucu ayarı bu sürümde kullanılamıyor.",
-      "currentLabel": "Geçerli sunucu",
-      "defaultLabel": "Varsayılan",
-      "inputLabel": "Sunucu URL'si",
-      "hint": "Uygulama, yeni sunucuya bağlanmak için kaydettikten sonra yeniden yüklenecek.",
-      "save": "Test et ve kaydet",
-      "testing": "Sunucu kontrol ediliyor …",
-      "reset": "Varsayılana sıfırla",
-      "savedReloading": "Bağlandı. Yeniden yükleniyor …",
-      "invalidUrl": "Lütfen geçerli bir URL gir (örn. https://web.synaplan.com).",
-      "unreachable": "Sunucuya ulaşılamıyor. Lütfen adresi kontrol et.",
-      "resetConfirmTitle": "Sunucu sıfırlansın mı?",
-      "resetConfirmMessage": "Uygulama tekrar {server} adresine bağlanacak ve yeniden yüklenecek.",
-      "resetConfirmAction": "Sıfırla"
-    },
     "overview": {
       "totalUsers": "Toplam Kullanıcı",
       "recentUsers": "Son Kullanıcılar"
@@ -2890,7 +2872,25 @@
     "cta": "Şimdi güncelle"
   },
   "nativeServer": {
-    "changeServer": "Sunucuyu değiştir"
+    "changeServer": "Sunucuyu değiştir",
+    "appServer": {
+      "title": "Uygulama sunucusu",
+      "description": "Bu uygulamanın hangi Synaplan sunucusuna bağlanacağını seç. Bunu yalnızca kendi Synaplan sunucunu çalıştırıyorsan değiştir.",
+      "unavailable": "Sunucu ayarı bu sürümde kullanılamıyor.",
+      "currentLabel": "Geçerli sunucu",
+      "defaultLabel": "Varsayılan",
+      "inputLabel": "Sunucu URL'si",
+      "hint": "Kaydettiğinde her sunucudaki oturumun kapatılır ve uygulama yeniden yüklenir; tekrar giriş yapman gerekir.",
+      "save": "Test et ve kaydet",
+      "testing": "Sunucu kontrol ediliyor …",
+      "reset": "Varsayılana sıfırla",
+      "savedSigningOut": "Bağlandı. Oturumun kapatılıyor …",
+      "invalidUrl": "Lütfen geçerli bir URL gir (örn. https://web.synaplan.com).",
+      "unreachable": "Sunucuya ulaşılamıyor. Lütfen adresi kontrol et.",
+      "resetConfirmTitle": "Sunucu sıfırlansın mı?",
+      "resetConfirmMessage": "Uygulama oturumunu kapatacak, tekrar {server} adresine bağlanacak ve yeniden yüklenecek.",
+      "resetConfirmAction": "Sıfırla"
+    }
   },
   "onboarding": {
     "skip": "Atla",

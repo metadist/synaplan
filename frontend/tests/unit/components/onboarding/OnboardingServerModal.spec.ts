@@ -3,12 +3,15 @@ import { mount, flushPromises } from '@vue/test-utils'
 
 /**
  * MOBILE-APP SEAM (first-run onboarding): the own-server modal keeps all server
- * logic (probe, persist, reload) behind the `nativeServer.ts` seam. This spec
- * pins the two paths the SPA controls: a rejected probe surfaces an error and
- * rolls the resume step back, and a successful save emits `saved`.
+ * logic (probe, persist) behind the `nativeServer.ts` seam. `saveNativeServerUrl`
+ * only persists — the modal is responsible for calling `reloadNativeApp()`
+ * itself once the save succeeds. This spec pins the two paths the SPA
+ * controls: a rejected probe surfaces an error and rolls the resume step back,
+ * and a successful save emits `saved` and reloads.
  */
 
 const mockSave = vi.fn()
+const mockReload = vi.fn()
 const mockSetResume = vi.fn()
 const mockClearResume = vi.fn()
 
@@ -16,6 +19,7 @@ vi.mock('@/services/api/nativeServer', () => ({
   getNativeServerUrl: () => 'https://web.synaplan.com',
   getNativeDefaultServerUrl: () => 'https://web.synaplan.com',
   saveNativeServerUrl: (...args: unknown[]) => mockSave(...args),
+  reloadNativeApp: (...args: unknown[]) => mockReload(...args),
 }))
 
 vi.mock('@/composables/useOnboarding', () => ({
@@ -65,9 +69,10 @@ describe('OnboardingServerModal', () => {
     expect(mockClearResume).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[data-testid="text-server-error"]').text()).toBe('Server unreachable.')
     expect(wrapper.emitted('saved')).toBeUndefined()
+    expect(mockReload).not.toHaveBeenCalled()
   })
 
-  it('emits "saved" on a successful save (reload is imminent)', async () => {
+  it('emits "saved" and reloads on a successful save', async () => {
     mockSave.mockResolvedValue({ ok: true })
     const wrapper = mountModal()
 
@@ -79,5 +84,6 @@ describe('OnboardingServerModal', () => {
     expect(mockSave).toHaveBeenCalledWith('https://good.example.com')
     expect(mockClearResume).not.toHaveBeenCalled()
     expect(wrapper.emitted('saved')).toHaveLength(1)
+    expect(mockReload).toHaveBeenCalledTimes(1)
   })
 })

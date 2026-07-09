@@ -681,7 +681,7 @@
 
         <!-- App server Tab (native shell only) -->
         <div v-if="activeTab === 'appServer'">
-          <AdminAppServerPanel />
+          <NativeServerControl />
         </div>
       </div>
     </div>
@@ -771,8 +771,8 @@ const AdminSubscriptionsPanel = defineAsyncComponent(
 const AdminSystemInfoPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSystemInfoPanel.vue')
 )
-const AdminAppServerPanel = defineAsyncComponent(
-  () => import('@/components/admin/AdminAppServerPanel.vue')
+const NativeServerControl = defineAsyncComponent(
+  () => import('@/components/NativeServerControl.vue')
 )
 
 import { useRouter } from 'vue-router'

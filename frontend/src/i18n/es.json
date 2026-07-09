@@ -195,24 +195,6 @@
       "usage": "Uso",
       "appServer": "Servidor de la app"
     },
-    "appServer": {
-      "title": "Servidor de la app",
-      "description": "Elige a qué servidor de Synaplan se conecta esta app. Cámbialo solo si tienes tu propio servidor de Synaplan.",
-      "unavailable": "La configuración del servidor no está disponible en esta versión.",
-      "currentLabel": "Servidor actual",
-      "defaultLabel": "Predeterminado",
-      "inputLabel": "URL del servidor",
-      "hint": "La app se recargará después de guardar para conectarse al nuevo servidor.",
-      "save": "Probar y guardar",
-      "testing": "Comprobando servidor …",
-      "reset": "Restablecer al predeterminado",
-      "savedReloading": "Conectado. Recargando …",
-      "invalidUrl": "Introduce una URL válida (p. ej. https://web.synaplan.com).",
-      "unreachable": "Servidor no accesible. Comprueba la dirección.",
-      "resetConfirmTitle": "¿Restablecer servidor?",
-      "resetConfirmMessage": "La app se conectará de nuevo a {server} y se recargará.",
-      "resetConfirmAction": "Restablecer"
-    },
     "overview": {
       "totalUsers": "Usuarios Totales",
       "recentUsers": "Usuarios Recientes"
@@ -2889,7 +2871,25 @@
     "cta": "Actualizar ahora"
   },
   "nativeServer": {
-    "changeServer": "Cambiar servidor"
+    "changeServer": "Cambiar servidor",
+    "appServer": {
+      "title": "Servidor de la app",
+      "description": "Elige a qué servidor de Synaplan se conecta esta app. Cámbialo solo si tienes tu propio servidor de Synaplan.",
+      "unavailable": "La configuración del servidor no está disponible en esta versión.",
+      "currentLabel": "Servidor actual",
+      "defaultLabel": "Predeterminado",
+      "inputLabel": "URL del servidor",
+      "hint": "Al guardar se cerrará tu sesión en todos los servidores y la app se recargará; deberás iniciar sesión de nuevo.",
+      "save": "Probar y guardar",
+      "testing": "Comprobando servidor …",
+      "reset": "Restablecer al predeterminado",
+      "savedSigningOut": "Conectado. Cerrando tu sesión …",
+      "invalidUrl": "Introduce una URL válida (p. ej. https://web.synaplan.com).",
+      "unreachable": "Servidor no accesible. Comprueba la dirección.",
+      "resetConfirmTitle": "¿Restablecer servidor?",
+      "resetConfirmMessage": "La app cerrará tu sesión, se conectará de nuevo a {server} y se recargará.",
+      "resetConfirmAction": "Restablecer"
+    }
   },
   "onboarding": {
     "skip": "Omitir",

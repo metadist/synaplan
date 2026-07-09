@@ -203,24 +203,6 @@
       "subscriptions": "Subscriptions",
       "appServer": "App server"
     },
-    "appServer": {
-      "title": "App server",
-      "description": "Choose which Synaplan server this app connects to. Only change this if you run your own Synaplan server.",
-      "unavailable": "Server settings are not available in this build.",
-      "currentLabel": "Current server",
-      "defaultLabel": "Default",
-      "inputLabel": "Server URL",
-      "hint": "The app will reload after saving to connect to the new server.",
-      "save": "Test & save",
-      "testing": "Checking server …",
-      "reset": "Reset to default",
-      "savedReloading": "Connected. Reloading …",
-      "invalidUrl": "Please enter a valid URL (e.g. https://web.synaplan.com).",
-      "unreachable": "Server unreachable. Please check the address.",
-      "resetConfirmTitle": "Reset server?",
-      "resetConfirmMessage": "The app will connect to {server} again and reload.",
-      "resetConfirmAction": "Reset"
-    },
     "overview": {
       "totalUsers": "Total Users",
       "recentUsers": "Recent Users"
@@ -3944,7 +3926,25 @@
     "cta": "Update now"
   },
   "nativeServer": {
-    "changeServer": "Change server"
+    "changeServer": "Change server",
+    "appServer": {
+      "title": "App server",
+      "description": "Choose which Synaplan server this app connects to. Only change this if you run your own Synaplan server.",
+      "unavailable": "Server settings are not available in this build.",
+      "currentLabel": "Current server",
+      "defaultLabel": "Default",
+      "inputLabel": "Server URL",
+      "hint": "Saving signs you out of every server and reloads the app — you'll need to log in again.",
+      "save": "Test & save",
+      "testing": "Checking server …",
+      "reset": "Reset to default",
+      "savedSigningOut": "Connected. Signing you out …",
+      "invalidUrl": "Please enter a valid URL (e.g. https://web.synaplan.com).",
+      "unreachable": "Server unreachable. Please check the address.",
+      "resetConfirmTitle": "Reset server?",
+      "resetConfirmMessage": "The app will sign you out, connect to {server} again, and reload.",
+      "resetConfirmAction": "Reset"
+    }
   },
   "onboarding": {
     "skip": "Skip",

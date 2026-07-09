@@ -8,11 +8,16 @@
  * the SPA boots). It also exposes a tiny imperative API on `window.SynaplanServer`.
  *
  * This module is the typed wrapper the SPA uses to read and change that value
- * from the in-app "Admin → App server" panel — so the URL parsing, reachability
- * probe, persistence and reload logic all stay app-owned (zero duplication in
- * this submodule). On the plain web build (and any native build without the
- * bootstrap) `window.SynaplanServer` is absent, so every accessor is guarded and
- * `isNativeServerControlAvailable()` returns false.
+ * from the in-app Settings / "Admin → App server" UI — so the URL parsing,
+ * reachability probe and persistence logic all stay app-owned (zero
+ * duplication in this submodule). On the plain web build (and any native build
+ * without the bootstrap) `window.SynaplanServer` is absent, so every accessor
+ * is guarded and `isNativeServerControlAvailable()` returns false.
+ *
+ * IMPORTANT: `saveNativeServerUrl()`/`resetNativeServerUrl()` only VALIDATE +
+ * PERSIST — they do NOT reload the WebView. Callers MUST run their own cleanup
+ * (see `NativeServerControl.vue`: sign the user out of every server via
+ * `clearAllNativeTokens()`) and then call `reloadNativeApp()` themselves.
  */
 
 /** Result of a save attempt: `ok` only when the target server was reachable. */
@@ -27,6 +32,7 @@ interface NativeServerApi {
   open: () => void
   save: (url: string) => Promise<NativeServerSaveResult>
   reset: () => void
+  reload: () => void
 }
 
 function getApi(): NativeServerApi | null {
@@ -63,9 +69,9 @@ export function getNativeDefaultServerUrl(): string {
 }
 
 /**
- * Probe + persist a new backend URL. On success the native shell reloads the
- * WebView so the SPA re-bootstraps against the new server, so a resolved `ok`
- * result is typically the last thing the caller observes before the reload.
+ * Probe + persist a new backend URL. Does NOT reload the WebView — on a
+ * resolved `ok` result, the caller must run its own cleanup and then call
+ * `reloadNativeApp()` to actually switch over to the new server.
  */
 export async function saveNativeServerUrl(url: string): Promise<NativeServerSaveResult> {
   const api = getApi()
@@ -97,7 +103,11 @@ export function openNativeServerOverlay(): void {
   }
 }
 
-/** Reset to the build/compiled default server and reload the WebView. */
+/**
+ * Reset to the build/compiled default server. Does NOT reload the WebView —
+ * see `saveNativeServerUrl()`; the caller must call `reloadNativeApp()` after
+ * its own cleanup.
+ */
 export function resetNativeServerUrl(): void {
   const api = getApi()
   if (!api) {
@@ -105,6 +115,23 @@ export function resetNativeServerUrl(): void {
   }
   try {
     api.reset()
+  } catch {
+    /* no-op: nothing the SPA can do if the native bridge is gone */
+  }
+}
+
+/**
+ * Reload the WebView so the SPA re-bootstraps against the server persisted by
+ * `saveNativeServerUrl()`/`resetNativeServerUrl()`. Call this only after any
+ * SPA-side cleanup (e.g. signing the user out) has finished.
+ */
+export function reloadNativeApp(): void {
+  const api = getApi()
+  if (!api) {
+    return
+  }
+  try {
+    api.reload()
   } catch {
     /* no-op: nothing the SPA can do if the native bridge is gone */
   }
