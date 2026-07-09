@@ -14,6 +14,11 @@ const mockAlert = vi.fn().mockResolvedValue(undefined)
 const mockRouterPush = vi.fn()
 const mockIsPurchaseAllowed = vi.fn(() => true)
 const mockGetPlans = vi.fn()
+// Vitest runs with import.meta.env.DEV = true, so the REAL isNonProdBuild()
+// would always be true here and silently reroute every purchase through the
+// dev checkout fallback. Default to `false` so these tests pin the PROD
+// (store-only) behaviour; the dev-fallback test flips it explicitly.
+const mockIsNonProdBuild = vi.fn(() => false)
 
 vi.mock('@/services/api/nativeRuntime', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/api/nativeRuntime')>()
@@ -22,6 +27,7 @@ vi.mock('@/services/api/nativeRuntime', async (importOriginal) => {
     // Force the native shell for this test; keep getNativeApiBaseUrl et al. intact
     // (httpClient → nativeAuth imports them at module load).
     isNativeApp: () => true,
+    isNonProdBuild: () => mockIsNonProdBuild(),
   }
 })
 
@@ -82,6 +88,7 @@ describe('SubscriptionView — native purchase guard (Epic 5.2)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockIsPurchaseAllowed.mockReturnValue(true)
+    mockIsNonProdBuild.mockReturnValue(false)
     mockGetPlans.mockResolvedValue({
       plans: [
         {
@@ -113,6 +120,28 @@ describe('SubscriptionView — native purchase guard (Epic 5.2)', () => {
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
     // Instead the native IAP path informs the user (Epic 5.3 wires the real plugin).
     expect(mockAlert).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to the Stripe checkout in a non-prod build when the store cannot sell the product', async () => {
+    // Local development (e.g. `cap run` without Xcode's StoreKit catalogue):
+    // no CdvPurchase global → the store product is never ready → the purchase
+    // must route through the server's (test) checkout instead of erroring.
+    mockIsNonProdBuild.mockReturnValue(true)
+    mockCreateCheckoutSession.mockResolvedValue({ sessionId: 's', url: 'https://stripe.test/c' })
+    const windowOpen = vi.spyOn(window, 'open').mockReturnValue(null)
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="btn-select-pro"]').trigger('click')
+    await flushPromises()
+
+    expect(mockCreateCheckoutSession).toHaveBeenCalledWith('PRO')
+    // Opened externally — the WebView must not navigate away.
+    expect(windowOpen).toHaveBeenCalledWith('https://stripe.test/c', '_blank')
+    expect(mockAlert).not.toHaveBeenCalled()
+
+    windowOpen.mockRestore()
   })
 
   it('redirects home and never loads plans on a custom server in the app', async () => {
