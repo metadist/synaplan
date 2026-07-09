@@ -818,7 +818,9 @@ const tabs = computed<AdminTab[]>(() => {
 })
 
 // Mobile tab dropdown (single dropdown, mirrors FilesTabs.vue)
-const activeTabDef = computed(() => tabs.value.find((tab) => tab.id === activeTab.value) ?? tabs.value[0])
+const activeTabDef = computed(
+  () => tabs.value.find((tab) => tab.id === activeTab.value) ?? tabs.value[0]
+)
 const tabMenuOpen = ref(false)
 const tabDropdownRef = ref<HTMLElement | null>(null)
 

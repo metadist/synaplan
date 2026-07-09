@@ -48,9 +48,7 @@ describe('OnboardingServerModal', () => {
 
   it('does nothing when the input is empty (connect stays disabled)', async () => {
     const wrapper = mountModal()
-    expect(
-      wrapper.find('[data-testid="btn-server-connect"]').attributes('disabled')
-    ).toBeDefined()
+    expect(wrapper.find('[data-testid="btn-server-connect"]').attributes('disabled')).toBeDefined()
     await wrapper.find('[data-testid="btn-server-connect"]').trigger('click')
     expect(mockSave).not.toHaveBeenCalled()
   })

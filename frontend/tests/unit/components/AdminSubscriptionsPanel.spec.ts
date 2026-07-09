@@ -9,6 +9,7 @@ const mockSubscriptions = [
     level: 'NEW',
     priceMonthly: '0.00',
     priceYearly: '0.00',
+    currency: 'EUR',
     description: 'Free plan',
     active: true,
     costBudgetMonthly: '5.00',
@@ -20,6 +21,7 @@ const mockSubscriptions = [
     level: 'PRO',
     priceMonthly: '19.99',
     priceYearly: '199.00',
+    currency: 'EUR',
     description: 'Professional plan',
     active: true,
     costBudgetMonthly: '15.00',
@@ -115,6 +117,9 @@ describe('AdminSubscriptionsPanel', () => {
     await wrapper.find('[data-testid="btn-edit-2"]').trigger('click')
     await flushPromises()
 
+    expect(wrapper.find('[data-testid="input-price-monthly"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="input-price-yearly"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="input-currency"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="input-budget-monthly"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="input-budget-yearly"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="btn-save"]').exists()).toBe(true)
@@ -135,17 +140,23 @@ describe('AdminSubscriptionsPanel', () => {
     expect(wrapper.find('[data-testid="btn-edit-2"]').exists()).toBe(true)
   })
 
-  it('should save budget changes', async () => {
+  it('should save price and budget changes', async () => {
     const wrapper = mount(AdminSubscriptionsPanel, mountOptions)
     await flushPromises()
 
     await wrapper.find('[data-testid="btn-edit-2"]').trigger('click')
     await flushPromises()
 
+    await wrapper.find('[data-testid="input-price-monthly"]').setValue('24.95')
+    await wrapper.find('[data-testid="input-currency"]').setValue('usd')
+
     await wrapper.find('[data-testid="btn-save"]').trigger('click')
     await flushPromises()
 
     expect(mockUpdate).toHaveBeenCalledWith(2, {
+      priceMonthly: 24.95,
+      priceYearly: 199,
+      currency: 'USD',
       costBudgetMonthly: 15,
       costBudgetYearly: 150,
     })

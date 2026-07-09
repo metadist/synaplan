@@ -31,6 +31,7 @@ vi.mock('@/services/api/subscriptionApi', () => ({
           name: 'Pro',
           stripePriceId: 'price_pro',
           price: 19.95,
+          appPrice: 25.99,
           currency: 'EUR',
           interval: 'month',
           features: ['a'],

@@ -325,6 +325,27 @@
       "activeSubscriptions": "Suscripciones Activas",
       "subscriptionOverview": "Resumen de Suscripciones"
     },
+    "subscriptions": {
+      "title": "Planes de suscripción",
+      "description": "Gestiona precios, presupuestos de costos y estado activo de cada nivel de suscripción. Los precios se muestran a los usuarios en el onboarding y en la página de suscripción.",
+      "level": "Nivel",
+      "name": "Nombre",
+      "priceMonthly": "Precio/mes",
+      "priceYearly": "Precio/año",
+      "currency": "Moneda",
+      "budgetMonthly": "Presupuesto/mes",
+      "budgetYearly": "Presupuesto/año",
+      "active": "Activo",
+      "actions": "Acciones",
+      "edit": "Editar",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "saveSuccess": "Plan actualizado correctamente",
+      "saveError": "No se pudo actualizar el plan",
+      "loadError": "No se pudieron cargar las suscripciones",
+      "noSubscriptions": "No se encontraron planes de suscripción. Crea primero los planes en la base de datos.",
+      "budgetHint": "El presupuesto define el costo máximo de tokens (en EUR) por período de facturación. Establécelo en 0 para uso ilimitado. Los precios son los precios públicos mostrados; las compras en la app móvil usan el precio de la tienda de aplicaciones."
+    },
     "config": {
       "title": "Configuración del Sistema",
       "description": "Gestionar variables de entorno y conexiones de servicios",
@@ -1392,11 +1413,16 @@
     },
     "native": {
       "purchaseTitle": "Compra dentro de la app",
-      "purchaseComingSoon": "Las compras dentro de la app para el plan {plan} se están configurando y estarán disponibles en una próxima actualización de la app.",
+      "purchaseUnavailable": "Las compras dentro de la app aún no están disponibles en este servidor. Inténtalo de nuevo más tarde.",
+      "purchaseSuccess": "Tu suscripción ya está activa. ¡Gracias!",
+      "purchasePending": "Tu compra está pendiente de aprobación (p. ej. «Pedir para comprar»). Tu suscripción se activará automáticamente cuando se apruebe.",
+      "purchaseConflict": "Esta compra ya está vinculada a otra cuenta o a una suscripción existente. Revisa tu cuenta de la tienda o contacta con soporte.",
+      "purchaseFailed": "No se pudo completar la compra. No se te ha cobrado nada. Inténtalo de nuevo.",
       "manageInStore": "Gestionar en la tienda",
       "restoreButton": "Restaurar compras",
       "restoreTitle": "Restaurar compras",
-      "restoreComingSoon": "La restauración de compras estará disponible en una próxima actualización de la app.",
+      "restoreDone": "Compras restauradas: tu suscripción está activa.",
+      "restoreNone": "No se encontró ninguna suscripción activa para restaurar.",
       "storeNote": "Las compras y suscripciones se procesan y gestionan a través de App Store o Google Play."
     },
     "plans": {

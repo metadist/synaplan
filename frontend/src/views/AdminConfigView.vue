@@ -452,8 +452,7 @@ onBeforeUnmount(() => {
                 <p
                   class="px-3 pt-2.5 pb-1 text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
                   :class="{
-                    'border-t border-light-border/10 dark:border-dark-border/10 mt-1':
-                      groupIdx > 0,
+                    'border-t border-light-border/10 dark:border-dark-border/10 mt-1': groupIdx > 0,
                   }"
                 >
                   {{ $t(group.labelKey) }}

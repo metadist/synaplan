@@ -9,12 +9,23 @@ import { mount, flushPromises } from '@vue/test-utils'
  */
 
 const mockGetPlans = vi.fn()
+const mockIsNativeApp = vi.fn(() => false)
 
 vi.mock('@/services/api/subscriptionApi', () => ({
   subscriptionApi: {
     getPlans: (...args: unknown[]) => mockGetPlans(...args),
   },
 }))
+
+vi.mock('@/services/api/nativeRuntime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api/nativeRuntime')>()
+  return {
+    ...actual,
+    // Switchable per test; keep getNativeApiBaseUrl et al. intact (httpClient
+    // → nativeAuth imports them at module load).
+    isNativeApp: () => mockIsNativeApp(),
+  }
+})
 
 vi.mock('@iconify/vue', () => ({
   Icon: { template: '<i />' },
@@ -27,6 +38,7 @@ const proPlan = {
   name: 'Pro',
   stripePriceId: 'price_pro',
   price: 19.95,
+  appPrice: 25.99,
   currency: 'EUR',
   interval: 'month',
   features: ['Feature A', 'Feature B', 'Feature C', 'Feature D', 'Feature E'],
@@ -37,6 +49,7 @@ const teamPlan = {
   name: 'Team',
   stripePriceId: 'price_team',
   price: 49.95,
+  appPrice: 64.99,
   currency: 'EUR',
   interval: 'month',
   features: ['Team A', 'Team B'],
@@ -71,6 +84,22 @@ describe('OnboardingPlansStep', () => {
 
     await wrapper.find('[data-testid="btn-plan-continue"]').trigger('click')
     expect(wrapper.emitted('select-plan')).toEqual([['PRO']])
+  })
+
+  it('shows the marked-up app price in the native shell (store commission on top)', async () => {
+    // In the app the store's localized price wins once loaded; before that the
+    // fallback is `appPrice` (web price + store commission) — NEVER the cheaper
+    // web price (anti-steering).
+    mockIsNativeApp.mockReturnValue(true)
+    try {
+      const wrapper = mount(OnboardingPlansStep)
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('€25.99')
+      expect(wrapper.text()).not.toContain('€19.95')
+    } finally {
+      mockIsNativeApp.mockReturnValue(false)
+    }
   })
 
   it('shows the features of the selected plan (max 4) and swaps them on selection', async () => {

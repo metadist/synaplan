@@ -2,27 +2,20 @@
 import type { z } from 'zod'
 import {
   GetSubscriptionBudgetResponseSchema,
+  GetSubscriptionPlansResponseSchema,
   PostSubscriptionTopupResponseSchema,
   PostIapVerifyResponseSchema,
 } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
-export interface SubscriptionPlan {
-  id: string
-  name: string
-  /** Null when billing/Stripe is disabled on this server (OpenAPI: nullable). */
-  stripePriceId: string | null
-  /**
-   * MOBILE-APP SEAM (Epic 5.5): the native store product ID the app purchases
-   * for this tier (Apple/Google). Null/placeholder until the server configures
-   * real store products.
-   */
-  iapProductId?: string | null
-  price: number
-  currency: string
-  interval: string
-  features: string[]
-}
+/**
+ * Public plan catalogue: `plans` carry the operator-configured display price
+ * (from BSUBSCRIPTIONS) plus the per-channel purchase identifiers. Inferred
+ * from the generated schema (per AGENTS.md: never hand-write interfaces for
+ * API responses).
+ */
+export type SubscriptionPlansResponse = z.infer<typeof GetSubscriptionPlansResponseSchema>
+export type SubscriptionPlan = SubscriptionPlansResponse['plans'][number]
 
 export interface CheckoutSession {
   sessionId: string
@@ -95,17 +88,10 @@ export type TopupSession = z.infer<typeof PostSubscriptionTopupResponseSchema>
 export type BudgetStatus = z.infer<typeof GetSubscriptionBudgetResponseSchema>
 
 export const subscriptionApi = {
-  async getPlans(): Promise<{
-    plans: SubscriptionPlan[]
-    stripeConfigured: boolean
-    iapConfigured?: boolean
-  }> {
-    return httpClient<{
-      plans: SubscriptionPlan[]
-      stripeConfigured: boolean
-      iapConfigured?: boolean
-    }>('/api/v1/subscription/plans', {
+  async getPlans(): Promise<SubscriptionPlansResponse> {
+    return httpClient('/api/v1/subscription/plans', {
       method: 'GET',
+      schema: GetSubscriptionPlansResponseSchema,
     })
   },
 

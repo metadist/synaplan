@@ -325,6 +325,27 @@
       "activeSubscriptions": "Aktif Abonelikler",
       "subscriptionOverview": "Abonelik Özeti"
     },
+    "subscriptions": {
+      "title": "Abonelik Planları",
+      "description": "Her abonelik seviyesi için fiyatları, maliyet bütçelerini ve aktif durumu yönetin. Fiyatlar kullanıcılara onboarding sırasında ve abonelik sayfasında gösterilir.",
+      "level": "Seviye",
+      "name": "Ad",
+      "priceMonthly": "Fiyat/Ay",
+      "priceYearly": "Fiyat/Yıl",
+      "currency": "Para birimi",
+      "budgetMonthly": "Bütçe/Ay",
+      "budgetYearly": "Bütçe/Yıl",
+      "active": "Aktif",
+      "actions": "İşlemler",
+      "edit": "Düzenle",
+      "save": "Kaydet",
+      "cancel": "İptal",
+      "saveSuccess": "Plan başarıyla güncellendi",
+      "saveError": "Plan güncellenemedi",
+      "loadError": "Abonelikler yüklenemedi",
+      "noSubscriptions": "Abonelik planı bulunamadı. Önce veritabanında abonelik planları oluşturun.",
+      "budgetHint": "Bütçe, fatura dönemi başına izin verilen maksimum token maliyetini (EUR cinsinden) tanımlar. Sınırsız kullanım için 0 olarak ayarlayın. Fiyatlar herkese açık gösterim fiyatlarıdır; mobil uygulamadaki satın almalar uygulama mağazası fiyatını kullanır."
+    },
     "config": {
       "title": "Sistem Yapılandırması",
       "description": "Ortam değişkenlerini ve servis bağlantılarını yönetin",
@@ -1393,11 +1414,16 @@
     },
     "native": {
       "purchaseTitle": "Uygulama içi satın alma",
-      "purchaseComingSoon": "{plan} planı için uygulama içi satın alma ayarlanıyor ve gelecek bir uygulama güncellemesinde kullanıma sunulacak.",
+      "purchaseUnavailable": "Uygulama içi satın almalar bu sunucuda henüz kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+      "purchaseSuccess": "Aboneliğiniz artık aktif. Teşekkürler!",
+      "purchasePending": "Satın alma işleminiz onay bekliyor (ör. „Satın Almak İçin Sor“). Onaylandığında aboneliğiniz otomatik olarak etkinleşecek.",
+      "purchaseConflict": "Bu satın alma zaten başka bir hesaba veya mevcut bir aboneliğe bağlı. Lütfen mağaza hesabınızı kontrol edin veya destekle iletişime geçin.",
+      "purchaseFailed": "Satın alma tamamlanamadı. Sizden ücret alınmadı. Lütfen tekrar deneyin.",
       "manageInStore": "Mağazada yönet",
       "restoreButton": "Satın alımları geri yükle",
       "restoreTitle": "Satın alımları geri yükle",
-      "restoreComingSoon": "Satın alımları geri yükleme, gelecek bir uygulama güncellemesinde kullanıma sunulacak.",
+      "restoreDone": "Satın alımlar geri yüklendi — aboneliğiniz aktif.",
+      "restoreNone": "Geri yüklenecek aktif bir abonelik bulunamadı.",
       "storeNote": "Satın alımlar ve abonelikler App Store veya Google Play üzerinden işlenir ve yönetilir."
     },
     "plans": {

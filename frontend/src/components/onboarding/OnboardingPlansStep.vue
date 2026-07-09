@@ -49,7 +49,7 @@
             </span>
           </span>
           <span class="text-xs txt-secondary whitespace-nowrap flex-shrink-0">
-            <span class="text-sm font-bold txt-primary">€{{ plan.price }}</span>
+            <span class="text-sm font-bold txt-primary">{{ displayPrice(plan) }}</span>
             /{{ intervalLabel(plan.interval) }}
           </span>
         </button>
@@ -162,6 +162,9 @@ import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { subscriptionApi, type SubscriptionPlan } from '@/services/api/subscriptionApi'
+import { formatPlanPrice } from '@/utils/formatPrice'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import { getStorePrice, initNativeIap, isNativeIapAvailable } from '@/services/nativeIap'
 
 const emit = defineEmits<{
   back: []
@@ -195,6 +198,28 @@ function planName(plan: SubscriptionPlan): string {
   return te(key) ? t(key) : plan.name
 }
 
+/** Set once the native store catalogue is loaded (native shell only). */
+const storePricesReady = ref(false)
+
+/**
+ * Price shown to the user, channel-aware:
+ * - Native app: the store's own localized price wins (that is what Apple/Google
+ *   actually charge); until the catalogue is loaded, `appPrice` (web price plus
+ *   the store-commission markup) is the fallback so the app never advertises
+ *   the cheaper web price (anti-steering).
+ * - Web: always the plain server-configured `price`.
+ */
+function displayPrice(plan: SubscriptionPlan): string {
+  if (isNativeApp()) {
+    if (storePricesReady.value) {
+      const storePrice = getStorePrice(plan.iapProductId)
+      if (storePrice) return storePrice
+    }
+    return formatPlanPrice(plan.appPrice, plan.currency)
+  }
+  return formatPlanPrice(plan.price, plan.currency)
+}
+
 function intervalLabel(interval: string): string {
   const key = `subscription.per${interval.charAt(0).toUpperCase()}${interval.slice(1)}`
   return te(key) ? t(key) : interval
@@ -211,10 +236,20 @@ async function loadPlans(): Promise<boolean> {
     }
     plans.value = response.plans
     selectedPlanId.value = response.plans[0]?.id ?? null
+    void loadStorePrices(response.plans)
     return true
   } catch {
     return false
   }
+}
+
+/** Fetch the store's localized prices (native shell only, non-blocking). */
+async function loadStorePrices(loadedPlans: SubscriptionPlan[]): Promise<void> {
+  if (!isNativeIapAvailable()) return
+  const productIds = loadedPlans
+    .map((plan) => plan.iapProductId)
+    .filter((id): id is string => 'string' === typeof id && '' !== id)
+  storePricesReady.value = await initNativeIap(productIds)
 }
 
 onMounted(async () => {

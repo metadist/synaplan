@@ -329,12 +329,13 @@
       "subscriptionOverview": "Abo-Übersicht"
     },
     "subscriptions": {
-      "title": "Abo-Budget-Verwaltung",
-      "description": "Kostenbudgets und Aktivstatus für jede Abo-Stufe verwalten. Preise sind schreibgeschützt und werden über Stripe verwaltet.",
+      "title": "Abo-Pläne",
+      "description": "Preise, Kostenbudgets und Aktivstatus für jede Abo-Stufe verwalten. Die Preise werden Nutzern im Onboarding und auf der Abo-Seite angezeigt.",
       "level": "Stufe",
       "name": "Name",
       "priceMonthly": "Preis/Monat",
       "priceYearly": "Preis/Jahr",
+      "currency": "Währung",
       "budgetMonthly": "Budget/Monat",
       "budgetYearly": "Budget/Jahr",
       "active": "Aktiv",
@@ -342,11 +343,11 @@
       "edit": "Bearbeiten",
       "save": "Speichern",
       "cancel": "Abbrechen",
-      "saveSuccess": "Budget erfolgreich aktualisiert",
-      "saveError": "Budget-Aktualisierung fehlgeschlagen",
+      "saveSuccess": "Plan erfolgreich aktualisiert",
+      "saveError": "Plan-Aktualisierung fehlgeschlagen",
       "loadError": "Abonnements konnten nicht geladen werden",
       "noSubscriptions": "Keine Abo-Pläne gefunden. Erstellen Sie zuerst Abo-Pläne in der Datenbank.",
-      "budgetHint": "Das Budget definiert die maximalen Token-Kosten (in EUR) pro Abrechnungszeitraum. Setzen Sie es auf 0 für unbegrenzte Nutzung. Preise sind nur zur Anzeige und werden über Stripe verwaltet."
+      "budgetHint": "Das Budget definiert die maximalen Token-Kosten (in EUR) pro Abrechnungszeitraum. Setzen Sie es auf 0 für unbegrenzte Nutzung. Die Preise sind die öffentlichen Anzeigepreise; Käufe in der Mobil-App nutzen den App-Store-Preis."
     },
     "config": {
       "title": "Systemkonfiguration",
@@ -1899,11 +1900,16 @@
     },
     "native": {
       "purchaseTitle": "In-App-Kauf",
-      "purchaseComingSoon": "In-App-Käufe für den {plan}-Tarif werden gerade eingerichtet und stehen in einem zukünftigen App-Update zur Verfügung.",
+      "purchaseUnavailable": "In-App-Käufe sind auf diesem Server noch nicht verfügbar. Bitte versuche es später erneut.",
+      "purchaseSuccess": "Dein Abonnement ist jetzt aktiv. Vielen Dank!",
+      "purchasePending": "Dein Kauf wartet auf eine Genehmigung (z. B. „Kaufen anfragen“). Dein Abonnement wird nach der Genehmigung automatisch aktiviert.",
+      "purchaseConflict": "Dieser Kauf ist bereits mit einem anderen Konto oder einem bestehenden Abonnement verknüpft. Bitte prüfe dein Store-Konto oder kontaktiere den Support.",
+      "purchaseFailed": "Der Kauf konnte nicht abgeschlossen werden. Dir wurde nichts berechnet. Bitte versuche es erneut.",
       "manageInStore": "Im Store verwalten",
       "restoreButton": "Käufe wiederherstellen",
       "restoreTitle": "Käufe wiederherstellen",
-      "restoreComingSoon": "Das Wiederherstellen von Käufen steht in einem zukünftigen App-Update zur Verfügung.",
+      "restoreDone": "Käufe wiederhergestellt – dein Abonnement ist aktiv.",
+      "restoreNone": "Es wurde kein aktives Abonnement zum Wiederherstellen gefunden.",
       "storeNote": "Käufe und Abonnements werden über den App Store oder Google Play abgewickelt und verwaltet."
     },
     "plans": {
