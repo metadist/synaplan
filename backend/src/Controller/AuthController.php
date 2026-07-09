@@ -81,6 +81,24 @@ class AuthController extends AbstractController
         ];
     }
 
+    /**
+     * First name from Personal Information (`BUSERDETAILS` JSON), or null until
+     * the user sets one.
+     *
+     * The frontend replaces its in-memory user object wholesale with whatever
+     * `user` payload the most recent auth response carried (login, refresh,
+     * native exchange, …), so every endpoint that returns a `user` object MUST
+     * include this field — omitting it here would silently erase an
+     * already-displayed name on the next token refresh.
+     */
+    private function extractFirstName(User $user): ?string
+    {
+        $details = $user->getUserDetails();
+        $firstName = trim((string) ($details['firstName'] ?? $details['first_name'] ?? ''));
+
+        return '' !== $firstName ? $firstName : null;
+    }
+
     #[Route('/native/exchange', name: 'native_exchange', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/auth/native/exchange',
@@ -135,6 +153,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'firstName' => $this->extractFirstName($user),
             ],
             'tokens' => $this->nativeTokenPayload($accessToken, $refreshToken),
         ]);
@@ -270,6 +289,7 @@ class AuthController extends AbstractController
                     new OA\Property(property: 'level', type: 'string', example: 'NEW'),
                     new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
                     new OA\Property(property: 'memoriesEnabled', type: 'boolean', example: true),
+                    new OA\Property(property: 'firstName', type: 'string', nullable: true, description: 'First name from Personal Information; null until the user sets it.', example: 'John'),
                 ]),
             ]
         )
@@ -344,6 +364,7 @@ class AuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'firstName' => $this->extractFirstName($user),
             ],
         ];
 
@@ -450,6 +471,8 @@ class AuthController extends AbstractController
                 'level' => $result['user']->getUserLevel(),
                 'emailVerified' => $result['user']->isEmailVerified(),
                 'isAdmin' => $result['user']->isAdmin(),
+                'memoriesEnabled' => $result['user']->isMemoriesEnabled(),
+                'firstName' => $this->extractFirstName($result['user']),
             ],
         ];
 
@@ -510,6 +533,8 @@ class AuthController extends AbstractController
                 'level' => $target->getUserLevel(),
                 'emailVerified' => $target->isEmailVerified(),
                 'isAdmin' => $target->isAdmin(),
+                'memoriesEnabled' => $target->isMemoriesEnabled(),
+                'firstName' => $this->extractFirstName($target),
             ],
         ]);
 
@@ -575,6 +600,8 @@ class AuthController extends AbstractController
                 'level' => $user->getUserLevel(),
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
+                'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'firstName' => $this->extractFirstName($user),
             ],
         ]);
 
@@ -953,8 +980,6 @@ class AuthController extends AbstractController
         }
 
         $impersonator = $this->impersonationService->resolveImpersonatorFromActiveSession($request);
-        $userDetails = $user->getUserDetails();
-        $firstName = trim((string) ($userDetails['firstName'] ?? $userDetails['first_name'] ?? ''));
 
         return $this->json([
             'success' => true,
@@ -966,7 +991,7 @@ class AuthController extends AbstractController
                 'created' => $user->getCreated(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
-                'firstName' => '' !== $firstName ? $firstName : null,
+                'firstName' => $this->extractFirstName($user),
             ],
             'impersonator' => $impersonator ? [
                 'id' => $impersonator->getId(),
