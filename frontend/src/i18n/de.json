@@ -1083,6 +1083,7 @@
       "modelsPurposesTitle": "Modelle & Verwendungszwecke",
       "allModels": "Alle Modelle",
       "availableModelsTitle": "Verfügbare Modelle",
+      "searchPlaceholder": "Nach Name oder Dienst filtern…",
       "showRating": "Bewertung anzeigen",
       "sortAlphabet": "Sortierung: A-Z",
       "sortService": "Sortierung: Anbieter",

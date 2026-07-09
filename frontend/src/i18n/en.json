@@ -1059,6 +1059,7 @@
       "modelsPurposesTitle": "Models & Purposes",
       "allModels": "All Models",
       "availableModelsTitle": "Available Models",
+      "searchPlaceholder": "Filter by name or service…",
       "showRating": "Show Rating",
       "sortAlphabet": "Sort: A-Z",
       "sortService": "Sort: Service",

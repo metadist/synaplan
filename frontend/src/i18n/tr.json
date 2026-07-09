@@ -1763,6 +1763,7 @@
       "modelsPurposesTitle": "Modeller ve Amaçlar",
       "allModels": "Tüm Modeller",
       "availableModelsTitle": "Mevcut Modeller",
+      "searchPlaceholder": "Ada veya hizmete göre filtrele…",
       "showRating": "Derecelendirmeyi Göster",
       "sortAlphabet": "Sırala: A-Z",
       "sortService": "Sırala: Hizmet",
