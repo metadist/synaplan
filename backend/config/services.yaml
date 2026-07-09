@@ -90,6 +90,8 @@ parameters:
     env(IAP_PRODUCT_PRO): 'com.synaplan.app.pro.monthly'
     env(IAP_PRODUCT_TEAM): 'com.synaplan.app.team.monthly'
     env(IAP_PRODUCT_BUSINESS): 'com.synaplan.app.business.monthly'
+    # Store commission passed on to app buyers (percent on top of the web price).
+    env(IAP_PRICE_MARKUP_PERCENT): '30'
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
     env(CLOUDFLARE_ACCOUNT_ID): ''
@@ -553,6 +555,7 @@ services:
             $iapProductPro: '%env(IAP_PRODUCT_PRO)%'
             $iapProductTeam: '%env(IAP_PRODUCT_TEAM)%'
             $iapProductBusiness: '%env(IAP_PRODUCT_BUSINESS)%'
+            $storeMarkupPercent: '%env(float:IAP_PRICE_MARKUP_PERCENT)%'
 
     # Native IAP server-side receipt validation (Epic 5.4). Both verifiers are
     # no-ops until store credentials are configured (isConfigured() === false),

@@ -66,4 +66,42 @@ final class IapPricingServiceTest extends TestCase
 
         $this->assertTrue($svc->isConfigured());
     }
+
+    public function testAppPriceAddsDefaultStoreMarkupAndSnapsToPricePoint(): void
+    {
+        // Default markup is 30 % — the Apple/Google commission passed on to app
+        // buyers — snapped to the nearest x.99 store price point.
+        $svc = new IapPricingService();
+
+        $this->assertSame(25.99, $svc->appPrice(19.95)); // 25.935 → 25.99
+        $this->assertSame(64.99, $svc->appPrice(49.95)); // 64.935 → 64.99
+        $this->assertSame(129.99, $svc->appPrice(99.95)); // 129.935 → 129.99
+        $this->assertSame(30.0, $svc->storeMarkupPercent());
+    }
+
+    public function testAppPriceHonoursConfiguredMarkup(): void
+    {
+        $svc = new IapPricingService(storeMarkupPercent: 15.0);
+
+        $this->assertSame(22.99, $svc->appPrice(19.95)); // 22.9425 → 22.99
+        $this->assertSame(15.0, $svc->storeMarkupPercent());
+    }
+
+    public function testAppPriceSnapsDownToTheNearestPricePoint(): void
+    {
+        // "Nearest" can also round DOWN — as long as it stays >= the web price.
+        $svc = new IapPricingService(storeMarkupPercent: 32.0);
+
+        // 20.00 * 1.32 = 26.40 → nearest price point is 25.99 (not 26.99).
+        $this->assertSame(25.99, $svc->appPrice(20.00));
+    }
+
+    public function testAppPriceNeverDiscountsOnNegativeMarkup(): void
+    {
+        // A misconfigured negative markup must never UNDERCUT the web price.
+        $svc = new IapPricingService(storeMarkupPercent: -10.0);
+
+        $this->assertSame(19.99, $svc->appPrice(19.95));
+        $this->assertSame(0.0, $svc->storeMarkupPercent());
+    }
 }

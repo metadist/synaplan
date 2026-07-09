@@ -25,6 +25,16 @@ class SubscriptionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Find subscription by level regardless of active state (the public plans
+     * endpoint needs to distinguish "row missing → fallback defaults" from
+     * "row deactivated by the operator → hide the plan").
+     */
+    public function findByLevelAnyState(string $level): ?Subscription
+    {
+        return $this->findOneBy(['level' => $level]);
+    }
+
+    /**
      * Find all active subscriptions.
      */
     public function findAllActive(): array

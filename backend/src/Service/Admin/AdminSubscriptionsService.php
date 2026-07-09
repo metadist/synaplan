@@ -38,6 +38,30 @@ final readonly class AdminSubscriptionsService
             throw new SubscriptionNotFoundException("Subscription with ID {$id} not found");
         }
 
+        if (array_key_exists('priceMonthly', $data)) {
+            $value = (string) $data['priceMonthly'];
+            if (!is_numeric($value) || (float) $value < 0) {
+                throw new \InvalidArgumentException('priceMonthly must be a number >= 0');
+            }
+            $subscription->setPriceMonthly(number_format((float) $value, 2, '.', ''));
+        }
+
+        if (array_key_exists('priceYearly', $data)) {
+            $value = (string) $data['priceYearly'];
+            if (!is_numeric($value) || (float) $value < 0) {
+                throw new \InvalidArgumentException('priceYearly must be a number >= 0');
+            }
+            $subscription->setPriceYearly(number_format((float) $value, 2, '.', ''));
+        }
+
+        if (array_key_exists('currency', $data)) {
+            $currency = strtoupper(trim((string) $data['currency']));
+            if (1 !== preg_match('/^[A-Z]{3}$/', $currency)) {
+                throw new \InvalidArgumentException('currency must be a 3-letter ISO 4217 code (e.g. EUR, USD)');
+            }
+            $subscription->setCurrency($currency);
+        }
+
         if (array_key_exists('costBudgetMonthly', $data)) {
             $value = (string) $data['costBudgetMonthly'];
             if ((float) $value < 0) {
@@ -74,6 +98,7 @@ final readonly class AdminSubscriptionsService
             'level' => $subscription->getLevel(),
             'priceMonthly' => $subscription->getPriceMonthly(),
             'priceYearly' => $subscription->getPriceYearly(),
+            'currency' => $subscription->getCurrency(),
             'description' => $subscription->getDescription(),
             'active' => $subscription->isActive(),
             'costBudgetMonthly' => $subscription->getCostBudgetMonthly(),

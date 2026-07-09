@@ -36,6 +36,7 @@ final class AdminSubscriptionsController extends AbstractController
         response: 200,
         description: 'List of subscription plans',
         content: new OA\JsonContent(
+            required: ['success', 'subscriptions'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(
@@ -43,12 +44,17 @@ final class AdminSubscriptionsController extends AbstractController
                     type: 'array',
                     items: new OA\Items(
                         type: 'object',
+                        required: [
+                            'id', 'name', 'level', 'priceMonthly', 'priceYearly', 'currency',
+                            'description', 'active', 'costBudgetMonthly', 'costBudgetYearly',
+                        ],
                         properties: [
                             new OA\Property(property: 'id', type: 'integer', example: 1),
                             new OA\Property(property: 'name', type: 'string', example: 'Pro'),
                             new OA\Property(property: 'level', type: 'string', example: 'PRO'),
                             new OA\Property(property: 'priceMonthly', type: 'string', example: '19.99'),
                             new OA\Property(property: 'priceYearly', type: 'string', example: '199.00'),
+                            new OA\Property(property: 'currency', type: 'string', example: 'EUR'),
                             new OA\Property(property: 'description', type: 'string', example: 'Professional plan'),
                             new OA\Property(property: 'active', type: 'boolean', example: true),
                             new OA\Property(property: 'costBudgetMonthly', type: 'string', example: '15.00'),
@@ -75,8 +81,8 @@ final class AdminSubscriptionsController extends AbstractController
     #[Route('/{id}', name: 'admin_subscriptions_update', methods: ['PATCH'])]
     #[OA\Patch(
         path: '/api/v1/admin/subscriptions/{id}',
-        summary: 'Update subscription budget',
-        description: 'Update cost budget and active status for a subscription plan (admin only)',
+        summary: 'Update subscription plan',
+        description: 'Update display prices, currency, cost budget and active status for a subscription plan (admin only)',
         security: [['Bearer' => []]],
         tags: ['Admin Subscriptions']
     )]
@@ -85,6 +91,15 @@ final class AdminSubscriptionsController extends AbstractController
         required: true,
         content: new OA\JsonContent(
             properties: [
+                new OA\Property(
+                    property: 'priceMonthly',
+                    type: 'number',
+                    format: 'float',
+                    example: 19.95,
+                    description: 'Public display price per month (shown in onboarding and the subscription page).',
+                ),
+                new OA\Property(property: 'priceYearly', type: 'number', format: 'float', example: 199.5),
+                new OA\Property(property: 'currency', type: 'string', example: 'EUR', description: 'ISO 4217 code.'),
                 new OA\Property(property: 'costBudgetMonthly', type: 'number', format: 'float', example: 15.0),
                 new OA\Property(property: 'costBudgetYearly', type: 'number', format: 'float', example: 150.0),
                 new OA\Property(property: 'active', type: 'boolean', example: true),
@@ -95,9 +110,29 @@ final class AdminSubscriptionsController extends AbstractController
         response: 200,
         description: 'Subscription updated',
         content: new OA\JsonContent(
+            required: ['success', 'subscription'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
-                new OA\Property(property: 'subscription', type: 'object'),
+                new OA\Property(
+                    property: 'subscription',
+                    type: 'object',
+                    required: [
+                        'id', 'name', 'level', 'priceMonthly', 'priceYearly', 'currency',
+                        'description', 'active', 'costBudgetMonthly', 'costBudgetYearly',
+                    ],
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 1),
+                        new OA\Property(property: 'name', type: 'string', example: 'Pro'),
+                        new OA\Property(property: 'level', type: 'string', example: 'PRO'),
+                        new OA\Property(property: 'priceMonthly', type: 'string', example: '19.95'),
+                        new OA\Property(property: 'priceYearly', type: 'string', example: '199.50'),
+                        new OA\Property(property: 'currency', type: 'string', example: 'EUR'),
+                        new OA\Property(property: 'description', type: 'string', example: 'Professional plan'),
+                        new OA\Property(property: 'active', type: 'boolean', example: true),
+                        new OA\Property(property: 'costBudgetMonthly', type: 'string', example: '15.00'),
+                        new OA\Property(property: 'costBudgetYearly', type: 'string', example: '150.00'),
+                    ],
+                ),
             ]
         )
     )]

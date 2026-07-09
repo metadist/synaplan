@@ -28,6 +28,11 @@ class Subscription
     #[ORM\Column(name: 'BPRICE_YEARLY', type: 'decimal', precision: 10, scale: 2)]
     private string $priceYearly;
 
+    // default literal matches MariaDB's information_schema COLUMN_DEFAULT format
+    // for varchar, so doctrine:schema:validate does not flag a diff.
+    #[ORM\Column(name: 'BCURRENCY', length: 3, options: ['default' => 'EUR'])]
+    private string $currency = 'EUR';
+
     #[ORM\Column(name: 'BDESCRIPTION', type: 'text')]
     private string $description;
 
@@ -97,6 +102,18 @@ class Subscription
     public function setPriceYearly(string $priceYearly): self
     {
         $this->priceYearly = $priceYearly;
+
+        return $this;
+    }
+
+    public function getCurrency(): string
+    {
+        return $this->currency;
+    }
+
+    public function setCurrency(string $currency): self
+    {
+        $this->currency = $currency;
 
         return $this;
     }
