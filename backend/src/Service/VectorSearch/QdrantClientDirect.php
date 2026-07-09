@@ -665,6 +665,15 @@ final class QdrantClientDirect implements QdrantClientInterface
 
     public function getGlobalDocumentStats(int $topLimit = 10): array
     {
+        // Authoritative total: Qdrant tracks the collection-wide point count,
+        // so ask it directly ("sum of all vectors of all users"). This is an
+        // O(1) call and — unlike the full scroll below — does not fail or time
+        // out on large collections, so the admin total is always populated.
+        $totalChunks = $this->countAllDocumentPoints();
+
+        // Per-user breakdown requires walking every point. Keep it in its own
+        // try/catch so a slow/failed scroll degrades gracefully to just the
+        // total instead of zeroing everything out.
         try {
             $points = $this->scrollAllDocumentPointsGlobal();
 
@@ -700,13 +709,38 @@ final class QdrantClientDirect implements QdrantClientInterface
             return [
                 'totalUsers' => count($byUser),
                 'totalFiles' => $totalFiles,
-                'totalChunks' => count($points),
+                // Prefer Qdrant's authoritative count; fall back to the scrolled
+                // count only if the count endpoint was unavailable (returned 0).
+                'totalChunks' => $totalChunks > 0 ? $totalChunks : count($points),
                 'topUsers' => array_slice($topUsers, 0, max(0, $topLimit)),
             ];
         } catch (\Throwable $e) {
-            $this->logger->error('Failed to get global document stats', ['error' => $e->getMessage()]);
+            $this->logger->error('Failed to get global document stats breakdown', ['error' => $e->getMessage()]);
 
-            return ['totalUsers' => 0, 'totalFiles' => 0, 'totalChunks' => 0, 'topUsers' => []];
+            return ['totalUsers' => 0, 'totalFiles' => 0, 'totalChunks' => $totalChunks, 'topUsers' => []];
+        }
+    }
+
+    /**
+     * Count every point in the documents collection (across all users).
+     *
+     * Uses Qdrant's exact count endpoint instead of scrolling, so it stays
+     * cheap and reliable regardless of collection size.
+     */
+    private function countAllDocumentPoints(): int
+    {
+        try {
+            $response = $this->qdrantRequest(
+                'POST',
+                "/collections/{$this->documentsCollection}/points/count",
+                ['exact' => true],
+            );
+
+            return (int) ($response['result']['count'] ?? 0);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to count document points', ['error' => $e->getMessage()]);
+
+            return 0;
         }
     }
 
