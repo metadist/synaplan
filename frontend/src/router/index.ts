@@ -126,8 +126,8 @@ const router = createRouter({
     },
     {
       // MOBILE-APP SEAM (first-run onboarding): native-only first-run flow
-      // (welcome → server → plans). Web builds never navigate here — the
-      // beforeEach guard redirects the route away unless the flow applies.
+      // (welcome → plans). Web builds never navigate here — the beforeEach
+      // guard redirects the route away unless the flow applies.
       path: '/onboarding',
       name: 'onboarding',
       component: () => import('@/views/OnboardingView.vue'),
@@ -673,7 +673,7 @@ router.beforeEach(async (to, from, next) => {
   } else if (to.name === 'chat' && !authenticated && !useGuestStore().isGuestMode) {
     // MOBILE-APP SEAM (first-run onboarding): the very first entry navigation
     // of a signed-out native user goes to the one-time onboarding flow
-    // (welcome → server → plans). `shouldShowOnboarding` is false on web, for
+    // (welcome → plans). `shouldShowOnboarding` is false on web, for
     // signed-in users, after completion/skip, and for existing guest sessions
     // — so this branch is a no-op everywhere except the app's true first run.
     if (shouldShowOnboarding(authenticated)) {

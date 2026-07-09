@@ -2874,13 +2874,24 @@
     "stepLabel": "Adım {step} / {total}",
     "welcome": {
       "title": "{brand} uygulamasına hoş geldin",
-      "subtitle": "Sohbet, görseller ve kendi belgelerin için AI asistanın",
-      "featureChatTitle": "Güçlü AI ile sohbet et",
-      "featureChatDesc": "Her şeyi sor, en yeni AI modellerinden yanıt al",
-      "featureMediaTitle": "Görseller ve daha fazlasını oluştur",
-      "featureMediaDesc": "Basit bir açıklamayı görsele, sese veya videoya dönüştür",
-      "featureKnowledgeTitle": "Belgelerinden yanıtlar",
-      "featureKnowledgeDesc": "Dosyalarını yükle ve içerikleri hakkında sorular sor"
+      "subtitle": "Tüm yapay zekâlar, tüm özellikler tek bir yerde",
+      "pillServer": "Kendi sunucun",
+      "pillRag": "RAG",
+      "pillWidget": "Sohbet widget'ı"
+    },
+    "rag": {
+      "title": "Belgelerinden yanıtlar",
+      "body": "RAG, AI asistanının yalnızca genel eğitimini değil, kendi dosyalarını kullanarak yanıt vermesini sağlar.",
+      "point1": "Belgeleri yükle ve içerikleri hakkında sorular sor",
+      "point2": "Yanıtlar, geldikleri kaynakları belirtir",
+      "point3": "Dosyaların hesabında gizli kalır"
+    },
+    "widget": {
+      "title": "Yerleştirilebilir sohbet widget'ı",
+      "body": "Bilgini, herhangi bir web sitesine yerleştirebileceğin bir sohbet widget'ına dönüştür.",
+      "point1": "Sitene dakikalar içinde bir AI asistanı ekle",
+      "point2": "Bağladığın belgelerden yanıt verir",
+      "point3": "Görünümü markana göre uyarla"
     },
     "server": {
       "title": "Sunucun",
@@ -2911,12 +2922,9 @@
     "plans": {
       "title": "Nasıl başlamak istersin?",
       "subtitle": "Ücretsiz dene — istediğin zaman yükseltebilirsin",
-      "guestTitle": "Sadece dene",
-      "guestDesc": "Hesap gerekmeden hemen sohbete başla",
-      "guestCta": "Hesapsız",
+      "guestCta": "Hesapsız devam et",
       "popular": "Popüler",
       "continueWith": "{plan} ile devam et",
-      "signUpNote": "Önce ücretsiz bir hesap oluşturur, ardından satın alma işlemini tamamlarsın.",
       "registerCta": "Ücretsiz hesap oluştur",
       "loginHint": "Zaten bir hesabın var mı?",
       "loginCta": "Giriş yap"

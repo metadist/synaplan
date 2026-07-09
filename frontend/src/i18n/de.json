@@ -3882,13 +3882,24 @@
     "stepLabel": "Schritt {step} von {total}",
     "welcome": {
       "title": "Willkommen bei {brand}",
-      "subtitle": "Dein KI-Assistent für Chat, Bilder und deine eigenen Dokumente",
-      "featureChatTitle": "Mit leistungsstarker KI chatten",
-      "featureChatDesc": "Stelle jede Frage und erhalte Antworten von den neuesten KI-Modellen",
-      "featureMediaTitle": "Bilder und mehr erstellen",
-      "featureMediaDesc": "Verwandle eine einfache Beschreibung in Bilder, Audio oder Video",
-      "featureKnowledgeTitle": "Antworten aus deinen Dokumenten",
-      "featureKnowledgeDesc": "Lade Dateien hoch und stelle Fragen zu ihrem Inhalt"
+      "subtitle": "Alle KIs, alle Funktionen an einem Platz",
+      "pillServer": "Eigener Server",
+      "pillRag": "RAG",
+      "pillWidget": "Chat-Widget"
+    },
+    "rag": {
+      "title": "Antworten aus deinen Dokumenten",
+      "body": "Mit RAG antwortet der KI-Assistent auf Basis deiner eigenen Dateien, nicht nur aus seinem allgemeinen Training.",
+      "point1": "Dokumente hochladen und Fragen zu ihrem Inhalt stellen",
+      "point2": "Antworten nennen die Quellen, aus denen sie stammen",
+      "point3": "Deine Dateien bleiben privat in deinem Konto"
+    },
+    "widget": {
+      "title": "Einbettbares Chat-Widget",
+      "body": "Mach aus deinem Wissen ein Chat-Widget, das du auf jeder Website einbetten kannst.",
+      "point1": "Füge deiner Website in Minuten einen KI-Assistenten hinzu",
+      "point2": "Es antwortet aus den Dokumenten, die du verbindest",
+      "point3": "Passe das Aussehen an deine Marke an"
     },
     "server": {
       "title": "Dein Server",
@@ -3919,12 +3930,9 @@
     "plans": {
       "title": "Wie möchtest du starten?",
       "subtitle": "Probiere es kostenlos aus — upgraden kannst du jederzeit",
-      "guestTitle": "Einfach ausprobieren",
-      "guestDesc": "Sofort loschatten, ganz ohne Konto",
-      "guestCta": "Ohne Konto",
+      "guestCta": "Ohne Konto fortfahren",
       "popular": "Beliebt",
       "continueWith": "Weiter mit {plan}",
-      "signUpNote": "Du erstellst zuerst ein kostenloses Konto und schließt den Kauf danach ab.",
       "registerCta": "Kostenloses Konto erstellen",
       "loginHint": "Du hast schon ein Konto?",
       "loginCta": "Anmelden"

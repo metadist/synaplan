@@ -69,14 +69,14 @@ describe('useOnboarding', () => {
 
   describe('resume step (server-switch WebView reload)', () => {
     it('sets and consumes the resume step exactly once', () => {
-      setOnboardingResumeStep(3)
-      expect(consumeOnboardingResumeStep()).toBe(3)
+      setOnboardingResumeStep(2)
+      expect(consumeOnboardingResumeStep()).toBe(2)
       // One-shot: the second read is empty.
       expect(consumeOnboardingResumeStep()).toBeNull()
     })
 
     it('can be cleared (probe rejected → no reload happened)', () => {
-      setOnboardingResumeStep(3)
+      setOnboardingResumeStep(2)
       clearOnboardingResumeStep()
       expect(consumeOnboardingResumeStep()).toBeNull()
     })

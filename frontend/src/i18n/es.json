@@ -2873,13 +2873,24 @@
     "stepLabel": "Paso {step} de {total}",
     "welcome": {
       "title": "Bienvenido a {brand}",
-      "subtitle": "Tu asistente de IA para chat, imágenes y tus propios documentos",
-      "featureChatTitle": "Chatea con una IA potente",
-      "featureChatDesc": "Pregunta lo que quieras y obtén respuestas de los últimos modelos de IA",
-      "featureMediaTitle": "Crea imágenes y más",
-      "featureMediaDesc": "Convierte una simple descripción en imágenes, audio o vídeo",
-      "featureKnowledgeTitle": "Respuestas de tus documentos",
-      "featureKnowledgeDesc": "Sube archivos y haz preguntas sobre su contenido"
+      "subtitle": "Todas las IA, todas las funciones en un solo lugar",
+      "pillServer": "Servidor propio",
+      "pillRag": "RAG",
+      "pillWidget": "Widget de chat"
+    },
+    "rag": {
+      "title": "Respuestas de tus documentos",
+      "body": "RAG permite que el asistente de IA responda con tus propios archivos, no solo con su entrenamiento general.",
+      "point1": "Sube documentos y haz preguntas sobre su contenido",
+      "point2": "Las respuestas citan las fuentes de las que provienen",
+      "point3": "Tus archivos permanecen privados en tu cuenta"
+    },
+    "widget": {
+      "title": "Widget de chat integrable",
+      "body": "Convierte tu conocimiento en un widget de chat que puedes integrar en cualquier sitio web.",
+      "point1": "Añade un asistente de IA a tu sitio en minutos",
+      "point2": "Responde a partir de los documentos que conectas",
+      "point3": "Adapta el aspecto a tu marca"
     },
     "server": {
       "title": "Tu servidor",
@@ -2910,12 +2921,9 @@
     "plans": {
       "title": "¿Cómo quieres empezar?",
       "subtitle": "Pruébalo gratis — puedes mejorar tu plan en cualquier momento",
-      "guestTitle": "Solo probarlo",
-      "guestDesc": "Empieza a chatear al instante, sin necesidad de cuenta",
-      "guestCta": "Sin cuenta",
+      "guestCta": "Continuar sin cuenta",
       "popular": "Popular",
       "continueWith": "Continuar con {plan}",
-      "signUpNote": "Primero crearás una cuenta gratuita y después completarás la compra.",
       "registerCta": "Crear una cuenta gratuita",
       "loginHint": "¿Ya tienes una cuenta?",
       "loginCta": "Iniciar sesión"

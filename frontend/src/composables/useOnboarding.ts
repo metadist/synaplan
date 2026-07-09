@@ -17,10 +17,10 @@ import { GUEST_STORAGE_KEY } from '@/stores/guest'
 const COMPLETED_KEY = 'synaplan.onboardingCompleted'
 
 /**
- * Switching the server in step 2 reloads the WebView (app-owned behavior of
- * `SynaplanServer.save`). The step to resume at survives that reload in
- * sessionStorage — and evaporates with the session, so a later cold start
- * never jumps into the middle of the flow.
+ * Switching the server from the own-server modal (page 1) reloads the WebView
+ * (app-owned behavior of `SynaplanServer.save`). The step to resume at survives
+ * that reload in sessionStorage — and evaporates with the session, so a later
+ * cold start never jumps into the middle of the flow.
  */
 const RESUME_STEP_KEY = 'synaplan.onboardingResumeStep'
 
@@ -96,7 +96,7 @@ export function consumeOnboardingResumeStep(): number | null {
       return null
     }
     const step = Number.parseInt(raw, 10)
-    return Number.isInteger(step) && step >= 1 && step <= 3 ? step : null
+    return Number.isInteger(step) && step >= 1 && step <= 2 ? step : null
   } catch {
     return null
   }

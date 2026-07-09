@@ -3948,13 +3948,24 @@
     "stepLabel": "Step {step} of {total}",
     "welcome": {
       "title": "Welcome to {brand}",
-      "subtitle": "Your AI assistant for chat, images, and your own documents",
-      "featureChatTitle": "Chat with powerful AI",
-      "featureChatDesc": "Ask anything and get answers from the latest AI models",
-      "featureMediaTitle": "Create images and more",
-      "featureMediaDesc": "Turn a simple description into images, audio, or video",
-      "featureKnowledgeTitle": "Your documents, answered",
-      "featureKnowledgeDesc": "Upload files and ask questions about what's inside"
+      "subtitle": "Every AI, every feature in one place",
+      "pillServer": "Own server",
+      "pillRag": "RAG",
+      "pillWidget": "Chat widget"
+    },
+    "rag": {
+      "title": "Answers from your documents",
+      "body": "RAG lets the AI assistant answer from your own files, not just its general training.",
+      "point1": "Upload documents and ask questions about what's inside",
+      "point2": "Answers cite the sources they come from",
+      "point3": "Your files stay private to your account"
+    },
+    "widget": {
+      "title": "Embeddable chat widget",
+      "body": "Turn your knowledge into a chat widget you can embed on any website.",
+      "point1": "Add an AI assistant to your site in minutes",
+      "point2": "It answers from the documents you connect",
+      "point3": "Match the look to your brand"
     },
     "server": {
       "title": "Your server",
@@ -3985,12 +3996,9 @@
     "plans": {
       "title": "How do you want to start?",
       "subtitle": "Try it for free — you can upgrade anytime",
-      "guestTitle": "Just try it",
-      "guestDesc": "Start chatting right away, no account needed",
-      "guestCta": "Without account",
+      "guestCta": "Continue without an account",
       "popular": "Popular",
       "continueWith": "Continue with {plan}",
-      "signUpNote": "You'll create a free account first, then complete your purchase.",
       "registerCta": "Create a free account",
       "loginHint": "Already have an account?",
       "loginCta": "Sign in"

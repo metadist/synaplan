@@ -91,16 +91,10 @@
              Slide direction comes from the CSS vars set on the container. -->
         <Transition name="onb-step" mode="out-in">
           <OnboardingWelcomeStep v-if="step === 1" key="welcome" @next="goTo(2)" />
-          <OnboardingServerStep
-            v-else-if="step === 2"
-            key="server"
-            @next="goTo(3)"
-            @back="goTo(1)"
-          />
           <OnboardingPlansStep
             v-else
             key="plans"
-            @back="goTo(2)"
+            @back="goTo(1)"
             @guest="finishAsGuest"
             @login="finishToLogin"
             @register="finishToRegister()"
@@ -134,11 +128,11 @@
 /**
  * MOBILE-APP SEAM (first-run onboarding): native-only first-run flow.
  *
- * Three steps, each skippable at any time (2026 onboarding best practice:
- * minimal friction before first value, no forced sign-up):
- *   1. Welcome — what the app can do (one screen, no feature tour)
- *   2. Server — default server preselected, expert affordance for own servers
- *   3. Start — guest chat (primary), plans (optional purchase), sign in
+ * Two pages, skippable at any time (2026 onboarding best practice: minimal
+ * friction before first value, no forced sign-up):
+ *   1. Welcome — what the app is, one focused "get started" CTA, plus quiet
+ *      pills that open modals (own server URL entry, RAG info, chat widget info)
+ *   2. Plans — paid plans in focus, with guest chat / sign in as quiet actions
  *
  * The router guard only sends true first-run native users here; finishing or
  * skipping persists completion so the flow never shows again.
@@ -148,7 +142,6 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import OnboardingWelcomeStep from '@/components/onboarding/OnboardingWelcomeStep.vue'
-import OnboardingServerStep from '@/components/onboarding/OnboardingServerStep.vue'
 import OnboardingPlansStep from '@/components/onboarding/OnboardingPlansStep.vue'
 import { markOnboardingCompleted, consumeOnboardingResumeStep } from '@/composables/useOnboarding'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
@@ -156,7 +149,7 @@ import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
 const router = useRouter()
 const { locale } = useI18n()
 
-const totalSteps = 3
+const totalSteps = 2
 
 const languages = [
   { value: 'de', label: 'Deutsch', flag: '🇩🇪' },

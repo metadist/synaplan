@@ -1,88 +1,99 @@
 <template>
   <div class="w-full max-w-sm text-center" data-testid="section-onboarding-welcome">
     <div class="onb-enter-1 mb-8 flex justify-center">
-      <img :src="logoSrc" :alt="config.branding.name" class="h-9" />
+      <img :src="logoSrc" :alt="config.branding.name" class="h-10" />
     </div>
 
     <h1 class="text-3xl font-bold txt-primary onb-enter-2">
       {{ $t('onboarding.welcome.title', { brand: config.branding.name }) }}
     </h1>
-    <p class="text-sm txt-secondary mt-2.5 onb-enter-3">
+    <p class="text-base txt-secondary mt-3 leading-relaxed onb-enter-3">
       {{ $t('onboarding.welcome.subtitle') }}
     </p>
 
-    <!-- One rotating showcase card instead of a stacked feature list: the three
-         value props cycle automatically (2026 onboarding best practice: show,
-         don't list — minimal reading, one screen, one action). Tapping the card
-         advances manually; auto-rotation pauses under prefers-reduced-motion. -->
+    <!-- Primary action: the focused "get started" CTA. -->
     <button
-      type="button"
-      class="mt-10 w-full p-6 rounded-2xl surface-card ring-1 ring-black/[0.04] dark:ring-white/[0.05] onb-enter-4 min-h-[11rem] flex flex-col items-center justify-center"
-      :aria-label="$t(activeFeature.titleKey)"
-      data-testid="btn-feature-showcase"
-      @click="advance"
-    >
-      <Transition name="feature" mode="out-in">
-        <div :key="activeIndex" class="flex flex-col items-center">
-          <div
-            class="w-14 h-14 rounded-2xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center feature-icon"
-          >
-            <Icon :icon="activeFeature.icon" class="w-7 h-7 text-brand" />
-          </div>
-          <p class="text-base font-semibold txt-primary mt-4">
-            {{ $t(activeFeature.titleKey) }}
-          </p>
-          <p class="text-sm txt-secondary mt-1.5 leading-relaxed">
-            {{ $t(activeFeature.descKey) }}
-          </p>
-        </div>
-      </Transition>
-    </button>
-
-    <!-- Feature dots: tiny progress indicator for the showcase (also tappable). -->
-    <div
-      class="mt-4 flex items-center justify-center gap-2 onb-enter-5"
-      data-testid="section-feature-dots"
-    >
-      <button
-        v-for="(feature, index) in features"
-        :key="feature.titleKey"
-        type="button"
-        class="feature-dot"
-        :class="{ 'feature-dot--active': index === activeIndex }"
-        :aria-label="$t(feature.titleKey)"
-        :aria-current="index === activeIndex ? 'true' : undefined"
-        :data-testid="`btn-feature-dot-${index}`"
-        @click="goTo(index)"
-      />
-    </div>
-
-    <button
-      class="mt-8 w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-6"
+      class="mt-10 w-full py-3.5 rounded-xl btn-primary font-semibold text-base transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-4"
       data-testid="btn-welcome-next"
       @click="emit('next')"
     >
       {{ $t('onboarding.getStarted') }}
     </button>
+
+    <!-- Secondary, deliberately understated pill actions. They must not compete
+         with the primary CTA — quiet chips that open a modal each. -->
+    <div class="mt-5 flex flex-wrap items-center justify-center gap-2 onb-enter-5">
+      <button
+        v-if="serverControlAvailable"
+        type="button"
+        class="onboarding-pill"
+        data-testid="btn-pill-server"
+        @click="activeModal = 'server'"
+      >
+        <Icon icon="mdi:server-network" class="w-4 h-4" aria-hidden="true" />
+        {{ $t('onboarding.welcome.pillServer') }}
+      </button>
+      <button
+        type="button"
+        class="onboarding-pill"
+        data-testid="btn-pill-rag"
+        @click="activeModal = 'rag'"
+      >
+        <Icon icon="mdi:database-search-outline" class="w-4 h-4" aria-hidden="true" />
+        {{ $t('onboarding.welcome.pillRag') }}
+      </button>
+      <button
+        type="button"
+        class="onboarding-pill"
+        data-testid="btn-pill-widget"
+        @click="activeModal = 'widget'"
+      >
+        <Icon icon="mdi:message-text-outline" class="w-4 h-4" aria-hidden="true" />
+        {{ $t('onboarding.welcome.pillWidget') }}
+      </button>
+    </div>
+
+    <!-- Own-server modal: URL entry replacing the standard server. -->
+    <OnboardingServerModal
+      :is-open="activeModal === 'server'"
+      @close="activeModal = null"
+      @saved="activeModal = null"
+    />
+
+    <!-- Info-only modals for RAG and the chat widget. -->
+    <OnboardingInfoModal
+      :is-open="activeModal === 'rag' || activeModal === 'widget'"
+      :icon="activeInfoContent.icon"
+      :title="activeInfoContent.title"
+      :description="activeInfoContent.description"
+      :points="activeInfoContent.points"
+      @close="activeModal = null"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * MOBILE-APP SEAM (first-run onboarding), step 1: one snappy welcome screen.
- * The three value props live in a single auto-rotating showcase card instead of
- * a stacked list — minimal reading, no decisions, one CTA. Rotation is paused
- * for users who prefer reduced motion; a tap on the card or a dot advances
- * manually and resets the timer.
+ * MOBILE-APP SEAM (first-run onboarding), page 1: welcome + quiet entry points.
+ *
+ * One focused "get started" CTA advances to the plans page. Below it, a row of
+ * deliberately understated pills open modals: "own server" (URL entry that
+ * points the app at a self-hosted Synaplan server) and two info modals that
+ * explain RAG and the chat widget. All modals close back to this page.
  */
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { useTheme } from '@/composables/useTheme'
+import { isNativeServerControlAvailable } from '@/services/api/nativeServer'
+import OnboardingServerModal from '@/components/onboarding/OnboardingServerModal.vue'
+import OnboardingInfoModal from '@/components/onboarding/OnboardingInfoModal.vue'
 
 const emit = defineEmits<{ next: [] }>()
 
+const { t } = useI18n()
 const config = useConfigStore()
 const themeStore = useTheme()
 
@@ -94,112 +105,62 @@ const isDark = computed(() => {
 
 const { logoSrc } = useBrandLogo(isDark)
 
-const features = [
-  {
-    icon: 'mdi:chat-processing-outline',
-    titleKey: 'onboarding.welcome.featureChatTitle',
-    descKey: 'onboarding.welcome.featureChatDesc',
-  },
-  {
-    icon: 'mdi:image-multiple-outline',
-    titleKey: 'onboarding.welcome.featureMediaTitle',
-    descKey: 'onboarding.welcome.featureMediaDesc',
-  },
-  {
-    icon: 'mdi:file-document-outline',
-    titleKey: 'onboarding.welcome.featureKnowledgeTitle',
-    descKey: 'onboarding.welcome.featureKnowledgeDesc',
-  },
-]
+const serverControlAvailable = isNativeServerControlAvailable()
 
-const ROTATE_INTERVAL_MS = 3200
+const activeModal = ref<'server' | 'rag' | 'widget' | null>(null)
 
-const activeIndex = ref(0)
-const activeFeature = computed(() => features[activeIndex.value])
-
-/** Auto-changing content is disorienting with reduced motion — rotate only on tap then. */
-const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
-
-let rotateTimer: ReturnType<typeof setInterval> | null = null
-
-function startRotation() {
-  if (prefersReducedMotion) return
-  stopRotation()
-  rotateTimer = setInterval(() => {
-    activeIndex.value = (activeIndex.value + 1) % features.length
-  }, ROTATE_INTERVAL_MS)
+interface InfoContent {
+  icon: string
+  title: string
+  description: string
+  points: string[]
 }
 
-function stopRotation() {
-  if (rotateTimer) {
-    clearInterval(rotateTimer)
-    rotateTimer = null
+const activeInfoContent = computed<InfoContent>(() => {
+  if ('widget' === activeModal.value) {
+    return {
+      icon: 'mdi:message-text-outline',
+      title: t('onboarding.widget.title'),
+      description: t('onboarding.widget.body'),
+      points: [
+        t('onboarding.widget.point1'),
+        t('onboarding.widget.point2'),
+        t('onboarding.widget.point3'),
+      ],
+    }
   }
-}
-
-/** Manual advance (card tap) — also resets the timer so it doesn't double-jump. */
-function advance() {
-  activeIndex.value = (activeIndex.value + 1) % features.length
-  startRotation()
-}
-
-function goTo(index: number) {
-  activeIndex.value = index
-  startRotation()
-}
-
-startRotation()
-onUnmounted(stopRotation)
+  return {
+    icon: 'mdi:database-search-outline',
+    title: t('onboarding.rag.title'),
+    description: t('onboarding.rag.body'),
+    points: [t('onboarding.rag.point1'), t('onboarding.rag.point2'), t('onboarding.rag.point3')],
+  }
+})
 </script>
 
 <style scoped>
-/* Showcase content swap: quick fade + slight rise. */
-.feature-enter-active {
-  transition:
-    opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.feature-leave-active {
-  transition:
-    opacity 0.18s ease-in,
-    transform 0.18s ease-in;
-}
-.feature-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-.feature-leave-to {
-  opacity: 0;
-  transform: translateY(-6px);
-}
-
-/* Gentle breathing on the icon container — alive, not distracting. */
-@keyframes featurePulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.06);
-  }
-}
-.feature-icon {
-  animation: featurePulse 3.2s ease-in-out infinite;
-}
-
-/* Showcase dots: same visual family as the step progress dots. */
-.feature-dot {
-  height: 6px;
-  width: 6px;
+/* Quiet pill: low-emphasis chip so it never competes with the primary CTA. */
+.onboarding-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4rem 0.85rem;
   border-radius: 9999px;
-  background-color: color-mix(in srgb, var(--brand) 25%, transparent);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--txt-secondary);
+  background-color: color-mix(in srgb, var(--txt-primary) 5%, transparent);
   transition:
-    width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-    background-color 0.3s ease;
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 }
-.feature-dot--active {
-  width: 18px;
-  background-color: var(--brand);
+.onboarding-pill:hover {
+  color: var(--txt-primary);
+  background-color: color-mix(in srgb, var(--txt-primary) 9%, transparent);
+}
+.onboarding-pill:active {
+  transform: scale(0.97);
 }
 
 /* Staggered enter, same family as the auth pages' entry animations. */
@@ -228,28 +189,17 @@ onUnmounted(stopRotation)
 .onb-enter-5 {
   animation: onbEnter 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
 }
-.onb-enter-6 {
-  animation: onbEnter 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.36s both;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .onb-enter-1,
   .onb-enter-2,
   .onb-enter-3,
   .onb-enter-4,
-  .onb-enter-5,
-  .onb-enter-6,
-  .feature-icon {
+  .onb-enter-5 {
     animation: none;
   }
-  .feature-enter-active,
-  .feature-leave-active,
-  .feature-dot {
+  .onboarding-pill {
     transition: none;
-  }
-  .feature-enter-from,
-  .feature-leave-to {
-    transform: none;
   }
 }
 </style>
