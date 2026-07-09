@@ -1762,6 +1762,7 @@
       "modelsPurposesTitle": "Modelos y Propósitos",
       "allModels": "Todos los Modelos",
       "availableModelsTitle": "Modelos Disponibles",
+      "searchPlaceholder": "Filtrar por nombre o servicio…",
       "showRating": "Mostrar Calificación",
       "sortAlphabet": "Ordenar: A-Z",
       "sortService": "Ordenar: Servicio",
