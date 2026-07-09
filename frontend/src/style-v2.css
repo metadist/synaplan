@@ -472,23 +472,6 @@
     0 0 1px var(--v2-glow);
 }
 
-.design-v2 .dropdown-down {
-  background: rgba(245, 245, 248, 0.95);
-  backdrop-filter: blur(var(--v2-blur-lg));
-  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
-  border: 1px solid var(--v2-border);
-  border-radius: var(--v2-radius);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.15),
-    0 0 1px var(--v2-glow);
-}
-.design-v2.dark .dropdown-down {
-  background: rgba(14, 22, 40, 0.95);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.55),
-    0 0 1px var(--v2-glow);
-}
-
 /* ----------------------------------------------------------
    10. Icon Ghost — Subtler with Glow
    ---------------------------------------------------------- */

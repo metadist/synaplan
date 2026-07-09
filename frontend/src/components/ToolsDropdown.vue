@@ -21,10 +21,7 @@
     </button>
     <div
       v-if="isOpen"
-      :class="[
-        direction === 'up' ? 'dropdown-up' : 'dropdown-down',
-        'left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[60vh] overflow-y-auto scroll-thin',
-      ]"
+      class="dropdown-up left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[60vh] overflow-y-auto scroll-thin"
       data-testid="dropdown-tools-panel"
       @keydown.escape="closeDropdown"
     >
@@ -189,7 +186,6 @@ import {
 import { Icon } from '@iconify/vue'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { getFeaturesStatus, DevOnlyFeatureError, type Feature } from '@/services/featuresService'
-import { useDropdownDirection } from '@/composables/useDropdownDirection'
 import { useRouter } from 'vue-router'
 
 interface Props {
@@ -242,7 +238,6 @@ const commandsStore = useCommandsStore()
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
-const { direction, updateDirection } = useDropdownDirection(dropdownRef)
 const featuresStatus = ref<Record<string, Feature>>({})
 const isLoadingFeatures = ref(true)
 
@@ -290,7 +285,6 @@ const loadFeaturesStatus = async () => {
 }
 
 const toggleOpen = () => {
-  if (!isOpen.value) updateDirection()
   isOpen.value = !isOpen.value
   if (isOpen.value && Object.keys(featuresStatus.value).length === 0) {
     loadFeaturesStatus()
