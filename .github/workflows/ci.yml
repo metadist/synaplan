@@ -46,7 +46,9 @@ jobs:
 
   backend:
     name: Backend (PHP/Symfony)
-    runs-on: ubuntu-latest
+    # 16-core org larger runner (billed per minute) — PHPStan + PHPUnit are the
+    # longest serial stage, so this is where the extra cores pay off.
+    runs-on: ubuntu-latest-m
 
     env:
       DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
@@ -184,7 +186,9 @@ jobs:
 
   frontend:
     name: Frontend (Vue/TypeScript)
-    runs-on: ubuntu-latest
+    # On the critical path (backend → frontend → docker-build → e2e); Vite
+    # builds and Vitest parallelize well across the 16 cores.
+    runs-on: ubuntu-latest-m
     needs: [backend]
 
     steps:
@@ -258,7 +262,8 @@ jobs:
 
   docker-build:
     name: Build Docker Image
-    runs-on: ubuntu-latest
+    # Image build (FrankenPHP + extensions) is CPU-heavy on cache misses.
+    runs-on: ubuntu-latest-m
     needs: [frontend]
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
@@ -321,7 +326,10 @@ jobs:
 
   e2e:
     name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }})
-    runs-on: ubuntu-latest
+    # Full docker-compose stack + Playwright per matrix leg; 16 cores/64 GB
+    # keeps the app responsive under test load. Runner allows max 10 concurrent
+    # jobs, so all 5 legs still run in parallel.
+    runs-on: ubuntu-latest-m
     needs: [docker-build]
     strategy:
       fail-fast: false
@@ -503,7 +511,9 @@ jobs:
     # the "Update visual baselines" workflow dispatch (same runner image,
     # never from a laptop).
     name: E2E Visual Snapshots
-    runs-on: ubuntu-latest
+    # MUST match the runner image used by visual-baselines.yml — snapshots are
+    # rendering-environment sensitive.
+    runs-on: ubuntu-latest-m
     needs: [docker-build]
     env:
       APP_IMAGE: synaplan-test:ci
