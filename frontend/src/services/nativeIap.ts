@@ -157,19 +157,6 @@ export function getStorePrice(productId: string | null | undefined): string | nu
   return cdv.store.get(productId, storePlatform(cdv))?.pricing?.price ?? null
 }
 
-/**
- * True when the store actually knows this product and offers it for sale —
- * i.e. a purchase started now can reach the payment sheet. False before
- * `initNativeIap()` completed, when the billing plugin is missing, or when the
- * store has no catalogue for the product (e.g. a dev build launched via
- * `cap run`, where Xcode's StoreKit configuration file is not applied).
- */
-export function isStoreProductReady(productId: string | null | undefined): boolean {
-  const cdv = getCdvPurchase()
-  if (!cdv || !productId) return false
-  return undefined !== cdv.store.get(productId, storePlatform(cdv))?.getOffer()
-}
-
 // ---------------------------------------------------------------------------
 // Purchase & restore
 // ---------------------------------------------------------------------------

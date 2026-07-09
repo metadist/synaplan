@@ -281,13 +281,12 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useDialog } from '@/composables/useDialog'
-import { isNativeApp, isNonProdBuild } from '@/services/api/nativeRuntime'
+import { isNativeApp } from '@/services/api/nativeRuntime'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import {
   getStorePrice,
   initNativeIap,
   isNativeIapAvailable,
-  isStoreProductReady,
   purchaseProduct,
   restoreNativePurchases,
 } from '@/services/nativeIap'
@@ -413,27 +412,10 @@ async function loadSubscriptionStatus() {
   }
 }
 
-/**
- * Local-development escape hatch: non-production builds run outside the store
- * (e.g. launched via `cap run`, where Xcode's StoreKit test catalogue is not
- * applied), so a native IAP purchase cannot reach a payment sheet. When the
- * store cannot sell the product in such a build, fall back to the server's
- * Stripe (test) checkout so purchases stay testable end-to-end. NEVER true in
- * a production build — there the store-only rule below is absolute.
- */
-function useDevCheckoutFallback(planId: string): boolean {
-  if (!isNonProdBuild()) {
-    return false
-  }
-  const plan = plans.value.find((p) => p.id === planId)
-  return !isStoreProductReady(plan?.iapProductId)
-}
-
 async function selectPlan(planId: string) {
   // MOBILE-APP SEAM (Epic 5.2): never open the Stripe web checkout in the app.
-  // Native purchases go through IAP (Epic 5.3 wires the store billing plugin
-  // here). Sole exception: the dev fallback above, in non-production builds.
-  if (isNative && !useDevCheckoutFallback(planId)) {
+  // Native purchases go through IAP (Epic 5.3 wires the store billing plugin here).
+  if (isNative) {
     await startNativePurchase(planId)
     return
   }
@@ -449,13 +431,6 @@ async function selectPlan(planId: string) {
   isProcessing.value = true
   try {
     const response = await subscriptionApi.createCheckoutSession(planId)
-    if (isNative) {
-      // Dev fallback only: open the (test) checkout in the system browser so
-      // the app's WebView stays on this page.
-      window.open(response.url, '_blank')
-      isProcessing.value = false
-      return
-    }
     // Redirect to Stripe Checkout
     window.location.href = response.url
   } catch (error: unknown) {
