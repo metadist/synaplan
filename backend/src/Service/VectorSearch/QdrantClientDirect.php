@@ -666,9 +666,10 @@ final class QdrantClientDirect implements QdrantClientInterface
     public function getGlobalDocumentStats(int $topLimit = 10): array
     {
         // Authoritative total: Qdrant tracks the collection-wide point count,
-        // so ask it directly ("sum of all vectors of all users"). This is an
-        // O(1) call and — unlike the full scroll below — does not fail or time
-        // out on large collections, so the admin total is always populated.
+        // so ask it directly ("sum of all vectors of all users"). This is a
+        // cheap count call that — unlike the full scroll below — does not time
+        // out on large collections. If it does fail it returns 0, and the
+        // scroll-based count is used as a fallback (see below).
         $totalChunks = $this->countAllDocumentPoints();
 
         // Per-user breakdown requires walking every point. Keep it in its own
