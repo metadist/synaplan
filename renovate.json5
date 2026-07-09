@@ -65,6 +65,13 @@
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "labels": ["dependencies", "breaking"]
+    },
+    {
+      "description": "Redis 8.x broke Centrifugo pub/sub fan-out — stay on 7.4 until Centrifugo adds support",
+      "matchManagers": ["docker-compose", "dockerfile"],
+      "matchPackageNames": ["redis"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
     }
   ]
 }
