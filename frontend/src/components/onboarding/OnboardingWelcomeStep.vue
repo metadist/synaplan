@@ -1,13 +1,16 @@
 <template>
   <div class="w-full max-w-sm text-center" data-testid="section-onboarding-welcome">
-    <div class="onb-enter-1 mb-8 flex justify-center">
-      <img :src="logoSrc" :alt="config.branding.name" class="h-10" />
+    <!-- Title wordmark: "Welcome to" on line 1, the brand logo (which already
+         contains the name) always wraps onto line 2 — no duplicate name. -->
+    <div class="onb-enter-2">
+      <h1 class="text-3xl font-bold txt-primary">
+        {{ $t('onboarding.welcome.title') }}
+      </h1>
+      <div class="mt-4 flex justify-center">
+        <img :src="logoSrc" :alt="config.branding.name" class="h-11" />
+      </div>
     </div>
-
-    <h1 class="text-3xl font-bold txt-primary onb-enter-2">
-      {{ $t('onboarding.welcome.title', { brand: config.branding.name }) }}
-    </h1>
-    <p class="text-base txt-secondary mt-3 leading-relaxed onb-enter-3">
+    <p class="text-base txt-secondary mt-4 leading-relaxed onb-enter-3">
       {{ $t('onboarding.welcome.subtitle') }}
     </p>
 

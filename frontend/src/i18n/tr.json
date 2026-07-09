@@ -2873,7 +2873,7 @@
     "getStarted": "Başlayalım",
     "stepLabel": "Adım {step} / {total}",
     "welcome": {
-      "title": "{brand} uygulamasına hoş geldin",
+      "title": "Hoş geldin",
       "subtitle": "Tüm yapay zekâlar, tüm özellikler tek bir yerde",
       "pillServer": "Kendi sunucun",
       "pillRag": "RAG",

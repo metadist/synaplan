@@ -3881,7 +3881,7 @@
     "getStarted": "Los geht's",
     "stepLabel": "Schritt {step} von {total}",
     "welcome": {
-      "title": "Willkommen bei {brand}",
+      "title": "Willkommen bei",
       "subtitle": "Alle KIs, alle Funktionen an einem Platz",
       "pillServer": "Eigener Server",
       "pillRag": "RAG",

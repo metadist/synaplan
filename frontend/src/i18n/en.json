@@ -3947,7 +3947,7 @@
     "getStarted": "Get started",
     "stepLabel": "Step {step} of {total}",
     "welcome": {
-      "title": "Welcome to {brand}",
+      "title": "Welcome to",
       "subtitle": "Every AI, every feature in one place",
       "pillServer": "Own server",
       "pillRag": "RAG",

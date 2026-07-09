@@ -2872,7 +2872,7 @@
     "getStarted": "Empezar",
     "stepLabel": "Paso {step} de {total}",
     "welcome": {
-      "title": "Bienvenido a {brand}",
+      "title": "Bienvenido a",
       "subtitle": "Todas las IA, todas las funciones en un solo lugar",
       "pillServer": "Servidor propio",
       "pillRag": "RAG",
