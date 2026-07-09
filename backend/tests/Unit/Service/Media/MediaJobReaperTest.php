@@ -11,7 +11,9 @@ use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobReaper;
 use App\Service\Media\MediaJobService;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
+use PHPUnit\Framework\Constraint\IsType;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -62,10 +64,10 @@ final class MediaJobReaperTest extends TestCase
 
         $this->aiFacade->expects(self::once())
             ->method('cancelVideoOperation')
-            ->with('op-1', 'higgsfield', 7, self::isType('array'));
+            ->with('op-1', 'higgsfield', 7, new IsType(NativeType::Array));
         $this->jobService->expects(self::once())
             ->method('markTimedOut')
-            ->with($job, self::isType('string'));
+            ->with($job, new IsType(NativeType::String));
         $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
 
         self::assertSame(1, $this->reaper->reap());
@@ -84,7 +86,7 @@ final class MediaJobReaperTest extends TestCase
         $this->jobService->method('findPastDeadline')->willReturn([$job]);
         $this->jobService->method('langFromJob')->willReturn('en');
 
-        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, self::isType('string'));
+        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String));
         $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
 
         self::assertSame(1, $this->reaper->reap());

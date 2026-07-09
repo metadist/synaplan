@@ -4,7 +4,7 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "require": {
-        "php": ">=8.3",
+        "php": ">=8.4",
         "ext-ctype": "*",
         "ext-iconv": "*",
         "api-platform/doctrine-orm": "^4.3.15",
@@ -137,7 +137,7 @@
         "friendsofphp/php-cs-fixer": "^3.95.11",
         "phpstan/phpstan": "^2.1.53",
         "phpstan/phpstan-doctrine": "^2.0.21",
-        "phpunit/phpunit": "^12.5.23",
+        "phpunit/phpunit": "^13.0.0",
         "symfony/browser-kit": "8.1.*",
         "symfony/css-selector": "8.1.*",
         "symfony/maker-bundle": "^1.67.0"

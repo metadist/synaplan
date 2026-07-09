@@ -62,7 +62,7 @@ class AiFacadeAsyncVideoTest extends TestCase
                 'duration' => 8,
             ]);
 
-        $this->registry->method('getVideoGenerationProvider')
+        $this->registry->expects(self::any())->method('getVideoGenerationProvider')
             ->with('google')
             ->willReturn($provider);
 
@@ -87,7 +87,7 @@ class AiFacadeAsyncVideoTest extends TestCase
                 'error' => null,
             ]);
 
-        $this->registry->method('getVideoGenerationProvider')
+        $this->registry->expects(self::any())->method('getVideoGenerationProvider')
             ->with('google')
             ->willReturn($provider);
 
@@ -107,7 +107,7 @@ class AiFacadeAsyncVideoTest extends TestCase
             ->with('https://example.com/video.mp4')
             ->willReturn('data:video/mp4;base64,dGVzdA==');
 
-        $this->registry->method('getVideoGenerationProvider')
+        $this->registry->expects(self::any())->method('getVideoGenerationProvider')
             ->with('google')
             ->willReturn($provider);
 

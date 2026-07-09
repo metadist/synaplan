@@ -177,7 +177,7 @@ class ApiKeyAuthenticatorTest extends TestCase
         $request = Request::create('/api/v1/chats', 'GET');
         $request->headers->set('Authorization', 'Bearer sk_valid_api_key_here');
 
-        $this->apiKeyRepository->method('findActiveByKey')
+        $this->apiKeyRepository->expects(self::any())->method('findActiveByKey')
             ->with('sk_valid_api_key_here')
             ->willReturn($apiKey);
         $this->apiKeyRepository->method('save');
@@ -200,7 +200,7 @@ class ApiKeyAuthenticatorTest extends TestCase
         $request = Request::create('/v1/chat/completions', 'POST');
         $request->headers->set('Authorization', 'Bearer sk-valid-key');
 
-        $this->apiKeyRepository->method('findActiveByKey')
+        $this->apiKeyRepository->expects(self::any())->method('findActiveByKey')
             ->with('sk-valid-key')
             ->willReturn($apiKey);
         $this->apiKeyRepository->method('save');

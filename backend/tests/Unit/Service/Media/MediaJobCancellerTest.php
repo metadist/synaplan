@@ -9,7 +9,9 @@ use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobCanceller;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use PHPUnit\Framework\Constraint\IsType;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -50,7 +52,7 @@ final class MediaJobCancellerTest extends TestCase
 
         $this->aiFacade->expects(self::once())
             ->method('cancelVideoOperation')
-            ->with('op-1', 'google', 7, self::isType('array'));
+            ->with('op-1', 'google', 7, new IsType(NativeType::Array));
         $this->jobService->expects(self::once())->method('markCancelled')->with($job);
         $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
 

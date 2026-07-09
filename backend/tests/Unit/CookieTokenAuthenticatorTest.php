@@ -9,6 +9,8 @@ use App\Repository\UserRepository;
 use App\Security\CookieTokenAuthenticator;
 use App\Service\OidcTokenService;
 use App\Service\TokenService;
+use PHPUnit\Framework\Constraint\IsType;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -142,7 +144,7 @@ class CookieTokenAuthenticatorTest extends TestCase
         $this->logger
             ->expects($this->once())
             ->method('debug')
-            ->with('OIDC token authenticated successfully', $this->isType('array'));
+            ->with('OIDC token authenticated successfully', new IsType(NativeType::Array));
 
         $passport = $this->authenticator->authenticate($request);
 

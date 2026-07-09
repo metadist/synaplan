@@ -366,7 +366,7 @@ class OidcUserServiceTest extends TestCase
         $query->method('getOneOrNullResult')->willReturn(null);
         $qb->method('getQuery')->willReturn($query);
         $this->userRepository->method('createQueryBuilder')->willReturn($qb);
-        $this->userRepository->method('findOneBy')->with(['mail' => 'overlap@example.com'])->willReturn($googleUser);
+        $this->userRepository->expects(self::any())->method('findOneBy')->with(['mail' => 'overlap@example.com'])->willReturn($googleUser);
 
         $this->em->expects($this->never())->method('persist');
 

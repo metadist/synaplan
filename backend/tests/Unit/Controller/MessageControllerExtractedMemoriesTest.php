@@ -62,6 +62,7 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
         $this->messageRepository = $this->createMock(MessageRepository::class);
 
         $this->em
+            ->expects(self::any())
             ->method('getRepository')
             ->with(Message::class)
             ->willReturn($this->messageRepository);
@@ -110,7 +111,7 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
     public function testReturnsNotFoundWithNoStoreHeadersWhenMessageMissing(): void
     {
         $user = $this->makeUser(7);
-        $this->messageRepository->method('find')->with(123)->willReturn(null);
+        $this->messageRepository->expects(self::any())->method('find')->with(123)->willReturn(null);
 
         $response = $this->controller->getExtractedMemories(123, $user);
 
@@ -123,7 +124,7 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
         $user = $this->makeUser(7);
         $message = $this->makeMessage(99, 999); // owned by user 999, not 7
 
-        $this->messageRepository->method('find')->with(123)->willReturn($message);
+        $this->messageRepository->expects(self::any())->method('find')->with(123)->willReturn($message);
 
         $response = $this->controller->getExtractedMemories(123, $user);
 
@@ -136,7 +137,7 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
         $user = $this->makeUser(7);
         $message = $this->makeMessage(99, 7); // belongs to user 7
 
-        $this->messageRepository->method('find')->with(123)->willReturn($message);
+        $this->messageRepository->expects(self::any())->method('find')->with(123)->willReturn($message);
 
         // Critical: refresh() must run BEFORE getMeta() so the poll sees
         // freshly-flushed worker writes (issue #881 root cause #3).
@@ -170,7 +171,7 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
             'delete_suggestions' => [],
         ]));
 
-        $this->messageRepository->method('find')->with(123)->willReturn($message);
+        $this->messageRepository->expects(self::any())->method('find')->with(123)->willReturn($message);
         $this->em->expects($this->once())->method('refresh')->with($message);
 
         $response = $this->controller->getExtractedMemories(123, $user);
@@ -191,7 +192,7 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
         $message = $this->makeMessage(99, 7);
         $message->setMeta('extracted_memories', '{this is not valid json');
 
-        $this->messageRepository->method('find')->with(123)->willReturn($message);
+        $this->messageRepository->expects(self::any())->method('find')->with(123)->willReturn($message);
         $this->em->expects($this->once())->method('refresh')->with($message);
 
         $response = $this->controller->getExtractedMemories(123, $user);
@@ -214,7 +215,7 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
         $user = $this->makeUser(7);
         $message = $this->makeMessage(99, 7);
 
-        $this->messageRepository->method('find')->with(123)->willReturn($message);
+        $this->messageRepository->expects(self::any())->method('find')->with(123)->willReturn($message);
         $this->em
             ->expects($this->once())
             ->method('refresh')

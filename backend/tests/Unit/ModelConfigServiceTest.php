@@ -234,6 +234,7 @@ class ModelConfigServiceTest extends TestCase
         $modelId = 999;
 
         $this->modelRepository
+            ->expects(self::any())
             ->method('find')
             ->with($modelId)
             ->willReturn(null);
@@ -272,6 +273,7 @@ class ModelConfigServiceTest extends TestCase
         $model->method('getName')->willReturn($expectedName);
 
         $this->modelRepository
+            ->expects(self::any())
             ->method('find')
             ->with($modelId)
             ->willReturn($model);
@@ -286,6 +288,7 @@ class ModelConfigServiceTest extends TestCase
         $modelId = 999;
 
         $this->modelRepository
+            ->expects(self::any())
             ->method('find')
             ->with($modelId)
             ->willReturn(null);
@@ -402,7 +405,7 @@ class ModelConfigServiceTest extends TestCase
             });
 
         // Stale: model row no longer exists → provider lookup returns null.
-        $this->modelRepository->method('find')->with(999)->willReturn(null);
+        $this->modelRepository->expects(self::any())->method('find')->with(999)->willReturn(null);
 
         // Vision falls through to the capability default chain. There's no
         // BCONFIG row, so it walks through findFallbackProvider() and lands
@@ -433,7 +436,7 @@ class ModelConfigServiceTest extends TestCase
         // Mock message with WhatsApp channel
         $message = $this->createMock(\App\Entity\Message::class);
         $message->method('getUserId')->willReturn($userId);
-        $message->method('getMeta')->with('channel')->willReturn('whatsapp');
+        $message->expects(self::any())->method('getMeta')->with('channel')->willReturn('whatsapp');
 
         // Mock user without verified phone
         $user = $this->createMock(\App\Entity\User::class);
@@ -457,7 +460,7 @@ class ModelConfigServiceTest extends TestCase
         // Mock message with WhatsApp channel
         $message = $this->createMock(\App\Entity\Message::class);
         $message->method('getUserId')->willReturn($userId);
-        $message->method('getMeta')->with('channel')->willReturn('whatsapp');
+        $message->expects(self::any())->method('getMeta')->with('channel')->willReturn('whatsapp');
 
         // Mock user with verified phone
         $user = $this->createMock(\App\Entity\User::class);
@@ -481,7 +484,7 @@ class ModelConfigServiceTest extends TestCase
         // Mock message with web channel (not WhatsApp)
         $message = $this->createMock(\App\Entity\Message::class);
         $message->method('getUserId')->willReturn($userId);
-        $message->method('getMeta')->with('channel')->willReturn('web');
+        $message->expects(self::any())->method('getMeta')->with('channel')->willReturn('web');
 
         // Should not check user repository for non-WhatsApp channels
         $this->userRepository
@@ -563,7 +566,7 @@ class ModelConfigServiceTest extends TestCase
         // Mock message with null channel (default to non-WhatsApp behavior)
         $message = $this->createMock(\App\Entity\Message::class);
         $message->method('getUserId')->willReturn($userId);
-        $message->method('getMeta')->with('channel')->willReturn(null);
+        $message->expects(self::any())->method('getMeta')->with('channel')->willReturn(null);
 
         // Should not check user repository for null channel
         $this->userRepository
@@ -597,7 +600,7 @@ class ModelConfigServiceTest extends TestCase
         // Mock message with WhatsApp channel
         $message = $this->createMock(\App\Entity\Message::class);
         $message->method('getUserId')->willReturn($userId);
-        $message->method('getMeta')->with('channel')->willReturn('whatsapp');
+        $message->expects(self::any())->method('getMeta')->with('channel')->willReturn('whatsapp');
 
         // Mock user not found in repository
         $this->userRepository
@@ -643,6 +646,7 @@ class ModelConfigServiceTest extends TestCase
         $model->method('getProviderId')->willReturn('gpt-oss-120b');
 
         $this->modelRepository
+            ->expects(self::any())
             ->method('find')
             ->with($userMemModelId)
             ->willReturn($model);
@@ -696,6 +700,7 @@ class ModelConfigServiceTest extends TestCase
         $model->method('getProviderId')->willReturn('claude-opus-4-6');
 
         $this->modelRepository
+            ->expects(self::any())
             ->method('find')
             ->with($globalChatModelId)
             ->willReturn($model);
@@ -754,6 +759,7 @@ class ModelConfigServiceTest extends TestCase
         $model->method('getProviderId')->willReturn('gpt-oss-120b');
 
         $this->modelRepository
+            ->expects(self::any())
             ->method('find')
             ->with($summaryModelId)
             ->willReturn($model);
@@ -801,6 +807,7 @@ class ModelConfigServiceTest extends TestCase
         $model->method('getProviderId')->willReturn('llama-3.3-70b');
 
         $this->modelRepository
+            ->expects(self::any())
             ->method('find')
             ->with($sortModelId)
             ->willReturn($model);
@@ -835,7 +842,7 @@ class ModelConfigServiceTest extends TestCase
         // Mock message with web channel
         $message = $this->createMock(\App\Entity\Message::class);
         $message->method('getUserId')->willReturn($userId);
-        $message->method('getMeta')->with('channel')->willReturn('web');
+        $message->expects(self::any())->method('getMeta')->with('channel')->willReturn('web');
 
         // User verification should not be checked for web channel
         $this->userRepository

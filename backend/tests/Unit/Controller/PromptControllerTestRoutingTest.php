@@ -129,7 +129,7 @@ final class PromptControllerTestRoutingTest extends TestCase
 
     public function testGetPlanningPromptReturns404WhenMissing(): void
     {
-        $this->promptRepository->method('findByTopic')->with('tools:plan', 0)->willReturn(null);
+        $this->promptRepository->expects(self::any())->method('findByTopic')->with('tools:plan', 0)->willReturn(null);
 
         $response = $this->controller->getPlanningPrompt($this->makeUser());
 
@@ -138,7 +138,7 @@ final class PromptControllerTestRoutingTest extends TestCase
 
     public function testGetPlanningPromptReturnsRawAndRenderedPrompt(): void
     {
-        $this->promptRepository->method('findByTopic')
+        $this->promptRepository->expects(self::any())->method('findByTopic')
             ->with('tools:plan', 0)
             ->willReturn($this->makePlanPrompt());
 
@@ -184,7 +184,7 @@ final class PromptControllerTestRoutingTest extends TestCase
     {
         $row = $this->makePlanPrompt('NEW PLAN');
         $row->expects($this->once())->method('setPrompt')->with('NEW PLAN');
-        $this->promptRepository->method('findByTopic')->with('tools:plan', 0)->willReturn($row);
+        $this->promptRepository->expects(self::any())->method('findByTopic')->with('tools:plan', 0)->willReturn($row);
         $this->em->expects($this->once())->method('flush');
 
         $request = Request::create('/api/v1/prompts/planning', 'PUT', content: json_encode(['prompt' => 'NEW PLAN']));

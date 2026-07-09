@@ -87,7 +87,7 @@ class InboundEmailHandlerServiceTest extends TestCase
     {
         $handler = $this->setUpRoutingHandler();
 
-        $this->userRepository->method('find')->with(42)->willReturn($this->createMock(\App\Entity\User::class));
+        $this->userRepository->expects(self::any())->method('find')->with(42)->willReturn($this->createMock(\App\Entity\User::class));
         $this->rateLimitService->expects($this->once())
             ->method('checkCostBudget')
             ->willReturn(['allowed' => false, 'budget' => 0.01, 'used_cost' => 0.5]);
@@ -108,7 +108,7 @@ class InboundEmailHandlerServiceTest extends TestCase
     {
         $handler = $this->setUpRoutingHandler();
 
-        $this->userRepository->method('find')->with(42)->willReturn($this->createMock(\App\Entity\User::class));
+        $this->userRepository->expects(self::any())->method('find')->with(42)->willReturn($this->createMock(\App\Entity\User::class));
         $this->rateLimitService->expects($this->once())
             ->method('checkCostBudget')
             ->willReturn(['allowed' => true]);
@@ -130,7 +130,7 @@ class InboundEmailHandlerServiceTest extends TestCase
     {
         $handler = $this->setUpRoutingHandler();
 
-        $this->userRepository->method('find')->with(42)->willReturn(null);
+        $this->userRepository->expects(self::any())->method('find')->with(42)->willReturn(null);
         $this->rateLimitService->expects($this->never())->method('checkCostBudget');
         $this->aiFacade->expects($this->never())->method('chat');
 

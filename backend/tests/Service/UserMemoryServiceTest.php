@@ -265,7 +265,7 @@ final class UserMemoryServiceTest extends TestCase
         $user->method('getId')->willReturn(1);
 
         $this->qdrantClient->method('isAvailable')->willReturn(true);
-        $this->qdrantClient->method('getMemory')
+        $this->qdrantClient->expects(self::any())->method('getMemory')
             ->with('mem_1_12345')
             ->willReturn(['key' => 'name', 'value' => 'Cristian', 'category' => 'personal']);
 
@@ -333,7 +333,7 @@ final class UserMemoryServiceTest extends TestCase
         $user->method('getId')->willReturn(1);
 
         $this->qdrantClient->method('isAvailable')->willReturn(true);
-        $this->qdrantClient->method('getMemory')
+        $this->qdrantClient->expects(self::any())->method('getMemory')
             ->with('mem_1_12345')
             ->willReturn(['key' => 'name', 'value' => 'Cristian', 'category' => 'personal']);
 
@@ -439,7 +439,7 @@ final class UserMemoryServiceTest extends TestCase
         // VECTORIZE points at a NARROWER model in BCONFIG (e.g. the
         // operator just swapped to text-embedding-3-small) — the
         // service must ignore it for memory writes.
-        $this->modelConfigService->method('getDefaultModel')->with('VECTORIZE')->willReturn(99);
+        $this->modelConfigService->expects(self::any())->method('getDefaultModel')->with('VECTORIZE')->willReturn(99);
 
         // The crucial assertion: embed() is called with the sticky
         // model's name, not the active VECTORIZE one. If the service

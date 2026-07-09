@@ -183,6 +183,7 @@ final class SlackNotificationServiceTest extends TestCase
         $response->method('getStatusCode')->willReturn(200);
 
         $this->httpClient
+            ->expects(self::any())
             ->method('request')
             ->with(
                 $this->anything(),

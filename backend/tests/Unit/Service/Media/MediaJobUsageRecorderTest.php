@@ -42,7 +42,7 @@ final class MediaJobUsageRecorderTest extends TestCase
 
     public function testBillsCompletedVideoOnceWithItsMediaUsage(): void
     {
-        $this->users->method('find')->with(7)->willReturn($this->createMock(User::class));
+        $this->users->expects(self::any())->method('find')->with(7)->willReturn($this->createMock(User::class));
 
         $job = (new MediaJob())
             ->setUserId(7)
@@ -119,7 +119,7 @@ final class MediaJobUsageRecorderTest extends TestCase
         $anon = (new MediaJob())->setUserId(0)->setType(MediaJob::TYPE_VIDEO)->setProvider('g')->setStatus(MediaJob::STATUS_COMPLETED);
         $this->recorder->record($anon);
 
-        $this->users->method('find')->with(99)->willReturn(null);
+        $this->users->expects(self::any())->method('find')->with(99)->willReturn(null);
         $missing = (new MediaJob())->setUserId(99)->setType(MediaJob::TYPE_VIDEO)->setProvider('g')->setStatus(MediaJob::STATUS_COMPLETED);
         $this->recorder->record($missing);
     }

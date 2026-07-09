@@ -112,7 +112,7 @@ class MediaGenerationServiceTest extends TestCase
 
         $model = $this->createModel('Google', 'veo-3.1', 'Veo 3.1');
         $this->setUpModelResolution(45, $model);
-        $this->modelConfigService->method('getDefaultModel')->with('TEXT2VID', 1)->willReturn(45);
+        $this->modelConfigService->expects(self::any())->method('getDefaultModel')->with('TEXT2VID', 1)->willReturn(45);
 
         $this->aiFacade->expects($this->once())
             ->method('startVideoGeneration')
@@ -315,7 +315,7 @@ class MediaGenerationServiceTest extends TestCase
             'startedAt' => time() - 10,
         ]);
 
-        $this->cache->method('getItem')->with('video_job_'.$jobId)->willReturn($cacheItem);
+        $this->cache->expects(self::any())->method('getItem')->with('video_job_'.$jobId)->willReturn($cacheItem);
 
         $this->aiFacade->expects($this->once())
             ->method('pollVideoOperation')
@@ -508,8 +508,8 @@ class MediaGenerationServiceTest extends TestCase
     private function setUpModelResolution(int $modelId, ?Model $model): void
     {
         $repo = $this->createMock(EntityRepository::class);
-        $repo->method('find')->with($modelId)->willReturn($model);
-        $this->em->method('getRepository')->with(Model::class)->willReturn($repo);
+        $repo->expects(self::any())->method('find')->with($modelId)->willReturn($model);
+        $this->em->expects(self::any())->method('getRepository')->with(Model::class)->willReturn($repo);
     }
 
     public function testEmptyPromptThrowsInvalidArgument(): void

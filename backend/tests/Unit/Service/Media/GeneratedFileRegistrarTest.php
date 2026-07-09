@@ -127,7 +127,7 @@ final class GeneratedFileRegistrarTest extends TestCase
     public function testReturnsExistingRowWithoutCreatingDuplicate(): void
     {
         $existing = new File();
-        $this->files->method('findOneBy')
+        $this->files->expects(self::any())->method('findOneBy')
             ->with(['userId' => 9, 'filePath' => '41/pic.png'])
             ->willReturn($existing);
         $this->files->expects(self::never())->method('save');

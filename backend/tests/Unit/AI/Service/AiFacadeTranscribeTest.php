@@ -70,7 +70,7 @@ class AiFacadeTranscribeTest extends TestCase
     {
         // User picked Groq / whisper-large-v3 in Settings → Models.
         // The facade must call Groq with that exact model id, not OpenAI/whisper-1.
-        $this->modelConfig->method('resolveSttDefault')
+        $this->modelConfig->expects(self::any())->method('resolveSttDefault')
             ->with(42)
             ->willReturn([
                 'provider' => 'groq',
@@ -94,7 +94,7 @@ class AiFacadeTranscribeTest extends TestCase
                 'segments' => [],
             ]);
 
-        $this->registry->method('getSpeechToTextProvider')
+        $this->registry->expects(self::any())->method('getSpeechToTextProvider')
             ->with('groq')
             ->willReturn($groq);
 
@@ -117,7 +117,7 @@ class AiFacadeTranscribeTest extends TestCase
         // the fix, GroqProvider's "$options['model'] ?? 'whisper-large-v3-turbo'"
         // fallback masked the user's choice because the facade never set the
         // model in $options.
-        $this->modelConfig->method('resolveSttDefault')
+        $this->modelConfig->expects(self::any())->method('resolveSttDefault')
             ->with(42)
             ->willReturn([
                 'provider' => 'groq',
@@ -144,7 +144,7 @@ class AiFacadeTranscribeTest extends TestCase
                 'segments' => [],
             ]);
 
-        $this->registry->method('getSpeechToTextProvider')
+        $this->registry->expects(self::any())->method('getSpeechToTextProvider')
             ->with('groq')
             ->willReturn($groq);
 
@@ -177,7 +177,7 @@ class AiFacadeTranscribeTest extends TestCase
                 'segments' => [],
             ]);
 
-        $this->registry->method('getSpeechToTextProvider')
+        $this->registry->expects(self::any())->method('getSpeechToTextProvider')
             ->with('openai')
             ->willReturn($openai);
 
@@ -197,7 +197,7 @@ class AiFacadeTranscribeTest extends TestCase
         // catalog reshuffle): resolveSttDefault returns the legacy capability
         // provider with model_id=null. We must NOT leak a stale model string —
         // the provider should fall back to its internal default.
-        $this->modelConfig->method('resolveSttDefault')
+        $this->modelConfig->expects(self::any())->method('resolveSttDefault')
             ->with(42)
             ->willReturn([
                 'provider' => 'openai',
@@ -221,7 +221,7 @@ class AiFacadeTranscribeTest extends TestCase
                 'segments' => [],
             ]);
 
-        $this->registry->method('getSpeechToTextProvider')
+        $this->registry->expects(self::any())->method('getSpeechToTextProvider')
             ->with('openai')
             ->willReturn($openai);
 
@@ -235,7 +235,7 @@ class AiFacadeTranscribeTest extends TestCase
     {
         // Caller explicitly provided a model but no provider: keep the caller's
         // model and resolve provider/model owner from SOUND2TEXT.
-        $this->modelConfig->method('resolveSttDefault')
+        $this->modelConfig->expects(self::any())->method('resolveSttDefault')
             ->with(42)
             ->willReturn([
                 'provider' => 'groq',
@@ -259,7 +259,7 @@ class AiFacadeTranscribeTest extends TestCase
                 'segments' => [],
             ]);
 
-        $this->registry->method('getSpeechToTextProvider')
+        $this->registry->expects(self::any())->method('getSpeechToTextProvider')
             ->with('groq')
             ->willReturn($groq);
 
@@ -289,7 +289,7 @@ class AiFacadeTranscribeTest extends TestCase
                 'segments' => [],
             ]);
 
-        $this->registry->method('getSpeechToTextProvider')
+        $this->registry->expects(self::any())->method('getSpeechToTextProvider')
             ->with(null)
             ->willReturn($provider);
 

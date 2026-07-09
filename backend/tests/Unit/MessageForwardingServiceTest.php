@@ -72,7 +72,7 @@ class MessageForwardingServiceTest extends TestCase
         $inbound = $this->createInboundMessageWithMeta('+491234567890', 'phone-number-id-123');
 
         $this->whatsAppService->method('isAvailable')->willReturn(true);
-        $this->messageRepository->method('findLatestInboundByChannel')
+        $this->messageRepository->expects(self::any())->method('findLatestInboundByChannel')
             ->with($chat->getId(), 'whatsapp')
             ->willReturn($inbound);
 
@@ -170,8 +170,8 @@ class MessageForwardingServiceTest extends TestCase
         $user->method('getId')->willReturn(7);
 
         $userRepo = $this->createMock(EntityRepository::class);
-        $userRepo->method('find')->with(7)->willReturn($user);
-        $this->em->method('getRepository')->with(User::class)->willReturn($userRepo);
+        $userRepo->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepo);
 
         $this->memoryService = $this->createMock(UserMemoryService::class);
         $this->memoryService->expects($this->once())
@@ -265,7 +265,7 @@ class MessageForwardingServiceTest extends TestCase
         $inbound = $this->createInboundMessageWithMeta('+491234567890', 'phone-number-id-123');
 
         $this->whatsAppService->method('isAvailable')->willReturn(true);
-        $this->messageRepository->method('findLatestInboundByChannel')
+        $this->messageRepository->expects(self::any())->method('findLatestInboundByChannel')
             ->with($chat->getId(), 'whatsapp')
             ->willReturn($inbound);
 
@@ -299,8 +299,8 @@ class MessageForwardingServiceTest extends TestCase
         $chat->method('getUserId')->willReturn(999);
 
         $userRepo = $this->createMock(EntityRepository::class);
-        $userRepo->method('find')->with(999)->willReturn(null);
-        $this->em->method('getRepository')->with(User::class)->willReturn($userRepo);
+        $userRepo->expects(self::any())->method('find')->with(999)->willReturn(null);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepo);
 
         $inbound = $this->createInboundMessageWithMeta('+491234567890', 'phone-id');
 
