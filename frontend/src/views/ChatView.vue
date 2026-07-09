@@ -129,23 +129,6 @@
               </p>
             </div>
 
-            <!-- Centered hero composer: the input starts high on the empty
-                 screen and docks to the bottom on first send (see bottom
-                 ChatInput, rendered only when there are messages). -->
-            <div class="w-full max-w-2xl">
-              <ChatInput
-                ref="chatInputRef"
-                centered
-                :is-streaming="isStreaming"
-                :is-guest-mode="isGuestMode"
-                :quote="quoting.pendingQuote.value"
-                @send="handleSendMessage"
-                @stop="handleUserStop"
-                @guest-feature-gate="handleGuestFeatureGate"
-                @clear-quote="quoting.clearPendingQuote"
-              />
-            </div>
-
             <ExamplePrompts
               v-if="!authStore.isAuthenticated && !configStore.marketingNews.enabled"
               @pick="handleExamplePick"
@@ -233,8 +216,12 @@
         @quote="quoting.confirmQuote"
       />
 
+      <!-- Single composer, always docked at the bottom. On the empty landing
+           the messages area shows only the welcome hero + example prompts;
+           keeping the input at the bottom (instead of a centered hero composer)
+           means the "+" menu and its dropdowns always open upward with room and
+           are never clipped by the chat container's overflow (issue #1285). -->
       <ChatInput
-        v-if="!isEmptyLanding"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
@@ -487,16 +474,6 @@ const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGu
 const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
-
-// Empty landing: no messages, not loading, and not the guest-error state.
-// Drives the centered hero composer (rendered inside state-empty) and hides the
-// bottom sticky composer so there is only ever one live ChatInput instance.
-const isEmptyLanding = computed(
-  () =>
-    !(guestStore.initFailed && !authStore.isAuthenticated) &&
-    historyStore.messages.length === 0 &&
-    !historyStore.isLoadingMessages
-)
 
 function handleGuestFeatureGate(key: string) {
   featureGateKey.value = key

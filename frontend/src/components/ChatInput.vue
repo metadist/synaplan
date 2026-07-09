@@ -15,11 +15,7 @@
     inset itself.
   -->
   <div
-    :class="
-      isCentered
-        ? 'bg-chat-input-area'
-        : 'sticky bottom-0 bg-chat-input-area md:pb-[env(safe-area-inset-bottom)]'
-    "
+    class="sticky bottom-0 bg-chat-input-area md:pb-[env(safe-area-inset-bottom)]"
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
@@ -340,8 +336,6 @@ interface UploadedFile {
 interface Props {
   isStreaming?: boolean
   isGuestMode?: boolean
-  /** Centered empty-state variant: drops the sticky-bottom positioning. */
-  centered?: boolean
   quote?: QuotedReference | null
 }
 
@@ -349,7 +343,6 @@ const props = defineProps<Props>()
 
 const isStreaming = computed(() => props.isStreaming ?? false)
 const isGuestMode = computed(() => props.isGuestMode ?? false)
-const isCentered = computed(() => props.centered ?? false)
 
 const plusMenuOpen = ref(false)
 const plusMenuRef = ref<HTMLElement | null>(null)
