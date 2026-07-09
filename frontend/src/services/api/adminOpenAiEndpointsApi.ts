@@ -61,7 +61,7 @@ export const adminOpenAiEndpointsApi = {
       `/api/v1/admin/openai-endpoints/${encodeURIComponent(name)}`,
       {
         method: 'DELETE',
-      },
+      }
     )
   },
 }

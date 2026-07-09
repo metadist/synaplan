@@ -20,12 +20,18 @@
     <!-- Add / edit form -->
     <div class="rounded-lg border border-light-border/30 dark:border-dark-border/20 p-4 mb-6">
       <div class="text-sm font-semibold txt-primary mb-3">
-        {{ editingName ? t('config.openaiEndpoints.editingTitle', { name: editingName }) : t('config.openaiEndpoints.addTitle') }}
+        {{
+          editingName
+            ? t('config.openaiEndpoints.editingTitle', { name: editingName })
+            : t('config.openaiEndpoints.addTitle')
+        }}
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-medium txt-secondary mb-1">{{ t('config.openaiEndpoints.nameLabel') }}</label>
+          <label class="block text-xs font-medium txt-secondary mb-1">{{
+            t('config.openaiEndpoints.nameLabel')
+          }}</label>
           <input
             v-model="form.name"
             :disabled="editingName !== null"
@@ -34,7 +40,9 @@
           />
         </div>
         <div>
-          <label class="block text-xs font-medium txt-secondary mb-1">{{ t('config.openaiEndpoints.labelLabel') }}</label>
+          <label class="block text-xs font-medium txt-secondary mb-1">{{
+            t('config.openaiEndpoints.labelLabel')
+          }}</label>
           <input
             v-model="form.label"
             class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
@@ -42,7 +50,9 @@
           />
         </div>
         <div class="md:col-span-2">
-          <label class="block text-xs font-medium txt-secondary mb-1">{{ t('config.openaiEndpoints.baseUrlLabel') }}</label>
+          <label class="block text-xs font-medium txt-secondary mb-1">{{
+            t('config.openaiEndpoints.baseUrlLabel')
+          }}</label>
           <input
             v-model="form.base_url"
             class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
@@ -50,13 +60,19 @@
           />
         </div>
         <div class="md:col-span-2">
-          <label class="block text-xs font-medium txt-secondary mb-1">{{ t('config.openaiEndpoints.apiKeyLabel') }}</label>
+          <label class="block text-xs font-medium txt-secondary mb-1">{{
+            t('config.openaiEndpoints.apiKeyLabel')
+          }}</label>
           <input
             v-model="form.api_key"
             type="password"
             autocomplete="off"
             class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
-            :placeholder="editingName ? t('config.openaiEndpoints.apiKeyKeepPlaceholder') : t('config.openaiEndpoints.apiKeyPlaceholder')"
+            :placeholder="
+              editingName
+                ? t('config.openaiEndpoints.apiKeyKeepPlaceholder')
+                : t('config.openaiEndpoints.apiKeyPlaceholder')
+            "
           />
           <p v-if="editingName" class="text-xs txt-secondary mt-1">
             {{ t('config.openaiEndpoints.apiKeyKeepHint') }}
@@ -65,7 +81,9 @@
       </div>
 
       <div class="mt-3">
-        <label class="block text-xs font-medium txt-secondary mb-1">{{ t('config.openaiEndpoints.capabilitiesLabel') }}</label>
+        <label class="block text-xs font-medium txt-secondary mb-1">{{
+          t('config.openaiEndpoints.capabilitiesLabel')
+        }}</label>
         <div class="flex flex-wrap gap-3">
           <label
             v-for="cap in availableCapabilities"
@@ -109,7 +127,11 @@
           {{ t('common.cancel') }}
         </button>
 
-        <span v-if="formTestResult" class="text-sm" :class="formTestResult.ok ? 'text-green-500' : 'text-red-500'">
+        <span
+          v-if="formTestResult"
+          class="text-sm"
+          :class="formTestResult.ok ? 'text-green-500' : 'text-red-500'"
+        >
           {{ formatTestResult(formTestResult) }}
         </span>
       </div>
@@ -117,7 +139,9 @@
 
     <!-- Existing endpoints -->
     <div v-if="loading" class="text-center py-8">
-      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"></div>
+      <div
+        class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"
+      ></div>
     </div>
 
     <div v-else-if="endpoints.length === 0" class="text-sm txt-secondary py-4">
@@ -128,11 +152,31 @@
       <table class="w-full min-w-[720px]">
         <thead>
           <tr class="border-b-2 border-light-border/30 dark:border-dark-border/20">
-            <th class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide">{{ t('config.openaiEndpoints.colName') }}</th>
-            <th class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide">{{ t('config.openaiEndpoints.colBaseUrl') }}</th>
-            <th class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide">{{ t('config.openaiEndpoints.colKey') }}</th>
-            <th class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide">{{ t('config.openaiEndpoints.colCapabilities') }}</th>
-            <th class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide">{{ t('config.openaiEndpoints.colActions') }}</th>
+            <th
+              class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide"
+            >
+              {{ t('config.openaiEndpoints.colName') }}
+            </th>
+            <th
+              class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide"
+            >
+              {{ t('config.openaiEndpoints.colBaseUrl') }}
+            </th>
+            <th
+              class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide"
+            >
+              {{ t('config.openaiEndpoints.colKey') }}
+            </th>
+            <th
+              class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide"
+            >
+              {{ t('config.openaiEndpoints.colCapabilities') }}
+            </th>
+            <th
+              class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide"
+            >
+              {{ t('config.openaiEndpoints.colActions') }}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -145,20 +189,24 @@
               <div class="txt-primary text-sm font-medium">{{ ep.label }}</div>
               <div class="txt-secondary text-xs">{{ ep.name }}</div>
             </td>
-            <td class="py-2 px-2 txt-secondary text-xs max-w-72 truncate" :title="ep.base_url">{{ ep.base_url }}</td>
+            <td class="py-2 px-2 txt-secondary text-xs max-w-72 truncate" :title="ep.base_url">
+              {{ ep.base_url }}
+            </td>
             <td class="py-2 px-2">
               <span
                 class="inline-block w-2 h-2 rounded-full"
                 :class="ep.has_api_key ? 'bg-green-500' : 'bg-gray-400'"
-                :title="ep.has_api_key ? t('config.openaiEndpoints.keySet') : t('config.openaiEndpoints.noKey')"
+                :title="
+                  ep.has_api_key
+                    ? t('config.openaiEndpoints.keySet')
+                    : t('config.openaiEndpoints.noKey')
+                "
               />
             </td>
             <td class="py-2 px-2">
-              <span
-                v-for="cap in ep.capabilities"
-                :key="cap"
-                class="pill text-xs mr-1"
-              >{{ cap }}</span>
+              <span v-for="cap in ep.capabilities" :key="cap" class="pill text-xs mr-1">{{
+                cap
+              }}</span>
             </td>
             <td class="py-2 px-2">
               <div class="flex items-center gap-1.5">
@@ -175,7 +223,11 @@
                   :disabled="rowTestingName === ep.name"
                   @click="testExisting(ep)"
                 >
-                  {{ rowTestingName === ep.name ? t('config.openaiEndpoints.testing') : t('config.openaiEndpoints.test') }}
+                  {{
+                    rowTestingName === ep.name
+                      ? t('config.openaiEndpoints.testing')
+                      : t('config.openaiEndpoints.test')
+                  }}
                 </button>
                 <button
                   type="button"
@@ -183,7 +235,11 @@
                   :disabled="rowDeletingName === ep.name"
                   @click="remove(ep)"
                 >
-                  {{ rowDeletingName === ep.name ? t('config.openaiEndpoints.deleting') : t('config.openaiEndpoints.delete') }}
+                  {{
+                    rowDeletingName === ep.name
+                      ? t('config.openaiEndpoints.deleting')
+                      : t('config.openaiEndpoints.delete')
+                  }}
                 </button>
               </div>
               <div

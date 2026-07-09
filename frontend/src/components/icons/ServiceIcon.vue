@@ -36,7 +36,10 @@ const hasService = computed(() => props.service.trim().length > 0)
 // ("openaicompatible") contains "openai", so it must win before any
 // substring check that would otherwise show the OpenAI logo + US flag.
 const isOpenAiCompatible = computed(() =>
-  props.service.toLowerCase().replace(/[\s_-]/g, '').includes('openaicompatible'),
+  props.service
+    .toLowerCase()
+    .replace(/[\s_-]/g, '')
+    .includes('openaicompatible')
 )
 const isGroq = computed(() => props.service.toLowerCase().includes('groq'))
 const isMistral = computed(() => props.service.toLowerCase().includes('mistral'))

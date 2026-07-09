@@ -37,7 +37,7 @@ withDefaults(
   {
     size: 24,
     className: '',
-  },
+  }
 )
 
 // Each instance needs its own gradient id — reusing one id across multiple
