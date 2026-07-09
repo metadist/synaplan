@@ -121,7 +121,7 @@ final class McpToolRegistryTest extends TestCase
     public function testCatalogForUserListsEnabledServersWithTheirTools(): void
     {
         $servers = $this->createMock(McpServerConfigRepository::class);
-        $servers->method('findEnabledByUser')->with(7)->willReturn([$this->server()]);
+        $servers->expects(self::any())->method('findEnabledByUser')->with(7)->willReturn([$this->server()]);
 
         $registry = $this->registry($this->happySession(), $servers);
         $catalog = $registry->catalogForUser(7);

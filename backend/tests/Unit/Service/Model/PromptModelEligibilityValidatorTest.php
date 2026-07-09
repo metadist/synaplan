@@ -90,7 +90,7 @@ final class PromptModelEligibilityValidatorTest extends TestCase
 
     public function testThrowsWhenModelDoesNotExist(): void
     {
-        $this->modelRepository->method('find')->with(999)->willReturn(null);
+        $this->modelRepository->expects(self::any())->method('find')->with(999)->willReturn(null);
         $this->embeddingChangeGuard->expects(self::never())->method('assertCanChange');
 
         $this->expectException(InvalidPromptModelException::class);

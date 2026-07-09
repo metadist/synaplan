@@ -19,6 +19,8 @@ use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Constraint\IsType;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
@@ -1155,10 +1157,10 @@ class WhatsAppServiceTest extends TestCase
             ->method('notifyWhatsAppSuccess')
             ->with(
                 $this->equalTo('text'),
-                $this->isType('string'),
-                $this->isType('string'),
-                $this->isType('string'),
-                $this->isType('array'),
+                new IsType(NativeType::String),
+                new IsType(NativeType::String),
+                new IsType(NativeType::String),
+                new IsType(NativeType::Array),
                 $this->equalTo(1)
             );
 
@@ -1172,10 +1174,10 @@ class WhatsAppServiceTest extends TestCase
             ->method('notifyWhatsAppError')
             ->with(
                 $this->equalTo('processing'),
-                $this->isType('string'),
-                $this->isType('string'),
-                $this->isType('string'),
-                $this->isType('array'),
+                new IsType(NativeType::String),
+                new IsType(NativeType::String),
+                new IsType(NativeType::String),
+                new IsType(NativeType::Array),
                 $this->equalTo(1)
             );
 

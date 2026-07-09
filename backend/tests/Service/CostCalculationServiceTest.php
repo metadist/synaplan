@@ -42,7 +42,7 @@ class CostCalculationServiceTest extends TestCase
 
     public function testCalculateCostWithMissingModelReturnsZero(): void
     {
-        $this->modelRepository->method('find')->with(999)->willReturn(null);
+        $this->modelRepository->expects(self::any())->method('find')->with(999)->willReturn(null);
 
         $result = $this->service->calculateCost(100, 50, 0, 0, 999);
 
@@ -53,7 +53,7 @@ class CostCalculationServiceTest extends TestCase
     {
         $model = $this->createModelMock(1, 'openai', 5.0, 15.0, 'per1M', 'per1M');
 
-        $this->modelRepository->method('find')->with(1)->willReturn($model);
+        $this->modelRepository->expects(self::any())->method('find')->with(1)->willReturn($model);
         $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
 
         $result = $this->service->calculateCost(1000, 500, 0, 0, 1);
@@ -85,7 +85,7 @@ class CostCalculationServiceTest extends TestCase
             ['pricing_mode' => 'per_character'],
         );
 
-        $this->modelRepository->method('find')->with(2)->willReturn($model);
+        $this->modelRepository->expects(self::any())->method('find')->with(2)->willReturn($model);
         $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
 
         $characters = 500;
@@ -110,7 +110,7 @@ class CostCalculationServiceTest extends TestCase
             ['pricing_mode' => 'per_image'],
         );
 
-        $this->modelRepository->method('find')->with(3)->willReturn($model);
+        $this->modelRepository->expects(self::any())->method('find')->with(3)->willReturn($model);
         $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
 
         $result = $this->service->calculateMediaCost(3, 0, 2.0);
@@ -133,7 +133,7 @@ class CostCalculationServiceTest extends TestCase
             ['pricing_mode' => 'per_second'],
         );
 
-        $this->modelRepository->method('find')->with(4)->willReturn($model);
+        $this->modelRepository->expects(self::any())->method('find')->with(4)->willReturn($model);
         $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
 
         $durationSeconds = 30.0;
@@ -155,7 +155,7 @@ class CostCalculationServiceTest extends TestCase
             ['pricing_mode' => 'per_token'],
         );
 
-        $this->modelRepository->method('find')->with(5)->willReturn($model);
+        $this->modelRepository->expects(self::any())->method('find')->with(5)->willReturn($model);
 
         $result = $this->service->calculateMediaCost(5, 1000, 0);
 
@@ -186,7 +186,7 @@ class CostCalculationServiceTest extends TestCase
             ['pricing_mode' => 'per_character'],
         );
 
-        $this->modelRepository->method('find')->with(6)->willReturn($model);
+        $this->modelRepository->expects(self::any())->method('find')->with(6)->willReturn($model);
 
         $this->assertSame('per_character', $this->service->getPricingMode(6));
     }

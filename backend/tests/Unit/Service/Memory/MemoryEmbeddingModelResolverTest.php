@@ -45,13 +45,14 @@ final class MemoryEmbeddingModelResolverTest extends TestCase
     public function testReturnsStickyPointerWhenCompatibleWithCollection(): void
     {
         $this->configRepository
+            ->expects(self::any())
             ->method('getValue')
             ->with(0, 'MEMORIES', 'EMBEDDING_MODEL_ID')
             ->willReturn('42');
 
-        $this->modelConfigService->method('getProviderForModel')->with(42)->willReturn('openai');
-        $this->modelConfigService->method('getModelName')->with(42)->willReturn('text-embedding-3-large');
-        $this->modelConfigService->method('getVectorDimForModel')->with(42)->willReturn(3072);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(42)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(42)->willReturn('text-embedding-3-large');
+        $this->modelConfigService->expects(self::any())->method('getVectorDimForModel')->with(42)->willReturn(3072);
 
         $this->qdrantClient->method('getMemoriesCollectionInfo')->willReturn([
             'exists' => true,
@@ -80,11 +81,13 @@ final class MemoryEmbeddingModelResolverTest extends TestCase
         // and fall back to payload inference instead of silently using
         // a bogus model id for every subsequent embed call.
         $this->configRepository
+            ->expects(self::any())
             ->method('getValue')
             ->with(0, 'MEMORIES', 'EMBEDDING_MODEL_ID')
             ->willReturn('22');
 
         $this->configRepository
+            ->expects(self::any())
             ->method('findByOwnerGroupAndSetting')
             ->with(0, 'MEMORIES', 'EMBEDDING_MODEL_ID')
             ->willReturn(new Config());
@@ -153,10 +156,10 @@ final class MemoryEmbeddingModelResolverTest extends TestCase
         ]);
         $this->qdrantClient->method('scrollAllMemoriesForReindex')->willReturn([]);
 
-        $this->modelConfigService->method('getDefaultModel')->with('VECTORIZE', null)->willReturn(7);
-        $this->modelConfigService->method('getProviderForModel')->with(7)->willReturn('ollama');
-        $this->modelConfigService->method('getModelName')->with(7)->willReturn('nomic-embed-text');
-        $this->modelConfigService->method('getVectorDimForModel')->with(7)->willReturn(768);
+        $this->modelConfigService->expects(self::any())->method('getDefaultModel')->with('VECTORIZE', null)->willReturn(7);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(7)->willReturn('ollama');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(7)->willReturn('nomic-embed-text');
+        $this->modelConfigService->expects(self::any())->method('getVectorDimForModel')->with(7)->willReturn(768);
 
         // VECTORIZE choice must be stamped as the new sticky.
         $this->configRepository

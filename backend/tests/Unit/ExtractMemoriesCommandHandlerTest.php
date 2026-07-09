@@ -65,11 +65,11 @@ final class ExtractMemoriesCommandHandlerTest extends TestCase
         ]);
 
         $messageRepo = $this->createMock(MessageRepository::class);
-        $messageRepo->method('find')->with(42)->willReturn($this->message);
+        $messageRepo->expects(self::any())->method('find')->with(42)->willReturn($this->message);
         $messageRepo->method('findOneBy')->willReturn(null);
 
         $userRepo = $this->createMock(UserRepository::class);
-        $userRepo->method('find')->with(1)->willReturn($this->user);
+        $userRepo->expects(self::any())->method('find')->with(1)->willReturn($this->user);
 
         $this->em->method('getRepository')->willReturnMap([
             [Message::class, $messageRepo],
@@ -91,7 +91,7 @@ final class ExtractMemoriesCommandHandlerTest extends TestCase
             source: 'auto_detected',
         );
 
-        $this->memoryService->method('getUserMemories')->with(1)->willReturn([$existing]);
+        $this->memoryService->expects(self::any())->method('getUserMemories')->with(1)->willReturn([$existing]);
 
         $this->memoryExtractionService->method('analyzeAndExtract')->willReturn([
             ['action' => 'create', 'category' => 'personal', 'key' => 'name', 'value' => 'Furkan'],

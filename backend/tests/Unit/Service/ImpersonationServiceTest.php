@@ -178,6 +178,7 @@ final class ImpersonationServiceTest extends TestCase
             ->method('generateRefreshToken');
 
         $this->tokenService
+            ->expects(self::any())
             ->method('createAccessCookie')
             ->with('target-impersonation-access')
             ->willReturn(Cookie::create(TokenService::ACCESS_COOKIE)->withValue('target-impersonation-access'));
@@ -243,11 +244,13 @@ final class ImpersonationServiceTest extends TestCase
             ->willReturn('fresh-admin-access');
 
         $this->tokenService
+            ->expects(self::any())
             ->method('createAccessCookie')
             ->with('fresh-admin-access')
             ->willReturn(Cookie::create(TokenService::ACCESS_COOKIE)->withValue('fresh-admin-access'));
 
         $this->tokenService
+            ->expects(self::any())
             ->method('createRefreshCookie')
             ->with('stashed-admin-refresh')
             ->willReturn(Cookie::create(TokenService::REFRESH_COOKIE)->withValue('stashed-admin-refresh'));
@@ -350,6 +353,7 @@ final class ImpersonationServiceTest extends TestCase
         $refreshTokenEntity->method('getUser')->willReturn($admin);
 
         $this->tokenService
+            ->expects(self::any())
             ->method('validateRefreshToken')
             ->with('stashed-admin-refresh')
             ->willReturn($refreshTokenEntity);
@@ -365,6 +369,7 @@ final class ImpersonationServiceTest extends TestCase
             ]);
 
         $this->userRepository
+            ->expects(self::any())
             ->method('find')
             ->with(7)
             ->willReturn($target);
@@ -541,6 +546,7 @@ final class ImpersonationServiceTest extends TestCase
             ]);
 
         $this->userRepository
+            ->expects(self::any())
             ->method('find')
             ->with(1)
             ->willReturn($admin);

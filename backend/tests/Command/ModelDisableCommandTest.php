@@ -6,6 +6,8 @@ namespace App\Tests\Command;
 
 use App\Command\ModelDisableCommand;
 use Doctrine\DBAL\Connection;
+use PHPUnit\Framework\Constraint\IsType;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -31,7 +33,7 @@ class ModelDisableCommandTest extends TestCase
     {
         // @phpstan-ignore-next-line
         $this->connection->expects($this->once())->method('executeStatement')
-            ->with('DELETE FROM BMODELS WHERE BID = ?', $this->isType('array'));
+            ->with('DELETE FROM BMODELS WHERE BID = ?', new IsType(NativeType::Array));
 
         $this->commandTester->execute(['models' => ['groq:llama-3.3-70b-versatile']]);
 
