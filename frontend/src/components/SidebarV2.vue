@@ -65,7 +65,13 @@
 
     <!-- Upgrade Button -->
     <div
-      v-if="!isGuestMode && !authStore.isAdmin && configStore.billing.enabled && !authStore.isPro"
+      v-if="
+        !isGuestMode &&
+        !authStore.isAdmin &&
+        configStore.billing.enabled &&
+        purchaseAllowed &&
+        !authStore.isPro
+      "
       class="flex items-center justify-center py-2 flex-shrink-0"
     >
       <button
@@ -205,7 +211,12 @@
                 <span>{{ $t('nav.preferences') }}</span>
               </button>
               <button
-                v-if="!authStore.isAdmin && configStore.billing.enabled && authStore.isPro"
+                v-if="
+                  !authStore.isAdmin &&
+                  configStore.billing.enabled &&
+                  purchaseAllowed &&
+                  authStore.isPro
+                "
                 role="menuitem"
                 class="dropdown-item"
                 data-testid="btn-sidebar-v2-subscription"
@@ -606,6 +617,7 @@ import {
 import { Icon } from '@iconify/vue'
 import { useSidebarStore } from '../stores/sidebar'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
+import { isPurchaseAllowed } from '../services/api/nativeServer'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
@@ -624,6 +636,9 @@ const { formatRelativeTime } = useDateFormat()
 const sidebarStore = useSidebarStore()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
+
+// No purchase path on a custom server in the native app (store IAP only).
+const purchaseAllowed = isPurchaseAllowed()
 const chatsStore = useChatsStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()

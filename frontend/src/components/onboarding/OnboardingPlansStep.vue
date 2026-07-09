@@ -9,11 +9,42 @@
       {{ $t('onboarding.plans.subtitle') }}
     </p>
 
+    <!-- Loading skeleton: mirrors the plan selector layout so the real plans
+         swap in without a flash of the price-free fallback while fetching. -->
+    <template v-if="loading">
+      <div class="mt-5 space-y-2 text-left" data-testid="section-plans-loading" aria-hidden="true">
+        <div
+          v-for="n in 3"
+          :key="n"
+          class="w-full px-3.5 py-2 rounded-2xl surface-card ring-1 ring-black/[0.04] dark:ring-white/[0.05] flex items-center justify-between gap-3 animate-pulse"
+        >
+          <span class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded-full bg-black/10 dark:bg-white/10"></span>
+            <span class="h-3.5 w-20 rounded bg-black/10 dark:bg-white/10"></span>
+          </span>
+          <span class="h-3.5 w-14 rounded bg-black/10 dark:bg-white/10"></span>
+        </div>
+      </div>
+      <div
+        class="mt-2.5 px-3.5 py-2.5 rounded-2xl bg-brand/[0.04] dark:bg-brand/10 space-y-1.5 animate-pulse"
+        aria-hidden="true"
+      >
+        <div class="h-2.5 w-3/4 rounded bg-black/10 dark:bg-white/10"></div>
+        <div class="h-2.5 w-2/3 rounded bg-black/10 dark:bg-white/10"></div>
+        <div class="h-2.5 w-1/2 rounded bg-black/10 dark:bg-white/10"></div>
+      </div>
+      <div class="mt-4 h-11 w-full rounded-xl bg-brand/30 animate-pulse" aria-hidden="true"></div>
+      <div
+        class="mt-4 h-4 w-40 mx-auto rounded bg-black/10 dark:bg-white/10 animate-pulse"
+        aria-hidden="true"
+      ></div>
+    </template>
+
     <!-- Paid plans in focus (compact selector): the tiers are selectable rows,
          one is pre-selected + badged, the SELECTED plan's benefits render once
          below, and a single primary CTA continues. Hidden when no purchase
          channel is configured (fail-safe) — the guest / sign-in path remains. -->
-    <template v-if="plans.length > 0">
+    <template v-else-if="plans.length > 0">
       <div class="mt-5 space-y-2 text-left">
         <button
           v-for="(plan, index) in plans"
@@ -164,6 +195,7 @@ import { useI18n } from 'vue-i18n'
 import { subscriptionApi, type SubscriptionPlan } from '@/services/api/subscriptionApi'
 import { formatPlanPrice } from '@/utils/formatPrice'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { getStorePrice, initNativeIap, isNativeIapAvailable } from '@/services/nativeIap'
 
 const emit = defineEmits<{
@@ -177,6 +209,16 @@ const emit = defineEmits<{
 const { t, te } = useI18n()
 
 const plans = ref<SubscriptionPlan[]>([])
+
+/**
+ * Whether the plan catalogue is still being fetched. Starts true only when a
+ * purchase channel could exist (i.e. purchases are allowed for this build /
+ * server); otherwise it is false from the first render so the price-free
+ * fallback shows immediately. While loading we render a skeleton instead of the
+ * fallback, so the real plans never flash in after an empty state.
+ */
+const purchaseAllowed = isPurchaseAllowed()
+const loading = ref(purchaseAllowed)
 
 /**
  * Selector state (compact paywall pattern): the entry plan is pre-selected and
@@ -253,7 +295,14 @@ async function loadStorePrices(loadedPlans: SubscriptionPlan[]): Promise<void> {
 }
 
 onMounted(async () => {
+  // Custom server in the native app: no store purchase channel, so never fetch
+  // or show plans/prices — the step stays on the price-free guest / sign-in /
+  // register fallback (Apple/Google IAP compliance). `loading` is already false.
+  if (!purchaseAllowed) {
+    return
+  }
   if (await loadPlans()) {
+    loading.value = false
     return
   }
   // One retry shortly after a failed cold-start request (e.g. the WebView's
@@ -261,6 +310,7 @@ onMounted(async () => {
   // to guest / sign-in / register.
   await new Promise((resolve) => setTimeout(resolve, 1500))
   await loadPlans()
+  loading.value = false
 })
 </script>
 

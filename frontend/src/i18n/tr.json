@@ -914,6 +914,9 @@
     "embedCodeHint": "Bu kodu web sitenizin <head> bölümüne kopyalayın"
   },
   "widgets": {
+    "advancedConfig": {
+      "proRequired": "PRO aboneliği gerekli"
+    },
     "title": "Sohbet Widgetları",
     "subtitle": "AI destekli sohbet widgetlarını web sitenize yerleştirin",
     "createNew": "Widget Oluştur",

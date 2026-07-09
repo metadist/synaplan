@@ -83,3 +83,29 @@ export function getNativeApiBaseUrl(): string {
 
   return DEFAULT_NATIVE_API_BASE_URL
 }
+
+/**
+ * App build environment, stamped by the native shell's build into
+ * `window.__SYNAPLAN_ENV__` (`synaplan-env.js`: one of 'prod' | 'staging' |
+ * 'dev' | ...). Returns 'prod' when unstamped (plain web build or a production
+ * app build) so any env-gated leniency stays OFF unless a non-prod build
+ * explicitly opts in.
+ */
+export function getAppEnv(): string {
+  const env = (globalThis as { __SYNAPLAN_ENV__?: unknown }).__SYNAPLAN_ENV__
+
+  if ('string' === typeof env && '' !== env.trim()) {
+    return env.trim().toLowerCase()
+  }
+
+  return 'prod'
+}
+
+/**
+ * True on any non-production build: a dev/staging device build (stamped
+ * `__SYNAPLAN_ENV__ !== 'prod'`) or the Vite dev server. Used to relax
+ * app-store-only gates during local development.
+ */
+export function isNonProdBuild(): boolean {
+  return import.meta.env.DEV || 'prod' !== getAppEnv()
+}

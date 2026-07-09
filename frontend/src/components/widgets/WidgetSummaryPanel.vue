@@ -12,6 +12,7 @@
         {{ $t('summary.teamRequiredDescription') }}
       </p>
       <button
+        v-if="purchaseAllowed"
         class="px-6 py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium hover:from-purple-600 hover:to-pink-600 transition-all flex items-center gap-2 mx-auto"
         @click="goToUpgrade"
       >
@@ -591,6 +592,7 @@ import { useDateFormat } from '@/composables/useDateFormat'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useAuth } from '@/composables/useAuth'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
 const props = withDefaults(
   defineProps<{
@@ -613,6 +615,9 @@ const { t } = useI18n()
 const { formatDate, formatDateTime } = useDateFormat()
 const { error, success } = useNotification()
 const { isTeam, isAdmin } = useAuth()
+
+// No purchase path on a custom server in the native app (store IAP only).
+const purchaseAllowed = isPurchaseAllowed()
 
 // Existing summary found message
 const existingSummaryFound = ref(false)

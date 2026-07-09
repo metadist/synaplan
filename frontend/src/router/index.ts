@@ -11,6 +11,7 @@ import { authReady } from '@/stores/auth'
 import { useGlobalErrorStore } from '@/stores/globalError'
 import { useGuestStore, GUEST_STORAGE_KEY } from '@/stores/guest'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { i18n } from '@/i18n'
@@ -23,7 +24,9 @@ const guardSubscription = (
   next: NavigationGuardNext
 ) => {
   const configStore = useConfigStore()
-  if (!configStore.billing.enabled) {
+  // A custom server in the native app has no store purchase channel, so the
+  // subscription pages (prices, checkout) must be unreachable there.
+  if (!configStore.billing.enabled || !isPurchaseAllowed()) {
     next(resolveDefaultRoute())
   } else {
     next()

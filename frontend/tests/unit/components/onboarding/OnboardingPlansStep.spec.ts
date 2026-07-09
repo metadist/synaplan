@@ -10,12 +10,21 @@ import { mount, flushPromises } from '@vue/test-utils'
 
 const mockGetPlans = vi.fn()
 const mockIsNativeApp = vi.fn(() => false)
+const mockIsPurchaseAllowed = vi.fn(() => true)
 
 vi.mock('@/services/api/subscriptionApi', () => ({
   subscriptionApi: {
     getPlans: (...args: unknown[]) => mockGetPlans(...args),
   },
 }))
+
+vi.mock('@/services/api/nativeServer', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api/nativeServer')>()
+  return {
+    ...actual,
+    isPurchaseAllowed: () => mockIsPurchaseAllowed(),
+  }
+})
 
 vi.mock('@/services/api/nativeRuntime', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/api/nativeRuntime')>()
@@ -59,6 +68,7 @@ describe('OnboardingPlansStep', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetPlans.mockResolvedValue({ plans: [proPlan, teamPlan], stripeConfigured: true })
+    mockIsPurchaseAllowed.mockReturnValue(true)
   })
 
   it('always offers the guest path and emits "guest"', async () => {
@@ -70,6 +80,31 @@ describe('OnboardingPlansStep', () => {
 
     await guestBtn.trigger('click')
     expect(wrapper.emitted('guest')).toHaveLength(1)
+  })
+
+  it('shows a skeleton (not the price-free fallback) while the catalogue loads', async () => {
+    // Pin the anti-flash behaviour: until the catalogue resolves we must show a
+    // skeleton, never the register/guest fallback that would flash before plans.
+    let resolvePlans: (value: unknown) => void = () => {}
+    mockGetPlans.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePlans = resolve
+      })
+    )
+
+    const wrapper = mount(OnboardingPlansStep)
+    await flushPromises()
+
+    // Still loading: skeleton visible, fallback (register) and plans both hidden.
+    expect(wrapper.find('[data-testid="section-plans-loading"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-create-account"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-plan-pro"]').exists()).toBe(false)
+
+    resolvePlans({ plans: [proPlan], stripeConfigured: true })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="section-plans-loading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-plan-pro"]').exists()).toBe(true)
   })
 
   it('renders plans from the public catalogue and emits the pre-selected plan id via the CTA', async () => {
@@ -118,6 +153,20 @@ describe('OnboardingPlansStep', () => {
 
     await wrapper.find('[data-testid="btn-plan-continue"]').trigger('click')
     expect(wrapper.emitted('select-plan')).toEqual([['TEAM']])
+  })
+
+  it('never fetches or shows plans on a custom server in the native app', async () => {
+    // Custom (self-hosted) server: no store purchase channel, so the step must
+    // not even request the catalogue — only guest / sign-in / register remain.
+    mockIsPurchaseAllowed.mockReturnValue(false)
+    const wrapper = mount(OnboardingPlansStep)
+    await flushPromises()
+
+    expect(mockGetPlans).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="btn-plan-pro"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-try-guest"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-create-account"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-login"]').exists()).toBe(true)
   })
 
   it('hides plans when the server has no purchase channel configured (billing off)', async () => {

@@ -45,7 +45,7 @@
         }}
       </p>
       <button
-        v-if="config.billing.enabled && stats?.user_level === 'NEW'"
+        v-if="config.billing.enabled && purchaseAllowed && stats?.user_level === 'NEW'"
         class="mt-2 w-full btn-primary text-xs py-1.5 px-3 rounded"
         data-testid="btn-storage-upgrade"
         @click="$emit('upgrade')"
@@ -62,12 +62,16 @@ import { Icon } from '@iconify/vue'
 import { getStorageStats } from '@/services/filesService'
 
 import { useConfigStore } from '@/stores/config'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
 defineEmits<{
   upgrade: []
 }>()
 
 const config = useConfigStore()
+
+// No purchase path on a custom server in the native app (store IAP only).
+const purchaseAllowed = isPurchaseAllowed()
 
 type StorageStatsPayload = Awaited<ReturnType<typeof getStorageStats>>
 const stats = ref<StorageStatsPayload | null>(null)

@@ -62,6 +62,7 @@
                   }}
                 </p>
                 <a
+                  v-if="purchaseAllowed"
                   href="/profile?tab=subscription"
                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
                   data-testid="btn-upgrade-cta"
@@ -333,6 +334,10 @@ import {
 } from '@heroicons/vue/24/outline'
 import { adminEmbeddingApi, type EmbeddingCostEstimate } from '@/services/api/adminEmbeddingApi'
 import { useNotification } from '@/composables/useNotification'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
+
+// No purchase path on a custom server in the native app (store IAP only).
+const purchaseAllowed = isPurchaseAllowed()
 
 const props = defineProps<{
   open: boolean

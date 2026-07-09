@@ -914,6 +914,9 @@
     "embedCodeHint": "Copia este código en la sección <head> de tu sitio web"
   },
   "widgets": {
+    "advancedConfig": {
+      "proRequired": "Se requiere suscripción PRO"
+    },
     "title": "Widgets de Chat",
     "subtitle": "Integra widgets de chat con IA en tu sitio web",
     "createNew": "Crear Widget",

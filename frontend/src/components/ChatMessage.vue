@@ -941,6 +941,7 @@
               </div>
               <div class="flex flex-wrap gap-2">
                 <button
+                  v-if="purchaseAllowed"
                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg transition-all"
                   @click="$router.push('/subscription')"
                 >
@@ -1011,8 +1012,12 @@ import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
 const { t } = useI18n()
+
+// No purchase path on a custom server in the native app (store IAP only).
+const purchaseAllowed = isPurchaseAllowed()
 const { error: showError } = useNotification()
 const { pendingUrl, warningOpen, openExternalLink, closeWarning } = useExternalLink()
 const { formatTime } = useDateFormat()

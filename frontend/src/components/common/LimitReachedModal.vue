@@ -88,7 +88,7 @@
 
           <!-- Benefits List -->
           <div
-            v-if="limitType === 'lifetime'"
+            v-if="limitType === 'lifetime' && purchaseAllowed"
             class="mb-6 space-y-2"
             data-testid="section-benefits"
           >
@@ -186,6 +186,7 @@
 
             <!-- Upgrade Button -->
             <button
+              v-if="purchaseAllowed"
               class="w-full px-6 py-3 rounded-lg font-semibold text-base flex items-center justify-center gap-2 group"
               :class="
                 showTopup
@@ -255,6 +256,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { subscriptionApi } from '@/services/api/subscriptionApi'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -298,6 +300,10 @@ const topupSteps = ref(1)
 // routes to the in-app subscription view, which gates itself for native.
 const isNative = isNativeApp()
 const showTopup = computed(() => props.topupAvailable && !isNative)
+
+// On a custom server in the native app there is no purchase path at all —
+// the modal only informs about the limit, without upgrade steering.
+const purchaseAllowed = isPurchaseAllowed()
 
 const topupTotalEur = computed(() => topupSteps.value * props.topupStepEur)
 

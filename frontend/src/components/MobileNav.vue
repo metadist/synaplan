@@ -216,7 +216,12 @@
                     <span>{{ $t('nav.preferences') }}</span>
                   </button>
                   <button
-                    v-if="!authStore.isAdmin && configStore.billing.enabled && authStore.isPro"
+                    v-if="
+                      !authStore.isAdmin &&
+                      configStore.billing.enabled &&
+                      purchaseAllowed &&
+                      authStore.isPro
+                    "
                     class="v2-drawer-account"
                     :class="
                       isPathActive('/subscription') ? 'v2-drawer-account--active' : 'txt-primary'
@@ -229,7 +234,12 @@
                     <span>{{ $t('nav.subscription') }}</span>
                   </button>
                   <button
-                    v-if="!authStore.isAdmin && configStore.billing.enabled && !authStore.isPro"
+                    v-if="
+                      !authStore.isAdmin &&
+                      configStore.billing.enabled &&
+                      purchaseAllowed &&
+                      !authStore.isPro
+                    "
                     class="v2-drawer-account text-amber-600 dark:text-amber-400"
                     data-testid="btn-mobile-more-upgrade"
                     @click="handleNavigate('/subscription')"
@@ -431,6 +441,7 @@ import {
 import { Icon } from '@iconify/vue'
 import {
   isNativeServerControlAvailable,
+  isPurchaseAllowed,
   openNativeServerOverlay,
 } from '../services/api/nativeServer'
 import { useAuthStore } from '../stores/auth'
@@ -453,6 +464,9 @@ const router = useRouter()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 const chatsStore = useChatsStore()
+
+// No purchase path on a custom server in the native app (store IAP only).
+const purchaseAllowed = isPurchaseAllowed()
 const sidebarStore = useSidebarStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()

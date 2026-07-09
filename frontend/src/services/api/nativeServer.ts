@@ -20,6 +20,8 @@
  * `clearAllNativeTokens()`) and then call `reloadNativeApp()` themselves.
  */
 
+import { isNativeApp, isNonProdBuild } from './nativeRuntime'
+
 /** Result of a save attempt: `ok` only when the target server was reachable. */
 export interface NativeServerSaveResult {
   ok: boolean
@@ -41,6 +43,36 @@ function getApi(): NativeServerApi | null {
     return api as NativeServerApi
   }
   return null
+}
+
+/** Defensive URL normalization for comparison (the shell already normalizes). */
+function normalizeServerUrl(url: string): string {
+  return url.trim().toLowerCase().replace(/\/+$/, '')
+}
+
+/**
+ * True when purchase/pricing UI may be shown: always on the plain web build;
+ * inside the native shell only while the configured server equals the build
+ * default (web.synaplan.com in store builds). Apple/Google require in-app
+ * purchases to run through the store — a self-hosted server has no IAP
+ * catalogue, so the app must not show prices or any purchase path for it.
+ *
+ * Non-prod builds (dev/staging device builds or the Vite dev server) always
+ * allow it, regardless of the configured server, so the purchase flow can be
+ * developed and tested locally against any backend.
+ */
+export function isPurchaseAllowed(): boolean {
+  if (!isNativeApp() || isNonProdBuild()) {
+    return true
+  }
+  const defaultUrl = getNativeDefaultServerUrl()
+  if ('' === defaultUrl) {
+    // Native UA but no SynaplanServer bridge: no way to switch servers, so the
+    // app is still on its compiled default.
+    return true
+  }
+  const current = getNativeServerUrl() || defaultUrl
+  return normalizeServerUrl(current) === normalizeServerUrl(defaultUrl)
 }
 
 /** True when the app-owned native server control surface is present. */

@@ -133,11 +133,13 @@
                           : 'border-dashed border-light-border/20 dark:border-dark-border/10 opacity-75'
                     "
                   >
-                    <!-- Free user: upgrade hint -->
+                    <!-- Free user: upgrade hint (PRO lock only, no purchase
+                         steering, when no purchase channel is available) -->
                     <button
                       v-if="!auth.isPro"
                       class="w-full text-left px-4 py-3 flex items-center gap-3"
-                      @click="router.push({ name: 'subscription' })"
+                      :class="purchaseAllowed ? '' : 'cursor-default'"
+                      @click="purchaseAllowed && router.push({ name: 'subscription' })"
                     >
                       <div
                         class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-amber-500/10"
@@ -149,7 +151,11 @@
                           {{ $t('widgets.detail.userData.title') }}
                         </p>
                         <p class="text-xs txt-secondary">
-                          {{ $t('widgets.detail.userData.upgradeHint') }}
+                          {{
+                            purchaseAllowed
+                              ? $t('widgets.detail.userData.upgradeHint')
+                              : $t('widgets.advancedConfig.proRequired')
+                          }}
                         </p>
                       </div>
                       <span
@@ -1193,6 +1199,7 @@ import {
 } from '@/utils/widgetBehaviorRules'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
 type ResponseType = 'link' | 'api' | 'text' | 'list' | 'pdf' | 'custom'
 
@@ -1221,6 +1228,9 @@ const route = useRoute()
 const auth = useAuthStore()
 const { error: showError, success } = useNotification()
 const { t } = useI18n()
+
+// No purchase path on a custom server in the native app (store IAP only).
+const purchaseAllowed = isPurchaseAllowed()
 
 const loading = ref(false)
 const saving = ref(false)

@@ -282,6 +282,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useDialog } from '@/composables/useDialog'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import {
   getStorePrice,
   initNativeIap,
@@ -637,7 +638,9 @@ function formatDate(timestamp: string | number): string {
 }
 
 onMounted(async () => {
-  if (!config.billing.enabled) {
+  // Defense in depth next to the router guard: no billing, or a custom server
+  // in the native app (no store purchase channel) → no subscription page.
+  if (!config.billing.enabled || !isPurchaseAllowed()) {
     router.push('/')
     return
   }

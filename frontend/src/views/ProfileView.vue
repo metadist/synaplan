@@ -121,7 +121,7 @@
           </section>
 
           <section
-            v-if="config.billing.enabled"
+            v-if="config.billing.enabled && purchaseAllowed"
             class="surface-card rounded-lg p-6"
             data-testid="section-billing"
           >
@@ -635,6 +635,7 @@ import { profileApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import {
   isBiometricAvailable,
   isBiometricLockEnabled,
@@ -646,6 +647,10 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const config = useConfigStore()
+
+// Billing address only matters for Stripe invoices; on a custom server in the
+// native app there is no purchase path at all.
+const purchaseAllowed = isPurchaseAllowed()
 const { error } = useNotification()
 const { t } = useI18n()
 
