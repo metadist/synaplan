@@ -1181,7 +1181,30 @@
         "failedSave": "Failed to save model",
         "failedDelete": "Failed to delete model",
         "requiredFields": "All fields are required: Service, Tag, Provider ID, Name",
-        "searchPlaceholder": "Search models..."
+        "searchPlaceholder": "Search models...",
+        "addForm": {
+          "title": "Add a model",
+          "subtitle": "Register a single AI model. Pick an OpenAI-compatible endpoint to connect your own AI backbone, or choose “Built-in provider” to add a model for a hosted provider.",
+          "endpointLabel": "Endpoint",
+          "endpointBuiltin": "Built-in provider (manual)",
+          "endpointHint": "This model will use the selected OpenAI-compatible endpoint.",
+          "noEndpoints": "No OpenAI-compatible endpoints yet — add one in the section below first.",
+          "serviceLabel": "Service",
+          "serviceHint": "e.g. OpenAI, Groq, Ollama",
+          "capabilityLabel": "Capability",
+          "providerIdLabel": "Model ID",
+          "providerIdHint": "The exact model id the API expects (e.g. llama3, gpt-4.1).",
+          "nameLabel": "Display name",
+          "nameHint": "Shown to users in the model picker.",
+          "selectable": "Selectable by users",
+          "active": "Active",
+          "submit": "Add model",
+          "submitting": "Adding…",
+          "created": "Model added",
+          "serviceRequired": "Service is required",
+          "providerIdRequired": "Model ID is required",
+          "nameRequired": "Display name is required"
+        }
       },
       "pagination": {
         "showing": "Showing {start}–{end} of {total}"

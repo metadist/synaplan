@@ -1797,6 +1797,32 @@
         "text2sound": "Texto a Voz",
         "analyze": "Análisis de Archivos"
       },
+      "admin": {
+        "failedCreate": "No se pudo crear el modelo",
+        "addForm": {
+          "title": "Añadir un modelo",
+          "subtitle": "Registra un único modelo de IA. Elige un endpoint compatible con OpenAI para conectar tu propia infraestructura de IA, o selecciona «Proveedor integrado» para añadir un modelo de un proveedor alojado.",
+          "endpointLabel": "Endpoint",
+          "endpointBuiltin": "Proveedor integrado (manual)",
+          "endpointHint": "Este modelo usará el endpoint compatible con OpenAI seleccionado.",
+          "noEndpoints": "Aún no hay endpoints compatibles con OpenAI; añade uno en la sección de abajo primero.",
+          "serviceLabel": "Servicio",
+          "serviceHint": "p. ej. OpenAI, Groq, Ollama",
+          "capabilityLabel": "Capacidad",
+          "providerIdLabel": "ID del modelo",
+          "providerIdHint": "El id exacto del modelo que espera la API (p. ej. llama3, gpt-4.1).",
+          "nameLabel": "Nombre visible",
+          "nameHint": "Se muestra a los usuarios en el selector de modelos.",
+          "selectable": "Seleccionable por los usuarios",
+          "active": "Activo",
+          "submit": "Añadir modelo",
+          "submitting": "Añadiendo…",
+          "created": "Modelo añadido",
+          "serviceRequired": "El servicio es obligatorio",
+          "providerIdRequired": "El ID del modelo es obligatorio",
+          "nameRequired": "El nombre visible es obligatorio"
+        }
+      },
       "chat": "Modelo de Chat",
       "sorting": "Modelo de Ordenamiento",
       "usedFor": "Usado para",

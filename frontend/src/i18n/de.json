@@ -1192,7 +1192,30 @@
         "failedSave": "Modell speichern fehlgeschlagen",
         "failedDelete": "Modell löschen fehlgeschlagen",
         "requiredFields": "Alle Felder sind erforderlich: Service, Tag, Provider-ID, Name",
-        "searchPlaceholder": "Modelle suchen..."
+        "searchPlaceholder": "Modelle suchen...",
+        "addForm": {
+          "title": "Modell hinzufügen",
+          "subtitle": "Registriere ein einzelnes KI-Modell. Wähle einen OpenAI-kompatiblen Endpunkt, um dein eigenes KI-Backbone anzubinden, oder wähle „Integrierter Anbieter“, um ein Modell für einen gehosteten Anbieter hinzuzufügen.",
+          "endpointLabel": "Endpunkt",
+          "endpointBuiltin": "Integrierter Anbieter (manuell)",
+          "endpointHint": "Dieses Modell verwendet den ausgewählten OpenAI-kompatiblen Endpunkt.",
+          "noEndpoints": "Noch keine OpenAI-kompatiblen Endpunkte — füge zuerst unten einen hinzu.",
+          "serviceLabel": "Service",
+          "serviceHint": "z. B. OpenAI, Groq, Ollama",
+          "capabilityLabel": "Fähigkeit",
+          "providerIdLabel": "Modell-ID",
+          "providerIdHint": "Die exakte Modell-ID, die die API erwartet (z. B. llama3, gpt-4.1).",
+          "nameLabel": "Anzeigename",
+          "nameHint": "Wird Nutzern in der Modellauswahl angezeigt.",
+          "selectable": "Von Nutzern auswählbar",
+          "active": "Aktiv",
+          "submit": "Modell hinzufügen",
+          "submitting": "Wird hinzugefügt…",
+          "created": "Modell hinzugefügt",
+          "serviceRequired": "Service ist erforderlich",
+          "providerIdRequired": "Modell-ID ist erforderlich",
+          "nameRequired": "Anzeigename ist erforderlich"
+        }
       },
       "pagination": {
         "showing": "Zeige {start}–{end} von {total}"
