@@ -1,0 +1,94 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit;
+
+use App\Entity\ApiKey;
+use App\Entity\User;
+use App\Repository\ApiKeyRepository;
+use App\Repository\UserRepository;
+use App\Service\Admin\AdminUserProvisioningService;
+use App\Service\ModelConfigService;
+use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+
+final class AdminUserProvisioningServiceTest extends TestCase
+{
+    private UserRepository&Stub $userRepository;
+    private ApiKeyRepository&MockObject $apiKeyRepository;
+    private EntityManagerInterface&Stub $em;
+    private ModelConfigService&Stub $modelConfig;
+    private AdminUserProvisioningService $service;
+
+    protected function setUp(): void
+    {
+        $this->userRepository = $this->createStub(UserRepository::class);
+        $this->apiKeyRepository = $this->createMock(ApiKeyRepository::class);
+        $this->em = $this->createStub(EntityManagerInterface::class);
+        $this->modelConfig = $this->createStub(ModelConfigService::class);
+
+        $this->service = new AdminUserProvisioningService(
+            $this->userRepository,
+            $this->apiKeyRepository,
+            $this->em,
+            $this->modelConfig,
+            new NullLogger(),
+        );
+    }
+
+    public function testProvisionRejectsEmptySource(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service->provision('', 'ext-1', 'a@b.test');
+    }
+
+    public function testProvisionRejectsInvalidEmail(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service->provision('nextcloud', 'ext-1', 'not-an-email');
+    }
+
+    public function testProvisionRejectsInvalidLevel(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service->provision('nextcloud', 'ext-1', 'a@b.test', 'Name', 'ADMIN');
+    }
+
+    public function testMintApiKeyGeneratesPrefixedKeyWithScopes(): void
+    {
+        $this->apiKeyRepository->expects($this->once())
+            ->method('save')
+            ->with($this->isInstanceOf(ApiKey::class));
+
+        $user = $this->userWithId(149);
+        $result = $this->service->mintApiKeyForUser($user, 'nc-alice', ['chat', 'files']);
+
+        $this->assertStringStartsWith('sk_', $result['plainKey']);
+        $this->assertSame(['chat', 'files'], $result['entity']->getScopes());
+        $this->assertSame('nc-alice', $result['entity']->getName());
+        $this->assertSame('active', $result['entity']->getStatus());
+    }
+
+    public function testMintApiKeyDefaultsToWildcardScope(): void
+    {
+        $this->apiKeyRepository->method('save');
+
+        $result = $this->service->mintApiKeyForUser($this->userWithId(150), '', []);
+
+        $this->assertSame(['*'], $result['entity']->getScopes());
+        $this->assertSame('external-integration', $result['entity']->getName());
+    }
+
+    private function userWithId(int $id): User
+    {
+        $user = new User();
+        $ref = new \ReflectionProperty(User::class, 'id');
+        $ref->setValue($user, $id);
+
+        return $user;
+    }
+}

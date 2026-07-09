@@ -1,6 +1,7 @@
 <template>
   <span class="service-icon" :style="rootStyle">
-    <GroqIcon v-if="isGroq" :size="size" />
+    <OpenAiCompatibleIcon v-if="isOpenAiCompatible" :size="size" />
+    <GroqIcon v-else-if="isGroq" :size="size" />
     <MistralIcon v-else-if="isMistral" :size="size" />
     <Icon v-else :icon="providerIcon" :style="rootStyle" />
     <Icon
@@ -18,6 +19,7 @@ import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import MistralIcon from '@/components/icons/MistralIcon.vue'
+import OpenAiCompatibleIcon from '@/components/icons/OpenAiCompatibleIcon.vue'
 import { getProviderIcon, getProviderFlag } from '@/utils/providerIcons'
 
 interface Props {
@@ -30,6 +32,15 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const hasService = computed(() => props.service.trim().length > 0)
+// Check the OpenAI-compatible provider FIRST: its service string
+// ("openaicompatible") contains "openai", so it must win before any
+// substring check that would otherwise show the OpenAI logo + US flag.
+const isOpenAiCompatible = computed(() =>
+  props.service
+    .toLowerCase()
+    .replace(/[\s_-]/g, '')
+    .includes('openaicompatible')
+)
 const isGroq = computed(() => props.service.toLowerCase().includes('groq'))
 const isMistral = computed(() => props.service.toLowerCase().includes('mistral'))
 const providerIcon = computed(() => getProviderIcon(props.service))

@@ -302,6 +302,17 @@ services:
         tags:
             - { name: 'app.ai.embedding' }
 
+    # Generic "OpenAI Compatible" provider (LocalAI, vLLM, LiteLLM, Ollama /v1,
+    # …). Endpoints are configured at runtime and stored encrypted in BCONFIG
+    # via OpenAiCompatibleEndpointRegistry — there are no env credentials.
+    App\AI\Provider\OpenAICompatibleProvider:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.vision' }
+
     # AI Facade
     App\AI\Service\AiFacade:
         arguments:
