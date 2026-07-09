@@ -1332,15 +1332,25 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         // Build full path
         $fullPath = $this->uploadDir.'/'.ltrim($imagePath, '/');
 
-        // Check if file exists
+        // Check if file exists. Keep the absolute path in logs only; the
+        // message may be surfaced to API clients (MediaController returns
+        // ProviderException::getMessage()), so it must not leak server paths.
         if (!file_exists($fullPath)) {
-            throw new ProviderException('OpenAI vision error: Image file not found: '.$fullPath, 'openai');
+            $this->logger->error('OpenAI: image file not found', ['path' => $fullPath]);
+            throw new ProviderException('OpenAI vision error: Image file not found: '.basename($imagePath), 'openai');
         }
 
-        // Read image and convert to a data URL
+        // Read image and convert to a data URL. Both calls can fail (races,
+        // permissions, unreadable content); guard them so we never build a
+        // malformed data URL from a false return value.
         $imageData = file_get_contents($fullPath);
-        $base64Image = base64_encode($imageData);
         $mimeType = mime_content_type($fullPath);
+        if (false === $imageData || false === $mimeType) {
+            $this->logger->error('OpenAI: failed to read image or detect MIME type', ['path' => $fullPath]);
+            throw new ProviderException('OpenAI vision error: Unable to read image file: '.basename($imagePath), 'openai');
+        }
+
+        $base64Image = base64_encode($imageData);
         $dataUrl = "data:{$mimeType};base64,{$base64Image}";
 
         $this->logger->info('OpenAI: Analyzing image', [

@@ -206,6 +206,7 @@
               v-model="modelSearch"
               type="search"
               :placeholder="$t('config.aiModels.searchPlaceholder')"
+              :aria-label="$t('config.aiModels.searchPlaceholder')"
               class="w-full sm:w-64 pl-9 pr-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               data-testid="input-model-search"
             />
