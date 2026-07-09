@@ -1440,8 +1440,24 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             }
 
             $response = $this->executeResponsesCreate($requestOptions);
+            $text = $response->outputText ?? '';
 
-            return $response->outputText ?? '';
+            if ('' === trim($text)) {
+                // A reasoning model can spend the whole output-token budget on
+                // chain-of-thought and return no visible text (status
+                // "incomplete", reason "max_output_tokens"). The "pro" tiers
+                // force at least `medium` effort and can't be dialed down, so
+                // they routinely truncate or time out on synchronous OCR.
+                // Surface this as a failure so the caller falls back to another
+                // vision provider instead of silently accepting an empty result.
+                $arr = $response->toArray();
+                $status = (string) ($arr['status'] ?? 'unknown');
+                $reason = $arr['incomplete_details']['reason'] ?? null;
+
+                throw new ProviderException(sprintf('OpenAI vision returned no text (model=%s, status=%s%s). Reasoning-heavy models such as the "pro" tiers are a poor fit for synchronous OCR; select a non-pro vision model (e.g. gpt-5.5).', $model, $status, null !== $reason ? ', reason='.$reason : ''), 'openai');
+            }
+
+            return $text;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -1453,7 +1469,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
      * Detect the HTTP 400 OpenAI returns when a Responses-only model (e.g. the
      * "pro" reasoning tiers) is called on v1/chat/completions:
      *   "This is not a chat model and thus not supported in the
-     *    v1/chat/completions endpoint. Did you mean to use v1/completions?"
+     *    v1/chat/completions endpoint. Did you mean to use v1/completions?".
      */
     private function isNotAChatModelError(\Throwable $e): bool
     {
