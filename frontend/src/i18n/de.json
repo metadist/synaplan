@@ -2276,7 +2276,12 @@
       "title": "Erzeugt",
       "subtitle": "Bilder, Video und Audio aus deinen Chats.",
       "openInChat": "Im Chat öffnen",
-      "download": "Herunterladen"
+      "download": "Herunterladen",
+      "autoGroup": "KI wählt einen Ordner",
+      "deleteConfirmTitle": "Erzeugte Datei löschen?",
+      "deleteConfirmMessage": "\"{name}\" wird dauerhaft gelöscht, einschließlich der indexierten Inhalte in deiner Wissensbasis. Das kann nicht rückgängig gemacht werden.",
+      "deleted": "Datei gelöscht, einschließlich der indexierten Inhalte.",
+      "deleteFailed": "Datei konnte nicht gelöscht werden. Bitte versuche es erneut."
     },
     "explainer": {
       "text": "Alles, was du hochlädst oder erstellst, liegt hier. Als „KI-durchsuchbar“ markierte Dateien werden deiner Wissensbasis hinzugefügt, damit der Assistent sie nutzen kann.",
