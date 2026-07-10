@@ -1162,6 +1162,30 @@
   color: var(--brand) !important;
 }
 
+/* EXCEPTION: the plus-menu popup (.dropdown-up) is a DOM descendant of the
+   white composer shell but keeps its dark glass background, so the light-box
+   ink colors above must NOT leak into it. Restore the dark-theme pill and
+   secondary-text colors for everything rendered inside the popup. */
+.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .pill {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #e4e5e9 !important;
+}
+.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .pill:hover {
+  background: rgba(107, 143, 214, 0.12) !important;
+  border-color: rgba(107, 143, 214, 0.3) !important;
+  color: var(--brand-light) !important;
+}
+.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .pill--active {
+  background: rgba(107, 143, 214, 0.1) !important;
+  border-color: rgba(107, 143, 214, 0.3) !important;
+  color: var(--brand-light) !important;
+}
+.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .txt-secondary,
+.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .txt-muted {
+  color: #9aa3b2 !important;
+}
+
 /* Send button keeps its vivid brand fill with a crisp white glyph */
 .design-v2.dark [data-testid='comp-chat-input-shell'] .btn-primary {
   color: #ffffff;
