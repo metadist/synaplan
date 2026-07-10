@@ -11,6 +11,7 @@ use App\Service\FeedbackConstants;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -109,6 +110,12 @@ final readonly class SystemConfigService
                 'label' => 'Routing',
                 'sections' => [
                     'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
+                ],
+            ],
+            'interface' => [
+                'label' => 'Interface',
+                'sections' => [
+                    'usage_display' => ['label' => 'Usage display', 'fields' => ['USAGE_TAXIMETER_ENABLED']],
                 ],
             ],
             'guest_landing' => [
@@ -724,6 +731,18 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MediaJobConfig::CONFIG_GROUP,
                 'dbKey' => MediaJobConfig::KEY_ASYNC_JOBS_ENABLED,
+            ],
+            // === Interface — in-chat usage taximeter (database-backed, no restart) ===
+            // Master switch (BCONFIG group USAGE_TAXIMETER, ownerId=0) for the in-chat
+            // consumption bar/ring + per-message token-cost badge. Default ON.
+            'USAGE_TAXIMETER_ENABLED' => [
+                'tab' => 'interface', 'section' => 'usage_display', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show the in-chat usage display: a consumption bar (desktop) / ring (mobile) with today\'s spend, a session statistics popover, and a token-cost badge on each AI reply. When OFF, none of these render and the app skips the extra daily-total queries. This does NOT affect the full Statistics page or the recorded usage data — it only toggles the in-chat display. On by default.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => UsageTaximeterConfig::CONFIG_GROUP,
+                'dbKey' => UsageTaximeterConfig::KEY_ENABLED,
             ],
             // === Branding (database-backed, no restart required) ===
             // Stored in BCONFIG group BRANDING (ownerId=0) — the rows BrandingService

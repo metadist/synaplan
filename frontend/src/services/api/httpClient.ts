@@ -146,6 +146,9 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         marketingNews: {
           enabled: false,
         },
+        usageTaximeter: {
+          enabled: true,
+        },
         build: {
           version: 'unknown',
           ip: 'dev',

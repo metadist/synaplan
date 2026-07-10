@@ -103,6 +103,17 @@
     "heading": "Neues von Synaplan",
     "readMore": "Mehr lesen"
   },
+  "usageTaximeter": {
+    "sessionLabel": "Sitzung",
+    "todayTooltip": "{tokens} Tokens heute",
+    "todayAria": "Verbrauch heute: {cost}",
+    "openStats": "Nutzungsstatistik anzeigen",
+    "usedModels": "Verwendete Modelle",
+    "promptsInSession": "Prompts in dieser Sitzung",
+    "modelChanges": "Modelländerungen: {count}",
+    "allStatistics": "Alle Statistiken",
+    "lessThanCent": "< 0,01 €"
+  },
   "chat": {
     "title": "Chat",
     "newChat": "Neuer Chat",

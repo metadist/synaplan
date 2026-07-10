@@ -22,6 +22,7 @@ use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
+use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -69,6 +70,7 @@ final class ConfigControllerPlannerModelTest extends TestCase
             $this->createStub(BrandingService::class),
             $this->createStub(MobileVersionService::class),
             $this->createStub(MarketingNewsConfig::class),
+            $this->createStub(UsageTaximeterConfig::class),
             'http://qdrant.example',
         );
 

@@ -18,6 +18,8 @@ use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\UsageStatsService;
+use App\Service\UsageTaximeterConfig;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -65,6 +67,8 @@ final class StreamControllerRagGroupKeyTest extends TestCase
             $this->createMock(MediaCancellationStore::class),
             $this->createMock(MediaJobService::class),
             $this->createMock(MediaJobMessageSync::class),
+            $this->createMock(UsageStatsService::class),
+            $this->createMock(UsageTaximeterConfig::class),
         );
     }
 

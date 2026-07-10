@@ -561,6 +561,39 @@ final readonly class UsageStatsService
     }
 
     /**
+     * Live daily totals for the in-chat usage taximeter.
+     *
+     * Two cheap SUM queries over BUSELOG from the start of today (server local
+     * time, matching getCostSummary()'s `today`). Cost is the CHARGED amount
+     * (raw provider cost + operator markup) so it is consistent with the
+     * /statistics cost budget. Costs are decimal strings (6 dp) for lossless
+     * transport; tokens are an int.
+     *
+     * @return array{todayCost: string, todayTokens: int}
+     */
+    public function getLiveTotals(User $user): array
+    {
+        $conn = $this->em->getConnection();
+        $todayStart = (int) strtotime('today');
+
+        $row = $conn->fetchAssociative(
+            'SELECT COALESCE(SUM(BCOST), 0) AS raw_cost, COALESCE(SUM(BTOKENS), 0) AS tokens
+             FROM BUSELOG
+             WHERE BUSERID = :user_id AND BUNIXTIMES >= :since',
+            ['user_id' => $user->getId(), 'since' => $todayStart]
+        );
+
+        $rawCost = (float) ($row['raw_cost'] ?? 0);
+        $markupMultiplier = 1.0 + ($this->rateLimitService->getMarkupPercent() / 100.0);
+        $chargedCost = $rawCost * $markupMultiplier;
+
+        return [
+            'todayCost' => number_format($chargedCost, 6, '.', ''),
+            'todayTokens' => (int) ($row['tokens'] ?? 0),
+        ];
+    }
+
+    /**
      * Get cost summary by time period.
      */
     private function getCostSummary(int $userId): array

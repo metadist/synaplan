@@ -10,6 +10,7 @@ use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobService;
 use App\Service\Media\MediaJobUsageRecorder;
 use App\Service\RateLimitService;
+use App\Service\Usage\RecordedUsage;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -56,8 +57,10 @@ final class MediaJobUsageRecorderTest extends TestCase
         $captured = null;
         $this->rateLimit->expects(self::once())
             ->method('recordUsage')
-            ->willReturnCallback(function (User $u, string $action, array $meta) use (&$captured): void {
+            ->willReturnCallback(function (User $u, string $action, array $meta) use (&$captured): RecordedUsage {
                 $captured = ['action' => $action, 'meta' => $meta];
+
+                return new RecordedUsage('0.000000', '0.000000', 0, 0, 0);
             });
         // The job is flagged + persisted so a re-sync won't double-bill.
         $this->jobService->expects(self::once())->method('save')->with($job);
@@ -75,8 +78,10 @@ final class MediaJobUsageRecorderTest extends TestCase
 
         $actions = [];
         $this->rateLimit->method('recordUsage')->willReturnCallback(
-            function (User $u, string $action) use (&$actions): void {
+            function (User $u, string $action) use (&$actions): RecordedUsage {
                 $actions[] = $action;
+
+                return new RecordedUsage('0.000000', '0.000000', 0, 0, 0);
             }
         );
 

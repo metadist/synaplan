@@ -17,6 +17,7 @@ use App\Seed\PromptSeeder;
 use App\Seed\RateLimitConfigSeeder;
 use App\Seed\SeedResult;
 use App\Seed\SubscriptionPlanSeeder;
+use App\Seed\UsageTaximeterConfigSeeder;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -38,7 +39,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *   9. branding      (BCONFIG: BRANDING white-label defaults, ownerId=0)
  *  10. mobile        (BCONFIG: MOBILE forced-update gate defaults, ownerId=0)
  *  11. marketing-news (BCONFIG: MARKETING_NEWS guest-landing flags, master switch OFF)
- *  12. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *  12. usage-taximeter (BCONFIG: USAGE_TAXIMETER display switch, ownerId=0 — default ON)
+ *  13. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -62,6 +64,7 @@ final class SeedAllCommand extends Command
         private readonly BrandingConfigSeeder $brandingConfigSeeder,
         private readonly MobileConfigSeeder $mobileConfigSeeder,
         private readonly MarketingNewsConfigSeeder $marketingNewsConfigSeeder,
+        private readonly UsageTaximeterConfigSeeder $usageTaximeterConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -81,7 +84,8 @@ final class SeedAllCommand extends Command
             "  9. branding defaults           (BCONFIG, group=BRANDING, ownerId=0)\n".
             "  10. mobile gate defaults       (BCONFIG, group=MOBILE, ownerId=0)\n".
             "  11. marketing news flags       (BCONFIG, group=MARKETING_NEWS, ownerId=0 — master switch OFF)\n".
-            "  12. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  12. usage taximeter switch      (BCONFIG, group=USAGE_TAXIMETER, ownerId=0 — default ON)\n".
+            "  13. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }
@@ -103,6 +107,7 @@ final class SeedAllCommand extends Command
             ['branding',    fn (): SeedResult => $this->brandingConfigSeeder->seed()],
             ['mobile',      fn (): SeedResult => $this->mobileConfigSeeder->seed()],
             ['marketing-news', fn (): SeedResult => $this->marketingNewsConfigSeeder->seed()],
+            ['usage-taximeter', fn (): SeedResult => $this->usageTaximeterConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 

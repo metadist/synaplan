@@ -117,8 +117,10 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         $this->recordedUsage = [];
         $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->rateLimitService->method('recordUsage')->willReturnCallback(
-            function (object $user, string $action, array $meta): void {
+            function (object $user, string $action, array $meta): \App\Service\Usage\RecordedUsage {
                 $this->recordedUsage[] = ['action' => $action, 'meta' => $meta];
+
+                return new \App\Service\Usage\RecordedUsage('0.000000', '0.000000', 0, 0, 0);
             }
         );
 
