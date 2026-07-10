@@ -174,11 +174,11 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
 
         $results = $this->search($query);
 
-        // Filter out the source chunk itself
-        return array_filter(
+        // Filter out the source chunk itself and re-index so JSON serialization produces an array
+        return array_values(array_filter(
             $results,
             fn (SearchResult $r) => $r->chunkId !== $intChunkId
-        );
+        ));
     }
 
     public function getStats(int $userId): StorageStats

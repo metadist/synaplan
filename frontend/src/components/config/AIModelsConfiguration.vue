@@ -423,6 +423,8 @@
 
     <AIModelsAdminPanel v-if="authStore.isAdmin" />
 
+    <OpenAiCompatibleEndpointsPanel v-if="authStore.isAdmin" />
+
     <EmbeddingSwitchModal
       :open="switchModalOpen"
       :to-model-id="switchModalTargetId"
@@ -451,6 +453,7 @@ import {
   MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
+import OpenAiCompatibleEndpointsPanel from '@/components/config/OpenAiCompatibleEndpointsPanel.vue'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'

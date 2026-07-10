@@ -169,11 +169,11 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
 
         $results = $this->search($query);
 
-        // Filter out source
-        return array_filter(
+        // Filter out source and re-index so JSON serialization produces an array
+        return array_values(array_filter(
             $results,
             fn (SearchResult $r) => (string) $r->chunkId !== (string) $sourceChunkId
-        );
+        ));
     }
 
     public function getStats(int $userId): StorageStats
