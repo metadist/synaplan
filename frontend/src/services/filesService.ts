@@ -1066,14 +1066,22 @@ export async function describeVectorizeSortFile(fileId: number): Promise<{
 
 /**
  * Add an AI-generated file's generation prompt to the knowledge base on demand.
+ * Pass a groupKey to file it into a specific knowledge group; without one the
+ * backend lets the AI pick a suitable group.
  */
-export async function indexPromptFile(fileId: number): Promise<{
+export async function indexPromptFile(
+  fileId: number,
+  groupKey?: string
+): Promise<{
   success: boolean
   chunksCreated?: number
   groupKey?: string
   error?: string
 }> {
-  return httpClient(`/api/v1/files/${fileId}/index-prompt`, { method: 'POST' })
+  return httpClient(`/api/v1/files/${fileId}/index-prompt`, {
+    method: 'POST',
+    ...(groupKey ? { body: JSON.stringify({ group_key: groupKey }) } : {}),
+  })
 }
 
 /**

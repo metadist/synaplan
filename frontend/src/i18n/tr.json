@@ -1724,7 +1724,12 @@
       "title": "Üretilen",
       "subtitle": "Sohbetlerinizde oluşturulan görseller, video ve ses.",
       "openInChat": "Sohbette aç",
-      "download": "İndir"
+      "download": "İndir",
+      "autoGroup": "Klasörü yapay zekâ seçsin",
+      "deleteConfirmTitle": "Üretilen dosya silinsin mi?",
+      "deleteConfirmMessage": "\"{name}\" kalıcı olarak silinecek; bilgi tabanınızdaki dizinlenmiş içeriği de kaldırılacak. Bu işlem geri alınamaz.",
+      "deleted": "Dosya silindi, dizinlenmiş içeriği de kaldırıldı.",
+      "deleteFailed": "Dosya silinemedi. Lütfen tekrar deneyin."
     },
     "explainer": {
       "text": "Yüklediğiniz veya oluşturduğunuz her şey burada. „Yapay zekâ ile aranabilir“ olarak işaretli dosyalar bilgi tabanınıza eklenir; böylece asistan bunları kullanabilir.",

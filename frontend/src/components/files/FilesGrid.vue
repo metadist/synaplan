@@ -46,12 +46,12 @@
       <div
         v-for="file in files"
         :key="file.id"
-        class="group rounded-lg border border-light-border/15 dark:border-dark-border/5 overflow-hidden bg-white dark:bg-white/[0.02]"
+        class="group rounded-lg border border-light-border/15 dark:border-dark-border/5 bg-white dark:bg-white/[0.02]"
         data-testid="grid-tile"
       >
         <div
           :class="[
-            'w-full overflow-hidden bg-gray-100 dark:bg-gray-800 relative flex items-center justify-center',
+            'w-full overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-800 relative flex items-center justify-center',
             kindOf(file) === 'audio' ? 'p-2' : 'aspect-video',
           ]"
         >
@@ -86,6 +86,13 @@
             {{ file.display_name || file.filename }}
           </p>
           <p class="text-[10px] txt-secondary truncate">{{ file.uploaded_date }}</p>
+          <div v-if="file.is_vectorized" class="mt-1">
+            <FileVectorPill
+              :state="file.vector_state ?? 'vectorized'"
+              :chunk-count="file.chunk_count ?? 0"
+              :group-key="file.group_key ?? null"
+            />
+          </div>
           <div class="flex items-center gap-1 mt-1.5">
             <button
               class="flex-1 px-2 py-1 rounded-md bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-[11px] font-medium flex items-center justify-center gap-1"
@@ -104,6 +111,79 @@
               @click="openInChat(file)"
             >
               <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
+            </button>
+            <div v-if="!file.is_vectorized" class="relative">
+              <button
+                class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:text-[var(--brand)] transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
+                :title="$t('files.indexPromptAction')"
+                :disabled="isIndexing(file.id)"
+                :data-testid="`btn-generated-index-${file.id}`"
+                @click.stop="toggleKbMenu(file.id)"
+              >
+                <Icon
+                  :icon="isIndexing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'"
+                  class="w-3.5 h-3.5"
+                  :class="isIndexing(file.id) && 'animate-spin'"
+                />
+              </button>
+              <Transition name="fade">
+                <div
+                  v-if="kbMenuOpen === file.id"
+                  class="absolute right-0 bottom-full mb-1 z-30 w-52 surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
+                  :data-testid="`menu-generated-index-${file.id}`"
+                  @click.stop
+                >
+                  <div
+                    class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider txt-secondary"
+                  >
+                    {{ $t('files.indexPromptAction') }}
+                  </div>
+                  <button
+                    class="w-full flex items-center gap-2 px-3 py-2 text-xs txt-primary hover:bg-[var(--brand)]/10 transition-colors text-left"
+                    :data-testid="`btn-generated-index-auto-${file.id}`"
+                    @click="addToKnowledgeBase(file)"
+                  >
+                    <Icon icon="mdi:auto-fix" class="w-4 h-4 shrink-0 text-[var(--brand)]" />
+                    <span class="truncate">{{ $t('files.generated.autoGroup') }}</span>
+                  </button>
+                  <button
+                    v-for="folder in folders"
+                    :key="folder.name"
+                    class="w-full flex items-center gap-2 px-3 py-2 text-xs txt-primary hover:bg-[var(--brand)]/10 transition-colors text-left"
+                    @click="addToKnowledgeBase(file, folder.name)"
+                  >
+                    <Icon icon="heroicons:folder-solid" class="w-4 h-4 shrink-0" />
+                    <span class="truncate">{{ folder.name }}</span>
+                  </button>
+                  <div
+                    class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5"
+                  >
+                    <div class="flex items-center gap-1.5 px-3 py-1">
+                      <Icon
+                        icon="heroicons:folder-plus"
+                        class="w-4 h-4 text-[var(--brand)] shrink-0"
+                      />
+                      <input
+                        v-model="newFolderName"
+                        type="text"
+                        class="flex-1 text-xs bg-transparent txt-primary placeholder:txt-secondary/50 focus:outline-none"
+                        :placeholder="$t('files.folderPicker.newPlaceholder')"
+                        @keyup.enter="addToKnowledgeBase(file, newFolderName.trim())"
+                        @click.stop
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+            <button
+              class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 text-red-400/70 hover:text-red-500 hover:bg-red-500/10 transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
+              :title="$t('files.delete')"
+              :disabled="isDeleting(file.id)"
+              :data-testid="`btn-generated-delete-${file.id}`"
+              @click="confirmAndDelete(file)"
+            >
+              <TrashIcon class="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -142,21 +222,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
+import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import MessageVideo from '@/components/MessageVideo.vue'
 import MessageAudio from '@/components/MessageAudio.vue'
+import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import filesService, { type FileItem, type FileOriginKind } from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
 import { useChatsStore } from '@/stores/chats'
 
 const { t } = useI18n()
 const router = useRouter()
-const { error: showError } = useNotification()
+const { success: showSuccess, error: showError } = useNotification()
+const { confirm } = useDialog()
 const chatsStore = useChatsStore()
 
 const files = ref<FileItem[]>([])
@@ -165,6 +248,32 @@ const currentPage = ref(1)
 const totalCount = ref(0)
 const itemsPerPage = 30
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / itemsPerPage)))
+
+// Knowledge-base menu + per-file busy state for index/delete actions.
+const folders = ref<Array<{ name: string; count: number }>>([])
+const kbMenuOpen = ref<number | null>(null)
+const newFolderName = ref('')
+const indexingIds = ref<number[]>([])
+const deletingIds = ref<number[]>([])
+const isIndexing = (id: number) => indexingIds.value.includes(id)
+const isDeleting = (id: number) => deletingIds.value.includes(id)
+
+const toggleKbMenu = (id: number) => {
+  kbMenuOpen.value = kbMenuOpen.value === id ? null : id
+  newFolderName.value = ''
+}
+
+const closeKbMenu = () => {
+  kbMenuOpen.value = null
+}
+
+const loadFolders = async () => {
+  try {
+    folders.value = await filesService.getFileGroups()
+  } catch {
+    folders.value = []
+  }
+}
 
 const load = async (page = currentPage.value) => {
   loading.value = true
@@ -244,5 +353,78 @@ const openInChat = (file: FileItem) => {
   router.push({ name: 'chat' })
 }
 
-onMounted(load)
+// Index the generated artefact into the knowledge base: AI description with
+// generation-prompt fallback (backend), filed into the chosen group — or an
+// AI-suggested one when no group is picked.
+const addToKnowledgeBase = async (file: FileItem, groupKey?: string) => {
+  closeKbMenu()
+  if (isIndexing(file.id)) return
+  if (groupKey !== undefined && groupKey === '') return
+  indexingIds.value = [...indexingIds.value, file.id]
+  try {
+    const res = await filesService.indexPromptFile(file.id, groupKey)
+    if (res.success) {
+      if (res.groupKey) {
+        showSuccess(t('files.describeSortDoneGroup', { group: res.groupKey }))
+      } else {
+        showSuccess(t('files.indexPromptDone'))
+      }
+      await Promise.all([load(), loadFolders()])
+    } else {
+      showError(res.error || t('files.describeSortFailed'))
+    }
+  } catch {
+    showError(t('files.describeSortFailed'))
+  } finally {
+    indexingIds.value = indexingIds.value.filter((x) => x !== file.id)
+  }
+}
+
+// Delete the artefact: the backend removes its vector chunks, the stored file
+// and the DB row in one call.
+const confirmAndDelete = async (file: FileItem) => {
+  if (isDeleting(file.id)) return
+  const confirmed = await confirm({
+    title: t('files.generated.deleteConfirmTitle'),
+    message: t('files.generated.deleteConfirmMessage', {
+      name: file.display_name || file.filename,
+    }),
+    confirmText: t('files.delete'),
+    danger: true,
+  })
+  if (!confirmed) return
+
+  deletingIds.value = [...deletingIds.value, file.id]
+  try {
+    await filesService.deleteFile(file.id)
+    showSuccess(t('files.generated.deleted'))
+    await Promise.all([load(), loadFolders()])
+  } catch {
+    showError(t('files.generated.deleteFailed'))
+  } finally {
+    deletingIds.value = deletingIds.value.filter((x) => x !== file.id)
+  }
+}
+
+onMounted(() => {
+  void load()
+  void loadFolders()
+  document.addEventListener('click', closeKbMenu)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeKbMenu)
+})
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

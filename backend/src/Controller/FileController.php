@@ -311,9 +311,15 @@ class FileController extends AbstractController
     #[OA\Post(
         path: '/api/v1/files/{id}/index-prompt',
         summary: 'Add an AI-generated file to the knowledge base (AI description)',
-        description: 'Vectorizes an AI DESCRIPTION of the generated artefact so it becomes searchable by its actual content (#1224). The stored generation prompt is only a fallback when no description can be derived.',
+        description: 'Vectorizes an AI DESCRIPTION of the generated artefact so it becomes searchable by its actual content (#1224). The stored generation prompt is only a fallback when no description can be derived. An optional group_key files the content into that knowledge group instead of the AI-suggested one.',
         tags: ['Files'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [new OA\Property(property: 'group_key', type: 'string', nullable: true, example: 'Marketing')]
+            )
+        ),
         responses: [
             new OA\Response(response: 200, description: 'File indexed'),
             new OA\Response(response: 401, description: 'Not authenticated'),
@@ -322,7 +328,7 @@ class FileController extends AbstractController
             new OA\Response(response: 500, description: 'Vectorization failed'),
         ]
     )]
-    public function indexPrompt(int $id, #[CurrentUser] ?User $user): JsonResponse
+    public function indexPrompt(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -331,6 +337,15 @@ class FileController extends AbstractController
         $file = $this->fileRepository->find($id);
         if (!$file || $file->getUserId() !== $user->getId()) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Optional target knowledge group: both indexing paths below keep a
+        // user-chosen group (they only auto-suggest when none is set), so
+        // setting it on the file up front routes the vectors there.
+        $body = '' !== $request->getContent() ? $request->toArray() : [];
+        $requestedGroup = isset($body['group_key']) && is_string($body['group_key']) ? trim($body['group_key']) : '';
+        if ('' !== $requestedGroup && 'DEFAULT' !== $requestedGroup) {
+            $file->setGroupKey($requestedGroup);
         }
 
         // #1224: the searchable content must be the AI DESCRIPTION of the
