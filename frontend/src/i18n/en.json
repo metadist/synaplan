@@ -338,6 +338,10 @@
       },
       "liveBadge": "Live",
       "liveHint": "Changes take effect immediately, no restart required.",
+      "brandingMode": {
+        "light": "You are editing the LIGHT mode settings — colors saved here apply when the app is in light mode. Switch the app to dark mode to edit the dark mode colors.",
+        "dark": "You are editing the DARK mode settings — colors saved here apply when the app is in dark mode. Switch the app to light mode to edit the light mode colors."
+      },
       "restartBanner": {
         "title": "Configuration Updated — Restart Required",
         "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",
