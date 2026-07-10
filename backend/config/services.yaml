@@ -9,6 +9,12 @@ parameters:
     # Public app URL (widgets, shared links, OAuth callbacks)
     synaplan_url: '%env(APP_URL)%'
 
+    # Application/release version. Single source of truth for both the runtime
+    # config's build.version and the OpenAPI docs (info.version). Set by the
+    # build/release pipeline (from the git tag); falls back to 'dev' locally so
+    # nothing hard-codes a release number that inevitably drifts.
+    app_version_default: 'dev'
+
     # OIDC admin role claim values (comma-separated, case-insensitive)
     env(OIDC_ADMIN_ROLES): 'admin,realm-admin,synaplan-admin,administrator'
 
@@ -297,6 +303,17 @@ services:
             $apiToken: '%env(CLOUDFLARE_API_TOKEN)%'
         tags:
             - { name: 'app.ai.embedding' }
+
+    # Generic "OpenAI Compatible" provider (LocalAI, vLLM, LiteLLM, Ollama /v1,
+    # …). Endpoints are configured at runtime and stored encrypted in BCONFIG
+    # via OpenAiCompatibleEndpointRegistry — there are no env credentials.
+    App\AI\Provider\OpenAICompatibleProvider:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.vision' }
 
     # AI Facade
     App\AI\Service\AiFacade:

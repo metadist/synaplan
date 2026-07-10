@@ -22,6 +22,8 @@ concurrency:
 jobs:
   update-baselines:
     name: Regenerate visual snapshot baselines
+    # MUST match the runner used by CI's e2e-visual job — baselines recorded
+    # on a different image would be permanently red.
     runs-on: ubuntu-latest
     env:
       APP_IMAGE: synaplan-test:ci

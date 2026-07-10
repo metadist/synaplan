@@ -451,6 +451,39 @@ final readonly class ModelConfigService
     }
 
     /**
+     * Resolve the model that condenses long conversations into a rolling summary.
+     *
+     * Priority:
+     *   1. User-scoped DEFAULTMODEL.SUMMARY  (per-user override, e.g. GPT-OSS-120B)
+     *   2. Global DEFAULTMODEL.SUMMARY       (operator-configured summary model)
+     *   3. User/global DEFAULTMODEL.SORT     (default: reuse the sorting model —
+     *                                          cheap + fast, and always seeded)
+     *   4. User/global DEFAULTMODEL.CHAT     (last resort)
+     *
+     * Keeping this next to getMemoryModelConfig()/getToolsModelConfig() means the
+     * ConversationSummaryService never hardcodes a model name; operators pick the
+     * condensing model in the UI.
+     *
+     * @return array{model: ?string, provider: ?string, model_id: ?int}
+     */
+    public function getSummaryModelConfig(?int $userId = null): array
+    {
+        $modelId = $this->getDefaultModel('SUMMARY', $userId)
+            ?? $this->getDefaultModel('SORT', $userId)
+            ?? $this->getDefaultModel('CHAT', $userId);
+
+        if (!$modelId) {
+            return ['model' => null, 'provider' => null, 'model_id' => null];
+        }
+
+        return [
+            'model' => $this->getModelName($modelId),
+            'provider' => $this->getProviderForModel($modelId),
+            'model_id' => $modelId,
+        ];
+    }
+
+    /**
      * Get provider name for a specific model ID
      * Returns provider name from BMODELS.BSERVICE (e.g., 'Ollama', 'OpenAI').
      */

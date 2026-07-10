@@ -5,6 +5,8 @@ namespace App\Tests\Unit;
 use App\Entity\Message;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\MediaPromptExtractor;
+use PHPUnit\Framework\Constraint\IsType;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -31,7 +33,7 @@ class MediaPromptExtractorTest extends TestCase
             ->with(
                 $this->identicalTo($this->message),
                 $this->equalTo([]),
-                $this->isType('array'),
+                new IsType(NativeType::Array),
                 $this->isNull()
             )
             ->willReturn(['content' => '{"BMEDIA":"audio","BTEXT":"Hallo"}']);

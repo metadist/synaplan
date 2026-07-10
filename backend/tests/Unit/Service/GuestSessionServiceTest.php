@@ -183,7 +183,7 @@ class GuestSessionServiceTest extends TestCase
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
         $sessionRepo->method('countActiveSessionsByIp')->willReturn(1);
-        $sessionRepo->method('sumActiveMessageCountByIp')
+        $sessionRepo->expects(self::any())->method('sumActiveMessageCountByIp')
             ->with('1.2.3.4')
             ->willReturn(3);
 
@@ -205,7 +205,7 @@ class GuestSessionServiceTest extends TestCase
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
         $sessionRepo->method('countActiveSessionsByIp')->willReturn(2);
-        $sessionRepo->method('sumActiveMessageCountByIp')
+        $sessionRepo->expects(self::any())->method('sumActiveMessageCountByIp')
             ->with('1.2.3.4')
             ->willReturn(5);
 
@@ -295,7 +295,7 @@ class GuestSessionServiceTest extends TestCase
         $session->setIpAddress('1.2.3.4');
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
-        $sessionRepo->method('sumActiveMessageCountByIp')
+        $sessionRepo->expects(self::any())->method('sumActiveMessageCountByIp')
             ->with('1.2.3.4')
             ->willReturn(5);
 
@@ -315,7 +315,7 @@ class GuestSessionServiceTest extends TestCase
         $session->setIpAddress('10.0.0.1');
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
-        $sessionRepo->method('sumActiveMessageCountByIp')
+        $sessionRepo->expects(self::any())->method('sumActiveMessageCountByIp')
             ->with('10.0.0.1')
             ->willReturn(3);
 
@@ -441,7 +441,7 @@ class GuestSessionServiceTest extends TestCase
         $request->headers->set('CF-Connecting-IP', '10.0.0.1');
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
-        $sessionRepo->method('countActiveSessionsByIp')
+        $sessionRepo->expects(self::any())->method('countActiveSessionsByIp')
             ->with('10.0.0.1')
             ->willReturn(2);
 
@@ -458,7 +458,7 @@ class GuestSessionServiceTest extends TestCase
         $request->headers->set('CF-Connecting-IP', '10.0.0.1');
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
-        $sessionRepo->method('countActiveSessionsByIp')
+        $sessionRepo->expects(self::any())->method('countActiveSessionsByIp')
             ->with('10.0.0.1')
             ->willReturn(50);
 
@@ -478,7 +478,7 @@ class GuestSessionServiceTest extends TestCase
         $request->headers->set('CF-Connecting-IP', '10.0.0.1');
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
-        $sessionRepo->method('countActiveSessionsByIp')
+        $sessionRepo->expects(self::any())->method('countActiveSessionsByIp')
             ->with('10.0.0.1')
             ->willReturn(GuestSessionService::MAX_SESSIONS_PER_IP);
 

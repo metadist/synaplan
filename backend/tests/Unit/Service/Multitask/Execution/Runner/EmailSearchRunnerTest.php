@@ -49,7 +49,7 @@ final class EmailSearchRunnerTest extends TestCase
         );
 
         $handlers = $this->createMock(InboundEmailHandlerRepository::class);
-        $handlers->method('findActiveByUser')->with(self::USER_ID)->willReturn($accounts);
+        $handlers->expects(self::any())->method('findActiveByUser')->with(self::USER_ID)->willReturn($accounts);
 
         $searcher = $this->createMock(MailboxSearcher::class);
         if ($searchResult instanceof \Throwable) {

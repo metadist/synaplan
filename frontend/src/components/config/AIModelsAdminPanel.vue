@@ -103,6 +103,8 @@
       </div>
     </div>
 
+    <AddModelForm @created="loadModels" />
+
     <div class="surface-card p-6" data-testid="admin-ai-models-editor">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <h2 class="text-xl font-semibold txt-primary">
@@ -126,46 +128,9 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <input
-          v-model="newModel.service"
-          class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
-          :placeholder="t('config.aiModels.admin.servicePlaceholder')"
-        />
-        <input
-          v-model="newModel.tag"
-          class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
-          :placeholder="t('config.aiModels.admin.tagPlaceholder')"
-        />
-        <input
-          v-model="newModel.providerId"
-          class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
-          :placeholder="t('config.aiModels.admin.providerIdPlaceholder')"
-        />
-        <input
-          v-model="newModel.name"
-          class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
-          :placeholder="t('config.aiModels.admin.namePlaceholder')"
-        />
-      </div>
-
-      <div class="flex flex-wrap items-center gap-3 mb-6">
-        <button
-          type="button"
-          class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:opacity-90 transition"
-          :disabled="createLoading"
-          @click="createModel"
-        >
-          {{
-            createLoading
-              ? t('config.aiModels.admin.creating')
-              : t('config.aiModels.admin.createModel')
-          }}
-        </button>
-        <div class="text-xs txt-secondary">
-          {{ t('config.aiModels.admin.uniqueKey') }}:
-          <span class="txt-primary font-semibold">BSERVICE + BTAG + BPROVID</span>
-        </div>
+      <div class="text-xs txt-secondary mb-6">
+        {{ t('config.aiModels.admin.uniqueKey') }}:
+        <span class="txt-primary font-semibold">BSERVICE + BTAG + BPROVID</span>
       </div>
 
       <div v-if="modelsLoading" class="text-center py-8">
@@ -476,16 +441,10 @@ import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { adminModelsApi, type AdminModel } from '@/services/api/adminModelsApi'
+import AddModelForm from '@/components/config/AddModelForm.vue'
 
 const { t } = useI18n()
 const dialog = useDialog()
-
-interface NewModel {
-  service: string
-  tag: string
-  providerId: string
-  name: string
-}
 
 interface EditForm {
   service: string
@@ -522,7 +481,6 @@ const aiModel = ref<string | null>(null)
 
 const adminModels = ref<AdminModel[]>([])
 const modelsLoading = ref(false)
-const createLoading = ref(false)
 const rowSavingId = ref<number | null>(null)
 const rowDeletingId = ref<number | null>(null)
 const adminPage = ref(1)
@@ -545,13 +503,6 @@ const editForm = ref<EditForm>({
   rating: 0.5,
   description: null,
   json: {},
-})
-
-const newModel = ref<NewModel>({
-  service: '',
-  tag: '',
-  providerId: '',
-  name: '',
 })
 
 const validationOk = computed(
@@ -667,31 +618,6 @@ async function loadModels() {
     showError(msg)
   } finally {
     modelsLoading.value = false
-  }
-}
-
-async function createModel() {
-  const service = newModel.value.service.trim()
-  const tag = newModel.value.tag.trim()
-  const providerId = newModel.value.providerId.trim()
-  const name = newModel.value.name.trim()
-
-  if (!service || !tag || !providerId || !name) {
-    showError(t('config.aiModels.admin.requiredFields'))
-    return
-  }
-
-  createLoading.value = true
-  try {
-    await adminModelsApi.create({ service, tag, providerId, name })
-    success(t('config.aiModels.admin.modelCreated'))
-    newModel.value = { service: '', tag: '', providerId: '', name: '' }
-    await loadModels()
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : t('config.aiModels.admin.failedCreate')
-    showError(msg)
-  } finally {
-    createLoading.value = false
   }
 }
 

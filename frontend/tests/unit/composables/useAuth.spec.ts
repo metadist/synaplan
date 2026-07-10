@@ -50,15 +50,14 @@ describe('useAuth', () => {
 
   it('should login successfully', async () => {
     // Mock successful login response (cookie-based - no token in response body)
-    global.fetch = vi.fn(
-      (): Promise<Response> =>
-        Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              user: { id: 1, email: 'test@example.com', level: 'PRO' },
-            }),
-        } as Response)
+    global.fetch = vi.fn((): Promise<Response> =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            user: { id: 1, email: 'test@example.com', level: 'PRO' },
+          }),
+      } as Response)
     )
 
     const { login, isAuthenticated, user } = useAuth()
@@ -76,12 +75,11 @@ describe('useAuth', () => {
     authStore.user = { id: 1, email: 'test@example.com', level: 'PRO' }
 
     // Mock logout response
-    global.fetch = vi.fn(
-      (): Promise<Response> =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({}),
-        } as Response)
+    global.fetch = vi.fn((): Promise<Response> =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({}),
+      } as Response)
     )
 
     const { logout, isAuthenticated, user } = useAuth()
@@ -111,13 +109,12 @@ describe('useAuth', () => {
 
   it('should handle login failure', async () => {
     // Mock failed login response
-    global.fetch = vi.fn(
-      (): Promise<Response> =>
-        Promise.resolve({
-          ok: false,
-          status: 401,
-          json: () => Promise.resolve({ error: 'Invalid credentials' }),
-        } as Response)
+    global.fetch = vi.fn((): Promise<Response> =>
+      Promise.resolve({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: 'Invalid credentials' }),
+      } as Response)
     )
 
     const { login, isAuthenticated } = useAuth()

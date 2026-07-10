@@ -135,7 +135,7 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
             'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
         ]);
 
-        $this->registry->method('getEmbeddingProvider')
+        $this->registry->expects(self::any())->method('getEmbeddingProvider')
             ->with(null)
             ->willReturn($primary);
 
@@ -184,7 +184,7 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
             new ProviderException('Connection refused', 'ollama')
         );
 
-        $this->registry->method('getEmbeddingProvider')
+        $this->registry->expects(self::any())->method('getEmbeddingProvider')
             ->with(null)
             ->willReturn($primary);
 
@@ -203,7 +203,7 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
             new ProviderException('Connection refused', 'ollama')
         );
 
-        $this->registry->method('getEmbeddingProvider')
+        $this->registry->expects(self::any())->method('getEmbeddingProvider')
             ->with(null)
             ->willReturn($primary);
 

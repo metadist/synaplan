@@ -7,7 +7,9 @@ namespace App\Tests\Unit\Service\File;
 use App\AI\Service\AiFacade;
 use App\Service\File\ThumbnailService;
 use App\Service\File\VideoAnalysisService;
+use PHPUnit\Framework\Constraint\IsType;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -46,7 +48,7 @@ class VideoAnalysisServiceTest extends TestCase
         $this->aiFacade
             ->expects($this->once())
             ->method('analyzeImage')
-            ->with('13/000/clip_thumb.jpg', $this->isType('string'), 7)
+            ->with('13/000/clip_thumb.jpg', new IsType(NativeType::String), 7)
             ->willReturn(['content' => 'A person waving at the camera.']);
 
         $this->assertSame(

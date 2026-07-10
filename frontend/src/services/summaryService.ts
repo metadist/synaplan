@@ -13,11 +13,7 @@ export interface SummaryConfig {
 }
 
 export type FocusArea =
-  | 'main-ideas'
-  | 'key-facts'
-  | 'conclusions'
-  | 'action-items'
-  | 'numbers-dates'
+  'main-ideas' | 'key-facts' | 'conclusions' | 'action-items' | 'numbers-dates'
 
 export interface SummaryRequest {
   text: string

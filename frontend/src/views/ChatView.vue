@@ -149,46 +149,6 @@
               </p>
             </div>
 
-            <!-- Centered hero composer (md+ only): the input starts high on the
-                 empty screen and docks to the bottom on first send. On mobile
-                 the composer lives at the bottom instead (see below), while this
-                 welcome copy stays centered. -->
-            <div v-if="showHeroComposer" class="w-full max-w-2xl">
-              <ChatInput
-                ref="chatInputRef"
-                centered
-                :is-streaming="isStreaming"
-                :is-guest-mode="isGuestMode"
-                :banner-visible="isGuestMode && guestStore.shouldShowBanner"
-                :quote="quoting.pendingQuote.value"
-                @send="handleSendMessage"
-                @stop="handleUserStop"
-                @guest-feature-gate="handleGuestFeatureGate"
-                @clear-quote="quoting.clearPendingQuote"
-              >
-                <template v-if="isGuestMode" #banner>
-                  <GuestBanner
-                    :visible="guestStore.shouldShowBanner"
-                    :remaining="guestStore.remainingMessages"
-                    :max-messages="guestStore.maxMessages"
-                    @dismiss="guestStore.dismissBanner()"
-                  />
-                </template>
-                <template v-else-if="incognitoStore.active" #banner>
-                  <div
-                    class="flex items-center justify-center gap-2 px-4 py-2 mb-2 rounded-lg surface-chip text-xs txt-secondary"
-                    data-testid="banner-incognito"
-                  >
-                    <Icon icon="mdi:incognito" class="w-4 h-4 txt-brand flex-shrink-0" />
-                    <span>
-                      <strong class="txt-primary">{{ $t('incognito.bannerTitle') }}</strong>
-                      — {{ $t('incognito.bannerText') }}
-                    </span>
-                  </div>
-                </template>
-              </ChatInput>
-            </div>
-
             <ExamplePrompts
               v-if="!authStore.isAuthenticated && !configStore.marketingNews.enabled"
               @pick="handleExamplePick"
@@ -267,8 +227,12 @@
         @quote="quoting.confirmQuote"
       />
 
+      <!-- Single composer, always docked at the bottom. On the empty landing
+           the messages area shows only the welcome hero + example prompts;
+           keeping the input at the bottom (instead of a centered hero composer)
+           means the "+" menu and its dropdowns always open upward with room and
+           are never clipped by the chat container's overflow (issue #1285). -->
       <ChatInput
-        v-if="showBottomComposer"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
@@ -438,7 +402,6 @@ import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
   useHistoryStore,
-  parseContentWithThinking,
   isTaskCardKind,
   isTaskCardState,
   type Message,
@@ -469,7 +432,11 @@ import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
-import { parseMediaJobPayload, applyMediaJobUpdateToMessage } from '@/utils/messageMapper'
+import {
+  parseMediaJobPayload,
+  applyMediaJobUpdateToMessage,
+  mapApiMessageRow,
+} from '@/utils/messageMapper'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
@@ -554,30 +521,14 @@ const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
 
 // Empty landing: no messages, not loading, and not the guest-error state.
-// Drives the centered hero composer (rendered inside state-empty) and hides the
-// bottom sticky composer so there is only ever one live ChatInput instance.
+// Keeps the welcome content vertically centered while the composer remains
+// docked at the bottom, leaving enough room for its upward-opening menus.
 const isEmptyLanding = computed(
   () =>
     !(guestStore.initFailed && !authStore.isAuthenticated) &&
     historyStore.messages.length === 0 &&
     !historyStore.isLoadingMessages
 )
-
-// Mobile breakpoint (< md, matches Tailwind's `md`). Initialised synchronously
-// so the correct composer renders on first paint (no hero→bottom flash).
-const isMobileViewport = ref(
-  typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-)
-let mobileMql: MediaQueryList | null = null
-const handleMobileMqlChange = (event: MediaQueryListEvent) => {
-  isMobileViewport.value = event.matches
-}
-
-// On mobile the composer always docks at the bottom (messenger-style) while the
-// welcome copy stays centered; on md+ the empty screen keeps its centered hero
-// composer. Exactly one ChatInput instance is ever mounted.
-const showHeroComposer = computed(() => isEmptyLanding.value && !isMobileViewport.value)
-const showBottomComposer = computed(() => !isEmptyLanding.value || isMobileViewport.value)
 
 function handleGuestFeatureGate(key: string) {
   featureGateKey.value = key
@@ -695,38 +646,11 @@ onMounted(async () => {
       const rawMessages = await guestStore.loadMessages()
       if (rawMessages.length > 0) {
         historyStore.clear()
-        const loaded: Message[] = rawMessages.map((m) => {
-          const role: 'user' | 'assistant' = m.direction === 'IN' ? 'user' : 'assistant'
-          const parts = parseContentWithThinking(m.text || '', role)
-          const models = m.aiModels as Message['aiModels']
-          const chatModel = models?.chat
-          // Attached files (e.g. AI-generated documents) so the download
-          // badge survives a page reload in guest mode.
-          const files: Message['files'] =
-            m.files && m.files.length > 0
-              ? m.files.map((f) => ({
-                  id: f.id,
-                  filename: f.filename,
-                  fileType: f.fileType,
-                  filePath: f.filePath,
-                  fileSize: f.fileSize ?? undefined,
-                  fileMime: f.fileMime ?? undefined,
-                }))
-              : undefined
-          return {
-            id: `backend-${m.id}`,
-            role,
-            parts,
-            timestamp: new Date(m.timestamp * 1000),
-            provider: chatModel?.provider ?? m.provider ?? undefined,
-            modelLabel: chatModel?.model ?? m.provider ?? (role === 'assistant' ? 'AI' : undefined),
-            backendMessageId: m.id,
-            aiModels: models ?? null,
-            webSearch: (m.webSearch as Message['webSearch']) ?? null,
-            searchResults: (m.searchResults as Message['searchResults']) ?? null,
-            files,
-          }
-        })
+        // Use the SAME row mapper as the authenticated reload path (issue
+        // #1070) so guests keep full parity: task-plan cards and generated
+        // media (video/image/audio) survive a reload instead of collapsing to
+        // the plain answer text.
+        const loaded: Message[] = rawMessages.map((m) => mapApiMessageRow(m))
         historyStore.messages.push(...loaded)
         await nextTick()
         scrollToBottom()
@@ -802,11 +726,6 @@ onMounted(async () => {
   prefetchSseToken()
   window.addEventListener('focus', prefetchSseToken)
   document.addEventListener('visibilitychange', handleVisibilityChangeForToken)
-
-  // Track the mobile breakpoint so the composer docks at the bottom on phones.
-  mobileMql = window.matchMedia('(max-width: 767px)')
-  isMobileViewport.value = mobileMql.matches
-  mobileMql.addEventListener('change', handleMobileMqlChange)
 })
 
 const handleVisibilityChangeForToken = () => {
@@ -904,7 +823,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('focus', prefetchSseToken)
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
-  mobileMql?.removeEventListener('change', handleMobileMqlChange)
   clearDeleteDialogTimer()
   clearMemoryPollTimers()
 })
@@ -2016,6 +1934,107 @@ const streamAIResponse = async (
             processingMetadata.value = data.metadata || {}
           } else if (data.status === 'processing') {
             // Processing/routing — no UI update needed
+          } else if (data.status === 'plan') {
+            // Multitask routing: a multi-node plan was recognized. Render a task
+            // card per node. Mirrors the authenticated handler so anonymous
+            // (guest) users see the exact same DAG surface — e.g. the generated
+            // video card (issue: guest media rendered as text-only because these
+            // events were dropped). Single-node turns never emit this.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const tasks = data.metadata?.plan
+            if (message && Array.isArray(tasks) && tasks.length > 0) {
+              processingStatus.value = ''
+              processingMetadata.value = {}
+              message.wasMultitask = true
+              message.taskPlan = {
+                active: true,
+                trackId: currentTrackId,
+                replyNode:
+                  typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
+                cards: tasks.map((tk) => ({
+                  nodeId: tk.node_id,
+                  capability: tk.capability,
+                  kind: isTaskCardKind(tk.kind) ? tk.kind : 'text',
+                  state: 'pending' as const,
+                })),
+              }
+            }
+          } else if (data.status === 'plan_discarded') {
+            // The DAG failed entirely; the backend falls back to a single-bubble
+            // answer. Retract the now-misleading failed cards.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.taskPlan = null
+              message.wasMultitask = false
+            }
+          } else if (data.status === 'task_update') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && card.state === 'cancelled') {
+              // keep cancelled — a user-cancelled step is terminal on the client
+            } else if (card && isTaskCardState(data.metadata?.state)) {
+              card.state = data.metadata.state
+              if (typeof data.metadata?.error === 'string' && data.metadata.error) {
+                card.error = data.metadata.error
+              }
+              if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
+                card.prompt = data.metadata.prompt
+              }
+              if (typeof data.metadata?.query === 'string' && data.metadata.query) {
+                card.query = data.metadata.query
+              }
+              if (typeof data.metadata?.results_count === 'number') {
+                card.resultsCount = data.metadata.results_count
+              }
+            }
+          } else if (data.status === 'task_chunk') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.chunk === 'string') {
+              card.text = (card.text ?? '') + data.metadata.chunk
+            }
+          } else if (data.status === 'task_file') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.url === 'string') {
+              card.url = normalizeMediaUrl(data.metadata.url)
+              card.mediaType =
+                typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
+            }
+          } else if (data.status === 'task_progress') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && card.state !== 'cancelled') {
+              if (typeof data.metadata?.percent === 'number') {
+                card.progressPercent = data.metadata.percent
+              }
+              if (typeof data.metadata?.provider_status === 'string') {
+                card.providerStatus = data.metadata.provider_status
+              }
+              if (typeof data.metadata?.elapsed_seconds === 'number') {
+                card.elapsedSeconds = data.metadata.elapsed_seconds
+              }
+            }
+          } else if (
+            data.status === 'data' &&
+            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
+          ) {
+            // Multitask mode: the task cards are the live surface. Still
+            // accumulate the assembled reply text (compose_reply is hidden and
+            // has no card) so the 'complete' flush renders the answer body.
+            if (data.chunk) {
+              fullContent += data.chunk
+            }
+          } else if (
+            (data.status === 'file' ||
+              data.status === 'audio' ||
+              data.status === 'tts_generating' ||
+              data.status === 'links') &&
+            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
+          ) {
+            // Multitask: task cards are the live media surface, so suppress the
+            // normal single-bubble media events (they still persist on the OUT
+            // message and re-render from history on reload).
           } else if (data.status === 'data' && data.chunk) {
             if (processingStatus.value) {
               processingStatus.value = ''
@@ -2041,6 +2060,55 @@ const streamAIResponse = async (
                 message.parts.unshift(reasoningPart)
               }
               reasoningPart.content += data.chunk
+            }
+          } else if (data.status === 'file') {
+            // Single-capability media (image / video / audio) delivered outside a
+            // DAG. Without this branch the generated file never rendered for
+            // guests — they only saw the "Generated image:" text chunk.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.url) {
+              const absoluteUrl = normalizeMediaUrl(data.url)
+              if (data.type === 'image' || data.type === 'video' || data.type === 'audio') {
+                pushMediaPart(message, data.type, absoluteUrl)
+              }
+            }
+          } else if (data.status === 'tts_generating') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.parts.push({ type: 'tts_loading' })
+            }
+          } else if (data.status === 'audio') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.url) {
+              const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
+              if (loadingIdx !== -1) {
+                message.parts.splice(loadingIdx, 1)
+              }
+              pushMediaPart(message, 'audio', normalizeMediaUrl(data.url))
+            }
+          } else if (data.status === 'links') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.links) {
+              message.parts.push({
+                type: 'links',
+                items: data.links.map((l) => {
+                  try {
+                    return {
+                      title: l.title || l.url,
+                      url: l.url,
+                      desc: l.description,
+                      host: new URL(l.url).hostname,
+                    }
+                  } catch {
+                    return {
+                      title: l.title || l.url,
+                      url: l.url,
+                      desc: l.description,
+                      host: l.url,
+                    }
+                  }
+                }),
+              })
             }
           } else if (data.status === 'complete') {
             if (streamingRafId !== null) {
@@ -2068,6 +2136,16 @@ const streamAIResponse = async (
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
               applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
+
+              // Multitask: the DAG finished — freeze the task cards (video/image/
+              // audio already carry their url via task_file) so they render as
+              // final rather than actively animating. Guests cannot reconcile
+              // against the persisted message (that endpoint is auth-only), so the
+              // terminal card states already streamed via task_update are
+              // authoritative here.
+              if (message.taskPlan) {
+                message.taskPlan.active = false
+              }
 
               if (data.messageId) {
                 message.backendMessageId = data.messageId
@@ -2141,6 +2219,10 @@ const streamAIResponse = async (
             }
             processingStatus.value = ''
             processingMetadata.value = {}
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message?.taskPlan) {
+              message.taskPlan.active = false
+            }
             historyStore.finishStreamingMessage(messageId)
           }
         },

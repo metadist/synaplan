@@ -34,6 +34,7 @@ class AdminSubscriptionsServiceTest extends TestCase
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
 
         $this->subscriptionRepository
+            ->expects(self::any())
             ->method('findBy')
             ->with([], ['priceMonthly' => 'ASC'])
             ->willReturn([$sub]);
@@ -57,7 +58,7 @@ class AdminSubscriptionsServiceTest extends TestCase
     {
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '0.00', '0.00');
 
-        $this->subscriptionRepository->method('find')->with(1)->willReturn($sub);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
         $this->em->expects(self::once())->method('flush');
 
         $result = $this->service->updateSubscription(1, ['costBudgetMonthly' => 15.0]);
@@ -69,7 +70,7 @@ class AdminSubscriptionsServiceTest extends TestCase
     {
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '0.00', '0.00');
 
-        $this->subscriptionRepository->method('find')->with(1)->willReturn($sub);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
         $this->em->expects(self::once())->method('flush');
 
         $result = $this->service->updateSubscription(1, ['costBudgetYearly' => 150.0]);
@@ -81,7 +82,7 @@ class AdminSubscriptionsServiceTest extends TestCase
     {
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
 
-        $this->subscriptionRepository->method('find')->with(1)->willReturn($sub);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
         $this->em->expects(self::once())->method('flush');
 
         $result = $this->service->updateSubscription(1, ['active' => false]);
@@ -93,7 +94,7 @@ class AdminSubscriptionsServiceTest extends TestCase
     {
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '0.00', '0.00');
 
-        $this->subscriptionRepository->method('find')->with(1)->willReturn($sub);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
         $this->em->expects(self::once())->method('flush');
 
         $result = $this->service->updateSubscription(1, [
@@ -149,7 +150,7 @@ class AdminSubscriptionsServiceTest extends TestCase
 
     public function testUpdateNonExistentThrows(): void
     {
-        $this->subscriptionRepository->method('find')->with(999)->willReturn(null);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(999)->willReturn(null);
 
         $this->expectException(SubscriptionNotFoundException::class);
 
@@ -159,7 +160,7 @@ class AdminSubscriptionsServiceTest extends TestCase
     public function testUpdateNegativeBudgetMonthlyThrows(): void
     {
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
-        $this->subscriptionRepository->method('find')->with(1)->willReturn($sub);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('costBudgetMonthly must be >= 0');
@@ -170,7 +171,7 @@ class AdminSubscriptionsServiceTest extends TestCase
     public function testUpdateNegativeBudgetYearlyThrows(): void
     {
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
-        $this->subscriptionRepository->method('find')->with(1)->willReturn($sub);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('costBudgetYearly must be >= 0');
@@ -181,7 +182,7 @@ class AdminSubscriptionsServiceTest extends TestCase
     public function testUpdateWithEmptyDataPreservesValues(): void
     {
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
-        $this->subscriptionRepository->method('find')->with(1)->willReturn($sub);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
         $this->em->expects(self::once())->method('flush');
 
         $result = $this->service->updateSubscription(1, []);

@@ -894,8 +894,7 @@
 SynaplanWidget.init({
   widgetId: '{{ widget.widgetId }}',
   externalUserId: '&lt;YOUR_USER_ID&gt;'
-})</pre
-                    >
+})</pre>
                   </div>
                 </div>
               </div>
@@ -1051,8 +1050,7 @@ SynaplanWidget.init({
                     <pre
                       v-if="apiTestResult.responsePreview"
                       class="mt-1.5 px-3 py-2 rounded-lg bg-gray-900 text-green-400 text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-48 overflow-y-auto"
-                      >{{ apiTestResult.responsePreview }}</pre
-                    >
+                      >{{ apiTestResult.responsePreview }}</pre>
                   </div>
 
                   <!-- Failure -->

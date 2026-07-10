@@ -13,21 +13,17 @@
     in the native app.
   -->
   <div
-    :class="
-      isCentered
-        ? 'bg-chat-input-area'
-        : [
-            'chat-composer-sticky bg-chat-input-area',
-            { 'chat-composer-sticky--kb-open': keyboardOpen },
-          ]
-    "
+    :class="[
+      'chat-composer-sticky bg-chat-input-area',
+      { 'chat-composer-sticky--kb-open': keyboardOpen },
+    ]"
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
     <!-- On mobile the horizontal padding matches the drawer toggle's left
          offset (left-3 = 12px) so the composer aligns with the menu button and
          uses the full width; md+ keeps the roomier px-4. -->
-    <div class="max-w-4xl mx-auto py-2 md:py-4" :class="{ 'px-3 md:px-4': !isCentered }">
+    <div class="max-w-4xl mx-auto px-3 py-2 md:px-4 md:py-4">
       <!-- File and Quote Display (above input) -->
       <div v-if="uploadedFiles.length > 0 || quote" class="mb-3 flex flex-wrap gap-2">
         <!-- Quoted reference chip -->
@@ -144,7 +140,7 @@
               <button
                 type="button"
                 :class="[
-                  'surface-chip icon-ghost h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl relative',
+                  'surface-chip icon-ghost h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl relative touch-manipulation',
                   plusMenuOpen && 'pill--active',
                 ]"
                 :aria-label="$t('chatInput.plusMenu.label')"
@@ -382,8 +378,6 @@ interface UploadedFile {
 interface Props {
   isStreaming?: boolean
   isGuestMode?: boolean
-  /** Centered empty-state variant: drops the sticky-bottom positioning. */
-  centered?: boolean
   quote?: QuotedReference | null
   /**
    * A banner is attached to the input's top edge via the #banner slot. On mobile
@@ -398,7 +392,6 @@ const props = defineProps<Props>()
 
 const isStreaming = computed(() => props.isStreaming ?? false)
 const isGuestMode = computed(() => props.isGuestMode ?? false)
-const isCentered = computed(() => props.centered ?? false)
 
 // Drop the home-indicator safe-area padding while the soft keyboard is open —
 // the keyboard already covers that area, so the extra inset would leave a gap.

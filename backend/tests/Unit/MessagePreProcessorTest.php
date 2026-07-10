@@ -356,7 +356,7 @@ class MessagePreProcessorTest extends TestCase
             $file->expects($this->never())->method('setStatus');
 
             // Owner not resolvable → billing is a no-op (keeps the test focused).
-            $this->userRepository->method('find')->with(7)->willReturn(null);
+            $this->userRepository->expects(self::any())->method('find')->with(7)->willReturn(null);
 
             $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
             $message = $this->createMock(Message::class);

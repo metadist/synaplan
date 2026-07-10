@@ -5,6 +5,7 @@ namespace App\Tests\Unit;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Message\ConversationSummaryService;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
@@ -64,7 +65,8 @@ class MessageProcessorTest extends TestCase
             $this->createMock(MultitaskRoutingConfig::class),
             $this->createMock(TaskPlanner::class),
             $this->createMock(TaskPlanStore::class),
-            $this->createMock(TaskPlanExecutor::class)
+            $this->createMock(TaskPlanExecutor::class),
+            $this->createMock(ConversationSummaryService::class)
         );
     }
 

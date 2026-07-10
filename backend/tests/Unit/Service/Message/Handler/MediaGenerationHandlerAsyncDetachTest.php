@@ -25,7 +25,9 @@ use App\Service\RateLimitService;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
+use PHPUnit\Framework\Constraint\IsType;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -103,8 +105,8 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
 
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
 
-        $this->mediaJobConfig->method('isAsyncJobsEnabled')->with(7)->willReturn(true);
-        $this->aiFacade->method('supportsAsyncVideo')->with('higgsfield')->willReturn(true);
+        $this->mediaJobConfig->expects(self::any())->method('isAsyncJobsEnabled')->with(7)->willReturn(true);
+        $this->aiFacade->expects(self::any())->method('supportsAsyncVideo')->with('higgsfield')->willReturn(true);
 
         $job = new MediaJob('job-detach-1');
         $this->mediaJobService->expects(self::once())
@@ -140,11 +142,11 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
         $this->modelConfigService->method('getDefaultModel')->willReturn(42);
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
-        $this->mediaJobConfig->method('isAsyncJobsEnabled')->with(7)->willReturn(true);
-        $this->aiFacade->method('supportsAsyncVideo')->with('higgsfield')->willReturn(true);
+        $this->mediaJobConfig->expects(self::any())->method('isAsyncJobsEnabled')->with(7)->willReturn(true);
+        $this->aiFacade->expects(self::any())->method('supportsAsyncVideo')->with('higgsfield')->willReturn(true);
 
         // At the ceiling: no job is created and the provider is never called.
-        $this->mediaJobService->method('countActiveForUser')->with(7)->willReturn(16);
+        $this->mediaJobService->expects(self::any())->method('countActiveForUser')->with(7)->willReturn(16);
         $this->mediaJobService->expects(self::never())->method('create');
         $this->mediaJobDispatcher->expects(self::never())->method('dispatch');
         $this->aiFacade->expects(self::never())->method('generateVideo');
@@ -169,8 +171,8 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
         $this->modelConfigService->method('getDefaultModel')->willReturn(42);
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
-        $this->mediaJobConfig->method('isAsyncJobsEnabled')->with(7)->willReturn(true);
-        $this->aiFacade->method('supportsAsyncVideo')->with('higgsfield')->willReturn(true);
+        $this->mediaJobConfig->expects(self::any())->method('isAsyncJobsEnabled')->with(7)->willReturn(true);
+        $this->aiFacade->expects(self::any())->method('supportsAsyncVideo')->with('higgsfield')->willReturn(true);
 
         $job = new MediaJob('job-detach-fail');
         $this->mediaJobService->method('create')->willReturn($job);
@@ -179,7 +181,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         // job failed, sync the message, and surface a localized error in the
         // same turn — no empty bubble, no endless poll.
         $this->mediaJobDispatcher->expects(self::once())->method('dispatch')->with($job)->willReturn(false);
-        $this->mediaJobService->expects(self::once())->method('markFailed')->with($job, self::isType('string'));
+        $this->mediaJobService->expects(self::once())->method('markFailed')->with($job, new IsType(NativeType::String));
         $this->mediaJobMessageSync->expects(self::once())->method('syncTerminalState')->with($job);
         $this->aiFacade->expects(self::never())->method('generateVideo');
 
@@ -209,7 +211,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
 
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
 
-        $this->mediaJobConfig->method('isAsyncJobsEnabled')->with(7)->willReturn(false);
+        $this->mediaJobConfig->expects(self::any())->method('isAsyncJobsEnabled')->with(7)->willReturn(false);
         $this->aiFacade->expects(self::never())->method('supportsAsyncVideo');
 
         $this->mediaJobService->expects(self::never())->method('create');
@@ -246,7 +248,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         $model->method('getJson')->willReturn(['default_duration' => 5]);
 
         $modelRepo = $this->createMock(EntityRepository::class);
-        $modelRepo->method('find')->with(42)->willReturn($model);
+        $modelRepo->expects(self::any())->method('find')->with(42)->willReturn($model);
 
         $this->em->method('getRepository')->willReturnMap([
             [User::class, $userRepo],

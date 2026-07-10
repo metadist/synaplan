@@ -8,6 +8,8 @@ use App\Message\ProcessMessageCommand;
 use App\Repository\MessageRepository;
 use App\Service\MessageEnqueueService;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Constraint\IsType;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
@@ -63,7 +65,7 @@ class MessageEnqueueServiceTest extends TestCase
 
         $this->logger->expects($this->once())
             ->method('info')
-            ->with($this->stringContains('enqueued'), $this->isType('array'));
+            ->with($this->stringContains('enqueued'), new IsType(NativeType::Array));
 
         $result = $this->service->enqueueMessage($user, $text, $options);
 

@@ -217,8 +217,7 @@
           <div class="relative">
             <pre
               class="bg-black/5 dark:bg-white/5 p-4 rounded-lg overflow-x-auto text-sm font-mono txt-primary"
-              >{{ embedCode }}</pre
-            >
+              >{{ embedCode }}</pre>
             <button
               class="absolute top-2 right-2 px-3 py-1 rounded bg-[var(--brand)] text-white text-xs hover:bg-[var(--brand-hover)] transition-colors"
               data-testid="btn-copy"

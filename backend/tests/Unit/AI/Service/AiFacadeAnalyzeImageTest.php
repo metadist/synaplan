@@ -63,7 +63,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
 
     public function testAnalyzeImageHonoursPic2TextProviderAndModel(): void
     {
-        $this->modelConfig->method('resolveVisionDefault')
+        $this->modelConfig->expects(self::any())->method('resolveVisionDefault')
             ->with(42)
             ->willReturn([
                 'provider' => 'groq',
@@ -87,7 +87,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
             )
             ->willReturn('a cat');
 
-        $this->registry->method('getVisionProvider')
+        $this->registry->expects(self::any())->method('getVisionProvider')
             ->with('groq', $this->anything())
             ->willReturn($groq);
 
@@ -100,7 +100,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
 
     public function testAnalyzeImageDoesNotLeakPic2TextModelToFallbackProvider(): void
     {
-        $this->modelConfig->method('resolveVisionDefault')
+        $this->modelConfig->expects(self::any())->method('resolveVisionDefault')
             ->with(42)
             ->willReturn([
                 'provider' => 'groq',
@@ -148,7 +148,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
         // PIC2TEXT row exists but the referenced BMODELS row is gone (e.g. catalog
         // reshuffle): provider lookup returns null. We must NOT fail — we should
         // fall back to the capability-level default provider chain.
-        $this->modelConfig->method('resolveVisionDefault')
+        $this->modelConfig->expects(self::any())->method('resolveVisionDefault')
             ->with(42)
             ->willReturn([
                 'provider' => 'anthropic',
@@ -173,7 +173,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
             )
             ->willReturn('a cat (via anthropic)');
 
-        $this->registry->method('getVisionProvider')
+        $this->registry->expects(self::any())->method('getVisionProvider')
             ->with('anthropic', $this->anything())
             ->willReturn($anthropic);
 
@@ -205,7 +205,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
             )
             ->willReturn('a cat');
 
-        $this->registry->method('getVisionProvider')
+        $this->registry->expects(self::any())->method('getVisionProvider')
             ->with('openai', $this->anything())
             ->willReturn($openai);
 

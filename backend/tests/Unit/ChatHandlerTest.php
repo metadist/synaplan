@@ -139,8 +139,8 @@ class ChatHandlerTest extends TestCase
         ];
 
         $this->promptRepository->method('findOneBy')->willReturn(null);
-        $this->modelConfigService->method('getProviderForModel')->with(42)->willReturn('ollama');
-        $this->modelConfigService->method('getModelName')->with(42)->willReturn('llama3');
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(42)->willReturn('ollama');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(42)->willReturn('llama3');
 
         $this->aiFacade
             ->expects($this->once())
@@ -177,7 +177,7 @@ class ChatHandlerTest extends TestCase
         $message->method('getTopic')->willReturn('CHAT');
         $message->method('getLanguage')->willReturn('en');
         $message->method('getFileText')->willReturn('');
-        $message->method('getMeta')->with('channel')->willReturn('web'); // Non-WhatsApp channel
+        $message->expects(self::any())->method('getMeta')->with('channel')->willReturn('web'); // Non-WhatsApp channel
 
         $classification = [
             'topic' => 'CHAT',
@@ -185,10 +185,10 @@ class ChatHandlerTest extends TestCase
         ];
 
         $this->promptRepository->method('findOneBy')->willReturn(null);
-        $this->modelConfigService->method('getEffectiveUserIdForMessage')->with($message)->willReturn(1);
-        $this->modelConfigService->method('getDefaultModel')->with('CHAT', 1)->willReturn(10);
-        $this->modelConfigService->method('getProviderForModel')->with(10)->willReturn('openai');
-        $this->modelConfigService->method('getModelName')->with(10)->willReturn('gpt-4');
+        $this->modelConfigService->expects(self::any())->method('getEffectiveUserIdForMessage')->with($message)->willReturn(1);
+        $this->modelConfigService->expects(self::any())->method('getDefaultModel')->with('CHAT', 1)->willReturn(10);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(10)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(10)->willReturn('gpt-4');
 
         $this->aiFacade
             ->method('chat')
@@ -458,6 +458,80 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
+     * Rolling conversation summary: when MessageProcessor condenses older turns
+     * and passes them via options['conversation_summary'], ChatHandler must fold
+     * that text into the SYSTEM prompt so long threads keep their context.
+     */
+    public function testHandleStreamInjectsConversationSummaryIntoSystemPrompt(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('And what about the second point?');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(function ($messages, $cb, $userId, $options) use (&$captured) {
+                $captured = $messages;
+                $cb('ok');
+
+                return ['provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function (): void {},
+            null,
+            ['conversation_summary' => 'Earlier: the user argued for option A and asked to compare prices.'],
+        );
+
+        self::assertNotNull($captured);
+        $systemPrompt = $captured[0]['content'] ?? '';
+        self::assertSame('system', $captured[0]['role'] ?? '');
+        self::assertStringContainsString('Summary of earlier conversation', $systemPrompt);
+        self::assertStringContainsString('option A', $systemPrompt);
+    }
+
+    public function testHandleStreamWithoutConversationSummaryLeavesSystemPromptClean(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Hello');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(function ($messages, $cb, $userId, $options) use (&$captured) {
+                $captured = $messages;
+                $cb('ok');
+
+                return ['provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function (): void {},
+        );
+
+        self::assertNotNull($captured);
+        self::assertStringNotContainsString('Summary of earlier conversation', $captured[0]['content'] ?? '');
+    }
+
+    /**
      * Issue #615: the non-streaming `handle()` path serves email
      * (`smart+...@synaplan.net`) and the generic API webhook. Before the
      * fix, neither loaded user memories nor extracted new ones. This
@@ -485,8 +559,8 @@ class ChatHandlerTest extends TestCase
         $user->method('isMemoriesEnabled')->willReturn(true);
 
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('find')->with(7)->willReturn($user);
-        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+        $userRepository->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepository);
 
         $this->userMemoryService->method('isAvailable')->willReturn(true);
         // PR #985 follow-up: ChatHandler now embeds memory queries via
@@ -578,8 +652,8 @@ class ChatHandlerTest extends TestCase
         $user->method('isMemoriesEnabled')->willReturn(true);
 
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('find')->with(7)->willReturn($user);
-        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+        $userRepository->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepository);
 
         $this->userMemoryService->method('isAvailable')->willReturn(false);
 
@@ -595,7 +669,7 @@ class ChatHandlerTest extends TestCase
             'model' => 'gpt-4.1',
         ]);
 
-        $this->perfPipelineFlag->method('isEnabled')->with(7)->willReturn(true);
+        $this->perfPipelineFlag->expects(self::any())->method('isEnabled')->with(7)->willReturn(true);
 
         $dispatched = null;
         $this->memoryExtractionDispatcher
@@ -704,8 +778,8 @@ class ChatHandlerTest extends TestCase
         $user->method('isMemoriesEnabled')->willReturn(false); // ← user toggled memories off
 
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('find')->with(7)->willReturn($user);
-        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+        $userRepository->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepository);
 
         $this->promptRepository->method('findOneBy')->willReturn(null);
         $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
@@ -840,8 +914,8 @@ class ChatHandlerTest extends TestCase
         $user->method('isMemoriesEnabled')->willReturn(true);
 
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('find')->with(7)->willReturn($user);
-        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+        $userRepository->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepository);
 
         $this->userMemoryService->method('isAvailable')->willReturn(false);
 
@@ -857,7 +931,7 @@ class ChatHandlerTest extends TestCase
             'model' => 'gpt-4.1',
         ]);
 
-        $this->perfPipelineFlag->method('isEnabled')->with(7)->willReturn(true);
+        $this->perfPipelineFlag->expects(self::any())->method('isEnabled')->with(7)->willReturn(true);
 
         // The crucial expectation: the handler must NOT touch the bus
         // when the dispatch is deferred — that is the whole point of
@@ -1074,13 +1148,13 @@ class ChatHandlerTest extends TestCase
             ->willReturn(['prompt' => $prompt, 'metadata' => []]);
 
         $this->promptRepository->method('findOneBy')->willReturn(null);
-        $this->modelConfigService->method('getProviderForModel')->with(206)->willReturn('openai');
-        $this->modelConfigService->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
 
         // No supportsSystemMessages key → legacy "no streaming ⇒ no system role" heuristic fires.
         $model = $this->createMock(Model::class);
         $model->method('getJson')->willReturn(['supportsStreaming' => false]);
-        $this->modelRepository->method('find')->with(206)->willReturn($model);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
 
         $capturedMessages = null;
         $this->aiFacade
@@ -1141,12 +1215,12 @@ class ChatHandlerTest extends TestCase
             ->willReturn(['prompt' => $prompt, 'metadata' => []]);
 
         $this->promptRepository->method('findOneBy')->willReturn(null);
-        $this->modelConfigService->method('getProviderForModel')->with(206)->willReturn('openai');
-        $this->modelConfigService->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
 
         $model = $this->createMock(Model::class);
         $model->method('getJson')->willReturn(['supportsStreaming' => false, 'supportsSystemMessages' => true]);
-        $this->modelRepository->method('find')->with(206)->willReturn($model);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
 
         $capturedMessages = null;
         $this->aiFacade
@@ -1184,13 +1258,13 @@ class ChatHandlerTest extends TestCase
             ->willReturn(['prompt' => $prompt, 'metadata' => []]);
 
         $this->promptRepository->method('findOneBy')->willReturn(null);
-        $this->modelConfigService->method('getProviderForModel')->with(206)->willReturn('openai');
-        $this->modelConfigService->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
 
         $model = $this->createMock(Model::class);
         $model->method('getFeatures')->willReturn([]);
         $model->method('getJson')->willReturn(['supportsStreaming' => false]);
-        $this->modelRepository->method('find')->with(206)->willReturn($model);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
 
         $capturedMessages = null;
         $this->aiFacade

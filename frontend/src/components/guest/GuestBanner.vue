@@ -17,11 +17,11 @@
           />
         </div>
 
-        <span class="text-xs txt-secondary whitespace-nowrap">
+        <span class="text-xs font-medium txt-primary whitespace-nowrap">
           {{ $t('guest.banner.remaining', { count: remaining }) }}
         </span>
 
-        <span class="w-px h-3.5 bg-gray-300 dark:bg-gray-600" />
+        <span class="w-px h-3.5 bg-gray-400 dark:bg-gray-500" />
 
         <router-link
           to="/register"

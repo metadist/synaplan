@@ -40,7 +40,7 @@ final class TaskPlannerTest extends TestCase
         // Default: planner prompt present, topics available.
         $prompt = $this->createMock(Prompt::class);
         $prompt->method('getPrompt')->willReturn('PLAN. Capabilities: [CAPABILITYLIST] Topics: [DYNAMICLIST] Keys: [KEYLIST]');
-        $this->promptRepository->method('findByTopic')->with('tools:plan', 0)->willReturn($prompt);
+        $this->promptRepository->expects(self::any())->method('findByTopic')->with('tools:plan', 0)->willReturn($prompt);
         $this->promptRepository->method('getAllTopics')->willReturn(['general', 'officemaker']);
         $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([
             ['topic' => 'general', 'description' => 'catch-all'],

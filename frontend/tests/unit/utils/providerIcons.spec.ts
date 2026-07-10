@@ -1,10 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { getProviderIcon } from '@/utils/providerIcons'
+import { getProviderIcon, getProviderFlag } from '@/utils/providerIcons'
 
 describe('Provider Icons Utility', () => {
   it('should return OpenAI icon for openai service', () => {
     expect(getProviderIcon('openai')).toBe('simple-icons:openai')
     expect(getProviderIcon('OpenAI')).toBe('simple-icons:openai')
+  })
+
+  it('should NOT return the OpenAI icon for the OpenAI-compatible (local) service', () => {
+    // "openaicompatible" contains "openai" — it must be matched first so a
+    // self-hosted/local endpoint never shows the OpenAI logo.
+    expect(getProviderIcon('OpenAICompatible')).toBe('mdi:server-network')
+    expect(getProviderIcon('openaicompatible')).toBe('mdi:server-network')
+    expect(getProviderIcon('openai-compatible')).toBe('mdi:server-network')
   })
 
   it('should return Anthropic icon for anthropic service', () => {
@@ -51,5 +59,20 @@ describe('Provider Icons Utility', () => {
   it('should be case insensitive', () => {
     expect(getProviderIcon('OPENAI')).toBe('simple-icons:openai')
     expect(getProviderIcon('AnThRoPiC')).toBe('simple-icons:anthropic')
+  })
+})
+
+describe('Provider Flag Utility', () => {
+  it('should return the US flag for OpenAI', () => {
+    expect(getProviderFlag('openai')).toBe('circle-flags:us')
+  })
+
+  it('should return a neutral world badge (not the US flag) for OpenAI-compatible', () => {
+    expect(getProviderFlag('OpenAICompatible')).toBe('circle-flags:un')
+    expect(getProviderFlag('openaicompatible')).toBe('circle-flags:un')
+  })
+
+  it('should return the German flag for self-hosted Ollama', () => {
+    expect(getProviderFlag('ollama')).toBe('circle-flags:de')
   })
 })

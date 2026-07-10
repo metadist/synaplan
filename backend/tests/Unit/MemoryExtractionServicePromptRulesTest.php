@@ -50,7 +50,7 @@ final class MemoryExtractionServicePromptRulesTest extends TestCase
         $modelConfigService->method('getDefaultModel')->willReturn(null);
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->method('getReference')
+        $entityManager->expects(self::any())->method('getReference')
             ->with(User::class, 1)
             ->willReturn($this->createMock(User::class));
 
@@ -127,7 +127,7 @@ final class MemoryExtractionServicePromptRulesTest extends TestCase
             ]);
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->method('getReference')
+        $entityManager->expects(self::any())->method('getReference')
             ->with(User::class, 1)
             ->willReturn($this->createMock(User::class));
 

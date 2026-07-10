@@ -18,7 +18,9 @@ use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Media\SyncMediaJobGenerator;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
+use PHPUnit\Framework\Constraint\IsType;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Lock\LockFactory;
@@ -122,7 +124,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
 
         $this->aiFacade->expects(self::once())
             ->method('pollVideoOperation')
-            ->with('op-1', 'higgsfield', 7, self::isType('array'))
+            ->with('op-1', 'higgsfield', 7, new IsType(NativeType::Array))
             ->willReturn(['done' => false, 'videoUri' => null, 'error' => null, 'status' => 'in_progress', 'percent' => 42]);
 
         $this->jobService->expects(self::once())->method('updateProgress')->with($job, 42, 'in_progress');
@@ -166,7 +168,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
 
         $this->aiFacade->expects(self::once())
             ->method('downloadVideoRaw')
-            ->with('https://cdn/out.mp4', 'higgsfield', 7, self::isType('array'))
+            ->with('https://cdn/out.mp4', 'higgsfield', 7, new IsType(NativeType::Array))
             ->willReturn('RAW-MP4-BYTES');
 
         $captured = null;
@@ -262,7 +264,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
 
         $admin = (new User())->setUserLevel('ADMIN');
         $adminRepo = $this->createMock(UserRepository::class);
-        $adminRepo->method('find')->with(1)->willReturn($admin);
+        $adminRepo->expects(self::any())->method('find')->with(1)->willReturn($admin);
 
         $handler = new AdvanceMediaJobCommandHandler(
             $this->jobService,
@@ -393,8 +395,8 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
 
         $this->aiFacade->expects(self::once())
             ->method('cancelVideoOperation')
-            ->with('op-1', 'higgsfield', 7, self::isType('array'));
-        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, self::isType('string'));
+            ->with('op-1', 'higgsfield', 7, new IsType(NativeType::Array));
+        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String));
 
         // A timed-out job must not poll or re-dispatch.
         $this->aiFacade->expects(self::never())->method('pollVideoOperation');

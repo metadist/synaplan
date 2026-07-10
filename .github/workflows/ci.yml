@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -46,7 +49,9 @@ jobs:
 
   backend:
     name: Backend (PHP/Symfony)
-    runs-on: ubuntu-latest
+    # 16-core org larger runner (billed per minute) — PHPStan + PHPUnit are the
+    # longest serial stage, so this is where the extra cores pay off.
+    runs-on: ubuntu-latest-m
 
     env:
       DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
@@ -184,7 +189,9 @@ jobs:
 
   frontend:
     name: Frontend (Vue/TypeScript)
-    runs-on: ubuntu-latest
+    # On the critical path (backend → frontend → docker-build → e2e); Vite
+    # builds and Vitest parallelize well across the 16 cores.
+    runs-on: ubuntu-latest-m
     needs: [backend]
 
     steps:
@@ -281,11 +288,11 @@ jobs:
           path: frontend/dist-widget/
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
       - name: Extract metadata (tags, labels)
         id: meta
-        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -300,7 +307,7 @@ jobs:
 
       - name: Build Docker image
         id: build
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: _docker/backend/Dockerfile
@@ -320,26 +327,47 @@ jobs:
           retention-days: 1
 
   e2e:
-    name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }})
+    name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }}${{ matrix.shard && format(' [{0}]', matrix.shard) || '' }})
+    # E2E jobs run on free ubuntu-latest runners (unlimited capacity for public
+    # repos) to avoid queue contention from the limited ubuntu-latest-m pool.
+    # Chromium and Firefox are sharded (--shard=N/M) so each half finishes in
+    # ~50% of the time; the free runner pool ensures all shards start instantly.
     runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Standard password auth (both browsers) — exclude @oidc tests (no Keycloak running)
+          # Standard password auth — chromium sharded into 2 parallel jobs
           - browser: chromium
             variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e"
             grep_filter: "@ci"
+            shard: "1/2"
+          - browser: chromium
+            variant: ""
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e"
+            grep_filter: "@ci"
+            shard: "2/2"
+          # Standard password auth — firefox sharded into 2 parallel jobs
           - browser: firefox
             variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e:firefox"
             grep_filter: "@ci"
+            shard: "1/2"
+          - browser: firefox
+            variant: ""
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e:firefox"
+            grep_filter: "@ci"
+            shard: "2/2"
           # Mobile viewport layout guard (chromium device emulation; runs the
           # @layout suite only — see frontend/tests/e2e/playwright.config.ts)
           - browser: chromium
@@ -348,6 +376,7 @@ jobs:
             compose_profiles: ""
             npm_script: "test:e2e:mobile"
             grep_filter: "@ci"
+            shard: ""
           # OIDC auth (chromium only — auth flow testing, not browser compat)
           - browser: chromium
             variant: ""
@@ -355,6 +384,7 @@ jobs:
             compose_profiles: "--profile oidc"
             npm_script: "test:e2e:oidc"
             grep_filter: "@oidc"
+            shard: ""
           # OIDC auto-redirect (starts app with OIDC_AUTO_REDIRECT=true)
           - browser: chromium
             variant: ""
@@ -362,6 +392,7 @@ jobs:
             compose_profiles: "--profile oidc"
             npm_script: "test:e2e:oidc-redirect"
             grep_filter: ""
+            shard: ""
     env:
       APP_IMAGE: synaplan-test:ci
       APP_URL: http://localhost:8001
@@ -475,15 +506,21 @@ jobs:
           MAILHOG_URL: http://localhost:8026
         run: |
           echo "============================================"
-          echo "Running E2E tests with ${{ matrix.browser }} (${{ matrix.auth_method }})"
+          echo "Running E2E tests with ${{ matrix.browser }} (${{ matrix.auth_method }})${{ matrix.shard && format(' shard {0}', matrix.shard) || '' }}"
           echo "============================================"
-          npm run ${{ matrix.npm_script }}${{ matrix.grep_filter && format(' -- --grep "{0}"', matrix.grep_filter) || '' }}
+          EXTRA_ARGS="${{ matrix.grep_filter && format('--grep "{0}"', matrix.grep_filter) || '' }} ${{ matrix.shard && format('--shard={0}', matrix.shard) || '' }}"
+          EXTRA_ARGS=$(echo "$EXTRA_ARGS" | xargs)
+          if [ -n "$EXTRA_ARGS" ]; then
+            npm run ${{ matrix.npm_script }} -- $EXTRA_ARGS
+          else
+            npm run ${{ matrix.npm_script }}
+          fi
 
       - name: Upload Playwright test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: playwright-results-${{ matrix.browser }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}-${{ matrix.auth_method }}
+          name: playwright-results-${{ strategy.job-index }}-${{ matrix.browser }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}-${{ matrix.auth_method }}
           path: |
             frontend/tests/e2e/test-results/
             frontend/tests/e2e/reports/
@@ -503,6 +540,8 @@ jobs:
     # the "Update visual baselines" workflow dispatch (same runner image,
     # never from a laptop).
     name: E2E Visual Snapshots
+    # MUST match the runner used by visual-baselines.yml — snapshots are
+    # rendering-environment sensitive.
     runs-on: ubuntu-latest
     needs: [docker-build]
     env:
@@ -612,7 +651,7 @@ jobs:
           docker images
 
       - name: Log in to the Container registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}

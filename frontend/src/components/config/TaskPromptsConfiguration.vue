@@ -1328,12 +1328,7 @@ const filteredPrompts = computed(() => {
  * Map a prompt to a display category for grouping in the sidebar list.
  */
 type CategoryId =
-  | 'conversation'
-  | 'code'
-  | 'generation'
-  | 'productivity'
-  | 'other-system'
-  | 'custom'
+  'conversation' | 'code' | 'generation' | 'productivity' | 'other-system' | 'custom'
 
 interface CategoryDef {
   id: CategoryId

@@ -105,7 +105,9 @@ const dropdownRef = ref<HTMLElement | null>(null)
 
 const chatModels = computed(() => {
   const models = aiConfigStore.models.CHAT || []
-  return models.filter((m) => m.service !== 'test')
+  return [...models]
+    .filter((m) => m.service !== 'test')
+    .sort((a, b) => a.name.localeCompare(b.name))
 })
 const defaultModelId = computed(() => aiConfigStore.defaults.CHAT)
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\Service\JwtValidator;
+use PHPUnit\Framework\Constraint\IsType;
+use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
@@ -90,7 +92,7 @@ class JwtValidatorTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects($this->once())
             ->method('error')
-            ->with('JWT validation error', $this->isType('array'));
+            ->with('JWT validation error', new IsType(NativeType::Array));
 
         $validator = new JwtValidator(
             $httpClient,

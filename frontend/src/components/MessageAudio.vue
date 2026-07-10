@@ -26,13 +26,13 @@
             {{ $t('chat.audioUnavailableDescription') }}
           </p>
         </div>
-        <a
+        <button
           v-if="canDownload"
-          :href="props.url"
-          :download="fileName"
+          type="button"
           class="flex-shrink-0 txt-primary hover:text-[var(--brand)] transition-colors"
           :aria-label="$t('commands.download')"
           data-testid="btn-audio-download-fallback"
+          @click.stop="downloadAudio"
         >
           <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -42,7 +42,7 @@
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
             />
           </svg>
-        </a>
+        </button>
       </div>
 
       <div v-else class="flex items-center gap-2 sm:gap-4">
@@ -91,9 +91,10 @@
         <div class="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
           <!-- Progress Bar -->
           <div
+            ref="progressBarRef"
             class="h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden cursor-pointer"
-            @click="seek"
-            @mousedown="startDragging"
+            @click.stop="seek"
+            @mousedown.stop.prevent="startDragging"
           >
             <div
               class="h-full bg-[var(--brand)] transition-all"
@@ -146,11 +147,13 @@
         </button>
 
         <!-- Download Button -->
-        <a
-          :href="props.url"
-          :download="fileName"
+        <button
+          v-if="canDownload"
+          type="button"
           class="flex-shrink-0 txt-primary hover:text-[var(--brand)] transition-colors"
           :aria-label="$t('commands.download')"
+          data-testid="btn-audio-download"
+          @click.stop="downloadAudio"
         >
           <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -160,7 +163,7 @@
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
             />
           </svg>
-        </a>
+        </button>
       </div>
 
       <!-- Hidden Audio Element -->
@@ -183,6 +186,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
 import { useAudioPlayback } from '@/composables/useAudioPlayback'
+import { useConfigStore } from '@/stores/config'
 
 interface Props {
   url: string
@@ -192,11 +196,14 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const config = useConfigStore()
+
 // Only one inline audio player may play at a time (issue #1078): starting this
 // one pauses any other that is currently playing.
 const { setActive, clearActive } = useAudioPlayback()
 
 const audioRef = ref<HTMLAudioElement>()
+const progressBarRef = ref<HTMLElement>()
 const isPlaying = ref(false)
 const isMuted = ref(false)
 const progress = ref(0)
@@ -239,6 +246,36 @@ const canDownload = computed(() => {
   if (!url) return false
   return !url.startsWith('data:')
 })
+
+// Internal audio is served from authenticated endpoints, so a plain
+// `<a href>` navigates the current tab to the file (looks like a "redirect")
+// instead of downloading. Fetch the file as a blob and trigger a real
+// download, mirroring `MessageImage.downloadImage` (issue #1071).
+const downloadAudio = async () => {
+  let tempUrl: string | null = null
+  try {
+    const fullUrl = props.url.startsWith('/') ? `${config.appBaseUrl}${props.url}` : props.url
+    const response = await fetch(fullUrl, { method: 'GET', credentials: 'include' })
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    const blob = await response.blob()
+    tempUrl = URL.createObjectURL(blob)
+
+    const link = document.createElement('a')
+    link.href = tempUrl
+    link.download = fileName.value
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error('Failed to download audio:', error)
+  } finally {
+    if (tempUrl) {
+      URL.revokeObjectURL(tempUrl)
+    }
+  }
+}
 
 const formatTime = (seconds: number): string => {
   if (!isFinite(seconds)) return '0:00'
@@ -354,9 +391,17 @@ const updateProgress = () => {
 }
 
 const seek = (event: MouseEvent) => {
-  if (!audioRef.value || hasFailed.value) return
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  const percent = (event.clientX - rect.left) / rect.width
+  // Read the geometry from the progress-bar element itself, NOT
+  // `event.currentTarget`: during a drag `seek()` is invoked from the
+  // document-level `mousemove` listener, where `currentTarget` is `document`
+  // (no `getBoundingClientRect`). Relying on it threw a TypeError on every
+  // move, which the global error handler turned into a full-screen error /
+  // redirect while scrubbing.
+  const bar = progressBarRef.value
+  if (!audioRef.value || hasFailed.value || !bar) return
+  const rect = bar.getBoundingClientRect()
+  if (rect.width <= 0) return
+  const percent = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
   const total = audioRef.value.duration
   if (!isFinite(total) || total <= 0) return
   audioRef.value.currentTime = percent * total

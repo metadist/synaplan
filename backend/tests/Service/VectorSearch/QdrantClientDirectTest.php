@@ -343,6 +343,57 @@ final class QdrantClientDirectTest extends TestCase
         );
     }
 
+    public function testGetGlobalDocumentStatsUsesExactCountForTotal(): void
+    {
+        $client = $this->buildClient([
+            // Authoritative total — the "sum of all vectors of all users".
+            '/collections/user_documents/points/count' => fn () => new MockResponse(
+                json_encode(['result' => ['count' => 7]]),
+                ['http_code' => 200],
+            ),
+            // Per-user breakdown scroll (single page).
+            '/collections/user_documents/points/scroll' => fn () => new MockResponse(
+                json_encode(['result' => [
+                    'points' => [
+                        ['id' => 'a', 'payload' => ['user_id' => 1, 'file_id' => 10]],
+                        ['id' => 'b', 'payload' => ['user_id' => 1, 'file_id' => 10]],
+                        ['id' => 'c', 'payload' => ['user_id' => 2, 'file_id' => 20]],
+                    ],
+                    'next_page_offset' => null,
+                ]]),
+                ['http_code' => 200],
+            ),
+        ]);
+
+        $stats = $client->getGlobalDocumentStats(10);
+
+        // Total comes from the exact count endpoint, not the scrolled sample.
+        $this->assertSame(7, $stats['totalChunks']);
+        $this->assertSame(2, $stats['totalUsers']);
+        $this->assertSame(2, $stats['totalFiles']);
+        $this->assertSame(1, $stats['topUsers'][0]['userId'], 'top user by chunks first');
+        $this->assertSame(2, $stats['topUsers'][0]['chunks']);
+    }
+
+    public function testGetGlobalDocumentStatsReturnsTotalEvenWhenScrollFails(): void
+    {
+        // Only the count endpoint is routed; the scroll hits the default 599
+        // responder and throws, exercising the graceful-degradation path.
+        $client = $this->buildClient([
+            '/collections/user_documents/points/count' => fn () => new MockResponse(
+                json_encode(['result' => ['count' => 5]]),
+                ['http_code' => 200],
+            ),
+        ]);
+
+        $stats = $client->getGlobalDocumentStats(10);
+
+        $this->assertSame(5, $stats['totalChunks'], 'total must survive a failed per-user scroll');
+        $this->assertSame(0, $stats['totalUsers']);
+        $this->assertSame(0, $stats['totalFiles']);
+        $this->assertSame([], $stats['topUsers']);
+    }
+
     public function testHealthCheckReturnsTrueOn200(): void
     {
         $client = $this->buildClient([

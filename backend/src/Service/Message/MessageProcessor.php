@@ -46,6 +46,7 @@ final readonly class MessageProcessor
         private TaskPlanner $taskPlanner,
         private TaskPlanStore $taskPlanStore,
         private TaskPlanExecutor $taskPlanExecutor,
+        private ConversationSummaryService $conversationSummaryService,
     ) {
     }
 
@@ -451,6 +452,48 @@ final readonly class MessageProcessor
                         $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
                     }
                 }
+            }
+
+            // Step 2.9: Rolling conversation summary.
+            //
+            // Condense the OLDER turns of the chat into a compact summary that
+            // ChatHandler injects into the system prompt, while the newest turns
+            // are still replayed verbatim. This lets long threads keep their
+            // topic / the user's position "7-8 answers later" while the combined
+            // context stays inside the configured 10-15k character memory window.
+            //
+            // Only for the chat-style path with a persisted chat (needs the full
+            // history via chatId); other intents simply ignore the option. The
+            // service never throws into the turn — on failure it leaves the
+            // standard windowed history untouched.
+            $summaryIntent = $classification['intent'] ?? 'chat';
+            $summaryChatId = $message->getChatId();
+            if ('chat' === $summaryIntent && null !== $summaryChatId && $summaryChatId > 0) {
+                $perfTimer->start('summary');
+                // Reuse the recent window already loaded above and pass a cheap
+                // COUNT instead of re-loading the whole chat: the service only
+                // hydrates the full history on an actual cache miss (PR #1282).
+                // excludeFailed:false so the count matches findAllByChatId(),
+                // which the summarizer loads (no status filtering) — otherwise the
+                // older-span size would drift and defeat the cache.
+                $totalMessages = $this->messageRepository->countByChatId(
+                    $summaryChatId,
+                    excludeFailed: false,
+                );
+                $rolling = $this->conversationSummaryService->buildRollingContext(
+                    $conversationHistory,
+                    $totalMessages,
+                    $message->getUserId(),
+                    $summaryChatId,
+                );
+                if ($rolling->applied) {
+                    $options['conversation_summary'] = $rolling->summary;
+                    $conversationHistory = $rolling->recentMessages;
+                    $this->notify($statusCallback, 'summarizing', 'Condensing earlier conversation...', [
+                        'summarized_messages' => $rolling->summarizedCount,
+                    ]);
+                }
+                $perfTimer->stop('summary');
             }
 
             // Step 3: Inference (AI Response) mit STREAMING
