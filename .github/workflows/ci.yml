@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -262,8 +265,7 @@ jobs:
 
   docker-build:
     name: Build Docker Image
-    # Image build (FrankenPHP + extensions) is CPU-heavy on cache misses.
-    runs-on: ubuntu-latest-m
+    runs-on: ubuntu-latest
     needs: [frontend]
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
@@ -325,29 +327,47 @@ jobs:
           retention-days: 1
 
   e2e:
-    name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }})
-    # Full docker-compose stack + Playwright per matrix leg; 16 cores/64 GB
-    # keeps the app responsive under test load. Runner allows max 10 concurrent
-    # jobs, so all 5 legs still run in parallel.
-    runs-on: ubuntu-latest-m
+    name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }}${{ matrix.shard && format(' [{0}]', matrix.shard) || '' }})
+    # E2E jobs run on free ubuntu-latest runners (unlimited capacity for public
+    # repos) to avoid queue contention from the limited ubuntu-latest-m pool.
+    # Chromium and Firefox are sharded (--shard=N/M) so each half finishes in
+    # ~50% of the time; the free runner pool ensures all shards start instantly.
+    runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Standard password auth (both browsers) — exclude @oidc tests (no Keycloak running)
+          # Standard password auth — chromium sharded into 2 parallel jobs
           - browser: chromium
             variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e"
             grep_filter: "@ci"
+            shard: "1/2"
+          - browser: chromium
+            variant: ""
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e"
+            grep_filter: "@ci"
+            shard: "2/2"
+          # Standard password auth — firefox sharded into 2 parallel jobs
           - browser: firefox
             variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e:firefox"
             grep_filter: "@ci"
+            shard: "1/2"
+          - browser: firefox
+            variant: ""
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e:firefox"
+            grep_filter: "@ci"
+            shard: "2/2"
           # Mobile viewport layout guard (chromium device emulation; runs the
           # @layout suite only — see frontend/tests/e2e/playwright.config.ts)
           - browser: chromium
@@ -356,6 +376,7 @@ jobs:
             compose_profiles: ""
             npm_script: "test:e2e:mobile"
             grep_filter: "@ci"
+            shard: ""
           # OIDC auth (chromium only — auth flow testing, not browser compat)
           - browser: chromium
             variant: ""
@@ -363,6 +384,7 @@ jobs:
             compose_profiles: "--profile oidc"
             npm_script: "test:e2e:oidc"
             grep_filter: "@oidc"
+            shard: ""
           # OIDC auto-redirect (starts app with OIDC_AUTO_REDIRECT=true)
           - browser: chromium
             variant: ""
@@ -370,6 +392,7 @@ jobs:
             compose_profiles: "--profile oidc"
             npm_script: "test:e2e:oidc-redirect"
             grep_filter: ""
+            shard: ""
     env:
       APP_IMAGE: synaplan-test:ci
       APP_URL: http://localhost:8001
@@ -483,15 +506,21 @@ jobs:
           MAILHOG_URL: http://localhost:8026
         run: |
           echo "============================================"
-          echo "Running E2E tests with ${{ matrix.browser }} (${{ matrix.auth_method }})"
+          echo "Running E2E tests with ${{ matrix.browser }} (${{ matrix.auth_method }})${{ matrix.shard && format(' shard {0}', matrix.shard) || '' }}"
           echo "============================================"
-          npm run ${{ matrix.npm_script }}${{ matrix.grep_filter && format(' -- --grep "{0}"', matrix.grep_filter) || '' }}
+          EXTRA_ARGS="${{ matrix.grep_filter && format('--grep "{0}"', matrix.grep_filter) || '' }} ${{ matrix.shard && format('--shard={0}', matrix.shard) || '' }}"
+          EXTRA_ARGS=$(echo "$EXTRA_ARGS" | xargs)
+          if [ -n "$EXTRA_ARGS" ]; then
+            npm run ${{ matrix.npm_script }} -- $EXTRA_ARGS
+          else
+            npm run ${{ matrix.npm_script }}
+          fi
 
       - name: Upload Playwright test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: playwright-results-${{ matrix.browser }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}-${{ matrix.auth_method }}
+          name: playwright-results-${{ strategy.job-index }}-${{ matrix.browser }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}-${{ matrix.auth_method }}
           path: |
             frontend/tests/e2e/test-results/
             frontend/tests/e2e/reports/
@@ -511,9 +540,9 @@ jobs:
     # the "Update visual baselines" workflow dispatch (same runner image,
     # never from a laptop).
     name: E2E Visual Snapshots
-    # MUST match the runner image used by visual-baselines.yml — snapshots are
+    # MUST match the runner used by visual-baselines.yml — snapshots are
     # rendering-environment sensitive.
-    runs-on: ubuntu-latest-m
+    runs-on: ubuntu-latest
     needs: [docker-build]
     env:
       APP_IMAGE: synaplan-test:ci
