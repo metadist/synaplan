@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "classifications": [
+    "no-app-impact",
+    "backend-only",
+    "ota-candidate",
+    "store-required"
+  ],
+  "labels": {
+    "no-app-impact": "mobile-impact:no-app-impact",
+    "backend-only": "mobile-impact:backend-only",
+    "ota-candidate": "mobile-impact:ota-candidate",
+    "store-required": "mobile-impact:store-required",
+    "otaApproval": "mobile-ota-approved"
+  },
+  "storeRequired": {
+    "reason": "The change can affect a native binary, mobile contract, authentication, payments, navigation, runtime configuration, offline behavior, or application dependencies.",
+    "patterns": [
+      "android/**",
+      "ios/**",
+      "capacitor.config.*",
+      "**/package.json",
+      "**/package-lock.json",
+      "**/pnpm-lock.yaml",
+      "**/yarn.lock",
+      "**/*MobileVersion*",
+      "frontend/src/router/**",
+      "frontend/src/**/auth/**",
+      "frontend/src/**/*Auth*",
+      "frontend/src/**/*Iap*",
+      "frontend/src/**/*IAP*",
+      "frontend/src/**/*RuntimeConfig*",
+      "frontend/src/generated/api-schemas.ts",
+      "frontend/src/stores/auth.ts",
+      "frontend/src/stores/config.ts",
+      "frontend/src/composables/useAuth.ts",
+      "frontend/src/utils/pendingAuthRedirect.ts",
+      "frontend/src/services/authService.ts",
+      "frontend/src/services/biometricLock.ts",
+      "frontend/src/services/native*.ts",
+      "frontend/src/services/api/authApi.ts",
+      "frontend/src/services/api/configApi.ts",
+      "frontend/src/services/api/native*.ts",
+      "frontend/src/services/otaUpdates.ts",
+      "frontend/**/sw.js",
+      "frontend/**/*ServiceWorker*",
+      "frontend/**/*serviceWorker*",
+      "frontend/public/site.webmanifest",
+      "backend/src/Controller/**",
+      "backend/src/Service/Client/MobileVersionService.php",
+      "backend/src/Seed/MobileConfigSeeder.php",
+      "backend/src/**/Payment*.php",
+      "backend/src/**/Purchase*.php",
+      "backend/src/**/Subscription*.php",
+      "backend/src/**/Stripe*.php",
+      "backend/config/routes/**",
+      "backend/config/routes.yaml",
+      "backend/config/packages/security.yaml",
+      "backend/composer.json",
+      "backend/composer.lock",
+      "backend/**/*OpenApi*",
+      "backend/**/*OpenAPI*"
+    ]
+  },
+  "otaCandidate": {
+    "reason": "The change is limited to web-delivered styling, translations, static assets, or explicitly presentational UI.",
+    "patterns": [
+      "frontend/src/**/*.css",
+      "frontend/src/i18n/*.json",
+      "frontend/src/assets/**",
+      "frontend/public/**/*.svg",
+      "frontend/public/**/*.png",
+      "frontend/public/**/*.jpg",
+      "frontend/public/**/*.jpeg",
+      "frontend/public/**/*.webp",
+      "frontend/src/components/icons/**"
+    ]
+  },
+  "backendOnly": {
+    "reason": "The change only touches allow-listed server-side implementation or test files and does not touch payment, authentication, or a mobile contract.",
+    "patterns": [
+      "backend/src/Command/**",
+      "backend/src/Entity/**",
+      "backend/src/MessageHandler/**",
+      "backend/src/Repository/**",
+      "backend/src/Service/**",
+      "backend/src/ValueObject/**",
+      "backend/tests/**"
+    ],
+    "excludedPatterns": [
+      "backend/src/Service/Client/**",
+      "backend/src/**/*Auth*.php",
+      "backend/src/**/*Mobile*.php",
+      "backend/src/**/*OpenApi*.php",
+      "backend/src/**/*Payment*.php",
+      "backend/src/**/*Purchase*.php",
+      "backend/src/**/*Subscription*.php",
+      "backend/src/**/*Stripe*.php",
+      "backend/tests/**/*Auth*.php",
+      "backend/tests/**/*Mobile*.php",
+      "backend/tests/**/*Payment*.php",
+      "backend/tests/**/*Purchase*.php",
+      "backend/tests/**/*Subscription*.php",
+      "backend/tests/**/*Stripe*.php"
+    ]
+  },
+  "noAppImpact": {
+    "reason": "The change only affects documentation or mobile-impact classification tooling.",
+    "patterns": [
+      "**/*.md",
+      "docs/**",
+      ".github/ISSUE_TEMPLATE/**",
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      ".github/mobile-impact-policy.json",
+      "scripts/mobile-impact.mjs",
+      "tests/mobile-impact.test.mjs"
+    ]
+  },
+  "fallback": {
+    "classification": "store-required",
+    "reason": "Fail-closed fallback: at least one changed path is not explicitly allow-listed."
+  }
+}

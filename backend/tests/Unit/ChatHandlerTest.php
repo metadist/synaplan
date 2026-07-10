@@ -1041,8 +1041,8 @@ class ChatHandlerTest extends TestCase
         $user->method('isMemoriesEnabled')->willReturn(true);
 
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('find')->with(7)->willReturn($user);
-        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+        $userRepository->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepository);
 
         $this->userMemoryService->method('isAvailable')->willReturn(false);
 

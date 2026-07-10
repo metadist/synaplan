@@ -3,7 +3,7 @@
  * Generate Zod schemas from OpenAPI and create readable aliases
  */
 
-import { execSync } from 'child_process'
+import { execFileSync } from 'child_process'
 import { readFileSync, writeFileSync } from 'fs'
 
 // Check if we should skip the fetch step (for CI)
@@ -12,11 +12,11 @@ const skipFetch = process.argv.includes('--skip-fetch')
 if (!skipFetch) {
   // Step 1: Generate schemas using openapi-zod-client
   console.log('🔄 Generating schemas from OpenAPI spec...')
-  execSync(
-    'openapi-zod-client http://backend/api/doc.json -o src/generated/api-schemas.ts --template schema-template.hbs',
-    {
-      stdio: 'inherit',
-    }
+  const source = process.env.OPENAPI_SPEC || 'http://backend/api/doc.json'
+  execFileSync(
+    'openapi-zod-client',
+    [source, '-o', 'src/generated/api-schemas.ts', '--template', 'schema-template.hbs'],
+    { stdio: 'inherit' }
   )
 }
 

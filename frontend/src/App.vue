@@ -52,11 +52,15 @@ import { initBiometricLock } from '@/composables/useBiometricLock'
 import { initNativeStatusBar } from '@/services/nativeStatusBar'
 import { initNativeBackButton } from '@/services/nativeBackButton'
 import { initKeyboardScrollAssist } from '@/services/keyboardScrollAssist'
+import { isNativeApp } from '@/services/api/nativeRuntime'
 import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
 useTheme()
 
-if ('serviceWorker' in navigator) {
+// The native shell uses Capgo as the single web-asset version authority. A
+// service worker inside the WebView could serve stale files across an OTA
+// activation and defeat Capgo's health check/rollback guarantees.
+if (!isNativeApp() && 'serviceWorker' in navigator) {
   // The new global unhandledrejection handler (installGlobalErrorHandlers)
   // would otherwise turn a missing /sw.js or a registration failure into a
   // full-screen ErrorView for end users. SW failures are non-fatal — log

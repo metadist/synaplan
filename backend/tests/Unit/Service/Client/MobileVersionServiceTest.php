@@ -62,6 +62,27 @@ final class MobileVersionServiceTest extends TestCase
         $this->assertFalse($this->service->isUpdateRequired($this->app('4.0.6')));
     }
 
+    public function testFutureEnforcementDeadlineProvidesGracePeriod(): void
+    {
+        $this->withMobileConfig('4.1', '2999-01-01T00:00:00Z');
+
+        $this->assertFalse($this->service->isUpdateRequired($this->app('4.0')));
+    }
+
+    public function testPastEnforcementDeadlineActivatesGate(): void
+    {
+        $this->withMobileConfig('4.1', '2000-01-01T00:00:00Z');
+
+        $this->assertTrue($this->service->isUpdateRequired($this->app('4.0')));
+    }
+
+    public function testInvalidEnforcementDeadlineFailsOpen(): void
+    {
+        $this->withMobileConfig('4.1', 'not-a-timestamp');
+
+        $this->assertFalse($this->service->isUpdateRequired($this->app('4.0')));
+    }
+
     public function testStoreUrlsReturnedFromConfig(): void
     {
         $this->configRepository->method('getValue')->willReturnCallback(
@@ -98,8 +119,17 @@ final class MobileVersionServiceTest extends TestCase
 
     private function withMinVersion(string $min): void
     {
+        $this->withMobileConfig($min, null);
+    }
+
+    private function withMobileConfig(string $min, ?string $enforceAfter): void
+    {
         $this->configRepository->method('getValue')->willReturnCallback(
-            static fn (int $owner, string $group, string $setting): ?string => MobileVersionService::KEY_MIN_APP_VERSION === $setting ? $min : null
+            static fn (int $owner, string $group, string $setting): ?string => match ($setting) {
+                MobileVersionService::KEY_MIN_APP_VERSION => $min,
+                MobileVersionService::KEY_UPDATE_ENFORCE_AFTER => $enforceAfter,
+                default => null,
+            }
         );
     }
 

@@ -279,6 +279,10 @@ const config = {
     get updateRequired(): boolean {
       return getConfigSync().mobile?.updateRequired ?? false
     },
+    /** ISO-8601 deadline after which the forced-update gate may block. */
+    get updateEnforceAfter(): string {
+      return getConfigSync().mobile?.updateEnforceAfter ?? ''
+    },
     /** App Store link for the update button ('' when unset). */
     get iosAppUrl(): string {
       return getConfigSync().mobile?.iosAppUrl ?? ''

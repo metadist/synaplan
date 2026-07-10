@@ -292,6 +292,12 @@ class ConfigController extends AbstractController
                             description: 'True when the calling mobile app is older than minVersion and must show a blocking "please update" screen.'
                         ),
                         new OA\Property(
+                            property: 'updateEnforceAfter',
+                            type: 'string',
+                            example: '2026-07-17T12:00:00Z',
+                            description: 'ISO-8601 grace-period deadline. Before this timestamp the update is not blocking; empty means immediate enforcement.'
+                        ),
+                        new OA\Property(
                             property: 'iosAppUrl',
                             type: 'string',
                             example: 'https://apps.apple.com/app/id000000000',
@@ -457,6 +463,7 @@ class ConfigController extends AbstractController
         $mobileConfig = [
             'minVersion' => $this->mobileVersionService->getMinVersion(),
             'updateRequired' => $this->mobileVersionService->isUpdateRequired($client),
+            'updateEnforceAfter' => $this->mobileVersionService->getUpdateEnforceAfter(),
             'iosAppUrl' => $storeUrls['ios'],
             'androidAppUrl' => $storeUrls['android'],
         ];

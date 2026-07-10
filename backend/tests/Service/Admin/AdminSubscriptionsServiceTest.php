@@ -112,7 +112,7 @@ class AdminSubscriptionsServiceTest extends TestCase
     {
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
 
-        $this->subscriptionRepository->method('find')->with(1)->willReturn($sub);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
         $this->em->expects(self::once())->method('flush');
 
         $result = $this->service->updateSubscription(1, [
@@ -129,7 +129,7 @@ class AdminSubscriptionsServiceTest extends TestCase
     public function testUpdateNegativePriceMonthlyThrows(): void
     {
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
-        $this->subscriptionRepository->method('find')->with(1)->willReturn($sub);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('priceMonthly must be a number >= 0');
@@ -140,7 +140,7 @@ class AdminSubscriptionsServiceTest extends TestCase
     public function testUpdateInvalidCurrencyThrows(): void
     {
         $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
-        $this->subscriptionRepository->method('find')->with(1)->willReturn($sub);
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('currency must be a 3-letter ISO 4217 code');

@@ -26,10 +26,12 @@ final readonly class MobileVersionService
     public const OWNER_ID = 0;
 
     public const KEY_MIN_APP_VERSION = 'MIN_APP_VERSION';
+    public const KEY_UPDATE_ENFORCE_AFTER = 'UPDATE_ENFORCE_AFTER';
     public const KEY_IOS_APP_URL = 'IOS_APP_URL';
     public const KEY_ANDROID_APP_URL = 'ANDROID_APP_URL';
 
     public const DEFAULT_MIN_APP_VERSION = '';
+    public const DEFAULT_UPDATE_ENFORCE_AFTER = '';
     public const DEFAULT_IOS_APP_URL = '';
     public const DEFAULT_ANDROID_APP_URL = '';
 
@@ -46,6 +48,15 @@ final readonly class MobileVersionService
         $raw = $this->configRepository->getValue(self::OWNER_ID, self::GROUP, self::KEY_MIN_APP_VERSION);
 
         return null === $raw ? self::DEFAULT_MIN_APP_VERSION : trim($raw);
+    }
+
+    /**
+     * ISO-8601 timestamp after which the gate may block, or '' for immediate
+     * enforcement. Invalid timestamps fail open in isUpdateRequired().
+     */
+    public function getUpdateEnforceAfter(): string
+    {
+        return $this->value(self::KEY_UPDATE_ENFORCE_AFTER, self::DEFAULT_UPDATE_ENFORCE_AFTER);
     }
 
     /**
@@ -72,6 +83,19 @@ final readonly class MobileVersionService
         $min = $this->getMinVersion();
         if ('' === $min) {
             return false;
+        }
+
+        $enforceAfter = $this->getUpdateEnforceAfter();
+        if ('' !== $enforceAfter) {
+            try {
+                $deadline = new \DateTimeImmutable($enforceAfter);
+            } catch (\Exception) {
+                return false;
+            }
+
+            if (new \DateTimeImmutable() < $deadline) {
+                return false;
+            }
         }
 
         return version_compare($client->appVersion, $min, '<');

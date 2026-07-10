@@ -102,6 +102,30 @@ Real failure modes that have caused red CI more than once:
 
 - **Heuristic changes ≠ production effect.** If a config flag (e.g. `CLASSIFIER.FAST_PATH_ENABLED`) defaults a code path OFF, new logic there passes tests and is still a no-op in prod. Check the `BCONFIG` default and confirm the path is reachable before claiming a fix.
 
+### Mobile App Compatibility
+
+The private `synaplan-apps` repository consumes this public repository as a pinned submodule. Keep
+mobile support a narrow, reviewable compatibility layer:
+
+- Mark every shared hook with `MOBILE-APP SEAM`; keep the implementation in new, focused files
+  whenever possible.
+- Mobile behavior is **default-off** and web/self-host behavior must remain unchanged without a
+  mobile client or explicit configuration. API and runtime-config changes are additive, optional,
+  and have safe defaults.
+- Classify every change before release:
+  - **backend-only** — no bundled SPA/native-shell effect; deploy through the normal platform path.
+  - **ota-candidate** — web-asset-only fix within already reviewed behavior; release only from
+    `synaplan-apps` under its OTA policy.
+  - **store-required** — native code, plugins, permissions, privacy declarations, IAP/entitlements,
+    authentication transport, or material behavior changes.
+- Treat these as mobile-risk paths: runtime config/OpenAPI, auth/OAuth and Bearer handling,
+  SSE/WebSocket setup, subscription/IAP and entitlement logic, native guards/bootstrap,
+  onboarding/routing, forced updates, and Capacitor-facing services.
+- Run the complete backend/frontend gate for every affected area. For OpenAPI changes, regenerate
+  schemas, run `vue-tsc`, and verify that the app build consumes the same generated contract.
+- This public repository never publishes OTA bundles and must not contain private app-signing,
+  store-account, OTA-hosting, endpoint, credential, or infrastructure details.
+
 ## Essential Commands
 
 ```bash
