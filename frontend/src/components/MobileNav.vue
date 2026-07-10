@@ -822,7 +822,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0.5rem 0.75rem;
   border-radius: 0.625rem;
   font-size: 0.8125rem;

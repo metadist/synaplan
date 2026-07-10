@@ -292,7 +292,6 @@
               </button>
 
               <button
-                v-if="!isMobile || canSend || isStreaming"
                 type="button"
                 :disabled="!isStreaming && !canSend"
                 class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl pointer-events-auto transition-all"
