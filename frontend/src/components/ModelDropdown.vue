@@ -10,7 +10,7 @@
     >
       <Icon icon="mdi:robot-outline" class="w-4 h-4 md:w-5 md:h-5" />
       <span class="text-xs md:text-sm font-medium truncate max-w-[22vw] sm:max-w-[120px]">
-        {{ selectedModelName }}
+        {{ triggerModelName }}
       </span>
       <ModelCostBadge v-if="selectedModelObj" :model="selectedModelObj" :peers="chatModels" />
       <ChevronUpIcon class="w-4 h-4" />
@@ -122,9 +122,14 @@ const selectedModelObj = computed((): AIModel | null => {
   return chatModels.value.find((m) => m.id === props.modelValue) ?? null
 })
 
-const selectedModelName = computed(() => {
-  if (selectedModelObj.value) return selectedModelObj.value.name
-  return t('chatInput.modelDropdown.default')
+/**
+ * Pill label: always the effective model name (explicit pick, or the account
+ * default instead of the word "Default"), clipped to 8 characters with ".."
+ * so the trigger stays compact.
+ */
+const triggerModelName = computed(() => {
+  const name = selectedModelObj.value?.name ?? defaultModelName.value
+  return name.length > 8 ? `${name.slice(0, 8).trimEnd()}..` : name
 })
 
 const toggleOpen = () => {

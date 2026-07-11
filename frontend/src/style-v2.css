@@ -1218,6 +1218,57 @@
 }
 
 /* ----------------------------------------------------------
+   19b. Dark overlays INSIDE the light composer
+
+   Section 19 recolors .pill / .txt-secondary / .txt-muted to dark ink
+   because the composer shell itself is a white box in dark V2. But three
+   overlay surfaces render inside the shell's DOM subtree with their own
+   DARK panels: the "+" menu and its nested Model/Tools/Knowledge
+   drop-ups (.dropdown-up), the command palette, and the @file-mention
+   palette. Without these restores, the white-composer ink lands on the
+   near-black panels (~1.6:1 contrast — unreadable). Anything on a dark
+   overlay must use the dark-theme colors again; appended after 19 so it
+   wins at equal importance.
+   ---------------------------------------------------------- */
+
+.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .pill {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #e4e5e9 !important;
+}
+.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .pill:hover {
+  background: rgba(107, 143, 214, 0.12) !important;
+  border-color: rgba(107, 143, 214, 0.3) !important;
+  color: var(--brand-light) !important;
+}
+.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .pill--active {
+  background: rgba(107, 143, 214, 0.1) !important;
+  border-color: rgba(107, 143, 214, 0.3) !important;
+  color: var(--brand-light) !important;
+}
+
+.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .txt-secondary,
+.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .txt-muted,
+.design-v2.dark
+  [data-testid='comp-chat-input-shell']
+  [data-testid='comp-command-palette']
+  .txt-secondary,
+.design-v2.dark
+  [data-testid='comp-chat-input-shell']
+  [data-testid='comp-command-palette']
+  .txt-muted,
+.design-v2.dark
+  [data-testid='comp-chat-input-shell']
+  [data-testid='comp-file-mention-palette']
+  .txt-secondary,
+.design-v2.dark
+  [data-testid='comp-chat-input-shell']
+  [data-testid='comp-file-mention-palette']
+  .txt-muted {
+  color: var(--txt-secondary) !important;
+}
+
+/* ----------------------------------------------------------
    20. Light-mode contrast overhaul (readability pass)
 
    Mirrors the dark pass: darker rail icons/labels, a solid

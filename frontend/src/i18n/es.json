@@ -343,6 +343,10 @@
         "communication": "Comunicación",
         "security": "Seguridad e inicio de sesión"
       },
+      "brandingMode": {
+        "light": "Está editando los ajustes del modo CLARO — los colores guardados aquí se aplican en el modo claro. Cambie la aplicación al modo oscuro para editar los colores del modo oscuro.",
+        "dark": "Está editando los ajustes del modo OSCURO — los colores guardados aquí se aplican en el modo oscuro. Cambie la aplicación al modo claro para editar los colores del modo claro."
+      },
       "restartBanner": {
         "title": "Configuración Actualizada — Reinicio Requerido",
         "message": "Sus cambios se han guardado en el archivo .env. Para que los cambios surtan efecto, debe reiniciar sus contenedores Docker.",
@@ -1800,7 +1804,12 @@
       "title": "Generados",
       "subtitle": "Imágenes, vídeo y audio creados en tus chats.",
       "openInChat": "Abrir en el chat",
-      "download": "Descargar"
+      "download": "Descargar",
+      "autoGroup": "Dejar que la IA elija una carpeta",
+      "deleteConfirmTitle": "¿Eliminar archivo generado?",
+      "deleteConfirmMessage": "\"{name}\" se eliminará permanentemente, incluido su contenido indexado en tu base de conocimiento. Esta acción no se puede deshacer.",
+      "deleted": "Archivo eliminado, incluido su contenido indexado.",
+      "deleteFailed": "No se pudo eliminar el archivo. Inténtalo de nuevo."
     },
     "explainer": {
       "text": "Todo lo que subes o creas está aquí. Los archivos marcados como «consultables por IA» se añaden a tu base de conocimiento para que el asistente pueda usarlos.",

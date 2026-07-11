@@ -354,6 +354,10 @@
       },
       "liveBadge": "Live",
       "liveHint": "Changes take effect immediately, no restart required.",
+      "brandingMode": {
+        "light": "You are editing the LIGHT mode settings — colors saved here apply when the app is in light mode. Switch the app to dark mode to edit the dark mode colors.",
+        "dark": "You are editing the DARK mode settings — colors saved here apply when the app is in dark mode. Switch the app to light mode to edit the light mode colors."
+      },
       "restartBanner": {
         "title": "Configuration Updated — Restart Required",
         "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",
@@ -966,7 +970,12 @@
       "title": "Generated",
       "subtitle": "Images, video and audio created in your chats.",
       "openInChat": "Open in chat",
-      "download": "Download"
+      "download": "Download",
+      "autoGroup": "Let AI choose a folder",
+      "deleteConfirmTitle": "Delete generated file?",
+      "deleteConfirmMessage": "\"{name}\" will be permanently deleted, including its indexed content in your knowledge base. This cannot be undone.",
+      "deleted": "File deleted, including its indexed content.",
+      "deleteFailed": "Couldn't delete the file. Please try again."
     },
     "explainer": {
       "text": "Everything you upload or create lives here. Files marked \"searchable by AI\" are added to your knowledge base so the assistant can use them.",

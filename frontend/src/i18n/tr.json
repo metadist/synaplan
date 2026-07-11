@@ -343,6 +343,10 @@
         "communication": "İletişim",
         "security": "Güvenlik ve Giriş"
       },
+      "brandingMode": {
+        "light": "AÇIK mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler açık modda geçerlidir. Koyu mod renklerini düzenlemek için uygulamayı koyu moda geçirin.",
+        "dark": "KOYU mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler koyu modda geçerlidir. Açık mod renklerini düzenlemek için uygulamayı açık moda geçirin."
+      },
       "restartBanner": {
         "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
         "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",
@@ -1801,7 +1805,12 @@
       "title": "Üretilen",
       "subtitle": "Sohbetlerinizde oluşturulan görseller, video ve ses.",
       "openInChat": "Sohbette aç",
-      "download": "İndir"
+      "download": "İndir",
+      "autoGroup": "Klasörü yapay zekâ seçsin",
+      "deleteConfirmTitle": "Üretilen dosya silinsin mi?",
+      "deleteConfirmMessage": "\"{name}\" kalıcı olarak silinecek; bilgi tabanınızdaki dizinlenmiş içeriği de kaldırılacak. Bu işlem geri alınamaz.",
+      "deleted": "Dosya silindi, dizinlenmiş içeriği de kaldırıldı.",
+      "deleteFailed": "Dosya silinemedi. Lütfen tekrar deneyin."
     },
     "explainer": {
       "text": "Yüklediğiniz veya oluşturduğunuz her şey burada. „Yapay zekâ ile aranabilir“ olarak işaretli dosyalar bilgi tabanınıza eklenir; böylece asistan bunları kullanabilir.",

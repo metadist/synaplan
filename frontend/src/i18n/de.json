@@ -349,6 +349,10 @@
       },
       "liveBadge": "Live",
       "liveHint": "Änderungen werden sofort wirksam, kein Neustart erforderlich.",
+      "brandingMode": {
+        "light": "Sie bearbeiten die Einstellungen für den HELLEN Modus — hier gespeicherte Farben gelten im hellen Modus. Wechseln Sie in den dunklen Modus, um die Farben für den dunklen Modus zu bearbeiten.",
+        "dark": "Sie bearbeiten die Einstellungen für den DUNKLEN Modus — hier gespeicherte Farben gelten im dunklen Modus. Wechseln Sie in den hellen Modus, um die Farben für den hellen Modus zu bearbeiten."
+      },
       "restartBanner": {
         "title": "Konfiguration aktualisiert — Neustart erforderlich",
         "message": "Ihre Änderungen wurden in der .env-Datei gespeichert. Damit die Änderungen wirksam werden, müssen Sie Ihre Docker-Container neu starten.",
@@ -2330,7 +2334,12 @@
       "title": "Erzeugt",
       "subtitle": "Bilder, Video und Audio aus deinen Chats.",
       "openInChat": "Im Chat öffnen",
-      "download": "Herunterladen"
+      "download": "Herunterladen",
+      "autoGroup": "KI wählt einen Ordner",
+      "deleteConfirmTitle": "Erzeugte Datei löschen?",
+      "deleteConfirmMessage": "\"{name}\" wird dauerhaft gelöscht, einschließlich der indexierten Inhalte in deiner Wissensbasis. Das kann nicht rückgängig gemacht werden.",
+      "deleted": "Datei gelöscht, einschließlich der indexierten Inhalte.",
+      "deleteFailed": "Datei konnte nicht gelöscht werden. Bitte versuche es erneut."
     },
     "explainer": {
       "text": "Alles, was du hochlädst oder erstellst, liegt hier. Als „KI-durchsuchbar“ markierte Dateien werden deiner Wissensbasis hinzugefügt, damit der Assistent sie nutzen kann.",
