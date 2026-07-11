@@ -1414,6 +1414,17 @@ const handleContinueResponse = async (message: Message) => {
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
 
+        // Usage taximeter: a continued response is a billed turn like any
+        // other — adopt its usage + live day totals.
+        if (usageTaximeterStore.active) {
+          usageTaximeterStore.applyComplete(
+            (data.usage ?? null) as Message['usage'],
+            (data.usage_totals ?? null) as UsageTotals | null,
+            (data.usage_extra ?? null) as Message['usageExtra']
+          )
+          usageTaximeterStore.refreshAfterSettlement()
+        }
+
         // Issue #1070: reconcile against the persisted message so files /
         // media / metadata reflect the authoritative backend state.
         if (message.backendMessageId) {
@@ -2885,6 +2896,24 @@ const streamAIResponse = async (
                 },
                 { provider, model: modelLabel, model_id: currentModel?.id ?? null }
               )
+
+              // Usage taximeter: attach this turn's usage (badge + session
+              // model list) and adopt the live day totals from the server.
+              // The settlement refresh covers costs recorded moments after
+              // the stream (media renders billed by the worker).
+              if (usageTaximeterStore.active) {
+                const turnUsage = (data.usage ?? null) as Message['usage']
+                const turnUsageExtra = (data.usage_extra ?? null) as Message['usageExtra']
+                const turnTotals = (data.usage_totals ?? null) as UsageTotals | null
+                if (turnUsage) {
+                  message.usage = turnUsage
+                }
+                if (turnUsageExtra && turnUsageExtra.length > 0) {
+                  message.usageExtra = turnUsageExtra
+                }
+                usageTaximeterStore.applyComplete(turnUsage, turnTotals, turnUsageExtra)
+                usageTaximeterStore.refreshAfterSettlement()
+              }
 
               // Store topic from classification
               if (data.topic) {
