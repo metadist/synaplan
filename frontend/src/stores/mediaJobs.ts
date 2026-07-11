@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useHistoryStore } from '@/stores/history'
 import { useChatsStore } from '@/stores/chats'
 import { useRealtimeStore } from '@/stores/realtime'
+import { useUsageTaximeterStore } from '@/stores/usageTaximeter'
 import { useNotification } from '@/composables/useNotification'
 import { getConfigSync } from '@/services/api/httpClient'
 import { i18n } from '@/i18n'
@@ -54,18 +55,32 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
 
   /** Apply one realtime/poll update: patch the loaded message + maintain the tray + toast on terminal. */
   function applyUpdate(payload: MediaJobUpdate): void {
-    if (payload.message_id != null) {
-      const message = useHistoryStore().messages.find(
-        (m) => m.backendMessageId === payload.message_id
-      )
-      if (message) {
-        applyMediaJobUpdateToMessage(message, payload)
-      }
+    const loadedMessage =
+      payload.message_id != null
+        ? useHistoryStore().messages.find((m) => m.backendMessageId === payload.message_id)
+        : undefined
+    if (loadedMessage) {
+      applyMediaJobUpdateToMessage(loadedMessage, payload)
     }
 
     if (TERMINAL_STATES.has(payload.state)) {
       removeActive(payload.job_id)
       raiseTerminalToast(payload)
+
+      // Usage taximeter: the render was billed by the worker at completion —
+      // pull fresh day totals now, and (when the message is loaded) reconcile
+      // it so the persisted usage meta lands in the session model list without
+      // a page reload.
+      const taximeter = useUsageTaximeterStore()
+      if ('done' === payload.state && taximeter.active) {
+        void taximeter.loadSummary()
+        if (loadedMessage && payload.message_id != null) {
+          const historyStore = useHistoryStore()
+          void historyStore
+            .reconcileMessage(loadedMessage.id, payload.message_id)
+            .then(() => taximeter.seedFromHistory(historyStore.messages))
+        }
+      }
     } else {
       upsertActive(payload)
     }
