@@ -67,19 +67,23 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
       removeActive(payload.job_id)
       raiseTerminalToast(payload)
 
-      // Usage taximeter: the render was billed by the worker at completion —
-      // pull fresh day totals now, and (when the message is loaded) reconcile
-      // it so the persisted usage meta lands in the session model list without
-      // a page reload.
+      // Usage taximeter: the render is billed by the worker around completion,
+      // and the job can become visible as "done" moments BEFORE the billing row
+      // and usage meta are committed. refreshAfterSettlement pulls day totals
+      // now and retries briefly, re-reconciling the message so the persisted
+      // usage meta lands in the session model list without a page reload.
       const taximeter = useUsageTaximeterStore()
       if ('done' === payload.state && taximeter.active) {
-        void taximeter.loadSummary()
-        if (loadedMessage && payload.message_id != null) {
-          const historyStore = useHistoryStore()
-          void historyStore
-            .reconcileMessage(loadedMessage.id, payload.message_id)
-            .then(() => taximeter.seedFromHistory(historyStore.messages))
-        }
+        const reconcile =
+          loadedMessage && payload.message_id != null
+            ? () => {
+                const historyStore = useHistoryStore()
+                void historyStore
+                  .reconcileMessage(loadedMessage.id, payload.message_id as number)
+                  .then(() => taximeter.seedFromHistory(historyStore.messages))
+              }
+            : undefined
+        taximeter.refreshAfterSettlement(reconcile)
       }
     } else {
       upsertActive(payload)

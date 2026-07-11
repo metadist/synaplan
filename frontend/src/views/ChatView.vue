@@ -1201,20 +1201,26 @@ function handleMediaJobCompleted(message: Message, payload: { url: string; type:
     file: { url: payload.url, type: payload.type },
   })
 
-  // Usage taximeter: an async media render is billed by the worker at job
-  // completion (after the stream ended), so pull fresh day totals now, and
-  // rebuild the session models from the reconciled history (the persisted
-  // ai_usage_extra meta now carries the render's model + cost).
-  if (usageTaximeterStore.active) {
-    void usageTaximeterStore.loadSummary()
-  }
+  // Usage taximeter: an async media render is billed by the worker around job
+  // completion — the poll can observe "done" moments before the billing row
+  // and usage meta are committed. refreshAfterSettlement pulls fresh day
+  // totals with a short bounded retry and re-reconciles the message so the
+  // session model list picks up the render's model + cost without a reload.
+  const backendMessageId = message.backendMessageId
+  usageTaximeterStore.refreshAfterSettlement(
+    backendMessageId
+      ? () => {
+          void historyStore.reconcileMessage(message.id, backendMessageId).then(() => {
+            if (usageTaximeterStore.active) {
+              usageTaximeterStore.seedFromHistory(historyStore.messages)
+            }
+          })
+        }
+      : undefined
+  )
 
-  if (message.backendMessageId) {
-    void historyStore.reconcileMessage(message.id, message.backendMessageId).then(() => {
-      if (usageTaximeterStore.active) {
-        usageTaximeterStore.seedFromHistory(historyStore.messages)
-      }
-    })
+  if (!usageTaximeterStore.active && backendMessageId) {
+    void historyStore.reconcileMessage(message.id, backendMessageId)
   }
 }
 

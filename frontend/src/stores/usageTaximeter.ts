@@ -287,6 +287,37 @@ export const useUsageTaximeterStore = defineStore('usageTaximeter', () => {
     }
   }
 
+  // Timers of a pending post-completion settlement refresh (see below).
+  let settlementTimers: Array<ReturnType<typeof setTimeout>> = []
+
+  /**
+   * Refresh the display after an async media job completed — resilient to the
+   * worker's write ordering: the job becomes visible as "done" (Redis) BEFORE
+   * the billing row and the message usage meta are committed, so a poll-driven
+   * completion can observe "done" seconds early. Refresh immediately AND retry
+   * twice with a short backoff so the settled figures always land. Not
+   * polling — a bounded, self-clearing follow-up.
+   *
+   * @param reconcile optional callback that re-fetches the persisted message
+   *                  and re-seeds the session model list from history
+   */
+  function refreshAfterSettlement(reconcile?: () => void): void {
+    if (!active.value) return
+
+    for (const timer of settlementTimers) clearTimeout(timer)
+    settlementTimers = []
+
+    const run = () => {
+      void loadSummary()
+      reconcile?.()
+    }
+
+    run()
+    for (const delayMs of [2500, 7000]) {
+      settlementTimers.push(setTimeout(run, delayMs))
+    }
+  }
+
   /**
    * Rebuild the session from the loaded chat history (chat switch / reload).
    * Resets the session first, then folds in every assistant `usage` and counts
@@ -354,6 +385,7 @@ export const useUsageTaximeterStore = defineStore('usageTaximeter', () => {
     active,
     // actions
     loadSummary,
+    refreshAfterSettlement,
     seedFromHistory,
     applyComplete,
     registerPrompt,
