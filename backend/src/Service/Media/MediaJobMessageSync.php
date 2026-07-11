@@ -134,7 +134,11 @@ final readonly class MediaJobMessageSync
         // happened on an earlier sync (e.g. while the job was still bound to
         // the IN message), the recorder returns null and the charged cost is
         // read from the stash it left on the job options.
-        $chargedCost = $recorded?->chargedCost
+        // `$recorded` is null when billing was skipped (non-completed state) or
+        // already recorded on an earlier sync; the `??` uses isset() semantics,
+        // so reading ->chargedCost off a null left operand safely falls through
+        // to the stashed cost without a warning (no nullsafe needed here).
+        $chargedCost = $recorded->chargedCost
             ?? (is_string($job->getOptions()['_usage_charged_cost'] ?? null) ? $job->getOptions()['_usage_charged_cost'] : null);
         if (MediaJob::STATUS_COMPLETED === $job->getStatus() && null !== $chargedCost) {
             $this->appendUsageExtraMeta($message, $job, $chargedCost);
