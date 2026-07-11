@@ -33,7 +33,7 @@ describe('ConsumptionBar', () => {
     setActivePinia(createPinia())
   })
 
-  it('renders the head euro value and the "Session" foot label', () => {
+  it('renders the head euro value and the "Tokens" foot label', () => {
     const store = useUsageTaximeterStore()
     store.applyComplete(usage('openai:gpt-4o', '0.02', 8420), {
       todayCost: '1.02',
@@ -42,7 +42,7 @@ describe('ConsumptionBar', () => {
 
     const wrapper = mountBar()
     expect(wrapper.find('.usage-bar__head').text()).toContain('1.02')
-    expect(wrapper.find('.usage-bar__foot').text()).toBe('Session')
+    expect(wrapper.find('.usage-bar__foot').text()).toBe('Tokens')
   })
 
   it('renders one segment per epochSegments entry', () => {

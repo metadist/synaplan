@@ -104,7 +104,7 @@
     "readMore": "Read more"
   },
   "usageTaximeter": {
-    "sessionLabel": "Session",
+    "sessionLabel": "Tokens",
     "todayTooltip": "{tokens} tokens today",
     "todayAria": "Usage today: {cost}",
     "openStats": "Show usage statistics",

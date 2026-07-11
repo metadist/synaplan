@@ -103,7 +103,7 @@
     "readMore": "Devamını oku"
   },
   "usageTaximeter": {
-    "sessionLabel": "Oturum",
+    "sessionLabel": "Tokenlar",
     "todayTooltip": "Bugün {tokens} token",
     "todayAria": "Bugünkü kullanım: {cost}",
     "openStats": "Kullanım istatistiklerini göster",
