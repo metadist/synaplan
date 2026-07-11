@@ -130,6 +130,9 @@ final readonly class ChatRunner implements TaskRunner
             'provider' => $response['provider'] ?? $provider,
             'model' => $response['model'] ?? $modelName,
             'model_id' => $modelId,
+            // Exact provider token counts so the turn's MESSAGES usage row can
+            // bill real tokens instead of byte-estimating the assembled text.
+            'usage' => $response['usage'] ?? [],
         ];
         if (Capability::RagQuery === $node->capability) {
             $metadata['rag_chunks'] = $ragChunks;

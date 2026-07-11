@@ -14,6 +14,7 @@ use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\Skill\SkillCatalog;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
+use App\Service\RateLimitService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -40,6 +41,7 @@ final readonly class TaskPlanner
         private TimeContextBuilder $timeContextBuilder,
         private SkillCatalog $skillCatalog,
         private PromptService $promptService,
+        private RateLimitService $rateLimitService,
     ) {
     }
 
@@ -77,6 +79,11 @@ final readonly class TaskPlanner
                 'max_tokens' => 1500,
             ]);
             $raw = (string) ($response['content'] ?? '');
+
+            // The planner call is a billable LLM request like the sorter's —
+            // record it so DAG turns don't get their routing tokens for free.
+            // Never let a recording hiccup break planning.
+            $this->recordPlanningUsage($userId, $modelId, $response);
         } catch (\Throwable $e) {
             $this->logger->warning('TaskPlanner: planner model call failed, falling back', [
                 'error' => $e->getMessage(),
@@ -107,6 +114,40 @@ final readonly class TaskPlanner
         }
 
         return new TaskPlanResult($plan, fallback: false, modelId: $modelId, rawResponse: $raw, errors: []);
+    }
+
+    /**
+     * Record token usage of the planner call (BACTION=PLANNING). Mirrors
+     * MessageSorter::recordSortingUsage — never throws, best-effort.
+     *
+     * @param array<string, mixed> $response
+     */
+    private function recordPlanningUsage(?int $userId, ?int $modelId, array $response): void
+    {
+        if (null === $userId || $userId <= 0) {
+            return;
+        }
+
+        try {
+            $user = $this->userRepository->find($userId);
+            if (null === $user) {
+                return;
+            }
+
+            $this->rateLimitService->recordUsage($user, 'PLANNING', [
+                'usage' => $response['usage'] ?? [],
+                'model_id' => $modelId,
+                'provider' => $response['provider'] ?? '',
+                'model' => $response['model'] ?? '',
+                'input_text' => '',
+                'response_text' => $response['content'] ?? '',
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanner: failed to record planning usage', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId,
+            ]);
+        }
     }
 
     /**

@@ -1,6 +1,25 @@
 import { httpClient } from '@/services/api/httpClient'
 import { saveOrDownloadBlob } from '@/services/api/nativeDownload'
 import { useConfigStore } from '@/stores/config'
+import { GetApiUsageSummaryResponseSchema } from '@/generated/api-schemas'
+import type { z } from 'zod'
+
+/**
+ * Live daily totals for the in-chat usage taximeter. Generated Zod schema from
+ * the backend OpenAPI spec (GET /api/v1/usage/summary) — no hand-written type.
+ */
+export type UsageSummary = z.infer<typeof GetApiUsageSummaryResponseSchema>
+
+/**
+ * Fetch today's charged spend + token count (once per chat-view mount). The
+ * SSE `complete` event keeps them fresh afterwards, so there is no polling.
+ */
+export async function getUsageSummary(): Promise<UsageSummary> {
+  return httpClient('/api/v1/usage/summary', {
+    method: 'GET',
+    schema: GetApiUsageSummaryResponseSchema,
+  })
+}
 
 // NOTE: this interface is hand-maintained because UsageStatsController's
 // OpenAPI annotation currently types the `data` field as a generic `object`.

@@ -52,6 +52,8 @@ final readonly class MessageApiFormatter
         $webSearchData = null;
         $searchResultsData = [];
         $wasMultitask = false;
+        $usage = null;
+        $usageExtra = null;
 
         if ('OUT' === $m->getDirection()) {
             // Multi-task routing: the turn ran the DAG executor, so the
@@ -96,6 +98,13 @@ final readonly class MessageApiFormatter
                     'model_id' => $audioModelId ? (int) $audioModelId : null,
                 ];
             }
+
+            // Usage taximeter: rebuild the per-message usage object from meta so
+            // a page reload can reconstruct the session totals. Tokens live in
+            // ai_chat_usage; the charged cost in ai_chat_cost (may be absent for
+            // non-web channels); the model identity in ai_chat_provider/model.
+            $usage = $this->buildUsage($m);
+            $usageExtra = $this->buildUsageExtra($m);
 
             // Web Search metadata
             $searchQuery = $m->getMeta('web_search_query');
@@ -186,6 +195,8 @@ final readonly class MessageApiFormatter
             'aiModels' => !empty($aiModels) ? $aiModels : null, // AI model metadata
             'webSearch' => $webSearchData, // Web search metadata
             'searchResults' => !empty($searchResultsData) ? $searchResultsData : null, // Actual search results
+            'usage' => $usage, // Per-message token/cost usage (taximeter); null when absent
+            'usageExtra' => $usageExtra, // Auxiliary usage of this turn (sorting/media/TTS); null when absent
             'multitask' => $wasMultitask, // True when the turn ran the multi-task DAG
             // Per-node task-plan render state for reload (issue #1070 — DAG divergence).
             // Null for non-DAG turns, non-null only on OUT messages of DAG turns.
@@ -199,6 +210,92 @@ final readonly class MessageApiFormatter
                 'type' => $m->getFileType(),
             ] : null,
         ];
+    }
+
+    /**
+     * Rebuild the per-message usage object for the taximeter from message meta.
+     *
+     * Shape mirrors the SSE `complete` `usage` payload:
+     *   { promptTokens, completionTokens, totalTokens, cost, modelKey, kind }
+     *
+     * Returns null when no token usage was recorded (ai_chat_usage meta absent),
+     * so the field is simply omitted rather than shipping a null-filled object.
+     * `cost` is null when ai_chat_cost is absent (e.g. non-web channels that
+     * never went through the taximeter write path).
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string|null, modelKey: string, kind: string}|null
+     */
+    private function buildUsage(Message $m): ?array
+    {
+        $raw = $m->getMeta('ai_chat_usage');
+        if (null === $raw || '' === $raw) {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        $promptTokens = (int) ($decoded['prompt_tokens'] ?? 0);
+        $completionTokens = (int) ($decoded['completion_tokens'] ?? 0);
+        $totalTokens = (int) ($decoded['total_tokens'] ?? ($promptTokens + $completionTokens));
+
+        $cost = $m->getMeta('ai_chat_cost');
+
+        $provider = strtolower(trim((string) $m->getMeta('ai_chat_provider')));
+        $model = trim((string) $m->getMeta('ai_chat_model'));
+        if ('' !== $provider && '' !== $model) {
+            $modelKey = $provider.':'.$model;
+        } else {
+            $modelKey = '' !== $model ? $model : ('' !== $provider ? $provider : 'unknown');
+        }
+
+        return [
+            'promptTokens' => $promptTokens,
+            'completionTokens' => $completionTokens,
+            'totalTokens' => $totalTokens,
+            'cost' => (null !== $cost && '' !== $cost) ? $cost : null,
+            'modelKey' => $modelKey,
+            'kind' => 'LLM',
+        ];
+    }
+
+    /**
+     * Decode the persisted `ai_usage_extra` meta (auxiliary usage of the turn:
+     * sorting/routing call, media renders, TTS) back into the API list shape.
+     * Null when absent or malformed — the field is simply omitted.
+     *
+     * @return list<array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}>|null
+     */
+    private function buildUsageExtra(Message $m): ?array
+    {
+        $raw = $m->getMeta('ai_usage_extra');
+        if (null === $raw || '' === $raw) {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || [] === $decoded) {
+            return null;
+        }
+
+        $entries = [];
+        foreach ($decoded as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $entries[] = [
+                'promptTokens' => (int) ($entry['promptTokens'] ?? 0),
+                'completionTokens' => (int) ($entry['completionTokens'] ?? 0),
+                'totalTokens' => (int) ($entry['totalTokens'] ?? 0),
+                'cost' => (string) ($entry['cost'] ?? '0'),
+                'modelKey' => (string) ($entry['modelKey'] ?? 'unknown'),
+                'kind' => (string) ($entry['kind'] ?? 'LLM'),
+            ];
+        }
+
+        return [] !== $entries ? $entries : null;
     }
 
     /**

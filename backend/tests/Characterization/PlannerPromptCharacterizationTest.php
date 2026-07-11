@@ -14,6 +14,7 @@ use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
+use App\Service\RateLimitService;
 use App\Tests\Characterization\Support\RoutingSnapshot;
 use App\Tests\Support\SkillCatalogFactory;
 use Doctrine\ORM\EntityManagerInterface;
@@ -118,6 +119,7 @@ final class PlannerPromptCharacterizationTest extends TestCase
                 $this->createMock(EntityManagerInterface::class),
                 new NullLogger(),
             ),
+            $this->createMock(RateLimitService::class),
         );
     }
 

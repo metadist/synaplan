@@ -24,6 +24,9 @@ use App\Service\PerfTimer;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
 use App\Service\TtsTextSanitizer;
+use App\Service\Usage\RecordedUsage;
+use App\Service\UsageStatsService;
+use App\Service\UsageTaximeterConfig;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -72,6 +75,8 @@ class StreamController extends AbstractController
         private MediaCancellationStore $cancellationStore,
         private MediaJobService $mediaJobService,
         private MediaJobMessageSync $mediaJobMessageSync,
+        private UsageStatsService $usageStatsService,
+        private UsageTaximeterConfig $usageTaximeterConfig,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
     ) {
@@ -1632,7 +1637,7 @@ class StreamController extends AbstractController
                     $this->messageForwardingService->forwardIfNeeded($chat, $finalText);
                 }
 
-                $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                     'provider' => $response['metadata']['provider'] ?? 'unknown',
                     'model' => $response['metadata']['model'] ?? 'unknown',
                     'model_id' => $response['metadata']['model_id'] ?? null,
@@ -1644,6 +1649,37 @@ class StreamController extends AbstractController
                     'input_text' => $messageText,
                 ]);
 
+                // Usage taximeter (issue: chat usage display). Build the
+                // per-message usage payload (badge + session store) and persist
+                // the charged cost so a page reload can rebuild the session
+                // totals. The payload itself is switch-independent; display
+                // gating happens in the frontend.
+                $chatUsagePayload = $this->buildChatUsagePayload(
+                    $outgoingMessage,
+                    $recordedChatUsage,
+                    $response['metadata']['provider'] ?? null,
+                    $response['metadata']['model'] ?? null,
+                );
+
+                // Usage taximeter: auxiliary usage entries for this turn (the
+                // sorting/routing call, media renders, TTS). These feed the
+                // "models used" session list so the routing and media models
+                // appear with their real cost — not only the chat LLM.
+                $usageExtra = [];
+                if (is_array($classification['sorting_usage'] ?? null)) {
+                    $usageExtra[] = [
+                        'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
+                        'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
+                        'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
+                        'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
+                        'modelKey' => $this->buildUsageModelKey(
+                            $classification['sorting_provider'] ?? null,
+                            $classification['sorting_model_name'] ?? null,
+                        ),
+                        'kind' => 'SORT',
+                    ];
+                }
+
                 // Record AI-generated media usage (IMAGES, VIDEOS, AUDIOS) separately.
                 // Issue #1146: MediaGenerationHandler now records this itself (the
                 // instant the provider bills us, so a client disconnect can't skip
@@ -1651,6 +1687,9 @@ class StreamController extends AbstractController
                 // NOT record again here or we would double-charge the user.
                 $mediaType = $response['metadata']['media_type'] ?? null;
                 $mediaUsageAlreadyRecorded = !empty($response['metadata']['usage_recorded']);
+                $recordedMediaUsage = ($response['metadata']['media_recorded_usage'] ?? null) instanceof RecordedUsage
+                    ? $response['metadata']['media_recorded_usage']
+                    : null;
                 if ($mediaType && !$mediaUsageAlreadyRecorded) {
                     $mediaAction = match ($mediaType) {
                         'image' => 'IMAGES',
@@ -1662,7 +1701,7 @@ class StreamController extends AbstractController
                     if ($mediaAction) {
                         $mediaBytes = $generatedFile ? $generatedFile->getFileSize() : 0;
 
-                        $this->rateLimitService->recordUsage($user, $mediaAction, [
+                        $recordedMediaUsage = $this->rateLimitService->recordUsage($user, $mediaAction, [
                             'provider' => $response['metadata']['provider'] ?? 'unknown',
                             'model' => $response['metadata']['model'] ?? 'unknown',
                             'model_id' => $response['metadata']['model_id'] ?? null,
@@ -1673,6 +1712,22 @@ class StreamController extends AbstractController
                             'media_usage' => $response['metadata']['media_usage'] ?? [],
                         ]);
                     }
+                }
+
+                if ($mediaType && null !== $recordedMediaUsage) {
+                    $usageExtra[] = $this->buildExtraUsageEntry(
+                        strtoupper((string) $mediaType),
+                        $response['metadata']['provider'] ?? null,
+                        $response['metadata']['model'] ?? null,
+                        $recordedMediaUsage,
+                    );
+                }
+
+                if ([] !== $usageExtra) {
+                    $outgoingMessage->setMeta('ai_usage_extra', (string) json_encode($usageExtra));
+                }
+                if (null !== $chatUsagePayload || [] !== $usageExtra) {
+                    $this->em->flush();
                 }
 
                 // Get search results if available (uses the effective source computed above)
@@ -1721,6 +1776,18 @@ class StreamController extends AbstractController
                     'searchResults' => $searchResults,
                     'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
                 ];
+
+                // Usage taximeter: per-message usage (switch-independent) and,
+                // only when the display is enabled for authenticated web users,
+                // the live daily totals (so the two SUM queries are skipped when
+                // the admin turned the feature off). usage_totals is refreshed
+                // again right before sendSSE so late recordings (TTS) are in.
+                if (null !== $chatUsagePayload) {
+                    $completeData['usage'] = $chatUsagePayload;
+                }
+                if ([] !== $usageExtra) {
+                    $completeData['usage_extra'] = $usageExtra;
+                }
 
                 if ('length' === $finishReason) {
                     $completeData['truncated'] = true;
@@ -1846,7 +1913,7 @@ class StreamController extends AbstractController
                                 'model_id' => $this->normalizeModelId($ttsModelId, 'sse_audio_event'),
                             ]);
 
-                            $this->rateLimitService->recordUsage($user, 'AUDIOS', [
+                            $recordedTtsUsage = $this->rateLimitService->recordUsage($user, 'AUDIOS', [
                                 'provider' => $ttsProvider ?? 'unknown',
                                 'model' => $ttsModelName ?? 'unknown',
                                 'model_id' => $ttsModelId,
@@ -1854,6 +1921,17 @@ class StreamController extends AbstractController
                                     'characters' => $ttsResult['text_length'] ?? mb_strlen($ttsText),
                                 ],
                             ]);
+
+                            // Usage taximeter: list the TTS model for this turn.
+                            $usageExtra[] = $this->buildExtraUsageEntry(
+                                'TTS',
+                                null !== $ttsProvider ? (string) $ttsProvider : null,
+                                null !== $ttsModelName ? (string) $ttsModelName : null,
+                                $recordedTtsUsage,
+                            );
+                            $completeData['usage_extra'] = $usageExtra;
+                            $outgoingMessage->setMeta('ai_usage_extra', (string) json_encode($usageExtra));
+                            $this->em->flush();
 
                             $this->logger->info('StreamController: Voice reply generated', [
                                 'url' => $audioUrl,
@@ -1899,6 +1977,13 @@ class StreamController extends AbstractController
                 // Sent before `complete` so the client picks it up while the
                 // EventSource is still open.
                 $this->sendSSE('perf', $perfTimer->toArray());
+
+                // Usage taximeter: compute the live daily totals LAST so every
+                // BUSELOG row of this turn (chat, sorting, media, TTS) is
+                // already written and the displayed today-figure is complete.
+                if (!$isWidgetMode && !$isGuestMode && $this->usageTaximeterConfig->isEnabled()) {
+                    $completeData['usage_totals'] = $this->usageStatsService->getLiveTotals($user);
+                }
 
                 $this->sendSSE('complete', $completeData);
 
@@ -2310,7 +2395,7 @@ class StreamController extends AbstractController
                 $this->messageForwardingService->forwardIfNeeded($chat, $content);
             }
 
-            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+            $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
                 'model_id' => $metadata['model_id'] ?? null,
@@ -2321,6 +2406,47 @@ class StreamController extends AbstractController
                 'response_text' => $content,
                 'input_text' => $message->getText(),
             ]);
+
+            // Usage taximeter (mirrors the streaming branch): per-message usage
+            // payload + persisted charged cost for reload reconstruction.
+            $chatUsagePayload = $this->buildChatUsagePayload(
+                $outgoingMessage,
+                $recordedChatUsage,
+                $metadata['provider'] ?? null,
+                $metadata['model'] ?? null,
+            );
+
+            $usageExtra = [];
+            if (is_array($classification['sorting_usage'] ?? null)) {
+                $usageExtra[] = [
+                    'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
+                    'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
+                    'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
+                    'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
+                    'modelKey' => $this->buildUsageModelKey(
+                        $classification['sorting_provider'] ?? null,
+                        $classification['sorting_model_name'] ?? null,
+                    ),
+                    'kind' => 'SORT',
+                ];
+            }
+            $recordedMediaUsage = ($metadata['media_recorded_usage'] ?? null) instanceof RecordedUsage
+                ? $metadata['media_recorded_usage']
+                : null;
+            if (null !== $recordedMediaUsage && !empty($metadata['media_type'])) {
+                $usageExtra[] = $this->buildExtraUsageEntry(
+                    strtoupper((string) $metadata['media_type']),
+                    $metadata['provider'] ?? null,
+                    $metadata['model'] ?? null,
+                    $recordedMediaUsage,
+                );
+            }
+            if ([] !== $usageExtra) {
+                $outgoingMessage->setMeta('ai_usage_extra', (string) json_encode($usageExtra));
+            }
+            if (null !== $chatUsagePayload || [] !== $usageExtra) {
+                $this->em->flush();
+            }
 
             // $metadata['model_id'] provenance varies per provider (some emit
             // string, some int, occasionally non-numeric junk). Coerce once
@@ -2347,6 +2473,16 @@ class StreamController extends AbstractController
                 'searchResults' => $this->formatSearchResultsForSse($effectiveSearchResults ?? null),
                 'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
             ];
+
+            if (null !== $chatUsagePayload) {
+                $completeData['usage'] = $chatUsagePayload;
+            }
+            if ([] !== $usageExtra) {
+                $completeData['usage_extra'] = $usageExtra;
+            }
+            if ('WEB' === $source && $this->usageTaximeterConfig->isEnabled()) {
+                $completeData['usage_totals'] = $this->usageStatsService->getLiveTotals($user);
+            }
 
             if (isset($metadata['memories']) && is_array($metadata['memories'])) {
                 $completeData['memoryIds'] = array_map(fn ($memory) => $memory['id'], $metadata['memories']);
@@ -2621,6 +2757,72 @@ class StreamController extends AbstractController
         }
 
         return [] === $aiModels ? null : $aiModels;
+    }
+
+    /**
+     * Build the per-message usage payload for the SSE `complete` event and
+     * persist the charged cost on the message so a page reload can rebuild the
+     * taximeter session totals (BUSELOG is never queried per chat).
+     *
+     * Returns null when there is nothing to show (no tokens and no cost), so
+     * the badge / session store only react to real usage.
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null
+     */
+    private function buildChatUsagePayload(Message $message, RecordedUsage $recorded, ?string $provider, ?string $model): ?array
+    {
+        if ($recorded->totalTokens <= 0 && (float) $recorded->chargedCost <= 0.0) {
+            return null;
+        }
+
+        // Persist the charged cost so MessageApiFormatter can rebuild the
+        // session model costs after a reload. Tokens already live in the
+        // ai_chat_usage meta; the model identity comes from ai_chat_model(_*).
+        $message->setMeta('ai_chat_cost', $recorded->chargedCost);
+
+        return [
+            'promptTokens' => $recorded->promptTokens,
+            'completionTokens' => $recorded->completionTokens,
+            'totalTokens' => $recorded->totalTokens,
+            'cost' => $recorded->chargedCost,
+            'modelKey' => $this->buildUsageModelKey($provider, $model),
+            'kind' => 'LLM',
+        ];
+    }
+
+    /**
+     * Build one auxiliary usage entry (sorting / media / TTS) for the
+     * taximeter's `usage_extra` list. Same shape as the chat `usage` payload.
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}
+     */
+    private function buildExtraUsageEntry(string $kind, ?string $provider, ?string $model, RecordedUsage $recorded): array
+    {
+        return [
+            'promptTokens' => $recorded->promptTokens,
+            'completionTokens' => $recorded->completionTokens,
+            'totalTokens' => $recorded->totalTokens,
+            'cost' => $recorded->chargedCost,
+            'modelKey' => $this->buildUsageModelKey($provider, $model),
+            'kind' => $kind,
+        ];
+    }
+
+    /**
+     * Compose a stable model key ("provider:model") for taximeter session
+     * grouping. Never hard-codes model names — the parts come from the
+     * response metadata (which originates from the model catalog).
+     */
+    private function buildUsageModelKey(?string $provider, ?string $model): string
+    {
+        $p = strtolower(trim((string) $provider));
+        $m = trim((string) $model);
+
+        if ('' !== $p && '' !== $m) {
+            return $p.':'.$m;
+        }
+
+        return '' !== $m ? $m : ('' !== $p ? $p : 'unknown');
     }
 
     private function sendSSE(string $status, array $data): void

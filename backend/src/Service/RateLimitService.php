@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
+use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -257,8 +258,13 @@ final class RateLimitService
      *
      * Accepts granular token data from provider usage arrays.
      * Falls back to byte-based heuristic estimation if no token data available.
+     *
+     * Returns the token counts and both cost figures (raw + charged) for the
+     * row just written, so callers can surface the charged per-message cost
+     * live (e.g. in the SSE `complete` event) without re-querying. The return
+     * value may be safely ignored by callers that don't need it.
      */
-    public function recordUsage(User $user, string $action, array $metadata = []): void
+    public function recordUsage(User $user, string $action, array $metadata = []): RecordedUsage
     {
         $usage = $metadata['usage'] ?? [];
         $promptTokens = $usage['prompt_tokens'] ?? 0;
@@ -404,6 +410,19 @@ final class RateLimitService
             'cost' => $costResult->totalCost,
             'estimated' => $estimated,
         ]);
+
+        // Charged cost = raw provider cost + operator markup, consistent with
+        // checkCostBudget() and the /statistics budget number.
+        $rawCost = (float) $costResult->totalCost;
+        $chargedCost = $rawCost * (1.0 + ($this->getMarkupPercent() / 100.0));
+
+        return new RecordedUsage(
+            chargedCost: number_format($chargedCost, 6, '.', ''),
+            rawCost: number_format($rawCost, 6, '.', ''),
+            promptTokens: (int) $promptTokens,
+            completionTokens: (int) $completionTokens,
+            totalTokens: (int) $totalTokens,
+        );
     }
 
     /**

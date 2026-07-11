@@ -20,6 +20,7 @@ use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
+use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -54,6 +55,7 @@ class ConfigController extends AbstractController
         private BrandingService $brandingService,
         private MobileVersionService $mobileVersionService,
         private MarketingNewsConfig $marketingNewsConfig,
+        private UsageTaximeterConfig $usageTaximeterConfig,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -321,6 +323,19 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'usageTaximeter',
+                    type: 'object',
+                    description: 'In-chat usage-display master switch (admin-controlled, on by default). When false, the frontend renders no consumption bar/ring and no per-message token-cost badge, and performs no usage-summary fetch. Does not affect the Statistics page.',
+                    properties: [
+                        new OA\Property(
+                            property: 'enabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'Whether the in-chat usage display is enabled platform-wide (default true).'
+                        ),
+                    ]
+                ),
+                new OA\Property(
                     property: 'unavailableProviders',
                     type: 'array',
                     description: 'AI providers that are disabled due to missing API keys (only for authenticated users)',
@@ -479,6 +494,9 @@ class ConfigController extends AbstractController
             'mobile' => $mobileConfig,
             'marketingNews' => [
                 'enabled' => $this->marketingNewsConfig->isEnabled(),
+            ],
+            'usageTaximeter' => [
+                'enabled' => $this->usageTaximeterConfig->isEnabled(),
             ],
         ];
 

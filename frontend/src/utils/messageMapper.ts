@@ -315,6 +315,24 @@ export interface ApiLoadedMessageRow {
     state: string
     error?: string
   } | null
+  /** Per-message token/cost usage for the taximeter (assistant messages). */
+  usage?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+    cost: string | null
+    modelKey: string
+    kind: string
+  } | null
+  /** Auxiliary usage of the turn (sorting/routing call, media renders, TTS). */
+  usageExtra?: Array<{
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+    cost: string | null
+    modelKey: string
+    kind: string
+  }> | null
 }
 
 /**
@@ -516,6 +534,8 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     tool: toolData,
     taskPlan: taskPlanState,
     mediaJob: parseMediaJobPayload(m.mediaJob),
+    usage: m.usage ?? null,
+    usageExtra: m.usageExtra ?? null,
   }
 }
 
@@ -641,6 +661,14 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   }
   if (persisted.wasMultitask) {
     local.wasMultitask = true
+  }
+  // Taximeter usage: adopt the persisted (authoritative) value when present so
+  // the token-cost badge survives the post-stream reconcile.
+  if (persisted.usage) {
+    local.usage = persisted.usage
+  }
+  if (persisted.usageExtra && persisted.usageExtra.length > 0) {
+    local.usageExtra = persisted.usageExtra
   }
   // Media job state: a terminal client state is FINAL and must never be
   // downgraded back to `running` by a stale persisted snapshot. Without this

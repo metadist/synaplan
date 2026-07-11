@@ -174,6 +174,8 @@
               :task-plan="message.taskPlan"
               :media-job="message.mediaJob"
               :was-multitask="message.wasMultitask"
+              :usage="message.usage"
+              :usage-taximeter-active="usageTaximeterStore.active"
               :is-guest-mode="isGuestMode"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
@@ -190,6 +192,14 @@
           </template>
         </div>
       </div>
+
+      <!-- Usage taximeter: desktop rail + mobile ring. Gated by the admin
+           master switch and authenticated (non-guest/widget) web usage; the
+           two share one store and differ only by CSS breakpoint. -->
+      <template v-if="usageTaximeterStore.active">
+        <ConsumptionBar />
+        <ConsumptionRing />
+      </template>
 
       <!-- Guest Banner (shown for unauthenticated trial users) -->
       <GuestBanner
@@ -364,6 +374,8 @@ import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
 import ExamplePrompts from '@/components/ExamplePrompts.vue'
+import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
+import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
@@ -381,6 +393,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
+import { useUsageTaximeterStore, type UsageTotals } from '@/stores/usageTaximeter'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useLimitCheck } from '@/composables/useLimitCheck'
@@ -465,6 +478,7 @@ const authStore = useAuthStore()
 const mediaJobsStore = useMediaJobsStore()
 const guestStore = useGuestStore()
 const configStore = useConfigStore()
+const usageTaximeterStore = useUsageTaximeterStore()
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
 const promoTips = usePromoTips()
@@ -645,6 +659,13 @@ onMounted(async () => {
     await historyStore.loadMessages(chatsStore.activeChatId)
   }
 
+  // Usage taximeter: seed today's totals once and rebuild the session from the
+  // freshly loaded history (no-op when the admin switch is off / not authed).
+  if (usageTaximeterStore.active) {
+    void usageTaximeterStore.loadSummary()
+    usageTaximeterStore.seedFromHistory(historyStore.messages)
+  }
+
   // Scroll to newest message after initial load
   await nextTick()
   scrollToBottom(true)
@@ -783,6 +804,13 @@ watch(
       // loadMessages() replaces messages when offset=0, making clear() redundant.
       // Calling clear() first causes empty chat if loadMessages() fails silently.
       await historyStore.loadMessages(newChatId)
+
+      // Usage taximeter: a chat switch resets the session (not the day totals)
+      // and rebuilds it from the newly loaded history.
+      if (usageTaximeterStore.active) {
+        usageTaximeterStore.seedFromHistory(historyStore.messages)
+      }
+
       await nextTick()
       scrollToBottom(true)
 
@@ -1173,8 +1201,26 @@ function handleMediaJobCompleted(message: Message, payload: { url: string; type:
     file: { url: payload.url, type: payload.type },
   })
 
-  if (message.backendMessageId) {
-    void historyStore.reconcileMessage(message.id, message.backendMessageId)
+  // Usage taximeter: an async media render is billed by the worker around job
+  // completion — the poll can observe "done" moments before the billing row
+  // and usage meta are committed. refreshAfterSettlement pulls fresh day
+  // totals with a short bounded retry and re-reconciles the message so the
+  // session model list picks up the render's model + cost without a reload.
+  const backendMessageId = message.backendMessageId
+  usageTaximeterStore.refreshAfterSettlement(
+    backendMessageId
+      ? () => {
+          void historyStore.reconcileMessage(message.id, backendMessageId).then(() => {
+            if (usageTaximeterStore.active) {
+              usageTaximeterStore.seedFromHistory(historyStore.messages)
+            }
+          })
+        }
+      : undefined
+  )
+
+  if (!usageTaximeterStore.active && backendMessageId) {
+    void historyStore.reconcileMessage(message.id, backendMessageId)
   }
 }
 
@@ -1368,6 +1414,17 @@ const handleContinueResponse = async (message: Message) => {
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
 
+        // Usage taximeter: a continued response is a billed turn like any
+        // other — adopt its usage + live day totals.
+        if (usageTaximeterStore.active) {
+          usageTaximeterStore.applyComplete(
+            (data.usage ?? null) as Message['usage'],
+            (data.usage_totals ?? null) as UsageTotals | null,
+            (data.usage_extra ?? null) as Message['usageExtra']
+          )
+          usageTaximeterStore.refreshAfterSettlement()
+        }
+
         // Issue #1070: reconcile against the persisted message so files /
         // media / metadata reflect the authoritative backend state.
         if (message.backendMessageId) {
@@ -1400,6 +1457,11 @@ const handleSendMessage = async (
 ) => {
   autoScroll.value = true
   stickToBottom = false
+
+  // Usage taximeter: count this user prompt for the session statistics.
+  if (usageTaximeterStore.active) {
+    usageTaximeterStore.registerPrompt()
+  }
 
   // Prepare files info if fileIds are provided
   let files: import('@/stores/history').MessageFile[] | undefined = undefined
@@ -2051,6 +2113,29 @@ const streamAIResponse = async (
                 },
                 { provider, model: modelLabel, model_id: currentModel?.id ?? null }
               )
+
+              // Usage taximeter: attach the per-message usage (for the badge)
+              // and fold it into the session store, adopting today's live
+              // totals. Gated so a disabled/guest session is a no-op.
+              if (usageTaximeterStore.active) {
+                const usage = (data.usage ?? null) as Message['usage']
+                const usageExtra = (data.usage_extra ?? null) as Message['usageExtra']
+                const totals = (data.usage_totals ?? null) as UsageTotals | null
+                if (usage) {
+                  message.usage = usage
+                }
+                if (usageExtra && usageExtra.length > 0) {
+                  message.usageExtra = usageExtra
+                }
+                usageTaximeterStore.applyComplete(usage, totals, usageExtra)
+                // Reconcile against the summary endpoint only when the SSE
+                // payload carried no `usage_totals` (the backend computes the
+                // totals after every billing row of the turn, so when present
+                // they are already server-accurate — no extra GET needed).
+                if (!totals) {
+                  void usageTaximeterStore.loadSummary()
+                }
+              }
             }
 
             historyStore.finishStreamingMessage(messageId)
@@ -2811,6 +2896,24 @@ const streamAIResponse = async (
                 },
                 { provider, model: modelLabel, model_id: currentModel?.id ?? null }
               )
+
+              // Usage taximeter: attach this turn's usage (badge + session
+              // model list) and adopt the live day totals from the server.
+              // The settlement refresh covers costs recorded moments after
+              // the stream (media renders billed by the worker).
+              if (usageTaximeterStore.active) {
+                const turnUsage = (data.usage ?? null) as Message['usage']
+                const turnUsageExtra = (data.usage_extra ?? null) as Message['usageExtra']
+                const turnTotals = (data.usage_totals ?? null) as UsageTotals | null
+                if (turnUsage) {
+                  message.usage = turnUsage
+                }
+                if (turnUsageExtra && turnUsageExtra.length > 0) {
+                  message.usageExtra = turnUsageExtra
+                }
+                usageTaximeterStore.applyComplete(turnUsage, turnTotals, turnUsageExtra)
+                usageTaximeterStore.refreshAfterSettlement()
+              }
 
               // Store topic from classification
               if (data.topic) {
