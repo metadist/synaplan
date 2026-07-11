@@ -121,6 +121,15 @@ onBeforeUnmount(() => {
       @touchend="onTouchEnd"
     >
       <svg :width="SIZE" :height="SIZE" :viewBox="`0 0 ${SIZE} ${SIZE}`" class="usage-ring__svg">
+        <!-- Solid centre disc (with a thin round border) so the euro value is
+             always readable regardless of what scrolls behind the ring. -->
+        <circle
+          :cx="SIZE / 2"
+          :cy="SIZE / 2"
+          :r="RADIUS - STROKE / 2 - 1"
+          stroke-width="2"
+          class="usage-ring__center"
+        />
         <g :transform="`rotate(-90 ${SIZE / 2} ${SIZE / 2})`">
           <circle
             :cx="SIZE / 2"
@@ -167,8 +176,9 @@ onBeforeUnmount(() => {
   display: block;
 }
 
-/* Mobile only; the bar covers >= 768 px. */
-@media (min-width: 768px) {
+/* Compact view up to 1023 px; the full bar takes over on wide desktops
+   (>= 1024 px), where it can never overlap the chat column. */
+@media (min-width: 1024px) {
   .usage-ring {
     display: none;
   }
@@ -187,6 +197,13 @@ onBeforeUnmount(() => {
 
 .usage-ring__svg {
   display: block;
+}
+
+.usage-ring__center {
+  /* Solid, theme-safe disc behind the euro value: white-ish in light mode,
+     dark in dark mode — --bg-app is a solid hex in every theme (incl. V2). */
+  fill: var(--bg-app);
+  stroke: var(--usage-track);
 }
 
 .usage-ring__track {

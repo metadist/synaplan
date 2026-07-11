@@ -49,8 +49,8 @@ describe('ConsumptionRing', () => {
 
     const wrapper = mountRing()
     const circles = wrapper.findAll('circle')
-    // 1 track + N segment arcs
-    expect(circles.length).toBe(1 + store.epochSegments.length)
+    // 1 centre disc + 1 track + N segment arcs
+    expect(circles.length).toBe(2 + store.epochSegments.length)
   })
 
   it('opens the stats panel when tapped', async () => {

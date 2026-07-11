@@ -181,8 +181,9 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-/* Desktop only; the ring covers < 768 px. */
-@media (min-width: 768px) {
+/* Wide desktop only; below 1024 px the compact ring takes over so the rail
+   can never overlap the chat column/composer. */
+@media (min-width: 1024px) {
   .usage-bar {
     display: block;
   }
@@ -211,8 +212,8 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   flex-direction: column-reverse;
-  width: 0.5rem;
-  height: 10.5rem;
+  width: 0.625rem;
+  height: 13.65rem;
   border-radius: 9999px;
   background: var(--usage-track);
   overflow: hidden;
