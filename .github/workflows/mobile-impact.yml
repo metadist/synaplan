@@ -34,6 +34,16 @@ jobs:
           set -euo pipefail
           git fetch --no-tags origin "pull/${PR_NUMBER}/head:refs/remotes/pull/head"
           test "$(git rev-parse refs/remotes/pull/head)" = "$HEAD_SHA"
+          # Bootstrap-only: the classifier tooling is checked out from the base
+          # branch (fail-closed against PR tampering), but the PR that first
+          # introduces the tooling has no copy on base yet. Materialize it from
+          # the PR head just for that case. Once merged to main this branch is
+          # dead code, because base always carries the files.
+          if [ ! -f scripts/mobile-impact.mjs ]; then
+            mkdir -p scripts .github
+            git show refs/remotes/pull/head:scripts/mobile-impact.mjs > scripts/mobile-impact.mjs
+            git show refs/remotes/pull/head:.github/mobile-impact-policy.json > .github/mobile-impact-policy.json
+          fi
           mkdir -p mobile-impact
           args=(
             --base "$BASE_SHA"

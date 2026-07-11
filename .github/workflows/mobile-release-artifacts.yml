@@ -32,6 +32,11 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+          # This workflow_run job checks out the release commit (privileged
+          # context) and runs tooling from it, so never leave the base-repo
+          # token in .git/config. All git use here is read-only; authenticated
+          # calls use an explicit token via `gh api`.
+          persist-credentials: false
 
       - name: Verify the immutable release tag
         run: |
@@ -140,6 +145,8 @@ jobs:
 
       - name: Report release without app impact
         if: steps.manifest.outputs.needs_sync == 'false'
+        env:
+          CLASSIFICATION: ${{ steps.manifest.outputs.classification }}
         run: |
-          echo "Classification \`${{ steps.manifest.outputs.classification }}\` does not require an apps synchronization PR." |
+          echo "Classification \`${CLASSIFICATION}\` does not require an apps synchronization PR." |
             tee -a "$GITHUB_STEP_SUMMARY"
