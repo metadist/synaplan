@@ -2128,13 +2128,13 @@ const streamAIResponse = async (
                   message.usageExtra = usageExtra
                 }
                 usageTaximeterStore.applyComplete(usage, totals, usageExtra)
-                // Reconcile today's totals against the server after every turn.
-                // The `usage_totals` SSE field gives an instant bump when
-                // present; this guarantees the head figure is always the
-                // server-accurate charged spend (a single lightweight GET, not
-                // polling), which also covers turns whose cost is only known
-                // after the stream (e.g. media renders).
-                void usageTaximeterStore.loadSummary()
+                // Reconcile against the summary endpoint only when the SSE
+                // payload carried no `usage_totals` (the backend computes the
+                // totals after every billing row of the turn, so when present
+                // they are already server-accurate — no extra GET needed).
+                if (!totals) {
+                  void usageTaximeterStore.loadSummary()
+                }
               }
             }
 

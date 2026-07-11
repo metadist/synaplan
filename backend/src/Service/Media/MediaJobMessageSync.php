@@ -134,7 +134,7 @@ final readonly class MediaJobMessageSync
         // happened on an earlier sync (e.g. while the job was still bound to
         // the IN message), the recorder returns null and the charged cost is
         // read from the stash it left on the job options.
-        $chargedCost = $recorded->chargedCost
+        $chargedCost = $recorded?->chargedCost
             ?? (is_string($job->getOptions()['_usage_charged_cost'] ?? null) ? $job->getOptions()['_usage_charged_cost'] : null);
         if (MediaJob::STATUS_COMPLETED === $job->getStatus() && null !== $chargedCost) {
             $this->appendUsageExtraMeta($message, $job, $chargedCost);
