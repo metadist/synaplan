@@ -212,6 +212,41 @@ describe('usageTaximeter store', () => {
     })
   })
 
+  describe('auxiliary usage (sorting / media / TTS)', () => {
+    it('lists aux models without touching epochs or the model-change counter', () => {
+      const store = useUsageTaximeterStore()
+      store.applyComplete(usage('openai:gpt-4o', '0.02'), null, [
+        { ...usage('groq:openai/gpt-oss-120b', '0.0007', 3600), kind: 'SORT' },
+        { ...usage('google:gemini-3.1-flash-image-preview', '0.0737', 0), kind: 'IMAGE' },
+      ])
+
+      expect(store.models).toHaveLength(3)
+      expect(store.models.map((m) => m.modelKey)).toContain('groq:openai/gpt-oss-120b')
+      expect(store.models.map((m) => m.modelKey)).toContain('google:gemini-3.1-flash-image-preview')
+      // Aux usage never creates epochs or counts as a model change.
+      expect(store.epochs).toHaveLength(1)
+      expect(store.modelChanges).toBe(0)
+    })
+
+    it('seedFromHistory rebuilds aux models from usageExtra', () => {
+      const store = useUsageTaximeterStore()
+      store.seedFromHistory([
+        { role: 'user', timestamp: 1 },
+        {
+          role: 'assistant',
+          usage: usage('openai:gpt-4o', '0.02', 80),
+          usageExtra: [{ ...usage('groq:openai/gpt-oss-120b', '0.0007', 3600), kind: 'SORT' }],
+          timestamp: 2,
+        },
+      ])
+
+      expect(store.models).toHaveLength(2)
+      const aux = store.models.find((m) => m.modelKey === 'groq:openai/gpt-oss-120b')
+      expect(aux?.kind).toBe('SORT')
+      expect(aux?.cost).toBeCloseTo(0.0007, 6)
+    })
+  })
+
   describe('registerPrompt', () => {
     it('increments only the prompt counter', () => {
       const store = useUsageTaximeterStore()

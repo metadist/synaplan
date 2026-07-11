@@ -9,6 +9,7 @@ use App\Service\DiscordNotificationService;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -214,7 +215,7 @@ final readonly class MessageSorter
 
             $aiResponse = $response['content'];
 
-            $this->recordSortingUsage($userId, $modelId, $response);
+            $recordedSortingUsage = $this->recordSortingUsage($userId, $modelId, $response);
 
             $this->logger->info('MessageSorter: AI response received', [
                 'provider' => $response['provider'],
@@ -276,6 +277,14 @@ final readonly class MessageSorter
                 'sorting_model_id' => $modelId,
                 'sorting_provider' => $response['provider'] ?? $provider,
                 'sorting_model_name' => $response['model'] ?? $modelName,
+                // Usage taximeter: charged cost + tokens of the sorting call so
+                // the chat display can list the routing model for this turn.
+                'sorting_usage' => null !== $recordedSortingUsage ? [
+                    'cost' => $recordedSortingUsage->chargedCost,
+                    'tokens' => $recordedSortingUsage->totalTokens,
+                    'prompt_tokens' => $recordedSortingUsage->promptTokens,
+                    'completion_tokens' => $recordedSortingUsage->completionTokens,
+                ] : null,
             ];
         } catch (\App\AI\Exception\ProviderException $e) {
             // Re-throw ProviderException to preserve install instructions
@@ -471,20 +480,23 @@ final readonly class MessageSorter
 
     /**
      * Record token usage for the sorting AI call.
+     *
+     * Returns the recorded token/cost figures (or null when nothing was
+     * recorded) so classify() can surface them to the usage taximeter.
      */
-    private function recordSortingUsage(?int $userId, ?int $modelId, array $response): void
+    private function recordSortingUsage(?int $userId, ?int $modelId, array $response): ?RecordedUsage
     {
         if (!$userId) {
-            return;
+            return null;
         }
 
         try {
             $user = $this->em->getRepository(User::class)->find($userId);
             if (!$user) {
-                return;
+                return null;
             }
 
-            $this->rateLimitService->recordUsage($user, 'SORTING', [
+            return $this->rateLimitService->recordUsage($user, 'SORTING', [
                 'usage' => $response['usage'] ?? [],
                 'model_id' => $modelId,
                 'provider' => $response['provider'] ?? '',
@@ -497,6 +509,8 @@ final readonly class MessageSorter
                 'error' => $e->getMessage(),
                 'user_id' => $userId,
             ]);
+
+            return null;
         }
     }
 

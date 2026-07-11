@@ -29,6 +29,8 @@ export interface UsageTotals {
 export interface UsageSessionMessage {
   role: 'user' | 'assistant'
   usage?: MessageUsage | null
+  /** Auxiliary usage of the turn (sorting/routing call, media renders, TTS). */
+  usageExtra?: MessageUsage[] | null
   timestamp?: Date | number
 }
 
@@ -222,6 +224,35 @@ export const useUsageTaximeterStore = defineStore('usageTaximeter', () => {
     }
   }
 
+  /**
+   * Fold an auxiliary usage record (sorting/routing call, media render, TTS)
+   * into the session model list ONLY. Aux usage never participates in the
+   * epoch/tone tracking — the bar segments follow the chat LLM epochs, while
+   * aux costs are still visible per model in the stats panel (and are part of
+   * the server-side day totals anyway).
+   */
+  function ingestAuxUsage(usage: MessageUsage, atMs: number): void {
+    const cost = parseCost(usage.cost)
+    const key = usage.modelKey || 'unknown'
+
+    const existing = models.value.find((m) => m.modelKey === key)
+    if (existing) {
+      existing.cost += cost
+      existing.tokens += usage.totalTokens
+      existing.lastUsedAt = atMs
+    } else {
+      models.value.push({
+        modelKey: key,
+        label: labelFromModelKey(key),
+        kind: usage.kind || 'LLM',
+        cost,
+        tokens: usage.totalTokens,
+        lastUsedAt: atMs,
+        tone: 'a',
+      })
+    }
+  }
+
   // --- Public actions -------------------------------------------------------
 
   /** Reset the per-session accumulators (day totals are left untouched). */
@@ -268,19 +299,32 @@ export const useUsageTaximeterStore = defineStore('usageTaximeter', () => {
       order += 1
       if (message.role === 'user') {
         promptCount.value += 1
-      } else if (message.role === 'assistant' && message.usage) {
-        ingestUsage(message.usage, toEpochMs(message.timestamp, order))
+      } else if (message.role === 'assistant') {
+        const atMs = toEpochMs(message.timestamp, order)
+        if (message.usage) {
+          ingestUsage(message.usage, atMs)
+        }
+        for (const extra of message.usageExtra ?? []) {
+          ingestAuxUsage(extra, atMs)
+        }
       }
     }
   }
 
   /** Live update after a completed answer (`complete` SSE event). */
-  function applyComplete(usage?: MessageUsage | null, totals?: UsageTotals | null): void {
+  function applyComplete(
+    usage?: MessageUsage | null,
+    totals?: UsageTotals | null,
+    extra?: MessageUsage[] | null
+  ): void {
     if (totals) {
       setDayTotals(parseCost(totals.todayCost), totals.todayTokens ?? 0, true)
     }
     if (usage) {
       ingestUsage(usage, Date.now())
+    }
+    for (const entry of extra ?? []) {
+      ingestAuxUsage(entry, Date.now())
     }
   }
 

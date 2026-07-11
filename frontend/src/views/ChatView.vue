@@ -1204,6 +1204,12 @@ function handleMediaJobCompleted(message: Message, payload: { url: string; type:
   if (message.backendMessageId) {
     void historyStore.reconcileMessage(message.id, message.backendMessageId)
   }
+
+  // Usage taximeter: an async media render is billed by the worker at job
+  // completion (after the stream ended), so pull fresh day totals now.
+  if (usageTaximeterStore.active) {
+    void usageTaximeterStore.loadSummary()
+  }
 }
 
 function renderStreamingContent(content: string, msgId: string): void {
@@ -2090,11 +2096,15 @@ const streamAIResponse = async (
               // totals. Gated so a disabled/guest session is a no-op.
               if (usageTaximeterStore.active) {
                 const usage = (data.usage ?? null) as Message['usage']
+                const usageExtra = (data.usage_extra ?? null) as Message['usageExtra']
                 const totals = (data.usage_totals ?? null) as UsageTotals | null
                 if (usage) {
                   message.usage = usage
                 }
-                usageTaximeterStore.applyComplete(usage, totals)
+                if (usageExtra && usageExtra.length > 0) {
+                  message.usageExtra = usageExtra
+                }
+                usageTaximeterStore.applyComplete(usage, totals, usageExtra)
                 // Reconcile today's totals against the server after every turn.
                 // The `usage_totals` SSE field gives an instant bump when
                 // present; this guarantees the head figure is always the

@@ -1660,8 +1660,24 @@ class StreamController extends AbstractController
                     $response['metadata']['provider'] ?? null,
                     $response['metadata']['model'] ?? null,
                 );
-                if (null !== $chatUsagePayload) {
-                    $this->em->flush();
+
+                // Usage taximeter: auxiliary usage entries for this turn (the
+                // sorting/routing call, media renders, TTS). These feed the
+                // "models used" session list so the routing and media models
+                // appear with their real cost — not only the chat LLM.
+                $usageExtra = [];
+                if (is_array($classification['sorting_usage'] ?? null)) {
+                    $usageExtra[] = [
+                        'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
+                        'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
+                        'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
+                        'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
+                        'modelKey' => $this->buildUsageModelKey(
+                            $classification['sorting_provider'] ?? null,
+                            $classification['sorting_model_name'] ?? null,
+                        ),
+                        'kind' => 'SORT',
+                    ];
                 }
 
                 // Record AI-generated media usage (IMAGES, VIDEOS, AUDIOS) separately.
@@ -1671,6 +1687,9 @@ class StreamController extends AbstractController
                 // NOT record again here or we would double-charge the user.
                 $mediaType = $response['metadata']['media_type'] ?? null;
                 $mediaUsageAlreadyRecorded = !empty($response['metadata']['usage_recorded']);
+                $recordedMediaUsage = ($response['metadata']['media_recorded_usage'] ?? null) instanceof RecordedUsage
+                    ? $response['metadata']['media_recorded_usage']
+                    : null;
                 if ($mediaType && !$mediaUsageAlreadyRecorded) {
                     $mediaAction = match ($mediaType) {
                         'image' => 'IMAGES',
@@ -1682,7 +1701,7 @@ class StreamController extends AbstractController
                     if ($mediaAction) {
                         $mediaBytes = $generatedFile ? $generatedFile->getFileSize() : 0;
 
-                        $this->rateLimitService->recordUsage($user, $mediaAction, [
+                        $recordedMediaUsage = $this->rateLimitService->recordUsage($user, $mediaAction, [
                             'provider' => $response['metadata']['provider'] ?? 'unknown',
                             'model' => $response['metadata']['model'] ?? 'unknown',
                             'model_id' => $response['metadata']['model_id'] ?? null,
@@ -1693,6 +1712,22 @@ class StreamController extends AbstractController
                             'media_usage' => $response['metadata']['media_usage'] ?? [],
                         ]);
                     }
+                }
+
+                if ($mediaType && null !== $recordedMediaUsage) {
+                    $usageExtra[] = $this->buildExtraUsageEntry(
+                        strtoupper((string) $mediaType),
+                        $response['metadata']['provider'] ?? null,
+                        $response['metadata']['model'] ?? null,
+                        $recordedMediaUsage,
+                    );
+                }
+
+                if ([] !== $usageExtra) {
+                    $outgoingMessage->setMeta('ai_usage_extra', (string) json_encode($usageExtra));
+                }
+                if (null !== $chatUsagePayload || [] !== $usageExtra) {
+                    $this->em->flush();
                 }
 
                 // Get search results if available (uses the effective source computed above)
@@ -1745,12 +1780,13 @@ class StreamController extends AbstractController
                 // Usage taximeter: per-message usage (switch-independent) and,
                 // only when the display is enabled for authenticated web users,
                 // the live daily totals (so the two SUM queries are skipped when
-                // the admin turned the feature off).
+                // the admin turned the feature off). usage_totals is refreshed
+                // again right before sendSSE so late recordings (TTS) are in.
                 if (null !== $chatUsagePayload) {
                     $completeData['usage'] = $chatUsagePayload;
                 }
-                if (!$isWidgetMode && !$isGuestMode && $this->usageTaximeterConfig->isEnabled()) {
-                    $completeData['usage_totals'] = $this->usageStatsService->getLiveTotals($user);
+                if ([] !== $usageExtra) {
+                    $completeData['usage_extra'] = $usageExtra;
                 }
 
                 if ('length' === $finishReason) {
@@ -1877,7 +1913,7 @@ class StreamController extends AbstractController
                                 'model_id' => $this->normalizeModelId($ttsModelId, 'sse_audio_event'),
                             ]);
 
-                            $this->rateLimitService->recordUsage($user, 'AUDIOS', [
+                            $recordedTtsUsage = $this->rateLimitService->recordUsage($user, 'AUDIOS', [
                                 'provider' => $ttsProvider ?? 'unknown',
                                 'model' => $ttsModelName ?? 'unknown',
                                 'model_id' => $ttsModelId,
@@ -1885,6 +1921,17 @@ class StreamController extends AbstractController
                                     'characters' => $ttsResult['text_length'] ?? mb_strlen($ttsText),
                                 ],
                             ]);
+
+                            // Usage taximeter: list the TTS model for this turn.
+                            $usageExtra[] = $this->buildExtraUsageEntry(
+                                'TTS',
+                                null !== $ttsProvider ? (string) $ttsProvider : null,
+                                null !== $ttsModelName ? (string) $ttsModelName : null,
+                                $recordedTtsUsage,
+                            );
+                            $completeData['usage_extra'] = $usageExtra;
+                            $outgoingMessage->setMeta('ai_usage_extra', (string) json_encode($usageExtra));
+                            $this->em->flush();
 
                             $this->logger->info('StreamController: Voice reply generated', [
                                 'url' => $audioUrl,
@@ -1930,6 +1977,13 @@ class StreamController extends AbstractController
                 // Sent before `complete` so the client picks it up while the
                 // EventSource is still open.
                 $this->sendSSE('perf', $perfTimer->toArray());
+
+                // Usage taximeter: compute the live daily totals LAST so every
+                // BUSELOG row of this turn (chat, sorting, media, TTS) is
+                // already written and the displayed today-figure is complete.
+                if (!$isWidgetMode && !$isGuestMode && $this->usageTaximeterConfig->isEnabled()) {
+                    $completeData['usage_totals'] = $this->usageStatsService->getLiveTotals($user);
+                }
 
                 $this->sendSSE('complete', $completeData);
 
@@ -2361,7 +2415,36 @@ class StreamController extends AbstractController
                 $metadata['provider'] ?? null,
                 $metadata['model'] ?? null,
             );
-            if (null !== $chatUsagePayload) {
+
+            $usageExtra = [];
+            if (is_array($classification['sorting_usage'] ?? null)) {
+                $usageExtra[] = [
+                    'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
+                    'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
+                    'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
+                    'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
+                    'modelKey' => $this->buildUsageModelKey(
+                        $classification['sorting_provider'] ?? null,
+                        $classification['sorting_model_name'] ?? null,
+                    ),
+                    'kind' => 'SORT',
+                ];
+            }
+            $recordedMediaUsage = ($metadata['media_recorded_usage'] ?? null) instanceof RecordedUsage
+                ? $metadata['media_recorded_usage']
+                : null;
+            if (null !== $recordedMediaUsage && !empty($metadata['media_type'])) {
+                $usageExtra[] = $this->buildExtraUsageEntry(
+                    strtoupper((string) $metadata['media_type']),
+                    $metadata['provider'] ?? null,
+                    $metadata['model'] ?? null,
+                    $recordedMediaUsage,
+                );
+            }
+            if ([] !== $usageExtra) {
+                $outgoingMessage->setMeta('ai_usage_extra', (string) json_encode($usageExtra));
+            }
+            if (null !== $chatUsagePayload || [] !== $usageExtra) {
                 $this->em->flush();
             }
 
@@ -2393,6 +2476,9 @@ class StreamController extends AbstractController
 
             if (null !== $chatUsagePayload) {
                 $completeData['usage'] = $chatUsagePayload;
+            }
+            if ([] !== $usageExtra) {
+                $completeData['usage_extra'] = $usageExtra;
             }
             if ('WEB' === $source && $this->usageTaximeterConfig->isEnabled()) {
                 $completeData['usage_totals'] = $this->usageStatsService->getLiveTotals($user);
@@ -2701,6 +2787,24 @@ class StreamController extends AbstractController
             'cost' => $recorded->chargedCost,
             'modelKey' => $this->buildUsageModelKey($provider, $model),
             'kind' => 'LLM',
+        ];
+    }
+
+    /**
+     * Build one auxiliary usage entry (sorting / media / TTS) for the
+     * taximeter's `usage_extra` list. Same shape as the chat `usage` payload.
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}
+     */
+    private function buildExtraUsageEntry(string $kind, ?string $provider, ?string $model, RecordedUsage $recorded): array
+    {
+        return [
+            'promptTokens' => $recorded->promptTokens,
+            'completionTokens' => $recorded->completionTokens,
+            'totalTokens' => $recorded->totalTokens,
+            'cost' => $recorded->chargedCost,
+            'modelKey' => $this->buildUsageModelKey($provider, $model),
+            'kind' => $kind,
         ];
     }
 

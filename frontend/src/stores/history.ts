@@ -186,6 +186,8 @@ export interface Message {
    * Present on assistant messages that recorded usage; null/absent otherwise.
    */
   usage?: MessageUsage | null
+  /** Auxiliary usage of the turn (sorting/routing call, media renders, TTS). */
+  usageExtra?: MessageUsage[] | null
 }
 
 export const TASK_CARD_KINDS = [

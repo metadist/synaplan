@@ -144,7 +144,7 @@ onBeforeUnmount(() => {
       @touchstart.passive="onTouchStart"
       @touchend="onTouchEnd"
     >
-      <span class="usage-bar__head txt-primary">{{ displayCost }}</span>
+      <span class="usage-bar__head txt-secondary">{{ displayCost }}</span>
       <span class="usage-bar__track">
         <span
           v-for="seg in segments"
@@ -200,8 +200,9 @@ onBeforeUnmount(() => {
 }
 
 .usage-bar__head {
+  /* Same quiet grey and weight as the "Session" foot label. */
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -211,7 +212,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column-reverse;
   width: 0.5rem;
-  height: 9rem;
+  height: 10.5rem;
   border-radius: 9999px;
   background: var(--usage-track);
   overflow: hidden;
