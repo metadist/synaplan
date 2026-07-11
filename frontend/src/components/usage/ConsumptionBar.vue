@@ -171,7 +171,11 @@ onBeforeUnmount(() => {
 .usage-bar {
   position: absolute;
   top: 50%;
-  right: 0.5rem;
+  /* Align to the right edge of the centered chat column (max-w-4xl = 56rem),
+     nudged ~20px further right so the rail sits just past the user avatar
+     rather than at the far window edge. Clamped so it never leaves the
+     viewport on narrow windows. */
+  left: min(calc(50% + 28rem + 20px), calc(100% - 3.25rem));
   transform: translateY(-50%);
   z-index: 20;
   display: none;
