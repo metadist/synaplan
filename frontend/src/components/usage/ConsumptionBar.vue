@@ -175,7 +175,7 @@ onBeforeUnmount(() => {
      nudged ~20px further right so the rail sits just past the user avatar
      rather than at the far window edge. Clamped so it never leaves the
      viewport on narrow windows. */
-  left: min(calc(50% + 28rem + 20px), calc(100% - 3.25rem));
+  left: min(calc(50% + 28rem + 10px), calc(100% - 3.25rem));
   transform: translateY(-50%);
   z-index: 20;
   display: none;
@@ -214,6 +214,7 @@ onBeforeUnmount(() => {
   flex-direction: column-reverse;
   width: 0.625rem;
   height: 13.65rem;
+  min-height: 300px;
   border-radius: 9999px;
   background: var(--usage-track);
   overflow: hidden;
