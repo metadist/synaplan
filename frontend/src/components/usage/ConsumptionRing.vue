@@ -148,7 +148,7 @@ onBeforeUnmount(() => {
       <span class="usage-ring__value txt-primary">{{ displayCost }}</span>
     </button>
 
-    <div v-if="showTooltip && !showPanel" class="usage-ring__tooltip surface-chip" role="tooltip">
+    <div v-if="showTooltip && !showPanel" class="usage-ring__tooltip" role="tooltip">
       {{ tokenTooltip }}
     </div>
 
@@ -223,6 +223,13 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
+  /* Fully opaque surface: --bg-app is a solid hex in every theme (incl. V2),
+     unlike the translucent chip/card tokens that let chat text shine through. */
+  background: var(--bg-app);
+  color: var(--txt-primary);
+  border: 1px solid var(--border-light);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 30;
 }
 
 .usage-ring__panel {
