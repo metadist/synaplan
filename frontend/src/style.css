@@ -109,6 +109,13 @@
     --status-neutral-muted: #f1f5f9;
     --status-neutral-text: #475569;
     --divider: rgba(0, 0, 0, 0.1);
+
+    /* Usage taximeter (consumption bar / ring). Two alternating blue tones for
+       model epochs plus a neutral track. Contrast of each tone against the
+       track is >= 3:1 (WCAG AA for graphical objects) in this light theme. */
+    --usage-track: rgba(0, 63, 199, 0.1);
+    --usage-epoch-a: #003fc7;
+    --usage-epoch-b: #4f9cf9;
   }
 
   .dark {
@@ -142,6 +149,12 @@
     --status-neutral-muted: rgba(100, 116, 139, 0.2);
     --status-neutral-text: #cbd5e1;
     --divider: rgba(255, 255, 255, 0.1);
+
+    /* Usage taximeter — dark theme. Lighter blues so both epoch tones keep
+       >= 3:1 contrast against the darker track. */
+    --usage-track: rgba(109, 154, 224, 0.18);
+    --usage-epoch-a: #6d9ae0;
+    --usage-epoch-b: #93c5fd;
   }
 
   select {

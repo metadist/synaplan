@@ -85,6 +85,48 @@ class UsageStatsController extends AbstractController
     }
 
     /**
+     * Live daily totals for the in-chat usage taximeter.
+     *
+     * GET /api/v1/usage/summary
+     *
+     * Lightweight endpoint (two SUM queries) called once per chat-view mount to
+     * seed today's charged spend + token count. The live SSE `complete` event
+     * keeps them fresh afterwards, so there is no polling. Independent of the
+     * USAGE_TAXIMETER display switch (it returns the user's own data); the
+     * frontend simply does not call it while the switch is off.
+     */
+    #[Route('/summary', name: 'summary', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/usage/summary',
+        summary: 'Get live daily usage totals (taximeter)',
+        description: "Today's charged cost and token count for the authenticated user. Charged = raw provider cost + operator markup, consistent with the Statistics cost budget. Costs are decimal strings (6 dp).",
+        tags: ['Usage Statistics'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Live daily totals',
+                content: new OA\JsonContent(
+                    required: ['todayCost', 'todayTokens'],
+                    properties: [
+                        new OA\Property(property: 'todayCost', type: 'string', example: '1.120000', description: 'Charged cost since 00:00 local time (decimal string, 6 dp)'),
+                        new OA\Property(property: 'todayTokens', type: 'integer', example: 8420, description: 'Total tokens since 00:00 local time'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function getSummary(
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        return $this->json($this->usageStatsService->getLiveTotals($user));
+    }
+
+    /**
      * Get paginated activity log with filters.
      */
     #[Route('/activity', name: 'activity', methods: ['GET'])]

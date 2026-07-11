@@ -16,6 +16,7 @@ use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
+use App\Service\RateLimitService;
 use App\Tests\Support\SkillCatalogFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -64,6 +65,7 @@ final class TaskPlannerTest extends TestCase
                 $this->createMock(EntityManagerInterface::class),
                 new NullLogger(),
             ),
+            $this->createMock(RateLimitService::class),
         );
     }
 

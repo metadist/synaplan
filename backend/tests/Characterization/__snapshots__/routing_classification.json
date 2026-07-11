@@ -50,6 +50,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "general",
         "web_search": false
@@ -61,6 +62,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "general",
         "web_search": false
@@ -72,6 +74,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "general",
         "web_search": false
@@ -83,6 +86,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "general",
         "web_search": false
@@ -94,6 +98,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "general",
         "web_search": false
@@ -161,6 +166,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "analyze",
         "web_search": false
@@ -173,6 +179,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "mediamaker",
         "web_search": false
@@ -184,6 +191,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "general",
         "web_search": false
@@ -195,6 +203,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "general",
         "web_search": false
@@ -207,6 +216,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "mediamaker",
         "web_search": false
@@ -218,6 +228,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "legal-review",
         "web_search": false
@@ -229,6 +240,7 @@
         "model_name": "llama3",
         "provider": "ollama",
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "general",
         "web_search": false
@@ -241,6 +253,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "mediamaker",
         "web_search": false
@@ -252,6 +265,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "officemaker",
         "web_search": false
@@ -266,6 +280,7 @@
         "provider": null,
         "resolution": "720p",
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "mediamaker",
         "web_search": false
@@ -277,6 +292,7 @@
         "model_name": null,
         "provider": null,
         "skip_sorting": false,
+        "sorting_usage": null,
         "source": "ai_sorting",
         "topic": "general",
         "web_search": true

@@ -786,6 +786,17 @@
                 </div>
               </Transition>
             </div>
+
+            <!-- Usage taximeter: per-reply token/cost badge, hover-revealed on
+                 fine pointers (matches the message hover pattern), always shown
+                 on touch. Only when the display is active and usage exists. -->
+            <span
+              v-if="usageBadge"
+              class="text-xs txt-secondary whitespace-nowrap tabular-nums transition-opacity duration-200 pointer-fine:opacity-0 pointer-fine:group-hover/bubble:opacity-100"
+              data-testid="message-usage-badge"
+            >
+              {{ usageBadge.tokens }} · {{ usageBadge.cost }}
+            </span>
           </div>
 
           <!-- Right: Actions (assistant only, hidden during streaming) -->
@@ -1005,6 +1016,8 @@ import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'
 import type { Part, MessageFile, MediaJobInfo, TaskPlanState } from '@/stores/history'
+import type { MessageUsage } from '@/stores/usageTaximeter'
+import { formatCostDisplay, formatTokens } from '@/utils/usageFormat'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import MediaJobStatus from '@/components/MediaJobStatus.vue'
 import type { AgainData } from '@/types/ai-models'
@@ -1014,7 +1027,7 @@ import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // No purchase path on a custom server in the native app (store IAP only).
 const purchaseAllowed = isPurchaseAllowed()
@@ -1102,6 +1115,11 @@ interface Props {
   // Multitask routing: this assistant turn ran the DAG (persisted flag, also
   // true for live plans). Switches "Again with…" to the simple "Again".
   wasMultitask?: boolean
+  // Usage taximeter: per-message token/cost usage (assistant only). When the
+  // display is enabled, a small hover badge shows "<tokens> · <cost>".
+  usage?: MessageUsage | null
+  // Whether the taximeter display is active (admin switch + authed web user).
+  usageTaximeterActive?: boolean
   // Status for failed/pending messages
   isGuestMode?: boolean
   status?: 'sent' | 'failed' | 'rate_limited'
@@ -1118,6 +1136,27 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+/**
+ * Usage taximeter hover badge: "<tokens> · <cost>" for an assistant reply that
+ * recorded usage, shown only while the display is active. Cost below one cent
+ * renders "< 0.01 €".
+ */
+const usageBadge = computed<{ tokens: string; cost: string } | null>(() => {
+  if (props.role !== 'assistant' || !props.usageTaximeterActive || !props.usage) {
+    return null
+  }
+  const u = props.usage
+  const costValue = u.cost != null ? Number.parseFloat(u.cost) : 0
+  return {
+    tokens: formatTokens(u.totalTokens, locale.value),
+    cost: formatCostDisplay(
+      Number.isFinite(costValue) ? costValue : 0,
+      locale.value,
+      t('usageTaximeter.lessThanCent')
+    ),
+  }
+})
 
 // Copy message text to clipboard
 const copied = ref(false)

@@ -231,6 +231,17 @@ const config = {
   },
 
   /**
+   * In-chat usage taximeter master switch (admin-controlled, ON by default).
+   * When false, the consumption bar/ring and per-message token-cost badge are
+   * not rendered and no usage-summary request is made.
+   */
+  usageTaximeter: {
+    get enabled(): boolean {
+      return getConfigSync().usageTaximeter?.enabled ?? true
+    },
+  },
+
+  /**
    * Installed plugins for the current user
    */
   get plugins(): NonNullable<ReturnType<typeof getConfigSync>['plugins']> {

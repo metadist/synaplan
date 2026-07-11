@@ -6,6 +6,7 @@ namespace App\Service\Media;
 
 use App\Repository\UserRepository;
 use App\Service\RateLimitService;
+use App\Service\Usage\RecordedUsage;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -31,25 +32,25 @@ final readonly class MediaJobUsageRecorder
     ) {
     }
 
-    public function record(MediaJob $job): void
+    public function record(MediaJob $job): ?RecordedUsage
     {
         if (MediaJob::STATUS_COMPLETED !== $job->getStatus()) {
-            return;
+            return null;
         }
 
         $options = $job->getOptions();
         if (!empty($options['_usage_recorded'])) {
-            return;
+            return null;
         }
 
         $userId = $job->getUserId();
         if ($userId <= 0) {
-            return;
+            return null;
         }
 
         $user = $this->userRepository->find($userId);
         if (null === $user) {
-            return;
+            return null;
         }
 
         $action = match ($job->getType()) {
@@ -60,7 +61,7 @@ final readonly class MediaJobUsageRecorder
         $mediaUsage = is_array($options['media_usage'] ?? null) ? $options['media_usage'] : [];
 
         try {
-            $this->rateLimitService->recordUsage($user, $action, [
+            $recorded = $this->rateLimitService->recordUsage($user, $action, [
                 'provider' => $job->getProvider(),
                 'model' => $job->getModel() ?? 'unknown',
                 'model_id' => $job->getModelId(),
@@ -75,11 +76,18 @@ final readonly class MediaJobUsageRecorder
                 'error' => $e->getMessage(),
             ]);
 
-            return;
+            return null;
         }
 
         $options['_usage_recorded'] = true;
+        // Stash the charged cost so a later (re-)sync of the message can still
+        // write the taximeter usage meta even though billing already happened
+        // (e.g. job billed while bound to the IN message, meta written after
+        // the rebind to the OUT message).
+        $options['_usage_charged_cost'] = $recorded->chargedCost;
         $job->setOptions($options);
         $this->jobService->save($job);
+
+        return $recorded;
     }
 }

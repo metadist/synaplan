@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useHistoryStore } from '@/stores/history'
 import { useChatsStore } from '@/stores/chats'
 import { useRealtimeStore } from '@/stores/realtime'
+import { useUsageTaximeterStore } from '@/stores/usageTaximeter'
 import { useNotification } from '@/composables/useNotification'
 import { getConfigSync } from '@/services/api/httpClient'
 import { i18n } from '@/i18n'
@@ -54,18 +55,36 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
 
   /** Apply one realtime/poll update: patch the loaded message + maintain the tray + toast on terminal. */
   function applyUpdate(payload: MediaJobUpdate): void {
-    if (payload.message_id != null) {
-      const message = useHistoryStore().messages.find(
-        (m) => m.backendMessageId === payload.message_id
-      )
-      if (message) {
-        applyMediaJobUpdateToMessage(message, payload)
-      }
+    const loadedMessage =
+      payload.message_id != null
+        ? useHistoryStore().messages.find((m) => m.backendMessageId === payload.message_id)
+        : undefined
+    if (loadedMessage) {
+      applyMediaJobUpdateToMessage(loadedMessage, payload)
     }
 
     if (TERMINAL_STATES.has(payload.state)) {
       removeActive(payload.job_id)
       raiseTerminalToast(payload)
+
+      // Usage taximeter: the render is billed by the worker around completion,
+      // and the job can become visible as "done" moments BEFORE the billing row
+      // and usage meta are committed. refreshAfterSettlement pulls day totals
+      // now and retries briefly, re-reconciling the message so the persisted
+      // usage meta lands in the session model list without a page reload.
+      const taximeter = useUsageTaximeterStore()
+      if ('done' === payload.state && taximeter.active) {
+        const reconcile =
+          loadedMessage && payload.message_id != null
+            ? () => {
+                const historyStore = useHistoryStore()
+                void historyStore
+                  .reconcileMessage(loadedMessage.id, payload.message_id as number)
+                  .then(() => taximeter.seedFromHistory(historyStore.messages))
+              }
+            : undefined
+        taximeter.refreshAfterSettlement(reconcile)
+      }
     } else {
       upsertActive(payload)
     }

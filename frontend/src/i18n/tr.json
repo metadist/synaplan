@@ -116,6 +116,17 @@
     "heading": "Synaplan'dan en yeniler",
     "readMore": "Devamını oku"
   },
+  "usageTaximeter": {
+    "sessionLabel": "Tokenlar",
+    "todayTooltip": "Bugün {tokens} token",
+    "todayAria": "Bugünkü kullanım: {cost}",
+    "openStats": "Kullanım istatistiklerini göster",
+    "usedModels": "Kullanılan modeller",
+    "promptsInSession": "Bu oturumdaki istemler",
+    "modelChanges": "Model değişiklikleri: {count}",
+    "allStatistics": "Tüm istatistikler",
+    "lessThanCent": "< 0,01 €"
+  },
   "chat": {
     "title": "Sohbet",
     "historyLog": "Geçmiş",

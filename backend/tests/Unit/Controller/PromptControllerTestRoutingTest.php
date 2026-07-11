@@ -80,6 +80,7 @@ final class PromptControllerTestRoutingTest extends TestCase
                     $this->createMock(EntityManagerInterface::class),
                     new NullLogger(),
                 ),
+                $this->createMock(RateLimitService::class),
             ),
         );
 

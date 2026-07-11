@@ -1698,14 +1698,21 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-3.1-flash-image-preview',
-            'priceIn' => 0.1,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.4,
-            'outUnit' => 'per1M',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.067,
+            'outUnit' => 'perImage',
             'quality' => 10,
             'rating' => 1,
             'json' => [
                 'description' => 'Google Nano Banana 2 - advanced image generation and editing. Up to 4K, 14 reference images, Google Search grounding.',
+                // Google bills image output at $60/1M image tokens; a 1K
+                // (1024px) image consumes 1120 tokens = $0.067/image (standard
+                // tier, per ai.google.dev/gemini-api/docs/pricing). Billed
+                // per_image like the other Google image models so the IMAGES
+                // BUSELOG row carries the real cost.
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.067],
                 'params' => ['model' => 'gemini-3.1-flash-image-preview'],
                 'features' => ['image', 'pic2pic'],
                 'meta' => ['max_reference_images' => 14],

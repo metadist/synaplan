@@ -21,6 +21,8 @@ use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\UsageStatsService;
+use App\Service\UsageTaximeterConfig;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -67,6 +69,8 @@ class StreamControllerAiModelsPayloadTest extends TestCase
             $this->createMock(MediaJobService::class),
             $this->createMock(MediaJobMessageSync::class),
             new GeneratedFileRegistrar($this->createMock(FileRepository::class), new NullLogger(), '/tmp/upload'),
+            $this->createMock(UsageStatsService::class),
+            $this->createMock(UsageTaximeterConfig::class),
         );
     }
 

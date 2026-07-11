@@ -22,6 +22,7 @@ use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\RateLimitService;
+use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -675,7 +676,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
                 // Issue #1146: record the cost before returning (see image/video
                 // path) so a torn-down worker can't bypass audio billing.
-                $usageRecorded = $this->maybeRecordMediaUsage($user, $options, $mediaAction, $modelId, $result['provider'] ?? $provider, $result['model'] ?? $modelName, $audioMediaUsage);
+                $recordedMediaUsage = $this->maybeRecordMediaUsage($user, $options, $mediaAction, $modelId, $result['provider'] ?? $provider, $result['model'] ?? $modelName, $audioMediaUsage);
 
                 return [
                     'metadata' => [
@@ -686,7 +687,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'media_prompt' => $prompt,
                         'media_type' => $mediaType,
                         'media_usage' => $audioMediaUsage,
-                        'usage_recorded' => $usageRecorded,
+                        'usage_recorded' => null !== $recordedMediaUsage,
+                        'media_recorded_usage' => $recordedMediaUsage,
                         'file' => [
                             'path' => $displayUrl,
                             'type' => $mediaType,
@@ -875,7 +877,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // this guarantees BUSELOG is written even if the streaming worker is
             // later torn down by a client disconnect — closing the billing-bypass
             // window. `usage_recorded` tells the caller to skip its own recording.
-            $usageRecorded = $this->maybeRecordMediaUsage($user, $options, $mediaAction, $modelId, $result['provider'] ?? $provider, $result['model'] ?? $modelName, $mediaUsage);
+            $recordedMediaUsage = $this->maybeRecordMediaUsage($user, $options, $mediaAction, $modelId, $result['provider'] ?? $provider, $result['model'] ?? $modelName, $mediaUsage);
 
             return [
                 'metadata' => [
@@ -888,7 +890,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'media_prompt' => $prompt,
                     'media_type' => $mediaType,
                     'media_usage' => $mediaUsage,
-                    'usage_recorded' => $usageRecorded,
+                    'usage_recorded' => null !== $recordedMediaUsage,
+                    'media_recorded_usage' => $recordedMediaUsage,
                     'file' => [
                         'path' => $displayUrl,
                         'type' => $mediaType,
@@ -915,7 +918,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // is deterministic from the requested duration/resolution (video) or
             // a single image, mirroring the success-path media_usage shape.
             $cancelledMediaUsage = $this->buildCancelledMediaUsage($mediaType, $options, $classification, $result ?? null);
-            $usageRecorded = $this->maybeRecordMediaUsage($user, $options, $mediaAction, $modelId, $provider, $modelName, $cancelledMediaUsage);
+            $recordedMediaUsage = $this->maybeRecordMediaUsage($user, $options, $mediaAction, $modelId, $provider, $modelName, $cancelledMediaUsage);
 
             return [
                 'metadata' => [
@@ -925,7 +928,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'media_type' => $mediaType,
                     'media_usage' => $cancelledMediaUsage,
                     'cancelled' => true,
-                    'usage_recorded' => $usageRecorded,
+                    'usage_recorded' => null !== $recordedMediaUsage,
+                    'media_recorded_usage' => $recordedMediaUsage,
                     'error' => 'cancelled',
                 ],
             ];
@@ -1865,7 +1869,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
      * @param array<string, mixed> $options
      * @param array<string, mixed> $mediaUsage
      *
-     * @return bool true when usage was recorded (caller should skip its own recordUsage)
+     * @return RecordedUsage|null the recorded token/cost figures, or null when
+     *                            nothing was recorded (caller records itself)
      */
     private function maybeRecordMediaUsage(
         ?User $user,
@@ -1875,20 +1880,18 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         ?string $provider,
         ?string $modelName,
         array $mediaUsage,
-    ): bool {
+    ): ?RecordedUsage {
         if (empty($options['record_media_usage']) || !$user instanceof User) {
-            return false;
+            return null;
         }
 
         try {
-            $this->rateLimitService->recordUsage($user, $mediaAction, [
+            return $this->rateLimitService->recordUsage($user, $mediaAction, [
                 'provider' => $provider ?? 'unknown',
                 'model' => $modelName ?? 'unknown',
                 'model_id' => $modelId,
                 'media_usage' => $mediaUsage,
             ]);
-
-            return true;
         } catch (\Throwable $e) {
             // Never let a billing-record hiccup take down media generation.
             $this->logger->error('MediaGenerationHandler: Failed to record media usage', [
@@ -1897,7 +1900,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'error' => $e->getMessage(),
             ]);
 
-            return false;
+            return null;
         }
     }
 

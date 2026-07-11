@@ -116,6 +116,17 @@
     "heading": "Lo último de Synaplan",
     "readMore": "Leer más"
   },
+  "usageTaximeter": {
+    "sessionLabel": "Tokens",
+    "todayTooltip": "{tokens} tokens hoy",
+    "todayAria": "Consumo de hoy: {cost}",
+    "openStats": "Mostrar estadísticas de uso",
+    "usedModels": "Modelos usados",
+    "promptsInSession": "Prompts en esta sesión",
+    "modelChanges": "Cambios de modelo: {count}",
+    "allStatistics": "Todas las estadísticas",
+    "lessThanCent": "< 0,01 €"
+  },
   "chat": {
     "title": "Chat",
     "historyLog": "Historial",

@@ -122,6 +122,28 @@ final readonly class MediaJobMessageSync
             }
         }
 
+        // Bill the user for a successful render (no-op for non-completed states;
+        // idempotent). Detached jobs never ran the inline billing path, so this
+        // is where async media usage is recorded (Sprint E, #1146).
+        $recorded = $this->usageRecorder->record($job);
+
+        // Usage taximeter: persist the billed render in the message's
+        // ai_usage_extra meta so the "models used" session list includes the
+        // media model after the async completion — live (via the client's
+        // post-completion reconcile) and after a reload. When billing already
+        // happened on an earlier sync (e.g. while the job was still bound to
+        // the IN message), the recorder returns null and the charged cost is
+        // read from the stash it left on the job options.
+        // `$recorded` is null when billing was skipped (non-completed state) or
+        // already recorded on an earlier sync; the `??` uses isset() semantics,
+        // so reading ->chargedCost off a null left operand safely falls through
+        // to the stashed cost without a warning (no nullsafe needed here).
+        $chargedCost = $recorded->chargedCost
+            ?? (is_string($job->getOptions()['_usage_charged_cost'] ?? null) ? $job->getOptions()['_usage_charged_cost'] : null);
+        if (MediaJob::STATUS_COMPLETED === $job->getStatus() && null !== $chargedCost) {
+            $this->appendUsageExtraMeta($message, $job, $chargedCost);
+        }
+
         $this->em->flush();
 
         $this->logger->info('MediaJobMessageSync: updated message meta for terminal job', [
@@ -130,15 +152,50 @@ final readonly class MediaJobMessageSync
             'state' => $status['state'],
         ]);
 
-        // Bill the user for a successful render (no-op for non-completed states;
-        // idempotent). Detached jobs never ran the inline billing path, so this
-        // is where async media usage is recorded (Sprint E, #1146).
-        $this->usageRecorder->record($job);
-
         // Push the terminal state to the owner so the banner resolves instantly
         // (best-effort; the persisted state above + the client poll are the
         // fallback if realtime is disabled/unreachable).
         $this->realtimeNotifier->publishUpdate($job);
+    }
+
+    /**
+     * Append the completed render to the message's `ai_usage_extra` meta (the
+     * taximeter's per-turn auxiliary usage list). Idempotent per job key so a
+     * retried sync never duplicates the entry.
+     */
+    private function appendUsageExtraMeta(\App\Entity\Message $message, MediaJob $job, string $chargedCost): void
+    {
+        $raw = $message->getMeta('ai_usage_extra');
+        $entries = null !== $raw && '' !== $raw ? json_decode($raw, true) : [];
+        if (!is_array($entries)) {
+            $entries = [];
+        }
+
+        foreach ($entries as $entry) {
+            if (is_array($entry) && ($entry['jobId'] ?? null) === $job->getJobKey()) {
+                return;
+            }
+        }
+
+        $provider = strtolower(trim($job->getProvider()));
+        $model = trim((string) $job->getModel());
+        if ('' !== $provider && '' !== $model) {
+            $modelKey = $provider.':'.$model;
+        } else {
+            $modelKey = '' !== $model ? $model : ('' !== $provider ? $provider : 'unknown');
+        }
+
+        $entries[] = [
+            'promptTokens' => 0,
+            'completionTokens' => 0,
+            'totalTokens' => 0,
+            'cost' => $chargedCost,
+            'modelKey' => $modelKey,
+            'kind' => strtoupper($job->getType()),
+            'jobId' => $job->getJobKey(),
+        ];
+
+        $message->setMeta('ai_usage_extra', (string) json_encode($entries));
     }
 
     /**

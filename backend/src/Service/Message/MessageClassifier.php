@@ -253,6 +253,9 @@ final readonly class MessageClassifier
             'model_id' => $result['sorting_model_id'] ?? null,
             'provider' => $result['sorting_provider'] ?? null,
             'model_name' => $result['sorting_model_name'] ?? null,
+            // Usage taximeter: tokens/charged cost of the sorting call (null
+            // when the fast path skipped the AI sorter or recording failed).
+            'sorting_usage' => $result['sorting_usage'] ?? null,
         ];
 
         if ($overrideModelId) {

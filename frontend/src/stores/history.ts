@@ -9,6 +9,7 @@ import {
 } from '@/utils/messageMapper'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
+import type { MessageUsage } from '@/stores/usageTaximeter'
 
 // Re-export so existing consumers keep importing from the store module.
 // The implementation moved to utils/messageMapper.ts (issue #1070) so the
@@ -185,6 +186,13 @@ export interface Message {
   // Persisted server-side (`multitask` meta), so it survives reloads — used to
   // show the simple "Again" (full re-plan) instead of "Again with…".
   wasMultitask?: boolean
+  /**
+   * Per-message token/cost usage for the taximeter (badge + session store).
+   * Present on assistant messages that recorded usage; null/absent otherwise.
+   */
+  usage?: MessageUsage | null
+  /** Auxiliary usage of the turn (sorting/routing call, media renders, TTS). */
+  usageExtra?: MessageUsage[] | null
 }
 
 export const TASK_CARD_KINDS = [
