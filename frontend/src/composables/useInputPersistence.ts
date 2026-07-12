@@ -182,17 +182,25 @@ export function useFilePersistence(storageKey: string) {
 
 /**
  * Auto-persist input as user types
+ *
+ * @param disabled when true (e.g. during an incognito chat session), nothing
+ *                 is written to localStorage — drafts must not survive the
+ *                 session. Reads keep working so a pre-existing draft is
+ *                 restored once persistence is re-enabled.
  */
 export function useAutoPersist(
   inputRef: Ref<string>,
   baseKey: string,
-  chatId?: Ref<number | null>
+  chatId?: Ref<number | null>,
+  disabled?: Ref<boolean>
 ) {
   const { saveInput, loadInput, clearInput } = useInputPersistence(baseKey, chatId)
 
+  const isDisabled = () => disabled?.value === true
+
   // Load persisted input on mount
   const persisted = loadInput()
-  if (persisted && !inputRef.value) {
+  if (persisted && !inputRef.value && !isDisabled()) {
     inputRef.value = persisted
   }
 
@@ -202,6 +210,7 @@ export function useAutoPersist(
       chatId,
       (newId, oldId) => {
         if (newId === oldId) return
+        if (isDisabled()) return
 
         // Flush the current text into the slot we are leaving so it is not lost.
         saveInput(inputRef.value, oldId)
@@ -229,8 +238,10 @@ export function useAutoPersist(
     inputRef,
     (newValue) => {
       if (saveTimeout) clearTimeout(saveTimeout)
+      if (isDisabled()) return
 
       saveTimeout = setTimeout(() => {
+        if (isDisabled()) return
         saveInput(newValue)
       }, 500) // Debounce 500ms
     },
@@ -240,7 +251,7 @@ export function useAutoPersist(
   // Clear on unmount if input is empty
   onBeforeUnmount(() => {
     if (saveTimeout) clearTimeout(saveTimeout)
-    if (!inputRef.value.trim()) {
+    if (!inputRef.value.trim() && !isDisabled()) {
       clearInput()
     }
   })

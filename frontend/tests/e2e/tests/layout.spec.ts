@@ -22,13 +22,14 @@ const CHAT = selectors.chat
 
 /**
  * Touch-target floor in px — §4.3 #1/#2: interactive nav targets are 44 px
- * minimum since phase 6 (bottom tab bar).
+ * minimum (desktop rail and the mobile push-drawer).
  */
 const MIN_TARGET_PX = 44
 
 /**
- * Tailwind `md` — since phase 6 the rail exists only at >= md; below it the
- * bottom tab bar (MobileNav) is the primary navigation.
+ * Tailwind `md` — the rail exists only at >= md; below it the mobile
+ * push-drawer (MobileNav, opened via the top-left toggle) is the primary
+ * navigation.
  */
 const MOBILE_MAX_WIDTH = 768
 
@@ -132,28 +133,37 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await ensureAdvancedMode(page)
 
     if (isMobileViewport(page)) {
-      // Phase 6 (§4.3 #2): on mobile the bottom tab bar IS the primary nav.
-      await expect(page.locator(NAV.mobileBar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      // §4.3: on mobile the top-left toggle opens the push-drawer, which IS
+      // the primary nav. Open it, then assert the primary buttons.
+      const toggle = page.locator(NAV.mobileDrawerToggle)
+      await expect(toggle).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      const toggleBox = await toggle.boundingBox()
+      expect(toggleBox, 'drawer toggle: not rendered').not.toBeNull()
+      if (toggleBox) {
+        expect(toggleBox.width, 'drawer toggle: tap target too narrow').toBeGreaterThanOrEqual(
+          MIN_TARGET_PX - 4
+        )
+        expect(toggleBox.height, 'drawer toggle: tap target too short').toBeGreaterThanOrEqual(
+          MIN_TARGET_PX - 4
+        )
+      }
+
+      await toggle.click()
+      await expect(page.locator(NAV.mobileDrawer)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+
       const tabs = page.locator('[data-testid^="btn-mobile-nav-"]')
       const count = await tabs.count()
-      expect(count, 'bottom bar renders New/History/Files/More').toBe(4)
+      expect(count, 'drawer renders New/Files/More buttons').toBe(3)
 
       for (let i = 0; i < count; i++) {
         const tab = tabs.nth(i)
         const testid = await tab.getAttribute('data-testid')
 
-        const label = tab.locator(NAV.railLabel)
-        await expect(label, `${testid}: tab label node missing`).toBeVisible()
-        expect(((await label.textContent()) ?? '').trim() !== '', `${testid}: label empty`).toBe(
-          true
-        )
+        expect(((await tab.textContent()) ?? '').trim() !== '', `${testid}: label empty`).toBe(true)
 
         const box = await tab.boundingBox()
         expect(box, `${testid}: not rendered`).not.toBeNull()
         if (box) {
-          expect(box.width, `${testid}: tap target too narrow`).toBeGreaterThanOrEqual(
-            MIN_TARGET_PX
-          )
           expect(box.height, `${testid}: tap target too short`).toBeGreaterThanOrEqual(
             MIN_TARGET_PX
           )
@@ -183,24 +193,27 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     }
   })
 
-  test('More sheet opens with accordion sections and 44px rows (mobile)', async ({
+  test('More section expands with accordion sections and 44px rows (mobile)', async ({
     page,
     credentials,
   }) => {
-    test.skip(!isMobileViewport(page), 'bottom tab bar exists only below md')
+    test.skip(!isMobileViewport(page), 'the push-drawer exists only below md')
 
     await login(page, credentials)
     await ensureAdvancedMode(page)
 
+    // Open the push-drawer first, then reveal the "More" section inline.
+    await page.locator(NAV.mobileDrawerToggle).click()
+    await expect(page.locator(NAV.mobileDrawer)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+
     await page.locator(NAV.mobileMore).click()
     const sheet = page.locator(NAV.mobileMoreSheet)
     await expect(sheet).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    await expectNoHorizontalOverflow(page, 'more sheet')
-    await expectInsideViewport(page, NAV.mobileMoreSheet, 'more sheet')
+    await expectNoHorizontalOverflow(page, 'more section')
 
-    // §4.4: the sheet carries the remaining sections + the account block.
+    // §4.4: the section carries the remaining sections + the account block.
     const sections = sheet.locator('[data-testid^="btn-mobile-more-"]')
-    expect(await sections.count(), 'more sheet renders section rows').toBeGreaterThanOrEqual(2)
+    expect(await sections.count(), 'more section renders section rows').toBeGreaterThanOrEqual(2)
     await expect(sheet.locator('[data-testid="section-mobile-more-account"]')).toBeVisible()
 
     // Accordion: tapping Channels expands its children inline (§4.3 #3).
@@ -209,7 +222,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
       timeout: TIMEOUTS.SHORT,
     })
 
-    // Touch targets: every visible row in the sheet is >= 44 px tall.
+    // Touch targets: every visible row in the section is >= 44 px tall.
     const rows = sheet.locator(
       '[data-testid^="btn-mobile-more-"], [data-testid^="link-mobile-more-"]'
     )
@@ -227,12 +240,12 @@ test.describe('@ci @layout UI guard — chat surface', () => {
 
     // Account rows navigate (regression: dead Subscription tap). Preferences
     // exists for every user level, and shares handleNavigate with the
-    // Subscription/Upgrade rows.
+    // Subscription/Upgrade rows. Navigating closes the drawer (scrim removed).
     const preferencesRow = sheet.locator('[data-testid="btn-mobile-more-preferences"]')
     await preferencesRow.scrollIntoViewIfNeeded()
     await preferencesRow.tap()
     await expect(page).toHaveURL(/\/settings/, { timeout: TIMEOUTS.STANDARD })
-    await expect(sheet).toBeHidden({ timeout: TIMEOUTS.SHORT })
+    await expect(page.locator(NAV.mobileDrawerScrim)).toHaveCount(0, { timeout: TIMEOUTS.SHORT })
   })
 
   test('chat-input "+" menu does not navigate (menu collision guard)', async ({
@@ -262,20 +275,24 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await expect(panel.locator('[data-testid="btn-manage-knowledge-groups"]')).toHaveCount(0)
   })
 
-  test('history sheet (chat list) opens within the viewport', async ({ page, credentials }) => {
+  test('chat history opens within the viewport', async ({ page, credentials }) => {
     await login(page, credentials)
 
-    // Same sheet, two entry points: bottom tab on mobile, rail on desktop.
+    // Two surfaces: the in-drawer history list on mobile, the rail modal on
+    // desktop.
     if (isMobileViewport(page)) {
-      await expect(page.locator(NAV.mobileHistory)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await page.locator(NAV.mobileHistory).click()
+      await page.locator(NAV.mobileDrawerToggle).click()
+      await expect(page.locator(NAV.mobileDrawer)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      // The infinite-scroll sentinel is always rendered (empty or not).
+      await expect(page.locator(NAV.mobileHistorySentinel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expectNoHorizontalOverflow(page, 'drawer history')
     } else {
       await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await page.locator(NAV.sidebarV2ChatNav).click()
+      await expect(page.locator(NAV.modalChatManager)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expectNoHorizontalOverflow(page, 'history sheet')
+      await expectInsideViewport(page, NAV.modalChatManager, 'history sheet')
     }
-    await expect(page.locator(NAV.modalChatManager)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    await expectNoHorizontalOverflow(page, 'history sheet')
-    await expectInsideViewport(page, NAV.modalChatManager, 'history sheet')
   })
 
   test('chat survives a 320px ultra-narrow viewport', async ({ page, credentials }) => {

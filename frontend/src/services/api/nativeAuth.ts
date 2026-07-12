@@ -115,6 +115,29 @@ export function clearNativeTokens(): void {
   void deleteSecure(REFRESH_TOKEN_KEY)
 }
 
+/**
+ * Drop native tokens for EVERY server scope, not just the current one.
+ *
+ * Used exclusively by the deliberate "change server" flow
+ * (`NativeServerControl.vue`): a server change must always require a fresh
+ * login, even when switching back to a server that was used (and thus has a
+ * still-valid stored token) before. `SecureStorage.clear()` wipes every item
+ * under the plugin's storage prefix, which this module is the sole user of in
+ * this codebase, so it is safe to call unconditionally.
+ */
+export async function clearAllNativeTokens(): Promise<void> {
+  accessToken = null
+  refreshToken = null
+  if (!isNativeApp()) {
+    return
+  }
+  try {
+    await SecureStorage.clear()
+  } catch {
+    /* best-effort: the in-memory cache is already cleared above */
+  }
+}
+
 // ── Secure storage helpers (async, native only) ────────────────────────────
 // All wrapped so a storage failure degrades to a non-persisted session rather
 // than throwing into the auth flow.

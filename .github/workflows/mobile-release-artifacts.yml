@@ -1,0 +1,152 @@
+name: Mobile Release Artifacts
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+concurrency:
+  group: mobile-release-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  attestations: write
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish mobile manifest
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      startsWith(github.event.workflow_run.head_branch, 'v')
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event.workflow_run.head_branch }}
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Checkout the tested release
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          # This workflow_run job checks out the release commit (privileged
+          # context) and runs tooling from it, so never leave the base-repo
+          # token in .git/config. All git use here is read-only; authenticated
+          # calls use an explicit token via `gh api`.
+          persist-credentials: false
+
+      - name: Verify the immutable release tag
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9]+){1,2}([+-][0-9A-Za-z.-]+)?$ ]]
+          test "$(git rev-list -n 1 "$RELEASE_TAG")" = "$RELEASE_SHA"
+
+      - name: Download commit-matching OpenAPI artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p mobile-release
+          artifact_id="$(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
+              --jq '.artifacts[] | select(.name == "openapi-spec" and .expired == false) | .id' |
+              head -n 1
+          )"
+          test -n "$artifact_id"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > /tmp/openapi.zip
+          unzip -q /tmp/openapi.zip -d mobile-release
+          test -s mobile-release/openapi-spec.json
+
+      - name: Generate mobile release manifest
+        id: manifest
+        run: |
+          set -euo pipefail
+          previous_tag=''
+          while IFS= read -r candidate; do
+            previous_tag="$candidate"
+            break
+          done < <(git tag --merged "${RELEASE_SHA}^" --list 'v*' --sort=-version:refname)
+          base_ref="${previous_tag:-$(git rev-list --max-parents=0 "$RELEASE_SHA")}"
+          node scripts/mobile-impact.mjs \
+            --base "$base_ref" \
+            --head "$RELEASE_SHA" \
+            --tag "$RELEASE_TAG" \
+            --api-contract mobile-release/openapi-spec.json \
+            --output mobile-release/mobile-release-manifest.json
+          test -s mobile-release/mobile-release-manifest.json
+          classification="$(jq -r '.classification' mobile-release/mobile-release-manifest.json)"
+          echo "classification=$classification" >> "$GITHUB_OUTPUT"
+          if [[ "$classification" == "ota-candidate" || "$classification" == "store-required" ]]; then
+            echo "needs_sync=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+          fi
+          (
+            cd mobile-release
+            sha256sum openapi-spec.json mobile-release-manifest.json > checksums.sha256
+          )
+
+      - name: Upload mobile release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: mobile-release-${{ env.RELEASE_TAG }}-${{ env.RELEASE_SHA }}
+          path: mobile-release/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Attest release checksums
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: mobile-release/checksums.sha256
+
+      - name: Check dispatch credentials
+        id: dispatch-config
+        env:
+          APP_ID: ${{ secrets.MOBILE_APPS_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.MOBILE_APPS_APP_PRIVATE_KEY }}
+        run: |
+          if test -n "$APP_ID" && test -n "$APP_PRIVATE_KEY"; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub App token
+        id: app-token
+        if: steps.dispatch-config.outputs.configured == 'true' && steps.manifest.outputs.needs_sync == 'true'
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.MOBILE_APPS_APP_ID }}
+          private-key: ${{ secrets.MOBILE_APPS_APP_PRIVATE_KEY }}
+          owner: metadist
+          repositories: synaplan-apps
+
+      - name: Dispatch apps synchronization
+        if: steps.app-token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST repos/metadist/synaplan-apps/dispatches \
+            -f event_type=synaplan-mobile-release \
+            -f "client_payload[tag]=$RELEASE_TAG" \
+            -f "client_payload[sha]=$RELEASE_SHA" \
+            -f "client_payload[source_run_id]=${{ github.run_id }}"
+
+      - name: Report skipped dispatch
+        if: steps.manifest.outputs.needs_sync == 'true' && steps.app-token.outcome == 'skipped'
+        run: |
+          echo "Mobile artifacts were published. Repository dispatch was skipped because GitHub App credentials are not configured." |
+            tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Report release without app impact
+        if: steps.manifest.outputs.needs_sync == 'false'
+        env:
+          CLASSIFICATION: ${{ steps.manifest.outputs.classification }}
+        run: |
+          echo "Classification \`${CLASSIFICATION}\` does not require an apps synchronization PR." |
+            tee -a "$GITHUB_STEP_SUMMARY"

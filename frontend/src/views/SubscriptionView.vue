@@ -29,7 +29,7 @@
             CTA reuses the existing customer-portal flow.
           -->
           <div
-            v-if="hasActivePlan && showPaymentFailedWarning"
+            v-if="hasActivePlan && showPaymentFailedWarning && !isNative"
             data-testid="section-payment-failed"
             class="alert-warning max-w-2xl mx-auto mb-8"
             role="alert"
@@ -114,7 +114,7 @@
               </div>
               <button
                 v-if="subscriptionStatus?.hasSubscription"
-                :disabled="isProcessing || !stripeConfigured"
+                :disabled="isProcessing || (!isNative && !stripeConfigured)"
                 class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
                 data-testid="btn-open-portal"
                 @click="openBillingPortal"
@@ -124,13 +124,13 @@
                   icon="mdi:loading"
                   class="w-4 h-4 animate-spin inline mr-2"
                 />
-                {{ $t('subscription.manage.openPortal') }}
+                {{ manageLabel }}
               </button>
             </div>
           </div>
 
-          <!-- Stripe Not Configured Warning -->
-          <div v-if="!stripeConfigured" class="alert-warning max-w-2xl mx-auto mb-8">
+          <!-- Stripe Not Configured Warning (web only — native buys via IAP) -->
+          <div v-if="!stripeConfigured && !isNative" class="alert-warning max-w-2xl mx-auto mb-8">
             <div class="flex items-start gap-3">
               <Icon icon="mdi:alert-circle" class="w-6 h-6 flex-shrink-0" />
               <div>
@@ -142,8 +142,8 @@
             </div>
           </div>
 
-          <!-- Plans Grid -->
-          <div v-if="stripeConfigured" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Plans Grid (native always shows them — purchase routes to IAP) -->
+          <div v-if="stripeConfigured || isNative" class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div
               v-for="plan in plans"
               :key="plan.id"
@@ -178,7 +178,7 @@
                   {{ $t(`subscription.plans.${plan.id.toLowerCase()}`) }}
                 </h3>
                 <div class="flex items-baseline gap-1">
-                  <span class="text-4xl font-bold txt-primary">€{{ plan.price }}</span>
+                  <span class="text-4xl font-bold txt-primary">{{ displayPrice(plan) }}</span>
                   <span class="txt-secondary"
                     >/{{ $t(`subscription.per${capitalize(plan.interval)}`) }}</span
                   >
@@ -238,6 +238,28 @@
               </button>
             </div>
           </div>
+
+          <!--
+            MOBILE-APP SEAM (Epic 9.4): store-managed purchases + anti-steering.
+            Apple requires a restore-purchases path; both stores forbid steering
+            to web checkout for digital goods, so the app exposes only native
+            affordances and never a link to the web billing flow.
+          -->
+          <div
+            v-if="isNative"
+            data-testid="section-native-store"
+            class="max-w-2xl mx-auto mt-8 text-center space-y-3"
+          >
+            <button
+              :disabled="isProcessing"
+              class="btn-secondary px-5 py-2.5 rounded-lg text-sm font-medium"
+              data-testid="btn-restore-purchases"
+              @click="restorePurchases"
+            >
+              {{ $t('subscription.native.restoreButton') }}
+            </button>
+            <p class="txt-secondary text-xs">{{ $t('subscription.native.storeNote') }}</p>
+          </div>
         </template>
       </div>
     </div>
@@ -260,6 +282,16 @@ import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useDialog } from '@/composables/useDialog'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
+import {
+  getStorePrice,
+  initNativeIap,
+  isNativeIapAvailable,
+  purchaseProduct,
+  restoreNativePurchases,
+} from '@/services/nativeIap'
+import { useNotification } from '@/composables/useNotification'
+import { formatPlanPrice } from '@/utils/formatPrice'
 import MainLayout from '@/components/MainLayout.vue'
 
 const { t, te } = useI18n()
@@ -268,7 +300,10 @@ const router = useRouter()
 const authStore = useAuthStore()
 const config = useConfigStore()
 const dialog = useDialog()
+const { success } = useNotification()
 const plans = ref<SubscriptionPlan[]>([])
+/** Set once the native store catalogue is loaded (native shell only). */
+const storePricesReady = ref(false)
 const loading = ref(false)
 const isProcessing = ref(false)
 const stripeConfigured = ref(true)
@@ -295,6 +330,12 @@ const isHighestPlan = computed(() => {
   return currentLevel.value === 'BUSINESS' || currentLevel.value === 'ADMIN'
 })
 
+// MOBILE-APP SEAM (Epic 9.4): in the app, "manage" means the store's own
+// subscription settings (Apple/Google), never the Stripe billing portal.
+const manageLabel = computed(() =>
+  isNative ? t('subscription.native.manageInStore') : t('subscription.manage.openPortal')
+)
+
 /**
  * Surface the dunning warning whenever the backend tells us either that
  * the last invoice was declined (`paymentFailed === true`, set on
@@ -309,6 +350,25 @@ const showPaymentFailedWarning = computed(() => {
   if (subscriptionStatus.value.paymentFailed === true) return true
   return subscriptionStatus.value.status === 'past_due'
 })
+
+/**
+ * Price shown to the user, channel-aware:
+ * - Native app: the store's own localized price wins (that is what Apple/Google
+ *   actually charge); until the catalogue is loaded, `appPrice` (web price plus
+ *   the store-commission markup) is the fallback so the app never advertises
+ *   the cheaper web price (anti-steering).
+ * - Web: always the plain server-configured `price`.
+ */
+function displayPrice(plan: SubscriptionPlan): string {
+  if (isNative) {
+    if (storePricesReady.value) {
+      const storePrice = getStorePrice(plan.iapProductId)
+      if (storePrice) return storePrice
+    }
+    return formatPlanPrice(plan.appPrice, plan.currency)
+  }
+  return formatPlanPrice(plan.price, plan.currency)
+}
 
 function isCurrentPlan(planId: string): boolean {
   return currentLevel.value === planId
@@ -327,11 +387,21 @@ async function loadPlans() {
     const response = await subscriptionApi.getPlans()
     plans.value = response.plans
     stripeConfigured.value = response.stripeConfigured
+    void loadStorePrices(response.plans)
   } catch (error) {
     console.error('Failed to load plans:', error)
   } finally {
     loading.value = false
   }
+}
+
+/** Fetch the store's localized prices (native shell only, non-blocking). */
+async function loadStorePrices(loadedPlans: SubscriptionPlan[]): Promise<void> {
+  if (!isNativeIapAvailable()) return
+  const productIds = loadedPlans
+    .map((plan) => plan.iapProductId)
+    .filter((id): id is string => 'string' === typeof id && '' !== id)
+  storePricesReady.value = await initNativeIap(productIds)
 }
 
 async function loadSubscriptionStatus() {
@@ -388,15 +458,89 @@ async function selectPlan(planId: string) {
 
 /**
  * MOBILE-APP SEAM (Epic 5.3): start a native in-app purchase for the selected
- * tier via the store billing plugin. Until that plugin is wired, this never
- * falls back to the web checkout — it only informs the user. The selected plan
- * is surfaced so the message is concrete.
+ * tier via the store billing plugin (StoreKit 2 / Play Billing). The purchase
+ * is verified server-side (`/api/v1/iap/verify`) before any tier is granted;
+ * this never falls back to the web checkout (Apple 3.1.1 / Google Play).
  */
 async function startNativePurchase(planId: string) {
-  await dialog.alert({
-    title: t('subscription.native.purchaseTitle'),
-    message: t('subscription.native.purchaseComingSoon', { plan: planId }),
-  })
+  const plan = plans.value.find((p) => p.id === planId)
+  const productId = plan?.iapProductId
+
+  if (!productId || !isNativeIapAvailable()) {
+    await dialog.alert({
+      title: t('subscription.native.purchaseTitle'),
+      message: t('subscription.native.purchaseUnavailable'),
+    })
+    return
+  }
+
+  isProcessing.value = true
+  try {
+    const outcome = await purchaseProduct(productId)
+
+    switch (outcome.status) {
+      case 'granted':
+        await Promise.all([authStore.refreshUser(), loadSubscriptionStatus()])
+        success(t('subscription.native.purchaseSuccess'))
+        break
+      case 'pending':
+        await dialog.alert({
+          title: t('subscription.native.purchaseTitle'),
+          message: t('subscription.native.purchasePending'),
+        })
+        break
+      case 'cancelled':
+        // The user closed the store sheet — no message needed.
+        break
+      case 'error': {
+        const messageKey =
+          'ownership_conflict' === outcome.code
+            ? 'subscription.native.purchaseConflict'
+            : 'not_available' === outcome.code
+              ? 'subscription.native.purchaseUnavailable'
+              : 'subscription.native.purchaseFailed'
+        await dialog.alert({
+          title: t('subscription.native.purchaseTitle'),
+          message: t(messageKey),
+        })
+        break
+      }
+    }
+  } finally {
+    isProcessing.value = false
+  }
+}
+
+/**
+ * MOBILE-APP SEAM (Epic 9.4): Apple requires a "Restore Purchases" path so a
+ * user who reinstalls or switches devices can recover an active subscription.
+ * Restored transactions run through the same server-side verification as a
+ * fresh purchase; the refreshed server status is the source of truth.
+ */
+async function restorePurchases() {
+  isProcessing.value = true
+  try {
+    const ran = await restoreNativePurchases()
+    if (!ran) {
+      await dialog.alert({
+        title: t('subscription.native.restoreTitle'),
+        message: t('subscription.native.purchaseUnavailable'),
+      })
+      return
+    }
+
+    await Promise.all([authStore.refreshUser(), loadSubscriptionStatus()])
+    if (hasActivePlan.value) {
+      success(t('subscription.native.restoreDone'))
+    } else {
+      await dialog.alert({
+        title: t('subscription.native.restoreTitle'),
+        message: t('subscription.native.restoreNone'),
+      })
+    }
+  } finally {
+    isProcessing.value = false
+  }
 }
 
 async function openBillingPortal() {
@@ -494,7 +638,9 @@ function formatDate(timestamp: string | number): string {
 }
 
 onMounted(async () => {
-  if (!config.billing.enabled) {
+  // Defense in depth next to the router guard: no billing, or a custom server
+  // in the native app (no store purchase channel) → no subscription page.
+  if (!config.billing.enabled || !isPurchaseAllowed()) {
     router.push('/')
     return
   }

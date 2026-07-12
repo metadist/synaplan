@@ -8,6 +8,7 @@ import {
   reconcileLocalMessage,
 } from '@/utils/messageMapper'
 import { authService } from '@/services/authService'
+import { hasSessionHint } from '@/services/sessionHint'
 import type { MessageUsage } from '@/stores/usageTaximeter'
 
 // Re-export so existing consumers keep importing from the store module.
@@ -20,7 +21,10 @@ export { parseContentWithThinking }
 function checkAuthOrRedirect(): boolean {
   if (!authService.isAuthenticated()) {
     console.warn('🔒 Not authenticated - redirecting to login')
-    window.location.href = '/login?reason=session_expired'
+    // Only genuine expired sessions (prior login on this browser) get the
+    // "session expired" message; never-logged-in guests get `auth_required`.
+    const reason = hasSessionHint() ? 'session_expired' : 'auth_required'
+    window.location.href = `/login?reason=${reason}`
     return false
   }
   return true
@@ -164,6 +168,7 @@ export interface Message {
     resultsCount?: number
   } | null // Web search metadata
   tool?: {
+    command?: string
     icon: string
     label: string
   } | null // Tool metadata (e.g., web search, file generation)

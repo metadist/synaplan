@@ -42,6 +42,9 @@
               <th class="text-right py-3 px-4 font-medium txt-secondary">
                 {{ $t('admin.subscriptions.priceYearly') }}
               </th>
+              <th class="text-center py-3 px-4 font-medium txt-secondary">
+                {{ $t('admin.subscriptions.currency') }}
+              </th>
               <th class="text-right py-3 px-4 font-medium txt-secondary">
                 {{ $t('admin.subscriptions.budgetMonthly') }}
               </th>
@@ -73,11 +76,46 @@
               <td class="py-3 px-4 txt-primary font-medium">
                 {{ sub.name }}
               </td>
-              <td class="py-3 px-4 text-right txt-secondary">
-                {{ formatCurrency(sub.priceMonthly) }}
+              <td class="py-3 px-4 text-right">
+                <input
+                  v-if="editingId === sub.id"
+                  v-model.number="editForm.priceMonthly"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="w-24 px-2 py-1 text-right text-sm rounded border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-price-monthly"
+                />
+                <span v-else class="txt-primary">
+                  {{ formatCurrency(sub.priceMonthly, sub.currency) }}
+                </span>
               </td>
-              <td class="py-3 px-4 text-right txt-secondary">
-                {{ formatCurrency(sub.priceYearly) }}
+              <td class="py-3 px-4 text-right">
+                <input
+                  v-if="editingId === sub.id"
+                  v-model.number="editForm.priceYearly"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="w-24 px-2 py-1 text-right text-sm rounded border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-price-yearly"
+                />
+                <span v-else class="txt-primary">
+                  {{ formatCurrency(sub.priceYearly, sub.currency) }}
+                </span>
+              </td>
+              <td class="py-3 px-4 text-center">
+                <input
+                  v-if="editingId === sub.id"
+                  v-model="editForm.currency"
+                  type="text"
+                  maxlength="3"
+                  class="w-16 px-2 py-1 text-center text-sm uppercase rounded border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-currency"
+                />
+                <span v-else class="txt-secondary">
+                  {{ sub.currency }}
+                </span>
               </td>
               <td class="py-3 px-4 text-right">
                 <input
@@ -90,7 +128,8 @@
                   data-testid="input-budget-monthly"
                 />
                 <span v-else class="txt-primary">
-                  {{ formatCurrency(sub.costBudgetMonthly) }}
+                  <!-- Cost budgets are provider costs and always tracked in EUR. -->
+                  {{ formatCurrency(sub.costBudgetMonthly, 'EUR') }}
                 </span>
               </td>
               <td class="py-3 px-4 text-right">
@@ -104,7 +143,7 @@
                   data-testid="input-budget-yearly"
                 />
                 <span v-else class="txt-primary">
-                  {{ formatCurrency(sub.costBudgetYearly) }}
+                  {{ formatCurrency(sub.costBudgetYearly, 'EUR') }}
                 </span>
               </td>
               <td class="py-3 px-4 text-center">
@@ -177,7 +216,13 @@ const subscriptions = ref<AdminSubscription[]>([])
 const loading = ref(true)
 const saving = ref(false)
 const editingId = ref<number | null>(null)
-const editForm = ref({ costBudgetMonthly: 0, costBudgetYearly: 0 })
+const editForm = ref({
+  priceMonthly: 0,
+  priceYearly: 0,
+  currency: 'EUR',
+  costBudgetMonthly: 0,
+  costBudgetYearly: 0,
+})
 
 const loadSubscriptions = async () => {
   loading.value = true
@@ -194,6 +239,9 @@ const loadSubscriptions = async () => {
 const startEdit = (sub: AdminSubscription) => {
   editingId.value = sub.id
   editForm.value = {
+    priceMonthly: parseFloat(sub.priceMonthly),
+    priceYearly: parseFloat(sub.priceYearly),
+    currency: sub.currency,
     costBudgetMonthly: parseFloat(sub.costBudgetMonthly),
     costBudgetYearly: parseFloat(sub.costBudgetYearly),
   }
@@ -207,6 +255,9 @@ const saveEdit = async (id: number) => {
   saving.value = true
   try {
     const response = await adminSubscriptionsApi.update(id, {
+      priceMonthly: editForm.value.priceMonthly,
+      priceYearly: editForm.value.priceYearly,
+      currency: editForm.value.currency.trim().toUpperCase(),
       costBudgetMonthly: editForm.value.costBudgetMonthly,
       costBudgetYearly: editForm.value.costBudgetYearly,
     })
@@ -238,8 +289,14 @@ const toggleActive = async (sub: AdminSubscription) => {
   }
 }
 
-const formatCurrency = (value: string) => {
-  return `${parseFloat(value).toFixed(2)} €`
+const formatCurrency = (value: string, currency: string) => {
+  const amount = parseFloat(value)
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount)
+  } catch {
+    // Unknown currency code in the DB — degrade to a plain suffix.
+    return `${amount.toFixed(2)} ${currency}`
+  }
 }
 
 const getLevelBadgeClass = (level: string) => {

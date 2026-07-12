@@ -1,4 +1,15 @@
 {
+  "incognito": {
+    "toggleStart": "Iniciar chat de incógnito",
+    "toggleEnd": "Finalizar chat de incógnito",
+    "bannerTitle": "Chat de incógnito",
+    "bannerText": "Esta conversación no se guarda. Tus recuerdos y conocimientos guardados se siguen usando, pero no se memoriza nada nuevo.",
+    "emptyTitle": "Chat de incógnito",
+    "emptyHint": "Los mensajes y archivos de esta sesión no se guardan y desaparecen cuando la finalizas.",
+    "endConfirmTitle": "¿Finalizar el chat de incógnito?",
+    "endConfirmMessage": "La conversación se descartará de forma permanente y los archivos de esta sesión se eliminarán.",
+    "endConfirmButton": "Finalizar y descartar"
+  },
   "jobs": {
     "kind": {
       "video": "vídeo",
@@ -69,6 +80,8 @@
     "widgetChats": "Chats de Widget",
     "liveSupport": "Soporte en vivo",
     "addinConnect": "Conectar complemento de Outlook",
+    "accountDeletion": "Eliminación de cuenta",
+    "onboarding": "Bienvenida",
     "mcpServers": "Servidores MCP"
   },
   "addinConnect": {
@@ -90,6 +103,7 @@
     "errorIssuanceFailed": "Synaplan no pudo emitir una clave de API para esta cuenta."
   },
   "welcome": "Bienvenido",
+  "welcomeUser": "Bienvenido, {name}",
   "examplePrompts": {
     "heading": "Prueba una de estas",
     "items": {
@@ -189,7 +203,8 @@
       "overview": "Resumen",
       "users": "Usuarios",
       "prompts": "Prompts",
-      "usage": "Uso"
+      "usage": "Uso",
+      "appServer": "Servidor de la app"
     },
     "overview": {
       "totalUsers": "Usuarios Totales",
@@ -303,6 +318,27 @@
       "activeSubscriptions": "Suscripciones Activas",
       "subscriptionOverview": "Resumen de Suscripciones"
     },
+    "subscriptions": {
+      "title": "Planes de suscripción",
+      "description": "Gestiona precios, presupuestos de costos y estado activo de cada nivel de suscripción. Los precios se muestran a los usuarios en el onboarding y en la página de suscripción.",
+      "level": "Nivel",
+      "name": "Nombre",
+      "priceMonthly": "Precio/mes",
+      "priceYearly": "Precio/año",
+      "currency": "Moneda",
+      "budgetMonthly": "Presupuesto/mes",
+      "budgetYearly": "Presupuesto/año",
+      "active": "Activo",
+      "actions": "Acciones",
+      "edit": "Editar",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "saveSuccess": "Plan actualizado correctamente",
+      "saveError": "No se pudo actualizar el plan",
+      "loadError": "No se pudieron cargar las suscripciones",
+      "noSubscriptions": "No se encontraron planes de suscripción. Crea primero los planes en la base de datos.",
+      "budgetHint": "El presupuesto define el costo máximo de tokens (en EUR) por período de facturación. Establécelo en 0 para uso ilimitado. Los precios son los precios públicos mostrados; las compras en la app móvil usan el precio de la tienda de aplicaciones."
+    },
     "config": {
       "title": "Configuración del Sistema",
       "description": "Gestionar variables de entorno y conexiones de servicios",
@@ -368,7 +404,8 @@
     "adminSystemConfig": "Configuración del Sistema",
     "profile": "Perfil",
     "more": "Más",
-    "moreDescription": "Más secciones y cuenta"
+    "moreDescription": "Más secciones y cuenta",
+    "menu": "Menú"
   },
   "guest": {
     "featureGate": {
@@ -446,6 +483,9 @@
       "imageGenDesc": "Crear imágenes desde texto",
       "videoGen": "Generación de Video",
       "videoGenDesc": "Generar videos desde texto",
+      "badgeSearch": "Búsqueda",
+      "badgeImage": "Imagen",
+      "badgeVideo": "Video",
       "thinkingDesc": "Muestra el razonamiento del modelo antes de la respuesta",
       "thinkingUnsupported": "El modelo seleccionado no admite razonamiento",
       "summarizer": "Resumidor",
@@ -892,6 +932,9 @@
     "embedCodeHint": "Copia este código en la sección <head> de tu sitio web"
   },
   "widgets": {
+    "advancedConfig": {
+      "proRequired": "Se requiere suscripción PRO"
+    },
     "title": "Widgets de Chat",
     "subtitle": "Integra widgets de chat con IA en tu sitio web",
     "createNew": "Crear Widget",
@@ -1088,7 +1131,8 @@
     "legal": {
       "title": "Privacidad y Términos",
       "privacy": "Política de Privacidad",
-      "terms": "Términos de Uso"
+      "terms": "Términos de Uso",
+      "accountDeletion": "Eliminar tu cuenta"
     },
     "dangerZone": {
       "title": "Zona de Peligro",
@@ -1116,6 +1160,34 @@
     "privacyNotice": "Todos los datos se almacenan de forma segura y se usan solo para propósitos de facturación según la ley alemana (RGPD).",
     "saveChanges": "Guardar Cambios",
     "cancel": "Cancelar"
+  },
+  "native": {
+    "exitHint": "Pulsa atrás de nuevo para salir"
+  },
+  "accountDeletion": {
+    "title": "Eliminar tu cuenta de {brand}",
+    "intro": "Puedes eliminar tu cuenta y todos los datos asociados de forma permanente en cualquier momento. Aquí te explicamos cómo funciona y qué se elimina.",
+    "howTitle": "Cómo eliminar tu cuenta",
+    "steps": [
+      "Inicia sesión en tu cuenta.",
+      "Abre tu Perfil y desplázate hasta la sección «Zona de peligro».",
+      "Haz clic en «Eliminar cuenta» y confirma con tu contraseña (o escribiendo DELETE en cuentas con inicio de sesión social).",
+      "Tu cuenta y tus datos se eliminan de inmediato y no se pueden recuperar."
+    ],
+    "goToProfile": "Ir al Perfil",
+    "signIn": "Iniciar sesión",
+    "dataTitle": "Qué se elimina",
+    "dataItems": [
+      "Todos tus mensajes y chats",
+      "Todos los archivos subidos y documentos de la base de conocimiento",
+      "Tus datos personales, ajustes y memorias",
+      "Claves de API, widgets y credenciales"
+    ],
+    "retention": "La eliminación es permanente y surte efecto de inmediato. Las copias de seguridad con datos residuales se rotan en un plazo de 30 días. Los datos que estamos legalmente obligados a conservar (p. ej. facturas) se mantienen solo durante el tiempo que exige la ley.",
+    "noAccessTitle": "¿No puedes iniciar sesión?",
+    "noAccessDesc": "Si ya no tienes acceso a tu cuenta, contáctanos a través de nuestro sitio web y procesaremos tu solicitud de eliminación.",
+    "visitWebsite": "Visitar el sitio web",
+    "privacyPolicy": "Política de Privacidad"
   },
   "notFound": {
     "title": "Página No Encontrada",
@@ -1344,8 +1416,17 @@
     },
     "native": {
       "purchaseTitle": "Compra dentro de la app",
-      "purchaseComingSoon": "Las compras dentro de la app para el plan {plan} se están configurando y estarán disponibles en una próxima actualización de la app.",
-      "manageInStore": "Gestionar suscripción en la tienda"
+      "purchaseUnavailable": "Las compras dentro de la app aún no están disponibles en este servidor. Inténtalo de nuevo más tarde.",
+      "purchaseSuccess": "Tu suscripción ya está activa. ¡Gracias!",
+      "purchasePending": "Tu compra está pendiente de aprobación (p. ej. «Pedir para comprar»). Tu suscripción se activará automáticamente cuando se apruebe.",
+      "purchaseConflict": "Esta compra ya está vinculada a otra cuenta o a una suscripción existente. Revisa tu cuenta de la tienda o contacta con soporte.",
+      "purchaseFailed": "No se pudo completar la compra. No se te ha cobrado nada. Inténtalo de nuevo.",
+      "manageInStore": "Gestionar en la tienda",
+      "restoreButton": "Restaurar compras",
+      "restoreTitle": "Restaurar compras",
+      "restoreDone": "Compras restauradas: tu suscripción está activa.",
+      "restoreNone": "No se encontró ninguna suscripción activa para restaurar.",
+      "storeNote": "Las compras y suscripciones se procesan y gestionan a través de App Store o Google Play."
     },
     "plans": {
       "pro": "Pro",
@@ -2884,6 +2965,91 @@
     "subtitle": "Esta versión de la app ya no es compatible. Actualiza a la última versión para continuar.",
     "minVersion": "Versión mínima requerida: {version}",
     "cta": "Actualizar ahora"
+  },
+  "nativeServer": {
+    "changeServer": "Cambiar servidor",
+    "appServer": {
+      "title": "Servidor de la app",
+      "description": "Elige a qué servidor de Synaplan se conecta esta app. Cámbialo solo si tienes tu propio servidor de Synaplan.",
+      "unavailable": "La configuración del servidor no está disponible en esta versión.",
+      "currentLabel": "Servidor actual",
+      "defaultLabel": "Predeterminado",
+      "inputLabel": "URL del servidor",
+      "hint": "Al guardar se cerrará tu sesión en todos los servidores y la app se recargará; deberás iniciar sesión de nuevo.",
+      "save": "Probar y guardar",
+      "testing": "Comprobando servidor …",
+      "reset": "Restablecer al predeterminado",
+      "savedSigningOut": "Conectado. Cerrando tu sesión …",
+      "invalidUrl": "Introduce una URL válida (p. ej. https://web.synaplan.com).",
+      "unreachable": "Servidor no accesible. Comprueba la dirección.",
+      "resetConfirmTitle": "¿Restablecer servidor?",
+      "resetConfirmMessage": "La app cerrará tu sesión, se conectará de nuevo a {server} y se recargará.",
+      "resetConfirmAction": "Restablecer"
+    }
+  },
+  "onboarding": {
+    "skip": "Omitir",
+    "back": "Atrás",
+    "next": "Continuar",
+    "getStarted": "Empezar",
+    "stepLabel": "Paso {step} de {total}",
+    "welcome": {
+      "title": "Bienvenido a",
+      "subtitle": "Todas las IA, todas las funciones en un solo lugar",
+      "pillServer": "Servidor propio",
+      "pillRag": "RAG",
+      "pillWidget": "Widget de chat"
+    },
+    "rag": {
+      "title": "Respuestas de tus documentos",
+      "body": "RAG permite que el asistente de IA responda con tus propios archivos, no solo con su entrenamiento general.",
+      "point1": "Sube documentos y haz preguntas sobre su contenido",
+      "point2": "Las respuestas citan las fuentes de las que provienen",
+      "point3": "Tus archivos permanecen privados en tu cuenta"
+    },
+    "widget": {
+      "title": "Widget de chat integrable",
+      "body": "Convierte tu conocimiento en un widget de chat que puedes integrar en cualquier sitio web.",
+      "point1": "Añade un asistente de IA a tu sitio en minutos",
+      "point2": "Responde a partir de los documentos que conectas",
+      "point3": "Adapta el aspecto a tu marca"
+    },
+    "server": {
+      "title": "Tu servidor",
+      "subtitle": "La app se conecta a un servidor de Synaplan. El servidor estándar es el adecuado para la mayoría — simplemente continúa.",
+      "defaultLabel": "Servidor estándar",
+      "currentLabel": "Servidor conectado",
+      "recommended": "Recomendado",
+      "almostThere": "Casi listo",
+      "moreInfo": "Saber más",
+      "helpSetup": "Cómo configurar tu propio servidor",
+      "standardInfoTitle": "Servidor estándar",
+      "standardInfoBody": "Es el servidor de Synaplan alojado y gestionado por el equipo de Synaplan. La forma más sencilla de empezar — sin configuración.",
+      "standardInfoPoint1": "Listo para usar de inmediato — nada que instalar",
+      "standardInfoPoint2": "Mantenido y actualizado por el equipo de Synaplan",
+      "standardInfoPoint3": "La opción adecuada para la mayoría",
+      "customInfoTitle": "Tu propio servidor",
+      "customInfoBody": "Conecta la app a un servidor de Synaplan que alojes tú o tu empresa.",
+      "customInfoPoint1": "Conéctate a un servidor de Synaplan que gestionas tú mismo",
+      "customInfoPoint2": "Tus datos permanecen en tu propia infraestructura",
+      "customInfoPoint3": "Requiere una instalación de Synaplan en funcionamiento",
+      "customToggle": "Usar mi propio servidor",
+      "customHint": "Opción para expertos: si tu empresa o tú tenéis un servidor de Synaplan propio, introduce aquí su dirección.",
+      "customPlaceholder": "https://tu-servidor.ejemplo.com",
+      "connect": "Conectar",
+      "connecting": "Comprobando la conexión…",
+      "connectError": "No se puede acceder a este servidor. Comprueba la dirección e inténtalo de nuevo."
+    },
+    "plans": {
+      "title": "¿Cómo quieres empezar?",
+      "subtitle": "Pruébalo gratis — puedes mejorar tu plan en cualquier momento",
+      "guestCta": "Continuar sin cuenta",
+      "popular": "Popular",
+      "continueWith": "Continuar con {plan}",
+      "registerCta": "Crear una cuenta gratuita",
+      "loginHint": "¿Ya tienes una cuenta?",
+      "loginCta": "Iniciar sesión"
+    }
   },
   "mcpServers": {
     "title": "Servidores MCP",

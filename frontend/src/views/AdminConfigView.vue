@@ -7,6 +7,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotification } from '@/composables/useNotification'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { useTheme } from '@/composables/useTheme'
 import {
   getConfigSchema,
@@ -114,11 +115,45 @@ function selectTab(tabId: string) {
   openGroup.value = null
 }
 
+// Mobile tab dropdown: a single dropdown replaces the 3-group bar (same
+// pattern as FilesTabs.vue), grouping the tabs under their section headers
+// so every entry the desktop dropdowns expose stays reachable.
+const mobileTabMenuOpen = ref(false)
+const mobileTabDropdownRef = ref<HTMLElement | null>(null)
+
+function toggleMobileTabMenu() {
+  triggerHapticImpact('light')
+  mobileTabMenuOpen.value = !mobileTabMenuOpen.value
+}
+
+function closeMobileTabMenu() {
+  if (!mobileTabMenuOpen.value) return
+  triggerHapticImpact('light')
+  mobileTabMenuOpen.value = false
+}
+
+function selectMobileTab(tabId: string) {
+  closeMobileTabMenu()
+  activeTab.value = tabId
+}
+
 function handleTabBarOutsideClick(event: MouseEvent) {
-  if (!openGroup.value) return
-  if (tabBarRef.value && !tabBarRef.value.contains(event.target as Node)) {
+  if (openGroup.value && tabBarRef.value && !tabBarRef.value.contains(event.target as Node)) {
     openGroup.value = null
   }
+  if (
+    mobileTabMenuOpen.value &&
+    mobileTabDropdownRef.value &&
+    !mobileTabDropdownRef.value.contains(event.target as Node)
+  ) {
+    mobileTabMenuOpen.value = false
+  }
+}
+
+function handleTabBarEscape(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return
+  openGroup.value = null
+  mobileTabMenuOpen.value = false
 }
 
 const currentTab = computed(() => {
@@ -246,6 +281,7 @@ function copyRestartCommand() {
 onMounted(async () => {
   // Close any open tab-group dropdown when clicking elsewhere.
   document.addEventListener('click', handleTabBarOutsideClick)
+  document.addEventListener('keydown', handleTabBarEscape)
 
   if (!authStore.isAdmin) {
     router.push('/admin')
@@ -256,6 +292,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleTabBarOutsideClick)
+  document.removeEventListener('keydown', handleTabBarEscape)
 })
 </script>
 
@@ -334,8 +371,13 @@ onBeforeUnmount(() => {
 
         <!-- Content -->
         <div v-else-if="schema" class="space-y-6">
-          <!-- Tab group dropdowns (max 3, mirrors AdvancedWidgetConfig) -->
-          <div ref="tabBarRef" class="border-b border-light-border/30 dark:border-dark-border/20">
+          <!-- Tab group dropdowns (desktop/tablet, max 3, mirrors AdvancedWidgetConfig).
+               On phones this is replaced by the single dropdown below (same
+               pattern as FilesTabs.vue). -->
+          <div
+            ref="tabBarRef"
+            class="hidden md:block border-b border-light-border/30 dark:border-dark-border/20"
+          >
             <div class="flex gap-1 sm:gap-2 py-2">
               <div v-for="group in tabGroups" :key="group.id" class="relative flex-1 sm:flex-none">
                 <button
@@ -391,6 +433,69 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Tab dropdown (mobile): a single dropdown replaces the 3-group bar
+               (same pattern as FilesTabs.vue). The trigger shows the current
+               tab; the panel keeps every group's sub-tabs under its own
+               section header so nothing from the desktop dropdowns is lost. -->
+          <div
+            ref="mobileTabDropdownRef"
+            class="md:hidden relative border-b border-light-border/30 dark:border-dark-border/20 pb-2"
+          >
+            <button
+              type="button"
+              class="dropdown-trigger surface-card w-full justify-between border border-light-border/20 dark:border-dark-border/10"
+              :aria-expanded="mobileTabMenuOpen"
+              aria-haspopup="menu"
+              data-testid="tab-admin-config-mobile-trigger"
+              @click="toggleMobileTabMenu"
+            >
+              <span class="flex items-center gap-2 txt-primary font-medium min-w-0">
+                <Icon :icon="tabIcons[activeTab] || 'mdi:cog'" class="w-5 h-5 flex-shrink-0" />
+                <span class="truncate">{{ currentTab?.label }}</span>
+              </span>
+              <Icon
+                icon="heroicons:chevron-down"
+                class="w-5 h-5 flex-shrink-0 transition-transform"
+                :class="{ 'rotate-180': mobileTabMenuOpen }"
+              />
+            </button>
+
+            <div
+              v-if="mobileTabMenuOpen"
+              class="dropdown-panel absolute left-0 right-0 top-full mt-1 z-30 max-h-[70vh] overflow-y-auto scroll-thin"
+              role="menu"
+              data-testid="tab-admin-config-mobile-menu"
+            >
+              <template v-for="(group, groupIdx) in tabGroups" :key="group.id">
+                <p
+                  class="px-3 pt-2.5 pb-1 text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
+                  :class="{
+                    'border-t border-light-border/10 dark:border-dark-border/10 mt-1': groupIdx > 0,
+                  }"
+                >
+                  {{ $t(group.labelKey) }}
+                </p>
+                <button
+                  v-for="tab in group.tabs"
+                  :key="tab.id"
+                  type="button"
+                  role="menuitem"
+                  :class="['dropdown-item', activeTab === tab.id && 'dropdown-item--active']"
+                  :data-testid="`btn-config-tab-${tab.id}-mobile`"
+                  @click="selectMobileTab(tab.id)"
+                >
+                  <Icon :icon="tab.icon" class="w-5 h-5 flex-shrink-0" />
+                  <span class="flex-1 text-left truncate">{{ tab.label }}</span>
+                  <Icon
+                    v-if="activeTab === tab.id"
+                    icon="heroicons:check"
+                    class="w-4 h-4 flex-shrink-0"
+                  />
+                </button>
+              </template>
             </div>
           </div>
 

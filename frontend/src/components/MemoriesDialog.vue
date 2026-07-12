@@ -3,11 +3,11 @@
     <Transition name="fade">
       <div
         v-if="isOpen"
-        class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-2 sm:p-4"
+        class="modal-overlay fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-2 sm:p-4"
         @click.self="close"
       >
         <div
-          class="surface-card rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden"
+          class="modal-panel surface-card rounded-xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden"
           data-testid="modal-memories-dialog"
           @click.stop
         >

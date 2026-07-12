@@ -1,11 +1,11 @@
 <template>
   <Teleport to="#app">
     <div
-      class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+      class="modal-overlay fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
       data-testid="modal-setup-chat"
     >
       <div
-        class="surface-card rounded-2xl w-full max-w-2xl h-[80vh] max-h-[700px] overflow-hidden shadow-2xl flex flex-col"
+        class="modal-panel surface-card rounded-2xl w-full max-w-2xl h-[80vh] overflow-hidden shadow-2xl flex flex-col"
         data-testid="section-setup-container"
       >
         <!-- Header -->

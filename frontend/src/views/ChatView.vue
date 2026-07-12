@@ -8,6 +8,17 @@
       @dragleave="handleDragLeave"
       @drop.prevent="handleDrop"
     >
+      <!-- Incognito toggle (desktop): there is no chat header, so the button
+           floats over the top-right of the message area. The mobile instance
+           lives in MainLayout (fixed top-right, mirroring the menu button). -->
+      <div
+        v-if="authStore.isAuthenticated"
+        class="hidden md:block absolute top-3 right-3 z-30"
+        data-testid="section-incognito-toggle-desktop"
+      >
+        <IncognitoToggle />
+      </div>
+
       <!-- Drag & Drop Overlay - covers entire chat area -->
       <Transition name="fade">
         <div
@@ -28,11 +39,12 @@
 
       <div
         ref="chatContainer"
-        class="flex-1 overflow-y-auto bg-chat overscroll-contain"
+        class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
+        :class="{ 'flex flex-col items-center': isEmptyLanding }"
         data-testid="section-messages"
         @scroll="handleScroll"
       >
-        <div class="max-w-4xl mx-auto py-6 px-4">
+        <div class="max-w-4xl mx-auto py-6 px-4" :class="{ 'my-auto w-full': isEmptyLanding }">
           <!-- Loading indicator for infinite scroll -->
           <div
             v-if="historyStore.isLoadingMessages"
@@ -117,15 +129,23 @@
 
           <div
             v-else-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
-            class="flex flex-col items-center justify-center min-h-[68vh] px-6 py-8 gap-6"
+            class="flex flex-col items-center justify-center px-6 py-8 gap-6"
             data-testid="state-empty"
           >
             <div class="text-center">
+              <div
+                v-if="incognitoStore.active"
+                class="w-12 h-12 mx-auto mb-3 rounded-full surface-chip flex items-center justify-center"
+              >
+                <Icon icon="mdi:incognito" class="w-6 h-6 txt-brand" aria-hidden="true" />
+              </div>
               <h2 class="text-2xl font-semibold txt-primary mb-2">
-                {{ $t('welcome') }}
+                {{ incognitoStore.active ? $t('incognito.emptyTitle') : welcomeGreeting }}
               </h2>
               <p class="txt-secondary">
-                {{ $t('chatInput.placeholder') }}
+                {{
+                  incognitoStore.active ? $t('incognito.emptyHint') : $t('chatInput.placeholder')
+                }}
               </p>
             </div>
 
@@ -201,15 +221,6 @@
         <ConsumptionRing />
       </template>
 
-      <!-- Guest Banner (shown for unauthenticated trial users) -->
-      <GuestBanner
-        v-if="isGuestMode"
-        :visible="guestStore.shouldShowBanner"
-        :remaining="guestStore.remainingMessages"
-        :max-messages="guestStore.maxMessages"
-        @dismiss="guestStore.dismissBanner()"
-      />
-
       <!-- Contextual Promo Tips -->
       <PromoTipBanner
         :tip="promoTips.currentTip.value"
@@ -235,12 +246,34 @@
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
+        :banner-visible="isGuestMode && guestStore.shouldShowBanner"
         :quote="quoting.pendingQuote.value"
         @send="handleSendMessage"
         @stop="handleUserStop"
         @guest-feature-gate="handleGuestFeatureGate"
         @clear-quote="quoting.clearPendingQuote"
-      />
+      >
+        <template v-if="isGuestMode" #banner>
+          <GuestBanner
+            :visible="guestStore.shouldShowBanner"
+            :remaining="guestStore.remainingMessages"
+            :max-messages="guestStore.maxMessages"
+            @dismiss="guestStore.dismissBanner()"
+          />
+        </template>
+        <template v-else-if="incognitoStore.active" #banner>
+          <div
+            class="flex items-center justify-center gap-2 px-4 py-2 mb-2 rounded-lg surface-chip text-xs txt-secondary"
+            data-testid="banner-incognito"
+          >
+            <Icon icon="mdi:incognito" class="w-4 h-4 txt-brand flex-shrink-0" />
+            <span>
+              <strong class="txt-primary">{{ $t('incognito.bannerTitle') }}</strong>
+              — {{ $t('incognito.bannerText') }}
+            </span>
+          </div>
+        </template>
+      </ChatInput>
 
       <!--
         Phase 3e: backgrounded memory extraction status pill.
@@ -396,6 +429,9 @@ import { useConfigStore } from '@/stores/config'
 import { useUsageTaximeterStore, type UsageTotals } from '@/stores/usageTaximeter'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
+import { useIncognitoStore } from '@/stores/incognito'
+import IncognitoToggle from '@/components/IncognitoToggle.vue'
+import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
 import { useLimitCheck } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
@@ -481,13 +517,32 @@ const configStore = useConfigStore()
 const usageTaximeterStore = useUsageTaximeterStore()
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
+const incognitoStore = useIncognitoStore()
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
 
 const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGuestMode)
+
+// Personalizes the empty-state heading with the user's first name (Personal
+// Information -> First Name) when they've set one; falls back to the
+// generic greeting for guests and users without a first name on file.
+const welcomeGreeting = computed(() => {
+  const firstName = authStore.user?.firstName?.trim()
+  return firstName ? t('welcomeUser', { name: firstName }) : t('welcome')
+})
 const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
+
+// Empty landing: no messages, not loading, and not the guest-error state.
+// Keeps the welcome content vertically centered while the composer remains
+// docked at the bottom, leaving enough room for its upward-opening menus.
+const isEmptyLanding = computed(
+  () =>
+    !(guestStore.initFailed && !authStore.isAuthenticated) &&
+    historyStore.messages.length === 0 &&
+    !historyStore.isLoadingMessages
+)
 
 function handleGuestFeatureGate(key: string) {
   featureGateKey.value = key
@@ -716,6 +771,26 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', handleViewportResize)
 }
 
+// Native keyboard bridge (app/synaplan-native.js) fires this on show/hide with
+// Keyboard.resize:'none', where visualViewport never changes — so this is the
+// only signal that the keyboard opened. When the user is pinned to the bottom
+// we re-pin after the inset-driven padding is applied, keeping the latest
+// message right above the composer. rAF guarantees the new scrollHeight is
+// measured (the padding var was set synchronously just before this event).
+const handleKeyboardInsetChange = () => {
+  if (!autoScroll.value || !chatContainer.value) return
+  if (historyStore.messages.some((m) => m.isStreaming)) {
+    followStreamingScroll()
+    return
+  }
+  requestAnimationFrame(() => {
+    if (!chatContainer.value) return
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    expectedScrollTop = chatContainer.value.scrollTop
+  })
+}
+window.addEventListener('synaplan:keyboardinset', handleKeyboardInsetChange)
+
 // Window event handler for memory dialog (used by MessageText.vue)
 const handleOpenMemoryDialogEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ memory: UserMemory }>
@@ -750,6 +825,12 @@ onBeforeUnmount(() => {
   isViewUnmounted = true
   mediaJobsStore.unsubscribe()
   handleNavigateAway()
+  // Leaving the chat surface ends an incognito session: the transcript is
+  // discarded and the session's ephemeral files are deleted (best effort —
+  // the backend reaper covers the rest).
+  if (incognitoStore.active) {
+    void incognitoStore.endSession()
+  }
   if (currentAudioStreamer) {
     currentAudioStreamer.stop()
     currentAudioStreamer = null
@@ -758,6 +839,7 @@ onBeforeUnmount(() => {
   if (window.visualViewport) {
     window.visualViewport.removeEventListener('resize', handleViewportResize)
   }
+  window.removeEventListener('synaplan:keyboardinset', handleKeyboardInsetChange)
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('focus', prefetchSseToken)
@@ -766,10 +848,50 @@ onBeforeUnmount(() => {
   clearMemoryPollTimers()
 })
 
+// Incognito session lifecycle: the toggle (MainLayout on mobile, floating
+// button on desktop) only flips the store flag — this watcher swaps the
+// transcript surface. The session transcript lives exclusively in the
+// in-memory history store; the user's persisted chat is untouched and
+// restored when the session ends.
+watch(
+  () => incognitoStore.active,
+  async (active) => {
+    // Detach any running turn (same semantics as switching chats).
+    if (isStreaming.value) {
+      handleNavigateAway()
+    }
+    quoting.clearPendingQuote()
+    historyStore.clear()
+
+    if (!active) {
+      // Session ended: restore the persisted chat. No toast here — the UI
+      // already reflects the change (toggle state + restored chat), so a
+      // confirmation toast would just be noise.
+      if (chatsStore.activeChatId) {
+        await historyStore.loadMessages(chatsStore.activeChatId)
+      }
+    }
+
+    await nextTick()
+    scrollToBottom(true)
+    setTimeout(() => {
+      chatInputRef.value?.textareaRef?.focus()
+    }, 100)
+  }
+)
+
 // Watch for active chat changes and load messages
 watch(
   () => chatsStore.activeChatId,
   async (newChatId, oldChatId) => {
+    // Picking a chat from the sidebar while incognito is active ends the
+    // session (the incognito transcript is meant to be discarded). The
+    // incognito watcher above restores nothing here — this watcher loads the
+    // newly selected chat below.
+    if (oldChatId !== newChatId && incognitoStore.active) {
+      void incognitoStore.endSession()
+    }
+
     // Switching chats DETACHES a running turn instead of cancelling it
     // (issue #1223): close the SSE connection and clear local streaming state,
     // but let the backend finish the turn in the background. Returning to the
@@ -834,8 +956,16 @@ async function generateChatTitleFromFirstMessage(firstMessage: string) {
   const userMessages = historyStore.messages.filter((m) => m.role === 'user')
   if (userMessages.length !== 1) return
 
-  // Generate title from first message (take first 50 chars)
+  // Generate title from first message (take first 50 chars). Strip a leading
+  // tool-command prefix ("/pic ", "/vid ", "/search ") first — `firstMessage`
+  // is the raw content sent to the backend, which keeps the prefix for
+  // pic/vid routing (see handleSendMessage), so without this the sidebar
+  // title showed e.g. "/pic Haus" instead of just "Haus".
   let title = firstMessage.trim()
+  const commandMatch = title.match(/^\/(search|pic|vid)\s+(.*)$/)
+  if (commandMatch) {
+    title = commandMatch[2].trim()
+  }
   if (title.length > 50) {
     title = title.substring(0, 47) + '...'
   }
@@ -1595,7 +1725,8 @@ const handleSendMessage = async (
   // conversation the user is interacting with is the most prominent one,
   // matching the backend's `updatedAt DESC` order on the next reload.
   // Mirrors the backend preview format (30 chars + ellipsis).
-  if (chatsStore.activeChatId) {
+  // Incognito: the turn belongs to no chat — never touch the sidebar.
+  if (chatsStore.activeChatId && !incognitoStore.active) {
     const previewSource = displayContent.trim()
     const preview =
       previewSource.length > 30 ? previewSource.slice(0, 30) + '…' : previewSource || undefined
@@ -1684,6 +1815,32 @@ function applyAssistantChatModelFooter(
       ...(nestedAudio ? { audio: nestedAudio } : {}),
     }
   }
+}
+
+/**
+ * Snapshot the in-memory incognito transcript for the backend: prior turns
+ * only (the current user message travels as `message`, the freshly created
+ * assistant placeholder is still streaming). The backend caps the payload at
+ * ~30 entries / 15k chars, so no client-side cap is needed.
+ */
+function buildIncognitoHistorySnapshot(): IncognitoHistoryEntry[] {
+  const entries: IncognitoHistoryEntry[] = []
+  for (const m of historyStore.messages) {
+    if (m.isStreaming) continue
+    const text = m.parts
+      .filter((p) => p.type === 'text' && p.content)
+      .map((p) => p.content as string)
+      .join('\n')
+      .trim()
+    if (!text) continue
+    entries.push({ role: m.role, content: text })
+  }
+  // Drop the current turn's user message (it was just appended by
+  // handleSendMessage and is sent separately).
+  if (entries.length > 0 && entries[entries.length - 1].role === 'user') {
+    entries.pop()
+  }
+  return entries
 }
 
 const streamAIResponse = async (
@@ -2160,16 +2317,26 @@ const streamAIResponse = async (
     } else {
       // Use real Backend API with SSE streaming
       const userId = authStore.user?.id || 1
-      const chatId = chatsStore.activeChatId
+      const incognito = incognitoStore.active
+      // Incognito turns belong to no chat — the backend processes them fully
+      // in-memory and gets the conversation context from the history payload.
+      const chatId = incognito ? undefined : (chatsStore.activeChatId ?? undefined)
 
-      if (!chatId) {
+      if (!chatId && !incognito) {
         console.error('No active chat selected')
         return
       }
 
+      // Snapshot the in-memory transcript for the backend (prior turns only:
+      // the current user message is sent separately, and the just-created
+      // assistant placeholder is still streaming).
+      const incognitoHistory: IncognitoHistoryEntry[] = incognito
+        ? buildIncognitoHistorySnapshot()
+        : []
+
       const trackId = Date.now()
       currentTrackId = trackId // Store for stop functionality
-      currentStreamingChatId = chatId // Store chatId for stop functionality
+      currentStreamingChatId = chatId ?? undefined // Store chatId for stop functionality
       let fullContent = ''
 
       const includeReasoning = options?.includeReasoning ?? false
@@ -2204,6 +2371,8 @@ const streamAIResponse = async (
         message: userMessage,
         trackId,
         chatId,
+        incognito,
+        history: incognitoHistory,
         includeReasoning,
         webSearch,
         modelId: finalModelId,
@@ -2581,6 +2750,11 @@ const streamAIResponse = async (
             }
           } else if (data.status === 'audio') {
             // Handle TTS audio response (voice reply)
+            // Incognito: the backend ships the ephemeral file id so the
+            // session-end cleanup can delete the synthesized audio.
+            if (incognito && typeof data.file_id === 'number') {
+              incognitoStore.registerFile(data.file_id)
+            }
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.url) {
               // Remove tts_loading part and replace with audio player
@@ -2789,6 +2963,11 @@ const streamAIResponse = async (
               message.parts = message.parts.filter((p) => p.type !== 'tts_loading')
               // ✨ NEW: Handle generated file from backend
               if (data.generatedFile) {
+                // Incognito: the generated document is ephemeral — track it so
+                // the session-end cleanup deletes it.
+                if (incognito) {
+                  incognitoStore.registerFile(data.generatedFile.id)
+                }
                 // Add file to message FIRST
                 if (!message.files) {
                   message.files = []
@@ -2948,12 +3127,17 @@ const streamAIResponse = async (
               console.error('❌ Could not find message with id:', messageId)
             }
 
-            // Generate chat title from first message
-            generateChatTitleFromFirstMessage(userMessage)
+            // Incognito: nothing was persisted — no chat title, no sidebar
+            // bump, no reconcile against a stored message, no memory-
+            // extraction poll (extraction is skipped server-side).
+            if (!incognito && chatId) {
+              // Generate chat title from first message
+              generateChatTitleFromFirstMessage(userMessage)
 
-            // Bump chat activity so the sidebar reflects the assistant message
-            // landing without waiting for a full reload.
-            chatsStore.bumpChatActivity(chatId)
+              // Bump chat activity so the sidebar reflects the assistant message
+              // landing without waiting for a full reload.
+              chatsStore.bumpChatActivity(chatId)
+            }
 
             historyStore.finishStreamingMessage(messageId)
 
@@ -2963,7 +3147,7 @@ const streamAIResponse = async (
             // accumulation missed (e.g. TTS audio in a multitask turn,
             // where the `audio` event is suppressed while task cards
             // stream) renders without a page reload.
-            if (data.messageId) {
+            if (data.messageId && !incognito) {
               void historyStore.reconcileMessage(messageId, data.messageId)
             }
 
@@ -2971,7 +3155,7 @@ const streamAIResponse = async (
             // extraction results. The worker writes to the source message
             // metadata; we pick it up here and surface via the same memory
             // store dispatch the legacy SSE events used.
-            if (data.messageId) {
+            if (data.messageId && !incognito) {
               schedulePostStreamMemoryPoll(data.messageId)
             }
 
@@ -3328,6 +3512,9 @@ const handleUserStop = async () => {
       // Guests can't persist messages via the auth-guarded /save-cancelled
       // endpoint (issue #1037). The cancellation notice is already shown
       // locally above, so we simply skip the backend save.
+    } else if (incognitoStore.active) {
+      // Incognito: nothing may be persisted — the partial answer stays only
+      // in the in-memory transcript.
     } else if (trackIdToSave && chatIdToSave) {
       // Save and update message with backend ID, pass current metadata
       const metadata = {

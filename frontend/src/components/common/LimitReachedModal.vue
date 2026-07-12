@@ -3,7 +3,7 @@
     <Transition name="modal">
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
         data-testid="modal-limit-reached"
       >
         <!-- Backdrop -->
@@ -88,7 +88,7 @@
 
           <!-- Benefits List -->
           <div
-            v-if="limitType === 'lifetime'"
+            v-if="limitType === 'lifetime' && purchaseAllowed"
             class="mb-6 space-y-2"
             data-testid="section-benefits"
           >
@@ -118,7 +118,7 @@
           <!-- Buttons -->
           <div class="flex flex-col gap-3">
             <!-- Top-up amount selector (monthly cost-budget exceeded) -->
-            <div v-if="topupAvailable" class="flex items-center justify-between gap-3">
+            <div v-if="showTopup" class="flex items-center justify-between gap-3">
               <span class="text-sm txt-secondary">
                 {{ $t('limitReached.topup.amountLabel', { step: topupStepEur }) }}
               </span>
@@ -150,7 +150,7 @@
 
             <!-- Top-up Button (monthly cost-budget exceeded) -->
             <button
-              v-if="topupAvailable"
+              v-if="showTopup"
               class="btn-primary w-full px-6 py-3 rounded-lg font-semibold text-base flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="topupLoading"
               data-testid="btn-topup"
@@ -186,9 +186,10 @@
 
             <!-- Upgrade Button -->
             <button
+              v-if="purchaseAllowed"
               class="w-full px-6 py-3 rounded-lg font-semibold text-base flex items-center justify-center gap-2 group"
               :class="
-                topupAvailable
+                showTopup
                   ? 'surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10'
                   : 'btn-primary'
               "
@@ -254,6 +255,8 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { subscriptionApi } from '@/services/api/subscriptionApi'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -290,6 +293,17 @@ const TOPUP_MAX_STEPS = 50
 const topupLoading = ref(false)
 const topupError = ref<string | null>(null)
 const topupSteps = ref(1)
+
+// MOBILE-APP SEAM (Epic 9.4): the top-up buys budget via the Stripe web
+// checkout, which Apple/Google forbid for digital goods inside the app. Hide it
+// in the native shell (no IAP consumable is wired yet); the upgrade CTA still
+// routes to the in-app subscription view, which gates itself for native.
+const isNative = isNativeApp()
+const showTopup = computed(() => props.topupAvailable && !isNative)
+
+// On a custom server in the native app there is no purchase path at all —
+// the modal only informs about the limit, without upgrade steering.
+const purchaseAllowed = isPurchaseAllowed()
 
 const topupTotalEur = computed(() => topupSteps.value * props.topupStepEur)
 

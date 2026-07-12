@@ -108,6 +108,46 @@ class AdminSubscriptionsServiceTest extends TestCase
         self::assertFalse($result['active']);
     }
 
+    public function testUpdateDisplayPricesAndCurrency(): void
+    {
+        $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
+
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
+        $this->em->expects(self::once())->method('flush');
+
+        $result = $this->service->updateSubscription(1, [
+            'priceMonthly' => 24.5,
+            'priceYearly' => 245.0,
+            'currency' => 'usd',
+        ]);
+
+        self::assertSame('24.50', $result['priceMonthly']);
+        self::assertSame('245.00', $result['priceYearly']);
+        self::assertSame('USD', $result['currency'], 'Currency is normalized to uppercase ISO 4217');
+    }
+
+    public function testUpdateNegativePriceMonthlyThrows(): void
+    {
+        $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('priceMonthly must be a number >= 0');
+
+        $this->service->updateSubscription(1, ['priceMonthly' => -1.0]);
+    }
+
+    public function testUpdateInvalidCurrencyThrows(): void
+    {
+        $sub = $this->createRealSubscription(1, 'Pro', 'PRO', '19.99', '199.00', true, '15.00', '150.00');
+        $this->subscriptionRepository->expects(self::any())->method('find')->with(1)->willReturn($sub);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('currency must be a 3-letter ISO 4217 code');
+
+        $this->service->updateSubscription(1, ['currency' => 'EURO']);
+    }
+
     public function testUpdateNonExistentThrows(): void
     {
         $this->subscriptionRepository->expects(self::any())->method('find')->with(999)->willReturn(null);

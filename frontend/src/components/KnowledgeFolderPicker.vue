@@ -76,6 +76,7 @@ import {
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 
 interface Props {
   /** Selected knowledge-folder (RAG group) key; '' = none. */
@@ -100,6 +101,7 @@ const selectedLabel = computed(() =>
 )
 
 const toggleOpen = () => {
+  triggerHapticImpact('light')
   isOpen.value = !isOpen.value
 }
 

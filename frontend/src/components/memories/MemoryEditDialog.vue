@@ -100,10 +100,10 @@ function handleBackdropClick(event: MouseEvent) {
 <template>
   <Teleport to="#app">
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
       @click="handleBackdropClick"
     >
-      <div class="surface-elevated w-full max-w-md p-6 max-h-[90vh] overflow-y-auto scroll-thin">
+      <div class="modal-panel surface-elevated w-full max-w-md p-6 overflow-y-auto scroll-thin">
         <!-- Header -->
         <div class="flex items-center justify-between mb-6">
           <h2 class="text-xl font-bold txt-primary">

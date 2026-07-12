@@ -28,11 +28,44 @@ final readonly class IapPricingService
     private const PLACEHOLDER_TEAM = 'com.synaplan.app.team.monthly';
     private const PLACEHOLDER_BUSINESS = 'com.synaplan.app.business.monthly';
 
+    /** Default store commission passed on to app buyers (Apple/Google ≈30 %). */
+    private const DEFAULT_STORE_MARKUP_PERCENT = 30.0;
+
     public function __construct(
         private string $iapProductPro = self::PLACEHOLDER_PRO,
         private string $iapProductTeam = self::PLACEHOLDER_TEAM,
         private string $iapProductBusiness = self::PLACEHOLDER_BUSINESS,
+        private float $storeMarkupPercent = self::DEFAULT_STORE_MARKUP_PERCENT,
     ) {
+    }
+
+    /**
+     * The price a tier costs when bought IN THE APP: the operator's web price
+     * plus the configured store-commission markup (IAP_PRICE_MARKUP_PERCENT),
+     * snapped to the nearest store price point (x.99 — Apple/Google only allow
+     * fixed price points). Used as the app's display fallback and as the
+     * reference when creating the store products — the store's own localized
+     * price always wins in the purchase sheet.
+     */
+    public function appPrice(float $webPrice): float
+    {
+        $markup = max(0.0, $this->storeMarkupPercent);
+        $raw = $webPrice * (1 + $markup / 100);
+
+        // Nearest x.99 price point; never undercut the operator's web price
+        // (the app must not advertise below web — anti-steering).
+        $pricePoint = round($raw + 0.01) - 0.01;
+        if ($pricePoint < $webPrice) {
+            $pricePoint += 1.0;
+        }
+
+        return round($pricePoint, 2);
+    }
+
+    /** The configured store-commission markup in percent (never negative). */
+    public function storeMarkupPercent(): float
+    {
+        return max(0.0, $this->storeMarkupPercent);
     }
 
     /**

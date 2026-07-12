@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
 use App\Service\BillingService;
 use App\Service\IapPricingService;
@@ -40,9 +41,57 @@ class SubscriptionController extends AbstractController
     /** Max number of EUR-100 steps in a single top-up checkout. */
     private const TOPUP_MAX_STEPS = 50;
 
+    /**
+     * Reference plan catalogue. Display name and price act as FALLBACKS for
+     * installations whose BSUBSCRIPTIONS rows don't exist yet (the seeder
+     * inserts them on `app:seed`); once a row exists, the operator-configured
+     * DB values win. Feature bullets stay code-owned.
+     *
+     * @var array<string, array{name: string, price: float, features: list<string>}>
+     */
+    private const PLAN_CATALOGUE = [
+        'PRO' => [
+            'name' => 'Pro',
+            'price' => 19.95,
+            'features' => [
+                'Unlimited Messages',
+                '100 Images/Month',
+                'Advanced AI Models',
+                'Priority Support',
+                '5GB Storage',
+            ],
+        ],
+        'TEAM' => [
+            'name' => 'Team',
+            'price' => 49.95,
+            'features' => [
+                'Everything in Pro',
+                '500 Images/Month',
+                'Team Collaboration',
+                'Custom Prompts',
+                '20GB Storage',
+                'API Access',
+            ],
+        ],
+        'BUSINESS' => [
+            'name' => 'Business',
+            'price' => 99.95,
+            'features' => [
+                'Everything in Team',
+                'Unlimited Images',
+                'Unlimited Video Generation',
+                'White-label Widgets',
+                '100GB Storage',
+                'Dedicated Support',
+                'SLA Guarantee',
+            ],
+        ],
+    ];
+
     public function __construct(
         private EntityManagerInterface $em,
         private UserRepository $userRepository,
+        private SubscriptionRepository $subscriptionRepository,
         private LoggerInterface $logger,
         private CacheItemPoolInterface $cache,
         private string $stripeSecretKey,
@@ -73,82 +122,96 @@ class SubscriptionController extends AbstractController
         response: 200,
         description: 'List of subscription plans',
         content: new OA\JsonContent(
-            type: 'array',
-            items: new OA\Items(
-                properties: [
-                    new OA\Property(property: 'id', type: 'string'),
-                    new OA\Property(property: 'name', type: 'string'),
-                    new OA\Property(property: 'stripePriceId', type: 'string', nullable: true),
-                    new OA\Property(
-                        property: 'iapProductId',
-                        type: 'string',
-                        nullable: true,
-                        description: 'Native in-app purchase product ID the app buys for this tier (Epic 5.5).',
-                    ),
-                    new OA\Property(property: 'price', type: 'number'),
-                    new OA\Property(property: 'currency', type: 'string'),
-                    new OA\Property(property: 'interval', type: 'string'),
-                    new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string')),
-                ]
-            )
+            required: ['plans', 'stripeConfigured', 'iapConfigured'],
+            properties: [
+                new OA\Property(
+                    property: 'plans',
+                    type: 'array',
+                    items: new OA\Items(
+                        required: ['id', 'name', 'price', 'appPrice', 'currency', 'interval', 'features'],
+                        properties: [
+                            new OA\Property(property: 'id', type: 'string', example: 'PRO'),
+                            new OA\Property(property: 'name', type: 'string', example: 'Pro'),
+                            new OA\Property(property: 'stripePriceId', type: 'string', nullable: true),
+                            new OA\Property(
+                                property: 'iapProductId',
+                                type: 'string',
+                                nullable: true,
+                                description: 'Native in-app purchase product ID the app buys for this tier (Epic 5.5).',
+                            ),
+                            new OA\Property(
+                                property: 'price',
+                                type: 'number',
+                                example: 19.95,
+                                description: 'Operator-configured display price from BSUBSCRIPTIONS '
+                                    .'(reference default when the plan row does not exist yet).',
+                            ),
+                            new OA\Property(
+                                property: 'appPrice',
+                                type: 'number',
+                                example: 25.99,
+                                description: 'Price when bought in the mobile app: the web price plus '
+                                    .'the store-commission markup (IAP_PRICE_MARKUP_PERCENT), snapped to '
+                                    .'the nearest x.99 store price point. The native app shows this as '
+                                    .'its fallback; the store\'s own localized price wins once loaded. '
+                                    .'The web NEVER shows this.',
+                            ),
+                            new OA\Property(property: 'currency', type: 'string', example: 'EUR'),
+                            new OA\Property(property: 'interval', type: 'string', example: 'month'),
+                            new OA\Property(
+                                property: 'features',
+                                type: 'array',
+                                items: new OA\Items(type: 'string')
+                            ),
+                        ]
+                    )
+                ),
+                new OA\Property(property: 'stripeConfigured', type: 'boolean'),
+                new OA\Property(
+                    property: 'iapConfigured',
+                    type: 'boolean',
+                    description: 'Whether native in-app purchase products are configured on this server.',
+                ),
+            ]
         )
     )]
     public function getPlans(): JsonResponse
     {
-        $plans = [
-            [
-                'id' => 'PRO',
-                'name' => 'Pro',
-                'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePricePro : null,
-                // MOBILE-APP SEAM (Epic 5.5): the store product the app buys for this tier.
-                'iapProductId' => $this->iapPricingService->productIdForTier('PRO'),
-                'price' => 19.95,
-                'currency' => 'EUR',
-                'interval' => 'month',
-                'features' => [
-                    'Unlimited Messages',
-                    '100 Images/Month',
-                    'Advanced AI Models',
-                    'Priority Support',
-                    '5GB Storage',
-                ],
-            ],
-            [
-                'id' => 'TEAM',
-                'name' => 'Team',
-                'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePriceTeam : null,
-                'iapProductId' => $this->iapPricingService->productIdForTier('TEAM'),
-                'price' => 49.95,
-                'currency' => 'EUR',
-                'interval' => 'month',
-                'features' => [
-                    'Everything in Pro',
-                    '500 Images/Month',
-                    'Team Collaboration',
-                    'Custom Prompts',
-                    '20GB Storage',
-                    'API Access',
-                ],
-            ],
-            [
-                'id' => 'BUSINESS',
-                'name' => 'Business',
-                'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePriceBusiness : null,
-                'iapProductId' => $this->iapPricingService->productIdForTier('BUSINESS'),
-                'price' => 99.95,
-                'currency' => 'EUR',
-                'interval' => 'month',
-                'features' => [
-                    'Everything in Team',
-                    'Unlimited Images',
-                    'Unlimited Video Generation',
-                    'White-label Widgets',
-                    '100GB Storage',
-                    'Dedicated Support',
-                    'SLA Guarantee',
-                ],
-            ],
+        $stripePriceIds = [
+            'PRO' => $this->stripePricePro,
+            'TEAM' => $this->stripePriceTeam,
+            'BUSINESS' => $this->stripePriceBusiness,
         ];
+
+        $plans = [];
+        foreach (self::PLAN_CATALOGUE as $tier => $defaults) {
+            // Operator-configured display price/name from BSUBSCRIPTIONS wins;
+            // the code catalogue is only the fallback for installs whose plan
+            // rows don't exist yet (seeded on `app:seed`). A row deactivated by
+            // the operator hides the plan from the public catalogue entirely.
+            $subscription = $this->subscriptionRepository->findByLevelAnyState($tier);
+            if (null !== $subscription && !$subscription->isActive()) {
+                continue;
+            }
+
+            $price = null !== $subscription ? (float) $subscription->getPriceMonthly() : $defaults['price'];
+
+            $plans[] = [
+                'id' => $tier,
+                'name' => null !== $subscription ? $subscription->getName() : $defaults['name'],
+                'stripePriceId' => $this->billingService->isEnabled() ? $stripePriceIds[$tier] : null,
+                // MOBILE-APP SEAM (Epic 5.5): the store product the app buys for this tier.
+                'iapProductId' => $this->iapPricingService->productIdForTier($tier),
+                'price' => $price,
+                // MOBILE-APP SEAM: in-app price = web price + store-commission
+                // markup. Shown ONLY by the native app (store price wins once
+                // its catalogue is loaded); the web always shows `price`.
+                'appPrice' => $this->iapPricingService->appPrice($price),
+                'currency' => null !== $subscription ? $subscription->getCurrency() : 'EUR',
+                'interval' => 'month',
+                'features' => $defaults['features'],
+            ];
+        }
 
         return $this->json([
             'plans' => $plans,

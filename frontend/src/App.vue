@@ -49,11 +49,18 @@ import { useGoogleTag } from '@/composables/useGoogleTag'
 import { initNativeLifecycle } from '@/services/nativeLifecycle'
 import { initOtaUpdates } from '@/services/otaUpdates'
 import { initBiometricLock } from '@/composables/useBiometricLock'
+import { initNativeStatusBar } from '@/services/nativeStatusBar'
+import { initNativeBackButton } from '@/services/nativeBackButton'
+import { initKeyboardScrollAssist } from '@/services/keyboardScrollAssist'
+import { isNativeApp } from '@/services/api/nativeRuntime'
 import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
 useTheme()
 
-if ('serviceWorker' in navigator) {
+// The native shell uses Capgo as the single web-asset version authority. A
+// service worker inside the WebView could serve stale files across an OTA
+// activation and defeat Capgo's health check/rollback guarantees.
+if (!isNativeApp() && 'serviceWorker' in navigator) {
   // The new global unhandledrejection handler (installGlobalErrorHandlers)
   // would otherwise turn a missing /sw.js or a registration failure into a
   // full-screen ErrorView for end users. SW failures are non-fatal — log
@@ -113,6 +120,15 @@ void initOtaUpdates()
 // Native shell only: optional biometric app lock (Epic 7.2). No-op on web or
 // when the user hasn't enabled it.
 void initBiometricLock()
+
+// Native shell only: keep the OS status bar themed with the app (Epic 9.5) and
+// give Android a sane hardware back-button behavior. Both no-op on web.
+void initNativeStatusBar()
+void initNativeBackButton()
+// Lift any focused input above the soft keyboard (Keyboard.resize:'none' means
+// the WebView does not shrink, so ordinary form/dialog fields would otherwise
+// stay hidden behind it). No-op on web.
+initKeyboardScrollAssist()
 
 // Update page title when language changes
 const route = useRoute()

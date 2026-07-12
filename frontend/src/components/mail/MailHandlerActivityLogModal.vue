@@ -173,11 +173,11 @@ const detailsByEntryId = computed<Record<number, Array<{ key: string; value: str
     <Transition name="fade">
       <div
         v-if="isOpen"
-        class="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-2 sm:p-4"
+        class="modal-overlay fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-2 sm:p-4"
         @click.self="emit('close')"
       >
         <div
-          class="surface-card rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+          class="modal-panel surface-card rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col"
           @click.stop
         >
           <!-- Header -->

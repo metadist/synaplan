@@ -21,6 +21,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUSERID', 'BVECTORSTATE'], name: 'idx_file_user_vstate')]
 #[ORM\Index(columns: ['BUSERID', 'BINCOMING'], name: 'idx_file_user_incoming')]
 #[ORM\Index(columns: ['BUSERID', 'BCREATEDAT'], name: 'idx_file_user_created')]
+#[ORM\Index(columns: ['BEPHEMERAL', 'BCREATEDAT'], name: 'idx_file_ephemeral_created')]
 class File
 {
     /**
@@ -94,7 +95,7 @@ class File
 
     /**
      * File types (extensions / handler kinds) that are media and therefore not
-     * RAG documents ÿÿÿ their vector state is {@see self::VECTOR_STATE_NOT_APPLICABLE}.
+     * RAG documents - their vector state is {@see self::VECTOR_STATE_NOT_APPLICABLE}.
      */
     public const MEDIA_TYPES = [
         'image', 'video', 'audio',
@@ -240,6 +241,15 @@ class File
      */
     #[ORM\Column(name: 'BTHUMBPATH', length: 255, nullable: true)]
     private ?string $thumbPath = null;
+
+    /**
+     * 1 for files created during an incognito chat session: they are excluded
+     * from all file listings, never vectorized, and deleted automatically ?
+     * by the frontend on session end (best effort) and by the
+     * `app:files:reap-ephemeral` command as a safety net.
+     */
+    #[ORM\Column(name: 'BEPHEMERAL', type: 'boolean', options: ['default' => 0])]
+    private bool $ephemeral = false;
 
     #[ORM\Column(name: 'BCREATEDAT', type: 'bigint')]
     private int $createdAt;
@@ -555,6 +565,18 @@ class File
     {
         $thumbPath = null !== $thumbPath ? trim($thumbPath) : null;
         $this->thumbPath = ('' === $thumbPath) ? null : $thumbPath;
+
+        return $this;
+    }
+
+    public function isEphemeral(): bool
+    {
+        return $this->ephemeral;
+    }
+
+    public function setEphemeral(bool $ephemeral): self
+    {
+        $this->ephemeral = $ephemeral;
 
         return $this;
     }

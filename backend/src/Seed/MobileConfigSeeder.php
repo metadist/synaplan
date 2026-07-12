@@ -27,6 +27,7 @@ final readonly class MobileConfigSeeder
         $g = MobileVersionService::GROUP;
         $rows = [
             ['ownerId' => 0, 'group' => $g, 'setting' => MobileVersionService::KEY_MIN_APP_VERSION, 'value' => MobileVersionService::DEFAULT_MIN_APP_VERSION],
+            ['ownerId' => 0, 'group' => $g, 'setting' => MobileVersionService::KEY_UPDATE_ENFORCE_AFTER, 'value' => MobileVersionService::DEFAULT_UPDATE_ENFORCE_AFTER],
             ['ownerId' => 0, 'group' => $g, 'setting' => MobileVersionService::KEY_IOS_APP_URL,     'value' => MobileVersionService::DEFAULT_IOS_APP_URL],
             ['ownerId' => 0, 'group' => $g, 'setting' => MobileVersionService::KEY_ANDROID_APP_URL, 'value' => MobileVersionService::DEFAULT_ANDROID_APP_URL],
         ];

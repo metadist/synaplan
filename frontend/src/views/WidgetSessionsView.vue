@@ -831,7 +831,7 @@
                     icon="heroicons:arrow-path"
                     class="w-5 h-5 text-white animate-spin"
                   />
-                  <Icon v-else icon="heroicons:paper-airplane" class="w-5 h-5 text-white" />
+                  <Icon v-else icon="heroicons:arrow-up" class="w-5 h-5 text-white" />
                 </button>
               </form>
             </div>

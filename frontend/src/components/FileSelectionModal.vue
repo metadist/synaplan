@@ -3,12 +3,12 @@
     <Transition name="modal">
       <div
         v-if="visible"
-        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50"
+        class="modal-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50"
         data-testid="modal-file-selection-root"
         @click.self="emit('close')"
       >
         <div
-          class="w-full sm:max-w-4xl max-h-[95dvh] sm:max-h-[80vh] overflow-hidden flex flex-col rounded-t-2xl sm:rounded-xl shadow-2xl bg-white dark:bg-[#0f1729] border border-light-border/20 dark:border-dark-border/20"
+          class="modal-panel w-full sm:max-w-4xl overflow-hidden flex flex-col rounded-t-2xl sm:rounded-xl shadow-2xl bg-white dark:bg-[#0f1729] border border-light-border/20 dark:border-dark-border/20"
           data-testid="modal-file-selection"
         >
           <!-- Header -->

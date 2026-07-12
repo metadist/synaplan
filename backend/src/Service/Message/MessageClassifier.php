@@ -311,8 +311,14 @@ final readonly class MessageClassifier
      * Check for prompt override (Again function)
      * Returns prompt ID if set, null otherwise.
      */
-    private function checkPromptOverride(int $messageId): ?string
+    private function checkPromptOverride(?int $messageId): ?string
     {
+        // Transient (incognito) messages are never persisted, so no PROMPTID
+        // meta can exist for them — nothing to override.
+        if (null === $messageId) {
+            return null;
+        }
+
         $meta = $this->messageMetaRepository->findOneBy([
             'messageId' => $messageId,
             'metaKey' => 'PROMPTID',
@@ -329,8 +335,14 @@ final readonly class MessageClassifier
      * Check for model override (Again function with specific model)
      * Returns model ID if set, null otherwise.
      */
-    private function checkModelOverride(int $messageId): ?int
+    private function checkModelOverride(?int $messageId): ?int
     {
+        // Transient (incognito) messages are never persisted, so no MODEL_ID
+        // meta can exist for them — nothing to override.
+        if (null === $messageId) {
+            return null;
+        }
+
         $meta = $this->messageMetaRepository->findOneBy([
             'messageId' => $messageId,
             'metaKey' => 'MODEL_ID',

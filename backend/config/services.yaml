@@ -96,6 +96,8 @@ parameters:
     env(IAP_PRODUCT_PRO): 'com.synaplan.app.pro.monthly'
     env(IAP_PRODUCT_TEAM): 'com.synaplan.app.team.monthly'
     env(IAP_PRODUCT_BUSINESS): 'com.synaplan.app.business.monthly'
+    # Store commission passed on to app buyers (percent on top of the web price).
+    env(IAP_PRICE_MARKUP_PERCENT): '30'
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
     env(CLOUDFLARE_ACCOUNT_ID): ''
@@ -570,23 +572,28 @@ services:
             $iapProductPro: '%env(IAP_PRODUCT_PRO)%'
             $iapProductTeam: '%env(IAP_PRODUCT_TEAM)%'
             $iapProductBusiness: '%env(IAP_PRODUCT_BUSINESS)%'
+            $storeMarkupPercent: '%env(float:IAP_PRICE_MARKUP_PERCENT)%'
 
     # Native IAP server-side receipt validation (Epic 5.4). Both verifiers are
     # no-ops until store credentials are configured (isConfigured() === false),
     # so web-only / open-source deployments keep working.
+    # NOTE: string args use `string:default::` — the `default::` processor alone
+    # yields NULL for unset OR EMPTY env vars (e.g. `IAP_GOOGLE_PACKAGE_NAME=`),
+    # which crashes the non-nullable constructors; `string:` normalizes to ''.
     App\Service\Iap\AppleStoreKitVerifier:
         arguments:
-            $bundleId: '%env(default::IAP_APPLE_BUNDLE_ID)%'
+            $bundleId: '%env(string:default::IAP_APPLE_BUNDLE_ID)%'
             $appAppleId: '%env(default::int:IAP_APPLE_APP_APPLE_ID)%'
-            $environment: '%env(default::string:IAP_APPLE_ENVIRONMENT)%'
-            $rootCertsDir: '%env(default::IAP_APPLE_ROOT_CERTS_DIR)%'
+            $environment: '%env(string:default::IAP_APPLE_ENVIRONMENT)%'
+            $rootCertsDir: '%env(string:default::IAP_APPLE_ROOT_CERTS_DIR)%'
+            $projectDir: '%kernel.project_dir%'
     App\Service\Iap\AppleReceiptVerifierInterface:
         alias: App\Service\Iap\AppleStoreKitVerifier
 
     App\Service\Iap\GooglePlayVerifier:
         arguments:
-            $packageName: '%env(default::IAP_GOOGLE_PACKAGE_NAME)%'
-            $serviceAccountJsonPath: '%env(default::IAP_GOOGLE_SERVICE_ACCOUNT_JSON)%'
+            $packageName: '%env(string:default::IAP_GOOGLE_PACKAGE_NAME)%'
+            $serviceAccountJsonPath: '%env(string:default::IAP_GOOGLE_SERVICE_ACCOUNT_JSON)%'
     App\Service\Iap\GooglePlayVerifierInterface:
         alias: App\Service\Iap\GooglePlayVerifier
 

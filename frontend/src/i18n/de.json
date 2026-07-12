@@ -1,4 +1,15 @@
 {
+  "incognito": {
+    "toggleStart": "Inkognito-Chat starten",
+    "toggleEnd": "Inkognito-Chat beenden",
+    "bannerTitle": "Inkognito-Chat",
+    "bannerText": "Diese Unterhaltung wird nicht gespeichert. Deine gespeicherten Erinnerungen und dein Wissen werden weiter genutzt, aber nichts Neues gemerkt.",
+    "emptyTitle": "Inkognito-Chat",
+    "emptyHint": "Nachrichten und Dateien aus dieser Sitzung werden nicht gespeichert und verschwinden, wenn du sie beendest.",
+    "endConfirmTitle": "Inkognito-Chat beenden?",
+    "endConfirmMessage": "Die Unterhaltung wird endgültig verworfen und Dateien aus dieser Sitzung werden gelöscht.",
+    "endConfirmButton": "Beenden und verwerfen"
+  },
   "jobs": {
     "kind": {
       "video": "Video",
@@ -70,6 +81,8 @@
     "widgetDetail": "Widget-Detail",
     "liveSupport": "Live-Support",
     "addinConnect": "Outlook-Add-in verbinden",
+    "accountDeletion": "Konto löschen",
+    "onboarding": "Willkommen",
     "mcpServers": "MCP-Server"
   },
   "addinConnect": {
@@ -91,6 +104,7 @@
     "errorIssuanceFailed": "Synaplan konnte für dieses Konto keinen API-Schlüssel ausstellen."
   },
   "welcome": "Willkommen bei Synaplan",
+  "welcomeUser": "Willkommen, {name}",
   "examplePrompts": {
     "heading": "Probiere eines davon",
     "items": {
@@ -192,7 +206,8 @@
       "users": "Benutzer",
       "prompts": "Prompts",
       "usage": "Nutzung",
-      "subscriptions": "Abonnements"
+      "subscriptions": "Abonnements",
+      "appServer": "App-Server"
     },
     "overview": {
       "totalUsers": "Gesamtbenutzer",
@@ -307,12 +322,13 @@
       "subscriptionOverview": "Abo-Übersicht"
     },
     "subscriptions": {
-      "title": "Abo-Budget-Verwaltung",
-      "description": "Kostenbudgets und Aktivstatus für jede Abo-Stufe verwalten. Preise sind schreibgeschützt und werden über Stripe verwaltet.",
+      "title": "Abo-Pläne",
+      "description": "Preise, Kostenbudgets und Aktivstatus für jede Abo-Stufe verwalten. Die Preise werden Nutzern im Onboarding und auf der Abo-Seite angezeigt.",
       "level": "Stufe",
       "name": "Name",
       "priceMonthly": "Preis/Monat",
       "priceYearly": "Preis/Jahr",
+      "currency": "Währung",
       "budgetMonthly": "Budget/Monat",
       "budgetYearly": "Budget/Jahr",
       "active": "Aktiv",
@@ -320,11 +336,11 @@
       "edit": "Bearbeiten",
       "save": "Speichern",
       "cancel": "Abbrechen",
-      "saveSuccess": "Budget erfolgreich aktualisiert",
-      "saveError": "Budget-Aktualisierung fehlgeschlagen",
+      "saveSuccess": "Plan erfolgreich aktualisiert",
+      "saveError": "Plan-Aktualisierung fehlgeschlagen",
       "loadError": "Abonnements konnten nicht geladen werden",
       "noSubscriptions": "Keine Abo-Pläne gefunden. Erstellen Sie zuerst Abo-Pläne in der Datenbank.",
-      "budgetHint": "Das Budget definiert die maximalen Token-Kosten (in EUR) pro Abrechnungszeitraum. Setzen Sie es auf 0 für unbegrenzte Nutzung. Preise sind nur zur Anzeige und werden über Stripe verwaltet."
+      "budgetHint": "Das Budget definiert die maximalen Token-Kosten (in EUR) pro Abrechnungszeitraum. Setzen Sie es auf 0 für unbegrenzte Nutzung. Die Preise sind die öffentlichen Anzeigepreise; Käufe in der Mobil-App nutzen den App-Store-Preis."
     },
     "config": {
       "title": "Systemkonfiguration",
@@ -395,7 +411,8 @@
     "adminFeatureStatus": "Feature-Status",
     "adminSystemConfig": "Systemkonfiguration",
     "more": "Mehr",
-    "moreDescription": "Weitere Bereiche und Konto"
+    "moreDescription": "Weitere Bereiche und Konto",
+    "menu": "Menü"
   },
   "chatInput": {
     "attach": "Anhängen",
@@ -454,6 +471,9 @@
       "imageGenDesc": "Bilder aus Text erstellen",
       "videoGen": "Videoerzeugung",
       "videoGenDesc": "Videos aus Text erstellen",
+      "badgeSearch": "Suche",
+      "badgeImage": "Bild",
+      "badgeVideo": "Video",
       "thinkingDesc": "Zeigt die Denkschritte des Modells vor der Antwort",
       "thinkingUnsupported": "Das gewählte Modell unterstützt kein Reasoning",
       "summarizer": "Zusammenfasser",
@@ -744,6 +764,34 @@
     "deleteSuccess": "{count} Chat(s) erfolgreich gelöscht",
     "deleteFailed": "Chats konnten nicht gelöscht werden"
   },
+  "native": {
+    "exitHint": "Zum Beenden erneut „Zurück“ drücken"
+  },
+  "accountDeletion": {
+    "title": "Dein {brand}-Konto löschen",
+    "intro": "Du kannst dein Konto und alle zugehörigen Daten jederzeit dauerhaft löschen. So funktioniert es und das wird entfernt.",
+    "howTitle": "So löschst du dein Konto",
+    "steps": [
+      "Melde dich in deinem Konto an.",
+      "Öffne dein Profil und scrolle zum Bereich „Gefahrenzone“.",
+      "Klicke auf „Konto löschen“ und bestätige mit deinem Passwort (oder tippe bei Social-Login-Konten DELETE).",
+      "Dein Konto und deine Daten werden sofort gelöscht und können nicht wiederhergestellt werden."
+    ],
+    "goToProfile": "Zum Profil",
+    "signIn": "Anmelden",
+    "dataTitle": "Was gelöscht wird",
+    "dataItems": [
+      "Alle deine Nachrichten und Chats",
+      "Alle hochgeladenen Dateien und Wissensdatenbank-Dokumente",
+      "Deine persönlichen Daten, Einstellungen und Erinnerungen",
+      "API-Schlüssel, Widgets und Zugangsdaten"
+    ],
+    "retention": "Die Löschung ist endgültig und wirkt sofort. Backups mit verbliebenen Daten werden innerhalb von 30 Tagen rotiert. Gesetzlich aufbewahrungspflichtige Daten (z. B. Rechnungen) werden nur so lange aufbewahrt, wie es das Gesetz verlangt.",
+    "noAccessTitle": "Keine Anmeldung möglich?",
+    "noAccessDesc": "Wenn du keinen Zugriff mehr auf dein Konto hast, kontaktiere uns über unsere Website und wir bearbeiten deine Löschanfrage.",
+    "visitWebsite": "Website besuchen",
+    "privacyPolicy": "Datenschutzerklärung"
+  },
   "notFound": {
     "title": "Seite nicht gefunden",
     "description": "Die gesuchte Seite existiert nicht oder wurde verschoben. Lass uns dich zurück auf den richtigen Weg bringen.",
@@ -907,7 +955,8 @@
     "legal": {
       "title": "Datenschutz & AGB",
       "privacy": "Datenschutzerklärung",
-      "terms": "Nutzungsbedingungen"
+      "terms": "Nutzungsbedingungen",
+      "accountDeletion": "Konto löschen"
     },
     "dangerZone": {
       "title": "Gefahrenzone",
@@ -1918,8 +1967,17 @@
     },
     "native": {
       "purchaseTitle": "In-App-Kauf",
-      "purchaseComingSoon": "In-App-Käufe für den {plan}-Tarif werden gerade eingerichtet und stehen in einem zukünftigen App-Update zur Verfügung.",
-      "manageInStore": "Abonnement im Store verwalten"
+      "purchaseUnavailable": "In-App-Käufe sind auf diesem Server noch nicht verfügbar. Bitte versuche es später erneut.",
+      "purchaseSuccess": "Dein Abonnement ist jetzt aktiv. Vielen Dank!",
+      "purchasePending": "Dein Kauf wartet auf eine Genehmigung (z. B. „Kaufen anfragen“). Dein Abonnement wird nach der Genehmigung automatisch aktiviert.",
+      "purchaseConflict": "Dieser Kauf ist bereits mit einem anderen Konto oder einem bestehenden Abonnement verknüpft. Bitte prüfe dein Store-Konto oder kontaktiere den Support.",
+      "purchaseFailed": "Der Kauf konnte nicht abgeschlossen werden. Dir wurde nichts berechnet. Bitte versuche es erneut.",
+      "manageInStore": "Im Store verwalten",
+      "restoreButton": "Käufe wiederherstellen",
+      "restoreTitle": "Käufe wiederherstellen",
+      "restoreDone": "Käufe wiederhergestellt – dein Abonnement ist aktiv.",
+      "restoreNone": "Es wurde kein aktives Abonnement zum Wiederherstellen gefunden.",
+      "storeNote": "Käufe und Abonnements werden über den App Store oder Google Play abgewickelt und verwaltet."
     },
     "plans": {
       "pro": "Pro",
@@ -3890,6 +3948,91 @@
     "subtitle": "Diese App-Version wird nicht mehr unterstützt. Bitte aktualisiere auf die neueste Version, um fortzufahren.",
     "minVersion": "Mindestens erforderliche Version: {version}",
     "cta": "Jetzt aktualisieren"
+  },
+  "nativeServer": {
+    "changeServer": "Server ändern",
+    "appServer": {
+      "title": "App-Server",
+      "description": "Lege fest, mit welchem Synaplan-Server sich diese App verbindet. Ändere das nur, wenn du einen eigenen Synaplan-Server betreibst.",
+      "unavailable": "Die Server-Einstellung ist in diesem Build nicht verfügbar.",
+      "currentLabel": "Aktueller Server",
+      "defaultLabel": "Standard",
+      "inputLabel": "Server-URL",
+      "hint": "Beim Speichern wirst du von jedem Server abgemeldet und die App lädt neu – du musst dich danach erneut einloggen.",
+      "save": "Testen & speichern",
+      "testing": "Server wird geprüft …",
+      "reset": "Auf Standard zurücksetzen",
+      "savedSigningOut": "Verbunden. Du wirst abgemeldet …",
+      "invalidUrl": "Bitte gib eine gültige URL ein (z. B. https://web.synaplan.com).",
+      "unreachable": "Server nicht erreichbar. Bitte prüfe die Adresse.",
+      "resetConfirmTitle": "Server zurücksetzen?",
+      "resetConfirmMessage": "Die App meldet dich ab, verbindet sich wieder mit {server} und lädt neu.",
+      "resetConfirmAction": "Zurücksetzen"
+    }
+  },
+  "onboarding": {
+    "skip": "Überspringen",
+    "back": "Zurück",
+    "next": "Weiter",
+    "getStarted": "Los geht's",
+    "stepLabel": "Schritt {step} von {total}",
+    "welcome": {
+      "title": "Willkommen bei",
+      "subtitle": "Alle KIs, alle Funktionen an einem Platz",
+      "pillServer": "Eigener Server",
+      "pillRag": "RAG",
+      "pillWidget": "Chat-Widget"
+    },
+    "rag": {
+      "title": "Antworten aus deinen Dokumenten",
+      "body": "Mit RAG antwortet der KI-Assistent auf Basis deiner eigenen Dateien, nicht nur aus seinem allgemeinen Training.",
+      "point1": "Dokumente hochladen und Fragen zu ihrem Inhalt stellen",
+      "point2": "Antworten nennen die Quellen, aus denen sie stammen",
+      "point3": "Deine Dateien bleiben privat in deinem Konto"
+    },
+    "widget": {
+      "title": "Einbettbares Chat-Widget",
+      "body": "Mach aus deinem Wissen ein Chat-Widget, das du auf jeder Website einbetten kannst.",
+      "point1": "Füge deiner Website in Minuten einen KI-Assistenten hinzu",
+      "point2": "Es antwortet aus den Dokumenten, die du verbindest",
+      "point3": "Passe das Aussehen an deine Marke an"
+    },
+    "server": {
+      "title": "Dein Server",
+      "subtitle": "Die App verbindet sich mit einem Synaplan-Server. Der Standard-Server passt für die meisten — einfach weiter.",
+      "defaultLabel": "Standard-Server",
+      "currentLabel": "Verbundener Server",
+      "recommended": "Empfohlen",
+      "almostThere": "Fast geschafft",
+      "moreInfo": "Mehr erfahren",
+      "helpSetup": "Eigenen Server einrichten",
+      "standardInfoTitle": "Standard-Server",
+      "standardInfoBody": "Das ist der gehostete Synaplan-Server, betrieben vom Synaplan-Team. Der einfachste Start — ganz ohne Einrichtung.",
+      "standardInfoPoint1": "Sofort einsatzbereit — nichts zu installieren",
+      "standardInfoPoint2": "Wird vom Synaplan-Team gepflegt und aktuell gehalten",
+      "standardInfoPoint3": "Die richtige Wahl für die meisten",
+      "customInfoTitle": "Dein eigener Server",
+      "customInfoBody": "Verbinde die App mit einem Synaplan-Server, den du oder deine Firma selbst betreibt.",
+      "customInfoPoint1": "Verbinde dich mit einem selbst betriebenen Synaplan-Server",
+      "customInfoPoint2": "Deine Daten bleiben auf deiner eigenen Infrastruktur",
+      "customInfoPoint3": "Erfordert eine laufende Synaplan-Installation",
+      "customToggle": "Eigenen Server verwenden",
+      "customHint": "Experten-Option: Wenn deine Firma oder du einen eigenen Synaplan-Server betreibt, gib hier seine Adresse ein.",
+      "customPlaceholder": "https://dein-server.beispiel.de",
+      "connect": "Verbinden",
+      "connecting": "Verbindung wird geprüft…",
+      "connectError": "Dieser Server ist nicht erreichbar. Prüfe die Adresse und versuche es erneut."
+    },
+    "plans": {
+      "title": "Wie möchtest du starten?",
+      "subtitle": "Probiere es kostenlos aus — upgraden kannst du jederzeit",
+      "guestCta": "Ohne Konto fortfahren",
+      "popular": "Beliebt",
+      "continueWith": "Weiter mit {plan}",
+      "registerCta": "Kostenloses Konto erstellen",
+      "loginHint": "Du hast schon ein Konto?",
+      "loginCta": "Anmelden"
+    }
   },
   "mcpServers": {
     "title": "MCP-Server",

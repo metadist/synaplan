@@ -13,6 +13,7 @@ use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
+use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
@@ -56,6 +57,16 @@ class StreamController extends AbstractController
      */
     private const MAX_QUOTED_TEXT_LENGTH = 1000;
 
+    /**
+     * Server-side caps for the incognito conversation history sent by the
+     * client. Mirrors {@see \App\Repository\MessageRepository::findChatHistory()}
+     * (30 messages / ~15k chars) so an incognito turn gets the same context
+     * budget as a persisted chat — and a crafted request cannot bloat the
+     * AI prompt.
+     */
+    private const MAX_INCOGNITO_HISTORY_MESSAGES = 30;
+    private const MAX_INCOGNITO_HISTORY_CHARS = 15000;
+
     public function __construct(
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
@@ -75,6 +86,7 @@ class StreamController extends AbstractController
         private MediaCancellationStore $cancellationStore,
         private MediaJobService $mediaJobService,
         private MediaJobMessageSync $mediaJobMessageSync,
+        private GeneratedFileRegistrar $generatedFileRegistrar,
         private UsageStatsService $usageStatsService,
         private UsageTaximeterConfig $usageTaximeterConfig,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
@@ -114,6 +126,73 @@ class StreamController extends AbstractController
         return $params;
     }
 
+    /**
+     * Extract the incognito conversation history from the request.
+     *
+     * `resolveStreamParams()` deliberately accepts only scalar body values, so
+     * the `history` array is read straight from the JSON body here (the GET
+     * variant may pass it as a JSON-encoded string query parameter). Entries
+     * are validated to `{role, content}` pairs, roles are normalized to
+     * user/assistant, and the result is capped to the same message/char
+     * budget as {@see \App\Repository\MessageRepository::findChatHistory()}.
+     *
+     * @return list<array{role: 'user'|'assistant', content: string}>
+     */
+    private function parseIncognitoHistory(Request $request): array
+    {
+        $raw = null;
+
+        if ($request->isMethod('POST')) {
+            $decoded = json_decode($request->getContent(), true);
+            if (is_array($decoded) && isset($decoded['history']) && is_array($decoded['history'])) {
+                $raw = $decoded['history'];
+            }
+        }
+
+        if (null === $raw) {
+            $queryHistory = $request->query->get('history');
+            if (is_string($queryHistory) && '' !== $queryHistory) {
+                $decoded = json_decode($queryHistory, true);
+                if (is_array($decoded)) {
+                    $raw = $decoded;
+                }
+            }
+        }
+
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $entries = [];
+        foreach ($raw as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $role = is_string($entry['role'] ?? null) ? strtolower(trim($entry['role'])) : '';
+            $content = is_string($entry['content'] ?? null) ? trim($entry['content']) : '';
+            if ('' === $content || !in_array($role, ['user', 'assistant'], true)) {
+                continue;
+            }
+            $entries[] = ['role' => $role, 'content' => $content];
+        }
+
+        // Keep the NEWEST messages within the caps (mirror of findChatHistory),
+        // then restore chronological order.
+        $entries = array_slice($entries, -self::MAX_INCOGNITO_HISTORY_MESSAGES);
+        $kept = [];
+        $totalChars = 0;
+        foreach (array_reverse($entries) as $entry) {
+            $length = strlen($entry['content']);
+            if ([] !== $kept && ($totalChars + $length) > self::MAX_INCOGNITO_HISTORY_CHARS) {
+                break;
+            }
+            $kept[] = $entry;
+            $totalChars += $length;
+        }
+
+        return array_reverse($kept);
+    }
+
     #[Route('/stream', name: 'stream', methods: ['GET', 'POST'])]
     #[OA\Get(
         path: '/api/v1/messages/stream',
@@ -125,22 +204,36 @@ class StreamController extends AbstractController
     #[OA\Post(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response (POST body)',
-        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
+        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
         security: [['Bearer' => []]],
         tags: ['Messages'],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['message', 'chatId'],
+                required: ['message'],
                 properties: [
                     new OA\Property(property: 'message', type: 'string', example: 'Summarize the following text: …'),
-                    new OA\Property(property: 'chatId', type: 'string', example: '123'),
+                    new OA\Property(property: 'chatId', type: 'string', example: '123', description: 'Required unless incognito is set.'),
                     new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
                     new OA\Property(property: 'reasoning', type: 'string', enum: ['0', '1'], example: '0'),
                     new OA\Property(property: 'webSearch', type: 'string', enum: ['0', '1'], example: '0'),
                     new OA\Property(property: 'modelId', type: 'string', example: '53'),
                     new OA\Property(property: 'fileIds', type: 'string', example: '1,2,3'),
                     new OA\Property(property: 'guestSession', type: 'string', example: 'gs_abc123'),
+                    new OA\Property(property: 'incognito', type: 'boolean', example: false, description: 'Incognito mode: the turn is processed entirely in-memory — no messages, metadata, search results or memory extractions are persisted. Memories/RAG/feedback are still READ. Files created during the turn are marked ephemeral and deleted after the session. Requires an authenticated user (not available for widget/guest).'),
+                    new OA\Property(
+                        property: 'history',
+                        type: 'array',
+                        description: 'Incognito only: the in-memory conversation history (oldest first) since the server has no stored chat to load context from. Capped server-side at 30 entries / ~15k chars.',
+                        items: new OA\Items(
+                            required: ['role', 'content'],
+                            properties: [
+                                new OA\Property(property: 'role', type: 'string', enum: ['user', 'assistant'], example: 'user'),
+                                new OA\Property(property: 'content', type: 'string', example: 'What is the weather today?'),
+                            ],
+                            type: 'object'
+                        )
+                    ),
                 ]
             )
         )
@@ -414,6 +507,26 @@ class StreamController extends AbstractController
         // Explicit opt-out from memory loading + extraction (used by public demo via synaplan.com/try-chat)
         $disableMemories = '1' === $params->get('disableMemories', '0');
 
+        // Incognito mode: process the turn entirely in-memory. No BMESSAGES/
+        // BMESSAGEMETA/BCHATS/BSEARCHRESULTS/BMESSAGE_TASKS rows, no memory
+        // extraction (Qdrant writes), no WhatsApp forwarding. Memories, RAG
+        // and feedback are still READ; BUSELOG billing keeps running. Only
+        // for authenticated web users — widget/guest channels are excluded.
+        $incognito = '1' === $params->get('incognito', '0');
+        if ($isWidgetMode || $isGuestMode) {
+            $incognito = false;
+        }
+
+        $incognitoHistory = $incognito ? $this->parseIncognitoHistory($request) : [];
+
+        if ($incognito) {
+            // No persisted rows exist in incognito mode, so continuing a
+            // truncated response or resolving a quoted source message by DB id
+            // is impossible. The quoted text itself (context block) still works.
+            $continueMessageId = null;
+            $quotedMessageId = null;
+        }
+
         // Parse fileIds (can be comma-separated string or single ID)
         $fileIdArray = [];
         if (!empty($fileIds)) {
@@ -424,7 +537,7 @@ class StreamController extends AbstractController
             return $this->json(['error' => 'Message or file attachment is required'], Response::HTTP_BAD_REQUEST);
         }
 
-        if (!$chatId) {
+        if (!$chatId && !$incognito) {
             return $this->json(['error' => 'Chat ID is required'], Response::HTTP_BAD_REQUEST);
         }
 
@@ -515,7 +628,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -553,8 +666,22 @@ class StreamController extends AbstractController
             );
 
             // Helper to save error message
-            $saveError = function ($chat, $incomingMessage, string $errorMessage, string $provider = 'system', string $errorType = 'unknown') use ($user, $trackId, $intendedChat) {
-                if (!$chat || !$incomingMessage) {
+            $saveError = function ($chat, $incomingMessage, string $errorMessage, string $provider = 'system', string $errorType = 'unknown') use ($user, $trackId, $intendedChat, $incognito) {
+                if (!$incomingMessage) {
+                    return null;
+                }
+
+                if ($incognito) {
+                    // Incognito: nothing is persisted — flag the transient
+                    // message in-memory only and let the SSE error event
+                    // carry the message to the client.
+                    $incomingMessage->setTopic('ERROR');
+                    $incomingMessage->setStatus('error');
+
+                    return null;
+                }
+
+                if (!$chat) {
                     return null;
                 }
 
@@ -603,12 +730,16 @@ class StreamController extends AbstractController
             $incomingMessage = null;
 
             try {
-                // Load chat
-                $chat = $this->em->getRepository(Chat::class)->find((int) $chatId);
-                if (!$chat || $chat->getUserId() !== $user->getId()) {
-                    $this->sendSSE('error', ['error' => 'Chat not found or access denied']);
+                // Load chat — skipped in incognito mode: the turn has no
+                // persisted chat, $chat stays null and every chat-bound write
+                // below is guarded.
+                if (!$incognito) {
+                    $chat = $this->em->getRepository(Chat::class)->find((int) $chatId);
+                    if (!$chat || $chat->getUserId() !== $user->getId()) {
+                        $this->sendSSE('error', ['error' => 'Chat not found or access denied']);
 
-                    return;
+                        return;
+                    }
                 }
 
                 // Guest mode: verify the chat belongs to THIS guest session
@@ -672,8 +803,13 @@ class StreamController extends AbstractController
                 $incomingMessage->setDirection('IN');
                 $incomingMessage->setStatus($continueMessageId ? 'hidden' : 'processing');
 
-                $this->em->persist($incomingMessage);
-                $this->em->flush(); // Flush first so message has an ID
+                // Incognito: the message stays TRANSIENT — never persisted, its
+                // id stays null, and all setMeta()/addFile() calls below are
+                // pure in-memory operations that flush() never touches.
+                if (!$incognito) {
+                    $this->em->persist($incomingMessage);
+                    $this->em->flush(); // Flush first so message has an ID
+                }
 
                 // Persist the quoted reference as message meta so it survives a
                 // reload (rendered as a blockquote in the user bubble). Flushed
@@ -684,14 +820,18 @@ class StreamController extends AbstractController
                     if (null !== $resolvedQuotedMessageId) {
                         $incomingMessage->setMeta('quoted_message_id', (string) $resolvedQuotedMessageId);
                     }
-                    $this->em->flush();
+                    if (!$incognito) {
+                        $this->em->flush();
+                    }
                 }
 
                 // Issue #1024: relay the operator prompt to WhatsApp before AI processing so
                 // the full conversation flow (prompt + response) is visible on the WhatsApp side.
                 // Guards: widget/guest users are not platform operators; continue-messages use a
-                // synthetic prompt that must not be forwarded; isAgain would re-send the same prompt.
-                if (!$isWidgetMode && !$isGuestMode && !$continueMessageId && !$isAgain) {
+                // synthetic prompt that must not be forwarded; isAgain would re-send the same prompt;
+                // incognito turns must never leave the in-memory session ($chat is
+                // null exactly for incognito, so the null check covers it).
+                if (!$isWidgetMode && !$isGuestMode && !$continueMessageId && !$isAgain && null !== $chat) {
                     $this->messageForwardingService->forwardUserPromptIfNeeded($chat, $messageText);
                 }
 
@@ -719,38 +859,45 @@ class StreamController extends AbstractController
                     if ($fileCount > 0) {
                         // Legacy: set file flag for compatibility
                         $incomingMessage->setFile($fileCount);
-                        $this->em->flush();
 
-                        // CRITICAL: Force reload of the entity with files collection!
-                        // refresh() doesn't work reliably for collections, so we use clear() + find()
-                        $messageId = $incomingMessage->getId();
-                        $chatId = $incomingMessage->getChatId();
+                        // Incognito: the transient message's files collection is a
+                        // plain in-memory ArrayCollection — no join rows to write,
+                        // so the flush + clear() + reload dance below is neither
+                        // needed nor possible (the message has no id to reload by).
+                        if (!$incognito) {
+                            $this->em->flush();
 
-                        $this->em->clear(); // Detach all entities
+                            // CRITICAL: Force reload of the entity with files collection!
+                            // refresh() doesn't work reliably for collections, so we use clear() + find()
+                            $messageId = $incomingMessage->getId();
+                            $chatId = $incomingMessage->getChatId();
 
-                        // Reload message with files
-                        $incomingMessage = $this->em->getRepository(Message::class)->find($messageId);
+                            $this->em->clear(); // Detach all entities
 
-                        if (!$incomingMessage) {
-                            $this->logger->error('StreamController: Message not found after refresh!', [
-                                'message_id' => $messageId,
-                            ]);
-                            $this->sendSSE('error', ['message' => 'Internal error: Message lost']);
+                            // Reload message with files
+                            $incomingMessage = $this->em->getRepository(Message::class)->find($messageId);
 
-                            return;
-                        }
+                            if (!$incomingMessage) {
+                                $this->logger->error('StreamController: Message not found after refresh!', [
+                                    'message_id' => $messageId,
+                                ]);
+                                $this->sendSSE('error', ['message' => 'Internal error: Message lost']);
 
-                        // Reload chat to avoid cascade persist error
-                        if ($chatId) {
-                            $chat = $this->em->getRepository(Chat::class)->find($chatId);
-                            if ($chat) {
-                                $incomingMessage->setChat($chat);
+                                return;
                             }
-                        }
 
-                        // Reload continuation entity after em->clear() so it stays managed
-                        if ($originalOutgoingMessage) {
-                            $originalOutgoingMessage = $this->em->getRepository(Message::class)->find((int) $continueMessageId);
+                            // Reload chat to avoid cascade persist error
+                            if ($chatId) {
+                                $chat = $this->em->getRepository(Chat::class)->find($chatId);
+                                if ($chat) {
+                                    $incomingMessage->setChat($chat);
+                                }
+                            }
+
+                            // Reload continuation entity after em->clear() so it stays managed
+                            if ($originalOutgoingMessage) {
+                                $originalOutgoingMessage = $this->em->getRepository(Message::class)->find((int) $continueMessageId);
+                            }
                         }
 
                         $this->logger->info('StreamController: Files attached and entity reloaded', [
@@ -817,6 +964,20 @@ class StreamController extends AbstractController
                     $processingOptions['disable_memories'] = true;
                 }
 
+                if ($incognito) {
+                    // Incognito: guards persistence throughout the pipeline
+                    // (transient messages, no search-result/task-plan rows, no
+                    // memory extraction) while memory/RAG/feedback READS stay
+                    // active — deliberately NOT `disable_memories`, which would
+                    // also block the reads. `incognito_history` replaces the DB
+                    // chat history; `force_inline_media` keeps generated media
+                    // in this request so it can be tracked as ephemeral instead
+                    // of detaching to an async job bound to a message id.
+                    $processingOptions['incognito'] = true;
+                    $processingOptions['incognito_history'] = $incognitoHistory;
+                    $processingOptions['force_inline_media'] = true;
+                }
+
                 if ($modelId) {
                     if ($isAgain) {
                         $processingOptions['model_id'] = (int) $modelId;
@@ -881,7 +1042,8 @@ class StreamController extends AbstractController
                         $chat,
                         $trackId,
                         $isWidgetMode ? 'WIDGET' : ($isGuestMode ? 'GUEST' : 'WEB'),
-                        $streamModelId
+                        $streamModelId,
+                        $incognito
                     );
 
                     return; // Exit callback early
@@ -1186,7 +1348,8 @@ class StreamController extends AbstractController
                         }
                     }
 
-                    // Save error message to database
+                    // Save error message to database (incognito: transient only —
+                    // the metas below are in-memory and feed the SSE payload)
                     $outgoingMessage = new Message();
                     $outgoingMessage->setUserId($user->getId());
                     $outgoingMessage->setChat($chat);
@@ -1202,8 +1365,10 @@ class StreamController extends AbstractController
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
 
-                    $this->em->persist($outgoingMessage);
-                    $this->em->flush(); // Flush to get message ID for metadata
+                    if (!$incognito) {
+                        $this->em->persist($outgoingMessage);
+                        $this->em->flush(); // Flush to get message ID for metadata
+                    }
 
                     // Store error details in metadata (show user's selected chat model, not literal "error")
                     $outgoingMessage->setMeta(
@@ -1235,8 +1400,10 @@ class StreamController extends AbstractController
                     $incomingMessage->setTopic('ERROR');
                     $incomingMessage->setStatus('error');
 
-                    $chat->updateTimestamp();
-                    $this->em->flush();
+                    if (!$incognito) {
+                        $chat?->updateTimestamp();
+                        $this->em->flush();
+                    }
                     // Include the nested aiModels shape so the error message
                     // row shows correct model/sorting badges live instead of
                     // only after a page refresh — see issue #603.
@@ -1309,7 +1476,7 @@ class StreamController extends AbstractController
                             'url' => $taskFile['path'],
                         ]);
                     }
-                    $taskFileEntities = $this->persistTaskPlanFiles($response['metadata']['files'], $user->getId());
+                    $taskFileEntities = $this->persistTaskPlanFiles($response['metadata']['files'], $user->getId(), $incognito);
                 }
 
                 if (isset($response['metadata']['links'])) {
@@ -1378,7 +1545,7 @@ class StreamController extends AbstractController
                                     'extension' => strtolower(pathinfo($jsonData['BFILEPATH'], PATHINFO_EXTENSION)),
                                 ];
 
-                                $generatedFile = $this->storeGeneratedFileInStream($fileData, $incomingMessage);
+                                $generatedFile = $this->storeGeneratedFileInStream($fileData, $incomingMessage, $incognito);
 
                                 if ($generatedFile) {
                                     $finalText = "__FILE_GENERATED__:{$jsonData['BFILEPATH']}";
@@ -1448,12 +1615,19 @@ class StreamController extends AbstractController
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
 
-                    $this->em->persist($outgoingMessage);
-                    $this->em->flush();
+                    // Incognito: the OUT message stays transient. addFile() below
+                    // is in-memory only — the File rows themselves exist (marked
+                    // ephemeral) but no BMESSAGE_FILE_ATTACHMENTS rows are written.
+                    if (!$incognito) {
+                        $this->em->persist($outgoingMessage);
+                        $this->em->flush();
+                    }
 
                     if ($generatedFile) {
                         $outgoingMessage->addFile($generatedFile);
-                        $this->em->flush();
+                        if (!$incognito) {
+                            $this->em->flush();
+                        }
                     }
 
                     // Attach multi-task output files (Sprint 3b) so they
@@ -1462,7 +1636,9 @@ class StreamController extends AbstractController
                         foreach ($taskFileEntities as $taskFileEntity) {
                             $outgoingMessage->addFile($taskFileEntity);
                         }
-                        $this->em->flush();
+                        if (!$incognito) {
+                            $this->em->flush();
+                        }
                     }
                 }
 
@@ -1622,18 +1798,22 @@ class StreamController extends AbstractController
                     $incomingMessage->setStatus('complete');
                 }
 
-                $chat->updateTimestamp();
+                if (!$incognito) {
+                    $chat?->updateTimestamp();
+                    $this->em->flush();
 
-                $this->em->flush();
+                    // Issue #881: now that the outgoing assistant message is
+                    // persisted (so its OUT row is visible to the worker),
+                    // fire the deferred ExtractMemoriesCommand. ChatHandler
+                    // built the payload but skipped the dispatch because we
+                    // passed `defer_memory_extraction = true` above.
+                    // Incognito never dispatches — ChatHandler already returns a
+                    // null payload for incognito turns; this guard is the second
+                    // line of defense.
+                    $this->dispatchDeferredMemoryExtraction($response['metadata'] ?? []);
+                }
 
-                // Issue #881: now that the outgoing assistant message is
-                // persisted (so its OUT row is visible to the worker),
-                // fire the deferred ExtractMemoriesCommand. ChatHandler
-                // built the payload but skipped the dispatch because we
-                // passed `defer_memory_extraction = true` above.
-                $this->dispatchDeferredMemoryExtraction($response['metadata'] ?? []);
-
-                if (!$isWidgetMode && !$isGuestMode) {
+                if (!$isWidgetMode && !$isGuestMode && !$incognito && $chat) {
                     $this->messageForwardingService->forwardIfNeeded($chat, $finalText);
                 }
 
@@ -1898,7 +2078,23 @@ class StreamController extends AbstractController
                             if (null !== $ttsModelId && '' !== (string) $ttsModelId) {
                                 $outgoingMessage->setMeta('ai_audio_model_id', (string) $ttsModelId);
                             }
-                            $this->em->flush();
+                            $ttsEphemeralFile = null;
+                            if (!$incognito) {
+                                $this->em->flush();
+                            } else {
+                                // Incognito: register the TTS audio as an
+                                // EPHEMERAL File row so the session-end cleanup
+                                // and the reaper can delete it — synthesize()
+                                // wrote it to disk without any DB row.
+                                $ttsEphemeralFile = $this->generatedFileRegistrar->register(
+                                    $user->getId(),
+                                    $ttsResult['relativePath'],
+                                    'audio',
+                                    null,
+                                    $ttsProvider,
+                                    ephemeral: true,
+                                );
+                            }
 
                             // Refresh the `aiModels` payload that was
                             // pre-built before TTS ran, so the live SSE
@@ -1906,12 +2102,18 @@ class StreamController extends AbstractController
                             // audio badge — no page reload required.
                             $completeData['aiModels'] = $this->buildAiModelsPayload($outgoingMessage);
 
-                            $this->sendSSE('audio', [
+                            $audioEvent = [
                                 'url' => $audioUrl,
                                 'provider' => $ttsProvider,
                                 'model' => $ttsModelName,
                                 'model_id' => $this->normalizeModelId($ttsModelId, 'sse_audio_event'),
-                            ]);
+                            ];
+                            // Incognito: ship the ephemeral file id so the
+                            // frontend can delete the audio on session end.
+                            if (null !== $ttsEphemeralFile?->getId()) {
+                                $audioEvent['file_id'] = $ttsEphemeralFile->getId();
+                            }
+                            $this->sendSSE('audio', $audioEvent);
 
                             $recordedTtsUsage = $this->rateLimitService->recordUsage($user, 'AUDIOS', [
                                 'provider' => $ttsProvider ?? 'unknown',
@@ -2136,10 +2338,11 @@ class StreamController extends AbstractController
         Message $message,
         array $options,
         User $user,
-        Chat $chat,
+        ?Chat $chat,
         int|string $trackId,
         string $source,
         ?int $intendedModelId,
+        bool $incognito = false,
     ): void {
         try {
             // Send processing status
@@ -2192,8 +2395,10 @@ class StreamController extends AbstractController
                 $outgoingMessage->setDirection('OUT');
                 $outgoingMessage->setStatus('complete');
 
-                $this->em->persist($outgoingMessage);
-                $this->em->flush();
+                if (!$incognito) {
+                    $this->em->persist($outgoingMessage);
+                    $this->em->flush();
+                }
 
                 $displayProvider = $intendedModelId
                     ? ($this->modelConfigService->getProviderForModel($intendedModelId) ?? ($result['provider'] ?? 'system'))
@@ -2223,8 +2428,10 @@ class StreamController extends AbstractController
 
                 $message->setTopic('ERROR');
                 $message->setStatus('error');
-                $chat->updateTimestamp();
-                $this->em->flush();
+                if (!$incognito) {
+                    $chat?->updateTimestamp();
+                    $this->em->flush();
+                }
 
                 $this->sendSSE('data', ['chunk' => $errorMessage]);
                 $this->sendSSE('complete', [
@@ -2302,8 +2509,10 @@ class StreamController extends AbstractController
             $outgoingMessage->setDirection('OUT');
             $outgoingMessage->setStatus('complete');
 
-            $this->em->persist($outgoingMessage);
-            $this->em->flush();
+            if (!$incognito) {
+                $this->em->persist($outgoingMessage);
+                $this->em->flush();
+            }
 
             if (!empty($metadata['provider']) || !empty($metadata['model'])) {
                 $outgoingMessage->setMeta('ai_chat_provider', (string) ($metadata['provider'] ?? ''));
@@ -2382,16 +2591,18 @@ class StreamController extends AbstractController
             $message->setTopic((string) ($classification['topic'] ?? $message->getTopic()));
             $message->setLanguage((string) ($classification['language'] ?? $message->getLanguage()));
             $message->setStatus('complete');
-            $chat->updateTimestamp();
-            $this->em->flush();
+            if (!$incognito) {
+                $chat?->updateTimestamp();
+                $this->em->flush();
 
-            // Issue #881: outgoing message is now persisted, so the
-            // worker can safely look it up via tracking_id when it
-            // writes the extracted_memories meta. Fire the deferred
-            // dispatch the same way the streaming branch does.
-            $this->dispatchDeferredMemoryExtraction($metadata);
+                // Issue #881: outgoing message is now persisted, so the
+                // worker can safely look it up via tracking_id when it
+                // writes the extracted_memories meta. Fire the deferred
+                // dispatch the same way the streaming branch does.
+                $this->dispatchDeferredMemoryExtraction($metadata);
+            }
 
-            if ('WEB' === $source) {
+            if ('WEB' === $source && !$incognito && $chat) {
                 $this->messageForwardingService->forwardIfNeeded($chat, $content);
             }
 
@@ -2401,7 +2612,7 @@ class StreamController extends AbstractController
                 'model_id' => $metadata['model_id'] ?? null,
                 'usage' => $metadata['usage'] ?? [],
                 'latency' => $metadata['latency'] ?? 0,
-                'chat_id' => $chat->getId(),
+                'chat_id' => $chat?->getId(),
                 'source' => $source,
                 'response_text' => $content,
                 'input_text' => $message->getText(),
@@ -2883,10 +3094,11 @@ class StreamController extends AbstractController
      * (index > 0) are always registered, as before.
      *
      * @param array<int|string, mixed> $taskFiles metadata['files'] descriptors from the task-plan executor
+     * @param bool                     $ephemeral mark the File rows ephemeral (incognito session)
      *
      * @return list<File>
      */
-    private function persistTaskPlanFiles(array $taskFiles, int $userId): array
+    private function persistTaskPlanFiles(array $taskFiles, int $userId, bool $ephemeral = false): array
     {
         $entities = [];
 
@@ -2904,6 +3116,7 @@ class StreamController extends AbstractController
                 $userId,
                 is_string($taskFile['local_path'] ?? null) ? $taskFile['local_path'] : null,
                 $type,
+                $ephemeral,
             );
             if ($entity instanceof File) {
                 $entities[] = $entity;
@@ -2919,7 +3132,7 @@ class StreamController extends AbstractController
      * upload path; this only records the DB row so the file shows in history and
      * is access-controlled. Best-effort — never throws.
      */
-    private function registerExistingGeneratedFile(int $userId, ?string $relativePath, string $type): ?File
+    private function registerExistingGeneratedFile(int $userId, ?string $relativePath, string $type, bool $ephemeral = false): ?File
     {
         if (null === $relativePath || '' === $relativePath) {
             return null;
@@ -2955,6 +3168,7 @@ class StreamController extends AbstractController
             // Issue #1190: mark provenance so generated files are distinguishable
             // from uploads (default 'web_upload') and can be targeted for repair.
             $file->setSource('generated');
+            $file->setEphemeral($ephemeral);
 
             $this->em->persist($file);
             $this->em->flush();
@@ -2970,7 +3184,7 @@ class StreamController extends AbstractController
         }
     }
 
-    private function storeGeneratedFileInStream(array $fileData, Message $message): ?File
+    private function storeGeneratedFileInStream(array $fileData, Message $message, bool $ephemeral = false): ?File
     {
         $userId = $message->getUserId();
         $filename = $fileData['filename'];
@@ -3058,6 +3272,7 @@ class StreamController extends AbstractController
             // from uploads (default 'web_upload') and can be regenerated from
             // BFILETEXT on download when the on-disk binary goes missing.
             $file->setSource('generated');
+            $file->setEphemeral($ephemeral);
 
             $this->em->persist($file);
             $this->em->flush();

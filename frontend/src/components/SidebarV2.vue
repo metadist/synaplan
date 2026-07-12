@@ -65,7 +65,13 @@
 
     <!-- Upgrade Button -->
     <div
-      v-if="!isGuestMode && !authStore.isAdmin && configStore.billing.enabled && !authStore.isPro"
+      v-if="
+        !isGuestMode &&
+        !authStore.isAdmin &&
+        configStore.billing.enabled &&
+        purchaseAllowed &&
+        !authStore.isPro
+      "
       class="flex items-center justify-center py-2 flex-shrink-0"
     >
       <button
@@ -205,7 +211,12 @@
                 <span>{{ $t('nav.preferences') }}</span>
               </button>
               <button
-                v-if="!authStore.isAdmin && configStore.billing.enabled && authStore.isPro"
+                v-if="
+                  !authStore.isAdmin &&
+                  configStore.billing.enabled &&
+                  purchaseAllowed &&
+                  authStore.isPro
+                "
                 role="menuitem"
                 class="dropdown-item"
                 data-testid="btn-sidebar-v2-subscription"
@@ -324,12 +335,12 @@
     <Transition name="modal">
       <div
         v-if="chatModalOpen"
-        class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+        class="modal-overlay fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
         data-testid="modal-chat-manager-backdrop"
         @click.self="chatModalOpen = false"
       >
         <div
-          class="w-full sm:max-w-xl max-h-[90vh] sm:max-h-[70vh] flex flex-col rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden bg-white/95 dark:bg-[#0e1628]/95 backdrop-blur-xl border-t sm:border border-white/20 dark:border-white/[0.08] sm:m-4"
+          class="modal-panel w-full sm:max-w-xl flex flex-col rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden bg-white/95 dark:bg-[#0e1628]/95 backdrop-blur-xl border-t sm:border border-white/20 dark:border-white/[0.08] sm:m-4"
           data-testid="modal-chat-manager"
           @click.stop
         >
@@ -605,6 +616,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useSidebarStore } from '../stores/sidebar'
+import { triggerHapticImpact } from '../services/api/nativeHaptics'
+import { isPurchaseAllowed } from '../services/api/nativeServer'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
@@ -623,6 +636,9 @@ const { formatRelativeTime } = useDateFormat()
 const sidebarStore = useSidebarStore()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
+
+// No purchase path on a custom server in the native app (store IAP only).
+const purchaseAllowed = isPurchaseAllowed()
 const chatsStore = useChatsStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
@@ -687,6 +703,7 @@ onBeforeUnmount(() => {
 })
 
 const toggleUserMenu = () => {
+  triggerHapticImpact('light')
   if (!userMenuOpen.value && userBtnRef.value) {
     const rect = userBtnRef.value.getBoundingClientRect()
     const dropdownHeight = 280
@@ -963,6 +980,7 @@ const handleChatShare = (chatId: number) => {
 }
 
 const toggleChatMenu = (chatId: number, event: MouseEvent) => {
+  triggerHapticImpact('light')
   if (chatMenuOpenId.value === chatId) {
     chatMenuOpenId.value = null
     return

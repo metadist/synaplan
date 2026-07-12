@@ -55,6 +55,7 @@ class MessagePreProcessorTest extends TestCase
     public function testProcessMessageWithoutFile(): void
     {
         $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(123);
         $message->method('getFile')->willReturn(0);
         $message->method('getFilePath')->willReturn('');
 
@@ -112,6 +113,7 @@ class MessagePreProcessorTest extends TestCase
     public function testProcessSavesMessage(): void
     {
         $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(123);
         $message->method('getFile')->willReturn(0);
 
         $this->messageRepository
@@ -120,6 +122,25 @@ class MessagePreProcessorTest extends TestCase
             ->with($message);
 
         $this->service->process($message);
+    }
+
+    /**
+     * Incognito turns run through the pipeline as TRANSIENT messages (id
+     * null, never persisted). The preprocessor must never save them —
+     * file-carrying turns only flush the managed (ephemeral) File entities,
+     * and a file-less turn like this one touches the repository not at all.
+     */
+    public function testProcessDoesNotSaveTransientMessage(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(null);
+        $message->method('getFile')->willReturn(0);
+
+        $this->messageRepository->expects($this->never())->method('save');
+
+        $result = $this->service->process($message);
+
+        $this->assertSame($message, $result);
     }
 
     public function testProcessReturnsMessage(): void

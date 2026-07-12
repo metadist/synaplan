@@ -27,7 +27,7 @@ class AuthControllerTest extends WebTestCase
     protected function tearDown(): void
     {
         // Cleanup test users
-        $testEmails = ['newuser@test.com', 'logintest@test.com', 'logintest2@test.com', 'unverified@test.com', 'existing@test.com'];
+        $testEmails = ['newuser@test.com', 'logintest@test.com', 'logintest2@test.com', 'logintest3@test.com', 'unverified@test.com', 'existing@test.com'];
         foreach ($testEmails as $email) {
             $user = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
             if ($user) {
@@ -182,6 +182,55 @@ class AuthControllerTest extends WebTestCase
         $cookieNames = array_map(fn ($cookie) => $cookie->getName(), $cookies);
         $this->assertContains('access_token', $cookieNames);
         $this->assertContains('refresh_token', $cookieNames);
+    }
+
+    /**
+     * Regression: the frontend replaces its in-memory user object wholesale
+     * with whatever `user` payload the most recent auth response carried, so
+     * `firstName` must survive both login AND the subsequent access-token
+     * refresh — otherwise a name shown right after login silently disappears
+     * once the token refreshes (observed on the native app, which refreshes
+     * eagerly on launch).
+     */
+    public function testLoginAndRefreshResponsesIncludeFirstName(): void
+    {
+        $user = new User();
+        $user->setMail('logintest3@test.com');
+        $user->setPw(password_hash('TestPass123!', PASSWORD_BCRYPT));
+        $user->setUserLevel('PRO');
+        $user->setProviderId('local');
+        $user->setCreated(date('YmdHis'));
+        $user->setEmailVerified(true);
+        $user->setUserDetails(['firstName' => 'Cristian']);
+
+        $this->em->persist($user);
+        $this->em->flush();
+
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/login',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'logintest3@test.com',
+                'password' => 'TestPass123!',
+            ])
+        );
+
+        $this->assertResponseIsSuccessful();
+        $loginData = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertSame('Cristian', $loginData['user']['firstName']);
+
+        $this->client->request('POST', '/api/v1/auth/refresh');
+
+        $this->assertResponseIsSuccessful();
+        $refreshData = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertSame('Cristian', $refreshData['user']['firstName']);
+
+        // Cleanup relies on tearDown()'s email lookup: the kernel reboots
+        // between requests above, so the original `$user` reference is
+        // detached and cannot be removed directly here.
     }
 
     public function testLoginWithInvalidPassword(): void

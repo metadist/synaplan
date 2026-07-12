@@ -10,7 +10,7 @@
     >
       <div
         v-if="show"
-        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        class="modal-overlay fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
         data-testid="modal-help"
         @click.self="$emit('close')"
       >

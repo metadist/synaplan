@@ -4,7 +4,7 @@
       <div
         v-if="isOpen"
         data-testid="guest-signup-modal"
-        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+        class="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4"
       >
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="$emit('close')" />
 

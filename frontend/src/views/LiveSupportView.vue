@@ -206,7 +206,7 @@
                 @click="sendReply"
               >
                 <Icon v-if="sending" icon="heroicons:arrow-path" class="w-5 h-5 animate-spin" />
-                <Icon v-else icon="heroicons:paper-airplane" class="w-5 h-5" />
+                <Icon v-else icon="heroicons:arrow-up" class="w-5 h-5" />
               </button>
             </div>
           </div>

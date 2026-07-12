@@ -10,6 +10,10 @@ import { useConfigStore } from '@/stores/config'
 import { authReady } from '@/stores/auth'
 import { useGlobalErrorStore } from '@/stores/globalError'
 import { useGuestStore, GUEST_STORAGE_KEY } from '@/stores/guest'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
+import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { i18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
@@ -20,7 +24,9 @@ const guardSubscription = (
   next: NavigationGuardNext
 ) => {
   const configStore = useConfigStore()
-  if (!configStore.billing.enabled) {
+  // A custom server in the native app has no store purchase channel, so the
+  // subscription pages (prices, checkout) must be unreachable there.
+  if (!configStore.billing.enabled || !isPurchaseAllowed()) {
     next(resolveDefaultRoute())
   } else {
     next()
@@ -120,6 +126,25 @@ const router = createRouter({
       name: 'logged-out',
       component: () => import('@/views/LoggedOutView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.loggedOut' },
+    },
+    {
+      // MOBILE-APP SEAM (first-run onboarding): native-only first-run flow
+      // (welcome → plans). Web builds never navigate here — the beforeEach
+      // guard redirects the route away unless the flow applies.
+      path: '/onboarding',
+      name: 'onboarding',
+      component: () => import('@/views/OnboardingView.vue'),
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.onboarding' },
+    },
+    {
+      // MOBILE-APP SEAM (Epic 9.1): public account-deletion info page. Google
+      // Play requires a web URL where users can learn how to delete their
+      // account + data WITHOUT signing in. Default target of
+      // `branding.accountDeletionUrl`; reachable from store metadata too.
+      path: '/account-deletion',
+      name: 'account-deletion',
+      component: () => import('@/views/AccountDeletionView.vue'),
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.accountDeletion' },
     },
     // Shared chat with optional language parameter for SEO
     // /shared/de/abc123 -> German UI
@@ -431,7 +456,14 @@ const router = createRouter({
 })
 
 // Update document title after each navigation
-router.afterEach((to) => {
+router.afterEach((to, from) => {
+  // Confirm every page change with a light haptic pulse (no-op on web / when the
+  // native bridge is absent). Only on a real path change, never on the initial
+  // load or in-place query/hash updates.
+  if (to.path !== from.path) {
+    triggerHapticImpact('light')
+  }
+
   const titleKey = to.meta.titleKey as string | undefined
   if (titleKey) {
     const t = i18n.global.t
@@ -642,6 +674,15 @@ router.beforeEach(async (to, from, next) => {
     // Admin route without admin privileges
     next(resolveDefaultRoute())
   } else if (to.name === 'chat' && !authenticated && !useGuestStore().isGuestMode) {
+    // MOBILE-APP SEAM (first-run onboarding): the very first entry navigation
+    // of a signed-out native user goes to the one-time onboarding flow
+    // (welcome → plans). `shouldShowOnboarding` is false on web, for
+    // signed-in users, after completion/skip, and for existing guest sessions
+    // — so this branch is a no-op everywhere except the app's true first run.
+    if (shouldShowOnboarding(authenticated)) {
+      next({ name: 'onboarding' })
+      return
+    }
     // A branded deployment may configure a custom public logged-out landing
     // (route name or free-form path): send first-time, not-signed-in visitors
     // there instead of the home/chat entry. Default-safe: when nothing valid is
@@ -653,6 +694,12 @@ router.beforeEach(async (to, from, next) => {
     } else {
       next()
     }
+  } else if (to.name === 'onboarding' && (!isNativeApp() || authenticated)) {
+    // MOBILE-APP SEAM (first-run onboarding): the flow is native-only and for
+    // signed-out users. Web or signed-in navigations bounce to their normal
+    // entry. No loop is possible: the chat branch above only redirects here
+    // while `shouldShowOnboarding` is true, which requires native + signed-out.
+    next(authenticated ? resolveDefaultRoute() : { name: 'chat' })
   } else if (isPublicRoute && isAuthenticated.value && to.name === 'login') {
     // Already logged in, redirect to home (but check for loops)
     const home = resolveDefaultRoute()
