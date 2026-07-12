@@ -6,7 +6,9 @@ AI-powered knowledge management with RAG, chat widgets, and multi-channel integr
 
 > **Live instance**: [web.synaplan.com](https://web.synaplan.com/) &nbsp;|&nbsp; **Docs**: [docs.synaplan.com](https://docs.synaplan.com/) &nbsp;|&nbsp; **API**: [Swagger UI](https://web.synaplan.com/api/doc)
 
-![Synaplan chat screen](docs/images/chat-screen.png)
+[![Watch the Synaplan demo](docs/images/chat-screen.png)](https://www.youtube.com/watch?v=WjO9mE43uec)
+
+<p align="center"><a href="https://www.youtube.com/watch?v=WjO9mE43uec">▶ Watch the demo on YouTube</a></p>
 
 ---
 
