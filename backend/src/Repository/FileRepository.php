@@ -231,6 +231,93 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
+     * Resolve the existing file to replace for a CORE-4 overwrite upload.
+     *
+     * Primary match is the stable external identity (user, source, source_id);
+     * when the source carries no id we fall back to (user, group_key,
+     * original_name) so a re-sync of the same document still overwrites in place
+     * instead of duplicating. Returns the most recent match, or null when this
+     * is genuinely a new file.
+     */
+    public function findForOverwrite(
+        int $userId,
+        string $source,
+        ?string $sourceId,
+        ?string $groupKey,
+        ?string $originalName,
+    ): ?File {
+        if (null !== $sourceId && '' !== trim($sourceId)) {
+            return $this->createQueryBuilder('f')
+                ->where('f.userId = :userId')
+                ->andWhere('f.source = :source')
+                ->andWhere('f.sourceId = :sourceId')
+                ->setParameter('userId', $userId)
+                ->setParameter('source', $source)
+                ->setParameter('sourceId', trim($sourceId))
+                ->orderBy('f.id', 'DESC')
+                ->setMaxResults(1)
+                ->getQuery()
+                ->getOneOrNullResult();
+        }
+
+        if (null !== $originalName && '' !== trim($originalName)) {
+            $qb = $this->createQueryBuilder('f')
+                ->where('f.userId = :userId')
+                ->andWhere('f.source = :source')
+                ->andWhere('f.originalName = :originalName')
+                ->setParameter('userId', $userId)
+                ->setParameter('source', $source)
+                ->setParameter('originalName', trim($originalName));
+
+            if (null !== $groupKey && '' !== $groupKey) {
+                $qb->andWhere('f.groupKey = :groupKey')->setParameter('groupKey', $groupKey);
+            }
+
+            return $qb->orderBy('f.id', 'DESC')->setMaxResults(1)->getQuery()->getOneOrNullResult();
+        }
+
+        return null;
+    }
+
+    /**
+     * Load a user's files for the given external source ids, keyed by source id,
+     * for the CORE-4 bulk stale check. When several rows share a source id (a
+     * pre-overwrite duplicate) the most recent wins.
+     *
+     * @param array<int, string> $sourceIds
+     *
+     * @return array<string, File>
+     */
+    public function findByUserSourceIds(int $userId, string $source, array $sourceIds): array
+    {
+        $sourceIds = array_values(array_filter(array_map('trim', $sourceIds), static fn (string $s): bool => '' !== $s));
+        if ([] === $sourceIds) {
+            return [];
+        }
+
+        $rows = $this->createQueryBuilder('f')
+            ->where('f.userId = :userId')
+            ->andWhere('f.source = :source')
+            ->andWhere('f.sourceId IN (:sourceIds)')
+            ->setParameter('userId', $userId)
+            ->setParameter('source', $source)
+            ->setParameter('sourceIds', $sourceIds)
+            ->orderBy('f.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        $map = [];
+        foreach ($rows as $file) {
+            $sid = $file->getSourceId();
+            if (null !== $sid) {
+                $map[$sid] = $file;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
      * @return array<string, int> group name => file count
      */
     public function getGroupCountsByUser(int $userId): array

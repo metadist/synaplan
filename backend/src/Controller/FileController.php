@@ -14,6 +14,7 @@ use App\Service\File\FileHelper;
 use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
 use App\Service\File\FileUploadService;
+use App\Service\File\UploadOptions;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\StorageQuotaService;
@@ -66,6 +67,10 @@ class FileController extends AbstractController
                         new OA\Property(property: 'process_level', type: 'string', enum: ['store', 'extract', 'vectorize', 'full'], example: 'vectorize'),
                         new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'whatsapp', 'widget', 'api', 'generated'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/Outlook) should set this so the file is labelled by source.'),
                         new OA\Property(property: 'original_name', type: 'string', example: '/Shared/Q3 Report.pdf', description: 'The file name at the source, preserved even when the stored name is normalised. Falls back to the uploaded filename.'),
+                        new OA\Property(property: 'source_id', type: 'string', example: '12345', description: 'Stable external id of the file at its source (e.g. the Nextcloud file id). Enables overwrite-in-place and bulk stale checks. Sent with a single file per request.'),
+                        new OA\Property(property: 'source_etag', type: 'string', example: 'a1b2c3', description: 'External version/etag captured at ingest; a differing value reported later marks the knowledge copy stale.'),
+                        new OA\Property(property: 'overwrite', type: 'boolean', example: true, description: 'Replace the existing file matching (source, source_id) — or (group_key, original_name) — in place instead of creating a duplicate. Keeps the file id stable.'),
+                        new OA\Property(property: 'retain_source', type: 'boolean', example: true, description: 'When false, the stored binary is discarded after successful vectorization; the row, extracted text and vectors are kept. Defaults to true.'),
                     ]
                 )
             )
@@ -97,6 +102,18 @@ class FileController extends AbstractController
         }
         $originalName = $request->request->get('original_name');
         $originalName = is_string($originalName) && '' !== trim($originalName) ? trim($originalName) : null;
+
+        // Knowledge-file lifecycle (CORE-4): external identity + sync knobs an
+        // integration passes so the same source file overwrites in place instead
+        // of duplicating, and the binary can be dropped after embedding.
+        $sourceId = $request->request->get('source_id');
+        $sourceId = is_string($sourceId) && '' !== trim($sourceId) ? trim($sourceId) : null;
+        $sourceEtag = $request->request->get('source_etag');
+        $sourceEtag = is_string($sourceEtag) && '' !== trim($sourceEtag) ? trim($sourceEtag) : null;
+        $overwrite = $request->request->getBoolean('overwrite');
+        $retainSource = !$request->request->has('retain_source') || $request->request->getBoolean('retain_source');
+
+        $options = new UploadOptions($source, $originalName, $sourceId, $sourceEtag, $overwrite, $retainSource);
 
         $uploadedFiles = $request->files->get('files', []);
 
@@ -132,7 +149,7 @@ class FileController extends AbstractController
             return $this->json(['error' => 'No files uploaded. Use form-data with files[] field'], Response::HTTP_BAD_REQUEST);
         }
 
-        $result = $this->uploadService->uploadBatch($uploadedFiles, $user, $groupKey, $processLevel, $source, $originalName);
+        $result = $this->uploadService->uploadBatch($uploadedFiles, $user, $groupKey, $processLevel, $options);
 
         return $this->json($result, $result['success'] ? Response::HTTP_OK : Response::HTTP_PARTIAL_CONTENT);
     }
@@ -545,7 +562,7 @@ class FileController extends AbstractController
             new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search in file name and content', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
             new OA\Parameter(name: 'source', in: 'query', required: false, description: 'Filter by provenance source(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'nextcloud,outlook')),
-            new OA\Parameter(name: 'vector_state', in: 'query', required: false, description: 'Filter by vector state(s): none, pending, vectorized, failed, not_applicable', schema: new OA\Schema(type: 'string', example: 'vectorized')),
+            new OA\Parameter(name: 'vector_state', in: 'query', required: false, description: 'Filter by vector state(s): none, pending, vectorized, failed, not_applicable, stale (comma-separated for groups)', schema: new OA\Schema(type: 'string', example: 'stale')),
             new OA\Parameter(name: 'origin_kind', in: 'query', required: false, description: 'Filter generated media by kind: image, video, audio, calendar, document', schema: new OA\Schema(type: 'string', example: 'image')),
             new OA\Parameter(name: 'incoming', in: 'query', required: false, description: 'Filter the Incoming inbox: 1 = only incoming, 0 = exclude incoming', schema: new OA\Schema(type: 'boolean')),
             new OA\Parameter(name: 'sort', in: 'query', required: false, description: 'Sort order: date_desc (default), date_asc, name_asc, name_desc, size_asc, size_desc', schema: new OA\Schema(type: 'string', example: 'date_desc')),
@@ -1078,6 +1095,187 @@ class FileController extends AbstractController
         $chunksUpdated = $this->vectorStorageFacade->updateGroupKey($user->getId(), $file->getId(), 'DEFAULT');
 
         return $this->json(['success' => true, 'chunksUpdated' => $chunksUpdated]);
+    }
+
+    #[Route('/check-stale', name: 'check_stale', methods: ['POST'], priority: 10)]
+    #[OA\Post(
+        path: '/api/v1/files/check-stale',
+        summary: 'Bulk-check which synced source files drifted (are stale) or are missing',
+        description: 'Lets a sync client poll the knowledge base cheaply instead of re-uploading everything: it sends its current (source_id, source_etag) list and gets back which knowledge files are stale (etag drifted or explicitly marked), missing (never ingested or deleted), or current. Stale files stay searchable until re-vectorized.',
+        tags: ['Files'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['items'],
+                properties: [
+                    new OA\Property(property: 'source', type: 'string', example: 'nextcloud', description: 'Provenance source the ids belong to. Defaults to nextcloud.'),
+                    new OA\Property(
+                        property: 'items',
+                        type: 'array',
+                        items: new OA\Items(
+                            properties: [
+                                new OA\Property(property: 'source_id', type: 'string', example: '12345'),
+                                new OA\Property(property: 'source_etag', type: 'string', example: 'a1b2c3', nullable: true),
+                            ],
+                            type: 'object',
+                        ),
+                    ),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Per-item status list + counts',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'results',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'source_id', type: 'string', example: '12345'),
+                                    new OA\Property(property: 'status', type: 'string', enum: ['current', 'stale', 'missing'], example: 'stale'),
+                                    new OA\Property(property: 'file_id', type: 'integer', nullable: true, example: 42),
+                                    new OA\Property(property: 'stored_etag', type: 'string', nullable: true, example: 'a1b2c3'),
+                                ],
+                                type: 'object',
+                            ),
+                        ),
+                        new OA\Property(property: 'counts', type: 'object', example: ['current' => 8, 'stale' => 1, 'missing' => 1]),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid input'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function checkStale(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode((string) $request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Invalid JSON body'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $source = isset($data['source']) && is_string($data['source']) && '' !== trim($data['source'])
+            ? trim($data['source'])
+            : 'nextcloud';
+
+        $items = $data['items'] ?? null;
+        if (!is_array($items)) {
+            return $this->json(['error' => 'items (array of {source_id, source_etag}) is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Preserve the caller's order and the first etag seen per id.
+        $requested = [];
+        foreach ($items as $item) {
+            if (!is_array($item) || !isset($item['source_id'])) {
+                continue;
+            }
+            $sid = trim((string) $item['source_id']);
+            if ('' === $sid || array_key_exists($sid, $requested)) {
+                continue;
+            }
+            $etag = isset($item['source_etag']) && '' !== trim((string) $item['source_etag'])
+                ? trim((string) $item['source_etag'])
+                : null;
+            $requested[$sid] = $etag;
+        }
+
+        $found = $this->fileRepository->findByUserSourceIds($user->getId(), $source, array_keys($requested));
+
+        $results = [];
+        $counts = ['current' => 0, 'stale' => 0, 'missing' => 0];
+        foreach ($requested as $sid => $reportedEtag) {
+            $file = $found[$sid] ?? null;
+            if (null === $file) {
+                $status = 'missing';
+                $fileId = null;
+                $storedEtag = null;
+            } else {
+                $storedEtag = $file->getSourceEtag();
+                $drifted = $file->isStale()
+                    || (null !== $reportedEtag && null !== $storedEtag && $reportedEtag !== $storedEtag);
+                $status = $drifted ? 'stale' : 'current';
+                $fileId = (int) $file->getId();
+            }
+
+            ++$counts[$status];
+            $results[] = [
+                'source_id' => $sid,
+                'status' => $status,
+                'file_id' => $fileId,
+                'stored_etag' => $storedEtag,
+            ];
+        }
+
+        return $this->json([
+            'success' => true,
+            'results' => $results,
+            'counts' => $counts,
+        ]);
+    }
+
+    #[Route('/{id}/mark-stale', name: 'mark_stale', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/mark-stale',
+        summary: 'Mark a knowledge file stale (its source changed and it needs re-vectorizing)',
+        description: 'Sets the explicit stale marker. The old vectors stay in place and searchable until the file is re-vectorized, so answers degrade gracefully rather than dropping the document.',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [new OA\Property(property: 'source_etag', type: 'string', example: 'z9y8x7', description: 'Optional new source etag to record alongside the stale marker.')]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'File marked stale'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'File not found'),
+        ]
+    )]
+    public function markStale(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = json_decode((string) $request->getContent(), true);
+        if (is_array($data) && isset($data['source_etag']) && '' !== trim((string) $data['source_etag'])) {
+            $file->setSourceEtag(trim((string) $data['source_etag']));
+        }
+
+        $file->setStale(true);
+        // Reflect staleness in the persisted vector state so the file manager
+        // badge + `?vector_state=stale` filter see it immediately. Only a file
+        // that actually carries vectors reads as "stale"; one without vectors
+        // stays in its current pre-vectorized state.
+        if (File::VECTOR_STATE_VECTORIZED === $file->getVectorState() || $file->getChunkCount() > 0) {
+            $file->setVectorState(File::VECTOR_STATE_STALE);
+        }
+        $this->fileRepository->save($file, true);
+
+        return $this->json([
+            'success' => true,
+            'id' => (int) $file->getId(),
+            'stale' => true,
+            'vector_state' => $file->getVectorState(),
+        ]);
     }
 
     #[Route('/{id}/re-vectorize', name: 're_vectorize', methods: ['POST'])]

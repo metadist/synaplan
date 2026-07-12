@@ -16,6 +16,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BSTATUS'], name: 'idx_file_status')]
 #[ORM\Index(columns: ['BGROUPKEY'], name: 'idx_file_groupkey')]
 #[ORM\Index(columns: ['BUSERID', 'BSOURCE'], name: 'idx_file_user_source')]
+#[ORM\Index(columns: ['BUSERID', 'BSOURCE', 'BSOURCEID'], name: 'idx_file_user_source_sid')]
 #[ORM\Index(columns: ['BUSERID', 'BGROUPKEY'], name: 'idx_file_user_group')]
 #[ORM\Index(columns: ['BUSERID', 'BVECTORSTATE'], name: 'idx_file_user_vstate')]
 #[ORM\Index(columns: ['BUSERID', 'BINCOMING'], name: 'idx_file_user_incoming')]
@@ -25,7 +26,7 @@ class File
     /**
      * Allowed provenance values for {@see self::$source}. Keep in sync with the
      * `source` whitelist in FileController and the file-world plan
-     * (03_file-management.md §3.1).
+     * (03_file-management.md ?3.1).
      */
     public const SOURCES = [
         'web_upload',
@@ -43,7 +44,7 @@ class File
      * Sources that are *pushed in* by an external integration for the user to
      * use as knowledge. Files from these sources arrive in the "Incoming inbox"
      * ({@see self::$incoming}) so the user can triage them (03_file-management.md
-     * §3.3) before they join the curated library.
+     * ?3.3) before they join the curated library.
      */
     public const INCOMING_SOURCES = [
         'outlook',
@@ -53,7 +54,7 @@ class File
 
     /**
      * Kind of a generated artefact, for {@see self::$source} === 'generated'.
-     * Null for non-generated files (03_file-management.md §3.1, `BORIGINKIND`).
+     * Null for non-generated files (03_file-management.md ?3.1, `BORIGINKIND`).
      */
     public const ORIGIN_KINDS = [
         'image',
@@ -66,7 +67,7 @@ class File
     /**
      * Authoritative vectorization state ({@see self::$vectorState}), decoupled
      * from {@see self::$status} which mixes the upload/extraction lifecycle
-     * (03_file-management.md §3.1, `BVECTORSTATE`).
+     * (03_file-management.md ?3.1, `BVECTORSTATE`).
      */
     public const VECTOR_STATE_NONE = 'none';
     public const VECTOR_STATE_PENDING = 'pending';
@@ -74,17 +75,26 @@ class File
     public const VECTOR_STATE_FAILED = 'failed';
     public const VECTOR_STATE_NOT_APPLICABLE = 'not_applicable';
 
+    /**
+     * The external source changed after ingest, so the vectors are out of date.
+     * Stale files remain searchable (old vectors stay) until re-vectorized ?
+     * stale is NOT "excluded" (hosting-partner CORE-4). Set explicitly via
+     * mark-stale or implicitly when a new {@see self::$sourceEtag} is reported.
+     */
+    public const VECTOR_STATE_STALE = 'stale';
+
     public const VECTOR_STATES = [
         self::VECTOR_STATE_NONE,
         self::VECTOR_STATE_PENDING,
         self::VECTOR_STATE_VECTORIZED,
         self::VECTOR_STATE_FAILED,
         self::VECTOR_STATE_NOT_APPLICABLE,
+        self::VECTOR_STATE_STALE,
     ];
 
     /**
      * File types (extensions / handler kinds) that are media and therefore not
-     * RAG documents — their vector state is {@see self::VECTOR_STATE_NOT_APPLICABLE}.
+     * RAG documents ��� their vector state is {@see self::VECTOR_STATE_NOT_APPLICABLE}.
      */
     public const MEDIA_TYPES = [
         'image', 'video', 'audio',
@@ -148,8 +158,34 @@ class File
     private ?string $originalName = null;
 
     /**
+     * Stable external identifier for this file at its {@see self::$source}
+     * (e.g. the Nextcloud file id). Lets an integration overwrite the same
+     * logical file in place instead of creating duplicates, and address it in
+     * bulk stale checks (hosting-partner CORE-4). Null for plain web uploads.
+     */
+    #[ORM\Column(name: 'BSOURCEID', length: 255, nullable: true)]
+    private ?string $sourceId = null;
+
+    /**
+     * External version/etag captured at ingest. A differing etag reported later
+     * means the source drifted and the KB copy is {@see self::VECTOR_STATE_STALE}
+     * (hosting-partner CORE-4). Null when the source does not provide one.
+     */
+    #[ORM\Column(name: 'BSOURCEETAG', length: 255, nullable: true)]
+    private ?string $sourceEtag = null;
+
+    /**
+     * Explicit "source changed, needs re-vectorize" marker. Kept separate from
+     * {@see self::$vectorState} so the fix-on-read state derivation (which reads
+     * "has chunks => vectorized") does not clobber staleness ? a stale file
+     * still has its old, searchable vectors (hosting-partner CORE-4).
+     */
+    #[ORM\Column(name: 'BSTALE', type: 'boolean', options: ['default' => 0])]
+    private bool $stale = false;
+
+    /**
      * For generated files: the artefact kind, one of {@see self::ORIGIN_KINDS};
-     * null otherwise (03_file-management.md §3.1, `BORIGINKIND`).
+     * null otherwise (03_file-management.md ?3.1, `BORIGINKIND`).
      */
     #[ORM\Column(name: 'BORIGINKIND', length: 24, nullable: true)]
     private ?string $originKind = null;
@@ -157,7 +193,7 @@ class File
     /**
      * 1 while the file is a freshly-arrived external push awaiting triage in the
      * Incoming inbox; cleared once the user keeps/files it (03_file-management.md
-     * §3.3, `BINCOMING`).
+     * ?3.3, `BINCOMING`).
      */
     #[ORM\Column(name: 'BINCOMING', type: 'boolean', options: ['default' => 0])]
     private bool $incoming = false;
@@ -165,34 +201,34 @@ class File
     /**
      * Relative path in the separate incoming/staging area where external pushes
      * land before promotion to the canonical tree; null once promoted
-     * (03_file-management.md §3.3, `BSTAGEPATH`).
+     * (03_file-management.md ?3.3, `BSTAGEPATH`).
      */
     #[ORM\Column(name: 'BSTAGEPATH', length: 255, nullable: true)]
     private ?string $stagePath = null;
 
     /**
      * Link to the originating BMESSAGES.BID (generated media + chat attachments),
-     * enabling "jump to chat" (03_file-management.md §3.1, `BMESSAGEID`).
+     * enabling "jump to chat" (03_file-management.md ?3.1, `BMESSAGEID`).
      */
     #[ORM\Column(name: 'BMESSAGEID', type: 'bigint', nullable: true)]
     private ?int $messageId = null;
 
     /**
      * Authoritative vectorization state, one of {@see self::VECTOR_STATES}
-     * (03_file-management.md §3.1, `BVECTORSTATE`).
+     * (03_file-management.md ?3.1, `BVECTORSTATE`).
      */
     #[ORM\Column(name: 'BVECTORSTATE', length: 16, options: ['default' => self::VECTOR_STATE_NONE])]
     private string $vectorState = self::VECTOR_STATE_NONE;
 
     /**
      * Cached chunk count kept in sync with the vector store so the list needs no
-     * per-row Qdrant call (03_file-management.md §3.1, `BCHUNKCOUNT`).
+     * per-row Qdrant call (03_file-management.md ?3.1, `BCHUNKCOUNT`).
      */
     #[ORM\Column(name: 'BCHUNKCOUNT', type: 'integer', options: ['default' => 0])]
     private int $chunkCount = 0;
 
     /**
-     * Generating provider/model for generated media (03_file-management.md §3.1,
+     * Generating provider/model for generated media (03_file-management.md ?3.1,
      * `BPROVIDER`).
      */
     #[ORM\Column(name: 'BPROVIDER', length: 48, nullable: true)]
@@ -200,7 +236,7 @@ class File
 
     /**
      * Optional generated thumbnail/poster for fast grids (03_file-management.md
-     * §3.1, `BTHUMBPATH`).
+     * ?3.1, `BTHUMBPATH`).
      */
     #[ORM\Column(name: 'BTHUMBPATH', length: 255, nullable: true)]
     private ?string $thumbPath = null;
@@ -379,11 +415,49 @@ class File
 
     /**
      * The name shown to the user: the source's original name when present,
-     * otherwise the stored name (03_file-management.md §4.4).
+     * otherwise the stored name (03_file-management.md ?4.4).
      */
     public function getDisplayName(): string
     {
         return $this->originalName ?? $this->fileName;
+    }
+
+    public function getSourceId(): ?string
+    {
+        return $this->sourceId;
+    }
+
+    public function setSourceId(?string $sourceId): self
+    {
+        $sourceId = null !== $sourceId ? trim($sourceId) : null;
+        $this->sourceId = ('' === $sourceId) ? null : $sourceId;
+
+        return $this;
+    }
+
+    public function getSourceEtag(): ?string
+    {
+        return $this->sourceEtag;
+    }
+
+    public function setSourceEtag(?string $sourceEtag): self
+    {
+        $sourceEtag = null !== $sourceEtag ? trim($sourceEtag) : null;
+        $this->sourceEtag = ('' === $sourceEtag) ? null : $sourceEtag;
+
+        return $this;
+    }
+
+    public function isStale(): bool
+    {
+        return $this->stale;
+    }
+
+    public function setStale(bool $stale): self
+    {
+        $this->stale = $stale;
+
+        return $this;
     }
 
     public function getOriginKind(): ?string
