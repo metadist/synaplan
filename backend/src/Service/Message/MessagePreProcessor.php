@@ -112,14 +112,23 @@ final readonly class MessagePreProcessor
             $this->notify($progressCallback, 'preprocessing', 'All files processed.');
 
             // CRITICAL: Persist changes to File entities!
-            $this->messageRepository->save($message);
+            // Incognito/transient messages (id === null) must NEVER be
+            // persisted — flush only the managed File entities (status/text
+            // updates on already-persisted, ephemeral-flagged files are fine).
+            if (null !== $message->getId()) {
+                $this->messageRepository->save($message);
+            } else {
+                $this->messageRepository->flush();
+            }
         } else {
             $this->logger->warning('PreProcessor: No files to process', [
                 'message_id' => $message->getId(),
             ]);
         }
 
-        $this->messageRepository->save($message);
+        if (null !== $message->getId()) {
+            $this->messageRepository->save($message);
+        }
 
         return $message;
     }

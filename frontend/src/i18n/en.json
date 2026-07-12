@@ -1,4 +1,15 @@
 {
+  "incognito": {
+    "toggleStart": "Start incognito chat",
+    "toggleEnd": "End incognito chat",
+    "bannerTitle": "Incognito chat",
+    "bannerText": "This conversation is not saved. Your saved memories and knowledge are still used, but nothing new is remembered.",
+    "emptyTitle": "Incognito chat",
+    "emptyHint": "Messages and files from this session are not saved and disappear when you end it.",
+    "endConfirmTitle": "End incognito chat?",
+    "endConfirmMessage": "The conversation will be discarded permanently and files from this session will be deleted.",
+    "endConfirmButton": "End and discard"
+  },
   "jobs": {
     "kind": {
       "video": "video",
@@ -70,6 +81,8 @@
     "widgetDetail": "Widget Detail",
     "liveSupport": "Live Support",
     "addinConnect": "Connect Outlook Add-in",
+    "accountDeletion": "Account Deletion",
+    "onboarding": "Welcome",
     "mcpServers": "MCP Servers"
   },
   "addinConnect": {
@@ -91,6 +104,7 @@
     "errorIssuanceFailed": "Synaplan could not issue an API key for this account."
   },
   "welcome": "Welcome",
+  "welcomeUser": "Welcome, {name}",
   "examplePrompts": {
     "heading": "Try one of these",
     "items": {
@@ -197,7 +211,8 @@
       "users": "Users",
       "prompts": "Prompts",
       "usage": "Usage",
-      "subscriptions": "Subscriptions"
+      "subscriptions": "Subscriptions",
+      "appServer": "App server"
     },
     "overview": {
       "totalUsers": "Total Users",
@@ -312,12 +327,13 @@
       "subscriptionOverview": "Subscription Overview"
     },
     "subscriptions": {
-      "title": "Subscription Budget Management",
-      "description": "Manage cost budgets and active status for each subscription tier. Prices are read-only and managed via Stripe.",
+      "title": "Subscription Plans",
+      "description": "Manage prices, cost budgets and active status for each subscription tier. Prices are shown to users in onboarding and on the subscription page.",
       "level": "Level",
       "name": "Name",
       "priceMonthly": "Price/Month",
       "priceYearly": "Price/Year",
+      "currency": "Currency",
       "budgetMonthly": "Budget/Month",
       "budgetYearly": "Budget/Year",
       "active": "Active",
@@ -325,11 +341,11 @@
       "edit": "Edit",
       "save": "Save",
       "cancel": "Cancel",
-      "saveSuccess": "Budget updated successfully",
-      "saveError": "Failed to update budget",
+      "saveSuccess": "Plan updated successfully",
+      "saveError": "Failed to update plan",
       "loadError": "Failed to load subscriptions",
       "noSubscriptions": "No subscription plans found. Create subscription plans in the database first.",
-      "budgetHint": "Budget defines the maximum token cost (in EUR) allowed per billing period. Set to 0 for unlimited usage. Prices are display-only and managed via Stripe."
+      "budgetHint": "Budget defines the maximum token cost (in EUR) allowed per billing period. Set to 0 for unlimited usage. Prices are the public display prices; purchases in the mobile app use the app store price."
     },
     "config": {
       "title": "System Configuration",
@@ -399,7 +415,8 @@
     "adminFeatureStatus": "Feature Status",
     "adminSystemConfig": "System Config",
     "more": "More",
-    "moreDescription": "More sections and account"
+    "moreDescription": "More sections and account",
+    "menu": "Menu"
   },
   "chatInput": {
     "placeholder": "Type your message...",
@@ -458,6 +475,9 @@
       "imageGenDesc": "Create images from text",
       "videoGen": "Video Generation",
       "videoGenDesc": "Generate videos from text",
+      "badgeSearch": "Search",
+      "badgeImage": "Image",
+      "badgeVideo": "Video",
       "thinkingDesc": "Show the model's reasoning before the answer",
       "thinkingUnsupported": "The selected model does not support reasoning",
       "summarizer": "Summarizer",
@@ -1932,8 +1952,17 @@
     },
     "native": {
       "purchaseTitle": "In-app purchase",
-      "purchaseComingSoon": "In-app purchases for the {plan} plan are being set up and will be available in a future app update.",
-      "manageInStore": "Manage subscription in the store"
+      "purchaseUnavailable": "In-app purchases are not available on this server yet. Please try again later.",
+      "purchaseSuccess": "Your subscription is now active. Thank you!",
+      "purchasePending": "Your purchase is waiting for approval (e.g. Ask to Buy). Your subscription will activate automatically once it is approved.",
+      "purchaseConflict": "This purchase is already linked to another account or an existing subscription. Please check your store account or contact support.",
+      "purchaseFailed": "The purchase could not be completed. You have not been charged. Please try again.",
+      "manageInStore": "Manage in the store",
+      "restoreButton": "Restore Purchases",
+      "restoreTitle": "Restore purchases",
+      "restoreDone": "Purchases restored — your subscription is active.",
+      "restoreNone": "No active subscription was found to restore.",
+      "storeNote": "Purchases and subscriptions are processed and managed through the App Store or Google Play."
     },
     "plans": {
       "pro": "Pro",
@@ -3118,7 +3147,8 @@
     "legal": {
       "title": "Privacy & Terms",
       "privacy": "Privacy Policy",
-      "terms": "Terms of Use"
+      "terms": "Terms of Use",
+      "accountDeletion": "Delete your account"
     },
     "dangerZone": {
       "title": "Danger Zone",
@@ -3146,6 +3176,34 @@
     "privacyNotice": "All data is stored securely and used only for invoicing purposes according to German law (DSGVO).",
     "saveChanges": "Save Changes",
     "cancel": "Cancel"
+  },
+  "native": {
+    "exitHint": "Press back again to exit"
+  },
+  "accountDeletion": {
+    "title": "Delete your {brand} account",
+    "intro": "You can permanently delete your account and all associated data at any time. Here is how it works and what gets removed.",
+    "howTitle": "How to delete your account",
+    "steps": [
+      "Sign in to your account.",
+      "Open your Profile and scroll to the \"Danger Zone\" section.",
+      "Click \"Delete Account\" and confirm with your password (or by typing DELETE for social-login accounts).",
+      "Your account and data are deleted immediately and cannot be recovered."
+    ],
+    "goToProfile": "Go to Profile",
+    "signIn": "Sign in",
+    "dataTitle": "What gets deleted",
+    "dataItems": [
+      "All your messages and chats",
+      "All uploaded files and knowledge-base documents",
+      "Your personal data, settings and memories",
+      "API keys, widgets and credentials"
+    ],
+    "retention": "Deletion is permanent and takes effect immediately. Backups containing residual data are rotated out within 30 days. Data we are legally required to retain (e.g. invoices) is kept only as long as the law requires.",
+    "noAccessTitle": "Can't sign in?",
+    "noAccessDesc": "If you no longer have access to your account, contact us through our website and we will process your deletion request.",
+    "visitWebsite": "Visit website",
+    "privacyPolicy": "Privacy Policy"
   },
   "notFound": {
     "title": "Page Not Found",
@@ -3956,6 +4014,91 @@
     "subtitle": "This version of the app is no longer supported. Please update to the latest version to continue.",
     "minVersion": "Minimum required version: {version}",
     "cta": "Update now"
+  },
+  "nativeServer": {
+    "changeServer": "Change server",
+    "appServer": {
+      "title": "App server",
+      "description": "Choose which Synaplan server this app connects to. Only change this if you run your own Synaplan server.",
+      "unavailable": "Server settings are not available in this build.",
+      "currentLabel": "Current server",
+      "defaultLabel": "Default",
+      "inputLabel": "Server URL",
+      "hint": "Saving signs you out of every server and reloads the app — you'll need to log in again.",
+      "save": "Test & save",
+      "testing": "Checking server …",
+      "reset": "Reset to default",
+      "savedSigningOut": "Connected. Signing you out …",
+      "invalidUrl": "Please enter a valid URL (e.g. https://web.synaplan.com).",
+      "unreachable": "Server unreachable. Please check the address.",
+      "resetConfirmTitle": "Reset server?",
+      "resetConfirmMessage": "The app will sign you out, connect to {server} again, and reload.",
+      "resetConfirmAction": "Reset"
+    }
+  },
+  "onboarding": {
+    "skip": "Skip",
+    "back": "Back",
+    "next": "Continue",
+    "getStarted": "Get started",
+    "stepLabel": "Step {step} of {total}",
+    "welcome": {
+      "title": "Welcome to",
+      "subtitle": "Every AI, every feature in one place",
+      "pillServer": "Own server",
+      "pillRag": "RAG",
+      "pillWidget": "Chat widget"
+    },
+    "rag": {
+      "title": "Answers from your documents",
+      "body": "RAG lets the AI assistant answer from your own files, not just its general training.",
+      "point1": "Upload documents and ask questions about what's inside",
+      "point2": "Answers cite the sources they come from",
+      "point3": "Your files stay private to your account"
+    },
+    "widget": {
+      "title": "Embeddable chat widget",
+      "body": "Turn your knowledge into a chat widget you can embed on any website.",
+      "point1": "Add an AI assistant to your site in minutes",
+      "point2": "It answers from the documents you connect",
+      "point3": "Match the look to your brand"
+    },
+    "server": {
+      "title": "Your server",
+      "subtitle": "The app connects to a Synaplan server. The standard server is right for most people — just continue.",
+      "defaultLabel": "Standard server",
+      "currentLabel": "Connected server",
+      "recommended": "Recommended",
+      "almostThere": "Almost there",
+      "moreInfo": "Learn more",
+      "helpSetup": "How to set up your own server",
+      "standardInfoTitle": "Standard server",
+      "standardInfoBody": "This is the hosted Synaplan server run by the Synaplan team. It's the easiest way to start — no setup needed.",
+      "standardInfoPoint1": "Ready to use right away — nothing to install",
+      "standardInfoPoint2": "Maintained and kept up to date by the Synaplan team",
+      "standardInfoPoint3": "The right choice for most people",
+      "customInfoTitle": "Your own server",
+      "customInfoBody": "Point the app at a Synaplan server that you or your company host yourselves.",
+      "customInfoPoint1": "Connect to a Synaplan server you run yourself",
+      "customInfoPoint2": "Your data stays on your own infrastructure",
+      "customInfoPoint3": "Requires a running Synaplan installation",
+      "customToggle": "Use my own server",
+      "customHint": "Expert option: if your company or you run your own Synaplan server, enter its address here.",
+      "customPlaceholder": "https://your-server.example.com",
+      "connect": "Connect",
+      "connecting": "Checking connection…",
+      "connectError": "This server can't be reached. Check the address and try again."
+    },
+    "plans": {
+      "title": "How do you want to start?",
+      "subtitle": "Try it for free — you can upgrade anytime",
+      "guestCta": "Continue without an account",
+      "popular": "Popular",
+      "continueWith": "Continue with {plan}",
+      "registerCta": "Create a free account",
+      "loginHint": "Already have an account?",
+      "loginCta": "Sign in"
+    }
   },
   "mcpServers": {
     "title": "MCP Servers",

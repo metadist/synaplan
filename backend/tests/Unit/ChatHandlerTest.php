@@ -1014,6 +1014,67 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
+     * Incognito turns must never write memories: even with
+     * `defer_memory_extraction` set (the StreamController always sets it),
+     * the handler must return a null extraction payload and never touch the
+     * bus. Reads (memory/RAG/feedback context) stay enabled — only the
+     * write path is cut.
+     */
+    public function testHandleSkipsExtractionPayloadInIncognitoEvenWhenDeferred(): void
+    {
+        // Deliberately a PERSISTED-looking message (id set): the payload must
+        // be suppressed by the incognito flag itself, not by a missing id.
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(456);
+        $message->method('getText')->willReturn('My new address is Bahnhofstrasse 1.');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260707100000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->userMemoryService->method('isAvailable')->willReturn(false);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Got it.',
+            'provider' => 'openai',
+            'model' => 'gpt-4.1',
+        ]);
+
+        $this->memoryExtractionDispatcher->expects($this->never())->method('dispatch');
+
+        $result = $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            null,
+            ['defer_memory_extraction' => true, 'incognito' => true],
+        );
+
+        self::assertNull(
+            $result['metadata']['extraction_payload'],
+            'incognito turns must not produce an extraction payload, even with defer_memory_extraction set',
+        );
+    }
+
+    /**
      * The public {@see ChatHandler::dispatchPendingMemoryExtraction()} is
      * now a thin proxy onto {@see MemoryExtractionDispatcher::dispatch()}
      * (Copilot review of PR #939: keep the dispatch + log + swallow

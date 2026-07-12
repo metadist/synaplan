@@ -53,10 +53,6 @@ import { getNativePlatform, isNativeApp } from '@/services/api/nativeRuntime'
 
 const config = useConfigStore()
 
-// Only ever block inside the native shell; the gate is meaningless on web,
-// where users always run the latest deployed bundle.
-const show = computed(() => isNativeApp() && config.mobile.updateRequired)
-
 const minVersion = computed(() => config.mobile.minVersion)
 
 const storeUrl = computed(() => {
@@ -70,4 +66,10 @@ const storeUrl = computed(() => {
   // Fallback: whichever link the operator configured.
   return config.mobile.iosAppUrl || config.mobile.androidAppUrl || ''
 })
+
+// Only block a native client after the server grace period and when the user
+// has a working path to the store. A missing store URL must fail open.
+const show = computed(
+  () => isNativeApp() && config.mobile.updateRequired && Boolean(storeUrl.value)
+)
 </script>

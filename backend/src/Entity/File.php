@@ -20,12 +20,13 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUSERID', 'BVECTORSTATE'], name: 'idx_file_user_vstate')]
 #[ORM\Index(columns: ['BUSERID', 'BINCOMING'], name: 'idx_file_user_incoming')]
 #[ORM\Index(columns: ['BUSERID', 'BCREATEDAT'], name: 'idx_file_user_created')]
+#[ORM\Index(columns: ['BEPHEMERAL', 'BCREATEDAT'], name: 'idx_file_ephemeral_created')]
 class File
 {
     /**
      * Allowed provenance values for {@see self::$source}. Keep in sync with the
      * `source` whitelist in FileController and the file-world plan
-     * (03_file-management.md §3.1).
+     * (03_file-management.md ?3.1).
      */
     public const SOURCES = [
         'web_upload',
@@ -43,7 +44,7 @@ class File
      * Sources that are *pushed in* by an external integration for the user to
      * use as knowledge. Files from these sources arrive in the "Incoming inbox"
      * ({@see self::$incoming}) so the user can triage them (03_file-management.md
-     * §3.3) before they join the curated library.
+     * ?3.3) before they join the curated library.
      */
     public const INCOMING_SOURCES = [
         'outlook',
@@ -53,7 +54,7 @@ class File
 
     /**
      * Kind of a generated artefact, for {@see self::$source} === 'generated'.
-     * Null for non-generated files (03_file-management.md §3.1, `BORIGINKIND`).
+     * Null for non-generated files (03_file-management.md ?3.1, `BORIGINKIND`).
      */
     public const ORIGIN_KINDS = [
         'image',
@@ -66,7 +67,7 @@ class File
     /**
      * Authoritative vectorization state ({@see self::$vectorState}), decoupled
      * from {@see self::$status} which mixes the upload/extraction lifecycle
-     * (03_file-management.md §3.1, `BVECTORSTATE`).
+     * (03_file-management.md ?3.1, `BVECTORSTATE`).
      */
     public const VECTOR_STATE_NONE = 'none';
     public const VECTOR_STATE_PENDING = 'pending';
@@ -84,7 +85,7 @@ class File
 
     /**
      * File types (extensions / handler kinds) that are media and therefore not
-     * RAG documents — their vector state is {@see self::VECTOR_STATE_NOT_APPLICABLE}.
+     * RAG documents ��� their vector state is {@see self::VECTOR_STATE_NOT_APPLICABLE}.
      */
     public const MEDIA_TYPES = [
         'image', 'video', 'audio',
@@ -149,7 +150,7 @@ class File
 
     /**
      * For generated files: the artefact kind, one of {@see self::ORIGIN_KINDS};
-     * null otherwise (03_file-management.md §3.1, `BORIGINKIND`).
+     * null otherwise (03_file-management.md ?3.1, `BORIGINKIND`).
      */
     #[ORM\Column(name: 'BORIGINKIND', length: 24, nullable: true)]
     private ?string $originKind = null;
@@ -157,7 +158,7 @@ class File
     /**
      * 1 while the file is a freshly-arrived external push awaiting triage in the
      * Incoming inbox; cleared once the user keeps/files it (03_file-management.md
-     * §3.3, `BINCOMING`).
+     * ?3.3, `BINCOMING`).
      */
     #[ORM\Column(name: 'BINCOMING', type: 'boolean', options: ['default' => 0])]
     private bool $incoming = false;
@@ -165,34 +166,34 @@ class File
     /**
      * Relative path in the separate incoming/staging area where external pushes
      * land before promotion to the canonical tree; null once promoted
-     * (03_file-management.md §3.3, `BSTAGEPATH`).
+     * (03_file-management.md ?3.3, `BSTAGEPATH`).
      */
     #[ORM\Column(name: 'BSTAGEPATH', length: 255, nullable: true)]
     private ?string $stagePath = null;
 
     /**
      * Link to the originating BMESSAGES.BID (generated media + chat attachments),
-     * enabling "jump to chat" (03_file-management.md §3.1, `BMESSAGEID`).
+     * enabling "jump to chat" (03_file-management.md ?3.1, `BMESSAGEID`).
      */
     #[ORM\Column(name: 'BMESSAGEID', type: 'bigint', nullable: true)]
     private ?int $messageId = null;
 
     /**
      * Authoritative vectorization state, one of {@see self::VECTOR_STATES}
-     * (03_file-management.md §3.1, `BVECTORSTATE`).
+     * (03_file-management.md ?3.1, `BVECTORSTATE`).
      */
     #[ORM\Column(name: 'BVECTORSTATE', length: 16, options: ['default' => self::VECTOR_STATE_NONE])]
     private string $vectorState = self::VECTOR_STATE_NONE;
 
     /**
      * Cached chunk count kept in sync with the vector store so the list needs no
-     * per-row Qdrant call (03_file-management.md §3.1, `BCHUNKCOUNT`).
+     * per-row Qdrant call (03_file-management.md ?3.1, `BCHUNKCOUNT`).
      */
     #[ORM\Column(name: 'BCHUNKCOUNT', type: 'integer', options: ['default' => 0])]
     private int $chunkCount = 0;
 
     /**
-     * Generating provider/model for generated media (03_file-management.md §3.1,
+     * Generating provider/model for generated media (03_file-management.md ?3.1,
      * `BPROVIDER`).
      */
     #[ORM\Column(name: 'BPROVIDER', length: 48, nullable: true)]
@@ -200,10 +201,19 @@ class File
 
     /**
      * Optional generated thumbnail/poster for fast grids (03_file-management.md
-     * §3.1, `BTHUMBPATH`).
+     * ?3.1, `BTHUMBPATH`).
      */
     #[ORM\Column(name: 'BTHUMBPATH', length: 255, nullable: true)]
     private ?string $thumbPath = null;
+
+    /**
+     * 1 for files created during an incognito chat session: they are excluded
+     * from all file listings, never vectorized, and deleted automatically ?
+     * by the frontend on session end (best effort) and by the
+     * `app:files:reap-ephemeral` command as a safety net.
+     */
+    #[ORM\Column(name: 'BEPHEMERAL', type: 'boolean', options: ['default' => 0])]
+    private bool $ephemeral = false;
 
     #[ORM\Column(name: 'BCREATEDAT', type: 'bigint')]
     private int $createdAt;
@@ -379,7 +389,7 @@ class File
 
     /**
      * The name shown to the user: the source's original name when present,
-     * otherwise the stored name (03_file-management.md §4.4).
+     * otherwise the stored name (03_file-management.md ?4.4).
      */
     public function getDisplayName(): string
     {
@@ -481,6 +491,18 @@ class File
     {
         $thumbPath = null !== $thumbPath ? trim($thumbPath) : null;
         $this->thumbPath = ('' === $thumbPath) ? null : $thumbPath;
+
+        return $this;
+    }
+
+    public function isEphemeral(): bool
+    {
+        return $this->ephemeral;
+    }
+
+    public function setEphemeral(bool $ephemeral): self
+    {
+        $this->ephemeral = $ephemeral;
 
         return $this;
     }

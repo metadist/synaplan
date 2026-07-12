@@ -113,7 +113,13 @@ final class MobilePurchaseController extends AbstractController
                 'source' => $result->source,
                 'status' => $result->status,
             ]);
-        } catch (IapNotConfiguredException) {
+        } catch (IapNotConfiguredException $e) {
+            $this->logger->warning('IAP verify rejected: store verifier not configured', [
+                'user_id' => $user->getId(),
+                'platform' => $platform->value,
+                'error' => $e->getMessage(),
+            ]);
+
             return $this->json([
                 'error' => 'In-app purchases are not available on this server.',
                 'code' => 'IAP_NOT_CONFIGURED',

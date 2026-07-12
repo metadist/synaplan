@@ -61,11 +61,24 @@ the store keeps a commission:
 comparable to the Stripe (web) price. Concretely: the web (Stripe) price and the store (IAP) price
 are configured **independently per channel**, and the store price is set higher to absorb the cut.
 
-| Tier | Web reference price (Stripe) | Store price (IAP) |
-|------|------------------------------|-------------------|
-| PRO | €19.95 | set in App Store Connect / Play Console, commission baked in |
-| TEAM | €49.95 | set in the stores, commission baked in |
-| BUSINESS | €99.95 | set in the stores, commission baked in |
+The markup is operator-configurable via `IAP_PRICE_MARKUP_PERCENT` (default `30`).
+`GET /api/v1/subscription/plans` exposes it as `appPrice = price × (1 + markup/100)`, snapped to
+the nearest x.99 store price point (stores only allow fixed price points), never below the web
+price:
+
+- the **web** always displays the plain `price`;
+- the **native app** displays the store's own localized price once its catalogue is loaded, and
+  `appPrice` as the fallback before that — the cheaper web price is never shown in the app
+  (anti-steering).
+
+| Tier | Web reference price (Stripe) | App price (30 % markup, .99-snapped) |
+|------|------------------------------|--------------------------------------|
+| PRO | €19.95 | €25.99 |
+| TEAM | €49.95 | €64.99 |
+| BUSINESS | €99.95 | €129.99 |
+
+When creating the store products in App Store Connect / Play Console, set exactly the `appPrice`
+price point — the store price is what the buyer actually pays and what the app shows once loaded.
 
 > Finance/tax note: on web, Synaplan is Merchant of Record (Stripe Tax/OSS handles VAT). On IAP,
 > Apple/Google are MoR — they collect/remit consumer VAT and pay net after their 15–30 %. Book
@@ -124,8 +137,18 @@ web-only / open-source deployments keep working untouched.
 | 5.2 channel gating (no Stripe redirect in app) + block-cross + anti-steering guard | ✅ implemented + tested |
 | 5.4 self-hosted IAP receipt validation (verify endpoint + Apple ASSN v2 / Google RTDN) | ✅ implemented + unit-tested (mocked stores); needs store accounts/keys to go live |
 | 5.5 channel-aware pricing config + IAP product↔tier mapping + this doc | ✅ implemented + tested |
-| 5.3 native IAP frontend (store billing plugin) | ⏳ needs the IAP plugin dependency + on-device store products |
+| 5.3 native IAP frontend (store billing plugin) | ✅ implemented — `nativeIap.ts` + `cordova-plugin-purchase`(+`-storekit2`); wired into `SubscriptionView` (purchase/restore) and onboarding (store prices); needs on-device QA with real store products |
 | 5.6 infra & secrets (Pub/Sub, keys) | ⏳ see `synaplan-apps/docs/LAUNCH_CHECKLIST.md` |
+
+### Display prices are operator-configurable
+
+`GET /api/v1/subscription/plans` reads name, monthly price, and currency from the
+`BSUBSCRIPTIONS` table (falling back to compiled defaults when a tier row is missing);
+deactivated rows (`BACTIVE = 0`) hide the tier. Admins edit prices/currency in the
+admin panel ("Subscription Plans" tab, `PATCH /api/v1/admin/subscriptions/{id}`), so a
+self-hosted install shows its own prices in onboarding and on the subscription page.
+Inside the native app the **store's localized price wins** (it is what the user is
+actually charged); the server price is the fallback and the web's only source.
 
 Creating the actual store products, sandbox testers, the real prices and the validation
 credentials is account-bound and is tracked in `synaplan-apps/docs/LAUNCH_CHECKLIST.md`.

@@ -368,11 +368,11 @@ const isMemory = computed(() => props.classification === 'memory')
     <Transition name="fade">
       <div
         v-if="isOpen"
-        class="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-2 sm:p-4"
+        class="modal-overlay fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-2 sm:p-4"
         @click.self="emit('close')"
       >
         <div
-          class="surface-card rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto scroll-thin"
+          class="modal-panel surface-card rounded-2xl shadow-2xl max-w-2xl w-full overflow-y-auto scroll-thin"
           @click.stop
         >
           <!-- Header -->

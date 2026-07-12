@@ -1,12 +1,12 @@
 <template>
   <!-- Fullscreen Modal Overlay -->
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+    class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
     data-testid="modal-widget-editor"
     @click.self="$emit('close')"
   >
     <div
-      class="surface-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+      class="modal-panel surface-card rounded-2xl max-w-4xl w-full overflow-y-auto shadow-2xl"
       data-testid="section-editor-shell"
     >
       <!-- Header -->

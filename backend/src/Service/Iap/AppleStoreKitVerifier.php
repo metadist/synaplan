@@ -31,16 +31,27 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
 
     private readonly ?int $appAppleId;
 
+    private readonly string $rootCertsDir;
+
     public function __construct(
         private readonly string $bundleId = '',
         int $appAppleId = 0,
         private readonly string $environment = 'production',
-        private readonly string $rootCertsDir = '',
+        string $rootCertsDir = '',
         private readonly bool $enableOnlineChecks = false,
+        string $projectDir = '',
     ) {
         // Env wiring passes 0 when APPLE_APP_APPLE_ID is unset; normalize to null
         // (the verifier only requires it for the Production environment).
         $this->appAppleId = $appAppleId > 0 ? $appAppleId : null;
+
+        // A relative IAP_APPLE_ROOT_CERTS_DIR (e.g. "var/apple-roots") must be
+        // anchored to the project dir — the web SAPI's cwd is public/, so a
+        // bare is_dir() check would silently report "not configured" there.
+        if ('' !== $rootCertsDir && '' !== $projectDir && !str_starts_with($rootCertsDir, '/')) {
+            $rootCertsDir = rtrim($projectDir, '/').'/'.$rootCertsDir;
+        }
+        $this->rootCertsDir = $rootCertsDir;
     }
 
     public function isConfigured(): bool

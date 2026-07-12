@@ -4,27 +4,28 @@
     the bottom of the scroll area and, on iOS, follows the soft keyboard via
     the visual viewport.
 
-    Safe-area inset is applied at md+ ONLY. On mobile the bottom tab bar
-    (MobileNav → .v2-mobile-tabbar) renders *below* this input and already
-    carries `padding-bottom: env(safe-area-inset-bottom)`. Adding the inset
-    here too would double-count the iOS home indicator and leave a ~34px dead
-    gap (≈ the Safari address-bar height) between the pill row and the tab bar
-    — visible on real iPhones, but invisible in Chrome's responsive emulator
-    where `env(safe-area-inset-bottom)` resolves to 0px. At md+ there is no
-    tab bar and the input sits at the window's bottom edge, so it owns the
-    inset itself.
+    The composer is the bottom-most element on every breakpoint (the mobile
+    push-drawer is an overlay, not a bottom bar), so it owns the iOS home-
+    indicator inset. That inset lives in `.chat-composer-sticky` (style.css) and
+    collapses to 0 while the keyboard is up so the input sits right above it —
+    driven by `--keyboard-inset-height` (native) with `--kb-open` as the web
+    fallback, because Keyboard.resize:'none' means visualViewport never shrinks
+    in the native app.
   -->
   <div
-    class="sticky bottom-0 bg-chat-input-area md:pb-[env(safe-area-inset-bottom)]"
+    :class="[
+      'chat-composer-sticky bg-chat-input-area',
+      { 'chat-composer-sticky--kb-open': keyboardOpen },
+    ]"
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
-    <div class="max-w-4xl mx-auto px-4 py-2 md:py-4">
-      <!-- Active Command and File Display (above input) -->
-      <div
-        v-if="activeCommand || uploadedFiles.length > 0 || quote"
-        class="mb-3 flex flex-wrap gap-2"
-      >
+    <!-- On mobile the horizontal padding matches the drawer toggle's left
+         offset (left-3 = 12px) so the composer aligns with the menu button and
+         uses the full width; md+ keeps the roomier px-4. -->
+    <div class="max-w-4xl mx-auto px-3 py-2 md:px-4 md:py-4">
+      <!-- File and Quote Display (above input) -->
+      <div v-if="uploadedFiles.length > 0 || quote" class="mb-3 flex flex-wrap gap-2">
         <!-- Quoted reference chip -->
         <QuoteChip v-if="quote" :quote="quote" @remove="emit('clearQuote')" />
 
@@ -46,29 +47,17 @@
             <XMarkIcon class="w-4 h-4" />
           </button>
         </div>
-
-        <!-- Active Command -->
-        <button
-          v-if="activeCommand"
-          type="button"
-          :class="[
-            'pill text-xs flex items-center gap-2',
-            isCommandValid
-              ? 'pill--active'
-              : 'bg-orange-500/10 border-orange-500/30 text-orange-600 dark:text-orange-400',
-          ]"
-          data-testid="btn-chat-command-clear"
-          @click="clearCommand"
-        >
-          <Icon :icon="commandIcon" class="w-4 h-4" />
-          <span class="font-mono font-semibold">/{{ activeCommand }}</span>
-          <XMarkIcon class="w-4 h-4" />
-        </button>
       </div>
+
+      <!-- Attached banner (e.g. guest message counter) glued to the input's top edge. -->
+      <slot name="banner" />
 
       <div
         class="relative surface-card"
-        :class="{ 'ring-2 ring-primary': isDragging }"
+        :class="[
+          { 'ring-2 ring-primary': isDragging },
+          bannerVisible ? 'max-sm:!rounded-t-none' : '',
+        ]"
         data-testid="comp-chat-input-shell"
         @dragover.prevent="handleDragOver"
         @dragleave.prevent="handleDragLeave"
@@ -91,182 +80,230 @@
           @close="mentionPaletteVisible = false"
         />
 
-        <!-- Scrollable container with padding for scrollbar alignment -->
-        <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
-          <div class="pl-[48px] py-1.5" :style="{ paddingRight: `${textareaPaddingRightPx}px` }">
-            <!-- Textarea -->
-            <Textarea
-              ref="textareaRef"
-              v-model="message"
-              :placeholder="isMobile ? 'Message...' : $t('chatInput.placeholder')"
-              :rows="1"
-              class="flex-1"
-              data-testid="input-chat-message"
-              @keydown="handleKeyDown"
-              @focus="isFocused = true"
-              @blur="isFocused = false"
-            />
+        <!--
+          Composer body. On mobile (< md) this is a vertical stack: the textarea
+          spans the full width on top and a control bar sits below it, both inside
+          the same card. On md+ it collapses to a plain block and the two control
+          clusters return to their absolute bottom-left / bottom-right overlay
+          (via `md:contents` on the control bar).
+        -->
+        <div class="flex flex-col md:block">
+          <!-- Textarea row. Mobile: full width with a comfortable 12px horizontal
+               inset (matches the control bar below) so text never sits flush
+               against the card edge. md+: py-2 (16px) + textarea min-h-[40px] =
+               56px shell, with room reserved for the overlaid plus button (left)
+               and action buttons (right). -->
+          <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
+            <div
+              class="flex items-center gap-2 px-3 py-2.5 md:pl-[56px] md:py-2"
+              :style="isMobile ? undefined : { paddingRight: `${textareaPaddingRightPx}px` }"
+            >
+              <!-- Inline badge pinned to the caret start — desktop only. On mobile
+                   the badge moves next to the plus button in the control bar.
+                   (`.tool-badge` sets display unlayered and would beat a `hidden`
+                   utility, so we gate visibility with v-if, not CSS.) -->
+              <ToolBadge
+                v-if="activeTool && !isMobile"
+                :tool="activeTool"
+                class="flex-shrink-0"
+                @remove="clearTool"
+              />
+              <!-- Textarea -->
+              <Textarea
+                ref="textareaRef"
+                v-model="message"
+                :placeholder="isMobile ? 'Message...' : $t('chatInput.placeholder')"
+                :rows="1"
+                class="flex-1 min-w-0"
+                data-testid="input-chat-message"
+                @keydown="handleKeyDown"
+                @focus="isFocused = true"
+                @blur="isFocused = false"
+              />
+            </div>
           </div>
-        </div>
 
-        <!-- Plus menu: attach + per-message controls (Model / Tools / Knowledge).
+          <!-- Control bar. Mobile: a real row below the textarea (plus + badge on
+               the left, actions on the right), same 12px inset as the textarea
+               row above. md+: `display: contents` so the plus group and action
+               group fall back to their absolute overlay positions relative to
+               the card. -->
+          <div class="flex items-center gap-2 px-3 pb-2.5 md:contents">
+            <!-- Plus menu: attach + per-message controls (Model / Tools / Knowledge).
              Exempt from the guest lock rule — the menu always opens; gated items
              inside surface the guest hint popover. -->
-        <div
-          ref="plusMenuRef"
-          class="absolute bottom-2 left-1 md:left-[6px]"
-          data-testid="section-chat-plus"
-        >
-          <button
-            type="button"
-            :class="[
-              'surface-chip icon-ghost h-[36px] min-w-[36px] flex items-center justify-center rounded-lg relative touch-manipulation',
-              plusMenuOpen && 'pill--active',
-            ]"
-            :aria-label="$t('chatInput.plusMenu.label')"
-            :aria-expanded="plusMenuOpen"
-            :disabled="uploading"
-            data-testid="btn-chat-plus"
-            @click="togglePlusMenu"
-          >
-            <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
-            <PlusIcon v-else class="w-5 h-5" />
-          </button>
-
-          <div
-            v-if="plusMenuOpen"
-            class="dropdown-up left-0 min-w-[220px] flex flex-col gap-1"
-            data-testid="dropdown-plus-panel"
-          >
-            <button
-              type="button"
-              class="dropdown-item"
-              data-testid="btn-plus-attach"
-              @click="handlePlusAttach"
+            <div
+              ref="plusMenuRef"
+              class="relative flex-shrink-0 md:absolute md:bottom-[6px] md:left-[6px]"
+              data-testid="section-chat-plus"
             >
-              <Icon icon="mdi:paperclip" class="w-5 h-5 flex-shrink-0" />
-              <span class="text-sm font-medium">{{ $t('chatInput.plusMenu.attach') }}</span>
-            </button>
+              <button
+                type="button"
+                :class="[
+                  'surface-chip icon-ghost h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl relative touch-manipulation',
+                  plusMenuOpen && 'pill--active',
+                ]"
+                :aria-label="$t('chatInput.plusMenu.label')"
+                :aria-expanded="plusMenuOpen"
+                :disabled="uploading"
+                data-testid="btn-chat-plus"
+                @click="togglePlusMenu"
+              >
+                <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
+                <PlusIcon v-else class="w-5 h-5" />
+              </button>
 
-            <template v-if="isGuestMode">
-              <button
-                type="button"
-                class="dropdown-item"
-                data-testid="btn-plus-model"
-                @click="handlePlusGate('models')"
+              <div
+                v-if="plusMenuOpen"
+                class="dropdown-up left-0 min-w-[220px] flex flex-col gap-1"
+                data-testid="dropdown-plus-panel"
               >
-                <Icon icon="mdi:tune-vertical" class="w-5 h-5 flex-shrink-0" />
-                <span class="text-sm font-medium flex-1 text-left">{{
-                  $t('chatInput.plusMenu.model')
-                }}</span>
-                <span class="text-xs txt-muted">{{ $t('chatInput.modelDropdown.default') }}</span>
-              </button>
-              <button
-                type="button"
-                class="dropdown-item"
-                data-testid="btn-plus-tools"
-                @click="handlePlusGate('tools')"
-              >
-                <Icon icon="mdi:toolbox-outline" class="w-5 h-5 flex-shrink-0" />
-                <span class="text-sm font-medium flex-1 text-left">{{
-                  $t('chatInput.plusMenu.tools')
-                }}</span>
-              </button>
-              <button
-                type="button"
-                class="dropdown-item"
-                data-testid="btn-plus-knowledge"
-                @click="handlePlusGate('knowledge')"
-              >
-                <Icon icon="mdi:folder-outline" class="w-5 h-5 flex-shrink-0" />
-                <span class="text-sm font-medium flex-1 text-left">{{
-                  $t('chatInput.plusMenu.knowledge')
-                }}</span>
-              </button>
-            </template>
+                <!-- Same `.pill` chip style as the Model/Tools/Knowledge triggers
+                 below it (previously this used the flat `.dropdown-item` row
+                 style). Unlike those rows it has no secondary value to push
+                 right, so `self-start` keeps it sized to its content instead
+                 of stretching across the panel like the full-width rows. -->
+                <button
+                  type="button"
+                  class="pill text-xs md:text-sm self-start"
+                  data-testid="btn-plus-attach"
+                  @click="handlePlusAttach"
+                >
+                  <Icon icon="mdi:paperclip" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                  <span class="font-medium">{{ $t('chatInput.plusMenu.attach') }}</span>
+                </button>
 
-            <template v-else>
-              <ModelDropdown v-model="selectedModelId" />
-              <ToolsDropdown
-                :active-command="activeCommand"
-                :thinking-enabled="thinkingEnabled"
-                :voice-reply="voiceReply"
-                :supports-reasoning="supportsReasoning"
-                :enhance-enabled="enhanceEnabled"
-                :enhance-loading="enhanceLoading"
-                :enhance-available="message.trim().length > 0"
-                @insert-command="handleInsertCommand"
-                @toggle-thinking="toggleThinking"
-                @toggle-voice-reply="toggleVoiceReply"
-                @toggle-enhance="toggleEnhance"
+                <!-- Guest-mode rows: same `.pill` chip style as "Attach files"
+                     above (and the real Model/Tools/Knowledge triggers in the
+                     authenticated branch below) for a consistent list. -->
+                <template v-if="isGuestMode">
+                  <button
+                    type="button"
+                    class="pill text-xs md:text-sm justify-between"
+                    data-testid="btn-plus-model"
+                    @click="handlePlusGate('models')"
+                  >
+                    <span class="inline-flex items-center gap-1.5">
+                      <Icon icon="mdi:tune-vertical" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                      <span class="font-medium">{{ $t('chatInput.plusMenu.model') }}</span>
+                    </span>
+                    <span class="text-xs txt-muted">{{
+                      $t('chatInput.modelDropdown.default')
+                    }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="pill text-xs md:text-sm"
+                    data-testid="btn-plus-tools"
+                    @click="handlePlusGate('tools')"
+                  >
+                    <Icon icon="mdi:toolbox-outline" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                    <span class="font-medium">{{ $t('chatInput.plusMenu.tools') }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="pill text-xs md:text-sm"
+                    data-testid="btn-plus-knowledge"
+                    @click="handlePlusGate('knowledge')"
+                  >
+                    <Icon icon="mdi:folder-outline" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                    <span class="font-medium">{{ $t('chatInput.plusMenu.knowledge') }}</span>
+                  </button>
+                </template>
+
+                <template v-else>
+                  <ModelDropdown v-model="selectedModelId" />
+                  <ToolsDropdown
+                    :active-command="activeTool"
+                    :thinking-enabled="thinkingEnabled"
+                    :voice-reply="voiceReply"
+                    :supports-reasoning="supportsReasoning"
+                    :enhance-enabled="enhanceEnabled"
+                    :enhance-loading="enhanceLoading"
+                    :enhance-available="message.trim().length > 0"
+                    @insert-command="handleInsertCommand"
+                    @toggle-thinking="toggleThinking"
+                    @toggle-voice-reply="toggleVoiceReply"
+                    @toggle-enhance="toggleEnhance"
+                  />
+                  <KnowledgeFolderPicker v-model="selectedGroupKey" :groups="knowledgeGroups" />
+                </template>
+              </div>
+
+              <input
+                type="file"
+                multiple
+                class="hidden"
+                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
+                data-testid="input-chat-file"
+                @change="handleFileSelect"
               />
-              <KnowledgeFolderPicker v-model="selectedGroupKey" :groups="knowledgeGroups" />
-            </template>
+            </div>
+
+            <!-- Mobile-only badge, right of the plus button. -->
+            <ToolBadge
+              v-if="activeTool && isMobile"
+              :tool="activeTool"
+              class="flex-shrink-0"
+              @remove="clearTool"
+            />
+
+            <!-- Spacer pushes the actions to the right edge on mobile (removed on md+). -->
+            <div class="flex-1 md:hidden"></div>
+
+            <!-- Action buttons. Mobile: right side of the control bar. md+: absolute
+             bottom-right overlay (same 6px inset as the plus button, 6px gap). -->
+            <div
+              class="flex flex-shrink-0 items-center gap-1.5 md:pointer-events-none md:absolute md:bottom-[6px] md:right-[6px]"
+              data-testid="section-chat-primary-actions"
+            >
+              <button
+                v-if="showEnhanceInInput"
+                type="button"
+                :class="[
+                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto relative',
+                  enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
+                  enhanceLoading && 'pill--loading',
+                ]"
+                :disabled="enhanceLoading"
+                :aria-label="$t('chatInput.enhance')"
+                :title="$t('chatInput.enhance')"
+                data-testid="btn-chat-enhance"
+                @click="toggleEnhance"
+              >
+                <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
+                <SparklesIcon v-else class="w-5 h-5" />
+              </button>
+
+              <button
+                v-if="showMicrophoneButton"
+                type="button"
+                :class="[
+                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto',
+                  isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost',
+                ]"
+                :aria-label="$t('chatInput.voice')"
+                :title="useWebSpeech ? $t('chatInput.voiceRealtime') : $t('chatInput.voiceWhisper')"
+                data-testid="btn-chat-voice"
+                @click="toggleRecording"
+              >
+                <Icon v-if="isRecording" icon="mdi:stop" class="w-5 h-5 text-white" />
+                <MicrophoneIcon v-else class="w-5 h-5" />
+              </button>
+
+              <button
+                type="button"
+                :disabled="!isStreaming && !canSend"
+                class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl pointer-events-auto transition-all"
+                :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
+                data-testid="btn-chat-send"
+                @click="isStreaming ? emit('stop') : sendMessage()"
+              >
+                <div v-if="isStreaming" class="w-4 h-4 bg-white rounded-sm"></div>
+                <ArrowUpIcon v-else class="w-5 h-5" />
+              </button>
+            </div>
           </div>
-
-          <input
-            type="file"
-            multiple
-            class="hidden"
-            accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
-            data-testid="input-chat-file"
-            @change="handleFileSelect"
-          />
-        </div>
-
-        <!-- Fixed action buttons (positioned absolutely) -->
-        <div
-          class="absolute bottom-1 right-2 md:right-3 flex items-center gap-2 pointer-events-none"
-          data-testid="section-chat-primary-actions"
-        >
-          <button
-            v-if="showEnhanceInInput"
-            type="button"
-            :class="[
-              'h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto relative',
-              enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
-              enhanceLoading && 'pill--loading',
-            ]"
-            :disabled="enhanceLoading"
-            :aria-label="$t('chatInput.enhance')"
-            :title="$t('chatInput.enhance')"
-            data-testid="btn-chat-enhance"
-            @click="toggleEnhance"
-          >
-            <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
-            <SparklesIcon v-else class="w-5 h-5" />
-          </button>
-
-          <button
-            v-if="showMicrophoneButton"
-            type="button"
-            :class="[
-              'h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto',
-              isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost',
-            ]"
-            :aria-label="$t('chatInput.voice')"
-            :title="useWebSpeech ? $t('chatInput.voiceRealtime') : $t('chatInput.voiceWhisper')"
-            data-testid="btn-chat-voice"
-            @click="toggleRecording"
-          >
-            <Icon v-if="isRecording" icon="mdi:stop" class="w-5 h-5 text-white" />
-            <MicrophoneIcon v-else class="w-5 h-5" />
-          </button>
-
-          <button
-            type="button"
-            :disabled="!isStreaming && !canSend"
-            :class="[
-              'h-[44px] min-w-[44px] flex items-center justify-center btn-primary pointer-events-auto transition-all',
-              isStreaming ? 'rounded' : 'rounded-xl',
-            ]"
-            :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
-            data-testid="btn-chat-send"
-            @click="isStreaming ? emit('stop') : sendMessage()"
-          >
-            <div v-if="isStreaming" class="w-4 h-4 bg-white rounded-sm"></div>
-            <PaperAirplaneIcon v-else class="w-5 h-5" />
-          </button>
         </div>
       </div>
 
@@ -293,7 +330,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted, type Ref } from 'vue'
 import {
-  PaperAirplaneIcon,
+  ArrowUpIcon,
   XMarkIcon,
   SparklesIcon,
   MicrophoneIcon,
@@ -304,14 +341,17 @@ import Textarea from './Textarea.vue'
 import CommandPalette from './CommandPalette.vue'
 import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
+import ToolBadge from './ToolBadge.vue'
 import ModelDropdown from './ModelDropdown.vue'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import { parseCommand } from '../commands/parse'
-import { useCommandsStore, type Command } from '@/stores/commands'
+import { type Command } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
+import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { chatApi } from '@/services/api/chatApi'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import type { FileItem } from '@/services/filesService'
 import { getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
@@ -322,6 +362,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
 import { useAuthStore } from '@/stores/auth'
+import { useIncognitoStore } from '@/stores/incognito'
 import QuoteChip from './QuoteChip.vue'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
 
@@ -337,6 +378,13 @@ interface Props {
   isStreaming?: boolean
   isGuestMode?: boolean
   quote?: QuotedReference | null
+  /**
+   * A banner is attached to the input's top edge via the #banner slot. On mobile
+   * the banner spans the full input width, so we square off the shell's top
+   * corners (max-sm only) to read as one seamless card. Rounded corners stay on
+   * md+ where the banner is a compact centered pill on the flat top edge.
+   */
+  bannerVisible?: boolean
 }
 
 const props = defineProps<Props>()
@@ -344,10 +392,15 @@ const props = defineProps<Props>()
 const isStreaming = computed(() => props.isStreaming ?? false)
 const isGuestMode = computed(() => props.isGuestMode ?? false)
 
+// Drop the home-indicator safe-area padding while the soft keyboard is open —
+// the keyboard already covers that area, so the extra inset would leave a gap.
+const keyboardOpen = useKeyboardOpen()
+
 const plusMenuOpen = ref(false)
 const plusMenuRef = ref<HTMLElement | null>(null)
 
 const togglePlusMenu = () => {
+  triggerHapticImpact('light')
   plusMenuOpen.value = !plusMenuOpen.value
 }
 
@@ -389,7 +442,16 @@ const mentionPaletteRef = ref<InstanceType<typeof FileMentionPalette> | null>(nu
 const mentionQuery = ref('')
 const textareaRef = ref<InstanceType<typeof Textarea> | null>(null)
 
-const activeCommand = ref<string | null>(null)
+// Tools that render as a removable badge inside the input (Cursor-style chips)
+// instead of injecting a "/command" into the textarea. The message text stays
+// clean and only holds the user's query; the "/command" is reconstructed at
+// send time so the ChatView/backend contract is unchanged.
+type ChatTool = 'search' | 'pic' | 'vid'
+const TOOL_COMMANDS: readonly ChatTool[] = ['search', 'pic', 'vid'] as const
+const isToolCommand = (name: string): name is ChatTool =>
+  (TOOL_COMMANDS as readonly string[]).includes(name)
+
+const activeTool = ref<ChatTool | null>(null)
 const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
@@ -415,6 +477,7 @@ const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const authStore = useAuthStore()
+const incognitoStore = useIncognitoStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -485,11 +548,13 @@ const useWebSpeech = computed(() => {
   return isWebSpeechSupported()
 })
 
-// Input persistence - auto-save with proper debouncing
+// Input persistence - auto-save with proper debouncing. Disabled during an
+// incognito session: drafts must never survive in localStorage.
 const { clearInput: clearPersistedInput } = useAutoPersist(
   message,
   'chat',
-  computed(() => chatsStore.activeChatId)
+  computed(() => chatsStore.activeChatId),
+  computed(() => incognitoStore.active)
 )
 
 const emit = defineEmits<{
@@ -511,26 +576,19 @@ const emit = defineEmits<{
   clearQuote: []
 }>()
 
-const commandsStore = useCommandsStore()
-
-const isCommandValid = computed(() => {
-  if (!activeCommand.value) return false
-  return commandsStore.commands.some((cmd) => cmd.name === activeCommand.value)
-})
-
-const commandIcon = computed(() => {
-  if (!activeCommand.value) return 'mdi:help-circle'
-  const cmd = commandsStore.commands.find((c) => c.name === activeCommand.value)
-  return cmd?.icon || 'mdi:help-circle'
-})
-
 const canSend = computed(() => {
   const trimmedMessage = message.value.trim()
   const hasMessage = trimmedMessage.length > 0
   const hasFiles = uploadedFiles.value.length > 0
   const filesReady = uploadedFiles.value.every((f) => !f.processing)
 
-  // Prevent sending if only a command is present (e.g., just "/pic" without arguments)
+  // A tool badge (search/image/video) needs a query or description to act on,
+  // so an active tool with an empty textarea (and no files) can't be sent.
+  if (activeTool.value && !hasMessage && !hasFiles) {
+    return false
+  }
+
+  // Prevent sending if only a raw command is typed (e.g., just "/pic" without arguments)
   const isOnlyCommand = trimmedMessage.startsWith('/') && !trimmedMessage.includes(' ')
   if (isOnlyCommand && !hasFiles) {
     return false
@@ -594,16 +652,13 @@ watch(
       const parsed = parseCommand(newValue)
 
       if (parsed) {
-        activeCommand.value = parsed.command
         // Hide palette if user has started typing arguments (command + space)
         paletteVisible.value = !hasSpace || parsed.args.length === 0
       } else {
-        activeCommand.value = null
         paletteVisible.value = true
       }
     } else {
       paletteVisible.value = false
-      activeCommand.value = null
     }
 
     // Detect @mention trigger: match @ preceded by start-of-string or whitespace, at end of input.
@@ -686,11 +741,19 @@ const sendMessage = () => {
     return
   }
 
-  const hasWebSearch = activeCommand.value === 'search'
+  const hasWebSearch = activeTool.value === 'search'
 
-  // Send the full message with command to backend (it needs it for /pic and /vid)
-  // The UI cleanup will happen in ChatView before adding to history
-  const messageToSend = message.value
+  // Reconstruct the "/command query" string from the active tool badge so the
+  // ChatView/backend contract stays identical to the old slash-command flow.
+  // The textarea only holds the query; ChatView strips the prefix for display
+  // and uses the webSearch flag for /search (see handleSendMessage).
+  const query = message.value
+  let messageToSend = query
+  if (activeTool.value === 'pic' || activeTool.value === 'vid') {
+    messageToSend = `/${activeTool.value} ${query}`.trim()
+  } else if (activeTool.value === 'search') {
+    messageToSend = `/search ${query}`.trim()
+  }
 
   const options = {
     includeReasoning: thinkingEnabled.value,
@@ -709,7 +772,7 @@ const sendMessage = () => {
   paletteVisible.value = false
   mentionPaletteVisible.value = false
   mentionQuery.value = ''
-  activeCommand.value = null
+  activeTool.value = null
   voiceReply.value = false
   emit('clearQuote')
   // Reset enhance state after sending
@@ -734,41 +797,53 @@ const toggleVoiceReply = () => {
   voiceReply.value = !voiceReply.value
 }
 
+// Selecting a command from the "/" autocomplete palette. The three tools
+// (search/pic/vid) become a badge and strip the typed "/query" from the input;
+// any other command (e.g. /tts) keeps the legacy inline-text behaviour.
 const handleCommandSelect = (cmd: Command) => {
-  if (cmd.requiresArgs) {
+  paletteVisible.value = false
+  if (isToolCommand(cmd.name)) {
+    setActiveTool(cmd.name)
+    // Drop the partial "/cmd" the user was typing so only the query remains.
+    message.value = ''
+  } else if (cmd.requiresArgs) {
     message.value = `${cmd.usage.split('[')[0].trim()} `
   } else {
     message.value = cmd.usage
   }
-  paletteVisible.value = false
-  activeCommand.value = cmd.name
   // Focus textarea after command selection
   nextTick(() => {
     textareaRef.value?.focus()
   })
 }
 
+// Picking a tool from the "+" -> Tools menu. Toggles the badge without touching
+// the textarea; the user then types their query as plain text.
 const handleInsertCommand = (cmd: Command) => {
-  if (cmd.requiresArgs) {
+  if (isToolCommand(cmd.name)) {
+    setActiveTool(cmd.name)
+  } else if (cmd.requiresArgs) {
     message.value = `${cmd.usage.split('[')[0].trim()} `
   } else {
     message.value = cmd.usage
   }
-  activeCommand.value = cmd.name
-  // Focus textarea after command insertion
+  // Focus textarea after selection
   nextTick(() => {
     textareaRef.value?.focus()
   })
+}
+
+// Single active tool at a time: selecting the active tool again clears it.
+const setActiveTool = (tool: ChatTool) => {
+  activeTool.value = activeTool.value === tool ? null : tool
 }
 
 const closePalette = () => {
   paletteVisible.value = false
 }
 
-const clearCommand = () => {
-  activeCommand.value = null
-  message.value = ''
-  paletteVisible.value = false
+const clearTool = () => {
+  activeTool.value = null
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -786,6 +861,19 @@ const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault()
       e.stopPropagation()
       mentionPaletteRef.value.handleKeyDown(e)
+      return
+    }
+  }
+
+  // Backspace at the very start of an empty input removes the active tool badge
+  // (Cursor-style chip deletion), so the user never has to reach for the X.
+  if (e.key === 'Backspace' && activeTool.value) {
+    const target = e.target as HTMLTextAreaElement
+    const atStart =
+      message.value.length === 0 || (target.selectionStart === 0 && target.selectionEnd === 0)
+    if (atStart) {
+      e.preventDefault()
+      clearTool()
       return
     }
   }
@@ -941,7 +1029,15 @@ const uploadFiles = async (files: File[]) => {
     uploadedFiles.value.push(tempFile)
 
     try {
-      const result = await chatApi.uploadChatFile(file, controller.signal)
+      // Incognito sessions mark the upload ephemeral (hidden from the file
+      // manager, auto-deleted after the session) and track the id for the
+      // session-end cleanup.
+      const result = await chatApi.uploadChatFile(file, controller.signal, {
+        incognito: incognitoStore.active,
+      })
+      if (incognitoStore.active) {
+        incognitoStore.registerFile(result.file_id)
+      }
 
       // Issue #729: when the synchronous extraction at upload time fails
       // (corrupted DOCX, password-protected PDF, etc.), surface a clear
@@ -1256,8 +1352,14 @@ const transcribeAudio = async (audioBlob: Blob) => {
   uploading.value = true
 
   try {
-    // Upload for transcription (WhisperCPP on backend)
-    const result = await chatApi.transcribeAudio(audioBlob)
+    // Upload for transcription (WhisperCPP on backend). Incognito recordings
+    // are ephemeral and tracked for the session-end cleanup.
+    const result = await chatApi.transcribeAudio(audioBlob, undefined, {
+      incognito: incognitoStore.active,
+    })
+    if (incognitoStore.active) {
+      incognitoStore.registerFile(result.file_id)
+    }
 
     if (result.text) {
       message.value += (message.value ? ' ' : '') + result.text

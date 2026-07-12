@@ -121,7 +121,7 @@
           </section>
 
           <section
-            v-if="config.billing.enabled"
+            v-if="config.billing.enabled && purchaseAllowed"
             class="surface-card rounded-lg p-6"
             data-testid="section-billing"
           >
@@ -443,6 +443,29 @@
                 {{ $t('profile.legal.terms') }}
                 <Icon icon="mdi:open-in-new" class="w-4 h-4 txt-secondary" />
               </a>
+              <!-- Account-deletion info (Epic 9.1). Internal default route, or a
+                   brand's external deletion page when configured. -->
+              <a
+                v-if="isExternalDeletionUrl"
+                :href="config.branding.accountDeletionUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
+                data-testid="link-account-deletion"
+              >
+                <Icon icon="mdi:account-remove-outline" class="w-5 h-5" />
+                {{ $t('profile.legal.accountDeletion') }}
+                <Icon icon="mdi:open-in-new" class="w-4 h-4 txt-secondary" />
+              </a>
+              <RouterLink
+                v-else
+                :to="config.branding.accountDeletionUrl"
+                class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
+                data-testid="link-account-deletion"
+              >
+                <Icon icon="mdi:account-remove-outline" class="w-5 h-5" />
+                {{ $t('profile.legal.accountDeletion') }}
+              </RouterLink>
             </div>
           </section>
 
@@ -612,6 +635,7 @@ import { profileApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import {
   isBiometricAvailable,
   isBiometricLockEnabled,
@@ -623,6 +647,10 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const config = useConfigStore()
+
+// Billing address only matters for Stripe invoices; on a custom server in the
+// native app there is no purchase path at all.
+const purchaseAllowed = isPurchaseAllowed()
 const { error } = useNotification()
 const { t } = useI18n()
 
@@ -634,6 +662,12 @@ const shouldHighlight = ref(false)
 const biometricAvailable = ref(false)
 const biometricLockOn = ref(isBiometricLockEnabled())
 const showBiometricSection = computed(() => isNativeApp() && biometricAvailable.value)
+
+// Account-deletion link (Epic 9.1): default is the internal /account-deletion
+// route; a white-label brand may configure an external (http) deletion page.
+const isExternalDeletionUrl = computed(() =>
+  /^https?:\/\//i.test(config.branding.accountDeletionUrl)
+)
 
 onMounted(async () => {
   biometricAvailable.value = await isBiometricAvailable()

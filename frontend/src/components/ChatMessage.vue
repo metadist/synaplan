@@ -371,9 +371,12 @@
                 </div>
               </template>
 
-              <!-- Tool Badge (replaces Web Search Badge for better consistency) -->
+              <!-- Tool badge: small colored chip matching the composer badge. -->
+              <ToolBadge v-if="messageToolBadge" :tool="messageToolBadge" :removable="false" />
+
+              <!-- Fallback for legacy/unknown tools without a mapped badge. -->
               <div
-                v-if="tool"
+                v-else-if="tool"
                 class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] dark:text-[var(--brand-light)] text-sm"
               >
                 <Icon :icon="tool.icon" class="w-4 h-4 flex-shrink-0" />
@@ -653,11 +656,20 @@
             <!-- Info popover trigger (assistant only, when metadata or per-reply
                  usage is available). On touch devices the token/cost badge is
                  hidden inline to avoid colliding with the footer actions, so the
-                 usage lives inside this popover instead. -->
+                 usage lives inside this popover instead.
+                 Mobile: same `.pill` chip look as the message action buttons
+                 (e.g. "Not correct"), icon-only. Desktop keeps the original
+                 compact circular icon button — `.pill` is an unlayered class
+                 that would beat `md:` Tailwind variants for the same
+                 properties, so we branch the whole class list instead. -->
             <div v-if="role === 'assistant' && hasInfoPopover && !isProcessing" class="relative">
               <button
                 type="button"
-                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs transition-colors bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 txt-tertiary hover:txt-primary"
+                :class="
+                  isMobileViewport
+                    ? 'pill'
+                    : 'inline-flex items-center justify-center w-6 h-6 rounded-full text-xs transition-colors bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 txt-tertiary hover:txt-primary'
+                "
                 :aria-label="t('chatMessage.messageDetails')"
                 data-testid="btn-message-info"
                 @click.stop="infoPopoverOpen = !infoPopoverOpen"
@@ -960,6 +972,7 @@
               </div>
               <div class="flex flex-wrap gap-2">
                 <button
+                  v-if="purchaseAllowed"
                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg transition-all"
                   @click="$router.push('/subscription')"
                 >
@@ -1006,6 +1019,7 @@ import {
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import ToolBadge from '@/components/ToolBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
@@ -1031,8 +1045,12 @@ import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
 const { t, locale } = useI18n()
+
+// No purchase path on a custom server in the native app (store IAP only).
+const purchaseAllowed = isPurchaseAllowed()
 const { error: showError } = useNotification()
 const { pendingUrl, warningOpen, openExternalLink, closeWarning } = useExternalLink()
 const { formatTime } = useDateFormat()
@@ -1103,6 +1121,7 @@ interface Props {
     resultsCount?: number
   } | null // Web search metadata
   tool?: {
+    command?: string
     icon: string
     label: string
   } | null // Tool metadata (e.g., web search, file generation)
@@ -1193,6 +1212,13 @@ const sourcesExpanded = ref(true)
 // Carousel state for search results
 const carouselPage = ref(0) // Which "page" we're on (0-based)
 const highlightedSource = ref<number | null>(null)
+
+// Map the sent-message tool metadata to the small colored composer badge
+// (search/pic/vid). Unknown/legacy tools fall back to the generic tool badge.
+const messageToolBadge = computed<'search' | 'pic' | 'vid' | null>(() => {
+  const cmd = props.tool?.command
+  return cmd === 'search' || cmd === 'pic' || cmd === 'vid' ? cmd : null
+})
 
 // Calculate total badges count (files + webSearch/tool)
 const totalBadgesCount = computed(() => {
@@ -1758,13 +1784,21 @@ const handleThumbnailError = (event: Event) => {
   }
 }
 
+// Same breakpoint as ChatInput's isMobile (innerWidth < 768). Drives the
+// info/lightbulb trigger's mobile-only pill styling below.
+const mobileMq = window.matchMedia('(max-width: 767px)')
+const isMobileViewport = ref(mobileMq.matches)
+const onMobileMqChange = (e: MediaQueryListEvent) => (isMobileViewport.value = e.matches)
+
 // Add event listener for reference clicks
 onMounted(() => {
   document.addEventListener('click', handleReferenceClick)
+  mobileMq.addEventListener('change', onMobileMqChange)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleReferenceClick)
+  mobileMq.removeEventListener('change', onMobileMqChange)
   clearLongRunningTimer()
 })
 </script>

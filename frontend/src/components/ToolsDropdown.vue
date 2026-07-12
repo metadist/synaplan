@@ -25,7 +25,7 @@
       data-testid="dropdown-tools-panel"
       @keydown.escape="closeDropdown"
     >
-      <!-- Command tools: insert a /command into the input -->
+      <!-- Command tools: toggle a removable tool badge inside the chat input -->
       <button
         v-for="tool in commandTools"
         ref="itemRefs"
@@ -187,6 +187,7 @@ import { Icon } from '@iconify/vue'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { getFeaturesStatus, DevOnlyFeatureError, type Feature } from '@/services/featuresService'
 import { useRouter } from 'vue-router'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 
 interface Props {
   activeCommand?: string | null
@@ -208,7 +209,7 @@ const emit = defineEmits<{
   toggleEnhance: []
 }>()
 
-/** Feature-gated tools that insert a slash command into the input. */
+/** Feature-gated tools that toggle a removable badge in the chat input. */
 const commandTools = [
   {
     id: 'web-search',
@@ -285,6 +286,7 @@ const loadFeaturesStatus = async () => {
 }
 
 const toggleOpen = () => {
+  triggerHapticImpact('light')
   isOpen.value = !isOpen.value
   if (isOpen.value && Object.keys(featuresStatus.value).length === 0) {
     loadFeaturesStatus()

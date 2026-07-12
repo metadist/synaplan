@@ -28,8 +28,9 @@ final readonly class GeneratedFileRegistrar
      * @param string      $type         handler media type (`audio`/`image`/`video`/...); falls back to the file extension
      * @param int|null    $messageId    originating BMESSAGES.BID, for "jump to chat" (03_file-management.md §3.1)
      * @param string|null $provider     generating provider/model, for the Generated gallery
+     * @param bool        $ephemeral    incognito-session artefact: hidden from listings, deleted after the session
      */
-    public function register(int $userId, ?string $relativePath, string $type, ?int $messageId = null, ?string $provider = null): ?File
+    public function register(int $userId, ?string $relativePath, string $type, ?int $messageId = null, ?string $provider = null, bool $ephemeral = false): ?File
     {
         if (null === $relativePath || '' === $relativePath) {
             return null;
@@ -90,6 +91,7 @@ final readonly class GeneratedFileRegistrar
             // generation prompt to the knowledge base on demand from the file
             // manager ("Add prompt to knowledge base").
             $file->setVectorState(File::VECTOR_STATE_NONE);
+            $file->setEphemeral($ephemeral);
 
             $this->files->save($file);
 

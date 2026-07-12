@@ -3,12 +3,12 @@
     <Transition name="modal">
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
         data-testid="modal-file-picker"
         @click.self="close"
       >
         <div
-          class="surface-elevated w-full max-w-xl p-6 m-4 max-h-[80vh] flex flex-col"
+          class="modal-panel surface-elevated w-full max-w-xl p-6 m-4 flex flex-col"
           data-testid="file-picker-content"
         >
           <!-- Header -->

@@ -41,6 +41,16 @@
   [data-testid='section-primary-content'] > :first-child:not([data-testid='page-chat']) {
     padding-top: calc(env(safe-area-inset-top, 0px) + 62px);
   }
+
+  /* ChatView is intentionally excluded above (messages scroll behind the
+     floating button), but with the WebView running edge-to-edge (iOS
+     contentInset: 'never' + viewport-fit=cover) its scroll content would
+     otherwise start under the status bar / notch. Pad the scroll container's
+     top by the safe-area inset so the first message / empty state sits below
+     the status bar, while messages still scroll up behind it. */
+  [data-testid='page-chat'] [data-testid='section-messages'] {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 }
 
 /* Base */
@@ -62,6 +72,10 @@
       system-ui,
       sans-serif;
     -moz-osx-font-smoothing: grayscale;
+    /* Theme the document background itself so any sliver the app root does not
+       cover — e.g. the rounded top corners of the iOS on-screen keyboard —
+       shows the app background instead of default black. */
+    background: var(--bg-app);
   }
 
   :root {
@@ -173,6 +187,67 @@
   }
   .bg-chat-input-area {
     background: var(--bg-chat);
+  }
+
+  /* On-screen keyboard inset (px). The native shell sets this from the
+     Capacitor Keyboard `keyboardWillShow`/`keyboardWillHide` events (see
+     app/synaplan-native.js) so the chat composer can float above the keyboard
+     WITHOUT the WebView resizing (Keyboard.resize = 'none'). Stays 0 on the web
+     build, where the composer keeps its normal sticky-bottom behavior. */
+  .chat-composer-sticky {
+    position: sticky;
+    bottom: 0;
+    /* keyboardWillShow fires at the START of the iOS animation with the final
+       height, so this transition glides the composer up in sync — no lag. */
+    transform: translateY(calc(var(--keyboard-inset-height, 0px) * -1));
+    transition:
+      transform 0.22s ease-out,
+      padding-bottom 0.22s ease-out;
+    will-change: transform;
+    /* The composer owns the iOS home-indicator safe area — but ONLY while the
+       keyboard is hidden. When the native keyboard is up (--keyboard-inset-height
+       > 0) this collapses to 0 so the input sits right above the keyboard instead
+       of floating ~34px above it. resize:'none' keeps visualViewport unchanged in
+       the native app, so this inset var is the reliable "keyboard open" signal. */
+    padding-bottom: max(
+      0px,
+      calc(env(safe-area-inset-bottom, 0px) - var(--keyboard-inset-height, 0px))
+    );
+  }
+
+  /* Web fallback: mobile browsers DO shrink visualViewport, so useKeyboardOpen
+     flips this class — collapse the inset there too (the native inset var stays
+     0 on the web build). */
+  .chat-composer-sticky--kb-open {
+    padding-bottom: 0;
+  }
+
+  /* With Keyboard.resize:'none' the WebView keeps its full height, so the chat
+     message list still lives behind the (semi-translucent) iOS keyboard and its
+     messages shimmer through while scrolling. This fills that region with the
+     solid chat background: the composer is lifted by --keyboard-inset-height, so
+     an ::after starting at its bottom edge and exactly that tall covers the whole
+     keyboard area with var(--bg-chat) — the keyboard now blurs a flat colour, not
+     the messages. Collapses to 0 height when the keyboard hides. */
+  .chat-composer-sticky::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: var(--keyboard-inset-height, 0px);
+    background: var(--bg-chat);
+    pointer-events: none;
+    transition: height 0.22s ease-out;
+  }
+
+  /* Reserve scroll space equal to the keyboard inset so the newest message can
+     be scrolled clear of the floating composer. Applied instantly (no
+     transition): ChatView pins the container to the bottom on the keyboard
+     event, so the padding must reach its final size in the same frame — an
+     animating padding would leave the pin chasing a growing scrollHeight. */
+  .chat-scroll-keyboard-pad {
+    padding-bottom: var(--keyboard-inset-height, 0px);
   }
 
   /* Surface Tokens (einheitlicher Card-Look) */
@@ -778,6 +853,23 @@
     scrollbar-gutter: stable both-edges;
   }
 
+  /*
+   * Shared modal primitives. Applied to every teleported overlay + panel so
+   * dialogs never grow under the iOS notch / Dynamic Island and always leave
+   * the device safe areas clear. `100dvh` (not `vh`) tracks the visible viewport
+   * on mobile browsers where the URL bar / keyboard change the usable height.
+   */
+  .modal-overlay {
+    padding-top: max(env(safe-area-inset-top, 0px), 1rem);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 1rem);
+  }
+  .modal-panel {
+    max-height: calc(
+      100dvh - max(env(safe-area-inset-top, 0px), 1rem) -
+        max(env(safe-area-inset-bottom, 0px), 1rem)
+    );
+  }
+
   /* Icon ghost */
   .icon-ghost {
     color: #8a8a8e;
@@ -1191,6 +1283,68 @@
     background: rgba(59, 130, 246, 0.3);
     color: #bfdbfe;
     border: 1px solid #2563eb;
+  }
+
+  /* Chat tool badges (Cursor-style chips inside the input). Subtle, low-alpha
+     tints per tool so they stay distinct without shouting. */
+  .tool-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    border-radius: 0.625rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.25;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .tool-badge .tool-badge__x {
+    opacity: 0.55;
+    transition: opacity 0.15s ease;
+  }
+  .tool-badge:hover .tool-badge__x {
+    opacity: 1;
+  }
+  /* Read-only variant shown inside a sent message bubble. */
+  .tool-badge--static {
+    cursor: default;
+  }
+
+  .tool-badge--search {
+    background: rgba(59, 130, 246, 0.1);
+    color: #2563eb;
+    border-color: rgba(59, 130, 246, 0.22);
+  }
+  .dark .tool-badge--search {
+    background: rgba(96, 165, 250, 0.16);
+    color: #93c5fd;
+    border-color: rgba(96, 165, 250, 0.3);
+  }
+
+  .tool-badge--image {
+    background: rgba(139, 92, 246, 0.1);
+    color: #7c3aed;
+    border-color: rgba(139, 92, 246, 0.22);
+  }
+  .dark .tool-badge--image {
+    background: rgba(167, 139, 250, 0.16);
+    color: #c4b5fd;
+    border-color: rgba(167, 139, 250, 0.3);
+  }
+
+  .tool-badge--video {
+    background: rgba(245, 158, 11, 0.12);
+    color: #b45309;
+    border-color: rgba(245, 158, 11, 0.25);
+  }
+  .dark .tool-badge--video {
+    background: rgba(251, 191, 36, 0.16);
+    color: #fcd34d;
+    border-color: rgba(251, 191, 36, 0.3);
   }
 
   /* Alert/Message Boxes - Compact versions with high contrast */

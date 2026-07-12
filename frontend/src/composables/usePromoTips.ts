@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
+import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
 export interface PromoTip {
   id: string
@@ -122,7 +123,9 @@ export function usePromoTips() {
         case 'doc-summary':
           return true
         case 'upgrade-pro':
-          return !authStore.isPro && !authStore.isAdmin
+          // Never steer to a purchase when the native app runs against a
+          // custom server (no store purchase channel there).
+          return !authStore.isPro && !authStore.isAdmin && isPurchaseAllowed()
         case 'files-upload':
           return true
         case 'file-mention':

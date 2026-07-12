@@ -1,44 +1,40 @@
+import type { z } from 'zod'
+import {
+  GetAdminSubscriptionsListResponseSchema,
+  PatchAdminSubscriptionsUpdateResponseSchema,
+} from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
-export interface AdminSubscription {
-  id: number
-  name: string
-  level: string
-  priceMonthly: string
-  priceYearly: string
-  description: string
-  active: boolean
-  costBudgetMonthly: string
-  costBudgetYearly: string
-}
+// Inferred from the generated Zod schemas (per AGENTS.md: never hand-write
+// interfaces for API responses).
+type AdminSubscriptionsListResponse = z.infer<typeof GetAdminSubscriptionsListResponseSchema>
+type AdminSubscriptionUpdateResponse = z.infer<typeof PatchAdminSubscriptionsUpdateResponseSchema>
+
+export type AdminSubscription = AdminSubscriptionsListResponse['subscriptions'][number]
 
 export interface AdminSubscriptionUpdateRequest {
+  priceMonthly?: number
+  priceYearly?: number
+  currency?: string
   costBudgetMonthly?: number
   costBudgetYearly?: number
   active?: boolean
 }
 
-interface AdminSubscriptionsListResponse {
-  success: boolean
-  subscriptions: AdminSubscription[]
-}
-
-interface AdminSubscriptionUpdateResponse {
-  success: boolean
-  subscription: AdminSubscription
-}
-
 export const adminSubscriptionsApi = {
   list: async (): Promise<AdminSubscriptionsListResponse> => {
-    return httpClient<AdminSubscriptionsListResponse>('/api/v1/admin/subscriptions')
+    return httpClient('/api/v1/admin/subscriptions', {
+      schema: GetAdminSubscriptionsListResponseSchema,
+    })
   },
   update: async (
     id: number,
     data: AdminSubscriptionUpdateRequest
   ): Promise<AdminSubscriptionUpdateResponse> => {
-    return httpClient<AdminSubscriptionUpdateResponse>(`/api/v1/admin/subscriptions/${id}`, {
+    return httpClient(`/api/v1/admin/subscriptions/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+      schema: PatchAdminSubscriptionsUpdateResponseSchema,
     })
   },
 }

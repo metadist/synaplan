@@ -192,6 +192,18 @@ const config = {
     get termsUrl(): string {
       return getConfigSync().branding?.termsUrl || 'https://www.synaplan.com/terms'
     },
+    // MOBILE-APP SEAM (Epic 9.1): account-deletion link (Google Play policy).
+    // Empty config falls back to the app's own public /account-deletion page so
+    // an unconfigured deployment is still store-compliant; white-label brands
+    // may point at their own deletion page.
+    get accountDeletionUrl(): string {
+      // Defensive read: older backend deployments omit a `type` on this field in
+      // their OpenAPI spec, so the generated schema types it as `{}` instead of
+      // `string`. A plain `|| fallback` would then return the object. Narrow to a
+      // non-empty string explicitly so the value is correct regardless of drift.
+      const url = getConfigSync().branding?.accountDeletionUrl
+      return typeof url === 'string' && url ? url : '/account-deletion'
+    },
     get landingPage(): string {
       return getConfigSync().branding?.landingPage ?? ''
     },
@@ -286,6 +298,10 @@ const config = {
     /** True when this mobile app is older than minVersion and must update. */
     get updateRequired(): boolean {
       return getConfigSync().mobile?.updateRequired ?? false
+    },
+    /** ISO-8601 deadline after which the forced-update gate may block. */
+    get updateEnforceAfter(): string {
+      return getConfigSync().mobile?.updateEnforceAfter ?? ''
     },
     /** App Store link for the update button ('' when unset). */
     get iosAppUrl(): string {

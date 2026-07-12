@@ -119,22 +119,8 @@
             </div>
           </div>
 
-          <!--
-            Logout is intentionally hidden while impersonating: clicking it
-            would clear the admin's session entirely (cookies + stash)
-            instead of just ending the impersonation, which is almost never
-            what the operator means. The "Exit" button on the floating
-            impersonation pill is the correct action here.
-          -->
-          <div v-if="!isImpersonating" class="surface-card p-6" data-testid="section-logout">
-            <button
-              class="btn-primary px-6 py-2.5 rounded-lg w-full"
-              data-testid="btn-logout"
-              @click="handleLogout"
-            >
-              {{ $t('settings.logout') }}
-            </button>
-          </div>
+          <!-- App server (native shell only, every authenticated user) -->
+          <NativeServerControl v-if="isNativeServerControlAvailable()" />
         </div>
       </div>
     </div>
@@ -143,18 +129,16 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useAuth } from '@/composables/useAuth'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import MainLayout from '@/components/MainLayout.vue'
+import NativeServerControl from '@/components/NativeServerControl.vue'
+import { isNativeServerControlAvailable } from '@/services/api/nativeServer'
 import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/vue/24/outline'
 
-const router = useRouter()
 const authStore = useAuthStore()
 const { theme, setTheme } = useTheme()
-const { isImpersonating } = useAuth()
 const { locale } = useI18n()
 
 const languages = [
@@ -174,10 +158,5 @@ const selectedLanguage = computed({
 
 const selectLanguage = (value: string) => {
   selectedLanguage.value = value
-}
-
-const handleLogout = async () => {
-  await authStore.logout()
-  router.push('/login')
 }
 </script>

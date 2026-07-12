@@ -43,6 +43,8 @@ class FileRepository extends ServiceEntityRepository
     ): array {
         $qb = $this->createQueryBuilder('mf')
             ->where('mf.userId = :userId')
+            // Incognito-session files never surface in the file manager.
+            ->andWhere('mf.ephemeral = false')
             ->setParameter('userId', $userId);
 
         if ($groupKey) {
@@ -166,6 +168,7 @@ class FileRepository extends ServiceEntityRepository
         $sourceRows = $this->createQueryBuilder('f')
             ->select('f.source AS k, COUNT(f.id) AS c')
             ->where('f.userId = :userId')
+            ->andWhere('f.ephemeral = false')
             ->setParameter('userId', $userId)
             ->groupBy('f.source')
             ->getQuery()
@@ -174,6 +177,7 @@ class FileRepository extends ServiceEntityRepository
         $stateRows = $this->createQueryBuilder('f')
             ->select('f.vectorState AS k, COUNT(f.id) AS c')
             ->where('f.userId = :userId')
+            ->andWhere('f.ephemeral = false')
             ->setParameter('userId', $userId)
             ->groupBy('f.vectorState')
             ->getQuery()
@@ -196,6 +200,7 @@ class FileRepository extends ServiceEntityRepository
             ->select('COUNT(f.id)')
             ->where('f.userId = :userId')
             ->andWhere('f.incoming = true')
+            ->andWhere('f.ephemeral = false')
             ->setParameter('userId', $userId)
             ->getQuery()
             ->getSingleScalarResult();
@@ -238,6 +243,7 @@ class FileRepository extends ServiceEntityRepository
         $qb = $this->createQueryBuilder('f')
             ->select('f.groupKey AS name, COUNT(f.id) AS cnt')
             ->where('f.userId = :userId')
+            ->andWhere('f.ephemeral = false')
             ->andWhere('f.groupKey IS NOT NULL')
             ->andWhere("f.groupKey != ''")
             ->andWhere("f.groupKey != 'DEFAULT'")
@@ -251,6 +257,25 @@ class FileRepository extends ServiceEntityRepository
         }
 
         return $groups;
+    }
+
+    /**
+     * Ephemeral (incognito-session) files older than the given cutoff — the
+     * reaper deletes them from disk and DB as a safety net for sessions the
+     * frontend could not clean up (tab crash, network loss).
+     *
+     * @return File[]
+     */
+    public function findExpiredEphemeral(int $cutoffTimestamp, int $limit = 500): array
+    {
+        return $this->createQueryBuilder('f')
+            ->where('f.ephemeral = true')
+            ->andWhere('f.createdAt < :cutoff')
+            ->setParameter('cutoff', $cutoffTimestamp)
+            ->orderBy('f.createdAt', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
     }
 
     public function delete(File $file): void

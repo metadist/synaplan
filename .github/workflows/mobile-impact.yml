@@ -1,0 +1,67 @@
+name: Mobile Impact
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: mobile-impact-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  classify:
+    name: Classify mobile release impact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Generate fail-closed impact manifest
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "pull/${PR_NUMBER}/head:refs/remotes/pull/head"
+          test "$(git rev-parse refs/remotes/pull/head)" = "$HEAD_SHA"
+          # Bootstrap-only: the classifier tooling is checked out from the base
+          # branch (fail-closed against PR tampering), but the PR that first
+          # introduces the tooling has no copy on base yet. Materialize it from
+          # the PR head just for that case. Once merged to main this branch is
+          # dead code, because base always carries the files.
+          if [ ! -f scripts/mobile-impact.mjs ]; then
+            mkdir -p scripts .github
+            git show refs/remotes/pull/head:scripts/mobile-impact.mjs > scripts/mobile-impact.mjs
+            git show refs/remotes/pull/head:.github/mobile-impact-policy.json > .github/mobile-impact-policy.json
+          fi
+          mkdir -p mobile-impact
+          args=(
+            --base "$BASE_SHA"
+            --head "$HEAD_SHA"
+            --output mobile-impact/manifest.json
+          )
+          while IFS= read -r label; do
+            args+=(--label "$label")
+          done < <(jq -r '.[]' <<< "$LABELS_JSON")
+          node scripts/mobile-impact.mjs "${args[@]}"
+          jq -r \
+            '"### Mobile impact: `\(.classification)`\n\n\(.reason)\n\nChanged files: \(.files | length)"' \
+            mobile-impact/manifest.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload impact manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: mobile-impact-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: mobile-impact/manifest.json
+          if-no-files-found: error
+          retention-days: 14

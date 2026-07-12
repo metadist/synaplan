@@ -1,18 +1,28 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
+import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useConfigStore } from '@/stores/config'
+import { useIncognitoStore } from '@/stores/incognito'
 import { authService } from '@/services/authService'
+import { hasSessionHint } from '@/services/sessionHint'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
+/** Page size for the mobile history drawer's infinite scroll. */
+const HISTORY_PAGE_SIZE = 20
+
 // Helper function to check authentication and redirect if needed
-// Uses authService which holds user info in memory (not localStorage)
+// Uses authService which holds user info in memory (not localStorage).
+// The redirect reason is only `session_expired` when this browser has a prior
+// successful login (session hint) — a never-logged-in guest gets the neutral
+// `auth_required`, so they never see the misleading "session expired" message.
 function checkAuthOrRedirect(): boolean {
   if (!authService.isAuthenticated()) {
     console.warn('🔒 Not authenticated - redirecting to login')
-    window.location.href = '/login?reason=session_expired'
+    const reason = hasSessionHint() ? 'session_expired' : 'auth_required'
+    window.location.href = `/login?reason=${reason}`
     return false
   }
   return true
@@ -54,6 +64,16 @@ export const useChatsStore = defineStore('chats', () => {
   const activeChatId = ref<number | null>(readActiveChatId())
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  /**
+   * Paginated history for the mobile drawer. Kept separate from `chats` so the
+   * global list (chat switching, desktop rail, `ensureValidActiveChat`) is not
+   * affected by the incremental, page-by-page loading of the drawer.
+   */
+  const historyChats = ref<Chat[]>([])
+  const historyLoading = ref(false)
+  const historyHasMore = ref(true)
+  const historyOffset = ref(0)
 
   const normalizeChat = (chat: unknown): Chat => {
     const c = chat as Chat
@@ -134,6 +154,49 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  /**
+   * Load one page of the paginated chat history for the mobile drawer.
+   *
+   * @param reset When true, start over at offset 0 and replace the list
+   *   (e.g. when the drawer opens or after a mutation). Otherwise append the
+   *   next page for infinite scroll. No-op while a page is in flight, or when
+   *   there is nothing more to load (unless resetting).
+   */
+  async function loadChatHistory(reset = false) {
+    if (!checkAuthOrRedirect()) return
+    if (historyLoading.value) return
+    if (!reset && !historyHasMore.value) return
+
+    const offset = reset ? 0 : historyOffset.value
+    historyLoading.value = true
+
+    try {
+      const data = await httpClient(`/api/v1/chats?limit=${HISTORY_PAGE_SIZE}&offset=${offset}`, {
+        schema: GetApiChatsListResponseSchema,
+      })
+      const page = (data.chats ?? []).map((chat) => normalizeChat(chat))
+
+      if (reset) {
+        historyChats.value = page
+      } else {
+        // Dedup by id so an item that shifted pages (a chat updated between
+        // requests) is never rendered twice.
+        const seen = new Set(historyChats.value.map((c) => c.id))
+        historyChats.value = [...historyChats.value, ...page.filter((c) => !seen.has(c.id))]
+      }
+
+      historyOffset.value = offset + page.length
+      // `hasMore` is optional in the API contract (older/prod OpenAPI specs omit
+      // it, where the generated schema types it as `unknown`). Treat a missing
+      // flag as "no more pages" so the type stays boolean across all specs.
+      historyHasMore.value = data.hasMore === true
+    } catch (err: unknown) {
+      console.error('Error loading chat history:', err)
+    } finally {
+      historyLoading.value = false
+    }
+  }
+
   async function createChat(title?: string): Promise<Chat | null> {
     if (!checkAuthOrRedirect()) return null
 
@@ -194,6 +257,17 @@ export const useChatsStore = defineStore('chats', () => {
    */
   async function findOrCreateEmptyChat(): Promise<Chat | null> {
     if (!checkAuthOrRedirect()) return null
+
+    // Starting a brand-new chat always leaves incognito: the "New Chat" button
+    // must land the user in a normal, persisted conversation. We cannot rely on
+    // the activeChatId watcher for this — an incognito session usually reuses an
+    // empty underlying chat, so the id stays unchanged and the watcher never
+    // fires. Ending the session here (fire-and-forget; file cleanup runs in the
+    // background) flips the flag so ChatView restores the normal surface.
+    const incognitoStore = useIncognitoStore()
+    if (incognitoStore.active) {
+      void incognitoStore.endSession()
+    }
 
     // Find all empty chats (not widget sessions, no messages, default title)
     const emptyChats = chats.value.filter((chat) => isChatEmpty(chat))
@@ -367,6 +441,10 @@ export const useChatsStore = defineStore('chats', () => {
 
   function $reset() {
     chats.value = []
+    historyChats.value = []
+    historyOffset.value = 0
+    historyHasMore.value = true
+    historyLoading.value = false
     updateActiveChatSelection(null)
     loading.value = false
     error.value = null
@@ -378,7 +456,11 @@ export const useChatsStore = defineStore('chats', () => {
     activeChat,
     loading,
     error,
+    historyChats,
+    historyLoading,
+    historyHasMore,
     loadChats,
+    loadChatHistory,
     createChat,
     findOrCreateEmptyChat,
     updateChatTitle,

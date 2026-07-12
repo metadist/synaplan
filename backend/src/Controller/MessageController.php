@@ -682,6 +682,10 @@ class MessageController extends AbstractController
             return $this->json(['error' => 'No file uploaded'], Response::HTTP_BAD_REQUEST);
         }
 
+        // Incognito-session uploads are ephemeral: hidden from file listings,
+        // never vectorized, deleted on session end (+ reaper safety net).
+        $incognito = '1' === $request->request->get('incognito');
+
         // Check rate limit for FILE_ANALYSIS BEFORE uploading
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
         if (!$rateLimitCheck['allowed']) {
@@ -722,6 +726,7 @@ class MessageController extends AbstractController
             $messageFile->setFileSize($storageResult['size']);
             $messageFile->setFileMime($storageResult['mime']);
             $messageFile->setStatus('uploaded');
+            $messageFile->setEphemeral($incognito);
 
             $this->em->persist($messageFile);
             $this->em->flush();

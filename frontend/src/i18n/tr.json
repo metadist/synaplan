@@ -1,4 +1,15 @@
 {
+  "incognito": {
+    "toggleStart": "Gizli sohbeti başlat",
+    "toggleEnd": "Gizli sohbeti bitir",
+    "bannerTitle": "Gizli sohbet",
+    "bannerText": "Bu konuşma kaydedilmez. Kayıtlı anıların ve bilgin kullanılmaya devam eder, ancak yeni hiçbir şey hatırlanmaz.",
+    "emptyTitle": "Gizli sohbet",
+    "emptyHint": "Bu oturumdaki mesajlar ve dosyalar kaydedilmez ve oturumu bitirdiğinde kaybolur.",
+    "endConfirmTitle": "Gizli sohbet bitirilsin mi?",
+    "endConfirmMessage": "Konuşma kalıcı olarak silinecek ve bu oturumdaki dosyalar kaldırılacak.",
+    "endConfirmButton": "Bitir ve sil"
+  },
   "jobs": {
     "kind": {
       "video": "video",
@@ -69,6 +80,8 @@
     "widgetChats": "Widget Sohbetleri",
     "liveSupport": "Canlı Destek",
     "addinConnect": "Outlook eklentisini bağla",
+    "accountDeletion": "Hesap Silme",
+    "onboarding": "Hoş geldin",
     "mcpServers": "MCP Sunucuları"
   },
   "addinConnect": {
@@ -90,6 +103,7 @@
     "errorIssuanceFailed": "Synaplan bu hesap için bir API anahtarı veremedi."
   },
   "welcome": "Hoş Geldiniz",
+  "welcomeUser": "Hoş geldin, {name}",
   "examplePrompts": {
     "heading": "Bunlardan birini deneyin",
     "items": {
@@ -189,7 +203,8 @@
       "overview": "Genel Bakış",
       "users": "Kullanıcılar",
       "prompts": "Promptlar",
-      "usage": "Kullanım"
+      "usage": "Kullanım",
+      "appServer": "Uygulama sunucusu"
     },
     "overview": {
       "totalUsers": "Toplam Kullanıcı",
@@ -303,6 +318,27 @@
       "activeSubscriptions": "Aktif Abonelikler",
       "subscriptionOverview": "Abonelik Özeti"
     },
+    "subscriptions": {
+      "title": "Abonelik Planları",
+      "description": "Her abonelik seviyesi için fiyatları, maliyet bütçelerini ve aktif durumu yönetin. Fiyatlar kullanıcılara onboarding sırasında ve abonelik sayfasında gösterilir.",
+      "level": "Seviye",
+      "name": "Ad",
+      "priceMonthly": "Fiyat/Ay",
+      "priceYearly": "Fiyat/Yıl",
+      "currency": "Para birimi",
+      "budgetMonthly": "Bütçe/Ay",
+      "budgetYearly": "Bütçe/Yıl",
+      "active": "Aktif",
+      "actions": "İşlemler",
+      "edit": "Düzenle",
+      "save": "Kaydet",
+      "cancel": "İptal",
+      "saveSuccess": "Plan başarıyla güncellendi",
+      "saveError": "Plan güncellenemedi",
+      "loadError": "Abonelikler yüklenemedi",
+      "noSubscriptions": "Abonelik planı bulunamadı. Önce veritabanında abonelik planları oluşturun.",
+      "budgetHint": "Bütçe, fatura dönemi başına izin verilen maksimum token maliyetini (EUR cinsinden) tanımlar. Sınırsız kullanım için 0 olarak ayarlayın. Fiyatlar herkese açık gösterim fiyatlarıdır; mobil uygulamadaki satın almalar uygulama mağazası fiyatını kullanır."
+    },
     "config": {
       "title": "Sistem Yapılandırması",
       "description": "Ortam değişkenlerini ve servis bağlantılarını yönetin",
@@ -368,7 +404,8 @@
     "adminSystemConfig": "Sistem Yapılandırması",
     "profile": "Profil",
     "more": "Daha fazla",
-    "moreDescription": "Diğer bölümler ve hesap"
+    "moreDescription": "Diğer bölümler ve hesap",
+    "menu": "Menü"
   },
   "guest": {
     "featureGate": {
@@ -446,6 +483,9 @@
       "imageGenDesc": "Metinden görsel oluştur",
       "videoGen": "Video Oluşturma",
       "videoGenDesc": "Metinden video oluştur",
+      "badgeSearch": "Arama",
+      "badgeImage": "Görsel",
+      "badgeVideo": "Video",
       "thinkingDesc": "Modelin yanıttan önceki akıl yürütmesini gösterir",
       "thinkingUnsupported": "Seçili model akıl yürütmeyi desteklemiyor",
       "summarizer": "Özetleyici",
@@ -892,6 +932,9 @@
     "embedCodeHint": "Bu kodu web sitenizin <head> bölümüne kopyalayın"
   },
   "widgets": {
+    "advancedConfig": {
+      "proRequired": "PRO aboneliği gerekli"
+    },
     "title": "Sohbet Widgetları",
     "subtitle": "AI destekli sohbet widgetlarını web sitenize yerleştirin",
     "createNew": "Widget Oluştur",
@@ -1088,7 +1131,8 @@
     "legal": {
       "title": "Gizlilik ve Şartlar",
       "privacy": "Gizlilik Politikası",
-      "terms": "Kullanım Koşulları"
+      "terms": "Kullanım Koşulları",
+      "accountDeletion": "Hesabını sil"
     },
     "dangerZone": {
       "title": "Tehlikeli Bölge",
@@ -1116,6 +1160,34 @@
     "privacyNotice": "Tüm veriler güvenli bir şekilde saklanır ve yalnızca Alman yasalarına (GDPR) uygun olarak fatura amaçları için kullanılır.",
     "saveChanges": "Değişiklikleri Kaydet",
     "cancel": "İptal"
+  },
+  "native": {
+    "exitHint": "Çıkmak için tekrar geri tuşuna basın"
+  },
+  "accountDeletion": {
+    "title": "{brand} hesabını sil",
+    "intro": "Hesabını ve ilişkili tüm verileri istediğin zaman kalıcı olarak silebilirsin. Nasıl çalıştığı ve nelerin silindiği aşağıda açıklanmıştır.",
+    "howTitle": "Hesabını nasıl silersin",
+    "steps": [
+      "Hesabına giriş yap.",
+      "Profilini aç ve „Tehlikeli Bölge“ bölümüne in.",
+      "„Hesabı Sil“e tıkla ve şifrenle onayla (sosyal giriş hesaplarında DELETE yazarak).",
+      "Hesabın ve verilerin anında silinir ve geri alınamaz."
+    ],
+    "goToProfile": "Profile Git",
+    "signIn": "Giriş yap",
+    "dataTitle": "Neler silinir",
+    "dataItems": [
+      "Tüm mesajların ve sohbetlerin",
+      "Yüklenen tüm dosyalar ve bilgi tabanı belgeleri",
+      "Kişisel verilerin, ayarların ve anıların",
+      "API anahtarları, widget'lar ve kimlik bilgileri"
+    ],
+    "retention": "Silme işlemi kalıcıdır ve anında geçerli olur. Artık veri içeren yedekler 30 gün içinde döngüden çıkarılır. Yasal olarak saklamakla yükümlü olduğumuz veriler (ör. faturalar) yalnızca yasanın gerektirdiği süre boyunca tutulur.",
+    "noAccessTitle": "Giriş yapamıyor musun?",
+    "noAccessDesc": "Hesabına artık erişemiyorsan, web sitemiz üzerinden bizimle iletişime geç; silme talebini işleme alalım.",
+    "visitWebsite": "Web sitesini ziyaret et",
+    "privacyPolicy": "Gizlilik Politikası"
   },
   "notFound": {
     "title": "Sayfa Bulunamadı",
@@ -1345,8 +1417,17 @@
     },
     "native": {
       "purchaseTitle": "Uygulama içi satın alma",
-      "purchaseComingSoon": "{plan} planı için uygulama içi satın alma ayarlanıyor ve gelecek bir uygulama güncellemesinde kullanıma sunulacak.",
-      "manageInStore": "Aboneliği mağazada yönet"
+      "purchaseUnavailable": "Uygulama içi satın almalar bu sunucuda henüz kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+      "purchaseSuccess": "Aboneliğiniz artık aktif. Teşekkürler!",
+      "purchasePending": "Satın alma işleminiz onay bekliyor (ör. „Satın Almak İçin Sor“). Onaylandığında aboneliğiniz otomatik olarak etkinleşecek.",
+      "purchaseConflict": "Bu satın alma zaten başka bir hesaba veya mevcut bir aboneliğe bağlı. Lütfen mağaza hesabınızı kontrol edin veya destekle iletişime geçin.",
+      "purchaseFailed": "Satın alma tamamlanamadı. Sizden ücret alınmadı. Lütfen tekrar deneyin.",
+      "manageInStore": "Mağazada yönet",
+      "restoreButton": "Satın alımları geri yükle",
+      "restoreTitle": "Satın alımları geri yükle",
+      "restoreDone": "Satın alımlar geri yüklendi — aboneliğiniz aktif.",
+      "restoreNone": "Geri yüklenecek aktif bir abonelik bulunamadı.",
+      "storeNote": "Satın alımlar ve abonelikler App Store veya Google Play üzerinden işlenir ve yönetilir."
     },
     "plans": {
       "pro": "Pro",
@@ -2885,6 +2966,91 @@
     "subtitle": "Uygulamanın bu sürümü artık desteklenmiyor. Devam etmek için lütfen en son sürüme güncelleyin.",
     "minVersion": "Gerekli en düşük sürüm: {version}",
     "cta": "Şimdi güncelle"
+  },
+  "nativeServer": {
+    "changeServer": "Sunucuyu değiştir",
+    "appServer": {
+      "title": "Uygulama sunucusu",
+      "description": "Bu uygulamanın hangi Synaplan sunucusuna bağlanacağını seç. Bunu yalnızca kendi Synaplan sunucunu çalıştırıyorsan değiştir.",
+      "unavailable": "Sunucu ayarı bu sürümde kullanılamıyor.",
+      "currentLabel": "Geçerli sunucu",
+      "defaultLabel": "Varsayılan",
+      "inputLabel": "Sunucu URL'si",
+      "hint": "Kaydettiğinde her sunucudaki oturumun kapatılır ve uygulama yeniden yüklenir; tekrar giriş yapman gerekir.",
+      "save": "Test et ve kaydet",
+      "testing": "Sunucu kontrol ediliyor …",
+      "reset": "Varsayılana sıfırla",
+      "savedSigningOut": "Bağlandı. Oturumun kapatılıyor …",
+      "invalidUrl": "Lütfen geçerli bir URL gir (örn. https://web.synaplan.com).",
+      "unreachable": "Sunucuya ulaşılamıyor. Lütfen adresi kontrol et.",
+      "resetConfirmTitle": "Sunucu sıfırlansın mı?",
+      "resetConfirmMessage": "Uygulama oturumunu kapatacak, tekrar {server} adresine bağlanacak ve yeniden yüklenecek.",
+      "resetConfirmAction": "Sıfırla"
+    }
+  },
+  "onboarding": {
+    "skip": "Atla",
+    "back": "Geri",
+    "next": "Devam",
+    "getStarted": "Başlayalım",
+    "stepLabel": "Adım {step} / {total}",
+    "welcome": {
+      "title": "Hoş geldin",
+      "subtitle": "Tüm yapay zekâlar, tüm özellikler tek bir yerde",
+      "pillServer": "Kendi sunucun",
+      "pillRag": "RAG",
+      "pillWidget": "Sohbet widget'ı"
+    },
+    "rag": {
+      "title": "Belgelerinden yanıtlar",
+      "body": "RAG, AI asistanının yalnızca genel eğitimini değil, kendi dosyalarını kullanarak yanıt vermesini sağlar.",
+      "point1": "Belgeleri yükle ve içerikleri hakkında sorular sor",
+      "point2": "Yanıtlar, geldikleri kaynakları belirtir",
+      "point3": "Dosyaların hesabında gizli kalır"
+    },
+    "widget": {
+      "title": "Yerleştirilebilir sohbet widget'ı",
+      "body": "Bilgini, herhangi bir web sitesine yerleştirebileceğin bir sohbet widget'ına dönüştür.",
+      "point1": "Sitene dakikalar içinde bir AI asistanı ekle",
+      "point2": "Bağladığın belgelerden yanıt verir",
+      "point3": "Görünümü markana göre uyarla"
+    },
+    "server": {
+      "title": "Sunucun",
+      "subtitle": "Uygulama bir Synaplan sunucusuna bağlanır. Standart sunucu çoğu kişi için uygundur — devam etmen yeterli.",
+      "defaultLabel": "Standart sunucu",
+      "currentLabel": "Bağlı sunucu",
+      "recommended": "Önerilen",
+      "almostThere": "Neredeyse tamam",
+      "moreInfo": "Daha fazla bilgi",
+      "helpSetup": "Kendi sunucunu nasıl kurarsın",
+      "standardInfoTitle": "Standart sunucu",
+      "standardInfoBody": "Bu, Synaplan ekibi tarafından işletilen barındırılan Synaplan sunucusudur. Başlamanın en kolay yolu — kurulum gerekmez.",
+      "standardInfoPoint1": "Hemen kullanıma hazır — kurulacak bir şey yok",
+      "standardInfoPoint2": "Synaplan ekibi tarafından bakımı yapılır ve güncel tutulur",
+      "standardInfoPoint3": "Çoğu kişi için doğru seçim",
+      "customInfoTitle": "Kendi sunucun",
+      "customInfoBody": "Uygulamayı senin veya şirketinin barındırdığı bir Synaplan sunucusuna yönlendir.",
+      "customInfoPoint1": "Kendi işlettiğin bir Synaplan sunucusuna bağlan",
+      "customInfoPoint2": "Verilerin kendi altyapında kalır",
+      "customInfoPoint3": "Çalışan bir Synaplan kurulumu gerektirir",
+      "customToggle": "Kendi sunucumu kullan",
+      "customHint": "Uzman seçeneği: Şirketin veya sen kendi Synaplan sunucunu çalıştırıyorsan adresini buraya gir.",
+      "customPlaceholder": "https://sunucun.ornek.com",
+      "connect": "Bağlan",
+      "connecting": "Bağlantı kontrol ediliyor…",
+      "connectError": "Bu sunucuya ulaşılamıyor. Adresi kontrol edip tekrar dene."
+    },
+    "plans": {
+      "title": "Nasıl başlamak istersin?",
+      "subtitle": "Ücretsiz dene — istediğin zaman yükseltebilirsin",
+      "guestCta": "Hesapsız devam et",
+      "popular": "Popüler",
+      "continueWith": "{plan} ile devam et",
+      "registerCta": "Ücretsiz hesap oluştur",
+      "loginHint": "Zaten bir hesabın var mı?",
+      "loginCta": "Giriş yap"
+    }
   },
   "mcpServers": {
     "title": "MCP Sunucuları",

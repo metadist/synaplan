@@ -3,12 +3,12 @@
     <Transition name="modal">
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
         data-testid="modal-share-root"
         @click.self="close"
       >
         <div
-          class="surface-elevated w-full max-w-2xl p-6 m-4 max-h-[90vh] overflow-y-auto"
+          class="modal-panel surface-elevated w-full max-w-2xl p-6 m-4 overflow-y-auto"
           data-testid="modal-share"
         >
           <!-- Header -->

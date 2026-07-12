@@ -85,6 +85,7 @@ import { Icon } from '@iconify/vue'
 import { ChevronDownIcon } from '@heroicons/vue/20/solid'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import type { AIModel, Capability } from '@/types/ai-models'
 
 export interface ModelGroup {
@@ -173,6 +174,7 @@ const isSelected = (model: AIModel) => formatValue(model) === props.modelValue
 
 const toggle = () => {
   if (props.disabled) return
+  triggerHapticImpact('light')
   isOpen.value = !isOpen.value
   if (isOpen.value) {
     nextTick(updatePanelPosition)

@@ -3,12 +3,12 @@
     <Transition name="modal">
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
         data-testid="modal-file-content-root"
         @click.self="close"
       >
         <div
-          class="surface-card max-w-6xl w-full max-h-[90vh] flex flex-col rounded-xl shadow-2xl overflow-hidden"
+          class="modal-panel surface-card max-w-6xl w-full flex flex-col rounded-xl shadow-2xl overflow-hidden"
           data-testid="modal-file-content"
           @click.stop
         >

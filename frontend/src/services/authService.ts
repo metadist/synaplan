@@ -69,6 +69,8 @@ export interface AuthUser {
   isAdmin?: boolean
   emailVerified?: boolean
   memoriesEnabled?: boolean
+  /** From Personal Information -> First Name; null until the user sets it. */
+  firstName?: string | null
 }
 
 /**

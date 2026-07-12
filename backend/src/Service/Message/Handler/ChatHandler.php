@@ -452,11 +452,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         if (null !== $fileData) {
             $this->logger->info('ChatHandler: Detected AI file generation');
 
-            // Store the file
-            $generatedFile = $this->storeGeneratedFile($fileData, $message);
+            // Store the file (ephemeral in incognito mode so it is cleaned up
+            // after the session)
+            $generatedFile = $this->storeGeneratedFile($fileData, $message, !empty($options['incognito']));
 
             if ($generatedFile) {
-                // Attach file to message
+                // Attach file to message (in-memory only for transient
+                // incognito messages — flush() never touches unmanaged entities)
                 $message->addFile($generatedFile);
                 $this->em->flush();
 
@@ -537,6 +539,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $memoriesDisabledByRequest,
             $memoriesDisabledByUser,
             $memoriesRequestDisableContext,
+            !empty($options['incognito']),
         );
 
         if (!$deferExtraction) {
@@ -1113,6 +1116,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $memoriesDisabledByRequest,
             $memoriesDisabledByUser,
             $memoriesRequestDisableContext,
+            !empty($options['incognito']),
         );
 
         if (!$deferExtraction) {
@@ -1227,8 +1231,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Thread Messages hinzufügen (letzte N Messages)
         // IMPORTANT: Exclude the current message from the thread to avoid duplicates
         foreach ($thread as $msg) {
-            // Skip if this is the current message (already added at the end)
-            if ($msg->getId() === $currentMessage->getId()) {
+            // Skip if this is the current message (already added at the end).
+            // Compare object identity first: transient incognito messages all
+            // have a null id, and `null === null` would otherwise drop the
+            // ENTIRE request-supplied history from the prompt.
+            if ($msg === $currentMessage || (null !== $msg->getId() && $msg->getId() === $currentMessage->getId())) {
                 continue;
             }
 
@@ -2113,7 +2120,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
      *
      * @return File|null The created File entity or null on error
      */
-    private function storeGeneratedFile(array $fileData, Message $message): ?File
+    private function storeGeneratedFile(array $fileData, Message $message, bool $ephemeral = false): ?File
     {
         $userId = $message->getUserId();
         $filename = $fileData['filename'];
@@ -2185,6 +2192,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             // exact current content instead of re-deriving it.
             $file->setFileText($content);
             $file->setStatus('generated');
+            $file->setEphemeral($ephemeral);
 
             $this->em->persist($file);
             $this->em->flush();
@@ -2711,6 +2719,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * @param bool                                                     $disabledByRequest     true when the caller (widget channel / `disable_memories` option) opted out
      * @param bool                                                     $disabledByUser        true when the user's profile setting has memories disabled
      * @param array<string, mixed>                                     $requestDisableContext optional log context describing which request-level lever fired (channel, classification source, disable_memories flag) — built by {@see loadMemoriesContext()}
+     * @param bool                                                     $incognito             true for incognito turns: memories were READ normally, but nothing from the conversation may be extracted/written
      */
     private function buildPendingMemoryExtraction(
         Message $message,
@@ -2720,7 +2729,19 @@ final readonly class ChatHandler implements MessageHandlerInterface
         bool $disabledByRequest,
         bool $disabledByUser,
         array $requestDisableContext = [],
+        bool $incognito = false,
     ): ?ExtractMemoriesCommand {
+        if ($incognito) {
+            // Incognito is read-only for memories: extraction would persist
+            // conversation content to Qdrant, which the mode forbids. (Also,
+            // the transient message has no id for the queued command.)
+            $this->logger->info('ChatHandler: Incognito turn — memory extraction skipped', [
+                'user_id' => $message->getUserId(),
+            ]);
+
+            return null;
+        }
+
         if ($disabledByRequest) {
             $this->logger->info('ChatHandler: Memory extraction disabled by request, skipping', array_merge([
                 'user_id' => $message->getUserId(),

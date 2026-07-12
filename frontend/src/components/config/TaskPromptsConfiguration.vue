@@ -908,12 +908,12 @@
     <!-- Create modal -->
     <div
       v-if="showCreateModal"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
       data-testid="modal-task-prompt-create"
       @click.self="showCreateModal = false"
     >
       <div
-        class="surface-card p-6 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+        class="modal-panel surface-card p-6 rounded-lg max-w-4xl w-full overflow-y-auto"
         data-testid="section-create-modal"
       >
         <div class="flex items-center justify-between mb-6">
