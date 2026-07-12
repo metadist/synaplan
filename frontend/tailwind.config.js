@@ -57,6 +57,7 @@ export default {
   plugins: [
     plugin(function ({ addBase, theme, addComponents, addUtilities, addVariant }) {
       addVariant('pointer-fine', '@media (pointer: fine)')
+      addVariant('pointer-coarse', '@media (pointer: coarse)')
 
       // CSS Vars (Light/Dark)
       addBase({

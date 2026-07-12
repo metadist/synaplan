@@ -463,7 +463,9 @@
     "regenerateWith": "Regenerar con",
     "copy": "Copiar mensaje",
     "infoAiModel": "Modelo de IA",
-    "infoAudioModel": "Modelo de audio"
+    "infoAudioModel": "Modelo de audio",
+    "infoTokens": "Tokens",
+    "infoCost": "Coste"
   },
   "commands": {
     "noResults": "No se encontraron comandos",
