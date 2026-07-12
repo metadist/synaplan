@@ -495,7 +495,9 @@
     "infoModel": "Modell",
     "infoAiModel": "KI-Modell",
     "infoProvider": "Anbieter",
-    "infoAudioModel": "Audio-Modell"
+    "infoAudioModel": "Audio-Modell",
+    "infoTokens": "Tokens",
+    "infoCost": "Kosten"
   },
   "commands": {
     "noResults": "Keine Befehle gefunden",

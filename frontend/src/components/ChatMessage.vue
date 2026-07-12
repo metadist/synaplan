@@ -653,16 +653,16 @@
               {{ formattedTime }}
             </span>
 
-            <!-- Info popover trigger (assistant only, when metadata is available) -->
-            <div
-              v-if="role === 'assistant' && hasMessageMetadata && !isProcessing"
-              class="relative"
-            >
-              <!-- Mobile: same `.pill` chip look as the message action buttons
-                   (e.g. "Not correct"), icon-only. Desktop keeps the original
-                   compact circular icon button — `.pill` is an unlayered class
-                   that would beat `md:` Tailwind variants for the same
-                   properties, so we branch the whole class list instead. -->
+            <!-- Info popover trigger (assistant only, when metadata or per-reply
+                 usage is available). On touch devices the token/cost badge is
+                 hidden inline to avoid colliding with the footer actions, so the
+                 usage lives inside this popover instead.
+                 Mobile: same `.pill` chip look as the message action buttons
+                 (e.g. "Not correct"), icon-only. Desktop keeps the original
+                 compact circular icon button — `.pill` is an unlayered class
+                 that would beat `md:` Tailwind variants for the same
+                 properties, so we branch the whole class list instead. -->
+            <div v-if="role === 'assistant' && hasInfoPopover && !isProcessing" class="relative">
               <button
                 type="button"
                 :class="
@@ -782,17 +782,37 @@
                         <span class="text-xs txt-secondary">{{ legacyProviderLabel }}</span>
                       </div>
                     </template>
+
+                    <!-- Per-reply usage (tokens + cost). Rendered here so it is
+                         reachable on touch devices, where the inline badge is
+                         hidden to keep the footer from colliding. -->
+                    <template v-if="usageBadge">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs txt-tertiary">{{ t('chatMessage.infoTokens') }}</span>
+                        <span class="text-xs font-medium txt-primary tabular-nums">{{
+                          usageBadge.tokens
+                        }}</span>
+                      </div>
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs txt-tertiary">{{ t('chatMessage.infoCost') }}</span>
+                        <span class="text-xs font-medium txt-primary tabular-nums">{{
+                          usageBadge.cost
+                        }}</span>
+                      </div>
+                    </template>
                   </div>
                 </div>
               </Transition>
             </div>
 
-            <!-- Usage taximeter: per-reply token/cost badge, hover-revealed on
-                 fine pointers (matches the message hover pattern), always shown
-                 on touch. Only when the display is active and usage exists. -->
+            <!-- Usage taximeter: per-reply token/cost badge. Hover-revealed on
+                 fine pointers (matches the message hover pattern); hidden on
+                 touch/coarse pointers where it would collide with the footer
+                 actions — there the same numbers are available via the info
+                 popover above. Only when the display is active and usage exists. -->
             <span
               v-if="usageBadge"
-              class="text-xs txt-secondary whitespace-nowrap tabular-nums transition-opacity duration-200 pointer-fine:opacity-0 pointer-fine:group-hover/bubble:opacity-100"
+              class="text-xs txt-secondary whitespace-nowrap tabular-nums transition-opacity duration-200 pointer-coarse:hidden pointer-fine:opacity-0 pointer-fine:group-hover/bubble:opacity-100"
               data-testid="message-usage-badge"
             >
               {{ usageBadge.tokens }} · {{ usageBadge.cost }}
@@ -1509,6 +1529,11 @@ const hasMessageMetadata = computed(() => {
   if (legacyModelLabel.value && legacyProviderLabel.value) return true
   return false
 })
+
+// The info popover opens for model/topic metadata OR per-reply usage, so the
+// token/cost numbers stay reachable on touch devices where the inline usage
+// badge is hidden to avoid colliding with the footer actions.
+const hasInfoPopover = computed(() => hasMessageMetadata.value || usageBadge.value !== null)
 
 const closeInfoPopover = () => {
   infoPopoverOpen.value = false
