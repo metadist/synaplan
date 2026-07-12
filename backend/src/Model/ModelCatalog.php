@@ -600,14 +600,21 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gpt-image-1',
-            'priceIn' => 5,
-            'inUnit' => 'per1M',
-            'priceOut' => 40,
-            'outUnit' => 'per1M',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.042,
+            'outUnit' => 'perImage',
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'OpenAI image generation model. Costs are 1:1 funneled.',
+                // The image-generation path does not capture per-image token
+                // usage from OpenAI, so a per-token model bills $0. Bill per
+                // image instead: medium-quality 1024x1024 = $0.042/image
+                // (per OpenAI image pricing) so the IMAGES BUSELOG row carries
+                // the real cost.
+                'description' => 'OpenAI image generation model.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.042],
                 'params' => ['model' => 'gpt-image-1'],
             ],
         ],
@@ -1082,14 +1089,19 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gpt-image-1.5',
-            'priceIn' => 5,
-            'inUnit' => 'per1M',
-            'priceOut' => 10,
-            'outUnit' => 'per1M',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.04,
+            'outUnit' => 'perImage',
             'quality' => 10,
             'rating' => 1,
             'json' => [
+                // The image path does not capture per-image token usage, so a
+                // per-token model bills $0. Bill per image: standard-quality
+                // 1024x1024 = $0.04/image (per OpenAI GPT Image 1.5 pricing).
                 'description' => 'OpenAI GPT Image 1.5 - state-of-the-art image generation and editing. Supports pic2pic via Responses API.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.04],
                 'params' => ['model' => 'gpt-image-1.5'],
                 'features' => ['image', 'pic2pic'],
                 'meta' => ['api' => 'responses'],
@@ -1505,14 +1517,21 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-2.5-flash-preview-tts',
-            'priceIn' => 0.1,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.4,
-            'outUnit' => 'per1M',
+            'priceIn' => 0.000022,
+            'inUnit' => 'perChar',
+            'priceOut' => 0,
+            'outUnit' => 'perChar',
             'quality' => 9,
             'rating' => 1,
             'json' => [
+                // Google bills TTS by audio-output tokens ($10/1M audio tokens,
+                // 32 tokens/sec). The TTS path meters INPUT characters, so we
+                // convert to a per-character rate: ~32 audio tok/sec ÷ ~15
+                // chars/sec of speech × $10/1M ≈ $0.000022/char (~$22/1M chars).
+                // A per_token model bills $0 here (no audio token usage captured).
                 'description' => 'Google Gemini 2.5 Flash Preview TTS (native speech generation)',
+                'pricing_mode' => 'per_character',
+                'mode_prices' => ['input_cost_per_character' => 0.000022],
                 'params' => ['model' => 'gemini-2.5-flash-preview-tts', 'voice' => 'Kore'],
                 'features' => ['tts', 'audio'],
             ],
@@ -1678,14 +1697,22 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-2.5-flash-image',
-            'priceIn' => 0.1,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.4,
-            'outUnit' => 'per1M',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.039,
+            'outUnit' => 'perImage',
             'quality' => 9,
             'rating' => 1,
             'json' => [
+                // Google bills image output at $30/1M image tokens; a 1024px
+                // image consumes 1290 tokens = $0.039/image (per
+                // ai.google.dev/gemini-api/docs/pricing). We never capture the
+                // image token usage from the provider, so bill per_image like
+                // the other Google image models instead of falling through to
+                // the per-token path with zero billed tokens ($0/image).
                 'description' => 'Google Nano Banana gemini-2.5-flash-image',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.039],
                 'params' => ['model' => 'gemini-2.5-flash-image'],
                 'features' => ['image', 'pic2pic'],
             ],
@@ -2033,14 +2060,21 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-3.1-flash-tts-preview',
-            'priceIn' => 0.10,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.40,
-            'outUnit' => 'per1M',
+            'priceIn' => 0.0000336,
+            'inUnit' => 'perChar',
+            'priceOut' => 0,
+            'outUnit' => 'perChar',
             'quality' => 10,
             'rating' => 1,
             'json' => [
+                // Google bills TTS by audio-output tokens ($20/1M audio tokens,
+                // 25 tokens/sec). The TTS path meters INPUT characters, so we
+                // convert to a per-character rate: ~25 audio tok/sec ÷ ~15
+                // chars/sec of speech × $20/1M ≈ $0.0000336/char (~$33.6/1M chars).
+                // A per_token model bills $0 here (no audio token usage captured).
                 'description' => 'Google Gemini 3.1 Flash TTS (preview) - powerful low-latency speech generation with expressive audio tags and natural prosody.',
+                'pricing_mode' => 'per_character',
+                'mode_prices' => ['input_cost_per_character' => 0.0000336],
                 'params' => ['model' => 'gemini-3.1-flash-tts-preview', 'voice' => 'Kore'],
                 'features' => ['tts', 'audio'],
             ],
@@ -2282,6 +2316,8 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'TheHive Flux Schnell - Fast image generation for prototyping. Generates images quickly with good quality.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.01],
                 'params' => ['model' => 'flux-schnell', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2301,6 +2337,8 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'TheHive Flux Schnell Enhanced - Photorealistic image generation with enhanced quality.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.02],
                 'params' => ['model' => 'flux-schnell-enhanced', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2320,6 +2358,8 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'TheHive SDXL - Stable Diffusion XL for general purpose high-quality image generation.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.02],
                 'params' => ['model' => 'sdxl', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2339,6 +2379,8 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'TheHive SDXL Enhanced - Premium quality image generation with enhanced details and photorealism.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.05],
                 'params' => ['model' => 'sdxl-enhanced', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2358,6 +2400,8 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'TheHive Emoji Model - Generate custom emojis with transparent backgrounds.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.01],
                 'params' => ['model' => 'emoji', 'width' => 512, 'height' => 512],
             ],
         ],
@@ -2384,6 +2428,8 @@ class ModelCatalog
             'rating' => 2,
             'json' => [
                 'description' => 'Higgsfield Soul Standard - cinematic, brand-quality text-to-image. High photorealism, supports aspect ratio and resolution overrides.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.05],
                 'params' => ['model' => 'higgsfield-ai/soul/standard'],
                 'allowed_resolutions' => ['720p', '1080p', '2K'],
                 'default_resolution' => '1080p',
@@ -2406,6 +2452,8 @@ class ModelCatalog
             'rating' => 2,
             'json' => [
                 'description' => 'Reve (via Higgsfield) - high-quality, prompt-accurate text-to-image. Supports aspect ratio and resolution overrides.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.05],
                 'params' => ['model' => 'reve/text-to-image'],
                 'allowed_resolutions' => ['720p', '1080p', '2K'],
                 'default_resolution' => '1080p',
@@ -2749,15 +2797,18 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'voxtral-mini-tts-2603',
-            // Voxtral TTS is billed per input token (the text to synthesise).
-            'priceIn' => 16.0,
-            'inUnit' => 'per1M',
+            // Voxtral TTS is billed at $16 / 1M input characters
+            // ($0.016 / 1k chars) via Mistral /v1/audio/speech.
+            'priceIn' => 0.000016,
+            'inUnit' => 'perChar',
             'priceOut' => 0,
-            'outUnit' => '-',
+            'outUnit' => 'perChar',
             'quality' => 8,
             'rating' => 2,
             'json' => [
                 'description' => 'Voxtral TTS - expressive text-to-speech with zero-shot voice cloning and 9-language support via Mistral /v1/audio/speech.',
+                'pricing_mode' => 'per_character',
+                'mode_prices' => ['input_cost_per_character' => 0.000016],
                 'params' => ['model' => 'voxtral-mini-tts-2603'],
                 'features' => ['voice-cloning', 'multilingual', 'streaming'],
             ],

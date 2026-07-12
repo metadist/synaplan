@@ -463,7 +463,9 @@
     "regenerateWith": "Şununla yeniden oluştur",
     "copy": "Mesajı kopyala",
     "infoAiModel": "Yapay Zeka Modeli",
-    "infoAudioModel": "Ses Modeli"
+    "infoAudioModel": "Ses Modeli",
+    "infoTokens": "Token",
+    "infoCost": "Maliyet"
   },
   "commands": {
     "noResults": "Komut bulunamadı",

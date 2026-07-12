@@ -479,7 +479,9 @@
     "infoModel": "Model",
     "infoAiModel": "AI Model",
     "infoProvider": "Provider",
-    "infoAudioModel": "Audio Model"
+    "infoAudioModel": "Audio Model",
+    "infoTokens": "Tokens",
+    "infoCost": "Cost"
   },
   "commands": {
     "noResults": "No commands found",
