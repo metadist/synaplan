@@ -38,8 +38,9 @@ final readonly class FileUploadService
      *
      * @return array{success: bool, files: array<mixed>, errors: array<mixed>, total_time_ms: int, process_level: string}
      */
-    public function uploadBatch(array $uploadedFiles, User $user, ?string $groupKey, string $processLevel, string $source = 'web_upload', ?string $originalName = null): array
+    public function uploadBatch(array $uploadedFiles, User $user, ?string $groupKey, string $processLevel, ?UploadOptions $options = null): array
     {
+        $options ??= new UploadOptions();
         $startTime = microtime(true);
         $results = [];
         $errors = [];
@@ -48,7 +49,7 @@ final readonly class FileUploadService
             $fileStartTime = microtime(true);
 
             try {
-                $result = $this->processSingleUpload($uploadedFile, $user, $groupKey, $processLevel, $source, $originalName);
+                $result = $this->processSingleUpload($uploadedFile, $user, $groupKey, $processLevel, $options);
 
                 if ($result['success']) {
                     $result['processing_time_ms'] = (int) ((microtime(true) - $fileStartTime) * 1000);
@@ -197,8 +198,7 @@ final readonly class FileUploadService
         User $user,
         ?string $groupKey,
         string $processLevel,
-        string $source = 'web_upload',
-        ?string $originalName = null,
+        UploadOptions $options,
     ): array {
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
         if (!$rateLimitCheck['allowed']) {
@@ -238,7 +238,22 @@ final readonly class FileUploadService
         // extraction/vectorization on the final stored extension, not the
         // client's original ".heic".
         $fileExtension = strtolower($storageResult['extension'] ?? $uploadedFile->getClientOriginalExtension());
-        $file = $this->createFileEntity($uploadedFile, $user, $storageResult, $groupKey, $source, $originalName);
+
+        // Overwrite-in-place (CORE-4): when the caller asks to overwrite and the
+        // same logical file already exists (matched by source identity, else by
+        // group + original name), replace that row's content and keep its id so
+        // the KB never accumulates duplicates of a synced source file.
+        $existing = $options->overwrite
+            ? $this->fileRepository->findForOverwrite($user->getId(), $options->source, $options->sourceId, $groupKey, $options->originalName)
+            : null;
+
+        if (null !== $existing) {
+            $file = $this->overwriteFileEntity($existing, $uploadedFile, $storageResult, $groupKey, $options);
+            $overwritten = true;
+        } else {
+            $file = $this->createFileEntity($uploadedFile, $user, $storageResult, $groupKey, $options);
+            $overwritten = false;
+        }
 
         $result = [
             'success' => true,
@@ -248,6 +263,8 @@ final readonly class FileUploadService
             'mime' => $storageResult['mime'],
             'path' => $storageResult['path'],
             'group_key' => $groupKey,
+            'overwritten' => $overwritten,
+            'source_id' => $file->getSourceId(),
         ];
 
         if ('store' === $processLevel) {
@@ -273,6 +290,16 @@ final readonly class FileUploadService
         $extractedText = $file->getFileText();
         if (in_array($processLevel, ['vectorize', 'full'], true) && '' !== trim($extractedText)) {
             $result = $this->vectorize($file, $extractedText, $user, $groupKey, $fileExtension, $result);
+
+            // Delete-after-embed (CORE-4): when the caller does not want the
+            // binary retained, drop it once vectors exist. We keep the row, the
+            // extracted text and the vectors, so RAG + re-vectorize (from stored
+            // text) still work while the external system stays the source of
+            // truth for the binary.
+            if (!$options->retainSource && ($result['vectorized'] ?? false)) {
+                $this->discardStoredBinary($file);
+                $result['source_retained'] = false;
+            }
         }
 
         if ('full' === $processLevel) {
@@ -296,8 +323,7 @@ final readonly class FileUploadService
         User $user,
         array $storageResult,
         ?string $groupKey,
-        string $source = 'web_upload',
-        ?string $originalName = null,
+        UploadOptions $options,
     ): File {
         $convertedFrom = $storageResult['converted_from'] ?? null;
 
@@ -310,19 +336,91 @@ final readonly class FileUploadService
         $file->setFileMime($storageResult['mime']);
         $file->setGroupKey($groupKey);
         $file->setStatus('uploaded');
-        $file->setSource($source);
+        $file->setSource($options->source);
         // External pushes (Outlook/Nextcloud/OpenCloud) land in the Incoming
         // inbox for the user to triage before they join the curated library
         // (03_file-management.md §3.3). Web uploads are never incoming.
-        $file->setIncoming(in_array($source, File::INCOMING_SOURCES, true));
+        $file->setIncoming(in_array($options->source, File::INCOMING_SOURCES, true));
         // Preserve the original ".heic" filename for provenance when we
         // transcoded the upload and the caller didn't supply its own.
-        $file->setOriginalName($originalName ?? (null !== $convertedFrom ? $uploadedFile->getClientOriginalName() : null));
+        $file->setOriginalName($options->originalName ?? (null !== $convertedFrom ? $uploadedFile->getClientOriginalName() : null));
+        $file->setSourceId($options->sourceId);
+        $file->setSourceEtag($options->sourceEtag);
 
         $this->em->persist($file);
         $this->em->flush();
 
         return $file;
+    }
+
+    /**
+     * Replace an existing file's content in place for CORE-4 overwrite: swap the
+     * stored binary, drop the old vectors, refresh provenance/identity and clear
+     * the stale marker. The BID is preserved; extraction/vectorization then runs
+     * on the new content through the normal pipeline.
+     */
+    private function overwriteFileEntity(
+        File $file,
+        UploadedFile $uploadedFile,
+        array $storageResult,
+        ?string $groupKey,
+        UploadOptions $options,
+    ): File {
+        $convertedFrom = $storageResult['converted_from'] ?? null;
+        $newPath = $storageResult['path'];
+        $oldPath = $file->getFilePath();
+
+        // Drop the superseded binary and the stale vectors so a re-vectorize
+        // cannot double-count chunks (mirrors reVectorize()/describe()).
+        if ('' !== $oldPath && $oldPath !== $newPath) {
+            $this->storageService->deleteFile($oldPath);
+        }
+        $this->vectorStorageFacade->deleteByFile($file->getUserId(), (int) $file->getId());
+
+        $file->setFilePath($newPath);
+        $file->setFileType(strtolower($storageResult['extension'] ?? $uploadedFile->getClientOriginalExtension()));
+        $file->setFileName($storageResult['display_name'] ?? $uploadedFile->getClientOriginalName());
+        $file->setFileSize($storageResult['size']);
+        $file->setFileMime($storageResult['mime']);
+        if (null !== $groupKey) {
+            $file->setGroupKey($groupKey);
+        }
+        $file->setStatus('uploaded');
+        // Force re-extraction from the new binary: the pipeline only re-extracts
+        // when the stored text is empty.
+        $file->setFileText('');
+        $file->setSource($options->source);
+        $file->setOriginalName($options->originalName ?? (null !== $convertedFrom ? $uploadedFile->getClientOriginalName() : $file->getOriginalName()));
+        $file->setSourceId($options->sourceId ?? $file->getSourceId());
+        $file->setSourceEtag($options->sourceEtag);
+        // Fresh content supersedes any prior "source changed" marker.
+        $file->setStale(false);
+        $file->setVectorState(File::VECTOR_STATE_PENDING);
+
+        $this->em->flush();
+
+        return $file;
+    }
+
+    /**
+     * Discard the stored binary for a delete-after-embed upload, keeping the
+     * BFILES row, extracted text and vectors intact (CORE-4 retain_source=0).
+     */
+    private function discardStoredBinary(File $file): void
+    {
+        $path = $file->getFilePath();
+        if ('' === $path) {
+            return;
+        }
+
+        try {
+            $this->storageService->deleteFile($path);
+        } catch (\Throwable $e) {
+            $this->logger->warning('FileUploadService: delete-after-embed binary discard failed', [
+                'file_id' => $file->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -598,6 +696,8 @@ final readonly class FileUploadService
 
             if ($vectorResult['success']) {
                 $file->setStatus('vectorized');
+                // Fresh vectors clear any prior "source changed" marker (CORE-4).
+                $file->setStale(false);
                 $this->em->flush();
 
                 return [

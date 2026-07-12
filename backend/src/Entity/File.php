@@ -16,6 +16,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BSTATUS'], name: 'idx_file_status')]
 #[ORM\Index(columns: ['BGROUPKEY'], name: 'idx_file_groupkey')]
 #[ORM\Index(columns: ['BUSERID', 'BSOURCE'], name: 'idx_file_user_source')]
+#[ORM\Index(columns: ['BUSERID', 'BSOURCE', 'BSOURCEID'], name: 'idx_file_user_source_sid')]
 #[ORM\Index(columns: ['BUSERID', 'BGROUPKEY'], name: 'idx_file_user_group')]
 #[ORM\Index(columns: ['BUSERID', 'BVECTORSTATE'], name: 'idx_file_user_vstate')]
 #[ORM\Index(columns: ['BUSERID', 'BINCOMING'], name: 'idx_file_user_incoming')]
@@ -75,17 +76,26 @@ class File
     public const VECTOR_STATE_FAILED = 'failed';
     public const VECTOR_STATE_NOT_APPLICABLE = 'not_applicable';
 
+    /**
+     * The external source changed after ingest, so the vectors are out of date.
+     * Stale files remain searchable (old vectors stay) until re-vectorized ?
+     * stale is NOT "excluded" (hosting-partner CORE-4). Set explicitly via
+     * mark-stale or implicitly when a new {@see self::$sourceEtag} is reported.
+     */
+    public const VECTOR_STATE_STALE = 'stale';
+
     public const VECTOR_STATES = [
         self::VECTOR_STATE_NONE,
         self::VECTOR_STATE_PENDING,
         self::VECTOR_STATE_VECTORIZED,
         self::VECTOR_STATE_FAILED,
         self::VECTOR_STATE_NOT_APPLICABLE,
+        self::VECTOR_STATE_STALE,
     ];
 
     /**
      * File types (extensions / handler kinds) that are media and therefore not
-     * RAG documents ��� their vector state is {@see self::VECTOR_STATE_NOT_APPLICABLE}.
+     * RAG documents - their vector state is {@see self::VECTOR_STATE_NOT_APPLICABLE}.
      */
     public const MEDIA_TYPES = [
         'image', 'video', 'audio',
@@ -147,6 +157,32 @@ class File
      */
     #[ORM\Column(name: 'BORIGINALNAME', length: 255, nullable: true)]
     private ?string $originalName = null;
+
+    /**
+     * Stable external identifier for this file at its {@see self::$source}
+     * (e.g. the Nextcloud file id). Lets an integration overwrite the same
+     * logical file in place instead of creating duplicates, and address it in
+     * bulk stale checks (hosting-partner CORE-4). Null for plain web uploads.
+     */
+    #[ORM\Column(name: 'BSOURCEID', length: 255, nullable: true)]
+    private ?string $sourceId = null;
+
+    /**
+     * External version/etag captured at ingest. A differing etag reported later
+     * means the source drifted and the KB copy is {@see self::VECTOR_STATE_STALE}
+     * (hosting-partner CORE-4). Null when the source does not provide one.
+     */
+    #[ORM\Column(name: 'BSOURCEETAG', length: 255, nullable: true)]
+    private ?string $sourceEtag = null;
+
+    /**
+     * Explicit "source changed, needs re-vectorize" marker. Kept separate from
+     * {@see self::$vectorState} so the fix-on-read state derivation (which reads
+     * "has chunks => vectorized") does not clobber staleness ? a stale file
+     * still has its old, searchable vectors (hosting-partner CORE-4).
+     */
+    #[ORM\Column(name: 'BSTALE', type: 'boolean', options: ['default' => 0])]
+    private bool $stale = false;
 
     /**
      * For generated files: the artefact kind, one of {@see self::ORIGIN_KINDS};
@@ -394,6 +430,44 @@ class File
     public function getDisplayName(): string
     {
         return $this->originalName ?? $this->fileName;
+    }
+
+    public function getSourceId(): ?string
+    {
+        return $this->sourceId;
+    }
+
+    public function setSourceId(?string $sourceId): self
+    {
+        $sourceId = null !== $sourceId ? trim($sourceId) : null;
+        $this->sourceId = ('' === $sourceId) ? null : $sourceId;
+
+        return $this;
+    }
+
+    public function getSourceEtag(): ?string
+    {
+        return $this->sourceEtag;
+    }
+
+    public function setSourceEtag(?string $sourceEtag): self
+    {
+        $sourceEtag = null !== $sourceEtag ? trim($sourceEtag) : null;
+        $this->sourceEtag = ('' === $sourceEtag) ? null : $sourceEtag;
+
+        return $this;
+    }
+
+    public function isStale(): bool
+    {
+        return $this->stale;
+    }
+
+    public function setStale(bool $stale): self
+    {
+        $this->stale = $stale;
+
+        return $this;
     }
 
     public function getOriginKind(): ?string

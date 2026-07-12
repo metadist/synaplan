@@ -259,6 +259,13 @@ final readonly class FileListService
      */
     private function deriveVectorState(File $file, int $chunkCount): string
     {
+        // Staleness is an explicit, persisted marker (CORE-4). A stale file
+        // keeps its old, still-searchable vectors, so it must win over the
+        // plain "has chunks => vectorized" derivation instead of being reset.
+        if ($file->isStale() && $chunkCount > 0) {
+            return File::VECTOR_STATE_STALE;
+        }
+
         if ($chunkCount > 0) {
             return File::VECTOR_STATE_VECTORIZED;
         }
