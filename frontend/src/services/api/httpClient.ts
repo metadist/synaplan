@@ -3,6 +3,7 @@
  * All requests include credentials for HttpOnly cookies
  */
 
+import { shallowRef } from 'vue'
 import { z } from 'zod'
 import { GetApiConfigRuntimeConfigResponseSchema } from '@/generated/api-schemas'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
@@ -80,9 +81,17 @@ export function setApiBaseUrl(url: string): void {
   API_BASE_URL = url
 }
 
-// Runtime config cache
+// Runtime config cache.
+//
+// Reactive (shallowRef) so every consumer of getConfigSync() — including Vue
+// `computed`s such as the usage-taximeter `active` gate — re-evaluates when the
+// config finishes loading or is reloaded. Without this, a computed could latch
+// onto the pre-load default (e.g. `usageTaximeter.enabled ?? true`) and never
+// see the real admin value, making the in-chat toggle appear to do nothing.
+// The object is always replaced wholesale (never deep-mutated), so a shallow ref
+// tracks exactly the assignments we care about at negligible cost.
 type RuntimeConfig = z.infer<typeof GetApiConfigRuntimeConfigResponseSchema>
-let runtimeConfig: RuntimeConfig | null = null
+const runtimeConfigRef = shallowRef<RuntimeConfig | null>(null)
 let configPromise: Promise<RuntimeConfig> | null = null
 let lastUnavailableProviders: string[] = []
 
@@ -92,8 +101,8 @@ let lastUnavailableProviders: string[] = []
  */
 async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   // Return cached config if already loaded
-  if (runtimeConfig) {
-    return runtimeConfig
+  if (runtimeConfigRef.value) {
+    return runtimeConfigRef.value
   }
 
   // Return existing promise if already loading
@@ -125,7 +134,7 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         ? data.unavailableProviders
         : []
       const validated = GetApiConfigRuntimeConfigResponseSchema.parse(data)
-      runtimeConfig = validated
+      runtimeConfigRef.value = validated
       return validated
     } catch (error) {
       console.error('Failed to load runtime config:', error)
@@ -154,7 +163,7 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
           ip: 'dev',
         },
       }
-      runtimeConfig = defaultConfig
+      runtimeConfigRef.value = defaultConfig
       return defaultConfig
     } finally {
       configPromise = null
@@ -177,7 +186,7 @@ export async function getConfig(): Promise<RuntimeConfig> {
  * Call this after login to get user-specific config like plugins
  */
 export async function reloadConfig(): Promise<RuntimeConfig> {
-  runtimeConfig = null
+  runtimeConfigRef.value = null
   configPromise = null
   return loadRuntimeConfig()
 }
@@ -195,7 +204,7 @@ export function getUnavailableProviders(): string[] {
  */
 export function getConfigSync(): RuntimeConfig {
   return (
-    runtimeConfig ?? {
+    runtimeConfigRef.value ?? {
       recaptcha: {
         enabled: false,
         siteKey: '',
