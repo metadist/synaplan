@@ -228,8 +228,8 @@ class ModelCatalogTest extends TestCase
             $this->assertSame('Anthropic', $variant['service']);
             $this->assertSame('claude-sonnet-5', $variant['providerId']);
             $this->assertSame('claude-sonnet-5', $variant['json']['params']['model'] ?? null);
-            $this->assertEqualsWithDelta(3.0, (float) $variant['priceIn'], 1e-9);
-            $this->assertEqualsWithDelta(15.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceOut'], 1e-9);
         }
     }
 

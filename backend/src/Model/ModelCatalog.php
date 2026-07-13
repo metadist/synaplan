@@ -426,9 +426,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'qwen/qwen3-32b',
-            'priceIn' => 0.15,
+            'priceIn' => 0.29,
             'inUnit' => 'per1M',
-            'priceOut' => 0.60,
+            'priceOut' => 0.59,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 5,
@@ -448,9 +448,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'openai/gpt-oss-20b',
-            'priceIn' => 0.10,
+            'priceIn' => 0.075,
             'inUnit' => 'per1M',
-            'priceOut' => 0.50,
+            'priceOut' => 0.30,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 3,
@@ -471,7 +471,7 @@ class ModelCatalog
             'providerId' => 'openai/gpt-oss-120b',
             'priceIn' => 0.15,
             'inUnit' => 'per1M',
-            'priceOut' => 0.75,
+            'priceOut' => 0.60,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 4,
@@ -522,7 +522,7 @@ class ModelCatalog
         //
         // Three options seeded by default — pick whichever the operator's
         // setup makes cheapest/fastest:
-        //   - 220: Groq gpt-oss-120b      (~200 ms TTFT, $0.15/$0.75 per 1M tokens)
+        //   - 220: Groq gpt-oss-120b      (~200 ms TTFT, $0.15/$0.60 per 1M tokens)
         //   - 221: Local Ollama gpt-oss:120b (free, latency depends on the GPU box)
         //   - 222: Anthropic Claude Opus 4.6 (highest quality, slowest)
         [
@@ -535,7 +535,7 @@ class ModelCatalog
             'providerId' => 'openai/gpt-oss-120b',
             'priceIn' => 0.15,
             'inUnit' => 'per1M',
-            'priceOut' => 0.75,
+            'priceOut' => 0.60,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 4,
@@ -1173,12 +1173,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gpt-5.4-nano',
-            // Tier-baselined against the published gpt-5.4-mini price
-            // (mini is $0.75/$4.50 per1M); nano is the smaller/cheaper
-            // sibling. SyncModelPricesCommand will normalise on next run.
             'priceIn' => 0.20,
             'inUnit' => 'per1M',
-            'priceOut' => 1.50,
+            'priceOut' => 1.25,
             'outUnit' => 'per1M',
             'quality' => 7,
             'rating' => 1,
@@ -1441,9 +1438,9 @@ class ModelCatalog
             // Claude Sonnet 5 — Anthropic's most agentic Sonnet yet; performance
             // close to Opus 4.8 at a lower price. Uses adaptive thinking and
             // effort levels, and (like Opus 4.7+) no longer accepts `temperature`.
-            // Introductory API pricing through 2026-08-31 is $2/MTok in and
-            // $10/MTok out; standard pricing (authored here) is $3/MTok in and
-            // $15/MTok out.
+            // Introductory API pricing through 2026-08-31: $2/MTok in, $10/MTok out.
+            // Standard pricing starting 2026-09-01: $3/MTok in, $15/MTok out.
+            // TODO: Update to standard pricing after 2026-08-31.
             'id' => 249,
             'service' => 'Anthropic',
             'name' => 'Claude Sonnet 5',
@@ -1451,9 +1448,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'claude-sonnet-5',
-            'priceIn' => 3,
+            'priceIn' => 2,
             'inUnit' => 'per1M',
-            'priceOut' => 15,
+            'priceOut' => 10,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -1473,9 +1470,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'claude-sonnet-5',
-            'priceIn' => 3,
+            'priceIn' => 2,
             'inUnit' => 'per1M',
-            'priceOut' => 15,
+            'priceOut' => 10,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -1578,20 +1575,20 @@ class ModelCatalog
             'providerId' => 'veo-3.1-fast-generate-preview',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.10,
+            'priceOut' => 0.15,
             'outUnit' => 'persec',
             'quality' => 8,
             'rating' => 1,
             'json' => [
-                'description' => 'Google Veo 3.1 Fast - quicker generations with audio. 720p: $0.10/sec, 1080p: $0.12/sec, 4K: $0.30/sec.',
+                'description' => 'Google Veo 3.1 Fast - quicker generations with audio. 720p: $0.15/sec, 1080p: $0.18/sec, 4K: $0.45/sec.',
                 'params' => ['model' => 'veo-3.1-fast-generate-preview'],
                 'pricing_mode' => 'per_second',
                 'allowed_resolutions' => ['720p', '1080p', '4K'],
                 'default_resolution' => '1080p',
                 'resolution_prices' => [
-                    '720p' => 0.10,
-                    '1080p' => 0.12,
-                    '4K' => 0.30,
+                    '720p' => 0.15,
+                    '1080p' => 0.18,
+                    '4K' => 0.45,
                 ],
             ],
         ],
@@ -1629,9 +1626,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-2.5-pro',
-            'priceIn' => 2.5,
+            'priceIn' => 1.25,
             'inUnit' => 'per1M',
-            'priceOut' => 15,
+            'priceOut' => 10,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -1650,9 +1647,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-2.5-pro',
-            'priceIn' => 2.5,
+            'priceIn' => 1.25,
             'inUnit' => 'per1M',
-            'priceOut' => 15,
+            'priceOut' => 10,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -1892,9 +1889,9 @@ class ModelCatalog
         // against the live Google price endpoint at next run.
         // ----------------------------------------------------------------
         [
-            // 3.5 Flash chat — opt-in upgrade over BID 170 (2.5 Flash). Same
-            // price tier and feature surface; chosen by the user via the
-            // model picker, never silently swapped.
+            // 3.5 Flash chat — opt-in upgrade over BID 170 (2.5 Flash). Higher
+            // price tier ($1.50/$9.00 vs $0.30/$2.50) but beats 3.1 Pro on
+            // coding and agentic benchmarks. Chosen by user via model picker.
             'id' => 237,
             'service' => 'Google',
             'name' => 'Gemini 3.5 Flash',
@@ -1902,9 +1899,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-3.5-flash',
-            'priceIn' => 0.30,
+            'priceIn' => 1.50,
             'inUnit' => 'per1M',
-            'priceOut' => 2.50,
+            'priceOut' => 9.00,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -1924,9 +1921,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-3.5-flash',
-            'priceIn' => 0.30,
+            'priceIn' => 1.50,
             'inUnit' => 'per1M',
-            'priceOut' => 2.50,
+            'priceOut' => 9.00,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -1945,9 +1942,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-3-flash-preview',
-            'priceIn' => 0.30,
+            'priceIn' => 0.50,
             'inUnit' => 'per1M',
-            'priceOut' => 2.50,
+            'priceOut' => 3.00,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -1967,9 +1964,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-3-flash-preview',
-            'priceIn' => 0.30,
+            'priceIn' => 0.50,
             'inUnit' => 'per1M',
-            'priceOut' => 2.50,
+            'priceOut' => 3.00,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -2137,7 +2134,7 @@ class ModelCatalog
             'providerId' => 'claude-sonnet-4-5-20250929',
             'priceIn' => 3,
             'inUnit' => 'per1M',
-            'priceOut' => 5,
+            'priceOut' => 15,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -2158,7 +2155,7 @@ class ModelCatalog
             'providerId' => 'claude-sonnet-4-5-20250929',
             'priceIn' => 3,
             'inUnit' => 'per1M',
-            'priceOut' => 5,
+            'priceOut' => 15,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,

@@ -326,7 +326,7 @@ final readonly class CostCalculationService
 
     private function getCacheReadDiscount(string $provider): float
     {
-        return match ($provider) {
+        return match (strtolower($provider)) {
             'anthropic' => self::CACHE_READ_DISCOUNT_ANTHROPIC,
             default => self::CACHE_READ_DISCOUNT_DEFAULT,
         };
@@ -334,7 +334,7 @@ final readonly class CostCalculationService
 
     private function getCacheWriteMultiplier(string $provider): float
     {
-        return match ($provider) {
+        return match (strtolower($provider)) {
             'anthropic' => self::CACHE_WRITE_MULTIPLIER_ANTHROPIC,
             default => 1.0,
         };
