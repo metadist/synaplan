@@ -176,16 +176,26 @@ onBeforeUnmount(() => {
   display: block;
 }
 
-/* On phones (< 768 px) the fixed mobile drawer toggle lives in the top-left
-   corner (MainLayout: left 0.75rem, top = safe-area-inset-top + 10px, 40px
-   tall). Drop the ring below that button — same left inset, offset past the
-   safe-area + button height + a small gap — so it never hides behind the menu.
-   From 768 px up the desktop sidebar replaces the mobile toggle, so the ring
-   can keep its default top-left placement in the chat column. */
+/* On phones (< 768 px) center the ring under the fixed top-right incognito
+   ("anonymous") toggle (MainLayout: right 0.75rem, top = safe-area-inset-top +
+   10px, 40px box). The 48px ring at a 0.5rem right inset lines its centre up
+   with the 40px button centre (both at 32px from the edge), and the vertical
+   offset clears the safe area + button height + a small gap. From 768 px up the
+   desktop sidebar / desktop toggle take over, so the ring keeps its default
+   top-left placement in the chat column. */
 @media (max-width: 767px) {
   .usage-ring {
     top: calc(env(safe-area-inset-top, 0px) + 3.75rem);
-    left: 0.75rem;
+    left: auto;
+    right: 0.5rem;
+  }
+
+  /* Anchor the tooltip / stats panel to the ring's right edge so a wide panel
+     opens leftwards and never overflows the screen edge. */
+  .usage-ring__tooltip,
+  .usage-ring__panel {
+    left: auto;
+    right: 0;
   }
 }
 
