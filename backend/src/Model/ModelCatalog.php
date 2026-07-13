@@ -2312,14 +2312,17 @@ class ModelCatalog
             'providerId' => 'flux-schnell',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.01,
+            'priceOut' => 0.003,
             'outUnit' => 'perpic',
             'quality' => 7,
             'rating' => 1,
             'json' => [
+                // TheHive bills $3.00 / 1000 images = $0.003/image at the default
+                // 4 inference steps (thehive.ai/pricing). Cost scales linearly if
+                // steps are raised; we send the default so the base rate applies.
                 'description' => 'TheHive Flux Schnell - Fast image generation for prototyping. Generates images quickly with good quality.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.01],
+                'mode_prices' => ['output_cost_per_image' => 0.003],
                 'params' => ['model' => 'flux-schnell', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2333,14 +2336,15 @@ class ModelCatalog
             'providerId' => 'flux-schnell-enhanced',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.02,
+            'priceOut' => 0.004,
             'outUnit' => 'perpic',
             'quality' => 8,
             'rating' => 1,
             'json' => [
+                // TheHive bills $4.00 / 1000 images = $0.004/image at default steps.
                 'description' => 'TheHive Flux Schnell Enhanced - Photorealistic image generation with enhanced quality.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.02],
+                'mode_prices' => ['output_cost_per_image' => 0.004],
                 'params' => ['model' => 'flux-schnell-enhanced', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2354,14 +2358,16 @@ class ModelCatalog
             'providerId' => 'sdxl',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.02,
+            'priceOut' => 0.003,
             'outUnit' => 'perpic',
             'quality' => 8,
             'rating' => 1,
             'json' => [
+                // TheHive bills $3.00 / 1000 images = $0.003/image at the default
+                // 20 inference steps. Cost scales linearly if steps are raised.
                 'description' => 'TheHive SDXL - Stable Diffusion XL for general purpose high-quality image generation.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.02],
+                'mode_prices' => ['output_cost_per_image' => 0.003],
                 'params' => ['model' => 'sdxl', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2375,14 +2381,15 @@ class ModelCatalog
             'providerId' => 'sdxl-enhanced',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.05,
+            'priceOut' => 0.004,
             'outUnit' => 'perpic',
             'quality' => 9,
             'rating' => 1,
             'json' => [
+                // TheHive bills $4.00 / 1000 images = $0.004/image at default steps.
                 'description' => 'TheHive SDXL Enhanced - Premium quality image generation with enhanced details and photorealism.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.05],
+                'mode_prices' => ['output_cost_per_image' => 0.004],
                 'params' => ['model' => 'sdxl-enhanced', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2396,14 +2403,16 @@ class ModelCatalog
             'providerId' => 'emoji',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.01,
+            'priceOut' => 0.004,
             'outUnit' => 'perpic',
             'quality' => 7,
             'rating' => 1,
             'json' => [
+                // TheHive bills the Flux Schnell Emoji model at $4.00 / 1000
+                // images = $0.004/image at default steps.
                 'description' => 'TheHive Emoji Model - Generate custom emojis with transparent backgrounds.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.01],
+                'mode_prices' => ['output_cost_per_image' => 0.004],
                 'params' => ['model' => 'emoji', 'width' => 512, 'height' => 512],
             ],
         ],
