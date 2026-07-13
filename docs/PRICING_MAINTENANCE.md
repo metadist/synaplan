@@ -198,6 +198,12 @@ Dry-run baseline 2026-07-13: **67 text models unchanged (no drift), 19 unmatched
 
 **Still true:** the sync is safe for per-token chat models only. The guard prevents accidental damage, but it does NOT fix the underlying whisper/gpt-image billing bugs (#1314/#1315) — those models still need proper per-second/per-image metering; the sync simply leaves them alone now. The `--force` flag overrides admin-set prices but does **not** override the mode guard (reclassification always requires a human editing the catalog).
 
+### Automated weekly drift check (CI)
+
+`.github/workflows/price-drift.yml` runs every Monday (and on manual dispatch): it seeds the catalog and runs `app:sync-model-prices --dry-run --fail-on-drift`. The `--fail-on-drift` flag exits with code **2** when any *per-token* model's price differs from LiteLLM (media/audio models are excluded by the guard, so no false alarms). On drift the workflow opens — or comments on an existing — GitHub issue titled "Price drift detected …" with the dry-run report, so a human verifies against the official page and updates `ModelCatalog.php`. It lives outside the PR CI on purpose: it depends on the external LiteLLM source, which must never turn a code PR red.
+
+You can run the same check locally: `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run --fail-on-drift; echo $?` (0 = no drift, 2 = drift).
+
 > Correction (2026-07-13): an earlier draft claimed whisper's `0.111 perhour` was "the same price" as the sync's per-second value. That was wrong — `perhour` falls through `normaliseToPerUnit()` unchanged and whisper carries no `pricing_mode`, so the number equivalence never happens in code. This is the live bug in #1314, not a harmless unit label.
 
 ## Time-boxed / reminders

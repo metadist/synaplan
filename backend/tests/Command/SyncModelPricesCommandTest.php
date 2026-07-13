@@ -538,6 +538,75 @@ class SyncModelPricesCommandTest extends TestCase
         $this->assertStringContainsString('per1M', $this->commandTester->getDisplay());
     }
 
+    public function testFailOnDriftReturnsDriftExitCodeWhenPricesDiffer(): void
+    {
+        $model = $this->createModelMock('openai', 'gpt-4o', 3.0, 15.0);
+
+        $this->mockLiteLLMResponse([
+            'gpt-4o' => [
+                'input_cost_per_token' => 0.000005,
+                'output_cost_per_token' => 0.000020,
+                'mode' => 'chat',
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        // Exit code 2 = drift detected (distinct from generic failure).
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('Price drift detected', $this->commandTester->getDisplay());
+    }
+
+    public function testFailOnDriftSucceedsWhenNoDrift(): void
+    {
+        // DB already at LiteLLM price → no drift.
+        $model = $this->createModelMock('openai', 'gpt-4o', 5.0, 20.0);
+
+        $this->mockLiteLLMResponse([
+            'gpt-4o' => [
+                'input_cost_per_token' => 0.000005,
+                'output_cost_per_token' => 0.000020,
+                'mode' => 'chat',
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+    }
+
+    public function testFailOnDriftIgnoresNonPerTokenSkips(): void
+    {
+        // A per_image model that would be skipped must NOT count as drift.
+        $model = $this->createModelMock('openai', 'dall-e-3', 0.0, 0.0);
+
+        $this->mockLiteLLMResponse([
+            'dall-e-3' => [
+                'mode' => 'image_generation',
+                'output_cost_per_image' => 0.04,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+    }
+
     private function mockLiteLLMResponse(array $data): void
     {
         $response = $this->createMock(ResponseInterface::class);

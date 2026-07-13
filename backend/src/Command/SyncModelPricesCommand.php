@@ -24,6 +24,13 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 )]
 class SyncModelPricesCommand extends Command
 {
+    /**
+     * Exit code returned when --fail-on-drift is set and per-token price drift
+     * was detected. Distinct from Command::FAILURE (1, generic error) so CI can
+     * tell "provider prices moved" apart from "the command itself broke".
+     */
+    private const EXIT_DRIFT_DETECTED = 2;
+
     private const LITELLM_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
 
     private const LOCAL_PROVIDERS = ['ollama', 'triton', 'test', 'piper', 'thehive'];
@@ -56,7 +63,8 @@ class SyncModelPricesCommand extends Command
         $this
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show changes without applying')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Override admin-set prices')
-            ->addOption('provider', null, InputOption::VALUE_REQUIRED, 'Only sync a specific provider');
+            ->addOption('provider', null, InputOption::VALUE_REQUIRED, 'Only sync a specific provider')
+            ->addOption('fail-on-drift', null, InputOption::VALUE_NONE, 'Exit with code 2 if any per-token price drift is detected (for scheduled CI drift checks; use with --dry-run)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -64,6 +72,7 @@ class SyncModelPricesCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $dryRun = (bool) $input->getOption('dry-run');
         $force = (bool) $input->getOption('force');
+        $failOnDrift = (bool) $input->getOption('fail-on-drift');
         $providerFilter = $input->getOption('provider');
 
         $io->title('Syncing model prices from LiteLLM');
@@ -238,6 +247,15 @@ class SyncModelPricesCommand extends Command
             'not_matched' => $notMatched,
             'dry_run' => $dryRun,
         ]);
+
+        if ($failOnDrift && $updated > 0) {
+            $io->warning(sprintf(
+                'Price drift detected: %d per-token model(s) differ from LiteLLM. A provider likely changed prices — verify against the official page and update ModelCatalog.php (see docs/PRICING_MAINTENANCE.md).',
+                $updated,
+            ));
+
+            return self::EXIT_DRIFT_DETECTED;
+        }
 
         return Command::SUCCESS;
     }
