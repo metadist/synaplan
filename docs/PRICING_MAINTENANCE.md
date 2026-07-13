@@ -211,6 +211,7 @@ The 8 flagged rows are NOT price drift — they are media/audio models the sync 
 - #1314 — Whisper per-hour/min unit + duration metering (P2)
 - #1315 — gpt-image-1/1.5 flat rate ignores quality/resolution tiers (P2)
 - #1317 — Higgsfield videos priced per_second but billed per-clip in credits (P2)
+- #1318 — app:sync-model-prices clobbers non-per-token models (P2)
 
 ## Done in current PR (#1316)
 
