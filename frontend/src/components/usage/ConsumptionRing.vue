@@ -176,6 +176,19 @@ onBeforeUnmount(() => {
   display: block;
 }
 
+/* On phones (< 768 px) the fixed mobile drawer toggle lives in the top-left
+   corner (MainLayout: left 0.75rem, top = safe-area-inset-top + 10px, 40px
+   tall). Drop the ring below that button — same left inset, offset past the
+   safe-area + button height + a small gap — so it never hides behind the menu.
+   From 768 px up the desktop sidebar replaces the mobile toggle, so the ring
+   can keep its default top-left placement in the chat column. */
+@media (max-width: 767px) {
+  .usage-ring {
+    top: calc(env(safe-area-inset-top, 0px) + 3.75rem);
+    left: 0.75rem;
+  }
+}
+
 /* Compact view up to 1023 px; the full bar takes over on wide desktops
    (>= 1024 px), where it can never overlap the chat column. */
 @media (min-width: 1024px) {
