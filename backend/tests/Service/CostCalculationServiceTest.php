@@ -143,6 +143,127 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame(number_format($expectedCost, 6, '.', ''), $result->totalCost);
     }
 
+    public function testCalculateMediaCostPerHourTranscription(): void
+    {
+        // Groq whisper-large-v3: authored $0.111/hour, billed on audio seconds
+        // (#1314). RateLimitService passes duration to both in/out quantities.
+        $model = $this->createModelMock(7, 'Groq', 0.111, 0.0, 'perhour', '-', ['pricing_mode' => 'per_second']);
+
+        $this->modelRepository->expects(self::any())->method('find')->with(7)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // A full hour of audio must cost exactly the hourly rate.
+        $result = $this->service->calculateMediaCost(7, 3600.0, 3600.0);
+
+        $this->assertSame('0.111000', $result->totalCost);
+    }
+
+    public function testCalculateMediaCostPerMinuteTranscription(): void
+    {
+        // OpenAI whisper-1: authored $0.006/min, billed on audio seconds (#1314).
+        $model = $this->createModelMock(8, 'OpenAI', 0.006, 0.0, 'permin', '-', ['pricing_mode' => 'per_second']);
+
+        $this->modelRepository->expects(self::any())->method('find')->with(8)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 120 seconds = 2 minutes → 2 × $0.006.
+        $result = $this->service->calculateMediaCost(8, 120.0, 120.0);
+
+        $this->assertSame(number_format(2 * 0.006, 6, '.', ''), $result->totalCost);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function gptImageJson(): array
+    {
+        return [
+            'pricing_mode' => 'per_image',
+            'default_quality' => 'medium',
+            'default_size' => '1024x1024',
+            'quality_prices' => [
+                'low' => ['1024x1024' => 0.011, '1024x1536' => 0.016, '1536x1024' => 0.016],
+                'medium' => ['1024x1024' => 0.042, '1024x1536' => 0.063, '1536x1024' => 0.063],
+                'high' => ['1024x1024' => 0.167, '1024x1536' => 0.25, '1536x1024' => 0.25],
+            ],
+        ];
+    }
+
+    public function testCalculateMediaCostImageHighQualityTier(): void
+    {
+        // #1315: high-quality 1024² must bill $0.167, not the flat $0.042.
+        $model = $this->createModelMock(10, 'OpenAI', 0.0, 0.042, 'perImage', 'perImage', $this->gptImageJson());
+        $this->modelRepository->expects(self::any())->method('find')->with(10)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(10, 0, 1.0, null, null, 'high', '1024x1024');
+
+        $this->assertSame('0.167000', $result->totalCost);
+    }
+
+    public function testCalculateMediaCostImageLowQualityPortraitTier(): void
+    {
+        // #1315: low-quality portrait must bill $0.016 (4x cheaper than flat).
+        $model = $this->createModelMock(11, 'OpenAI', 0.0, 0.042, 'perImage', 'perImage', $this->gptImageJson());
+        $this->modelRepository->expects(self::any())->method('find')->with(11)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(11, 0, 1.0, null, null, 'low', '1024x1536');
+
+        $this->assertSame('0.016000', $result->totalCost);
+    }
+
+    public function testCalculateMediaCostImageStandardAliasMapsToMedium(): void
+    {
+        // The app's legacy 'standard' quality must map to the medium tier,
+        // mirroring OpenAIProvider's quality map.
+        $model = $this->createModelMock(12, 'OpenAI', 0.0, 0.042, 'perImage', 'perImage', $this->gptImageJson());
+        $this->modelRepository->expects(self::any())->method('find')->with(12)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(12, 0, 1.0, null, null, 'standard', '1024x1024');
+
+        $this->assertSame('0.042000', $result->totalCost);
+    }
+
+    public function testCalculateMediaCostImageFallsBackToDefaultTierWhenUnspecified(): void
+    {
+        // No quality/size passed → default_quality (medium) + default_size (1024²).
+        $model = $this->createModelMock(13, 'OpenAI', 0.0, 0.042, 'perImage', 'perImage', $this->gptImageJson());
+        $this->modelRepository->expects(self::any())->method('find')->with(13)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(13, 0, 1.0);
+
+        $this->assertSame('0.042000', $result->totalCost);
+    }
+
+    public function testCalculateMediaCostImageUnknownQualityUsesDefault(): void
+    {
+        // 'auto' (or any unknown) → default_quality medium, so we never bill $0.
+        $model = $this->createModelMock(14, 'OpenAI', 0.0, 0.042, 'perImage', 'perImage', $this->gptImageJson());
+        $this->modelRepository->expects(self::any())->method('find')->with(14)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(14, 0, 2.0, null, null, 'auto', '1024x1024');
+
+        // 2 images × medium 1024² ($0.042).
+        $this->assertSame('0.084000', $result->totalCost);
+    }
+
+    public function testCalculateMediaCostImageWithoutTierTableUsesFlatPrice(): void
+    {
+        // A per_image model without quality_prices keeps the flat priceOut even
+        // when quality/size are supplied (no regression for DALL·E/TheHive).
+        $model = $this->createModelMock(15, 'OpenAI', 0.0, 0.04, 'perImage', 'perImage', ['pricing_mode' => 'per_image']);
+        $this->modelRepository->expects(self::any())->method('find')->with(15)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(15, 0, 1.0, null, null, 'high', '1024x1024');
+
+        $this->assertSame('0.040000', $result->totalCost);
+    }
+
     public function testCalculateMediaCostReturnsZeroForTokenBasedModel(): void
     {
         $model = $this->createModelMock(

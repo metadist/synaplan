@@ -388,6 +388,10 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Groq Whisper Large V3 - Best accuracy for multilingual transcription and translation. Supports 50+ languages.',
+                // Billed on audio duration. RateLimitService passes the transcript
+                // duration as media_usage.duration_seconds; CostCalculationService
+                // normalises the perhour price to per-second (see #1314).
+                'pricing_mode' => 'per_second',
                 'params' => [
                     'file' => '*LOCALFILEPATH*',
                     'model' => 'whisper-large-v3',
@@ -411,6 +415,8 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Groq Whisper Large V3 Turbo - Fast and cost-effective transcription. 3x cheaper than V3. No translation support.',
+                // Billed on audio duration (perhour → per-second at bill time, #1314).
+                'pricing_mode' => 'per_second',
                 'params' => [
                     'file' => '*LOCALFILEPATH*',
                     'model' => 'whisper-large-v3-turbo',
@@ -614,7 +620,17 @@ class ModelCatalog
                 // the real cost.
                 'description' => 'OpenAI image generation model.',
                 'pricing_mode' => 'per_image',
+                // Flat fallback = medium 1024² (the headline rate). The exact
+                // per-image price is picked from quality_prices below (#1315).
                 'mode_prices' => ['output_cost_per_image' => 0.042],
+                'default_quality' => 'medium',
+                'default_size' => '1024x1024',
+                // OpenAI gpt-image-1 per-image prices by quality × size.
+                'quality_prices' => [
+                    'low' => ['1024x1024' => 0.011, '1024x1536' => 0.016, '1536x1024' => 0.016],
+                    'medium' => ['1024x1024' => 0.042, '1024x1536' => 0.063, '1536x1024' => 0.063],
+                    'high' => ['1024x1024' => 0.167, '1024x1536' => 0.25, '1536x1024' => 0.25],
+                ],
                 'params' => ['model' => 'gpt-image-1'],
             ],
         ],
@@ -680,6 +696,8 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI Whisper model for audio transcription. Supports 50+ languages.',
+                // Billed on audio duration (permin → per-second at bill time, #1314).
+                'pricing_mode' => 'per_second',
                 'params' => ['model' => 'whisper-1', 'response_format' => 'verbose_json'],
                 'features' => ['multilingual', 'translation'],
             ],
@@ -1091,17 +1109,27 @@ class ModelCatalog
             'providerId' => 'gpt-image-1.5',
             'priceIn' => 0,
             'inUnit' => 'perImage',
-            'priceOut' => 0.04,
+            'priceOut' => 0.034,
             'outUnit' => 'perImage',
             'quality' => 10,
             'rating' => 1,
             'json' => [
                 // The image path does not capture per-image token usage, so a
-                // per-token model bills $0. Bill per image: standard-quality
-                // 1024x1024 = $0.04/image (per OpenAI GPT Image 1.5 pricing).
+                // per-token model bills $0. Bill per image instead; the exact
+                // price is picked from quality_prices by quality × size (#1315).
+                // Flat fallback = medium 1024² = $0.034 (OpenAI GPT Image 1.5).
                 'description' => 'OpenAI GPT Image 1.5 - state-of-the-art image generation and editing. Supports pic2pic via Responses API.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.04],
+                'mode_prices' => ['output_cost_per_image' => 0.034],
+                'default_quality' => 'medium',
+                'default_size' => '1024x1024',
+                // OpenAI gpt-image-1.5 per-image prices by quality × size
+                // (~20% cheaper than gpt-image-1).
+                'quality_prices' => [
+                    'low' => ['1024x1024' => 0.009, '1024x1536' => 0.013, '1536x1024' => 0.013],
+                    'medium' => ['1024x1024' => 0.034, '1024x1536' => 0.05, '1536x1024' => 0.05],
+                    'high' => ['1024x1024' => 0.133, '1024x1536' => 0.20, '1536x1024' => 0.20],
+                ],
                 'params' => ['model' => 'gpt-image-1.5'],
                 'features' => ['image', 'pic2pic'],
                 'meta' => ['api' => 'responses'],
@@ -2796,6 +2824,8 @@ class ModelCatalog
             'rating' => 2,
             'json' => [
                 'description' => 'Voxtral Mini Transcribe - efficient speech-to-text via Mistral /v1/audio/transcriptions. ~4% WER on FLEURS, 13 languages, up to 3h audio per request.',
+                // Billed on audio duration (permin → per-second at bill time, #1314).
+                'pricing_mode' => 'per_second',
                 'params' => ['model' => 'voxtral-mini-latest'],
                 'features' => ['multilingual', 'diarization', 'timestamps'],
             ],

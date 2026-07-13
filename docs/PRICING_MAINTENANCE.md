@@ -22,7 +22,7 @@ Living playbook for keeping Synaplan's model prices correct **and** billed the w
 | Embedding pre-flight estimate | `backend/src/Service/Embedding/EmbeddingCostEstimator.php` |
 | DB sync from catalog | `app:model:seed` |
 
-Units (`inUnit`/`outUnit` in the catalog): the tokens `CostCalculationService::normaliseToPerUnit()` actually understands are — `per1m`/`per1mchars`/`per1mtokens` (÷1e6), `per1k`/`per1000`/`per1000chars` (÷1e3), `per1`/`perchar`/`perpic`/`perimage`/`persec`/`persecond`/`permin` (as-is), and `-`/``/`free` (→ 0). **Anything else (incl. `perhour`) falls through unchanged and is billed as per-1** — that is the latent bug behind #1314, so never author a unit that isn't in this list. `pricing_mode` is one of `per_token` (default), `per_image`, `per_character`, `per_second`.
+Units (`inUnit`/`outUnit` in the catalog): the tokens `CostCalculationService::normaliseToPerUnit()` understands are — `per1m`/`per1mchars`/`per1mtokens` (÷1e6), `per1k`/`per1000`/`per1000chars` (÷1e3), `permin` (÷60), `perhour` (÷3600), `per1`/`perchar`/`perpic`/`perimage`/`persec`/`persecond` (as-is), and `-`/``/`free` (→ 0). Time-based media bills on **seconds**, so `permin`/`perhour` are converted down to per-second (fixed in #1314). Anything else falls through unchanged (per-1), so never author a unit that isn't in this list. `pricing_mode` is one of `per_token` (default), `per_image`, `per_character`, `per_second`.
 
 ## Verification playbook (do this for EVERY model)
 
@@ -169,7 +169,7 @@ Use the **API** price page https://mistral.ai/pricing/api/ (the plain /pricing p
 | 246 | Voxtral Mini Transcribe (`voxtral-mini-latest`) | $0.003 permin | $0.003/min |
 | 247 | Voxtral TTS (`voxtral-mini-tts-2603`) | $0.000016 perChar | $0.016/1k chars |
 
-**Billing mechanics:** per-token for chat/vision (in/out separate), Voxtral STT per audio-minute, Voxtral TTS per character. 50% batch discount + 90% cached-input discount exist (we don't use them). Our provider sends no price-changing params. Note: FAQ on the consumer page quotes "Large $2/$6" — that's the OLD Large 2411, not Large 3. Voxtral Transcribe per-min metering shares the duration-metering path flagged in #1314.
+**Billing mechanics:** per-token for chat/vision (in/out separate), Voxtral STT per audio-minute, Voxtral TTS per character. 50% batch discount + 90% cached-input discount exist (we don't use them). Our provider sends no price-changing params. Note: FAQ on the consumer page quotes "Large $2/$6" — that's the OLD Large 2411, not Large 3. Voxtral Transcribe (per-min) now carries `pricing_mode: per_second` and is metered via the shared duration path (#1314 fixed).
 
 ### Cloudflare Workers AI (verified 2026-07-13 — all correct, no change)
 
@@ -190,13 +190,13 @@ Dry-run baseline 2026-07-13: **67 text models unchanged (no drift), 19 unmatched
 
 | Model | Catalog | LiteLLM mode | Now |
 | ----- | ------- | ------------ | --- |
-| whisper-large-v3 / -turbo | perhour | per_second | skipped (still needs #1314 metering fix) |
-| whisper-1 | permin | per_second | skipped (#1314) |
-| gpt-image-1 / 1.5 | perImage | per_token | skipped (#1315) |
+| whisper-large-v3 / -turbo | perhour + per_second | per_second | skipped (metered, #1314 fixed) |
+| whisper-1, Voxtral | permin + per_second | per_second | skipped (metered, #1314 fixed) |
+| gpt-image-1 / 1.5 | perImage + per_image | per_token | skipped (tiered, #1315 fixed) |
 | gemini-2.5-flash-image, 3.1-flash-image | perImage | per_token | skipped |
 | gemini-2.5-flash-preview-tts | perChar | per_token | skipped |
 
-**Still true:** the sync is safe for per-token chat models only. The guard prevents accidental damage, but it does NOT fix the underlying whisper/gpt-image billing bugs (#1314/#1315) — those models still need proper per-second/per-image metering; the sync simply leaves them alone now. The `--force` flag overrides admin-set prices but does **not** override the mode guard (reclassification always requires a human editing the catalog).
+**Still true:** the sync is safe for per-token chat models only. The guard leaves media/audio models alone; their prices are maintained by hand. The `--force` flag overrides admin-set prices but does **not** override the mode guard (reclassification always requires a human editing the catalog).
 
 ### Automated weekly drift check (CI)
 
@@ -204,7 +204,7 @@ Dry-run baseline 2026-07-13: **67 text models unchanged (no drift), 19 unmatched
 
 You can run the same check locally: `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run --fail-on-drift; echo $?` (0 = no drift, 2 = drift).
 
-> Correction (2026-07-13): an earlier draft claimed whisper's `0.111 perhour` was "the same price" as the sync's per-second value. That was wrong — `perhour` falls through `normaliseToPerUnit()` unchanged and whisper carries no `pricing_mode`, so the number equivalence never happens in code. This is the live bug in #1314, not a harmless unit label.
+> History (2026-07-13): an earlier draft claimed whisper's `0.111 perhour` was "the same price" as the sync's per-second value. That was wrong at the time — `perhour` fell through `normaliseToPerUnit()` unchanged and whisper carried no `pricing_mode`. #1314 fixed both: whisper/Voxtral now carry `pricing_mode: per_second` and `normaliseToPerUnit()` converts `perhour`/`permin` down to per-second, and `AiFacade::transcribe()` records the provider-reported audio duration (see below).
 
 ## Time-boxed / reminders
 
@@ -213,11 +213,27 @@ You can run the same check locally: `docker compose exec -T backend php bin/cons
 ## Related issues
 
 - #1313 — provider name casing standardization (P2)
-- #1314 — Whisper per-hour/min unit + duration metering (P2)
-- #1315 — gpt-image-1/1.5 flat rate ignores quality/resolution tiers (P2)
+- #1314 — Whisper per-hour/min unit + duration metering (P2) — **fixed in #1316**
+- #1315 — gpt-image-1/1.5 flat rate ignores quality/resolution tiers (P2) — **fixed in #1316**
 - #1317 — Higgsfield videos priced per_second but billed per-clip in credits (P2)
 - #1318 — app:sync-model-prices clobbers non-per-token models (P2) — **fixed in #1316** (mode guard)
 
+## Transcription (STT) metering — #1314
+
+External speech-to-text (OpenAI/Groq Whisper, Mistral Voxtral) is billed on the audio duration the provider returns. `AiFacade::transcribe()` is the single choke point every external call passes through (local whisper.cpp bypasses it and is free), so `TranscriptionUsageRecorder` records the cost there exactly once, under its own `TRANSCRIPTION` action (kept separate from the zero-cost `FILE_ANALYSIS` quota event and from `AUDIOS`, which is TTS). Catalog: whisper/Voxtral carry `pricing_mode: per_second` with their natural `perhour`/`permin` unit; `normaliseToPerUnit()` converts to per-second.
+
+## Image quality/size tiers — #1315
+
+gpt-image bills a different per-image price per quality × size (e.g. gpt-image-1 low 1024² = $0.011, high 1024² = $0.167). The catalog encodes this as `json.quality_prices[quality][size]` with `default_quality`/`default_size` fall-backs; `CostCalculationService::calculateMediaCost()` picks the exact tier from the `quality`/`size` carried in `media_usage`. The generation handlers/services forward the requested quality+size; unknown/`auto` quality falls back to `default_quality`. Models without `quality_prices` keep their flat `priceOut` (no regression). Verified prices (per image):
+
+| Quality | gpt-image-1 1024² / portrait+landscape | gpt-image-1.5 1024² / portrait+landscape |
+| ------- | -------------------------------------- | ---------------------------------------- |
+| low | $0.011 / $0.016 | $0.009 / $0.013 |
+| medium | $0.042 / $0.063 | $0.034 / $0.05 |
+| high | $0.167 / $0.25 | $0.133 / $0.20 |
+
+> Rollout caveat: catalog price/JSON changes reach the DB via `ModelSeeder` only for rows still matching their seeded fingerprint. Fresh installs get the correct values; rows an admin edited in the UI are **preserved** and must be updated by hand (or a migration).
+
 ## Done in current PR (#1316)
 
-Price updates (Anthropic/Google/OpenAI/Groq) + Anthropic cache-discount case-sensitivity fix. Kimi/HF provider-pinning fix is separate, pending the routing decision above.
+Price updates (Anthropic/Google/OpenAI/Groq) + Anthropic cache-discount case-sensitivity fix + Kimi/HF DeepInfra pinning + TheHive price corrections + `app:sync-model-prices` mode guard & weekly drift CI (#1318) + Whisper/Voxtral duration metering (#1314) + gpt-image quality/size tiers (#1315).

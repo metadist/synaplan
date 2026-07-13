@@ -118,7 +118,17 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             ? ($this->extractResolutionFromResult($result) ?? $resolution)
             : null;
 
-        $this->recordUsage($user, $type, $provider, $modelName, $resolvedModelId, null, $usedResolution);
+        $this->recordUsage(
+            $user,
+            $type,
+            $provider,
+            $modelName,
+            $resolvedModelId,
+            null,
+            $usedResolution,
+            'image' === $type ? 'standard' : null,
+            'image' === $type ? self::DEFAULT_IMAGE_SIZE : null,
+        );
 
         $response = [
             'success' => true,
@@ -235,7 +245,8 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
 
         $this->registerGeneratedFile($user, $localPath, $mimeType);
 
-        $this->recordUsage($user, 'image', $provider, $modelName, $resolvedModelId);
+        // pic2pic uses high quality (see generateImage call above).
+        $this->recordUsage($user, 'image', $provider, $modelName, $resolvedModelId, null, null, 'high', self::DEFAULT_IMAGE_SIZE);
 
         // Clean up temporary upload files
         foreach ($imagePaths as $tmpPath) {
@@ -779,11 +790,21 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         ?int $modelId = null,
         ?float $durationSeconds = null,
         ?string $resolution = null,
+        ?string $quality = null,
+        ?string $size = null,
     ): void {
         $action = 'image' === $type ? 'IMAGES' : 'VIDEOS';
 
         if ('image' === $type) {
+            // quality/size let per-tier image models (gpt-image) bill the exact
+            // per-image price instead of a flat rate (#1315).
             $mediaUsage = ['images' => 1.0];
+            if (null !== $quality && '' !== $quality) {
+                $mediaUsage['quality'] = $quality;
+            }
+            if (null !== $size && '' !== $size) {
+                $mediaUsage['size'] = $size;
+            }
         } else {
             $mediaUsage = [
                 'duration_seconds' => $durationSeconds ?? (float) self::DEFAULT_VIDEO_DURATION,

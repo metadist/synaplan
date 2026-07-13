@@ -853,6 +853,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $mediaUsage = [];
             if ('image' === $mediaType) {
                 $mediaUsage['images'] = $result['image_count'] ?? 1;
+                // Carry the requested quality/size so per-tier image models
+                // (gpt-image) bill the exact price (#1315). Mirrors the defaults
+                // used when building $imageOptions above.
+                $mediaUsage['quality'] = $options['quality'] ?? ($isPic2Pic ? 'high' : 'standard');
+                $mediaUsage['size'] = $options['size'] ?? '1024x1024';
             } elseif ('video' === $mediaType) {
                 $requestedDuration = $options['duration'] ?? $classification['duration'] ?? 8;
                 $duration = $result['duration_seconds'] ?? null;
@@ -1799,7 +1804,13 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'duration_seconds' => (float) ($options['duration'] ?? $classification['duration'] ?? 8),
             ],
             MediaJob::TYPE_AUDIO => ['characters' => mb_strlen($prompt)],
-            default => ['images' => 1],
+            // Carry quality/size so per-tier image models (gpt-image) bill the
+            // exact price when the async job is later recorded (#1315).
+            default => [
+                'images' => 1,
+                'quality' => $options['quality'] ?? 'standard',
+                'size' => $options['size'] ?? '1024x1024',
+            ],
         };
     }
 

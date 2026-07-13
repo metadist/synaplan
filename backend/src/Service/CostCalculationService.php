@@ -169,6 +169,11 @@ final readonly class CostCalculationService
      *                                    When the model defines `json.resolution_prices`, the matching
      *                                    per-second price overrides `priceOut`. Falls back to default
      *                                    pricing when omitted or unknown.
+     * @param string|null $quality        Optional image quality tier (low|medium|high, or the legacy
+     *                                    standard/hd aliases). Used with $size to pick a per-image price
+     *                                    from `json.quality_prices` (e.g. gpt-image, #1315).
+     * @param string|null $size           Optional image size (e.g. '1024x1024', '1024x1536'). Combined
+     *                                    with $quality to look up the exact per-image tier price.
      */
     public function calculateMediaCost(
         ?int $modelId,
@@ -176,6 +181,8 @@ final readonly class CostCalculationService
         float $outputQuantity = 0,
         ?int $timestamp = null,
         ?string $resolution = null,
+        ?string $quality = null,
+        ?string $size = null,
     ): CostResult {
         if (!$modelId) {
             return $this->zeroCostResult();
@@ -223,6 +230,19 @@ final readonly class CostCalculationService
             $priceSnapshot['price_out_resolution'] = number_format($resolutionPrice, 8, '.', '');
         }
 
+        // Image models (gpt-image) charge a different per-image price per
+        // quality × size tier. When the model defines `json.quality_prices`,
+        // pick the exact tier so low-quality images aren't overbilled and
+        // high-quality ones aren't underbilled (#1315). Overrides the flat
+        // priceOut; no-op for models without tiers.
+        [$tierPrice, $tierQuality, $tierSize] = $this->lookupImageTierPrice($model, $quality, $size);
+        if (null !== $tierPrice) {
+            $priceOut = $this->normaliseToPerUnit($tierPrice, (string) $priceSnapshot['out_unit']);
+            $priceSnapshot['image_quality'] = $tierQuality;
+            $priceSnapshot['image_size'] = $tierSize;
+            $priceSnapshot['price_out_tier'] = number_format($tierPrice, 8, '.', '');
+        }
+
         $inputCost = $inputQuantity * $priceIn;
         $outputCost = $outputQuantity * $priceOut;
         $totalCost = $inputCost + $outputCost;
@@ -248,7 +268,14 @@ final readonly class CostCalculationService
         return match (strtolower($unit)) {
             'per1m', 'per1mchars', 'per1mtokens' => $price / 1_000_000,
             'per1k', 'per1000', 'per1000chars' => $price / 1_000,
-            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond', 'permin' => $price,
+            // Time-based media (transcription/video): the billable quantity is
+            // always passed in SECONDS, so per-minute / per-hour catalog prices
+            // must be converted down to per-second. Authoring in the provider's
+            // natural unit keeps the catalog readable ($0.111/hour) while billing
+            // stays correct (#1314). Anything already per-second is a no-op.
+            'permin' => $price / 60,
+            'perhour' => $price / 3_600,
+            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond' => $price,
             '-', '', 'free' => 0.0,
             default => $price,
         };
@@ -295,6 +322,72 @@ final readonly class CostCalculationService
         }
 
         return (float) $prices[$resolution];
+    }
+
+    /**
+     * Resolve the per-image price for an image model's quality × size tier.
+     *
+     * gpt-image bills a different price for every (quality, size) combination
+     * (e.g. gpt-image-1 low 1024² = $0.011 but high 1024² = $0.167). The catalog
+     * encodes this as `json.quality_prices[quality][size]` with `default_quality`
+     * / `default_size` fall-backs. Returns `[price, resolvedQuality, resolvedSize]`,
+     * or `[null, null, null]` when the model has no tier table (flat priceOut).
+     *
+     * @return array{0: float|null, 1: string|null, 2: string|null}
+     */
+    private function lookupImageTierPrice(Model $model, ?string $quality, ?string $size): array
+    {
+        $json = $model->getJson();
+        $tiers = $json['quality_prices'] ?? null;
+        if (!is_array($tiers) || [] === $tiers) {
+            return [null, null, null];
+        }
+
+        $resolvedQuality = $this->normaliseImageQuality($quality);
+        if (null === $resolvedQuality || !isset($tiers[$resolvedQuality]) || !is_array($tiers[$resolvedQuality])) {
+            $default = $json['default_quality'] ?? null;
+            $resolvedQuality = is_string($default) && isset($tiers[$default])
+                ? $default
+                : (string) array_key_first($tiers);
+        }
+
+        $sizes = $tiers[$resolvedQuality] ?? null;
+        if (!is_array($sizes) || [] === $sizes) {
+            return [null, null, null];
+        }
+
+        $resolvedSize = is_string($size) && isset($sizes[$size]) ? $size : null;
+        if (null === $resolvedSize) {
+            $defaultSize = $json['default_size'] ?? null;
+            $resolvedSize = is_string($defaultSize) && isset($sizes[$defaultSize])
+                ? $defaultSize
+                : (string) array_key_first($sizes);
+        }
+
+        return [(float) $sizes[$resolvedSize], $resolvedQuality, $resolvedSize];
+    }
+
+    /**
+     * Map the app-level quality value onto OpenAI's low|medium|high tiers.
+     *
+     * Mirrors the mapping in OpenAIProvider::generateImageWithGptImage1() so the
+     * price we bill matches the quality actually requested from the provider:
+     * standard→medium, hd→high, low/medium/high pass through. Unknown values
+     * (incl. 'auto', where OpenAI picks the tier) fall back to null so the
+     * caller applies the model's `default_quality`.
+     */
+    private function normaliseImageQuality(?string $quality): ?string
+    {
+        if (null === $quality) {
+            return null;
+        }
+
+        return match (strtolower($quality)) {
+            'standard' => 'medium',
+            'hd' => 'high',
+            'low', 'medium', 'high' => strtolower($quality),
+            default => null,
+        };
     }
 
     /**
