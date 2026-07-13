@@ -241,7 +241,7 @@ gpt-image bills a different per-image price per quality × size (e.g. gpt-image-
 | medium | $0.042 / $0.063 | $0.034 / $0.05 |
 | high | $0.167 / $0.25 | $0.133 / $0.20 |
 
-> Rollout caveat: catalog price/JSON changes reach the DB via `ModelSeeder` only for rows still matching their seeded fingerprint. Fresh installs get the correct values; rows an admin edited in the UI are **preserved** and must be updated by hand (or a migration).
+> Rollout caveat: catalog price/JSON changes reach the DB via `ModelSeeder` only for rows still matching their seeded fingerprint. Fresh installs get the correct values; rows an admin edited in the UI are **preserved** and must be updated by a data migration — see §"Production rollout to existing installs".
 
 ## Long-context tiers — #1319
 
@@ -259,6 +259,17 @@ Some providers charge a higher per-token rate for the **whole request** once the
 
 > `claude-sonnet-4-5`'s `max_input` is 200k, so its tier is currently unreachable — kept for completeness.
 
+## Production rollout to existing installs
+
+`ModelCatalog` is the source of truth, but a catalog change only reaches an **existing** DB row via `ModelSeeder` when that row still matches its seeded fingerprint. Rows an operator edited in the admin UI are **preserved** and never auto-updated — so a price correction can silently fail to reach production. The repo's convention (see `Version20260712120000/130000/140000`) is to ship a **Doctrine data migration** with idempotent, raw `UPDATE BMODELS ... WHERE BPROVID = :provid` for corrections that must land regardless. Rules:
+
+- Raw `addSql()` only — never touch the `Schema` API (`hasTable()`/`getTable()`); the Galera comparator throws on the shared cluster.
+- Idempotent: fixed value UPDATEs / `JSON_SET` re-run to the same result; a `providerId` change guards on the old `BPROVID` so a re-run is a no-op.
+- Never touch operator-owned columns (`BSELECTABLE`, `BACTIVE`, `BISDEFAULT`, `BSHOWWHENFREE`).
+- Migrations do **not** write `BMODEL_PRICE_HISTORY`; `BMODELS` is the effective price source (history is time-bounded and typically absent), matching every prior price migration.
+
+This PR's corrections are rolled out by `Version20260713190000` (per-token reprices, Kimi DeepInfra pin, TheHive rates, Veo 3.1 Fast, gpt-image quality tiers, Whisper/Voxtral per-second).
+
 ## Done in current PR (#1316)
 
-Price updates (Anthropic/Google/OpenAI/Groq) + Anthropic cache-discount case-sensitivity fix + Kimi/HF DeepInfra pinning + TheHive price corrections + `app:sync-model-prices` mode guard & weekly drift CI (#1318) + Whisper/Voxtral duration metering (#1314) + gpt-image quality/size tiers (#1315) + long-context token tiers (#1319).
+Price updates (Anthropic/Google/OpenAI/Groq) + Anthropic cache-discount case-sensitivity fix + Kimi/HF DeepInfra pinning + TheHive price corrections + `app:sync-model-prices` mode guard & weekly drift CI (#1318) + Whisper/Voxtral duration metering (#1314) + gpt-image quality/size tiers (#1315) + long-context token tiers (#1319) + production rollout migration `Version20260713190000`.
