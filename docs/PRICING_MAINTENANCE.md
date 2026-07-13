@@ -182,22 +182,21 @@ Official docs table (updated 2026-07-08). Billed in neurons ($0.011/1k neurons);
 
 **Billing mechanics:** everything is metered in **neurons** ($0.011/1k neurons, 10k/day free); the docs publish a per-token equivalent which is what we store. Embeddings bill input tokens only (output $0). No price-changing params sent by our code.
 
-## ⚠️ `app:sync-model-prices` is NOT safe to run blindly
+## `app:sync-model-prices` — per-token only (guard added, #1318 fixed)
 
-Dry-run verified 2026-07-13: **67 text models unchanged (no drift), 19 unmatched (our manual providers — expected), but 8 false "updates".** The command reads the catalog number but assumes a **per-token/per-second** unit, so it misreads `perhour` / `perImage` / `perChar` models and proposes bogus changes. Running it for real would CLOBBER correct prices.
+The command now **self-guards**: it only writes a model when the catalog mode AND the LiteLLM-derived mode are both `per_token`. Any model that is (or would become) `per_image` / `per_character` / `per_second` is counted under `skipped (non-per-token)` and never touched. This closes #1318 — earlier the sync would silently reclassify these media/audio models and clobber correct prices.
 
-The 8 flagged rows are NOT price drift — they are media/audio models the sync misreads. Do NOT apply sync to them:
+Dry-run baseline 2026-07-13: **67 text models unchanged (no drift), 19 unmatched (our manual providers — expected), and 8 media/audio rows now reported as `skipped (non-per-token)`** instead of bogus "updates":
 
-| Model | DB now | Sync wrongly wants | Why sync is wrong |
-| ----- | ------ | ------------------ | ----------------- |
-| whisper-large-v3 | 0.111 **perhour** | 0.000031 perSec | `perhour` is unhandled by `normaliseToPerUnit()` AND whisper has no `pricing_mode` → billed as default `per_token` on token counts. Structurally broken, see #1314 — do NOT paper over it with the sync value. |
-| whisper-large-v3-turbo | 0.04 perhour | 0.000011 perSec | same as above (#1314) |
-| whisper-1 | 0.006 permin | 0.0001 perSec | `permin` IS handled, but whisper still has no `per_second`/`per_character` mode → wrong billing path (#1314) |
-| gpt-image-1 / 1.5 | perImage $0.042 / $0.04 | per1M token values | image model, not token-billed (#1315) |
-| gemini-2.5-flash-image, 3.1-flash-image | perImage | per1M | image model |
-| gemini-2.5-flash-preview-tts | perChar | per1M | TTS is per-character |
+| Model | Catalog | LiteLLM mode | Now |
+| ----- | ------- | ------------ | --- |
+| whisper-large-v3 / -turbo | perhour | per_second | skipped (still needs #1314 metering fix) |
+| whisper-1 | permin | per_second | skipped (#1314) |
+| gpt-image-1 / 1.5 | perImage | per_token | skipped (#1315) |
+| gemini-2.5-flash-image, 3.1-flash-image | perImage | per_token | skipped |
+| gemini-2.5-flash-preview-tts | perChar | per_token | skipped |
 
-**Rule:** treat `app:sync-model-prices` as advisory for **per-token chat models only**. Never apply its output to any model whose `pricing_mode` is `per_image`/`per_character`/`per_second` or whose unit is `perhour`/`permin`/`perImage`/`perChar`. A proper fix would teach the sync command to skip non-per-token modes (candidate follow-up issue; overlaps #1314/#1315).
+**Still true:** the sync is safe for per-token chat models only. The guard prevents accidental damage, but it does NOT fix the underlying whisper/gpt-image billing bugs (#1314/#1315) — those models still need proper per-second/per-image metering; the sync simply leaves them alone now. The `--force` flag overrides admin-set prices but does **not** override the mode guard (reclassification always requires a human editing the catalog).
 
 > Correction (2026-07-13): an earlier draft claimed whisper's `0.111 perhour` was "the same price" as the sync's per-second value. That was wrong — `perhour` falls through `normaliseToPerUnit()` unchanged and whisper carries no `pricing_mode`, so the number equivalence never happens in code. This is the live bug in #1314, not a harmless unit label.
 
@@ -211,7 +210,7 @@ The 8 flagged rows are NOT price drift — they are media/audio models the sync 
 - #1314 — Whisper per-hour/min unit + duration metering (P2)
 - #1315 — gpt-image-1/1.5 flat rate ignores quality/resolution tiers (P2)
 - #1317 — Higgsfield videos priced per_second but billed per-clip in credits (P2)
-- #1318 — app:sync-model-prices clobbers non-per-token models (P2)
+- #1318 — app:sync-model-prices clobbers non-per-token models (P2) — **fixed in #1316** (mode guard)
 
 ## Done in current PR (#1316)
 

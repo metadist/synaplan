@@ -391,8 +391,11 @@ class SyncModelPricesCommandTest extends TestCase
         $this->assertStringContainsString('1 updated', $this->commandTester->getDisplay());
     }
 
-    public function testSyncsTtsPerCharacterPricing(): void
+    public function testSkipsTtsPerCharacterModel(): void
     {
+        // LiteLLM classifies tts-1 as audio_speech (per_character). The sync must
+        // NOT reclassify it away from the catalog's per_token default — such media
+        // models are maintained manually (#1318).
         $model = $this->createModelMock('openai', 'tts-1', 0.0, 0.0);
 
         $this->mockLiteLLMResponse([
@@ -407,17 +410,21 @@ class SyncModelPricesCommandTest extends TestCase
         // @phpstan-ignore-next-line
         $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
 
-        $this->em->expects($this->once())->method('persist');
+        $this->em->expects($this->never())->method('persist');
 
         $this->commandTester->execute([]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
-        $this->assertStringContainsString('1 updated', $this->commandTester->getDisplay());
-        $this->assertStringContainsString('perChar', $this->commandTester->getDisplay());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Skipped — non-per-token', $output);
+        $this->assertStringContainsString('litellm=per_character', $output);
     }
 
-    public function testSyncsWhisperPerSecondPricing(): void
+    public function testSkipsWhisperTranscriptionModel(): void
     {
+        // whisper is per_token in the catalog (no explicit mode) but LiteLLM says
+        // audio_transcription/per_second. The sync must skip rather than flip the
+        // mode (that reclassification is the #1314/#1318 hazard).
         $model = $this->createModelMock('openai', 'whisper-1', 0.0, 0.0);
 
         $this->mockLiteLLMResponse([
@@ -432,16 +439,17 @@ class SyncModelPricesCommandTest extends TestCase
         // @phpstan-ignore-next-line
         $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
 
-        $this->em->expects($this->once())->method('persist');
+        $this->em->expects($this->never())->method('persist');
 
         $this->commandTester->execute([]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
-        $this->assertStringContainsString('1 updated', $this->commandTester->getDisplay());
-        $this->assertStringContainsString('perSec', $this->commandTester->getDisplay());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Skipped — non-per-token', $output);
+        $this->assertStringContainsString('litellm=per_second', $output);
     }
 
-    public function testSyncsImagePerImagePricing(): void
+    public function testSkipsImagePerImageModel(): void
     {
         $model = $this->createModelMock('openai', 'dall-e-3', 0.0, 0.0);
 
@@ -457,13 +465,51 @@ class SyncModelPricesCommandTest extends TestCase
         // @phpstan-ignore-next-line
         $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
 
-        $this->em->expects($this->once())->method('persist');
+        $this->em->expects($this->never())->method('persist');
 
         $this->commandTester->execute([]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
-        $this->assertStringContainsString('1 updated', $this->commandTester->getDisplay());
-        $this->assertStringContainsString('perImage', $this->commandTester->getDisplay());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Skipped — non-per-token', $output);
+        $this->assertStringContainsString('litellm=per_image', $output);
+    }
+
+    public function testSkipsCatalogPerImageModelEvenWhenLiteLLMAgrees(): void
+    {
+        // A model already classified per_image in the catalog must not be touched
+        // by the sync at all, even if LiteLLM would return per_image too — its
+        // price is manually maintained.
+        $model = $this->createMock(Model::class);
+        $model->method('getId')->willReturn(29);
+        $model->method('getService')->willReturn('openai');
+        $model->method('getProviderId')->willReturn('gpt-image-1');
+        $model->method('getPriceIn')->willReturn(0.0);
+        $model->method('getPriceOut')->willReturn(0.042);
+        $model->method('getInUnit')->willReturn('perImage');
+        $model->method('getOutUnit')->willReturn('perImage');
+        $model->method('getJson')->willReturn(['pricing_mode' => 'per_image']);
+
+        $this->mockLiteLLMResponse([
+            'gpt-image-1' => [
+                'mode' => 'image_generation',
+                'output_cost_per_image' => 0.099,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute([]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Skipped — non-per-token', $output);
+        $this->assertStringContainsString('catalog=per_image', $output);
     }
 
     public function testTokenBasedImageGenFallsBackToTokenPricing(): void

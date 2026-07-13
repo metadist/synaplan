@@ -84,9 +84,11 @@ class SyncModelPricesCommand extends Command
         $unchanged = 0;
         $skipped = 0;
         $nullPriceSkipped = 0;
+        $nonTokenSkipped = 0;
         $notMatched = 0;
         $unmatchedList = [];
         $nullPriceList = [];
+        $nonTokenList = [];
 
         foreach ($dbModels as $model) {
             $service = $model->getService();
@@ -108,6 +110,30 @@ class SyncModelPricesCommand extends Command
 
             $litellmModel = $litellmData[$litellmKey];
             $pricing = $this->extractPricing($litellmModel);
+
+            // Guard against pricing-mode reclassification. LiteLLM derives its own
+            // billing mode, which can disagree with a deliberately-set catalog mode
+            // (e.g. gpt-image is per_image here but per_token in LiteLLM; whisper is
+            // manually per-hour/min but audio_transcription/per_second upstream).
+            // Applying such a change silently corrupts correct prices, so we ONLY
+            // let the sync touch models that are per_token AND stay per_token. Any
+            // other model is left to manual maintenance (see docs/PRICING_MAINTENANCE.md
+            // and #1318). Not overridable by --force: reclassification always needs
+            // a human editing the catalog.
+            $currentMode = $model->getJson()['pricing_mode'] ?? 'per_token';
+            $newMode = $pricing['pricing_mode'];
+            if ('per_token' !== $currentMode || 'per_token' !== $newMode) {
+                ++$nonTokenSkipped;
+                $nonTokenList[] = sprintf(
+                    '%s/%s (ID %d) — catalog=%s, litellm=%s',
+                    $service,
+                    $model->getProviderId(),
+                    $model->getId(),
+                    $currentMode,
+                    $newMode,
+                );
+                continue;
+            }
 
             if ($this->isNullPriceRisk($model, $pricing['price_in'], $pricing['price_out'])) {
                 ++$nullPriceSkipped;
@@ -135,14 +161,12 @@ class SyncModelPricesCommand extends Command
                 }
             }
 
+            // Both sides are per_token here (guaranteed by the mode guard above),
+            // so only the numeric price can differ.
             $priceChanged = abs($model->getPriceIn() - $pricing['price_in']) > 0.000001
                 || abs($model->getPriceOut() - $pricing['price_out']) > 0.000001;
 
-            // Also check if pricing_mode changed (e.g. first time setting mode metadata)
-            $currentJson = $model->getJson();
-            $modeChanged = ($currentJson['pricing_mode'] ?? 'per_token') !== $pricing['pricing_mode'];
-
-            if (!$priceChanged && !$modeChanged) {
+            if (!$priceChanged) {
                 ++$unchanged;
                 continue;
             }
@@ -185,16 +209,22 @@ class SyncModelPricesCommand extends Command
             $io->listing($nullPriceList);
         }
 
+        if ([] !== $nonTokenList) {
+            $io->section(sprintf('Skipped — non-per-token (manual maintenance) (%d)', count($nonTokenList)));
+            $io->listing($nonTokenList);
+        }
+
         if ([] !== $unmatchedList) {
             $io->section(sprintf('Unmatched models (%d)', count($unmatchedList)));
             $io->listing($unmatchedList);
         }
 
         $io->success(sprintf(
-            'Price sync complete: %d updated, %d unchanged, %d skipped (admin), %d null-price protected, %d unmatched',
+            'Price sync complete: %d updated, %d unchanged, %d skipped (admin), %d skipped (non-per-token), %d null-price protected, %d unmatched',
             $updated,
             $unchanged,
             $skipped,
+            $nonTokenSkipped,
             $nullPriceSkipped,
             $notMatched,
         ));
@@ -203,6 +233,7 @@ class SyncModelPricesCommand extends Command
             'updated' => $updated,
             'unchanged' => $unchanged,
             'skipped' => $skipped,
+            'non_token_skipped' => $nonTokenSkipped,
             'null_price_skipped' => $nullPriceSkipped,
             'not_matched' => $notMatched,
             'dry_run' => $dryRun,
