@@ -47,6 +47,64 @@ jobs:
         working-directory: backend
         run: composer lint
 
+  openapi-spec:
+    name: OpenAPI Spec
+    # Small dedicated job that only dumps the OpenAPI spec so the frontend
+    # jobs don't have to wait for the full backend job (PHPStan + PHPUnit).
+    # nelmio:apidoc:dump compiles the container but never touches the DB
+    # (Doctrine connects lazily), so no MariaDB service is needed here.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.4"
+          # Same extension set as the backend job so `composer install` passes
+          # the platform-req check (see backend job for the rationale).
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
+          coverage: none
+
+      - name: Cache composer dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install protoc from base image
+        run: |
+          BASE_IMAGE=$(grep -oP 'FROM \K\S+' _docker/backend/Dockerfile | head -1)
+          id=$(docker create "$BASE_IMAGE")
+          trap "docker rm $id" EXIT
+          sudo docker cp $id:/usr/local/bin/protoc /usr/local/bin/protoc
+          protoc --version
+
+      - name: Create .env file
+        working-directory: backend
+        run: cp .env.test .env
+
+      - name: Create plugins symlink
+        run: sudo ln -s ${{ github.workspace }}/plugins /plugins
+
+      - name: Install dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Generate OpenAPI spec
+        working-directory: backend
+        run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
+
+      - name: Upload OpenAPI spec artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: openapi-spec
+          path: backend/openapi-spec.json
+          retention-days: 1
+
   backend:
     name: Backend (PHP/Symfony)
     # 16-core org larger runner (billed per minute) — PHPStan + PHPUnit are the
@@ -176,23 +234,79 @@ jobs:
       - name: Run migrations-bootstrap bash tests
         run: bash _docker/backend/tests/test-migrations-bootstrap.sh
 
-      - name: Generate OpenAPI spec
-        working-directory: backend
-        run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
+  frontend-build:
+    name: Frontend Build
+    # On the critical path (openapi-spec → frontend-build → docker-build → e2e),
+    # so this job does only what docker-build needs: schema generation + the two
+    # Vite builds (run in parallel across the 16 cores). Lint/type-check/tests
+    # live in frontend-checks, which runs off the critical path.
+    runs-on: ubuntu-latest-m
+    needs: [openapi-spec]
 
-      - name: Upload OpenAPI spec artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Download OpenAPI spec artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: openapi-spec
-          path: backend/openapi-spec.json
+          path: frontend/src/generated/
+
+      - name: Generate Zod schemas from OpenAPI spec
+        working-directory: frontend
+        run: |
+          # Use OpenAPI spec from generated folder
+          npx openapi-zod-client src/generated/openapi-spec.json -o src/generated/api-schemas.ts --template schema-template.hbs
+          # Run post-processing to create readable aliases
+          node scripts/generate-schemas.js --skip-fetch
+          # Clean up the OpenAPI spec file (we only need the generated schemas)
+          rm src/generated/openapi-spec.json
+
+      - name: Build app and widget (parallel)
+        working-directory: frontend
+        # `npm run build` would also run check:types — that already gates the
+        # merge via frontend-checks, so call vite directly here to keep the
+        # critical path lean. Separate outDirs (dist/ vs dist-widget/), so the
+        # two builds can run concurrently.
+        run: |
+          npx vite build & APP_PID=$!
+          npx vite build --config vite.config.widget.ts & WIDGET_PID=$!
+          wait "$APP_PID"
+          wait "$WIDGET_PID"
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: frontend-dist
+          path: frontend/dist/
           retention-days: 1
 
-  frontend:
+      - name: Upload widget build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: widget-dist
+          path: frontend/dist-widget/
+          retention-days: 1
+
+  frontend-checks:
     name: Frontend (Vue/TypeScript)
-    # On the critical path (backend → frontend → docker-build → e2e); Vite
-    # builds and Vitest parallelize well across the 16 cores.
+    # Format check, lint, vue-tsc and Vitest — everything that gates merging
+    # but that docker-build/e2e don't need to wait for. Runs in parallel with
+    # frontend-build; Vitest parallelizes well across the 16 cores.
     runs-on: ubuntu-latest-m
-    needs: [backend]
+    needs: [openapi-spec]
 
     steps:
       - name: Checkout
@@ -241,32 +355,10 @@ jobs:
         working-directory: frontend
         run: npm run test
 
-      - name: Build
-        working-directory: frontend
-        run: npm run build
-
-      - name: Build widget
-        working-directory: frontend
-        run: npm run build:widget
-
-      - name: Upload frontend build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-          retention-days: 1
-
-      - name: Upload widget build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: widget-dist
-          path: frontend/dist-widget/
-          retention-days: 1
-
   docker-build:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: [frontend]
+    needs: [frontend-build]
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
       image-labels: ${{ steps.meta.outputs.labels }}
@@ -396,6 +488,9 @@ jobs:
     env:
       APP_IMAGE: synaplan-test:ci
       APP_URL: http://localhost:8001
+      # Job-level (not step-level) so the backgrounded `up -d` and the later
+      # `up --wait` see the same value — a mismatch would recreate containers.
+      OIDC_AUTO_REDIRECT: ${{ matrix.auth_method == 'oidc-redirect' && 'true' || 'false' }}
 
     steps:
       - name: Checkout
@@ -407,60 +502,37 @@ jobs:
           name: docker-image
           path: /tmp
 
-      - name: Load Docker image
-        run: |
-          docker load -i /tmp/docker-image.tar
-          echo "Loaded images:"
-          docker images
-
-          # Tag the first loaded image as synaplan-test:ci for docker-compose
-          IMAGE_TAG=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
-          echo "Tagging $IMAGE_TAG as synaplan-test:ci"
-          docker tag $IMAGE_TAG synaplan-test:ci
-          docker images
-
       - name: Add host.docker.internal to /etc/hosts
         if: contains(matrix.auth_method, 'oidc')
         run: echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
-      - name: Start test services and show logs
-        env:
-          OIDC_AUTO_REDIRECT: ${{ matrix.auth_method == 'oidc-redirect' && 'true' || 'false' }}
+      - name: Start test stack in background
+        # docker load + compose pull + up take ~1.5 min and don't depend on
+        # Node/Playwright, so they run in the background while the following
+        # steps set up the test runner. "Wait for test services" joins on this.
         run: |
           COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
           PROFILE="${{ matrix.compose_profiles }}"
-          n=0; until $COMPOSE $PROFILE pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
+          (
+            set -e
+            docker load -i /tmp/docker-image.tar
+            echo "Loaded images:"
+            docker images
 
-          # app_test entrypoint loads fixtures on first run (APP_ENV=test, empty DB)
-          # so TestProvider model (-1 > -7) and admin user exist for E2E.
-          echo "Starting services..."
-          $COMPOSE $PROFILE up -d
+            # Tag the first loaded image as synaplan-test:ci for docker-compose
+            IMAGE_TAG=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
+            echo "Tagging $IMAGE_TAG as synaplan-test:ci"
+            docker tag $IMAGE_TAG synaplan-test:ci
 
-          # Start following logs in background
-          $COMPOSE $PROFILE logs -f &
+            n=0; until $COMPOSE $PROFILE pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
 
-          echo "Waiting for services to be healthy..."
-          $COMPOSE $PROFILE up --wait || {
-            echo "Failed to start services. Status:"
-            $COMPOSE $PROFILE ps
-            echo ""
-            echo "Container logs:"
-            $COMPOSE $PROFILE logs
-            exit 1
-          }
-
-          # Wait for Keycloak provisioning to complete (if OIDC)
-          if [[ "${{ matrix.auth_method }}" == oidc* ]]; then
-            echo "Waiting for Keycloak provisioning..."
-            # Use -a to include exited containers (setup is a one-shot sidecar)
-            SETUP_ID=$($COMPOSE $PROFILE ps -a -q keycloak_setup)
-            if [ -n "$SETUP_ID" ]; then
-              docker wait "$SETUP_ID" || true
-            fi
-          fi
-
-          echo "Services are ready!"
-          $COMPOSE $PROFILE ps
+            # app_test entrypoint loads fixtures on first run (APP_ENV=test, empty DB)
+            # so TestProvider model (-1 > -7) and admin user exist for E2E.
+            echo "Starting services..."
+            $COMPOSE $PROFILE up -d
+            touch /tmp/stack-started.ok
+          ) > /tmp/stack-startup.log 2>&1 &
+          echo $! > /tmp/stack-startup.pid
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -494,6 +566,47 @@ jobs:
         run: |
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
           npx playwright install-deps ${{ matrix.browser }}
+
+      - name: Wait for test services
+        run: |
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
+          PROFILE="${{ matrix.compose_profiles }}"
+
+          echo "Waiting for background stack startup to finish..."
+          PID=$(cat /tmp/stack-startup.pid)
+          while kill -0 "$PID" 2>/dev/null; do sleep 2; done
+          echo "=== Stack startup log ==="
+          cat /tmp/stack-startup.log
+          if [ ! -f /tmp/stack-started.ok ]; then
+            echo "Stack startup failed (see log above)."
+            exit 1
+          fi
+
+          # Start following logs in background
+          $COMPOSE $PROFILE logs -f &
+
+          echo "Waiting for services to be healthy..."
+          $COMPOSE $PROFILE up --wait || {
+            echo "Failed to start services. Status:"
+            $COMPOSE $PROFILE ps
+            echo ""
+            echo "Container logs:"
+            $COMPOSE $PROFILE logs
+            exit 1
+          }
+
+          # Wait for Keycloak provisioning to complete (if OIDC)
+          if [[ "${{ matrix.auth_method }}" == oidc* ]]; then
+            echo "Waiting for Keycloak provisioning..."
+            # Use -a to include exited containers (setup is a one-shot sidecar)
+            SETUP_ID=$($COMPOSE $PROFILE ps -a -q keycloak_setup)
+            if [ -n "$SETUP_ID" ]; then
+              docker wait "$SETUP_ID" || true
+            fi
+          fi
+
+          echo "Services are ready!"
+          $COMPOSE $PROFILE ps
 
       - name: Run E2E tests
         working-directory: frontend
@@ -696,15 +809,17 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, backend, frontend, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
+    needs: [lint, openapi-spec, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
     if: always()
     steps:
       - name: Check for failures
         if: |
           !cancelled() && (
             needs.lint.result != 'success' ||
+            needs.openapi-spec.result != 'success' ||
             needs.backend.result != 'success' ||
-            needs.frontend.result != 'success' ||
+            needs.frontend-build.result != 'success' ||
+            needs.frontend-checks.result != 'success' ||
             needs.docker-build.result != 'success' ||
             needs.e2e.result != 'success' ||
             needs.e2e-visual.result != 'success' ||
