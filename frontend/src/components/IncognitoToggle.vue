@@ -2,7 +2,7 @@
   <button
     type="button"
     :class="[
-      'flex items-center justify-center w-10 h-10 !rounded-xl shadow-lg active:scale-95 transition-transform',
+      'flex items-center justify-center w-10 h-10 rounded-full shadow-lg active:scale-95 transition-transform',
       incognitoStore.active ? 'btn-primary' : 'surface-card txt-primary',
     ]"
     :aria-label="incognitoStore.active ? $t('incognito.toggleEnd') : $t('incognito.toggleStart')"
@@ -11,7 +11,7 @@
     data-testid="btn-incognito-toggle"
     @click="handleToggle"
   >
-    <Icon icon="mdi:incognito" class="w-5 h-5" aria-hidden="true" />
+    <Icon icon="mdi:incognito" class="w-6 h-6" aria-hidden="true" />
   </button>
 </template>
 
