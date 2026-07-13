@@ -33,7 +33,7 @@ class TranscriptionUsageRecorderTest extends TestCase
     public function testRecordsPerSecondUsageForValidTranscription(): void
     {
         $user = $this->createMock(User::class);
-        $this->userRepository->method('find')->with(42)->willReturn($user);
+        $this->userRepository->expects($this->any())->method('find')->with(42)->willReturn($user);
 
         $this->rateLimitService->expects($this->once())
             ->method('recordUsage')
@@ -73,7 +73,7 @@ class TranscriptionUsageRecorderTest extends TestCase
 
     public function testSkipsWhenUserNotFound(): void
     {
-        $this->userRepository->method('find')->with(42)->willReturn(null);
+        $this->userRepository->expects($this->any())->method('find')->with(42)->willReturn(null);
         $this->rateLimitService->expects($this->never())->method('recordUsage');
         $this->recorder->record(42, 21, 'groq', 'whisper-large-v3', 12.5);
     }
