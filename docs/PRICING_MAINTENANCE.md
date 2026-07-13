@@ -182,25 +182,33 @@ Official docs table (updated 2026-07-08). Billed in neurons ($0.011/1k neurons);
 
 **Billing mechanics:** everything is metered in **neurons** ($0.011/1k neurons, 10k/day free); the docs publish a per-token equivalent which is what we store. Embeddings bill input tokens only (output $0). No price-changing params sent by our code.
 
-## `app:sync-model-prices` — per-token only (guard added, #1318 fixed)
+## `app:sync-model-prices` — mode-aware guard (#1318 fixed)
 
-The command now **self-guards**: it only writes a model when the catalog mode AND the LiteLLM-derived mode are both `per_token`. Any model that is (or would become) `per_image` / `per_character` / `per_second` is counted under `skipped (non-per-token)` and never touched. This closes #1318 — earlier the sync would silently reclassify these media/audio models and clobber correct prices.
+The command classifies every matched model into one of three buckets by comparing the catalog `pricing_mode` against the mode LiteLLM derives — so nothing is silently ignored:
 
-Dry-run baseline 2026-07-13: **67 text models unchanged (no drift), 19 unmatched (our manual providers — expected), and 8 media/audio rows now reported as `skipped (non-per-token)`** instead of bogus "updates":
+1. **per_token on both sides** → compared and, on drift, **written** (price history + `BMODELS`). The auto-update path.
+2. **Same non-per-token mode on both sides** (`per_second`/`per_image`/`per_character`) → both prices are normalised to a single unit via the *same* `CostCalculationService::normaliseToPerUnit()` billing uses, then **compared and reported as drift** — but **never auto-written** (these rows are hand-authored with unit conventions + tier JSON the flat sync can't reproduce). This is what makes whisper / tts / veo / imagen actually checked.
+3. **Mode mismatch** (e.g. catalog `per_image` vs LiteLLM `per_token`, because LiteLLM counts the prompt tokens) → structurally not comparable. **Reported for human awareness, never written, and never counted as drift** (the mismatch is permanent — failing CI on it would go red forever).
 
-| Model | Catalog | LiteLLM mode | Now |
-| ----- | ------- | ------------ | --- |
-| whisper-large-v3 / -turbo | perhour + per_second | per_second | skipped (metered, #1314 fixed) |
-| whisper-1, Voxtral | permin + per_second | per_second | skipped (metered, #1314 fixed) |
-| gpt-image-1 / 1.5 | perImage + per_image | per_token | skipped (tiered, #1315 fixed) |
-| gemini-2.5-flash-image, 3.1-flash-image | perImage | per_token | skipped |
-| gemini-2.5-flash-preview-tts | perChar | per_token | skipped |
+Models not present in LiteLLM at all (Higgsfield, DeepInfra-pinned Kimi, Cloudflare `@cf/…`, Voxtral, nano-banana) land in **`unmatched`** — no upstream reference exists, verify manually.
 
-**Still true:** the sync is safe for per-token chat models only. The guard leaves media/audio models alone; their prices are maintained by hand. The `--force` flag overrides admin-set prices but does **not** override the mode guard (reclassification always requires a human editing the catalog).
+Dry-run baseline 2026-07-13: **70 unchanged (per-token + same-mode media, no drift), 5 mode-mismatch, 19 unmatched, 0 drift**. Same-mode media rows now verified against LiteLLM (previously invisible):
+
+| Model | Catalog mode | LiteLLM mode | Bucket |
+| ----- | ------------ | ------------ | ------ |
+| whisper-v3 / -turbo / whisper-1 | per_second | per_second | **checked** (same-mode) |
+| tts-1 / tts-1-hd | per_character | per_character | **checked** (same-mode) |
+| veo-3.1 / fast / lite | per_second | per_second | **checked** (same-mode) |
+| imagen-4.0 / fast / ultra | per_image | per_image | **checked** (same-mode) |
+| gpt-image-1 / 1.5 | per_image | per_token | mode-mismatch (manual) |
+| gemini-2.5/3.1-flash-image | per_image | per_token | mode-mismatch (manual) |
+| gemini-2.5-flash-preview-tts | per_character | per_token | mode-mismatch (manual) |
+
+**Writes stay conservative:** only per_token rows are auto-written. `--force` overrides admin-set prices but does **not** override the mode guard (reclassification always requires a human editing the catalog). Same-mode media drift is surfaced (and fails `--fail-on-drift`) but left for a human to apply in `ModelCatalog.php`.
 
 ### Automated weekly drift check (CI)
 
-`.github/workflows/price-drift.yml` runs every Monday (and on manual dispatch): it seeds the catalog and runs `app:sync-model-prices --dry-run --fail-on-drift`. The `--fail-on-drift` flag exits with code **2** when any *per-token* model's price differs from LiteLLM (media/audio models are excluded by the guard, so no false alarms). On drift the workflow opens — or comments on an existing — GitHub issue titled "Price drift detected …" with the dry-run report, so a human verifies against the official page and updates `ModelCatalog.php`. It lives outside the PR CI on purpose: it depends on the external LiteLLM source, which must never turn a code PR red.
+`.github/workflows/price-drift.yml` runs every Monday (and on manual dispatch): it seeds the catalog and runs `app:sync-model-prices --dry-run --fail-on-drift`. The flag exits with code **2** when any per-token model **or** any same-mode non-per-token model (whisper/tts/veo/imagen) differs from LiteLLM. Mode-mismatch and unmatched rows never trip it (no false alarms). On drift the workflow opens — or comments on an existing — GitHub issue titled "Price drift detected …" with the dry-run report, so a human verifies against the official page and updates `ModelCatalog.php`. It lives outside the PR CI on purpose: it depends on the external LiteLLM source, which must never turn a code PR red.
 
 You can run the same check locally: `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run --fail-on-drift; echo $?` (0 = no drift, 2 = drift).
 

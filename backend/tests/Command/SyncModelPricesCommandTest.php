@@ -163,7 +163,10 @@ class SyncModelPricesCommandTest extends TestCase
         $this->commandTester->execute([]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
-        $this->assertStringContainsString('1 skipped (admin)', $this->commandTester->getDisplay());
+        // Assert the stable label, not "1 skipped" — SymfonyStyle wraps the summary
+        // box between the count and the label. No persist above already proves the
+        // admin-skip branch was taken.
+        $this->assertStringContainsString('skipped (admin)', $this->commandTester->getDisplay());
     }
 
     public function testUpdatesModelWithChangedPrices(): void
@@ -391,11 +394,11 @@ class SyncModelPricesCommandTest extends TestCase
         $this->assertStringContainsString('1 updated', $this->commandTester->getDisplay());
     }
 
-    public function testSkipsTtsPerCharacterModel(): void
+    public function testModeMismatchTtsIsReportedNotWritten(): void
     {
-        // LiteLLM classifies tts-1 as audio_speech (per_character). The sync must
-        // NOT reclassify it away from the catalog's per_token default — such media
-        // models are maintained manually (#1318).
+        // tts-1 is per_token in the catalog (no explicit mode) but LiteLLM says
+        // audio_speech/per_character. The two numbers measure different things, so
+        // this is a structural mode mismatch: reported for a human, never written.
         $model = $this->createModelMock('openai', 'tts-1', 0.0, 0.0);
 
         $this->mockLiteLLMResponse([
@@ -416,21 +419,30 @@ class SyncModelPricesCommandTest extends TestCase
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $output = $this->commandTester->getDisplay();
-        $this->assertStringContainsString('Skipped — non-per-token', $output);
+        $this->assertStringContainsString('Pricing-mode mismatch', $output);
         $this->assertStringContainsString('litellm=per_character', $output);
     }
 
-    public function testSkipsWhisperTranscriptionModel(): void
+    public function testSameModeTranscriptionIsCheckedAndClean(): void
     {
-        // whisper is per_token in the catalog (no explicit mode) but LiteLLM says
-        // audio_transcription/per_second. The sync must skip rather than flip the
-        // mode (that reclassification is the #1314/#1318 hazard).
-        $model = $this->createModelMock('openai', 'whisper-1', 0.0, 0.0);
+        // whisper is authored per_second in the catalog (perhour unit, #1314) and
+        // LiteLLM agrees on per_second. Same mode → the sync DOES check it. Here the
+        // normalised prices match, so it is counted as unchanged (not skipped).
+        // $0.111/hour ÷ 3600 = $0.0000308333/sec.
+        $model = $this->createNonTokenModelMock(
+            'openai',
+            'whisper-1',
+            priceIn: 0.111,
+            inUnit: 'perhour',
+            priceOut: 0.0,
+            outUnit: '-',
+            mode: 'per_second',
+        );
 
         $this->mockLiteLLMResponse([
             'whisper-1' => [
                 'mode' => 'audio_transcription',
-                'input_cost_per_second' => 0.0001,
+                'input_cost_per_second' => 0.111 / 3600,
             ],
         ]);
 
@@ -445,12 +457,90 @@ class SyncModelPricesCommandTest extends TestCase
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $output = $this->commandTester->getDisplay();
-        $this->assertStringContainsString('Skipped — non-per-token', $output);
-        $this->assertStringContainsString('litellm=per_second', $output);
+        $this->assertStringContainsString('1 unchanged', $output);
+        $this->assertStringNotContainsString('Non-per-token price drift', $output);
     }
 
-    public function testSkipsImagePerImageModel(): void
+    public function testSameModeTranscriptionDriftIsDetectedNotWritten(): void
     {
+        // Same as above but LiteLLM's per-second price has moved. The sync must
+        // DETECT the drift (this is the whole point of #1318 — whisper/tts/veo/imagen
+        // are no longer invisible), report it for a human, but never auto-write a
+        // hand-authored media row.
+        $model = $this->createNonTokenModelMock(
+            'openai',
+            'whisper-1',
+            priceIn: 0.111,
+            inUnit: 'perhour',
+            priceOut: 0.0,
+            outUnit: '-',
+            mode: 'per_second',
+        );
+
+        $this->mockLiteLLMResponse([
+            'whisper-1' => [
+                'mode' => 'audio_transcription',
+                'input_cost_per_second' => 0.0002, // way off the $0.0000308/sec catalog value
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Non-per-token price drift', $output);
+        $this->assertStringContainsString('Price drift detected', $output);
+    }
+
+    public function testCatalogPerImageDriftDetectedButNotWritten(): void
+    {
+        // A per_image catalog model vs a per_image LiteLLM value: same mode, so the
+        // sync compares and detects drift (0.042 vs 0.099), but still never writes
+        // the hand-maintained tier row.
+        $model = $this->createNonTokenModelMock(
+            'openai',
+            'gpt-image-1',
+            priceIn: 0.0,
+            inUnit: 'perImage',
+            priceOut: 0.042,
+            outUnit: 'perImage',
+            mode: 'per_image',
+            id: 29,
+        );
+
+        $this->mockLiteLLMResponse([
+            'gpt-image-1' => [
+                'mode' => 'image_generation',
+                'output_cost_per_image' => 0.099,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute([]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Non-per-token price drift', $output);
+        $this->assertStringContainsString('gpt-image-1', $output);
+    }
+
+    public function testModeMismatchImageIsReportedNotDrift(): void
+    {
+        // dall-e-3 is per_token in the catalog, LiteLLM flat per_image → mode
+        // mismatch (structural), reported but never counted as drift.
         $model = $this->createModelMock('openai', 'dall-e-3', 0.0, 0.0);
 
         $this->mockLiteLLMResponse([
@@ -471,45 +561,8 @@ class SyncModelPricesCommandTest extends TestCase
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $output = $this->commandTester->getDisplay();
-        $this->assertStringContainsString('Skipped — non-per-token', $output);
+        $this->assertStringContainsString('Pricing-mode mismatch', $output);
         $this->assertStringContainsString('litellm=per_image', $output);
-    }
-
-    public function testSkipsCatalogPerImageModelEvenWhenLiteLLMAgrees(): void
-    {
-        // A model already classified per_image in the catalog must not be touched
-        // by the sync at all, even if LiteLLM would return per_image too — its
-        // price is manually maintained.
-        $model = $this->createMock(Model::class);
-        $model->method('getId')->willReturn(29);
-        $model->method('getService')->willReturn('openai');
-        $model->method('getProviderId')->willReturn('gpt-image-1');
-        $model->method('getPriceIn')->willReturn(0.0);
-        $model->method('getPriceOut')->willReturn(0.042);
-        $model->method('getInUnit')->willReturn('perImage');
-        $model->method('getOutUnit')->willReturn('perImage');
-        $model->method('getJson')->willReturn(['pricing_mode' => 'per_image']);
-
-        $this->mockLiteLLMResponse([
-            'gpt-image-1' => [
-                'mode' => 'image_generation',
-                'output_cost_per_image' => 0.099,
-            ],
-        ]);
-
-        // @phpstan-ignore-next-line
-        $this->modelRepository->method('findAll')->willReturn([$model]);
-        // @phpstan-ignore-next-line
-        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
-
-        $this->em->expects($this->never())->method('persist');
-
-        $this->commandTester->execute([]);
-
-        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
-        $output = $this->commandTester->getDisplay();
-        $this->assertStringContainsString('Skipped — non-per-token', $output);
-        $this->assertStringContainsString('catalog=per_image', $output);
     }
 
     public function testTokenBasedImageGenFallsBackToTokenPricing(): void
@@ -585,9 +638,11 @@ class SyncModelPricesCommandTest extends TestCase
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
     }
 
-    public function testFailOnDriftIgnoresNonPerTokenSkips(): void
+    public function testFailOnDriftIgnoresModeMismatch(): void
     {
-        // A per_image model that would be skipped must NOT count as drift.
+        // A per_token catalog model that LiteLLM reports as flat per_image is a
+        // structural mode mismatch — permanent, so it must NEVER fail the drift gate
+        // (otherwise the weekly CI would be red forever).
         $model = $this->createModelMock('openai', 'dall-e-3', 0.0, 0.0);
 
         $this->mockLiteLLMResponse([
@@ -627,6 +682,29 @@ class SyncModelPricesCommandTest extends TestCase
         $model->method('getInUnit')->willReturn('per1M');
         $model->method('getOutUnit')->willReturn('per1M');
         $model->method('getJson')->willReturn([]);
+
+        return $model;
+    }
+
+    private function createNonTokenModelMock(
+        string $service,
+        string $providerId,
+        float $priceIn,
+        string $inUnit,
+        float $priceOut,
+        string $outUnit,
+        string $mode,
+        int $id = 1,
+    ): Model {
+        $model = $this->createMock(Model::class);
+        $model->method('getId')->willReturn($id);
+        $model->method('getService')->willReturn($service);
+        $model->method('getProviderId')->willReturn($providerId);
+        $model->method('getPriceIn')->willReturn($priceIn);
+        $model->method('getPriceOut')->willReturn($priceOut);
+        $model->method('getInUnit')->willReturn($inUnit);
+        $model->method('getOutUnit')->willReturn($outUnit);
+        $model->method('getJson')->willReturn(['pricing_mode' => $mode]);
 
         return $model;
     }

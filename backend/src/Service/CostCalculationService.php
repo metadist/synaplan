@@ -206,11 +206,11 @@ final readonly class CostCalculationService
         // Honour the catalog-authored unit. e.g. OpenAI tts-1 is authored
         // as $0.015 per 1000 chars; we want $0.000015 per char before
         // multiplying by the spoken character count.
-        $priceIn = $this->normaliseToPerUnit(
+        $priceIn = self::normaliseToPerUnit(
             (float) $priceSnapshot['price_in'],
             (string) $priceSnapshot['in_unit'],
         );
-        $priceOut = $this->normaliseToPerUnit(
+        $priceOut = self::normaliseToPerUnit(
             (float) $priceSnapshot['price_out'],
             (string) $priceSnapshot['out_unit'],
         );
@@ -222,7 +222,7 @@ final readonly class CostCalculationService
             // ingest catalog uses for video (`persec`), so they need the
             // same normalisation. lookupResolutionPrice returns the raw
             // catalog value; if it's already per-1, this is a no-op.
-            $priceOut = $this->normaliseToPerUnit(
+            $priceOut = self::normaliseToPerUnit(
                 $resolutionPrice,
                 (string) $priceSnapshot['out_unit'],
             );
@@ -237,7 +237,7 @@ final readonly class CostCalculationService
         // priceOut; no-op for models without tiers.
         [$tierPrice, $tierQuality, $tierSize] = $this->lookupImageTierPrice($model, $quality, $size);
         if (null !== $tierPrice) {
-            $priceOut = $this->normaliseToPerUnit($tierPrice, (string) $priceSnapshot['out_unit']);
+            $priceOut = self::normaliseToPerUnit($tierPrice, (string) $priceSnapshot['out_unit']);
             $priceSnapshot['image_quality'] = $tierQuality;
             $priceSnapshot['image_size'] = $tierSize;
             $priceSnapshot['price_out_tier'] = number_format($tierPrice, 8, '.', '');
@@ -261,9 +261,14 @@ final readonly class CostCalculationService
      * Convert a catalog price authored in `inUnit` / `outUnit` into a
      * "per single billable unit" price (per 1 character, per 1 image, per
      * 1 second). Unknown units fall through unchanged so existing data
-     * stays billable; we log a warning so the gap is observable.
+     * stays billable.
+     *
+     * Public + static because it is a pure, stateless unit conversion and is
+     * the single source of truth for it: SyncModelPricesCommand reuses it to
+     * compare a DB price against LiteLLM on the same per-unit basis (#1318),
+     * so billing and drift detection can never diverge on unit handling.
      */
-    private function normaliseToPerUnit(float $price, string $unit): float
+    public static function normaliseToPerUnit(float $price, string $unit): float
     {
         return match (strtolower($unit)) {
             'per1m', 'per1mchars', 'per1mtokens' => $price / 1_000_000,
