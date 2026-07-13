@@ -176,29 +176,6 @@ onBeforeUnmount(() => {
   display: block;
 }
 
-/* On phones (< 768 px) center the ring under the fixed top-right incognito
-   ("anonymous") toggle (MainLayout: right 0.75rem, top = safe-area-inset-top +
-   10px, 40px box). The 48px ring at a 0.5rem right inset lines its centre up
-   with the 40px button centre (both at 32px from the edge), and the vertical
-   offset clears the safe area + button height + a small gap. From 768 px up the
-   desktop sidebar / desktop toggle take over, so the ring keeps its default
-   top-left placement in the chat column. */
-@media (max-width: 767px) {
-  .usage-ring {
-    top: calc(env(safe-area-inset-top, 0px) + 3.75rem);
-    left: auto;
-    right: 0.5rem;
-  }
-
-  /* Anchor the tooltip / stats panel to the ring's right edge so a wide panel
-     opens leftwards and never overflows the screen edge. */
-  .usage-ring__tooltip,
-  .usage-ring__panel {
-    left: auto;
-    right: 0;
-  }
-}
-
 /* Compact view up to 1023 px; the full bar takes over on wide desktops
    (>= 1024 px), where it can never overlap the chat column. */
 @media (min-width: 1024px) {
@@ -276,5 +253,34 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 0;
   top: calc(100% + 0.5rem);
+}
+
+/* On phones (< 768 px) center the ring under the fixed top-right incognito
+   ("anonymous") toggle (MainLayout: right 0.75rem, top = safe-area-inset-top +
+   10px, 40px box). The 48px ring at a 0.5rem right inset lines its centre up
+   with the 40px button centre (both at 32px from the edge), and the vertical
+   offset clears the safe area + button height + a small gap. From 768 px up the
+   desktop sidebar / desktop toggle take over, so the ring keeps its default
+   top-left placement in the chat column.
+
+   NOTE: this block must stay AFTER the base `.usage-ring__*` rules above so its
+   `left: auto` actually wins over the base `left: 0` (equal specificity → source
+   order decides). Otherwise the panel keeps `left: 0` + `right: 0`, stretches
+   from the ring's left edge and its content overflows the screen (issue: popup
+   opened rightwards off-screen on mobile). */
+@media (max-width: 767px) {
+  .usage-ring {
+    top: calc(env(safe-area-inset-top, 0px) + 3.75rem);
+    left: auto;
+    right: 0.5rem;
+  }
+
+  /* Anchor the tooltip / stats panel to the ring's right edge so a wide panel
+     opens leftwards and never overflows the screen edge. */
+  .usage-ring__tooltip,
+  .usage-ring__panel {
+    left: auto;
+    right: 0;
+  }
 }
 </style>
