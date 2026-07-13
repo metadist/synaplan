@@ -74,7 +74,7 @@
     "@typescript-eslint/eslint-plugin": "8.62.0",
     "@typescript-eslint/parser": "8.62.0",
     "@vitejs/plugin-vue": "6.0.7",
-    "@vitest/ui": "4.1.9",
+    "@vitest/ui": "4.1.10",
     "@vue/eslint-config-prettier": "10.2.0",
     "@vue/eslint-config-typescript": "14.9.0",
     "@vue/test-utils": "2.4.11",
@@ -92,7 +92,7 @@
     "terser": "5.48.0",
     "typescript": "6.0.3",
     "vite": "8.1.0",
-    "vitest": "4.1.9",
+    "vitest": "4.1.10",
     "vue-tsc": "3.3.5"
   }
 }
