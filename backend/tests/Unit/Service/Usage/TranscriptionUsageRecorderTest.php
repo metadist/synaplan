@@ -11,6 +11,7 @@ use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 class TranscriptionUsageRecorderTest extends TestCase
@@ -65,10 +66,23 @@ class TranscriptionUsageRecorderTest extends TestCase
         $this->recorder->record(42, null, 'groq', 'whisper-large-v3', 12.5);
     }
 
-    public function testSkipsWhenDurationNotPositive(): void
+    public function testSkipsWhenDurationNotPositiveAndWarnsAboutSilentZeroBilling(): void
     {
+        // A priced STT call with no duration bills $0 — that gap must be
+        // visible in the logs, not silent (same undercharge class as #1314).
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('warning')
+            ->with($this->stringContains('no audio duration'), $this->arrayHasKey('model_id'));
+
+        $recorder = new TranscriptionUsageRecorder(
+            $this->rateLimitService,
+            $this->userRepository,
+            $logger,
+        );
+
         $this->rateLimitService->expects($this->never())->method('recordUsage');
-        $this->recorder->record(42, 21, 'groq', 'whisper-large-v3', 0.0);
+        $recorder->record(42, 21, 'groq', 'whisper-large-v3', 0.0);
     }
 
     public function testSkipsWhenUserNotFound(): void

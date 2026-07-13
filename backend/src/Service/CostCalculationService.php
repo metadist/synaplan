@@ -394,9 +394,11 @@ final readonly class CostCalculationService
      *
      * Mirrors the mapping in OpenAIProvider::generateImageWithGptImage1() so the
      * price we bill matches the quality actually requested from the provider:
-     * standard→medium, hd→high, low/medium/high pass through. Unknown values
-     * (incl. 'auto', where OpenAI picks the tier) fall back to null so the
-     * caller applies the model's `default_quality`.
+     * standard→medium, hd→high, low/medium/high pass through, and unknown
+     * values map to 'high' because the provider defaults them to 'high' before
+     * sending — billing anything cheaper would under-bill the actual request.
+     * Only 'auto' (OpenAI picks the tier, we can't know which) and null fall
+     * back to null so the caller applies the model's `default_quality`.
      */
     private function normaliseImageQuality(?string $quality): ?string
     {
@@ -408,7 +410,8 @@ final readonly class CostCalculationService
             'standard' => 'medium',
             'hd' => 'high',
             'low', 'medium', 'high' => strtolower($quality),
-            default => null,
+            'auto' => null,
+            default => 'high',
         };
     }
 

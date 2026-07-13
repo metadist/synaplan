@@ -292,9 +292,10 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.042000', $result->totalCost);
     }
 
-    public function testCalculateMediaCostImageUnknownQualityUsesDefault(): void
+    public function testCalculateMediaCostImageAutoQualityUsesDefault(): void
     {
-        // 'auto' (or any unknown) → default_quality medium, so we never bill $0.
+        // 'auto' lets OpenAI pick the tier (we can't know which) → bill the
+        // model's default_quality (medium), so we never bill $0.
         $model = $this->createModelMock(14, 'OpenAI', 0.0, 0.042, 'perImage', 'perImage', $this->gptImageJson());
         $this->modelRepository->expects(self::any())->method('find')->with(14)->willReturn($model);
         $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
@@ -303,6 +304,20 @@ class CostCalculationServiceTest extends TestCase
 
         // 2 images × medium 1024² ($0.042).
         $this->assertSame('0.084000', $result->totalCost);
+    }
+
+    public function testCalculateMediaCostImageUnknownQualityBillsHigh(): void
+    {
+        // OpenAIProvider defaults unknown quality values to 'high' before
+        // sending, so billing must follow suit — falling back to medium would
+        // under-bill the high-tier image actually generated (~4x).
+        $model = $this->createModelMock(16, 'OpenAI', 0.0, 0.042, 'perImage', 'perImage', $this->gptImageJson());
+        $this->modelRepository->expects(self::any())->method('find')->with(16)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(16, 0, 1.0, null, null, 'ultra-mega', '1024x1024');
+
+        $this->assertSame('0.167000', $result->totalCost);
     }
 
     public function testCalculateMediaCostImageWithoutTierTableUsesFlatPrice(): void

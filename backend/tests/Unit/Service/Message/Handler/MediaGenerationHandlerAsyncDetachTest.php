@@ -196,6 +196,63 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         self::assertNotEmpty($result['metadata']['error'] ?? null);
     }
 
+    public function testAsyncPic2PicDetachCarriesHighQualityInMediaUsage(): void
+    {
+        // #1315 follow-up: pic2pic generates at quality 'high' (see the
+        // $imageOptions default in handleStream), so the billable media_usage
+        // serialized onto the async job must say 'high' too — 'standard' would
+        // bill the medium tier (~4x cheaper) for a high-tier gpt-image render.
+        $tempBase = (string) tempnam(sys_get_temp_dir(), 'p2p');
+        $referenceImage = $tempBase.'.png';
+        file_put_contents($referenceImage, 'png');
+
+        try {
+            $message = $this->messageStub();
+            $this->bootstrapImageModel();
+
+            $this->promptExtractor->method('extract')->willReturn([
+                'prompt' => 'make it a watercolor painting',
+                'media_type' => 'image',
+            ]);
+
+            $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+            $this->modelConfigService->method('getDefaultModel')->with('PIC2PIC', 7)->willReturn(42);
+            $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+            $this->mediaJobConfig->expects(self::any())->method('isAsyncJobsEnabled')->with(7)->willReturn(true);
+
+            $job = new MediaJob('job-p2p-1');
+            $this->mediaJobService->expects(self::once())
+                ->method('create')
+                ->with(self::callback(static function (array $params): bool {
+                    $mediaUsage = $params['options']['media_usage'] ?? [];
+
+                    return MediaJob::TYPE_IMAGE === ($params['type'] ?? null)
+                        && 'high' === ($mediaUsage['quality'] ?? null)
+                        && '1024x1024' === ($mediaUsage['size'] ?? null)
+                        && 1 === ($mediaUsage['images'] ?? null);
+                }))
+                ->willReturn($job);
+
+            $this->mediaJobDispatcher->expects(self::once())->method('dispatch')->with($job)->willReturn(true);
+            $this->aiFacade->expects(self::never())->method('generateImage');
+
+            $result = $this->handler->handleStream(
+                $message,
+                [],
+                ['topic' => 'chat', 'language' => 'en'],
+                static function (string $chunk): void {},
+                null,
+                ['reference_image_paths' => [$referenceImage]],
+            );
+
+            self::assertSame('running', $result['metadata']['media_job']['state'] ?? null);
+            self::assertSame('image', $result['metadata']['media_type'] ?? null);
+        } finally {
+            @unlink($referenceImage);
+            @unlink($tempBase);
+        }
+    }
+
     public function testAsyncFlagOffKeepsBlockingVideoPath(): void
     {
         $message = $this->messageStub();
@@ -233,6 +290,27 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
 
         self::assertArrayNotHasKey('media_job', $result['metadata'] ?? []);
         self::assertSame('video', $result['metadata']['media_type'] ?? null);
+    }
+
+    private function bootstrapImageModel(): void
+    {
+        $user = $this->createMock(User::class);
+        $userRepo = $this->createMock(EntityRepository::class);
+        $userRepo->method('find')->willReturn($user);
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('OpenAI');
+        $model->method('getProviderId')->willReturn('gpt-image-1.5');
+        $model->method('getName')->willReturn('GPT Image 1.5');
+        $model->method('getJson')->willReturn(['pricing_mode' => 'per_image']);
+
+        $modelRepo = $this->createMock(EntityRepository::class);
+        $modelRepo->expects(self::any())->method('find')->with(42)->willReturn($model);
+
+        $this->em->method('getRepository')->willReturnMap([
+            [User::class, $userRepo],
+            [Model::class, $modelRepo],
+        ]);
     }
 
     private function bootstrapVideoModel(): void

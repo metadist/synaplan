@@ -46,9 +46,24 @@ final readonly class TranscriptionUsageRecorder
         float $durationSeconds,
         array $extraMetadata = [],
     ): void {
-        // No user, no priced model, or no measurable audio → nothing to bill.
-        // (model_id is required because the per-second price lives on the model.)
-        if (null === $userId || $userId <= 0 || null === $modelId || $durationSeconds <= 0.0) {
+        // No user or no priced model → nothing to bill. (model_id is required
+        // because the per-second price lives on the model.)
+        if (null === $userId || $userId <= 0 || null === $modelId) {
+            return;
+        }
+
+        // A priced STT call without a usable duration would silently bill $0 —
+        // exactly the invisible-undercharge class #1314 fixed. Skip the row but
+        // make the gap observable so a provider that stops reporting duration
+        // shows up in the logs instead of in the balance sheet.
+        if ($durationSeconds <= 0.0) {
+            $this->logger->warning('TranscriptionUsageRecorder: priced STT call reported no audio duration — billed $0', [
+                'user_id' => $userId,
+                'model_id' => $modelId,
+                'provider' => $provider,
+                'model' => $model,
+            ]);
+
             return;
         }
 
