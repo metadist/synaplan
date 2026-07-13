@@ -14,6 +14,7 @@ use App\Service\DiscordNotificationService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
+use App\Service\Usage\TranscriptionUsageRecorder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
@@ -461,6 +462,7 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
             cache: $this->cache,
             cachePool: $this->cachePool,
             higgsfieldCredentials: $this->createMock(HiggsfieldCredentialResolver::class),
+            transcriptionUsageRecorder: $this->createMock(TranscriptionUsageRecorder::class),
             embeddingFallbackProvider: $fallbackProvider,
         );
     }

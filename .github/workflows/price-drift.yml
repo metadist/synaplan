@@ -1,0 +1,142 @@
+name: Price Drift Check
+
+# Weekly guard that flags when a provider has changed prices upstream while our
+# ModelCatalog.php still holds the old value. It runs `app:sync-model-prices
+# --dry-run --fail-on-drift`, which only reports drift for per-token models
+# (media/audio models are skipped by the #1318 mode guard). On drift it opens
+# (or comments on) a GitHub issue so a human can verify against the official
+# price page and update the catalog. This is informational — it deliberately
+# lives OUTSIDE the PR CI because it depends on an external source (LiteLLM)
+# that changes independently of our code.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # every Monday 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    name: Detect model price drift
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+
+    services:
+      mysql:
+        image: mariadb:12.3@sha256:b1c7bf836e64ed9406a8984af29509f40089d55cea14b32f12c4726a1f17104b
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: synaplan_test
+          MYSQL_USER: synaplan_test
+          MYSQL_PASSWORD: synaplan_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
+          coverage: none
+
+      - name: Cache composer dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install protoc from base image
+        run: |
+          BASE_IMAGE=$(grep -oP 'FROM \K\S+' _docker/backend/Dockerfile | head -1)
+          id=$(docker create "$BASE_IMAGE")
+          trap 'docker rm "$id"' EXIT
+          sudo docker cp "$id":/usr/local/bin/protoc /usr/local/bin/protoc
+          protoc --version
+
+      - name: Create .env file
+        working-directory: backend
+        run: cp .env.test .env
+
+      - name: Create plugins symlink
+        run: sudo ln -s ${{ github.workspace }}/plugins /plugins
+
+      - name: Install dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Setup database schema
+        working-directory: backend
+        run: php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+
+      - name: Seed catalogs (models, prompts, defaults, rate limits)
+        working-directory: backend
+        run: php bin/console app:seed --no-interaction
+
+      - name: Check for price drift
+        id: drift
+        working-directory: backend
+        run: |
+          set +e
+          php bin/console app:sync-model-prices --dry-run --fail-on-drift 2>&1 | tee drift-report.txt
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Open or update drift issue
+        if: failure() && steps.drift.outputs.exit_code == '2'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="Price drift detected — verify against official provider pages"
+          {
+            echo "The weekly price-drift check found per-token models whose price differs from the LiteLLM database (a provider likely changed prices)."
+            echo ""
+            echo "**What to do:** verify each flagged model against its official price page and update \`backend/src/Model/ModelCatalog.php\`, then re-seed. Follow the playbook in \`docs/PRICING_MAINTENANCE.md\`."
+            echo ""
+            echo "_Media/audio models (per_image / per_character / per_second) are intentionally skipped by the sync guard (#1318) and never appear here._"
+            echo ""
+            echo "<details><summary>Dry-run report ($(date -u +%Y-%m-%dT%H:%MZ))</summary>"
+            echo ""
+            echo '```'
+            cat drift-report.txt
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } > drift-body.md
+
+          EXISTING=$(gh issue list --state open --search "in:title \"Price drift detected\"" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            echo "Commenting on existing drift issue #$EXISTING"
+            gh issue comment "$EXISTING" --body-file drift-body.md
+          else
+            echo "Opening new drift issue"
+            gh issue create --title "$TITLE" --label "prio:2" --body-file drift-body.md
+          fi

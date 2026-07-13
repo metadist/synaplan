@@ -13,6 +13,7 @@ use App\Service\DiscordNotificationService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
+use App\Service\Usage\TranscriptionUsageRecorder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemPoolInterface;
@@ -39,6 +40,7 @@ class AiFacadeTranscribeTest extends TestCase
     private ModelConfigService&MockObject $modelConfig;
     private CircuitBreaker&MockObject $circuitBreaker;
     private UserUploadPathBuilder&MockObject $pathBuilder;
+    private TranscriptionUsageRecorder&MockObject $transcriptionUsageRecorder;
     private AiFacade $facade;
 
     protected function setUp(): void
@@ -47,6 +49,7 @@ class AiFacadeTranscribeTest extends TestCase
         $this->modelConfig = $this->createMock(ModelConfigService::class);
         $this->circuitBreaker = $this->createMock(CircuitBreaker::class);
         $this->pathBuilder = $this->createMock(UserUploadPathBuilder::class);
+        $this->transcriptionUsageRecorder = $this->createMock(TranscriptionUsageRecorder::class);
 
         $this->circuitBreaker->method('execute')
             ->willReturnCallback(fn (callable $cb) => $cb());
@@ -62,6 +65,7 @@ class AiFacadeTranscribeTest extends TestCase
             $this->createMock(CacheInterface::class),
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(HiggsfieldCredentialResolver::class),
+            $this->transcriptionUsageRecorder,
             '/tmp'
         );
     }
@@ -296,6 +300,36 @@ class AiFacadeTranscribeTest extends TestCase
         $result = $this->facade->transcribe('audio.mp3');
 
         $this->assertSame('test', $result['provider']);
+    }
+
+    public function testTranscribeRecordsUsageWithReportedDuration(): void
+    {
+        // #1314: the resolved model_id + provider-reported audio duration must
+        // reach the billing recorder so external STT is metered per audio second.
+        $this->modelConfig->expects(self::any())->method('resolveSttDefault')
+            ->with(42)
+            ->willReturn([
+                'provider' => 'groq',
+                'model' => 'whisper-large-v3',
+                'model_id' => 21,
+            ]);
+
+        $groq = $this->mockSttProvider('groq');
+        $groq->method('transcribe')->willReturn([
+            'text' => 'hello world',
+            'language' => 'en',
+            'duration' => 12.5,
+            'segments' => [],
+        ]);
+        $this->registry->expects(self::any())->method('getSpeechToTextProvider')
+            ->with('groq')
+            ->willReturn($groq);
+
+        $this->transcriptionUsageRecorder->expects($this->once())
+            ->method('record')
+            ->with(42, 21, 'groq', 'whisper-large-v3', 12.5, ['language' => 'en']);
+
+        $this->facade->transcribe('audio.mp3', 42);
     }
 
     private function mockSttProvider(string $name): SpeechToTextProviderInterface&MockObject

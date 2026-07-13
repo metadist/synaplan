@@ -8,6 +8,7 @@ use App\Entity\Model;
 use App\Entity\ModelPriceHistory;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
+use App\Service\CostCalculationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -24,6 +25,13 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 )]
 class SyncModelPricesCommand extends Command
 {
+    /**
+     * Exit code returned when --fail-on-drift is set and per-token price drift
+     * was detected. Distinct from Command::FAILURE (1, generic error) so CI can
+     * tell "provider prices moved" apart from "the command itself broke".
+     */
+    private const EXIT_DRIFT_DETECTED = 2;
+
     private const LITELLM_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
 
     private const LOCAL_PROVIDERS = ['ollama', 'triton', 'test', 'piper', 'thehive'];
@@ -56,7 +64,8 @@ class SyncModelPricesCommand extends Command
         $this
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show changes without applying')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Override admin-set prices')
-            ->addOption('provider', null, InputOption::VALUE_REQUIRED, 'Only sync a specific provider');
+            ->addOption('provider', null, InputOption::VALUE_REQUIRED, 'Only sync a specific provider')
+            ->addOption('fail-on-drift', null, InputOption::VALUE_NONE, 'Exit with code 2 if any per-token price drift is detected (for scheduled CI drift checks; use with --dry-run)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -64,6 +73,7 @@ class SyncModelPricesCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $dryRun = (bool) $input->getOption('dry-run');
         $force = (bool) $input->getOption('force');
+        $failOnDrift = (bool) $input->getOption('fail-on-drift');
         $providerFilter = $input->getOption('provider');
 
         $io->title('Syncing model prices from LiteLLM');
@@ -84,9 +94,13 @@ class SyncModelPricesCommand extends Command
         $unchanged = 0;
         $skipped = 0;
         $nullPriceSkipped = 0;
+        $modeMismatch = 0;
+        $nonTokenDrift = 0;
         $notMatched = 0;
         $unmatchedList = [];
         $nullPriceList = [];
+        $modeMismatchList = [];
+        $nonTokenDriftList = [];
 
         foreach ($dbModels as $model) {
             $service = $model->getService();
@@ -109,6 +123,59 @@ class SyncModelPricesCommand extends Command
             $litellmModel = $litellmData[$litellmKey];
             $pricing = $this->extractPricing($litellmModel);
 
+            $currentMode = $model->getJson()['pricing_mode'] ?? 'per_token';
+            $newMode = $pricing['pricing_mode'];
+
+            // Case 1 — mode mismatch (reclassification). LiteLLM derives its own
+            // billing mode, which can structurally disagree with a deliberately-set
+            // catalog mode (e.g. gpt-image is per_image here but per_token upstream
+            // because LiteLLM counts the prompt tokens). The two numbers measure
+            // different things, so they can never be compared and applying the change
+            // would corrupt a correct price. Reported for human awareness but NOT
+            // counted as drift — the mismatch is permanent, so failing CI on it would
+            // just go red forever. Never written, not overridable by --force.
+            if ($currentMode !== $newMode) {
+                ++$modeMismatch;
+                $modeMismatchList[] = sprintf(
+                    '%s/%s (ID %d) — catalog=%s, litellm=%s',
+                    $service,
+                    $model->getProviderId(),
+                    $model->getId(),
+                    $currentMode,
+                    $newMode,
+                );
+                continue;
+            }
+
+            // Case 2 — same non-per-token mode on both sides (per_second, per_image,
+            // per_character). The prices ARE comparable once normalised to a single
+            // unit, so we DETECT drift here (this is what makes whisper/tts/veo/imagen
+            // checkable at all, #1318). We do not auto-write: these catalog rows are
+            // hand-authored with unit conventions and tier JSON the flat sync can't
+            // reproduce. A human updates ModelCatalog.php after verifying the source.
+            if ('per_token' !== $currentMode) {
+                if ($this->nonTokenPriceDrifted($model, $pricing)) {
+                    ++$nonTokenDrift;
+                    $nonTokenDriftList[] = sprintf(
+                        '%s/%s (ID %d, %s) — DB: in=%.8f/%s out=%.8f/%s | LiteLLM: in=%.8f out=%.8f (per unit)',
+                        $service,
+                        $model->getProviderId(),
+                        $model->getId(),
+                        $currentMode,
+                        $model->getPriceIn(),
+                        $model->getInUnit(),
+                        $model->getPriceOut(),
+                        $model->getOutUnit(),
+                        $pricing['price_in'],
+                        $pricing['price_out'],
+                    );
+                } else {
+                    ++$unchanged;
+                }
+                continue;
+            }
+
+            // Case 3 — per_token on both sides: the sync may write (below).
             if ($this->isNullPriceRisk($model, $pricing['price_in'], $pricing['price_out'])) {
                 ++$nullPriceSkipped;
                 $nullPriceList[] = sprintf(
@@ -135,14 +202,12 @@ class SyncModelPricesCommand extends Command
                 }
             }
 
+            // Both sides are per_token here (guaranteed by the mode guard above),
+            // so only the numeric price can differ.
             $priceChanged = abs($model->getPriceIn() - $pricing['price_in']) > 0.000001
                 || abs($model->getPriceOut() - $pricing['price_out']) > 0.000001;
 
-            // Also check if pricing_mode changed (e.g. first time setting mode metadata)
-            $currentJson = $model->getJson();
-            $modeChanged = ($currentJson['pricing_mode'] ?? 'per_token') !== $pricing['pricing_mode'];
-
-            if (!$priceChanged && !$modeChanged) {
+            if (!$priceChanged) {
                 ++$unchanged;
                 continue;
             }
@@ -185,30 +250,85 @@ class SyncModelPricesCommand extends Command
             $io->listing($nullPriceList);
         }
 
+        if ([] !== $nonTokenDriftList) {
+            $io->section(sprintf('Non-per-token price drift — verify & update ModelCatalog.php (%d)', count($nonTokenDriftList)));
+            $io->listing($nonTokenDriftList);
+        }
+
+        if ([] !== $modeMismatchList) {
+            $io->section(sprintf('Pricing-mode mismatch — structural, manual only (%d)', count($modeMismatchList)));
+            $io->listing($modeMismatchList);
+        }
+
         if ([] !== $unmatchedList) {
-            $io->section(sprintf('Unmatched models (%d)', count($unmatchedList)));
+            $io->section(sprintf('Unmatched — no LiteLLM reference, verify manually (%d)', count($unmatchedList)));
             $io->listing($unmatchedList);
         }
 
+        $totalDrift = $updated + $nonTokenDrift;
+
         $io->success(sprintf(
-            'Price sync complete: %d updated, %d unchanged, %d skipped (admin), %d null-price protected, %d unmatched',
+            'Price sync complete: %d updated, %d non-per-token drift, %d unchanged, %d skipped (admin), %d mode-mismatch, %d null-price protected, %d unmatched',
             $updated,
+            $nonTokenDrift,
             $unchanged,
             $skipped,
+            $modeMismatch,
             $nullPriceSkipped,
             $notMatched,
         ));
 
         $this->logger->info('Price sync completed', [
             'updated' => $updated,
+            'non_token_drift' => $nonTokenDrift,
             'unchanged' => $unchanged,
             'skipped' => $skipped,
+            'mode_mismatch' => $modeMismatch,
             'null_price_skipped' => $nullPriceSkipped,
             'not_matched' => $notMatched,
             'dry_run' => $dryRun,
         ]);
 
+        if ($failOnDrift && $totalDrift > 0) {
+            $io->warning(sprintf(
+                'Price drift detected: %d per-token model(s) auto-updatable + %d non-per-token model(s) differ from LiteLLM. A provider likely changed prices — verify against the official page and update ModelCatalog.php (see docs/PRICING_MAINTENANCE.md).',
+                $updated,
+                $nonTokenDrift,
+            ));
+
+            return self::EXIT_DRIFT_DETECTED;
+        }
+
         return Command::SUCCESS;
+    }
+
+    /**
+     * Detects a price change for a non-per-token model whose catalog mode matches
+     * LiteLLM's. Both sides are normalised to a single billable unit (per second /
+     * image / character) via the same converter billing uses, then compared with a
+     * relative tolerance — per-second rates are tiny (~3e-5), so an absolute epsilon
+     * would flag float noise as drift.
+     *
+     * @param array{pricing_mode: string, price_in: float, price_out: float, in_unit: string, out_unit: string, cache_price_in: float, mode_prices: array<string, float>} $pricing
+     */
+    private function nonTokenPriceDrifted(Model $model, array $pricing): bool
+    {
+        $dbIn = CostCalculationService::normaliseToPerUnit($model->getPriceIn(), $model->getInUnit());
+        $dbOut = CostCalculationService::normaliseToPerUnit($model->getPriceOut(), $model->getOutUnit());
+
+        return $this->pricesDiffer($dbIn, $pricing['price_in'])
+            || $this->pricesDiffer($dbOut, $pricing['price_out']);
+    }
+
+    /**
+     * True when two per-unit prices differ beyond a 0.1% relative tolerance (with a
+     * tiny absolute floor for the zero case).
+     */
+    private function pricesDiffer(float $a, float $b): bool
+    {
+        $scale = max(abs($a), abs($b));
+
+        return abs($a - $b) > max(1e-12, $scale * 0.001);
     }
 
     /**

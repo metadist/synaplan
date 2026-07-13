@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\DTO\CostResult;
 use App\Entity\Model;
+use App\Model\ModelCatalog;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
 use Psr\Log\LoggerInterface;
@@ -57,6 +58,22 @@ final readonly class CostCalculationService
                 priceSnapshot: $priceSnapshot,
                 billedInputTokens: $promptTokens,
             );
+        }
+
+        // Long-context tier: several providers bill the WHOLE request at a
+        // higher per-token rate once the prompt crosses a token threshold
+        // (Gemini/Claude >200k, GPT-5.x >272k). Switch both input and output to
+        // the above-threshold rate — matching how the provider (and LiteLLM)
+        // meter it — so we don't under-bill large-context requests (#1319). The
+        // tier is read from the current catalog (not the historical snapshot):
+        // tiers are stable and rare, so this keeps the lookup simple without
+        // meaningfully affecting reproducibility.
+        $contextTier = ModelCatalog::contextPricing($model->getProviderId());
+        if (null !== $contextTier && $promptTokens > $contextTier['threshold_tokens']) {
+            $priceIn = $contextTier['price_in_above'];
+            $priceOut = $contextTier['price_out_above'];
+            $priceSnapshot['price_in'] = number_format($priceIn, 8, '.', '');
+            $priceSnapshot['price_out'] = number_format($priceOut, 8, '.', '');
         }
 
         $pricePerInputToken = $this->convertToPerToken($priceIn, $priceSnapshot['in_unit']);
@@ -169,6 +186,11 @@ final readonly class CostCalculationService
      *                                    When the model defines `json.resolution_prices`, the matching
      *                                    per-second price overrides `priceOut`. Falls back to default
      *                                    pricing when omitted or unknown.
+     * @param string|null $quality        Optional image quality tier (low|medium|high, or the legacy
+     *                                    standard/hd aliases). Used with $size to pick a per-image price
+     *                                    from `json.quality_prices` (e.g. gpt-image, #1315).
+     * @param string|null $size           Optional image size (e.g. '1024x1024', '1024x1536'). Combined
+     *                                    with $quality to look up the exact per-image tier price.
      */
     public function calculateMediaCost(
         ?int $modelId,
@@ -176,6 +198,8 @@ final readonly class CostCalculationService
         float $outputQuantity = 0,
         ?int $timestamp = null,
         ?string $resolution = null,
+        ?string $quality = null,
+        ?string $size = null,
     ): CostResult {
         if (!$modelId) {
             return $this->zeroCostResult();
@@ -199,11 +223,11 @@ final readonly class CostCalculationService
         // Honour the catalog-authored unit. e.g. OpenAI tts-1 is authored
         // as $0.015 per 1000 chars; we want $0.000015 per char before
         // multiplying by the spoken character count.
-        $priceIn = $this->normaliseToPerUnit(
+        $priceIn = self::normaliseToPerUnit(
             (float) $priceSnapshot['price_in'],
             (string) $priceSnapshot['in_unit'],
         );
-        $priceOut = $this->normaliseToPerUnit(
+        $priceOut = self::normaliseToPerUnit(
             (float) $priceSnapshot['price_out'],
             (string) $priceSnapshot['out_unit'],
         );
@@ -215,12 +239,25 @@ final readonly class CostCalculationService
             // ingest catalog uses for video (`persec`), so they need the
             // same normalisation. lookupResolutionPrice returns the raw
             // catalog value; if it's already per-1, this is a no-op.
-            $priceOut = $this->normaliseToPerUnit(
+            $priceOut = self::normaliseToPerUnit(
                 $resolutionPrice,
                 (string) $priceSnapshot['out_unit'],
             );
             $priceSnapshot['resolution'] = $resolvedResolution;
             $priceSnapshot['price_out_resolution'] = number_format($resolutionPrice, 8, '.', '');
+        }
+
+        // Image models (gpt-image) charge a different per-image price per
+        // quality × size tier. When the model defines `json.quality_prices`,
+        // pick the exact tier so low-quality images aren't overbilled and
+        // high-quality ones aren't underbilled (#1315). Overrides the flat
+        // priceOut; no-op for models without tiers.
+        [$tierPrice, $tierQuality, $tierSize] = $this->lookupImageTierPrice($model, $quality, $size);
+        if (null !== $tierPrice) {
+            $priceOut = self::normaliseToPerUnit($tierPrice, (string) $priceSnapshot['out_unit']);
+            $priceSnapshot['image_quality'] = $tierQuality;
+            $priceSnapshot['image_size'] = $tierSize;
+            $priceSnapshot['price_out_tier'] = number_format($tierPrice, 8, '.', '');
         }
 
         $inputCost = $inputQuantity * $priceIn;
@@ -241,14 +278,26 @@ final readonly class CostCalculationService
      * Convert a catalog price authored in `inUnit` / `outUnit` into a
      * "per single billable unit" price (per 1 character, per 1 image, per
      * 1 second). Unknown units fall through unchanged so existing data
-     * stays billable; we log a warning so the gap is observable.
+     * stays billable.
+     *
+     * Public + static because it is a pure, stateless unit conversion and is
+     * the single source of truth for it: SyncModelPricesCommand reuses it to
+     * compare a DB price against LiteLLM on the same per-unit basis (#1318),
+     * so billing and drift detection can never diverge on unit handling.
      */
-    private function normaliseToPerUnit(float $price, string $unit): float
+    public static function normaliseToPerUnit(float $price, string $unit): float
     {
         return match (strtolower($unit)) {
             'per1m', 'per1mchars', 'per1mtokens' => $price / 1_000_000,
             'per1k', 'per1000', 'per1000chars' => $price / 1_000,
-            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond', 'permin' => $price,
+            // Time-based media (transcription/video): the billable quantity is
+            // always passed in SECONDS, so per-minute / per-hour catalog prices
+            // must be converted down to per-second. Authoring in the provider's
+            // natural unit keeps the catalog readable ($0.111/hour) while billing
+            // stays correct (#1314). Anything already per-second is a no-op.
+            'permin' => $price / 60,
+            'perhour' => $price / 3_600,
+            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond' => $price,
             '-', '', 'free' => 0.0,
             default => $price,
         };
@@ -298,6 +347,75 @@ final readonly class CostCalculationService
     }
 
     /**
+     * Resolve the per-image price for an image model's quality × size tier.
+     *
+     * gpt-image bills a different price for every (quality, size) combination
+     * (e.g. gpt-image-1 low 1024² = $0.011 but high 1024² = $0.167). The catalog
+     * encodes this as `json.quality_prices[quality][size]` with `default_quality`
+     * / `default_size` fall-backs. Returns `[price, resolvedQuality, resolvedSize]`,
+     * or `[null, null, null]` when the model has no tier table (flat priceOut).
+     *
+     * @return array{0: float|null, 1: string|null, 2: string|null}
+     */
+    private function lookupImageTierPrice(Model $model, ?string $quality, ?string $size): array
+    {
+        $json = $model->getJson();
+        $tiers = $json['quality_prices'] ?? null;
+        if (!is_array($tiers) || [] === $tiers) {
+            return [null, null, null];
+        }
+
+        $resolvedQuality = $this->normaliseImageQuality($quality);
+        if (null === $resolvedQuality || !isset($tiers[$resolvedQuality]) || !is_array($tiers[$resolvedQuality])) {
+            $default = $json['default_quality'] ?? null;
+            $resolvedQuality = is_string($default) && isset($tiers[$default])
+                ? $default
+                : (string) array_key_first($tiers);
+        }
+
+        $sizes = $tiers[$resolvedQuality] ?? null;
+        if (!is_array($sizes) || [] === $sizes) {
+            return [null, null, null];
+        }
+
+        $resolvedSize = is_string($size) && isset($sizes[$size]) ? $size : null;
+        if (null === $resolvedSize) {
+            $defaultSize = $json['default_size'] ?? null;
+            $resolvedSize = is_string($defaultSize) && isset($sizes[$defaultSize])
+                ? $defaultSize
+                : (string) array_key_first($sizes);
+        }
+
+        return [(float) $sizes[$resolvedSize], $resolvedQuality, $resolvedSize];
+    }
+
+    /**
+     * Map the app-level quality value onto OpenAI's low|medium|high tiers.
+     *
+     * Mirrors the mapping in OpenAIProvider::generateImageWithGptImage1() so the
+     * price we bill matches the quality actually requested from the provider:
+     * standard→medium, hd→high, low/medium/high pass through, and unknown
+     * values map to 'high' because the provider defaults them to 'high' before
+     * sending — billing anything cheaper would under-bill the actual request.
+     * Only 'auto' (OpenAI picks the tier, we can't know which) and null fall
+     * back to null so the caller applies the model's `default_quality`.
+     */
+    private function normaliseImageQuality(?string $quality): ?string
+    {
+        if (null === $quality) {
+            return null;
+        }
+
+        return match (strtolower($quality)) {
+            'standard' => 'medium',
+            'hd' => 'high',
+            'low', 'medium', 'high' => strtolower($quality),
+            'auto' => null,
+            default => 'high',
+        };
+    }
+
+    /**
      * Detect whether a model uses non-token-based pricing.
      */
     public function getPricingMode(?int $modelId): string
@@ -326,7 +444,7 @@ final readonly class CostCalculationService
 
     private function getCacheReadDiscount(string $provider): float
     {
-        return match ($provider) {
+        return match (strtolower($provider)) {
             'anthropic' => self::CACHE_READ_DISCOUNT_ANTHROPIC,
             default => self::CACHE_READ_DISCOUNT_DEFAULT,
         };
@@ -334,7 +452,7 @@ final readonly class CostCalculationService
 
     private function getCacheWriteMultiplier(string $provider): float
     {
-        return match ($provider) {
+        return match (strtolower($provider)) {
             'anthropic' => self::CACHE_WRITE_MULTIPLIER_ANTHROPIC,
             default => 1.0,
         };

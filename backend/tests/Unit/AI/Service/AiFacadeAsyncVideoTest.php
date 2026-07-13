@@ -13,6 +13,7 @@ use App\Service\DiscordNotificationService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
+use App\Service\Usage\TranscriptionUsageRecorder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemPoolInterface;
@@ -45,6 +46,7 @@ class AiFacadeAsyncVideoTest extends TestCase
             $this->createMock(CacheInterface::class),
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(HiggsfieldCredentialResolver::class),
+            $this->createMock(TranscriptionUsageRecorder::class),
             '/tmp'
         );
     }

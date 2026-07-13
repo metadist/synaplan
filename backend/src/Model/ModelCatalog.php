@@ -63,6 +63,46 @@ class ModelCatalog
     private const FINGERPRINT_FLOAT_PRECISION = 6;
 
     /**
+     * Long-context pricing tiers, keyed by providerId.
+     *
+     * Several providers charge a higher per-token rate for the ENTIRE request
+     * once the prompt crosses a token threshold: Gemini 2.5/3.1 Pro and Claude
+     * Sonnet 4.5 above 200k, GPT-5.x above 272k. Prices are per 1M tokens — the
+     * same unit as the catalog base `priceIn`/`priceOut`. Kept here keyed by
+     * providerId (not duplicated into each model's chat + vision rows) because
+     * the tier is a property of the underlying model, not of the individual
+     * BTAG row. CostCalculationService applies it when the prompt exceeds the
+     * threshold, billing the whole request (input + output) at the above rate,
+     * mirroring how the providers meter it (#1319).
+     *
+     * @var array<string, array{threshold_tokens: int, price_in_above: float, price_out_above: float}>
+     */
+    private const CONTEXT_PRICING = [
+        'gpt-5.4' => ['threshold_tokens' => 272000, 'price_in_above' => 5.0, 'price_out_above' => 22.5],
+        'gpt-5.5' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0],
+        'gpt-5.5-pro' => ['threshold_tokens' => 272000, 'price_in_above' => 60.0, 'price_out_above' => 270.0],
+        'gpt-5.6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0],
+        'gpt-5.6-terra' => ['threshold_tokens' => 272000, 'price_in_above' => 5.0, 'price_out_above' => 22.5],
+        'gpt-5.6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 2.0, 'price_out_above' => 9.0],
+        'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0],
+        'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
+        // max_input is 200k so this tier is currently unreachable; kept for
+        // completeness in case a 1M-context variant is enabled.
+        'claude-sonnet-4-5-20250929' => ['threshold_tokens' => 200000, 'price_in_above' => 6.0, 'price_out_above' => 22.5],
+    ];
+
+    /**
+     * Long-context pricing tier for a providerId, or null when the model has no
+     * context-size tier. Prices are per 1M tokens. See CONTEXT_PRICING (#1319).
+     *
+     * @return array{threshold_tokens: int, price_in_above: float, price_out_above: float}|null
+     */
+    public static function contextPricing(string $providerId): ?array
+    {
+        return self::CONTEXT_PRICING[$providerId] ?? null;
+    }
+
+    /**
      * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
      *
      * Field ownership rules:
@@ -388,6 +428,10 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Groq Whisper Large V3 - Best accuracy for multilingual transcription and translation. Supports 50+ languages.',
+                // Billed on audio duration. RateLimitService passes the transcript
+                // duration as media_usage.duration_seconds; CostCalculationService
+                // normalises the perhour price to per-second (see #1314).
+                'pricing_mode' => 'per_second',
                 'params' => [
                     'file' => '*LOCALFILEPATH*',
                     'model' => 'whisper-large-v3',
@@ -411,6 +455,8 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Groq Whisper Large V3 Turbo - Fast and cost-effective transcription. 3x cheaper than V3. No translation support.',
+                // Billed on audio duration (perhour → per-second at bill time, #1314).
+                'pricing_mode' => 'per_second',
                 'params' => [
                     'file' => '*LOCALFILEPATH*',
                     'model' => 'whisper-large-v3-turbo',
@@ -426,9 +472,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'qwen/qwen3-32b',
-            'priceIn' => 0.15,
+            'priceIn' => 0.29,
             'inUnit' => 'per1M',
-            'priceOut' => 0.60,
+            'priceOut' => 0.59,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 5,
@@ -448,9 +494,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'openai/gpt-oss-20b',
-            'priceIn' => 0.10,
+            'priceIn' => 0.075,
             'inUnit' => 'per1M',
-            'priceOut' => 0.50,
+            'priceOut' => 0.30,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 3,
@@ -471,7 +517,7 @@ class ModelCatalog
             'providerId' => 'openai/gpt-oss-120b',
             'priceIn' => 0.15,
             'inUnit' => 'per1M',
-            'priceOut' => 0.75,
+            'priceOut' => 0.60,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 4,
@@ -522,7 +568,7 @@ class ModelCatalog
         //
         // Three options seeded by default — pick whichever the operator's
         // setup makes cheapest/fastest:
-        //   - 220: Groq gpt-oss-120b      (~200 ms TTFT, $0.15/$0.75 per 1M tokens)
+        //   - 220: Groq gpt-oss-120b      (~200 ms TTFT, $0.15/$0.60 per 1M tokens)
         //   - 221: Local Ollama gpt-oss:120b (free, latency depends on the GPU box)
         //   - 222: Anthropic Claude Opus 4.6 (highest quality, slowest)
         [
@@ -535,7 +581,7 @@ class ModelCatalog
             'providerId' => 'openai/gpt-oss-120b',
             'priceIn' => 0.15,
             'inUnit' => 'per1M',
-            'priceOut' => 0.75,
+            'priceOut' => 0.60,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 4,
@@ -614,7 +660,17 @@ class ModelCatalog
                 // the real cost.
                 'description' => 'OpenAI image generation model.',
                 'pricing_mode' => 'per_image',
+                // Flat fallback = medium 1024² (the headline rate). The exact
+                // per-image price is picked from quality_prices below (#1315).
                 'mode_prices' => ['output_cost_per_image' => 0.042],
+                'default_quality' => 'medium',
+                'default_size' => '1024x1024',
+                // OpenAI gpt-image-1 per-image prices by quality × size.
+                'quality_prices' => [
+                    'low' => ['1024x1024' => 0.011, '1024x1536' => 0.016, '1536x1024' => 0.016],
+                    'medium' => ['1024x1024' => 0.042, '1024x1536' => 0.063, '1536x1024' => 0.063],
+                    'high' => ['1024x1024' => 0.167, '1024x1536' => 0.25, '1536x1024' => 0.25],
+                ],
                 'params' => ['model' => 'gpt-image-1'],
             ],
         ],
@@ -680,6 +736,8 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI Whisper model for audio transcription. Supports 50+ languages.',
+                // Billed on audio duration (permin → per-second at bill time, #1314).
+                'pricing_mode' => 'per_second',
                 'params' => ['model' => 'whisper-1', 'response_format' => 'verbose_json'],
                 'features' => ['multilingual', 'translation'],
             ],
@@ -1091,17 +1149,27 @@ class ModelCatalog
             'providerId' => 'gpt-image-1.5',
             'priceIn' => 0,
             'inUnit' => 'perImage',
-            'priceOut' => 0.04,
+            'priceOut' => 0.034,
             'outUnit' => 'perImage',
             'quality' => 10,
             'rating' => 1,
             'json' => [
                 // The image path does not capture per-image token usage, so a
-                // per-token model bills $0. Bill per image: standard-quality
-                // 1024x1024 = $0.04/image (per OpenAI GPT Image 1.5 pricing).
+                // per-token model bills $0. Bill per image instead; the exact
+                // price is picked from quality_prices by quality × size (#1315).
+                // Flat fallback = medium 1024² = $0.034 (OpenAI GPT Image 1.5).
                 'description' => 'OpenAI GPT Image 1.5 - state-of-the-art image generation and editing. Supports pic2pic via Responses API.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.04],
+                'mode_prices' => ['output_cost_per_image' => 0.034],
+                'default_quality' => 'medium',
+                'default_size' => '1024x1024',
+                // OpenAI gpt-image-1.5 per-image prices by quality × size
+                // (~20% cheaper than gpt-image-1).
+                'quality_prices' => [
+                    'low' => ['1024x1024' => 0.009, '1024x1536' => 0.013, '1536x1024' => 0.013],
+                    'medium' => ['1024x1024' => 0.034, '1024x1536' => 0.05, '1536x1024' => 0.05],
+                    'high' => ['1024x1024' => 0.133, '1024x1536' => 0.20, '1536x1024' => 0.20],
+                ],
                 'params' => ['model' => 'gpt-image-1.5'],
                 'features' => ['image', 'pic2pic'],
                 'meta' => ['api' => 'responses'],
@@ -1173,12 +1241,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gpt-5.4-nano',
-            // Tier-baselined against the published gpt-5.4-mini price
-            // (mini is $0.75/$4.50 per1M); nano is the smaller/cheaper
-            // sibling. SyncModelPricesCommand will normalise on next run.
             'priceIn' => 0.20,
             'inUnit' => 'per1M',
-            'priceOut' => 1.50,
+            'priceOut' => 1.25,
             'outUnit' => 'per1M',
             'quality' => 7,
             'rating' => 1,
@@ -1441,9 +1506,9 @@ class ModelCatalog
             // Claude Sonnet 5 — Anthropic's most agentic Sonnet yet; performance
             // close to Opus 4.8 at a lower price. Uses adaptive thinking and
             // effort levels, and (like Opus 4.7+) no longer accepts `temperature`.
-            // Introductory API pricing through 2026-08-31 is $2/MTok in and
-            // $10/MTok out; standard pricing (authored here) is $3/MTok in and
-            // $15/MTok out.
+            // Introductory API pricing through 2026-08-31: $2/MTok in, $10/MTok out.
+            // Standard pricing starting 2026-09-01: $3/MTok in, $15/MTok out.
+            // TODO: Update to standard pricing after 2026-08-31.
             'id' => 249,
             'service' => 'Anthropic',
             'name' => 'Claude Sonnet 5',
@@ -1451,9 +1516,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'claude-sonnet-5',
-            'priceIn' => 3,
+            'priceIn' => 2,
             'inUnit' => 'per1M',
-            'priceOut' => 15,
+            'priceOut' => 10,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -1473,9 +1538,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'claude-sonnet-5',
-            'priceIn' => 3,
+            'priceIn' => 2,
             'inUnit' => 'per1M',
-            'priceOut' => 15,
+            'priceOut' => 10,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -1578,20 +1643,20 @@ class ModelCatalog
             'providerId' => 'veo-3.1-fast-generate-preview',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.10,
+            'priceOut' => 0.15,
             'outUnit' => 'persec',
             'quality' => 8,
             'rating' => 1,
             'json' => [
-                'description' => 'Google Veo 3.1 Fast - quicker generations with audio. 720p: $0.10/sec, 1080p: $0.12/sec, 4K: $0.30/sec.',
+                'description' => 'Google Veo 3.1 Fast - quicker generations with audio. 720p: $0.15/sec, 1080p: $0.18/sec, 4K: $0.45/sec.',
                 'params' => ['model' => 'veo-3.1-fast-generate-preview'],
                 'pricing_mode' => 'per_second',
                 'allowed_resolutions' => ['720p', '1080p', '4K'],
                 'default_resolution' => '1080p',
                 'resolution_prices' => [
-                    '720p' => 0.10,
-                    '1080p' => 0.12,
-                    '4K' => 0.30,
+                    '720p' => 0.15,
+                    '1080p' => 0.18,
+                    '4K' => 0.45,
                 ],
             ],
         ],
@@ -1629,9 +1694,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-2.5-pro',
-            'priceIn' => 2.5,
+            'priceIn' => 1.25,
             'inUnit' => 'per1M',
-            'priceOut' => 15,
+            'priceOut' => 10,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -1650,9 +1715,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-2.5-pro',
-            'priceIn' => 2.5,
+            'priceIn' => 1.25,
             'inUnit' => 'per1M',
-            'priceOut' => 15,
+            'priceOut' => 10,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -1892,9 +1957,9 @@ class ModelCatalog
         // against the live Google price endpoint at next run.
         // ----------------------------------------------------------------
         [
-            // 3.5 Flash chat — opt-in upgrade over BID 170 (2.5 Flash). Same
-            // price tier and feature surface; chosen by the user via the
-            // model picker, never silently swapped.
+            // 3.5 Flash chat — opt-in upgrade over BID 170 (2.5 Flash). Higher
+            // price tier ($1.50/$9.00 vs $0.30/$2.50) but beats 3.1 Pro on
+            // coding and agentic benchmarks. Chosen by user via model picker.
             'id' => 237,
             'service' => 'Google',
             'name' => 'Gemini 3.5 Flash',
@@ -1902,9 +1967,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-3.5-flash',
-            'priceIn' => 0.30,
+            'priceIn' => 1.50,
             'inUnit' => 'per1M',
-            'priceOut' => 2.50,
+            'priceOut' => 9.00,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -1924,9 +1989,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-3.5-flash',
-            'priceIn' => 0.30,
+            'priceIn' => 1.50,
             'inUnit' => 'per1M',
-            'priceOut' => 2.50,
+            'priceOut' => 9.00,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -1945,9 +2010,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-3-flash-preview',
-            'priceIn' => 0.30,
+            'priceIn' => 0.50,
             'inUnit' => 'per1M',
-            'priceOut' => 2.50,
+            'priceOut' => 3.00,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -1967,9 +2032,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gemini-3-flash-preview',
-            'priceIn' => 0.30,
+            'priceIn' => 0.50,
             'inUnit' => 'per1M',
-            'priceOut' => 2.50,
+            'priceOut' => 3.00,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -2137,7 +2202,7 @@ class ModelCatalog
             'providerId' => 'claude-sonnet-4-5-20250929',
             'priceIn' => 3,
             'inUnit' => 'per1M',
-            'priceOut' => 5,
+            'priceOut' => 15,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -2158,7 +2223,7 @@ class ModelCatalog
             'providerId' => 'claude-sonnet-4-5-20250929',
             'priceIn' => 3,
             'inUnit' => 'per1M',
-            'priceOut' => 5,
+            'priceOut' => 15,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -2176,17 +2241,22 @@ class ModelCatalog
             'tag' => 'chat',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'moonshotai/Kimi-K2.5',
-            'priceIn' => 0.383,
+            'providerId' => 'moonshotai/Kimi-K2.5:deepinfra',
+            'priceIn' => 0.45,
             'inUnit' => 'per1M',
-            'priceOut' => 1.72,
+            'priceOut' => 2.25,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'Kimi K2.5 via HuggingFace - multimodal MoE model with 256K context, native vision, and thinking/non-thinking modes. Routed through HF Inference Providers.',
+                // Pinned to DeepInfra via HF router (:deepinfra suffix) so the
+                // billed price is deterministic and matches this catalog rate.
+                // Auto-routing (:fastest) would pick a variable provider and
+                // break resale billing (raw cost + 10% markup). DeepInfra runs
+                // the model's native FP4 weights, so no quality loss.
+                'description' => 'Kimi K2.5 via HuggingFace - multimodal MoE model with 256K context, native vision, and thinking/non-thinking modes. Pinned to DeepInfra.',
                 'max_tokens' => 16384,
-                'params' => ['model' => 'moonshotai/Kimi-K2.5'],
+                'params' => ['model' => 'moonshotai/Kimi-K2.5:deepinfra'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
                 'meta' => ['context_window' => '262144', 'max_output' => '16384', 'routed_via' => 'huggingface'],
             ],
@@ -2198,17 +2268,17 @@ class ModelCatalog
             'tag' => 'pic2text',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'moonshotai/Kimi-K2.5',
-            'priceIn' => 0.383,
+            'providerId' => 'moonshotai/Kimi-K2.5:deepinfra',
+            'priceIn' => 0.45,
             'inUnit' => 'per1M',
-            'priceOut' => 1.72,
+            'priceOut' => 2.25,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'Kimi K2.5 via HuggingFace for image analysis and vision tasks. Native multimodal with strong OCR and chart reading.',
+                'description' => 'Kimi K2.5 via HuggingFace for image analysis and vision tasks. Native multimodal with strong OCR and chart reading. Pinned to DeepInfra.',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'moonshotai/Kimi-K2.5'],
+                'params' => ['model' => 'moonshotai/Kimi-K2.5:deepinfra'],
                 'meta' => ['supports_images' => true, 'routed_via' => 'huggingface'],
             ],
         ],
@@ -2219,17 +2289,17 @@ class ModelCatalog
             'tag' => 'chat',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'moonshotai/Kimi-K2.6',
-            'priceIn' => 0.60,
+            'providerId' => 'moonshotai/Kimi-K2.6:deepinfra',
+            'priceIn' => 0.75,
             'inUnit' => 'per1M',
-            'priceOut' => 3.00,
+            'priceOut' => 3.50,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Kimi K2.6 via HuggingFace - 1T parameter MoE (32B active) flagship for long-horizon coding, agentic workflows, and reasoning. 262K context. Routed through HF Inference Providers.',
+                'description' => 'Kimi K2.6 via HuggingFace - 1T parameter MoE (32B active) flagship for long-horizon coding, agentic workflows, and reasoning. 262K context. Pinned to DeepInfra.',
                 'max_tokens' => 16384,
-                'params' => ['model' => 'moonshotai/Kimi-K2.6'],
+                'params' => ['model' => 'moonshotai/Kimi-K2.6:deepinfra'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
                 'meta' => ['context_window' => '262144', 'max_output' => '16384', 'routed_via' => 'huggingface'],
             ],
@@ -2241,17 +2311,17 @@ class ModelCatalog
             'tag' => 'pic2text',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'moonshotai/Kimi-K2.6',
-            'priceIn' => 0.60,
+            'providerId' => 'moonshotai/Kimi-K2.6:deepinfra',
+            'priceIn' => 0.75,
             'inUnit' => 'per1M',
-            'priceOut' => 3.00,
+            'priceOut' => 3.50,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Kimi K2.6 via HuggingFace for image analysis and vision tasks. Flagship multimodal Kimi model.',
+                'description' => 'Kimi K2.6 via HuggingFace for image analysis and vision tasks. Flagship multimodal Kimi model. Pinned to DeepInfra.',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'moonshotai/Kimi-K2.6'],
+                'params' => ['model' => 'moonshotai/Kimi-K2.6:deepinfra'],
                 'meta' => ['supports_images' => true, 'routed_via' => 'huggingface'],
             ],
         ],
@@ -2263,17 +2333,17 @@ class ModelCatalog
             'tag' => 'chat',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'moonshotai/Kimi-K2.7-Code',
-            'priceIn' => 0.95,
+            'providerId' => 'moonshotai/Kimi-K2.7-Code:deepinfra',
+            'priceIn' => 0.74,
             'inUnit' => 'per1M',
-            'priceOut' => 4.00,
+            'priceOut' => 3.50,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Kimi K2.7 Code via HuggingFace - coding-focused 1T MoE (32B active) with 256K context. Always thinks; 30% fewer reasoning tokens than K2.6. Routed through HF Inference Providers.',
+                'description' => 'Kimi K2.7 Code via HuggingFace - coding-focused 1T MoE (32B active) with 256K context. Always thinks; 30% fewer reasoning tokens than K2.6. Pinned to DeepInfra.',
                 'max_tokens' => 32768,
-                'params' => ['model' => 'moonshotai/Kimi-K2.7-Code'],
+                'params' => ['model' => 'moonshotai/Kimi-K2.7-Code:deepinfra'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
                 'meta' => ['context_window' => '262144', 'max_output' => '32768', 'routed_via' => 'huggingface', 'forced_thinking' => true],
             ],
@@ -2285,17 +2355,17 @@ class ModelCatalog
             'tag' => 'pic2text',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'moonshotai/Kimi-K2.7-Code',
-            'priceIn' => 0.95,
+            'providerId' => 'moonshotai/Kimi-K2.7-Code:deepinfra',
+            'priceIn' => 0.74,
             'inUnit' => 'per1M',
-            'priceOut' => 4.00,
+            'priceOut' => 3.50,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Kimi K2.7 Code via HuggingFace for image analysis and vision tasks. Coding-optimised Kimi with MoonViT vision encoder.',
+                'description' => 'Kimi K2.7 Code via HuggingFace for image analysis and vision tasks. Coding-optimised Kimi with MoonViT vision encoder. Pinned to DeepInfra.',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'moonshotai/Kimi-K2.7-Code'],
+                'params' => ['model' => 'moonshotai/Kimi-K2.7-Code:deepinfra'],
                 'meta' => ['supports_images' => true, 'routed_via' => 'huggingface', 'forced_thinking' => true],
             ],
         ],
@@ -2310,14 +2380,17 @@ class ModelCatalog
             'providerId' => 'flux-schnell',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.01,
+            'priceOut' => 0.003,
             'outUnit' => 'perpic',
             'quality' => 7,
             'rating' => 1,
             'json' => [
+                // TheHive bills $3.00 / 1000 images = $0.003/image at the default
+                // 4 inference steps (thehive.ai/pricing). Cost scales linearly if
+                // steps are raised; we send the default so the base rate applies.
                 'description' => 'TheHive Flux Schnell - Fast image generation for prototyping. Generates images quickly with good quality.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.01],
+                'mode_prices' => ['output_cost_per_image' => 0.003],
                 'params' => ['model' => 'flux-schnell', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2331,14 +2404,15 @@ class ModelCatalog
             'providerId' => 'flux-schnell-enhanced',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.02,
+            'priceOut' => 0.004,
             'outUnit' => 'perpic',
             'quality' => 8,
             'rating' => 1,
             'json' => [
+                // TheHive bills $4.00 / 1000 images = $0.004/image at default steps.
                 'description' => 'TheHive Flux Schnell Enhanced - Photorealistic image generation with enhanced quality.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.02],
+                'mode_prices' => ['output_cost_per_image' => 0.004],
                 'params' => ['model' => 'flux-schnell-enhanced', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2352,14 +2426,16 @@ class ModelCatalog
             'providerId' => 'sdxl',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.02,
+            'priceOut' => 0.003,
             'outUnit' => 'perpic',
             'quality' => 8,
             'rating' => 1,
             'json' => [
+                // TheHive bills $3.00 / 1000 images = $0.003/image at the default
+                // 20 inference steps. Cost scales linearly if steps are raised.
                 'description' => 'TheHive SDXL - Stable Diffusion XL for general purpose high-quality image generation.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.02],
+                'mode_prices' => ['output_cost_per_image' => 0.003],
                 'params' => ['model' => 'sdxl', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2373,14 +2449,15 @@ class ModelCatalog
             'providerId' => 'sdxl-enhanced',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.05,
+            'priceOut' => 0.004,
             'outUnit' => 'perpic',
             'quality' => 9,
             'rating' => 1,
             'json' => [
+                // TheHive bills $4.00 / 1000 images = $0.004/image at default steps.
                 'description' => 'TheHive SDXL Enhanced - Premium quality image generation with enhanced details and photorealism.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.05],
+                'mode_prices' => ['output_cost_per_image' => 0.004],
                 'params' => ['model' => 'sdxl-enhanced', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -2394,14 +2471,16 @@ class ModelCatalog
             'providerId' => 'emoji',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.01,
+            'priceOut' => 0.004,
             'outUnit' => 'perpic',
             'quality' => 7,
             'rating' => 1,
             'json' => [
+                // TheHive bills the Flux Schnell Emoji model at $4.00 / 1000
+                // images = $0.004/image at default steps.
                 'description' => 'TheHive Emoji Model - Generate custom emojis with transparent backgrounds.',
                 'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.01],
+                'mode_prices' => ['output_cost_per_image' => 0.004],
                 'params' => ['model' => 'emoji', 'width' => 512, 'height' => 512],
             ],
         ],
@@ -2785,6 +2864,8 @@ class ModelCatalog
             'rating' => 2,
             'json' => [
                 'description' => 'Voxtral Mini Transcribe - efficient speech-to-text via Mistral /v1/audio/transcriptions. ~4% WER on FLEURS, 13 languages, up to 3h audio per request.',
+                // Billed on audio duration (permin → per-second at bill time, #1314).
+                'pricing_mode' => 'per_second',
                 'params' => ['model' => 'voxtral-mini-latest'],
                 'features' => ['multilingual', 'diarization', 'timestamps'],
             ],

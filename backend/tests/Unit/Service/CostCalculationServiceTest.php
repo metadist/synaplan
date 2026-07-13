@@ -97,7 +97,7 @@ class CostCalculationServiceTest extends TestCase
 
     public function testCalculatesCostWithCachedTokensAnthropicProvider(): void
     {
-        $model = $this->createModelMock('anthropic', 3.0, 15.0, 'per1M', 'per1M');
+        $model = $this->createModelMock('Anthropic', 3.0, 15.0, 'per1M', 'per1M');
 
         // @phpstan-ignore-next-line
         $this->modelRepository->method('find')->willReturn($model);

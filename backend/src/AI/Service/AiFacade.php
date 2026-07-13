@@ -14,6 +14,7 @@ use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
+use App\Service\Usage\TranscriptionUsageRecorder;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -52,6 +53,7 @@ class AiFacade
         // per missing text. Both interfaces target the same Redis keys.
         private CacheItemPoolInterface $cachePool,
         private HiggsfieldCredentialResolver $higgsfieldCredentials,
+        private TranscriptionUsageRecorder $transcriptionUsageRecorder,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private string $embeddingFallbackProvider = '',
     ) {
@@ -1176,11 +1178,27 @@ class AiFacade
             throw new ProviderException('Transcription failed', 'unknown', null, 0, $e);
         }
 
-        return array_merge($result, [
+        $enriched = array_merge($result, [
             'provider' => $provider->getName(),
             'model' => $this->reportedModel($provider, $options, 'speech_to_text'),
             'model_id' => $sttModelId,
         ]);
+
+        // Bill the transcription on the audio duration the provider reported.
+        // This is the single choke point for every external (paid) STT call —
+        // local whisper.cpp bypasses AiFacade and is free — so recording here
+        // meters all channels exactly once (#1314). No-ops without a user, a
+        // priced model_id, or a positive duration.
+        $this->transcriptionUsageRecorder->record(
+            userId: $userId,
+            modelId: $sttModelId,
+            provider: $provider->getName(),
+            model: (string) $enriched['model'],
+            durationSeconds: (float) ($result['duration'] ?? 0),
+            extraMetadata: ['language' => $result['language'] ?? 'unknown'],
+        );
+
+        return $enriched;
     }
 
     /**

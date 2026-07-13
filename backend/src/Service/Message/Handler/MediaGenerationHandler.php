@@ -853,6 +853,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $mediaUsage = [];
             if ('image' === $mediaType) {
                 $mediaUsage['images'] = $result['image_count'] ?? 1;
+                // Carry the requested quality/size so per-tier image models
+                // (gpt-image) bill the exact price (#1315). Mirrors the defaults
+                // used when building $imageOptions above.
+                $mediaUsage['quality'] = $options['quality'] ?? ($isPic2Pic ? 'high' : 'standard');
+                $mediaUsage['size'] = $options['size'] ?? '1024x1024';
             } elseif ('video' === $mediaType) {
                 $requestedDuration = $options['duration'] ?? $classification['duration'] ?? 8;
                 $duration = $result['duration_seconds'] ?? null;
@@ -1635,7 +1640,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // Stash the billable usage payload so the worker can record it when the
         // job completes (Sprint E, #1146). Mirrors the inline path's media_usage
         // shape so RateLimitService computes the identical cost.
-        $mediaOptions['media_usage'] = $this->detachMediaUsage($type, $prompt, $classification, $options);
+        $mediaOptions['media_usage'] = $this->detachMediaUsage($type, $prompt, $classification, $options, $mediaOptions);
 
         $job = $this->mediaJobService->create([
             'userId' => $effectiveUserId,
@@ -1789,17 +1794,27 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
      *
      * @param array<string, mixed> $classification
      * @param array<string, mixed> $options
+     * @param array<string, mixed> $mediaOptions   resolved provider options (see $imageOptions in handleStream)
      *
      * @return array<string, mixed>
      */
-    private function detachMediaUsage(string $type, string $prompt, array $classification, array $options): array
+    private function detachMediaUsage(string $type, string $prompt, array $classification, array $options, array $mediaOptions): array
     {
         return match ($type) {
             MediaJob::TYPE_VIDEO => [
                 'duration_seconds' => (float) ($options['duration'] ?? $classification['duration'] ?? 8),
             ],
             MediaJob::TYPE_AUDIO => ['characters' => mb_strlen($prompt)],
-            default => ['images' => 1],
+            // Carry quality/size so per-tier image models (gpt-image) bill the
+            // exact price when the async job is later recorded (#1315). Read
+            // from the RESOLVED provider options, not the raw request options:
+            // $imageOptions already applied the pic2pic default ('high'), and
+            // billing must follow what was actually sent to the provider.
+            default => [
+                'images' => 1,
+                'quality' => $mediaOptions['quality'] ?? $options['quality'] ?? 'standard',
+                'size' => $mediaOptions['size'] ?? $options['size'] ?? '1024x1024',
+            ],
         };
     }
 

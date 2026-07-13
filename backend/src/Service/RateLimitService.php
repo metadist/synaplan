@@ -343,12 +343,23 @@ final class RateLimitService
                 ? $mediaUsage['resolution']
                 : null;
 
+            // Image quality/size tier (gpt-image, #1315). Carried through so the
+            // exact per-image price is billed instead of a flat rate.
+            $quality = isset($mediaUsage['quality']) && is_string($mediaUsage['quality'])
+                ? $mediaUsage['quality']
+                : null;
+            $size = isset($mediaUsage['size']) && is_string($mediaUsage['size'])
+                ? $mediaUsage['size']
+                : null;
+
             $costResult = $this->costCalculationService->calculateMediaCost(
                 $modelId,
                 $inputQty,
                 $outputQty,
                 $timestamp,
                 $resolution,
+                $quality,
+                $size,
             );
         } else {
             $costResult = $this->costCalculationService->calculateCost(
