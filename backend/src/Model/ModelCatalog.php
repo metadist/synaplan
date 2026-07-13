@@ -63,6 +63,46 @@ class ModelCatalog
     private const FINGERPRINT_FLOAT_PRECISION = 6;
 
     /**
+     * Long-context pricing tiers, keyed by providerId.
+     *
+     * Several providers charge a higher per-token rate for the ENTIRE request
+     * once the prompt crosses a token threshold: Gemini 2.5/3.1 Pro and Claude
+     * Sonnet 4.5 above 200k, GPT-5.x above 272k. Prices are per 1M tokens — the
+     * same unit as the catalog base `priceIn`/`priceOut`. Kept here keyed by
+     * providerId (not duplicated into each model's chat + vision rows) because
+     * the tier is a property of the underlying model, not of the individual
+     * BTAG row. CostCalculationService applies it when the prompt exceeds the
+     * threshold, billing the whole request (input + output) at the above rate,
+     * mirroring how the providers meter it (#1319).
+     *
+     * @var array<string, array{threshold_tokens: int, price_in_above: float, price_out_above: float}>
+     */
+    private const CONTEXT_PRICING = [
+        'gpt-5.4' => ['threshold_tokens' => 272000, 'price_in_above' => 5.0, 'price_out_above' => 22.5],
+        'gpt-5.5' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0],
+        'gpt-5.5-pro' => ['threshold_tokens' => 272000, 'price_in_above' => 60.0, 'price_out_above' => 270.0],
+        'gpt-5.6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0],
+        'gpt-5.6-terra' => ['threshold_tokens' => 272000, 'price_in_above' => 5.0, 'price_out_above' => 22.5],
+        'gpt-5.6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 2.0, 'price_out_above' => 9.0],
+        'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0],
+        'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
+        // max_input is 200k so this tier is currently unreachable; kept for
+        // completeness in case a 1M-context variant is enabled.
+        'claude-sonnet-4-5-20250929' => ['threshold_tokens' => 200000, 'price_in_above' => 6.0, 'price_out_above' => 22.5],
+    ];
+
+    /**
+     * Long-context pricing tier for a providerId, or null when the model has no
+     * context-size tier. Prices are per 1M tokens. See CONTEXT_PRICING (#1319).
+     *
+     * @return array{threshold_tokens: int, price_in_above: float, price_out_above: float}|null
+     */
+    public static function contextPricing(string $providerId): ?array
+    {
+        return self::CONTEXT_PRICING[$providerId] ?? null;
+    }
+
+    /**
      * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
      *
      * Field ownership rules:

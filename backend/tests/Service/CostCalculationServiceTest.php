@@ -66,6 +66,60 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame(1000, $result->billedInputTokens);
     }
 
+    public function testCalculateCostAppliesLongContextTierAboveThreshold(): void
+    {
+        // gemini-2.5-pro: base 1.25/10 per 1M, above-200k tier 2.50/15 (#1319).
+        $model = $this->createModelMock(20, 'Google', 1.25, 10.0, 'per1M', 'per1M', [], 'gemini-2.5-pro');
+
+        $this->modelRepository->expects(self::any())->method('find')->with(20)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $promptTokens = 250_000;
+        $completionTokens = 1_000;
+        $result = $this->service->calculateCost($promptTokens, $completionTokens, 0, 0, 20);
+
+        $expectedInput = $promptTokens * (2.5 / 1_000_000);
+        $expectedOutput = $completionTokens * (15.0 / 1_000_000);
+
+        $this->assertSame(number_format($expectedInput, 6, '.', ''), $result->inputCost);
+        $this->assertSame(number_format($expectedOutput, 6, '.', ''), $result->outputCost);
+        $this->assertSame(number_format($expectedInput + $expectedOutput, 6, '.', ''), $result->totalCost);
+    }
+
+    public function testCalculateCostUsesBaseTierBelowThreshold(): void
+    {
+        $model = $this->createModelMock(21, 'Google', 1.25, 10.0, 'per1M', 'per1M', [], 'gemini-2.5-pro');
+
+        $this->modelRepository->expects(self::any())->method('find')->with(21)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $promptTokens = 100_000;
+        $completionTokens = 1_000;
+        $result = $this->service->calculateCost($promptTokens, $completionTokens, 0, 0, 21);
+
+        $expectedInput = $promptTokens * (1.25 / 1_000_000);
+        $expectedOutput = $completionTokens * (10.0 / 1_000_000);
+
+        $this->assertSame(number_format($expectedInput, 6, '.', ''), $result->inputCost);
+        $this->assertSame(number_format($expectedOutput, 6, '.', ''), $result->outputCost);
+    }
+
+    public function testCalculateCostWithoutContextTierIsUnaffectedByHugePrompt(): void
+    {
+        // A model with no context tier must bill the flat base rate even for a
+        // huge prompt — no regression for the vast majority of models (#1319).
+        $model = $this->createModelMock(22, 'OpenAI', 5.0, 15.0, 'per1M', 'per1M', [], 'gpt-4o');
+
+        $this->modelRepository->expects(self::any())->method('find')->with(22)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $promptTokens = 500_000;
+        $result = $this->service->calculateCost($promptTokens, 1_000, 0, 0, 22);
+
+        $expectedInput = $promptTokens * (5.0 / 1_000_000);
+        $this->assertSame(number_format($expectedInput, 6, '.', ''), $result->inputCost);
+    }
+
     public function testCalculateMediaCostWithNoModelReturnsZero(): void
     {
         $result = $this->service->calculateMediaCost(null, 1000, 0);
@@ -323,6 +377,7 @@ class CostCalculationServiceTest extends TestCase
         string $inUnit = 'per1M',
         string $outUnit = 'per1M',
         array $json = [],
+        string $providerId = '',
     ): Model {
         $model = $this->createMock(Model::class);
         $model->method('getId')->willReturn($id);
@@ -332,6 +387,7 @@ class CostCalculationServiceTest extends TestCase
         $model->method('getInUnit')->willReturn($inUnit);
         $model->method('getOutUnit')->willReturn($outUnit);
         $model->method('getJson')->willReturn($json);
+        $model->method('getProviderId')->willReturn($providerId);
 
         return $model;
     }

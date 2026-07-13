@@ -225,6 +225,7 @@ You can run the same check locally: `docker compose exec -T backend php bin/cons
 - #1315 — gpt-image-1/1.5 flat rate ignores quality/resolution tiers (P2) — **fixed in #1316**
 - #1317 — Higgsfield videos priced per_second but billed per-clip in credits (P2)
 - #1318 — app:sync-model-prices clobbers non-per-token models (P2) — **fixed in #1316** (mode guard)
+- #1319 — long-context token tier not applied (flat base rate above 200k/272k) (P3) — **fixed in #1316**
 
 ## Transcription (STT) metering — #1314
 
@@ -242,6 +243,22 @@ gpt-image bills a different per-image price per quality × size (e.g. gpt-image-
 
 > Rollout caveat: catalog price/JSON changes reach the DB via `ModelSeeder` only for rows still matching their seeded fingerprint. Fresh installs get the correct values; rows an admin edited in the UI are **preserved** and must be updated by hand (or a migration).
 
+## Long-context tiers — #1319
+
+Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 2.5/3.1 Pro and Claude Sonnet 4.5 above 200k, GPT-5.x above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches both input and output to the above rate when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
+
+| Model | Threshold | Base in/out (per 1M) | Above in/out (per 1M) |
+| ----- | --------- | -------------------- | --------------------- |
+| gpt-5.4 / gpt-5.6-terra | 272k | 2.50 / 15 | 5.00 / 22.50 |
+| gpt-5.5 / gpt-5.6-sol | 272k | 5.00 / 30 | 10.00 / 45 |
+| gpt-5.5-pro | 272k | 30 / 180 | 60 / 270 |
+| gpt-5.6-luna | 272k | 1.00 / 6 | 2.00 / 9 |
+| gemini-2.5-pro | 200k | 1.25 / 10 | 2.50 / 15 |
+| gemini-3.1-pro-preview | 200k | 2.00 / 12 | 4.00 / 18 |
+| claude-sonnet-4-5 | 200k | 3.00 / 15 | 6.00 / 22.50 |
+
+> `claude-sonnet-4-5`'s `max_input` is 200k, so its tier is currently unreachable — kept for completeness.
+
 ## Done in current PR (#1316)
 
-Price updates (Anthropic/Google/OpenAI/Groq) + Anthropic cache-discount case-sensitivity fix + Kimi/HF DeepInfra pinning + TheHive price corrections + `app:sync-model-prices` mode guard & weekly drift CI (#1318) + Whisper/Voxtral duration metering (#1314) + gpt-image quality/size tiers (#1315).
+Price updates (Anthropic/Google/OpenAI/Groq) + Anthropic cache-discount case-sensitivity fix + Kimi/HF DeepInfra pinning + TheHive price corrections + `app:sync-model-prices` mode guard & weekly drift CI (#1318) + Whisper/Voxtral duration metering (#1314) + gpt-image quality/size tiers (#1315) + long-context token tiers (#1319).

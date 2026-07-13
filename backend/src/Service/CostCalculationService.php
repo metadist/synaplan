@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\DTO\CostResult;
 use App\Entity\Model;
+use App\Model\ModelCatalog;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
 use Psr\Log\LoggerInterface;
@@ -57,6 +58,22 @@ final readonly class CostCalculationService
                 priceSnapshot: $priceSnapshot,
                 billedInputTokens: $promptTokens,
             );
+        }
+
+        // Long-context tier: several providers bill the WHOLE request at a
+        // higher per-token rate once the prompt crosses a token threshold
+        // (Gemini/Claude >200k, GPT-5.x >272k). Switch both input and output to
+        // the above-threshold rate — matching how the provider (and LiteLLM)
+        // meter it — so we don't under-bill large-context requests (#1319). The
+        // tier is read from the current catalog (not the historical snapshot):
+        // tiers are stable and rare, so this keeps the lookup simple without
+        // meaningfully affecting reproducibility.
+        $contextTier = ModelCatalog::contextPricing($model->getProviderId());
+        if (null !== $contextTier && $promptTokens > $contextTier['threshold_tokens']) {
+            $priceIn = $contextTier['price_in_above'];
+            $priceOut = $contextTier['price_out_above'];
+            $priceSnapshot['price_in'] = number_format($priceIn, 8, '.', '');
+            $priceSnapshot['price_out'] = number_format($priceOut, 8, '.', '');
         }
 
         $pricePerInputToken = $this->convertToPerToken($priceIn, $priceSnapshot['in_unit']);
