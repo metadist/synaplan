@@ -9,7 +9,7 @@
  * code — never blind-approved.
  */
 import { test, expect, type Page } from '../test-setup'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS } from '../config/config'
 
@@ -29,8 +29,8 @@ async function ensureAdvancedMode(page: Page) {
 }
 
 test.describe('@visual UI guard — capped snapshots', () => {
-  test('sidebar rail — light and dark', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('sidebar rail — light and dark', async ({ page }) => {
+    await openApp(page)
     await ensureAdvancedMode(page)
     const rail = page.locator(NAV.sidebar)
     await expect(rail).toBeVisible({ timeout: TIMEOUTS.SHORT })
@@ -45,8 +45,8 @@ test.describe('@visual UI guard — capped snapshots', () => {
     await page.emulateMedia({ colorScheme: 'light' })
   })
 
-  test('chat-input "+" menu', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('chat-input "+" menu', async ({ page }) => {
+    await openApp(page)
     await ensureAdvancedMode(page)
     const toggle = page.locator(selectors.chat.plusToggle)
     await expect(toggle).toBeVisible({ timeout: TIMEOUTS.STANDARD })
@@ -56,16 +56,16 @@ test.describe('@visual UI guard — capped snapshots', () => {
     await expect(panel).toHaveScreenshot('chat-input-plus-menu.png', SNAPSHOT_OPTS)
   })
 
-  test('files page header (upload form card)', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('files page header (upload form card)', async ({ page }) => {
+    await openApp(page)
     await page.goto('/files')
     const uploadForm = page.locator('[data-testid="section-upload-form"]')
     await expect(uploadForm).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(uploadForm).toHaveScreenshot('files-upload-form.png', SNAPSHOT_OPTS)
   })
 
-  test('channels flyout', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('channels flyout', async ({ page }) => {
+    await openApp(page)
     await ensureAdvancedMode(page)
     await page.locator(NAV.sidebarV2Channels).click()
     const flyout = page.locator(NAV.navDropdown)

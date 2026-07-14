@@ -9,7 +9,7 @@
  * as clearly marked link rows (Manage folders…, Summarizer).
  */
 import { test, expect, type Page } from '../test-setup'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS } from '../config/config'
 
@@ -59,8 +59,8 @@ async function openToolsDropdown(page: Page) {
 }
 
 test.describe('Chat input: "+" menu (§5)', () => {
-  test.beforeEach(async ({ page, credentials }) => {
-    await login(page, credentials)
+  test.beforeEach(async ({ page }) => {
+    await openApp(page)
     await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(page.locator(CHAT.plusToggle)).toBeVisible({ timeout: TIMEOUTS.SHORT })
   })

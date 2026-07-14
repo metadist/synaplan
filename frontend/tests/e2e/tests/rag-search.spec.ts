@@ -1,5 +1,5 @@
 import { test, expect } from '../test-setup'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { FIXTURE_PATHS } from '../config/test-data'
 import { TIMEOUTS, INTERVALS } from '../config/config'
@@ -18,8 +18,8 @@ const RAG = selectors.rag
 const NAV = selectors.nav
 
 test.describe('@ci Files & Search tabs (§4.8)', () => {
-  test('tabs link the two knowledge-base surfaces', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('tabs link the two knowledge-base surfaces', async ({ page }) => {
+    await openApp(page)
 
     await test.step('Files page shows the tab bar', async () => {
       await page.goto('/files')
@@ -48,13 +48,10 @@ test.describe('@ci Files & Search tabs (§4.8)', () => {
 test.describe('@ci @smoke RAG Semantic Search', () => {
   test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG + TIMEOUTS.STANDARD)
 
-  test('semantic search finds uploaded content (TestProvider embeddings)', async ({
-    page,
-    credentials,
-  }) => {
+  test('semantic search finds uploaded content (TestProvider embeddings)', async ({ page }) => {
     const fileName = path.basename(ragFixturePath)
 
-    await login(page, credentials)
+    await openApp(page)
 
     await test.step('Arrange: Files page', async () => {
       await page.locator(NAV.sidebarV2Files).click()

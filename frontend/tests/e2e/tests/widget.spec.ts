@@ -1,5 +1,5 @@
 import { test, expect } from '../test-setup'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import {
   createTestWidget,
   gotoWidgetTestPage,
@@ -27,8 +27,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 test.describe('@ci @smoke Widget', () => {
-  test('applies settings and auto-open', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('applies settings and auto-open', async ({ page }) => {
+    await openApp(page)
 
     const widgetName = WIDGET_NAMES.unique('Test Widget Settings')
     const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
@@ -72,8 +72,8 @@ test.describe('@ci @smoke Widget', () => {
     await expect(inactiveWidgetHost).toHaveCount(0)
   })
 
-  test('@security blocked on non-whitelisted domain', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('@security blocked on non-whitelisted domain', async ({ page }) => {
+    await openApp(page)
 
     const widgetName = WIDGET_NAMES.unique(WIDGET_NAMES.NOT_WHITELISTED)
     const widgetInfo = await createTestWidget(page, widgetName, WIDGET_TEST_URLS.EXAMPLE_DOMAIN)
@@ -157,8 +157,8 @@ test.describe('@ci @smoke Widget', () => {
     })
   })
 
-  test('embedded chat receives response', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('embedded chat receives response', async ({ page }) => {
+    await openApp(page)
 
     const widgetName = WIDGET_NAMES.unique('Embedded Widget Flow')
     const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
@@ -214,8 +214,8 @@ test.describe('@ci @smoke Widget', () => {
 })
 
 test.describe('@noci @smoke Widget — full flow', () => {
-  test('@security overlay receives response', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('@security overlay receives response', async ({ page }) => {
+    await openApp(page)
 
     const widgetName = WIDGET_NAMES.unique(WIDGET_NAMES.FULL_FLOW)
     await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
@@ -289,8 +289,8 @@ test.describe('@noci @smoke Widget — full flow', () => {
     expect(aiText.length).toBeGreaterThan(0)
   })
 
-  test('file upload returns answer', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('file upload returns answer', async ({ page }) => {
+    await openApp(page)
 
     const widgetName = WIDGET_NAMES.unique('Test Widget File Upload')
     const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
@@ -331,8 +331,8 @@ test.describe('@noci @smoke Widget — full flow', () => {
     await expect(widgetHost.locator(selectors.widget.errorFileUploadLimit)).toHaveCount(0)
   })
 
-  test('enforces file upload limit', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('enforces file upload limit', async ({ page }) => {
+    await openApp(page)
 
     const widgetName = WIDGET_NAMES.unique('Test Widget File Upload Limit')
     const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
@@ -382,8 +382,8 @@ test.describe('@noci @smoke Widget — full flow', () => {
     expect(fileCount).toBe(1)
   })
 
-  test('enforces max file size', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('enforces max file size', async ({ page }) => {
+    await openApp(page)
 
     const widgetName = WIDGET_NAMES.unique('Test Widget Max File Size')
     const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
@@ -410,8 +410,8 @@ test.describe('@noci @smoke Widget — full flow', () => {
     await expect(fileNameEl).not.toBeVisible({ timeout: TIMEOUTS.SHORT })
   })
 
-  test('task prompt returns answer', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('task prompt returns answer', async ({ page }) => {
+    await openApp(page)
 
     const widgetName = WIDGET_NAMES.unique('Test Widget Task Prompt')
     const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)

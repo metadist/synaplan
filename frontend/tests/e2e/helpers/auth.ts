@@ -86,6 +86,55 @@ interface AdminUsersResponse {
   users?: AdminUserSummary[]
 }
 
+/**
+ * Create a ready-to-use, email-verified user via the admin provisioning API
+ * (POST /api/v1/admin/users). No MailHog roundtrip needed — the user can log
+ * in with email/password immediately. Idempotent on (source, external_id),
+ * so re-running with the same email is safe.
+ */
+export async function provisionUser(
+  request: APIRequestContext,
+  options: { email: string; password: string; level?: 'NEW' | 'PRO' | 'TEAM' | 'BUSINESS' }
+): Promise<void> {
+  const headers = await getAuthHeaders(request, CREDENTIALS.getAdminCredentials())
+  const response = await request.post(`${apiBaseUrl()}/api/v1/admin/users`, {
+    headers,
+    data: {
+      source: 'e2e',
+      external_id: options.email,
+      email: options.email,
+      password: options.password,
+      level: options.level ?? 'NEW',
+    },
+  })
+  if (!response.ok()) {
+    const body = await response.text()
+    throw new Error(`User provisioning failed for ${options.email}: ${response.status()} ${body}`)
+  }
+}
+
+/**
+ * Open the app as an already-authenticated user (worker storageState from
+ * test-setup.ts). Replaces the UI login as the Arrange step for tests that
+ * are not themselves about authentication.
+ *
+ * Waits for the initial GET /api/v1/chats to resolve before returning:
+ * interacting earlier races against `ensureValidActiveChat()`, which resets
+ * the active-chat selection when the chat list response lands (e.g. a chat
+ * created by the test would be deselected again). The slower UI login used
+ * to mask this race.
+ */
+export async function openApp(page: Page): Promise<void> {
+  const chatsLoaded = page.waitForResponse(
+    (res) =>
+      new URL(res.url()).pathname.endsWith('/api/v1/chats') && res.request().method() === 'GET',
+    { timeout: TIMEOUTS.STANDARD }
+  )
+  await page.goto('/')
+  await chatsLoaded
+  await page.waitForSelector(selectors.chat.textInput, { timeout: TIMEOUTS.STANDARD })
+}
+
 export async function login(page: Page, credentials?: { user: string; pass: string }) {
   if (process.env.AUTH_METHOD === 'oidc') {
     return loginViaOidcButton(page, credentials)

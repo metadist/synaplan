@@ -1,8 +1,11 @@
-import { test, expect } from '../test-setup'
-import { deleteUser, login } from '../helpers/auth'
+import { test, expect, LOGGED_OUT } from '../test-setup'
+import { deleteUser, login, provisionUser } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
-import { waitForVerificationHref, normalizeVerificationUrl } from '../helpers/email'
-import { URLS, TIMEOUTS, INTERVALS } from '../config/config'
+import { TIMEOUTS } from '../config/config'
+
+// These tests exercise the login flow itself, so they must start without the
+// worker storageState that all other specs inherit.
+test.use(LOGGED_OUT)
 
 test.describe('@ci @auth Authentication', () => {
   test('@smoke should successfully login', async ({ page, credentials }) => {
@@ -44,28 +47,12 @@ test.describe('@ci @auth Authentication', () => {
     })
   })
 
-  // TODO: Use a pre-verified DB fixture + delete before test, then assert login fails (avoids MailHog/verify flow).
   test('@smoke deleted user cannot login', async ({ page, request }) => {
     const email = `deleted-user-${Date.now()}@example.test`
     const password = 'DeleteMe123!'
 
-    await test.step('Arrange: register and verify a new user', async () => {
-      const register = await request.post(`${URLS.BASE_URL}/api/v1/auth/register`, {
-        data: { email, password, recaptchaToken: '' },
-      })
-      expect(register.ok()).toBeTruthy()
-
-      const href = await waitForVerificationHref(request, email, {
-        timeout: TIMEOUTS.LONG,
-        intervals: INTERVALS.FAST(),
-      })
-      await page.goto(normalizeVerificationUrl(href))
-      await page
-        .locator(selectors.verifyEmail.successState)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-
-      await page.locator(selectors.verifyEmail.goToLoginLink).click()
-      await expect(page).toHaveURL(/\/login/)
+    await test.step('Arrange: provision a verified user via admin API', async () => {
+      await provisionUser(request, { email, password })
     })
 
     await test.step('Arrange: verify the new user can login', async () => {

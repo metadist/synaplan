@@ -1,8 +1,11 @@
-import { test, expect } from '../test-setup'
+import { test, expect, LOGGED_OUT } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { deleteUser } from '../helpers/auth'
 import { waitForVerificationHref, normalizeVerificationUrl } from '../helpers/email'
 import { TIMEOUTS, INTERVALS } from '../config/config'
+
+// Registration starts on the public login/register pages — no storageState.
+test.use(LOGGED_OUT)
 
 test.describe('@ci @password @auth Registration', () => {
   test('@smoke registration flow with email verification', async ({ page, request }) => {

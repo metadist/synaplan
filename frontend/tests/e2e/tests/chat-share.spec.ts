@@ -1,15 +1,15 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
 test.describe('@ci @smoke Chat Share', () => {
-  test('user can share chat and open shared link in incognito', async ({ page, credentials }) => {
+  test('user can share chat and open shared link in incognito', async ({ page }) => {
     const uniqueMessage = `Chat share E2E ${Date.now()} – please reply briefly.`
 
     await test.step('Arrange: login via UI', async () => {
-      await login(page, credentials)
+      await openApp(page)
     })
 
     const chat = new ChatHelper(page)

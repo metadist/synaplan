@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '../test-setup'
-import { login } from '../helpers/auth'
+import { login, openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS } from '../config/config'
@@ -36,10 +36,9 @@ async function openFlyout(page: Page, railItemSelector: string) {
 test.describe('Navigation: Sidebar basics (non-admin)', () => {
   test('@ci Sidebar shows all primary rail items (Channels + AI Setup always present)', async ({
     page,
-    credentials,
   }) => {
     await test.step('Arrange: login', async () => {
-      await login(page, credentials)
+      await openApp(page)
     })
 
     await test.step('Assert: primary + advanced items all visible (no Easy Mode)', async () => {
@@ -51,9 +50,9 @@ test.describe('Navigation: Sidebar basics (non-admin)', () => {
     })
   })
 
-  test('@ci Files button navigates to files page', async ({ page, credentials }) => {
+  test('@ci Files button navigates to files page', async ({ page }) => {
     await test.step('Arrange: login', async () => {
-      await login(page, credentials)
+      await openApp(page)
     })
 
     await test.step('Act: click Files nav button', async () => {
@@ -65,9 +64,9 @@ test.describe('Navigation: Sidebar basics (non-admin)', () => {
     })
   })
 
-  test('@ci History button opens chat manager modal', async ({ page, credentials }) => {
+  test('@ci History button opens chat manager modal', async ({ page }) => {
     await test.step('Arrange: login', async () => {
-      await login(page, credentials)
+      await openApp(page)
     })
 
     await test.step('Act: click History nav button', async () => {
@@ -79,9 +78,9 @@ test.describe('Navigation: Sidebar basics (non-admin)', () => {
     })
   })
 
-  test('@ci New Chat button is visible and enabled', async ({ page, credentials }) => {
+  test('@ci New Chat button is visible and enabled', async ({ page }) => {
     await test.step('Arrange: login', async () => {
-      await login(page, credentials)
+      await openApp(page)
     })
 
     await test.step('Assert: new chat button visible and enabled', async () => {
@@ -90,9 +89,9 @@ test.describe('Navigation: Sidebar basics (non-admin)', () => {
     })
   })
 
-  test('@ci Rail items carry always-visible labels (§4.1 #3)', async ({ page, credentials }) => {
+  test('@ci Rail items carry always-visible labels (§4.1 #3)', async ({ page }) => {
     await test.step('Arrange: login', async () => {
-      await login(page, credentials)
+      await openApp(page)
     })
 
     await test.step('Assert: every rail nav button shows a non-empty label node', async () => {
@@ -109,9 +108,9 @@ test.describe('Navigation: Sidebar basics (non-admin)', () => {
 })
 
 test.describe('Navigation: Rail flyouts (non-admin)', () => {
-  test('@ci Channels flyout opens with child links', async ({ page, credentials }) => {
+  test('@ci Channels flyout opens with child links', async ({ page }) => {
     await test.step('Arrange: login and wait for nav', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await ensureNavReady(page)
     })
 
@@ -124,9 +123,9 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     })
   })
 
-  test('@ci AI Setup flyout opens with child links', async ({ page, credentials }) => {
+  test('@ci AI Setup flyout opens with child links', async ({ page }) => {
     await test.step('Arrange: login and ensure advanced mode', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await ensureNavReady(page)
     })
 
@@ -137,9 +136,9 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     })
   })
 
-  test('@ci Channels flyout navigates to Chat Widget page', async ({ page, credentials }) => {
+  test('@ci Channels flyout navigates to Chat Widget page', async ({ page }) => {
     await test.step('Arrange: login, ensure advanced, open flyout', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await ensureNavReady(page)
       await openFlyout(page, NAV.sidebarV2Channels)
     })
@@ -155,9 +154,9 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     })
   })
 
-  test('@ci AI Setup flyout navigates to AI Models page', async ({ page, credentials }) => {
+  test('@ci AI Setup flyout navigates to AI Models page', async ({ page }) => {
     await test.step('Arrange: login, ensure advanced, open flyout', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await ensureNavReady(page)
       await openFlyout(page, NAV.sidebarV2AiSetup)
     })
@@ -202,9 +201,9 @@ test.describe('Navigation: Admin sidebar', () => {
     })
   })
 
-  test('@ci Non-admin does not see Admin button', async ({ page, credentials }) => {
+  test('@ci Non-admin does not see Admin button', async ({ page }) => {
     await test.step('Arrange: login as non-admin', async () => {
-      await login(page, credentials)
+      await openApp(page)
     })
 
     await test.step('Assert: sidebar visible but Admin button absent', async () => {
@@ -213,9 +212,9 @@ test.describe('Navigation: Admin sidebar', () => {
     })
   })
 
-  test('@ci Non-admin is redirected away from admin page', async ({ page, credentials }) => {
+  test('@ci Non-admin is redirected away from admin page', async ({ page }) => {
     await test.step('Arrange: login as non-admin', async () => {
-      await login(page, credentials)
+      await openApp(page)
     })
 
     await test.step('Act: navigate directly to /admin', async () => {
@@ -232,12 +231,9 @@ test.describe('Navigation: Admin sidebar', () => {
 })
 
 test.describe('Navigation: User menu', () => {
-  test('@ci User menu shows Profile, Statistics, Preferences and Logout', async ({
-    page,
-    credentials,
-  }) => {
+  test('@ci User menu shows Profile, Statistics, Preferences and Logout', async ({ page }) => {
     await test.step('Arrange: login', async () => {
-      await login(page, credentials)
+      await openApp(page)
     })
 
     await test.step('Act: open user menu', async () => {
@@ -254,9 +250,9 @@ test.describe('Navigation: User menu', () => {
     })
   })
 
-  test('@ci User menu navigates to Profile page', async ({ page, credentials }) => {
+  test('@ci User menu navigates to Profile page', async ({ page }) => {
     await test.step('Arrange: login and open user menu', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await page.locator(USR.button).click()
       await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     })
@@ -272,9 +268,9 @@ test.describe('Navigation: User menu', () => {
     })
   })
 
-  test('@ci User menu navigates to Statistics page', async ({ page, credentials }) => {
+  test('@ci User menu navigates to Statistics page', async ({ page }) => {
     await test.step('Arrange: login and open user menu', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await page.locator(USR.button).click()
       await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     })
@@ -292,12 +288,9 @@ test.describe('Navigation: User menu', () => {
 })
 
 test.describe('Navigation: Preferences page controls', () => {
-  test('@ci Language switch (Preferences) changes active language', async ({
-    page,
-    credentials,
-  }) => {
+  test('@ci Language switch (Preferences) changes active language', async ({ page }) => {
     await test.step('Arrange: login and open Preferences', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await openPreferences(page)
     })
 

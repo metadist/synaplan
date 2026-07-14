@@ -1,6 +1,6 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
@@ -23,8 +23,8 @@ const MULTITASK_PROMPT =
   'marketing strategy for the next two quarters.'
 
 test.describe('@ci @multitask Multi-task routing', () => {
-  test('a multi-node request renders task cards that complete', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('a multi-node request renders task cards that complete', async ({ page }) => {
+    await openApp(page)
     const chat = new ChatHelper(page)
 
     await test.step('Arrange: start a new chat', async () => {
@@ -120,9 +120,8 @@ test.describe('@ci @multitask Multi-task routing', () => {
    */
   test('@webSearch @noci Sources dropdown appears after a DAG web-search turn (PR #1076)', async ({
     page,
-    credentials,
   }) => {
-    await login(page, credentials)
+    await openApp(page)
     const chat = new ChatHelper(page)
 
     await test.step('Arrange: start a new chat', async () => {
@@ -185,11 +184,8 @@ test.describe('@ci @multitask Multi-task routing', () => {
    * re-fetches the persisted message after `complete` and reconciles it
    * (GET /api/v1/messages/{id} — the single authoritative source).
    */
-  test('TTS audio in a DAG turn is visible live and after reload (#1070)', async ({
-    page,
-    credentials,
-  }) => {
-    await login(page, credentials)
+  test('TTS audio in a DAG turn is visible live and after reload (#1070)', async ({ page }) => {
+    await openApp(page)
     const chat = new ChatHelper(page)
 
     const openPlusMenu = async () => {

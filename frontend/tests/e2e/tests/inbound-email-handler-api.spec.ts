@@ -3,9 +3,13 @@
  * Request-only (no browser) — validates REST lifecycle, auth guards, and input validation.
  */
 
-import { test, expect } from '../test-setup'
+import { test, expect, LOGGED_OUT } from '../test-setup'
 import { getAuthHeaders } from '../helpers/auth'
 import { getApiUrl } from '../config/config'
+
+// The request fixture must not inherit worker auth cookies — this suite
+// asserts 401 for unauthenticated calls and logs in explicitly where needed.
+test.use(LOGGED_OUT)
 
 const API_PATH = '/api/v1/inbound-email-handlers'
 
