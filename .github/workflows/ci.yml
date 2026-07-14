@@ -57,9 +57,13 @@ jobs:
 
   backend:
     name: Backend (PHP/Symfony)
-    # 16-core org larger runner (billed per minute) — PHPStan + PHPUnit are the
-    # longest serial stage, so this is where the extra cores pay off.
-    runs-on: ubuntu-latest-m
+    # Free runner on purpose: this job is off the critical path (done around
+    # minute 2-3 while e2e runs until ~minute 7), PHPUnit is single-process
+    # anyway, and free runners start instantly (queue p90 ~4s vs up to ~80s
+    # provisioning on the ubuntu-latest-m pool). Keeping it off the -m pool
+    # also leaves the warm -m runner to frontend-build, which IS the
+    # critical path. Revisit if this job ever becomes the longest one.
+    runs-on: ubuntu-latest
 
     env:
       DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
@@ -194,6 +198,11 @@ jobs:
     # artifact for frontend-checks and mobile-release-artifacts.yml.
     # nelmio:apidoc:dump compiles the container but never touches the DB
     # (Doctrine connects lazily), so no MariaDB service is needed here.
+    #
+    # This is the ONLY job on the paid 16-core pool: the parallel Vite builds
+    # are the one workload where the cores shorten the critical path. All
+    # other former -m jobs moved to free runners so the warm -m runner is
+    # reliably available for this job at t=0.
     runs-on: ubuntu-latest-m
 
     steps:
@@ -304,9 +313,10 @@ jobs:
     # Format check, lint, vue-tsc and Vitest — everything that gates merging
     # but that docker-build/e2e don't need to wait for. Consumes the
     # openapi-spec artifact from frontend-build; runs off the critical path
-    # (plenty of slack before the e2e jobs finish). Vitest parallelizes well
-    # across the 16 cores.
-    runs-on: ubuntu-latest-m
+    # (plenty of slack before the e2e jobs finish), so a free instant-start
+    # runner beats the paid pool: vue-tsc is single-threaded anyway and the
+    # -m pool has up to ~80s provisioning latency for mid-run job requests.
+    runs-on: ubuntu-latest
     needs: [frontend-build]
 
     steps:
