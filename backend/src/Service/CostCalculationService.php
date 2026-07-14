@@ -47,7 +47,6 @@ final readonly class CostCalculationService
         $priceIn = (float) $priceSnapshot['price_in'];
         $priceOut = (float) $priceSnapshot['price_out'];
         $cachePriceIn = $priceSnapshot['cache_price_in'];
-        $provider = $model->getService();
 
         if ($priceIn <= 0 && $priceOut <= 0) {
             return new CostResult(
@@ -79,7 +78,10 @@ final readonly class CostCalculationService
         $pricePerInputToken = $this->convertToPerToken($priceIn, $priceSnapshot['in_unit']);
         $pricePerOutputToken = $this->convertToPerToken($priceOut, $priceSnapshot['out_unit']);
 
-        // Determine cache discount based on provider
+        // Determine cache discount based on provider. Normalized via
+        // ModelCatalog::normalizeProvider so a CamelCase catalog name
+        // ('Anthropic') never silently misses the provider-specific rate (#1313).
+        $provider = ModelCatalog::normalizeProvider($model->getService());
         $cacheReadDiscount = $this->getCacheReadDiscount($provider);
         $cacheWriteMultiplier = $this->getCacheWriteMultiplier($provider);
 
@@ -442,20 +444,20 @@ final readonly class CostCalculationService
         };
     }
 
+    /** @param string $provider canonical provider key (see ModelCatalog::normalizeProvider) */
     private function getCacheReadDiscount(string $provider): float
     {
-        return match (strtolower($provider)) {
-            'anthropic' => self::CACHE_READ_DISCOUNT_ANTHROPIC,
-            default => self::CACHE_READ_DISCOUNT_DEFAULT,
-        };
+        return 'anthropic' === $provider
+            ? self::CACHE_READ_DISCOUNT_ANTHROPIC
+            : self::CACHE_READ_DISCOUNT_DEFAULT;
     }
 
+    /** @param string $provider canonical provider key (see ModelCatalog::normalizeProvider) */
     private function getCacheWriteMultiplier(string $provider): float
     {
-        return match (strtolower($provider)) {
-            'anthropic' => self::CACHE_WRITE_MULTIPLIER_ANTHROPIC,
-            default => 1.0,
-        };
+        return 'anthropic' === $provider
+            ? self::CACHE_WRITE_MULTIPLIER_ANTHROPIC
+            : 1.0;
     }
 
     private function zeroCostResult(): CostResult

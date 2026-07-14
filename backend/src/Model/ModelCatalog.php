@@ -103,6 +103,32 @@ class ModelCatalog
     }
 
     /**
+     * Provider (service) name aliases → the canonical lowercase key. Only names
+     * that appear in more than one spelling need an entry; everything else is
+     * normalized by lowercasing + trimming.
+     */
+    private const PROVIDER_ALIASES = [
+        'hugging face' => 'huggingface',
+    ];
+
+    /**
+     * Normalize a provider/service name to a single canonical, comparable key
+     * (lowercase, trimmed, aliases collapsed).
+     *
+     * The catalog authors provider names in CamelCase ('Anthropic', 'OpenAI',
+     * 'Google'); comparison code must never match those against a raw lowercase
+     * literal (the #1313 class of silent bug). Route provider-name comparisons
+     * through this normalizer (services) or {@see \App\Entity\Model::isProvider()}
+     * (entities) so casing can never diverge.
+     */
+    public static function normalizeProvider(string $service): string
+    {
+        $key = strtolower(trim($service));
+
+        return self::PROVIDER_ALIASES[$key] ?? $key;
+    }
+
+    /**
      * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
      *
      * Field ownership rules:

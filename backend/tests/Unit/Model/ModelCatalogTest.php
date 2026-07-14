@@ -19,6 +19,19 @@ class ModelCatalogTest extends TestCase
         $this->assertSame('llama-3.3-70b-versatile', $results[0]['providerId']);
     }
 
+    /**
+     * #1313: single canonical provider key so CamelCase catalog names and
+     * lowercase comparison literals can never diverge.
+     */
+    public function testNormalizeProviderCollapsesCasingAndAliases(): void
+    {
+        $this->assertSame('anthropic', ModelCatalog::normalizeProvider('Anthropic'));
+        $this->assertSame('openai', ModelCatalog::normalizeProvider('OpenAI'));
+        $this->assertSame('groq', ModelCatalog::normalizeProvider('  GROQ  '));
+        $this->assertSame('huggingface', ModelCatalog::normalizeProvider('Hugging Face'));
+        $this->assertSame('huggingface', ModelCatalog::normalizeProvider('huggingface'));
+    }
+
     public function testFindIsCaseInsensitive(): void
     {
         $lower = ModelCatalog::find('groq:llama-3.3-70b-versatile');
