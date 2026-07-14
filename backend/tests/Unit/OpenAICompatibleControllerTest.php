@@ -177,7 +177,8 @@ class OpenAICompatibleControllerTest extends TestCase
         $model->method('getName')->willReturn('GPT-4o');
         $model->method('getService')->willReturn('OpenAI');
 
-        $this->modelRepository->method('findBy')
+        $this->modelRepository->expects($this->once())
+            ->method('findBy')
             ->with(['active' => 1])
             ->willReturn([$model]);
 
