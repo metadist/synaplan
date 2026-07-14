@@ -208,11 +208,11 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     // §4.4: the section carries the remaining sections + the account block.
     const sections = sheet.locator('[data-testid^="btn-mobile-more-"]')
     expect(await sections.count(), 'more section renders section rows').toBeGreaterThanOrEqual(2)
-    await expect(sheet.locator('[data-testid="section-mobile-more-account"]')).toBeVisible()
+    await expect(sheet.locator(NAV.mobileMoreAccountSection)).toBeVisible()
 
     // Accordion: tapping Channels expands its children inline (§4.3 #3).
-    await sheet.locator('[data-testid="btn-mobile-more-channels"]').click()
-    await expect(sheet.locator('[data-testid="link-mobile-more-inbound"]')).toBeVisible({
+    await sheet.locator(NAV.mobileMoreChannels).click()
+    await expect(sheet.locator(NAV.mobileMoreInbound)).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
 
@@ -235,7 +235,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     // Account rows navigate (regression: dead Subscription tap). Preferences
     // exists for every user level, and shares handleNavigate with the
     // Subscription/Upgrade rows. Navigating closes the drawer (scrim removed).
-    const preferencesRow = sheet.locator('[data-testid="btn-mobile-more-preferences"]')
+    const preferencesRow = sheet.locator(NAV.mobileMorePreferences)
     await preferencesRow.scrollIntoViewIfNeeded()
     await preferencesRow.tap()
     await expect(page).toHaveURL(/\/settings/, { timeout: TIMEOUTS.STANDARD })
@@ -263,7 +263,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await expect(panel.locator('a, [role="link"]')).toHaveCount(0)
 
     // The standalone manage-folders navigation pill must not come back.
-    await expect(panel.locator('[data-testid="btn-manage-knowledge-groups"]')).toHaveCount(0)
+    await expect(panel.locator(CHAT.legacyManageKnowledgeGroupsBtn)).toHaveCount(0)
   })
 
   test('chat history opens within the viewport', async ({ page }) => {
@@ -317,7 +317,7 @@ test.describe('@ci @layout UI guard — key pages', () => {
   test('channels page (inbound config) has no overflow', async ({ page }) => {
     await openApp(page)
     await page.goto('/channels')
-    await expect(page.locator('[data-testid="page-config-inbound"]')).toBeVisible({
+    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
     await expectNoHorizontalOverflow(page, 'channels (inbound)')
@@ -331,10 +331,10 @@ test.describe('@ci @layout UI guard — key pages', () => {
 
     // §2.8 B1: the "reset defaults" header button used to overflow the card
     // on ~390px viewports. It must render fully inside the viewport.
-    const resetBtn = page.locator('[data-testid="btn-reset-defaults"]')
+    const resetBtn = page.locator(selectors.inboundConfig.resetDefaults)
     await expect(resetBtn).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await resetBtn.scrollIntoViewIfNeeded()
-    await expectInsideViewport(page, '[data-testid="btn-reset-defaults"]', 'reset-defaults button')
+    await expectInsideViewport(page, selectors.inboundConfig.resetDefaults, 'reset-defaults button')
   })
 
   test('login page has no overflow and reachable submit', async ({ page }) => {

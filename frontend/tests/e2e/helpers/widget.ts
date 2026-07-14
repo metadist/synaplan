@@ -27,7 +27,7 @@ export async function gotoWidgetTestPage(
   const url = `/widget-test.html?widgetId=${encodeURIComponent(widgetId)}&apiUrl=${encodeURIComponent(apiUrl)}`
   await page.goto(url, { waitUntil: 'domcontentloaded' })
 
-  const loadError = page.locator('[data-testid="widget-load-error"]')
+  const loadError = page.locator(selectors.widget.loadError)
   if (await loadError.isVisible()) {
     const msg = await loadError.textContent()
     throw new Error(`Widget script failed to load. Page error: ${msg?.trim() ?? 'unknown'}`)
@@ -46,7 +46,7 @@ export async function openWidgetOnTestPage(
   try {
     await widgetButton.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
   } catch {
-    const loadError = page.locator('[data-testid="widget-load-error"]')
+    const loadError = page.locator(selectors.widget.loadError)
     if ((await loadError.count()) > 0) {
       const msg = await loadError.textContent()
       throw new Error(`Widget did not load. Page error: ${msg?.trim() ?? 'unknown'}`)
@@ -174,7 +174,7 @@ export async function updateWidgetSettings(
   await page.waitForSelector(selectors.widgets.advancedConfig.modal, { timeout: TIMEOUTS.STANDARD })
 
   const behaviorSection = page.locator(selectors.widgets.advancedConfig.behaviorTab)
-  const isBehaviorTabVisible = await behaviorSection.isVisible().catch(() => false)
+  const isBehaviorTabVisible = await behaviorSection.isVisible()
   if (!isBehaviorTabVisible) {
     await page.locator(selectors.widgets.advancedConfig.tabGroupSetup).click()
     await page.locator(selectors.widgets.advancedConfig.tabButtonBehavior).click()
@@ -196,13 +196,15 @@ export async function updateWidgetSettings(
     await behaviorSection.locator(selectors.widgets.advancedConfig.allowFileUploadLabel).click()
     if (finalSettings.allowFileUpload) {
       await behaviorSection
-        .locator('[data-testid="input-file-limit"]')
+        .locator(selectors.widgets.advancedConfig.fileUploadLimitInput)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     }
   }
 
   if (finalSettings.allowFileUpload) {
-    const fileUploadLimitInput = behaviorSection.locator('[data-testid="input-file-limit"]')
+    const fileUploadLimitInput = behaviorSection.locator(
+      selectors.widgets.advancedConfig.fileUploadLimitInput
+    )
     await fileUploadLimitInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     await fileUploadLimitInput.fill(finalSettings.fileUploadLimit.toString())
     await page
@@ -267,15 +269,15 @@ export async function setWidgetTaskPrompt(
   await page.waitForSelector(selectors.widgets.advancedConfig.modal, { timeout: TIMEOUTS.STANDARD })
 
   const assistantTab = page.locator(selectors.widgets.advancedConfig.assistantTab)
-  const isAssistantTabVisible = await assistantTab.isVisible().catch(() => false)
+  const isAssistantTabVisible = await assistantTab.isVisible()
   if (!isAssistantTabVisible) {
     await page.locator(selectors.widgets.advancedConfig.tabGroupAiSetup).click()
     await page.locator(selectors.widgets.advancedConfig.tabButtonAssistant).click()
     await assistantTab.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
   }
 
-  const manualCreateButton = page.locator('[data-testid="btn-manual-create"]')
-  const isManualCreateVisible = await manualCreateButton.isVisible().catch(() => false)
+  const manualCreateButton = page.locator(selectors.widgets.advancedConfig.manualCreateButton)
+  const isManualCreateVisible = await manualCreateButton.isVisible()
 
   if (isManualCreateVisible) {
     await manualCreateButton.click()
@@ -304,7 +306,7 @@ export async function setWidgetTaskPrompt(
       timeout: TIMEOUTS.STANDARD,
     })
     const assistantTab = page.locator(selectors.widgets.advancedConfig.assistantTab)
-    const isAssistantTabVisible = await assistantTab.isVisible().catch(() => false)
+    const isAssistantTabVisible = await assistantTab.isVisible()
     if (!isAssistantTabVisible) {
       await page.locator(selectors.widgets.advancedConfig.tabGroupAiSetup).click()
       await page.locator(selectors.widgets.advancedConfig.tabButtonAssistant).click()

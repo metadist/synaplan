@@ -66,6 +66,10 @@ export const selectors = {
     mobileMore: '[data-testid="btn-mobile-nav-more"]',
     /** Inline "More" section that expands under the primary buttons */
     mobileMoreSheet: '[data-testid="sheet-mobile-more"]',
+    mobileMoreAccountSection: '[data-testid="section-mobile-more-account"]',
+    mobileMoreChannels: '[data-testid="btn-mobile-more-channels"]',
+    mobileMoreInbound: '[data-testid="link-mobile-more-inbound"]',
+    mobileMorePreferences: '[data-testid="btn-mobile-more-preferences"]',
     /** In-drawer chat history (paginated, infinite scroll) */
     mobileHistoryList: '[data-testid="list-mobile-history"]',
     mobileHistoryRow: '[data-testid="row-mobile-history"]',
@@ -176,6 +180,22 @@ export const selectors = {
     knowledgeFolderPanel: '[data-testid="dropdown-knowledge-folder"]',
     knowledgeFolderNone: '[data-testid="opt-knowledge-folder-none"]',
     manageFoldersLink: '[data-testid="link-manage-knowledge-folders"]',
+    toolWebSearch: '[data-testid="btn-tool-web-search"]',
+    toolImageGen: '[data-testid="btn-tool-image-gen"]',
+    toolVideoGen: '[data-testid="btn-tool-video-gen"]',
+    /** Retired composer controls — asserted ABSENT as a regression guard */
+    legacyThinkingPill: '[data-testid="btn-chat-thinking"]',
+    legacyVoiceReplyPill: '[data-testid="btn-chat-voice-reply"]',
+    legacyManageKnowledgeGroupsBtn: '[data-testid="btn-manage-knowledge-groups"]',
+  },
+  multitask: {
+    /** Task-plan block inside the assistant bubble (multi-node DAG turns) */
+    plan: '[data-testid="task-plan"]',
+    /** Per-node task card; n = node index (task-card-n1, task-card-n2, …) */
+    card: (n: number) => `[data-testid="task-card-n${n}"]`,
+    /** Assembled answer text outside the task-plan block (compose_reply output) */
+    answerTextOutsidePlan:
+      '[data-testid="message-text"]:not([data-testid="task-plan"] [data-testid="message-text"])',
   },
   share: {
     shareButton: '[data-testid="btn-chat-share"]',
@@ -306,6 +326,10 @@ export const selectors = {
       assistantTab: '[data-testid="section-assistant"]',
       allowFileUploadLabel: '[data-testid="label-allow-file-upload"]',
       allowFileUploadCheckbox: '[data-testid="input-allow-file-upload"]',
+      /** Visible only while allowFileUpload is checked (v-if) */
+      fileUploadLimitInput: '[data-testid="input-file-limit"]',
+      /** AI-Setup tab: switch from AI-generated to manual prompt editing */
+      manualCreateButton: '[data-testid="btn-manual-create"]',
       autoMessageInput: '[data-testid="input-auto-message"]',
       messageLimitInput: '[data-testid="input-message-limit"]',
       maxFileSizeInput: '[data-testid="input-max-file-size"]',
@@ -323,6 +347,8 @@ export const selectors = {
     host: '[data-testid="widget-host"]',
     // Button is attached directly to body (not in Shadow DOM) for easier styling/positioning
     button: '#synaplan-widget-button',
+    /** Rendered by the widget-test.html fixture page when the script fails to load */
+    loadError: '[data-testid="widget-load-error"]',
     // Elements inside Shadow DOM - must be accessed via host.locator()
     chatWindow: '[data-testid="section-chat-window"]',
     messagesContainer: '[data-testid="section-messages"]',
@@ -373,6 +399,10 @@ export const selectors = {
     stateSyncError: '[data-testid="state-sync-error"]',
     textNewLevel: '[data-testid="text-new-level"]',
   },
+  inboundConfig: {
+    page: '[data-testid="page-config-inbound"]',
+    resetDefaults: '[data-testid="btn-reset-defaults"]',
+  },
   taskPrompts: {
     page: '[data-testid="page-config-task-prompts"]',
     overview: '[data-testid="section-task-prompts-overview"]',
@@ -388,6 +418,8 @@ export const selectors = {
     statTotal: '[data-testid="stat-total"]',
     statSystem: '[data-testid="stat-system"]',
     statCustom: '[data-testid="stat-custom"]',
+    noPromptsMatch: '[data-testid="text-no-prompts-match"]',
+    btnClearFilters: '[data-testid="btn-clear-filters"]',
     promptHeader: '[data-testid="section-prompt-header"]',
     tabRouting: '[data-testid="tab-routing"]',
     tabPrompt: '[data-testid="tab-prompt"]',

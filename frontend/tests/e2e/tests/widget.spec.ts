@@ -237,11 +237,12 @@ test.describe('@noci @smoke Widget — full flow', () => {
     const input = overlay.locator(selectors.widget.input)
     await expect(input).toBeVisible({ timeout: TIMEOUTS.SHORT })
 
+    // The messages container mounts with the first message — when it is not
+    // in the DOM yet there are simply no previous messages.
     const messagesContainer = overlay.locator(selectors.widget.messagesContainer)
-    await messagesContainer.waitFor({ state: 'attached', timeout: TIMEOUTS.SHORT }).catch(() => {})
-    const previousCount = await messagesContainer
-      .locator(selectors.widget.messageContainers)
-      .count()
+    const previousCount = (await messagesContainer.count())
+      ? await messagesContainer.locator(selectors.widget.messageContainers).count()
+      : 0
 
     await input.fill(PROMPTS.SMOKE_TEST)
     await overlay.locator(selectors.widget.sendButton).click()

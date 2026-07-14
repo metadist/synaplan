@@ -59,7 +59,7 @@ test.describe('@visual UI guard — capped snapshots', () => {
   test('files page header (upload form card)', async ({ page }) => {
     await openApp(page)
     await page.goto('/files')
-    const uploadForm = page.locator('[data-testid="section-upload-form"]')
+    const uploadForm = page.locator(selectors.files.uploadForm)
     await expect(uploadForm).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(uploadForm).toHaveScreenshot('files-upload-form.png', SNAPSHOT_OPTS)
   })

@@ -197,7 +197,7 @@ export class ChatHelper {
     await expect(toggle).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
 
     const dropdown = latestBubble.locator(selectors.chat.againDropdownPanel)
-    const isAlreadyOpen = await dropdown.isVisible().catch(() => false)
+    const isAlreadyOpen = await dropdown.isVisible()
     if (!isAlreadyOpen) {
       await toggle.click()
       await dropdown.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
@@ -301,12 +301,11 @@ export class ChatHelper {
   }
 
   private async waitForDropdownHidden(): Promise<void> {
+    // 'hidden' also resolves when the panel is not in the DOM at all — a
+    // timeout here means the dropdown is genuinely stuck open, so let it fail.
     await this.conversationBubbles()
       .last()
       .locator(selectors.chat.againDropdownPanel)
       .waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
-      .catch(() => {
-        // Dropdown may already be hidden or auto-closed — not critical
-      })
   }
 }

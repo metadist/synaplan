@@ -72,13 +72,13 @@ test.describe('@ci Task Prompts', () => {
       await page
         .locator(SEL.promptSearch)
         .fill('zzz_no_topic_should_match_this_arbitrary_string_xyz')
-      await expect(page.locator('[data-testid="text-no-prompts-match"]')).toBeVisible({
+      await expect(page.locator(selectors.taskPrompts.noPromptsMatch)).toBeVisible({
         timeout: TIMEOUTS.SHORT,
       })
     })
 
     await test.step('Act: clear filters and pick the first card', async () => {
-      await page.locator('[data-testid="btn-clear-filters"]').click()
+      await page.locator(selectors.taskPrompts.btnClearFilters).click()
       const firstCard = page.locator(SEL.cardAny).first()
       await expect(firstCard).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await firstCard.click()

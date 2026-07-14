@@ -90,9 +90,9 @@ test.describe('@ci @smoke Chat Again', () => {
         }
         expect(clicked, 'At least one dropdown option should be visible and enabled').toBe(true)
 
-        await dropdown.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT }).catch(() => {
-          // Dropdown may auto-close after selection — not critical
-        })
+        // 'hidden' also resolves when the panel left the DOM; a timeout means
+        // the dropdown is stuck open after selection — a real bug, so fail.
+        await dropdown.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
       }
     )
 
