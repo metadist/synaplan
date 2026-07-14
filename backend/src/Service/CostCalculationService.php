@@ -299,7 +299,9 @@ final readonly class CostCalculationService
             // stays correct (#1314). Anything already per-second is a no-op.
             'permin' => $price / 60,
             'perhour' => $price / 3_600,
-            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond' => $price,
+            // Flat per-clip / per-call billing (#1317): the authored price is
+            // already the price for one whole generation, so no scaling.
+            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond', 'per_generation', 'pergeneration' => $price,
             '-', '', 'free' => 0.0,
             default => $price,
         };
