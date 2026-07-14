@@ -263,6 +263,20 @@ export const selectors = {
     table: '[data-testid="section-table"]',
     fileRow: '[data-testid="item-file"]',
     emptyState: '[data-testid="state-empty"]',
+    /** Toolbar: opens the inline "New folder" input row */
+    btnNewFolder: '[data-testid="btn-new-folder"]',
+    inputNewFolderToolbar: '[data-testid="input-new-folder-toolbar"]',
+    btnNewFolderCreate: '[data-testid="btn-new-folder-create"]',
+    /** Root view: one card per knowledge folder */
+    folderCard: (name: string) => `[data-testid="folder-card-${name}"]`,
+    /** Folder card hover action: open a chat scoped to this folder */
+    btnUseInChat: (name: string) => `[data-testid="btn-use-in-chat-${name}"]`,
+    /** Folder view: back to the root file list */
+    btnBackToRoot: '[data-testid="btn-back-to-root"]',
+    /** Folder view: shown when the open folder has no files left */
+    stateEmptyFolder: '[data-testid="state-empty-folder"]',
+    /** File row action: delete this file (opens ConfirmDialog) */
+    btnDeleteFile: '[data-testid="btn-delete"]',
     /** §4.8: knowledge-base tabs shared by /files and /files/search */
     tabsBar: '[data-testid="tabs-files"]',
     tabBrowse: '[data-testid="tab-files-browse"]',
@@ -467,6 +481,11 @@ export const selectors = {
     cancelBtn: '[data-testid="btn-dialog-cancel"]',
     /** Text input rendered by useDialog().prompt() */
     promptInput: '[data-testid="input-dialog-prompt"]',
+  },
+  /** ConfirmDialog.vue component (used by FilesView etc. — NOT useDialog()) */
+  confirmDialog: {
+    accept: '[data-testid="btn-confirm-accept"]',
+    cancel: '[data-testid="btn-confirm-cancel"]',
   },
   guest: {
     banner: '[data-testid="guest-banner"]',
