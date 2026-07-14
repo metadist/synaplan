@@ -28,8 +28,8 @@ frontend/tests/e2e/
 ├── fixtures/              # Static test fixtures (widget-test.html, …)
 ├── tests/                 # All *.spec.ts files
 ├── playwright.config.ts   # Global Playwright config
-├── global-setup.ts        # Runs once before all tests
-└── test-setup.ts          # Per-file setup
+├── global-setup.ts        # Runs once before all tests (admin login, TestProvider defaults)
+└── test-setup.ts          # Worker fixtures: per-worker user + pre-authenticated storageState
 ```
 
 ---
@@ -43,6 +43,35 @@ npx playwright test tests/chat.spec.ts             # single file
 npx playwright test --ui                           # interactive UI mode
 npx playwright show-report                         # view last report
 ```
+
+Against the local test stack (`docker compose -f docker-compose.test.yml up -d`):
+
+```bash
+BASE_URL=http://localhost:8001 npm run test:e2e -- --grep "@ci"
+```
+
+If the dev stack's Ollama already occupies host port 11434, remap the stub
+(`OLLAMA_STUB_URL=http://localhost:11435` plus a compose port override) — the
+backend reaches it container-to-container either way.
+
+---
+
+## 0. Tags & CI Matrix
+
+**`@ci` is the only authoritative tag.** The CI workflow runs `--grep "@ci"`
+(chromium 2 shards, firefox 2 shards, chromium-mobile) — a test without
+`@ci` in its title chain does not run in CI, period. Other tags:
+
+| Tag | Meaning |
+|-----|---------|
+| `@noci` | Excluded via project `grepInvert` even when the surrounding describe is `@ci`. Local/nightly only. |
+| `@layout` | Layout guard — runs in chromium desktop + chromium-mobile, excluded from firefox. |
+| `@visual` | Snapshot tests — separate CI-only project (baselines from the ubuntu runner). |
+| `@oidc`, `@oidc-redirect` | OIDC jobs only (dedicated matrix entries with Keycloak). |
+| `@smoke`, `@auth`, `@api`, … | Informational grouping — no CI effect, historically inconsistent. Don't rely on them for filtering. |
+
+When adding a test, decide explicitly: `@ci` (stable, deterministic, runs on
+every PR) or `@noci` (needs real providers/keys or is nightly-grade).
 
 ---
 
@@ -115,7 +144,7 @@ Import from `config/config.ts`:
 
 ### DON'T
 
-* **No `waitForTimeout`.** Ever. Wait for a DOM condition instead.
+* **No `waitForTimeout`.** Ever — as a synchronization mechanism. Wait for a DOM condition instead. (Sole exception: fixed-cadence *measurement sampling* loops that never gate correctness on the delay, e.g. `stableBoundingBox` in `layout.spec.ts` and the bubble-height sampler in `chat-bubble-monotonic.spec.ts`.)
 * **No `networkidle`** on SSE/widget pages (SSE keeps connections open → never resolves or silently times out).
 * No text-stabilization polling in tests. (Helpers like `ChatHelper.waitForAnswer` may poll internally — that is the single permitted place.)
 * No chaining multiple clicks without verifying intermediate states (e.g. wizard step transitions).
@@ -235,6 +264,16 @@ for (let i = 0; i < optionCount; i++) {
 ### DO
 
 * Generate unique data per test (timestamps, UUIDs, or `test.info().title`).
+* **Resources owned by the worker user clean themselves up**: the worker
+  fixture deletes its user on teardown, and `UserDeletionService` cascades
+  chats, messages, files, widgets, prompts, memories, handlers, etc. Explicit
+  cleanup is still required for anything created under OTHER accounts (admin,
+  provisioned one-off users) or outside user scope.
+* **Webhook senders must be unique per test** (`uniqueWaSender()`,
+  `uniqueEmailSender()`): the backend maps each sender to an auto-created
+  ANONYMOUS user whose MESSAGES limit is a lifetime total — a fixed sender
+  works on a fresh CI database but starts failing with 429 on any long-lived
+  local test DB.
 * **Cleanup is mandatory** for tests that create persistent resources (handlers, widgets, prompts, etc.). Use `test.afterEach` with API calls to delete any resources matching the test's name prefix — this ensures cleanup even when the test fails mid-way:
 
   ```ts
@@ -307,10 +346,28 @@ These are already configured in `playwright.config.ts` — do not duplicate or o
 
 ## 11. Authentication
 
-* Use `login()` from `helpers/auth.ts` for UI login.
-* Use `loginViaApi()` / `getAuthHeaders()` from `helpers/auth.ts` for API-only setup/teardown.
-* For test suites needing auth in every test, consider `storageState` in a setup project (see Playwright docs: "Authentication").
+Tests import `test` from `../test-setup`, which provides worker-scoped auth:
+
+* **Each worker gets its own user** — created via the admin provisioning API
+  (instantly verified, no MailHog) and deleted on worker teardown. Available
+  as the `credentials` fixture.
+* **Every test context starts pre-authenticated** — one API login per worker
+  is injected via `storageState` (cookies + the `sh` session hint). Do NOT run
+  a UI login as Arrange; call `openApp(page)` instead, which loads `/` and
+  waits for the chat surface plus the initial chat-list response.
+* **Specs that must start logged out** (login, registration, guest flows) opt
+  out with `test.use(LOGGED_OUT)` at file level. This also applies to
+  API specs asserting 401 for unauthenticated requests — the `request` fixture
+  inherits the worker cookies otherwise.
+* `login(page, creds)` (UI login) is reserved for tests whose SUBJECT is the
+  login flow, and for admin-account steps (`CREDENTIALS.getAdminCredentials()`).
+* Use `loginViaApi()` / `getAuthHeaders()` for API-only setup/teardown; use
+  `provisionUser()` when a test needs a disposable extra user (delete it in
+  a `finally`/`afterEach`).
 * Never hardcode user IDs — look them up via API or use `config/credentials.ts`.
+* **OIDC specs are exempt from all of this**: they import the base
+  `@playwright/test`, run in dedicated CI jobs against Keycloak, and their
+  login logic must not be changed as part of general test refactoring.
 
 ---
 
