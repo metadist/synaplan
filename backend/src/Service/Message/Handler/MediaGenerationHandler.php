@@ -333,11 +333,29 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             ]);
         }
 
-        // Fallback to OpenAI DALL-E if no model configured
+        // No model resolved: the operator has no default configured for this
+        // media capability (TEXT2PIC/TEXT2VID/TEXT2SOUND/…). Return an
+        // actionable error instead of silently routing to a hardcoded OpenAI
+        // model, which would bill an unconfigured vendor and break for installs
+        // that don't use OpenAI (#1320).
         if (!$provider) {
-            $provider = 'openai';
-            $modelName = 'dall-e-3';
-            $this->logger->warning('MediaGenerationHandler: No model configured, using DALL-E fallback');
+            $this->logger->warning('MediaGenerationHandler: No model configured for media generation', [
+                'media_type' => $mediaType,
+                'model_id' => $modelId,
+            ]);
+
+            $lang = $classification['language'] ?? 'en';
+            $noModelMessage = 'de' === $lang
+                ? 'Für die Medienerstellung ist kein Modell konfiguriert. Bitte lege in den Einstellungen ein Standardmodell fest (Bild, Video oder Audio).'
+                : 'No model is configured for media generation. Please set a default model (image, video, or audio) in Settings.';
+            $streamCallback($noModelMessage);
+
+            return [
+                'metadata' => [
+                    'error' => 'no_media_model_configured',
+                    'media_type' => $mediaType,
+                ],
+            ];
         }
 
         // Guard: a text-to-video request (no attached image) must never be sent

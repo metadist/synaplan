@@ -732,8 +732,9 @@ class ModelConfigServiceTest extends TestCase
 
     /**
      * The rolling conversation summarizer must honour an explicit
-     * DEFAULTMODEL.SUMMARY override before anything else — this is how an
+     * DEFAULTMODEL.SUMMARIZE override before anything else — this is how an
      * operator points the condensing step at e.g. a GPT-OSS-120B model.
+     * (#1320: key is SUMMARIZE end to end — seeder, reader, ChatRunner.).
      */
     public function testGetSummaryModelConfigPrefersExplicitSummaryModel(): void
     {
@@ -743,14 +744,14 @@ class ModelConfigServiceTest extends TestCase
         $summaryConfig = $this->createMock(Config::class);
         $summaryConfig->method('getValue')->willReturn((string) $summaryModelId);
 
-        // First lookup (user SUMMARY) wins — no fallback lookups happen.
+        // First lookup (user SUMMARIZE) wins — no fallback lookups happen.
         $this->configRepository
             ->expects($this->once())
             ->method('findOneBy')
             ->with([
                 'ownerId' => $userId,
                 'group' => 'DEFAULTMODEL',
-                'setting' => 'SUMMARY',
+                'setting' => 'SUMMARIZE',
             ])
             ->willReturn($summaryConfig);
 
@@ -772,7 +773,7 @@ class ModelConfigServiceTest extends TestCase
     }
 
     /**
-     * With no SUMMARY override the summarizer defaults to the sorting (SORT)
+     * With no SUMMARIZE override the summarizer defaults to the sorting (SORT)
      * model — the cheap/fast model requested for condensing by default.
      */
     public function testGetSummaryModelConfigFallsBackToSortModel(): void
@@ -783,7 +784,7 @@ class ModelConfigServiceTest extends TestCase
         $sortConfig = $this->createMock(Config::class);
         $sortConfig->method('getValue')->willReturn((string) $sortModelId);
 
-        // Chain: user SUMMARY → global SUMMARY → user SORT (returns here).
+        // Chain: user SUMMARIZE → global SUMMARIZE → user SORT (returns here).
         $this->configRepository
             ->expects($this->exactly(3))
             ->method('findOneBy')
@@ -792,8 +793,8 @@ class ModelConfigServiceTest extends TestCase
                 ++$calls;
 
                 $expected = [
-                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARY'],
-                    ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARY'],
+                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE'],
+                    ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE'],
                     ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT'],
                 ];
 

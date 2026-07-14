@@ -32,7 +32,6 @@ final readonly class WidgetSummaryService
 {
     public const SUMMARY_TOPIC_PREFIX = 'ws_';
     public const DEFAULT_SUMMARY_TOPIC = 'tools:widget-summary-default';
-    public const DEFAULT_SUMMARY_MODEL_ID = ModelConfigService::DEFAULT_LIGHTWEIGHT_MODEL_ID;
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -55,7 +54,8 @@ final readonly class WidgetSummaryService
      */
     private function getSummaryModelName(Widget $widget): ?string
     {
-        $modelId = self::DEFAULT_SUMMARY_MODEL_ID;
+        // #1320: resolve via the SUMMARIZE capability default, not a hardcoded id.
+        $modelId = $this->modelConfigService->getSummaryModelConfig($widget->getOwnerId())['model_id'] ?? 0;
 
         $customTopic = self::getSummaryTopicForWidget($widget);
         $customPrompt = $this->promptRepository->findOneBy([
@@ -78,7 +78,7 @@ final readonly class WidgetSummaryService
     /**
      * Resolve AI model configuration with multi-level fallback.
      *
-     * Priority: preferredModelId → DEFAULT_SUMMARY_MODEL_ID → owner default CHAT → global default CHAT.
+     * Priority: preferredModelId → SUMMARIZE capability default → owner default CHAT → global default CHAT.
      *
      * @return array{provider: string, model: string, model_id: int}
      *
@@ -88,7 +88,9 @@ final readonly class WidgetSummaryService
     {
         $candidates = array_filter([
             $preferredModelId,
-            self::DEFAULT_SUMMARY_MODEL_ID,
+            // #1320: SUMMARIZE capability default (→ SORT → CHAT) instead of a
+            // hardcoded lightweight model id.
+            $this->modelConfigService->getSummaryModelConfig($ownerId)['model_id'],
             $this->modelConfigService->getDefaultModel('CHAT', $ownerId),
             $this->modelConfigService->getDefaultModel('CHAT', 0),
         ]);
@@ -591,14 +593,15 @@ PROMPT;
     /**
      * Resolve summary prompt and model for a widget.
      *
-     * Fallback chain: custom per-widget -> system default -> hardcoded.
+     * Fallback chain: custom per-widget -> system default -> SUMMARIZE capability default.
      *
      * @return array{prompt: string, modelId: int}
      */
     private function resolveSummaryConfig(Widget $widget, string $conversationText, string $systemPrompt): array
     {
         $promptText = null;
-        $modelId = self::DEFAULT_SUMMARY_MODEL_ID;
+        // #1320: SUMMARIZE capability default instead of a hardcoded model id.
+        $modelId = $this->modelConfigService->getSummaryModelConfig($widget->getOwnerId())['model_id'] ?? 0;
 
         // 1. Try custom per-widget prompt
         $customTopic = self::getSummaryTopicForWidget($widget);

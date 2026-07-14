@@ -1629,27 +1629,13 @@ class PromptController extends AbstractController
         }
 
         try {
-            // Get a cheap, fast model for summarization
-            $provider = null;
-            $modelName = null;
-            $summaryModelId = ModelConfigService::DEFAULT_LIGHTWEIGHT_MODEL_ID;
-
-            // Try OpenAI gpt-4o-mini first (cheap and fast)
-            $openaiProvider = $this->modelConfigService->getProviderForModel($summaryModelId);
-            $openaiModel = $this->modelConfigService->getModelName($summaryModelId);
-
-            if ($openaiProvider && $openaiModel) {
-                $provider = $openaiProvider;
-                $modelName = $openaiModel;
-            } else {
-                // Fallback to user's default chat model
-                $fallbackModelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-                if ($fallbackModelId && $fallbackModelId > 0) {
-                    $summaryModelId = $fallbackModelId;
-                    $provider = $this->modelConfigService->getProviderForModel($fallbackModelId);
-                    $modelName = $this->modelConfigService->getModelName($fallbackModelId);
-                }
-            }
+            // Resolve a cheap, fast summarization model via the SUMMARIZE
+            // capability default (SUMMARIZE → SORT → CHAT) instead of a
+            // hardcoded model id (#1320).
+            $summaryConfig = $this->modelConfigService->getSummaryModelConfig($user->getId());
+            $summaryModelId = $summaryConfig['model_id'];
+            $provider = $summaryConfig['provider'];
+            $modelName = $summaryConfig['model'];
 
             // Build prompt for concise summary
             $systemPrompt = <<<'PROMPT'
