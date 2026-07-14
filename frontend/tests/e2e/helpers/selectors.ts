@@ -194,6 +194,14 @@ export const selectors = {
     legacyVoiceReplyPill: '[data-testid="btn-chat-voice-reply"]',
     legacyManageKnowledgeGroupsBtn: '[data-testid="btn-manage-knowledge-groups"]',
   },
+  incognito: {
+    /** Session toggle button — rendered twice (mobile + desktop), scope via desktopSection */
+    toggle: '[data-testid="btn-incognito-toggle"]',
+    /** Desktop wrapper of the toggle (floats over the message area) */
+    desktopSection: '[data-testid="section-incognito-toggle-desktop"]',
+    /** Banner above the composer while an incognito session is active */
+    banner: '[data-testid="banner-incognito"]',
+  },
   multitask: {
     /** Task-plan block inside the assistant bubble (multi-node DAG turns) */
     plan: '[data-testid="task-plan"]',
