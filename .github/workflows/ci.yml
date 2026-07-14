@@ -10,6 +10,13 @@ on:
 permissions:
   contents: read
 
+# Superseded runs on the same PR just burn runner capacity (and delay other
+# runs waiting for the limited ubuntu-latest-m pool). Never cancel main/tag
+# runs — docker-push and cloudflare-deploy must not be interrupted.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -46,64 +53,6 @@ jobs:
       - name: Run code formatting check
         working-directory: backend
         run: composer lint
-
-  openapi-spec:
-    name: OpenAPI Spec
-    # Small dedicated job that only dumps the OpenAPI spec so the frontend
-    # jobs don't have to wait for the full backend job (PHPStan + PHPUnit).
-    # nelmio:apidoc:dump compiles the container but never touches the DB
-    # (Doctrine connects lazily), so no MariaDB service is needed here.
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
-        with:
-          php-version: "8.4"
-          # Same extension set as the backend job so `composer install` passes
-          # the platform-req check (see backend job for the rationale).
-          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
-          coverage: none
-
-      - name: Cache composer dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: backend/vendor
-          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
-
-      - name: Install protoc from base image
-        run: |
-          BASE_IMAGE=$(grep -oP 'FROM \K\S+' _docker/backend/Dockerfile | head -1)
-          id=$(docker create "$BASE_IMAGE")
-          trap "docker rm $id" EXIT
-          sudo docker cp $id:/usr/local/bin/protoc /usr/local/bin/protoc
-          protoc --version
-
-      - name: Create .env file
-        working-directory: backend
-        run: cp .env.test .env
-
-      - name: Create plugins symlink
-        run: sudo ln -s ${{ github.workspace }}/plugins /plugins
-
-      - name: Install dependencies
-        working-directory: backend
-        run: composer install --prefer-dist --no-progress --no-interaction
-
-      - name: Generate OpenAPI spec
-        working-directory: backend
-        run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
-
-      - name: Upload OpenAPI spec artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: openapi-spec
-          path: backend/openapi-spec.json
-          retention-days: 1
 
   backend:
     name: Backend (PHP/Symfony)
@@ -236,19 +185,68 @@ jobs:
 
   frontend-build:
     name: Frontend Build
-    # On the critical path (openapi-spec → frontend-build → docker-build → e2e),
-    # so this job does only what docker-build needs: schema generation + the two
-    # Vite builds (run in parallel across the 16 cores). Lint/type-check/tests
-    # live in frontend-checks, which runs off the critical path.
+    # Head of the critical path (frontend-build → docker-build → e2e), so it
+    # starts at t=0 with no `needs`: it dumps the OpenAPI spec itself (PHP
+    # setup costs ~35s from caches) instead of waiting for a separate job —
+    # a mid-run job hop costs ~40-50s runner-provisioning latency on the
+    # ubuntu-latest-m pool. The spec is uploaded as the `openapi-spec`
+    # artifact for frontend-checks and mobile-release-artifacts.yml.
+    # nelmio:apidoc:dump compiles the container but never touches the DB
+    # (Doctrine connects lazily), so no MariaDB service is needed here.
     runs-on: ubuntu-latest-m
-    needs: [openapi-spec]
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.4"
+          # Same extension set as the backend job so `composer install` passes
+          # the platform-req check (see backend job for the rationale).
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
+          coverage: none
+
+      - name: Cache composer dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install protoc from base image
+        run: |
+          BASE_IMAGE=$(grep -oP 'FROM \K\S+' _docker/backend/Dockerfile | head -1)
+          id=$(docker create "$BASE_IMAGE")
+          trap "docker rm $id" EXIT
+          sudo docker cp $id:/usr/local/bin/protoc /usr/local/bin/protoc
+          protoc --version
+
+      - name: Create .env file
+        working-directory: backend
+        run: cp .env.test .env
+
+      - name: Create plugins symlink
+        run: sudo ln -s ${{ github.workspace }}/plugins /plugins
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Generate OpenAPI spec
+        working-directory: backend
+        run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
+
+      - name: Upload OpenAPI spec artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: openapi-spec
+          path: backend/openapi-spec.json
+          retention-days: 1
+
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "22"
           cache: "npm"
@@ -258,11 +256,8 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Download OpenAPI spec artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: openapi-spec
-          path: frontend/src/generated/
+      - name: Copy OpenAPI spec for schema generation
+        run: cp backend/openapi-spec.json frontend/src/generated/openapi-spec.json
 
       - name: Generate Zod schemas from OpenAPI spec
         working-directory: frontend
@@ -303,10 +298,12 @@ jobs:
   frontend-checks:
     name: Frontend (Vue/TypeScript)
     # Format check, lint, vue-tsc and Vitest — everything that gates merging
-    # but that docker-build/e2e don't need to wait for. Runs in parallel with
-    # frontend-build; Vitest parallelizes well across the 16 cores.
+    # but that docker-build/e2e don't need to wait for. Consumes the
+    # openapi-spec artifact from frontend-build; runs off the critical path
+    # (plenty of slack before the e2e jobs finish). Vitest parallelizes well
+    # across the 16 cores.
     runs-on: ubuntu-latest-m
-    needs: [openapi-spec]
+    needs: [frontend-build]
 
     steps:
       - name: Checkout
@@ -809,14 +806,13 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, openapi-spec, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
+    needs: [lint, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
     if: always()
     steps:
       - name: Check for failures
         if: |
           !cancelled() && (
             needs.lint.result != 'success' ||
-            needs.openapi-spec.result != 'success' ||
             needs.backend.result != 'success' ||
             needs.frontend-build.result != 'success' ||
             needs.frontend-checks.result != 'success' ||
