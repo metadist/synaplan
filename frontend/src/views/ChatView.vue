@@ -443,6 +443,7 @@ import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaP
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
+import { isRecoverableStreamError } from '@/utils/streamError'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
 import {
@@ -3176,6 +3177,31 @@ const streamAIResponse = async (
             console.error('Error:', errorMsg, data)
             processingStatus.value = ''
             processingMetadata.value = {}
+
+            // Issue #1265: a pure SSE transport drop is NOT a turn failure — the
+            // backend keeps the turn alive after the client disconnects (#1230)
+            // and persists the answer. Instead of leaving a phantom "Connection
+            // interrupted" bubble that disappears on refresh, reconcile with the
+            // server so the live view matches what a reload would show: the
+            // persisted answer, or (for a still-running turn) the in-progress
+            // task cards (#1142). Only genuine backend errors fall through to the
+            // error-bubble path below.
+            if (isRecoverableStreamError(data) && !incognito && chatId) {
+              historyStore.finishStreamingMessage(messageId)
+              const backendId =
+                data.messageId ??
+                historyStore.messages.find((m) => m.id === messageId)?.backendMessageId
+              if (backendId) {
+                void historyStore.reconcileMessage(messageId, backendId)
+              } else {
+                void historyStore.loadMessages(chatId)
+              }
+              streamingAbortController = null
+              stopStreamingFn = null
+              currentTrackId = undefined
+              currentStreamingChatId = undefined
+              return
+            }
 
             // Update message metadata from error event so status/provider/topic
             // are visible in real-time without requiring a page refresh
