@@ -257,7 +257,10 @@ jobs:
         run: npm ci
 
       - name: Copy OpenAPI spec for schema generation
-        run: cp backend/openapi-spec.json frontend/src/generated/openapi-spec.json
+        # src/generated/ is gitignored and absent in a fresh checkout
+        run: |
+          mkdir -p frontend/src/generated
+          cp backend/openapi-spec.json frontend/src/generated/openapi-spec.json
 
       - name: Generate Zod schemas from OpenAPI spec
         working-directory: frontend
