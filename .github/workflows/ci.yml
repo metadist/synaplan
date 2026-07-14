@@ -10,6 +10,14 @@ on:
 permissions:
   contents: read
 
+# Superseded runs on the same PR just burn runner capacity (and delay other
+# runs waiting for the limited ubuntu-latest-m pool). Push/tag runs get a
+# unique group (run_id) so main runs neither serialize nor cancel each other —
+# docker-push and cloudflare-deploy must never be interrupted or skipped.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -49,9 +57,13 @@ jobs:
 
   backend:
     name: Backend (PHP/Symfony)
-    # 16-core org larger runner (billed per minute) — PHPStan + PHPUnit are the
-    # longest serial stage, so this is where the extra cores pay off.
-    runs-on: ubuntu-latest-m
+    # Free runner on purpose: this job is off the critical path (done around
+    # minute 2-3 while e2e runs until ~minute 7), PHPUnit is single-process
+    # anyway, and free runners start instantly (queue p90 ~4s vs up to ~80s
+    # provisioning on the ubuntu-latest-m pool). Keeping it off the -m pool
+    # also leaves the warm -m runner to frontend-build, which IS the
+    # critical path. Revisit if this job ever becomes the longest one.
+    runs-on: ubuntu-latest
 
     env:
       DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
@@ -176,6 +188,62 @@ jobs:
       - name: Run migrations-bootstrap bash tests
         run: bash _docker/backend/tests/test-migrations-bootstrap.sh
 
+  frontend-build:
+    name: Frontend Build
+    # Head of the critical path (frontend-build → docker-build → e2e), so it
+    # starts at t=0 with no `needs`: it dumps the OpenAPI spec itself (PHP
+    # setup costs ~35s from caches) instead of waiting for a separate job —
+    # a mid-run job hop costs ~40-50s runner-provisioning latency on the
+    # ubuntu-latest-m pool. The spec is uploaded as the `openapi-spec`
+    # artifact for frontend-checks and mobile-release-artifacts.yml.
+    # nelmio:apidoc:dump compiles the container but never touches the DB
+    # (Doctrine connects lazily), so no MariaDB service is needed here.
+    #
+    # This is the ONLY job on the paid 16-core pool: the parallel Vite builds
+    # are the one workload where the cores shorten the critical path. All
+    # other former -m jobs moved to free runners so the warm -m runner is
+    # reliably available for this job at t=0.
+    runs-on: ubuntu-latest-m
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.4"
+          # Same extension set as the backend job so `composer install` passes
+          # the platform-req check (see backend job for the rationale).
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
+          coverage: none
+
+      - name: Cache composer dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install protoc from base image
+        run: |
+          BASE_IMAGE=$(grep -oP 'FROM \K\S+' _docker/backend/Dockerfile | head -1)
+          id=$(docker create "$BASE_IMAGE")
+          trap "docker rm $id" EXIT
+          sudo docker cp $id:/usr/local/bin/protoc /usr/local/bin/protoc
+          protoc --version
+
+      - name: Create .env file
+        working-directory: backend
+        run: cp .env.test .env
+
+      - name: Create plugins symlink
+        run: sudo ln -s ${{ github.workspace }}/plugins /plugins
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction
+
       - name: Generate OpenAPI spec
         working-directory: backend
         run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
@@ -187,12 +255,69 @@ jobs:
           path: backend/openapi-spec.json
           retention-days: 1
 
-  frontend:
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Copy OpenAPI spec for schema generation
+        # src/generated/ is gitignored and absent in a fresh checkout
+        run: |
+          mkdir -p frontend/src/generated
+          cp backend/openapi-spec.json frontend/src/generated/openapi-spec.json
+
+      - name: Generate Zod schemas from OpenAPI spec
+        working-directory: frontend
+        run: |
+          # Use OpenAPI spec from generated folder
+          npx openapi-zod-client src/generated/openapi-spec.json -o src/generated/api-schemas.ts --template schema-template.hbs
+          # Run post-processing to create readable aliases
+          node scripts/generate-schemas.js --skip-fetch
+          # Clean up the OpenAPI spec file (we only need the generated schemas)
+          rm src/generated/openapi-spec.json
+
+      - name: Build app and widget (parallel)
+        working-directory: frontend
+        # `npm run build` would also run check:types — that already gates the
+        # merge via frontend-checks, so call vite directly here to keep the
+        # critical path lean. Separate outDirs (dist/ vs dist-widget/), so the
+        # two builds can run concurrently.
+        run: |
+          npx vite build & APP_PID=$!
+          npx vite build --config vite.config.widget.ts & WIDGET_PID=$!
+          wait "$APP_PID"
+          wait "$WIDGET_PID"
+
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 1
+
+      - name: Upload widget build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: widget-dist
+          path: frontend/dist-widget/
+          retention-days: 1
+
+  frontend-checks:
     name: Frontend (Vue/TypeScript)
-    # On the critical path (backend → frontend → docker-build → e2e); Vite
-    # builds and Vitest parallelize well across the 16 cores.
-    runs-on: ubuntu-latest-m
-    needs: [backend]
+    # Format check, lint, vue-tsc and Vitest — everything that gates merging
+    # but that docker-build/e2e don't need to wait for. Consumes the
+    # openapi-spec artifact from frontend-build; runs off the critical path
+    # (plenty of slack before the e2e jobs finish), so a free instant-start
+    # runner beats the paid pool: vue-tsc is single-threaded anyway and the
+    # -m pool has up to ~80s provisioning latency for mid-run job requests.
+    runs-on: ubuntu-latest
+    needs: [frontend-build]
 
     steps:
       - name: Checkout
@@ -241,32 +366,10 @@ jobs:
         working-directory: frontend
         run: npm run test
 
-      - name: Build
-        working-directory: frontend
-        run: npm run build
-
-      - name: Build widget
-        working-directory: frontend
-        run: npm run build:widget
-
-      - name: Upload frontend build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-          retention-days: 1
-
-      - name: Upload widget build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: widget-dist
-          path: frontend/dist-widget/
-          retention-days: 1
-
   docker-build:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: [frontend]
+    needs: [frontend-build]
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
       image-labels: ${{ steps.meta.outputs.labels }}
@@ -396,6 +499,9 @@ jobs:
     env:
       APP_IMAGE: synaplan-test:ci
       APP_URL: http://localhost:8001
+      # Job-level (not step-level) so the backgrounded `up -d` and the later
+      # `up --wait` see the same value — a mismatch would recreate containers.
+      OIDC_AUTO_REDIRECT: ${{ matrix.auth_method == 'oidc-redirect' && 'true' || 'false' }}
 
     steps:
       - name: Checkout
@@ -407,60 +513,37 @@ jobs:
           name: docker-image
           path: /tmp
 
-      - name: Load Docker image
-        run: |
-          docker load -i /tmp/docker-image.tar
-          echo "Loaded images:"
-          docker images
-
-          # Tag the first loaded image as synaplan-test:ci for docker-compose
-          IMAGE_TAG=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
-          echo "Tagging $IMAGE_TAG as synaplan-test:ci"
-          docker tag $IMAGE_TAG synaplan-test:ci
-          docker images
-
       - name: Add host.docker.internal to /etc/hosts
         if: contains(matrix.auth_method, 'oidc')
         run: echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
-      - name: Start test services and show logs
-        env:
-          OIDC_AUTO_REDIRECT: ${{ matrix.auth_method == 'oidc-redirect' && 'true' || 'false' }}
+      - name: Start test stack in background
+        # docker load + compose pull + up take ~1.5 min and don't depend on
+        # Node/Playwright, so they run in the background while the following
+        # steps set up the test runner. "Wait for test services" joins on this.
         run: |
           COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
           PROFILE="${{ matrix.compose_profiles }}"
-          n=0; until $COMPOSE $PROFILE pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
+          (
+            set -e
+            docker load -i /tmp/docker-image.tar
+            echo "Loaded images:"
+            docker images
 
-          # app_test entrypoint loads fixtures on first run (APP_ENV=test, empty DB)
-          # so TestProvider model (-1 > -7) and admin user exist for E2E.
-          echo "Starting services..."
-          $COMPOSE $PROFILE up -d
+            # Tag the first loaded image as synaplan-test:ci for docker-compose
+            IMAGE_TAG=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
+            echo "Tagging $IMAGE_TAG as synaplan-test:ci"
+            docker tag $IMAGE_TAG synaplan-test:ci
 
-          # Start following logs in background
-          $COMPOSE $PROFILE logs -f &
+            n=0; until $COMPOSE $PROFILE pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
 
-          echo "Waiting for services to be healthy..."
-          $COMPOSE $PROFILE up --wait || {
-            echo "Failed to start services. Status:"
-            $COMPOSE $PROFILE ps
-            echo ""
-            echo "Container logs:"
-            $COMPOSE $PROFILE logs
-            exit 1
-          }
-
-          # Wait for Keycloak provisioning to complete (if OIDC)
-          if [[ "${{ matrix.auth_method }}" == oidc* ]]; then
-            echo "Waiting for Keycloak provisioning..."
-            # Use -a to include exited containers (setup is a one-shot sidecar)
-            SETUP_ID=$($COMPOSE $PROFILE ps -a -q keycloak_setup)
-            if [ -n "$SETUP_ID" ]; then
-              docker wait "$SETUP_ID" || true
-            fi
-          fi
-
-          echo "Services are ready!"
-          $COMPOSE $PROFILE ps
+            # app_test entrypoint loads fixtures on first run (APP_ENV=test, empty DB)
+            # so TestProvider model (-1 > -7) and admin user exist for E2E.
+            echo "Starting services..."
+            $COMPOSE $PROFILE up -d
+            touch /tmp/stack-started.ok
+          ) > /tmp/stack-startup.log 2>&1 &
+          echo $! > /tmp/stack-startup.pid
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -494,6 +577,47 @@ jobs:
         run: |
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
           npx playwright install-deps ${{ matrix.browser }}
+
+      - name: Wait for test services
+        run: |
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
+          PROFILE="${{ matrix.compose_profiles }}"
+
+          echo "Waiting for background stack startup to finish..."
+          PID=$(cat /tmp/stack-startup.pid)
+          while kill -0 "$PID" 2>/dev/null; do sleep 2; done
+          echo "=== Stack startup log ==="
+          cat /tmp/stack-startup.log
+          if [ ! -f /tmp/stack-started.ok ]; then
+            echo "Stack startup failed (see log above)."
+            exit 1
+          fi
+
+          # Start following logs in background
+          $COMPOSE $PROFILE logs -f &
+
+          echo "Waiting for services to be healthy..."
+          $COMPOSE $PROFILE up --wait || {
+            echo "Failed to start services. Status:"
+            $COMPOSE $PROFILE ps
+            echo ""
+            echo "Container logs:"
+            $COMPOSE $PROFILE logs
+            exit 1
+          }
+
+          # Wait for Keycloak provisioning to complete (if OIDC)
+          if [[ "${{ matrix.auth_method }}" == oidc* ]]; then
+            echo "Waiting for Keycloak provisioning..."
+            # Use -a to include exited containers (setup is a one-shot sidecar)
+            SETUP_ID=$($COMPOSE $PROFILE ps -a -q keycloak_setup)
+            if [ -n "$SETUP_ID" ]; then
+              docker wait "$SETUP_ID" || true
+            fi
+          fi
+
+          echo "Services are ready!"
+          $COMPOSE $PROFILE ps
 
       - name: Run E2E tests
         working-directory: frontend
@@ -630,7 +754,12 @@ jobs:
   docker-push:
     name: Push Docker Image
     runs-on: ubuntu-latest
-    needs: [docker-build, e2e]
+    # backend and frontend-checks are listed explicitly: docker-build no longer
+    # depends on them transitively (frontend-build has no `needs`), and a
+    # `latest` image must never be published when tests or checks fail —
+    # e.g. a semantic conflict between two individually green PRs surfacing
+    # only on the merged main. Costs no time: e2e always finishes last.
+    needs: [docker-build, e2e, backend, frontend-checks]
     # Only run on main branch or tags (e2e tests already passed)
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
     permissions:
@@ -669,7 +798,8 @@ jobs:
   cloudflare-deploy:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
-    needs: [e2e]
+    # Same rationale as docker-push: never deploy while tests/checks fail.
+    needs: [e2e, backend, frontend-checks]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
 
     steps:
@@ -696,7 +826,7 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, backend, frontend, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
+    needs: [lint, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
     if: always()
     steps:
       - name: Check for failures
@@ -704,7 +834,8 @@ jobs:
           !cancelled() && (
             needs.lint.result != 'success' ||
             needs.backend.result != 'success' ||
-            needs.frontend.result != 'success' ||
+            needs.frontend-build.result != 'success' ||
+            needs.frontend-checks.result != 'success' ||
             needs.docker-build.result != 'success' ||
             needs.e2e.result != 'success' ||
             needs.e2e-visual.result != 'success' ||
