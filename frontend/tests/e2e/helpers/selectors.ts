@@ -448,6 +448,12 @@ export const selectors = {
     btnCreate: '[data-testid="btn-create-prompt"]',
     btnDelete: '[data-testid="btn-delete"]',
     cardForTopic: (topic: string) => `[data-testid="card-prompt-${topic}"]`,
+    sectionDanger: '[data-testid="section-danger"]',
+    createModal: '[data-testid="modal-task-prompt-create"]',
+    inputNewTopic: '[data-testid="input-new-topic"]',
+    inputNewName: '[data-testid="input-new-name"]',
+    inputNewContent: '[data-testid="input-new-content"]',
+    btnConfirmCreate: '[data-testid="btn-confirm-create"]',
   },
   pages: {
     chat: '[data-testid="page-chat"]',

@@ -85,4 +85,63 @@ test.describe('@ci Task Prompts', () => {
       await expect(page.locator(SEL.promptDetails)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
   })
+
+  test('user can create a custom prompt, reload, and delete it', async ({ page }) => {
+    // Lowercase without spaces so the topic passes the create-normalization
+    // unchanged and the card testid is predictable (card-prompt-<topic>).
+    const topic = `e2e-prompt-${Date.now()}`
+    const promptContent = 'You are a test prompt created by an E2E test. Answer briefly.'
+
+    await test.step('Arrange: login and open task prompts page', async () => {
+      await openApp(page)
+      await page.goto(PAGE)
+      await expect(page.locator(SEL.overview)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    })
+
+    await test.step('Act: create a custom prompt via the modal', async () => {
+      await page.locator(SEL.btnCreate).click()
+      await page.locator(SEL.createModal).waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+      await page.locator(SEL.inputNewTopic).fill(topic)
+      await page.locator(SEL.inputNewName).fill(`E2E Prompt ${topic}`)
+      await page.locator(SEL.inputNewContent).fill(promptContent)
+      await page.locator(SEL.btnConfirmCreate).click()
+      await page.locator(SEL.createModal).waitFor({ state: 'hidden', timeout: TIMEOUTS.STANDARD })
+    })
+
+    await test.step('Assert: the new prompt opens in the editor and appears in the list', async () => {
+      await expect(page.locator(SEL.promptDetails)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator(SEL.cardForTopic(topic))).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+    })
+
+    await test.step('Assert: the prompt content survives a reload', async () => {
+      await page.reload()
+      await expect(page.locator(SEL.overview)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      const card = page.locator(SEL.cardForTopic(topic))
+      await expect(card).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await card.click()
+      await expect(page.locator(SEL.promptDetails)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await page.locator(SEL.tabPrompt).click()
+      await expect(page.locator(SEL.content)).toHaveValue(promptContent, {
+        timeout: TIMEOUTS.STANDARD,
+      })
+    })
+
+    await test.step('Act: delete the prompt from the danger tab', async () => {
+      await page.locator(SEL.tabDanger).click()
+      await expect(page.locator(SEL.sectionDanger)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await page.locator(SEL.btnDelete).click()
+
+      const confirmBtn = page.locator(selectors.dialog.confirmBtn)
+      await confirmBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+      await confirmBtn.click()
+    })
+
+    await test.step('Assert: the prompt is gone from the list', async () => {
+      await expect(page.locator(SEL.cardForTopic(topic))).toHaveCount(0, {
+        timeout: TIMEOUTS.STANDARD,
+      })
+    })
+  })
 })
