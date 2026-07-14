@@ -487,6 +487,15 @@ export const selectors = {
     accept: '[data-testid="btn-confirm-accept"]',
     cancel: '[data-testid="btn-confirm-cancel"]',
   },
+  profile: {
+    inputCurrentPassword: '[data-testid="input-current-password"]',
+    inputNewPassword: '[data-testid="input-new-password"]',
+    inputConfirmPassword: '[data-testid="input-confirm-password"]',
+  },
+  /** UnsavedChangesBar.vue (profile & config pages) */
+  unsavedBar: {
+    save: '[data-testid="btn-unsaved-save"]',
+  },
   guest: {
     banner: '[data-testid="guest-banner"]',
     bannerSignup: '[data-testid="guest-banner-signup"]',
