@@ -366,6 +366,66 @@ class MessageClassifierTest extends TestCase
     }
 
     /**
+     * #1300: a GENERATED audio file is stored with the generic kind
+     * BFILETYPE='audio' (not a concrete extension). It must still take the
+     * analyzefile route instead of falling through to the AI sorter + RAG
+     * (which silently answered from an unrelated knowledge folder).
+     */
+    public function testGeneratedAudioWithGenericFileTypeForcesAnalyzefileRoute(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(1300);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('fasse zusammen');
+        $message->method('getLanguage')->willReturn('de');
+
+        $file = $this->createMock(\App\Entity\File::class);
+        $file->method('getFileType')->willReturn('audio'); // generic kind, not 'mp3'
+        $file->method('getFileName')->willReturn('tts_123.mp3');
+        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $message->method('getFiles')->willReturn($files);
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    /**
+     * #1300: same for a generated document with a generic kind and NO usable
+     * filename extension — the resolver maps 'document' → representative ext so
+     * routing still lands on file_analysis.
+     */
+    public function testGeneratedDocumentWithGenericKindAndNoExtensionForcesAnalyzefileRoute(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(1301);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('was steht drin');
+        $message->method('getLanguage')->willReturn('de');
+
+        $file = $this->createMock(\App\Entity\File::class);
+        $file->method('getFileType')->willReturn('document');
+        $file->method('getFileName')->willReturn('generated-doc'); // no extension
+        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $message->method('getFiles')->willReturn($files);
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+    }
+
+    /**
      * Phase 1c: short, plain-chat messages should skip the AI sorter when the
      * fast-path BCONFIG flag is enabled (default-on in production). Builds an
      * isolated classifier (without the global "all configs return '0'" mock)

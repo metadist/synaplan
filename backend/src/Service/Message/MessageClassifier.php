@@ -6,6 +6,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Service\File\FileTypeResolver;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -491,11 +492,13 @@ final readonly class MessageClassifier
         }
 
         if ($message->getFile() > 0 && '' !== (string) $message->getFilePath()) {
-            $ext = strtolower(pathinfo($message->getFilePath(), PATHINFO_EXTENSION));
+            $category = FileTypeResolver::resolveCategory(
+                $message->getFileType() ?: '',
+                '',
+                (string) $message->getFilePath(),
+            );
 
-            return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
-                || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true)
-                || in_array($ext, MessagePreProcessor::VIDEO_EXTENSIONS, true);
+            return in_array($category, ['document', 'audio', 'video'], true);
         }
 
         return false;
@@ -510,18 +513,17 @@ final readonly class MessageClassifier
     private function messageHasImageAttachment(Message $message): bool
     {
         foreach ($message->getFiles() as $file) {
-            $type = strtolower($file->getFileType() ?: '');
-            $ext = '' !== $type ? $type : strtolower(pathinfo($file->getFileName(), PATHINFO_EXTENSION));
-            if ('image' === $ext || in_array($ext, MessagePreProcessor::IMAGE_EXTENSIONS, true)) {
+            if ('image' === FileTypeResolver::resolveCategory($file->getFileType() ?: '', $file->getFileName())) {
                 return true;
             }
         }
 
         if ($message->getFile() > 0) {
-            $type = strtolower($message->getFileType() ?: '');
-            $ext = '' !== $type ? $type : strtolower(pathinfo((string) $message->getFilePath(), PATHINFO_EXTENSION));
-
-            return 'image' === $ext || in_array($ext, MessagePreProcessor::IMAGE_EXTENSIONS, true);
+            return 'image' === FileTypeResolver::resolveCategory(
+                $message->getFileType() ?: '',
+                '',
+                (string) $message->getFilePath(),
+            );
         }
 
         return false;
@@ -529,17 +531,12 @@ final readonly class MessageClassifier
 
     private function attachedFileIsAnalyzableNonImage(File $file): bool
     {
-        $fromType = strtolower($file->getFileType() ?: '');
-        $fromName = strtolower(pathinfo($file->getFileName(), PATHINFO_EXTENSION));
-        $ext = '' !== $fromType ? $fromType : $fromName;
+        // Resolve the concrete category through the shared resolver (#1300) so a
+        // generated file stored with a GENERIC kind ('audio'/'video'/'document')
+        // is routed to file_analysis, not silently sent to the AI sorter + RAG.
+        $category = FileTypeResolver::resolveCategory($file->getFileType() ?: '', $file->getFileName());
 
-        if (in_array($ext, MessagePreProcessor::IMAGE_EXTENSIONS, true)) {
-            return false;
-        }
-
-        return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
-            || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true)
-            || in_array($ext, MessagePreProcessor::VIDEO_EXTENSIONS, true);
+        return in_array($category, ['document', 'audio', 'video'], true);
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -18,11 +19,14 @@ use Symfony\Component\HttpFoundation\Request;
 
 class OpenAICompatibleControllerTest extends TestCase
 {
-    private AiFacade $aiFacade;
-    private ModelRepository $modelRepository;
-    private ModelConfigService $modelConfigService;
-    private RateLimitService $rateLimitService;
-    private LoggerInterface $logger;
+    // Intersection types so PHPStan sees both the collaborator API and PHPUnit's
+    // mock API (`method()`/`expects()`) — avoids method.notFound baseline churn
+    // every time a test stubs another method.
+    private AiFacade&MockObject $aiFacade;
+    private ModelRepository&MockObject $modelRepository;
+    private ModelConfigService&MockObject $modelConfigService;
+    private RateLimitService&MockObject $rateLimitService;
+    private LoggerInterface&MockObject $logger;
     private OpenAICompatibleController $controller;
 
     protected function setUp(): void
