@@ -101,6 +101,8 @@ export const selectors = {
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
     /** V2 chat list modal */
     modalChatManager: '[data-testid="modal-chat-manager"]',
+    /** V2 chat list modal: backdrop — click outside the panel to close */
+    modalChatManagerBackdrop: '[data-testid="modal-chat-manager-backdrop"]',
     /** V2 chat list: container visible when at least one chat exists; use to wait before targeting rows */
     chatManagerListRows: '[data-testid="list-chat-manager-rows"]',
     /** V2 chat list: one row per chat; scope menu to this */
@@ -109,6 +111,10 @@ export const selectors = {
     chatV2RowMenu: '[data-testid="btn-chat-v2-row-menu"]',
     /** V2 chat context menu: Share button */
     chatV2Share: '[data-testid="btn-chat-v2-share"]',
+    /** V2 chat context menu: Rename button (opens dialog prompt) */
+    chatV2Rename: '[data-testid="btn-chat-v2-rename"]',
+    /** V2 chat context menu: Delete button (opens danger confirm) */
+    chatV2Delete: '[data-testid="btn-chat-v2-delete"]',
   },
   models: {
     page: '[data-testid="page-config-ai-models"]',
@@ -445,6 +451,8 @@ export const selectors = {
   dialog: {
     confirmBtn: '[data-testid="btn-dialog-confirm"]',
     cancelBtn: '[data-testid="btn-dialog-cancel"]',
+    /** Text input rendered by useDialog().prompt() */
+    promptInput: '[data-testid="input-dialog-prompt"]',
   },
   guest: {
     banner: '[data-testid="guest-banner"]',
