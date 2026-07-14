@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AgainData } from '@/types/ai-models'
-import type { ApiLoadedMessageRow } from '@/utils/messageMapper'
+import type { ApiInProgressTurn, ApiLoadedMessageRow } from '@/utils/messageMapper'
 import {
   mapApiMessageRow,
+  mapInProgressTurn,
   parseContentWithThinking,
   reconcileLocalMessage,
 } from '@/utils/messageMapper'
@@ -425,12 +426,20 @@ export const useHistoryStore = defineStore('history', () => {
         success?: boolean
         messages?: ApiLoadedMessageRow[]
         pagination?: { hasMore?: boolean }
+        inProgressTurn?: ApiInProgressTurn | null
       }
 
       if (myGeneration !== loadGeneration) return
 
       if (response.success && response.messages) {
         const loadedMessages: Message[] = response.messages.map(mapApiMessageRow)
+
+        // Issue #1142: append a provisional assistant bubble for a still-running
+        // multi-task turn (only sent on the first page) so returning mid-stream
+        // shows the running/completed task cards, not just the user prompt.
+        if (offset === 0 && response.inProgressTurn) {
+          loadedMessages.push(mapInProgressTurn(response.inProgressTurn))
+        }
 
         // If offset is 0, replace messages; otherwise, prepend (for infinite scroll)
         if (offset === 0) {

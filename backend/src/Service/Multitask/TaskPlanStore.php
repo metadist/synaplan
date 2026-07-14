@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask;
 
+use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlan;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
@@ -89,6 +90,82 @@ final readonly class TaskPlanStore
 
             return 0;
         }
+    }
+
+    /**
+     * Update a single node's status for a still-running turn (best-effort).
+     *
+     * Used by the DAG progress path (#1142) so BMESSAGE_TASKS reflects live
+     * per-node progress WHILE the turn runs — a client that reloads mid-stream
+     * can then rebuild running/completed cards instead of seeing only the bare
+     * user prompt. A miss only affects that transient reload view, never the
+     * turn, so failures are logged and swallowed.
+     */
+    public function updateNodeStatus(int $messageId, string $nodeId, string $status): void
+    {
+        if ('' === $nodeId) {
+            return;
+        }
+
+        try {
+            $this->connection->update(
+                'BMESSAGE_TASKS',
+                ['BSTATUS' => $status],
+                ['BMESSAGEID' => $messageId, 'BNODEID' => $nodeId],
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanStore: failed to update node status', [
+                'message_id' => $messageId,
+                'node_id' => $nodeId,
+                'status' => $status,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Load the persisted per-node cards for a message as the client-facing
+     * shape used to render task cards on reload (#1142). Hidden assembler nodes
+     * (compose_reply) are excluded — they are not user-visible cards. Ordered by
+     * insertion (BID) so cards render in plan order.
+     *
+     * Best-effort: a read failure returns an empty list (the caller falls back
+     * to showing only the persisted messages).
+     *
+     * @return list<array{nodeId: string, capability: string, kind: string, state: string}>
+     */
+    public function loadCards(int $messageId): array
+    {
+        try {
+            $rows = $this->connection->fetchAllAssociative(
+                'SELECT BNODEID, BCAPABILITY, BSTATUS FROM BMESSAGE_TASKS WHERE BMESSAGEID = ? ORDER BY BID ASC',
+                [$messageId],
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanStore: failed to load task cards', [
+                'message_id' => $messageId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+
+        $cards = [];
+        foreach ($rows as $row) {
+            $capability = (string) $row['BCAPABILITY'];
+            $kind = Capability::tryFromString($capability)?->uiKind() ?? 'text';
+            if ('hidden' === $kind) {
+                continue;
+            }
+            $cards[] = [
+                'nodeId' => (string) $row['BNODEID'],
+                'capability' => $capability,
+                'kind' => $kind,
+                'state' => (string) $row['BSTATUS'],
+            ];
+        }
+
+        return $cards;
     }
 
     /**

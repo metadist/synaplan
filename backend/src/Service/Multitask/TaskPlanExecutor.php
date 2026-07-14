@@ -365,6 +365,8 @@ final readonly class TaskPlanExecutor
 
         $context = new NodeContext($message, $thread, $userId, $classification, $options, $planCapabilities);
 
+        $messageId = $message->getId();
+
         // Announce the plan so the web client can render task cards up front. The
         // DagExecutor then emits task_update / task_chunk / task_file directly via
         // the same progress channel (all structured data rides in metadata, which
@@ -381,9 +383,30 @@ final readonly class TaskPlanExecutor
             ]);
         }
 
-        $assembled = $this->dagExecutor->execute($plan->plan, $context, $progressCallback);
+        // #1142: persist the plan BEFORE execution (all nodes 'running') so a
+        // client that reloads mid-turn — before the OUT message row exists —
+        // can rebuild the in-progress task cards from BMESSAGE_TASKS instead of
+        // seeing only the bare user prompt. The final per-node outcomes are
+        // written again after execution below. Best-effort (never breaks a turn).
+        if (null !== $messageId) {
+            try {
+                $this->store->persistWithStatuses($messageId, $plan->plan, $plan->modelId, [], 'running');
+            } catch (\Throwable $e) {
+                $this->logger->warning('TaskPlanExecutor: failed to pre-persist DAG plan (ignored)', [
+                    'message_id' => $messageId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
-        $messageId = $message->getId();
+        // #1142: mirror live per-node state into BMESSAGE_TASKS as the DAG
+        // settles each node, so the mid-turn reload view tracks progress
+        // (running → done/failed/skipped) rather than showing every card as
+        // 'running' until completion.
+        $trackedCallback = $this->wrapProgressForPersistence($messageId, $progressCallback);
+
+        $assembled = $this->dagExecutor->execute($plan->plan, $context, $trackedCallback);
+
         if (null !== $messageId) {
             try {
                 $this->store->persistWithStatuses(
@@ -403,6 +426,40 @@ final readonly class TaskPlanExecutor
         }
 
         return $assembled;
+    }
+
+    /**
+     * Wrap the client progress callback so a terminal per-node `task_update`
+     * (done/failed/skipped) also updates that node's BMESSAGE_TASKS row (#1142).
+     * The wrapped callback always forwards the event verbatim first — persistence
+     * is a side effect and must never alter or drop the client stream. Returns
+     * the original callback unchanged when there is nothing to track (no
+     * streaming client, or the message has no id yet).
+     */
+    private function wrapProgressForPersistence(?int $messageId, ?callable $progressCallback): ?callable
+    {
+        if (null === $progressCallback || null === $messageId) {
+            return $progressCallback;
+        }
+
+        $terminal = ['done', 'failed', 'skipped'];
+
+        return function (array $event) use ($progressCallback, $messageId, $terminal): void {
+            $progressCallback($event);
+
+            if ('task_update' !== ($event['status'] ?? null)) {
+                return;
+            }
+            $metadata = $event['metadata'] ?? null;
+            if (!is_array($metadata)) {
+                return;
+            }
+            $nodeId = $metadata['node_id'] ?? null;
+            $state = $metadata['state'] ?? null;
+            if (is_string($nodeId) && is_string($state) && in_array($state, $terminal, true)) {
+                $this->store->updateNodeStatus($messageId, $nodeId, $state);
+            }
+        };
     }
 
     /**

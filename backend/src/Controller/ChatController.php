@@ -8,6 +8,7 @@ use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Service\File\OgImageService;
 use App\Service\Message\MessageApiFormatter;
+use App\Service\Multitask\InProgressTurnResolver;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -29,6 +30,7 @@ class ChatController extends AbstractController
         private WidgetSessionService $widgetSessionService,
         private OgImageService $ogImageService,
         private MessageApiFormatter $messageApiFormatter,
+        private InProgressTurnResolver $inProgressTurnResolver,
         private LoggerInterface $logger,
     ) {
     }
@@ -507,6 +509,27 @@ class ChatController extends AbstractController
                                 new OA\Property(property: 'hasMore', type: 'boolean'),
                             ]
                         ),
+                        new OA\Property(
+                            property: 'inProgressTurn',
+                            description: 'Present only on the first page (offset 0) when the newest message is a still-running multi-task turn: the per-node task cards rebuilt from persisted plan state so a mid-stream reload shows running/completed cards before the assistant reply row exists (#1142).',
+                            type: 'object',
+                            nullable: true,
+                            properties: [
+                                new OA\Property(property: 'reply_node', type: 'string'),
+                                new OA\Property(
+                                    property: 'cards',
+                                    type: 'array',
+                                    items: new OA\Items(
+                                        properties: [
+                                            new OA\Property(property: 'nodeId', type: 'string'),
+                                            new OA\Property(property: 'capability', type: 'string'),
+                                            new OA\Property(property: 'kind', type: 'string'),
+                                            new OA\Property(property: 'state', type: 'string'),
+                                        ]
+                                    )
+                                ),
+                            ]
+                        ),
                     ]
                 )
             ),
@@ -558,7 +581,7 @@ class ChatController extends AbstractController
             ->getQuery()
             ->getSingleScalarResult();
 
-        return $this->json([
+        $payload = [
             'success' => true,
             'messages' => $messageData,
             'pagination' => [
@@ -567,7 +590,21 @@ class ChatController extends AbstractController
                 'total' => (int) $totalCount,
                 'hasMore' => ($offset + count($messages)) < $totalCount,
             ],
-        ]);
+        ];
+
+        // Issue #1142: on a fresh load, surface a still-running multi-task turn
+        // (user prompt sent, assistant OUT row not written yet) as in-progress
+        // task cards rebuilt from BMESSAGE_TASKS, so returning mid-stream shows
+        // running/completed cards instead of only the bare prompt. Only for the
+        // first page — the newest message is at the tail of the ascending list.
+        if (0 === $offset && [] !== $messages) {
+            $inProgress = $this->inProgressTurnResolver->resolve($messages[array_key_last($messages)]);
+            if (null !== $inProgress) {
+                $payload['inProgressTurn'] = $inProgress;
+            }
+        }
+
+        return $this->json($payload);
     }
 
     #[Route('/shared/{token}', name: 'shared', methods: ['GET'])]

@@ -539,6 +539,56 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   }
 }
 
+/** In-progress turn payload from GET /chats/{id}/messages (#1142). */
+export interface ApiInProgressTurn {
+  reply_node: string
+  cards: Array<{
+    nodeId: string
+    capability: string
+    kind: string
+    state: string
+  }>
+}
+
+/** Stable client id for the synthesized in-progress assistant bubble (#1142). */
+export const IN_PROGRESS_TURN_ID = 'in-progress-turn'
+
+/**
+ * Issue #1142: build a provisional assistant message from the in-progress turn
+ * payload so that reloading (or returning to) a chat while a multi-task turn is
+ * still running shows the running/completed task cards instead of only the bare
+ * user prompt. The real assistant message replaces this on the next reload once
+ * the turn completes and its OUT row exists.
+ *
+ * The bubble carries a fixed synthetic id (never `backend-*`), so it can't
+ * collide with a persisted row and is ignored by the reconcile path (which
+ * keys on `backendMessageId`).
+ */
+export function mapInProgressTurn(turn: ApiInProgressTurn): Message {
+  const cards = turn.cards.map((c) => ({
+    nodeId: c.nodeId,
+    capability: c.capability,
+    kind: isTaskCardKind(c.kind) ? c.kind : ('text' as TaskCardKind),
+    state: isTaskCardState(c.state) ? c.state : ('running' as TaskCardState),
+    text: '',
+  }))
+
+  return {
+    id: IN_PROGRESS_TURN_ID,
+    role: 'assistant',
+    parts: [{ type: 'text', content: '' }],
+    timestamp: new Date(),
+    isStreaming: true,
+    modelLabel: 'AI',
+    wasMultitask: true,
+    taskPlan: {
+      active: true,
+      replyNode: turn.reply_node,
+      cards,
+    },
+  }
+}
+
 /**
  * Comparison key for media URLs: the path component, ignoring origin and
  * query string. The live SSE event and the persisted row may differ in
