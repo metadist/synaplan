@@ -89,22 +89,10 @@ test.describe('Navigation: Sidebar basics (non-admin)', () => {
     })
   })
 
-  test('@ci Rail items carry always-visible labels (§4.1 #3)', async ({ page }) => {
-    await test.step('Arrange: login', async () => {
-      await openApp(page)
-    })
-
-    await test.step('Assert: every rail nav button shows a non-empty label node', async () => {
-      const navButtons = page.locator('[data-testid^="btn-sidebar-v2-nav-"]')
-      const count = await navButtons.count()
-      expect(count).toBeGreaterThanOrEqual(2)
-      for (let i = 0; i < count; i++) {
-        const label = navButtons.nth(i).locator(NAV.railLabel)
-        await expect(label).toBeVisible()
-        expect((await label.textContent())?.trim()).not.toBe('')
-      }
-    })
-  })
+  // Rail-label visibility (§4.1 #3) is covered by the layout guard
+  // ("primary nav controls carry visible labels and meet target size" in
+  // layout.spec.ts), which runs the same loop on desktop AND mobile and
+  // additionally asserts tap-target size.
 })
 
 test.describe('Navigation: Rail flyouts (non-admin)', () => {
