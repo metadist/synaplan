@@ -2,6 +2,8 @@ import { test, expect } from '../test-setup'
 import { openApp } from '../helpers/auth'
 import {
   createTestWidget,
+  createWidgetViaApi,
+  updateWidgetViaApi,
   gotoWidgetTestPage,
   openWidgetOnTestPage,
   waitForWidgetAnswer,
@@ -72,12 +74,11 @@ test.describe('@ci @smoke Widget', () => {
     await expect(inactiveWidgetHost).toHaveCount(0)
   })
 
-  test('@security blocked on non-whitelisted domain', async ({ page }) => {
-    await openApp(page)
-
+  test('@security blocked on non-whitelisted domain', async ({ page, request, credentials }) => {
     const widgetName = WIDGET_NAMES.unique(WIDGET_NAMES.NOT_WHITELISTED)
-    const widgetInfo = await createTestWidget(page, widgetName, WIDGET_TEST_URLS.EXAMPLE_DOMAIN)
-    await updateWidgetSettings(page, widgetName, {})
+    const widgetInfo = await createWidgetViaApi(request, credentials, widgetName, {
+      websiteUrl: WIDGET_TEST_URLS.EXAMPLE_DOMAIN,
+    })
 
     const apiUrl = getApiUrl()
 
@@ -114,39 +115,9 @@ test.describe('@ci @smoke Widget', () => {
       await expect(page.locator(selectors.widget.host)).toHaveCount(0)
     })
 
-    await test.step('Arrange: add localhost to whitelist', async () => {
-      await page.goto('/channels/widgets')
-      await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.SHORT })
-
-      const widgetCard = page
-        .locator(selectors.widgets.widgetCard.item)
-        .filter({ hasText: widgetName })
-        .first()
-      await widgetCard.locator(selectors.widgets.widgetCard.advancedButton).click()
-      await page
-        .locator(selectors.widgets.detailPage.settingsButton)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-      await page.locator(selectors.widgets.detailPage.settingsButton).click()
-      await page.waitForSelector(selectors.widgets.advancedConfig.modal, {
-        timeout: TIMEOUTS.STANDARD,
-      })
-
-      const securityTab = page.locator(selectors.widgets.advancedConfig.securityTab)
-      if (!(await securityTab.isVisible())) {
-        await page.locator(selectors.widgets.advancedConfig.tabGroupSecurityLegal).click()
-        await page.locator(selectors.widgets.advancedConfig.tabButtonSecurity).click()
-        await securityTab.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-      }
-      await page.locator(selectors.widgets.advancedConfig.domainInput).fill('localhost')
-      await page.locator(selectors.widgets.advancedConfig.addDomainButton).click()
-
-      const modal = page.locator(selectors.widgets.advancedConfig.modal)
-      const saveButton = modal.locator(selectors.widgets.advancedConfig.saveButton)
-      await saveButton.scrollIntoViewIfNeeded()
-      await saveButton.click()
-      await page.waitForSelector(selectors.widgets.advancedConfig.modal, {
-        state: 'hidden',
-        timeout: TIMEOUTS.STANDARD,
+    await test.step('Arrange: add localhost to whitelist (API — modal editing is covered above)', async () => {
+      await updateWidgetViaApi(request, credentials, widgetInfo.widgetId, {
+        config: { allowedDomains: ['example.com', 'localhost'] },
       })
     })
 
@@ -157,12 +128,11 @@ test.describe('@ci @smoke Widget', () => {
     })
   })
 
-  test('embedded chat receives response', async ({ page }) => {
-    await openApp(page)
-
+  test('embedded chat receives response', async ({ page, request, credentials }) => {
     const widgetName = WIDGET_NAMES.unique('Embedded Widget Flow')
-    const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
-    await updateWidgetSettings(page, widgetName, {})
+    const widgetInfo = await createWidgetViaApi(request, credentials, widgetName, {
+      websiteUrl: URLS.TEST_PAGE_URL,
+    })
 
     const apiUrl = getApiUrl()
     await test.step('Arrange: open widget on test page', async () => {
