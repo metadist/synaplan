@@ -11,11 +11,11 @@ use App\Repository\VerificationTokenRepository;
 use App\Service\Client\ClientContextResolver;
 use App\Service\ImpersonationService;
 use App\Service\InternalEmailService;
-use App\Service\ModelConfigService;
 use App\Service\NativeAuthHandoffService;
 use App\Service\OidcTokenService;
 use App\Service\RecaptchaService;
 use App\Service\TokenService;
+use App\Service\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -51,7 +51,7 @@ class AuthController extends AbstractController
         private ImpersonationService $impersonationService,
         private ClientContextResolver $clientContextResolver,
         private NativeAuthHandoffService $handoffService,
-        private ModelConfigService $modelConfigService,
+        private UserLifecycleService $userLifecycleService,
     ) {
         $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
         $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
@@ -219,20 +219,10 @@ class AuthController extends AbstractController
             ], Response::HTTP_OK);
         }
 
-        // Create user
-        $user = new User();
-        $user->setMail($dto->email);
-        $user->setPw($this->passwordHasher->hashPassword($user, $dto->password));
-        $user->setCreated(date('Y-m-d H:i:s'));
-        $user->setType('WEB');
-        $user->setUserLevel('NEW');
-        $user->setEmailVerified(false);
-        $user->setProviderId('local');
-
-        $this->em->persist($user);
-        $this->em->flush();
-
-        $this->modelConfigService->initializeNewUserDefaults($user->getId());
+        $user = $this->userLifecycleService->createUser(
+            email: $dto->email,
+            plainPassword: $dto->password,
+        );
 
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h

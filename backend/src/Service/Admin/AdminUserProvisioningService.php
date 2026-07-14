@@ -8,7 +8,7 @@ use App\Entity\ApiKey;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\UserRepository;
-use App\Service\ModelConfigService;
+use App\Service\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -36,7 +36,7 @@ final class AdminUserProvisioningService
         private readonly UserRepository $userRepository,
         private readonly ApiKeyRepository $apiKeyRepository,
         private readonly EntityManagerInterface $em,
-        private readonly ModelConfigService $modelConfigService,
+        private readonly UserLifecycleService $userLifecycleService,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -68,6 +68,12 @@ final class AdminUserProvisioningService
     /**
      * Idempotently create (or fetch) a Synaplan user for an external identity.
      *
+     * When $plainPassword is given, the new account can additionally sign in
+     * via the regular email/password login (used e.g. by E2E test setup to
+     * provision ready-to-use users without the email verification roundtrip).
+     * The password is only set at creation time — an idempotent hit never
+     * overwrites credentials.
+     *
      * @return array{user: User, created: bool}
      */
     public function provision(
@@ -76,6 +82,7 @@ final class AdminUserProvisioningService
         string $email,
         ?string $displayName = null,
         string $level = 'NEW',
+        ?string $plainPassword = null,
     ): array {
         $source = trim($source);
         $externalId = trim($externalId);
@@ -90,6 +97,9 @@ final class AdminUserProvisioningService
         }
         if (!in_array($level, self::ASSIGNABLE_LEVELS, true)) {
             throw new \InvalidArgumentException('level must be one of: '.implode(', ', self::ASSIGNABLE_LEVELS));
+        }
+        if (null !== $plainPassword && strlen($plainPassword) < 8) {
+            throw new \InvalidArgumentException('password must be at least 8 characters');
         }
 
         $existing = $this->findByExternalIdentity($source, $externalId);
@@ -107,25 +117,19 @@ final class AdminUserProvisioningService
             throw new UserProvisioningConflictException(sprintf('Email "%s" already belongs to a Synaplan account created via "%s". Refusing to attach the external identity.', $email, $byEmail->getProviderId() ?: 'unknown'));
         }
 
-        $user = new User();
-        $user->setMail($email);
-        $user->setType('WEB');
-        $user->setProviderId(self::PROVIDER_ID);
-        $user->setUserLevel($level);
-        $user->setEmailVerified(true);
-        $user->setCreated(date('Y-m-d H:i:s'));
-        $user->setPaymentDetails([]);
-        $user->setUserDetails([
-            'external_source' => $source,
-            'external_id' => $externalId,
-            'display_name' => $displayName ?? '',
-            'provisioned_at' => (new \DateTime())->format('Y-m-d H:i:s'),
-        ]);
-
-        $this->em->persist($user);
-        $this->em->flush();
-
-        $this->modelConfigService->initializeNewUserDefaults((int) $user->getId());
+        $user = $this->userLifecycleService->createUser(
+            email: $email,
+            plainPassword: $plainPassword,
+            providerId: self::PROVIDER_ID,
+            userLevel: $level,
+            emailVerified: true,
+            userDetails: [
+                'external_source' => $source,
+                'external_id' => $externalId,
+                'display_name' => $displayName ?? '',
+                'provisioned_at' => (new \DateTime())->format('Y-m-d H:i:s'),
+            ],
+        );
 
         $this->logger->info('Provisioned external user', [
             'user_id' => $user->getId(),
