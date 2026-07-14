@@ -25,7 +25,6 @@ final readonly class WidgetSetupService
 {
     public const SETUP_INTERVIEW_TOPIC = 'tools:widget-setup-interview';
     public const SETUP_TOPIC_PREFIX = 'wsetup_';
-    public const DEFAULT_SETUP_MODEL_ID = ModelConfigService::DEFAULT_LIGHTWEIGHT_MODEL_ID;
     private const START_MARKER = '__START_INTERVIEW__';
     private const FLOW_BUILDER_START_MARKER = '__START_FLOW_BUILDER__';
 
@@ -50,7 +49,7 @@ final readonly class WidgetSetupService
     /**
      * Resolve AI model configuration with multi-level fallback.
      *
-     * Priority: preferredModelId → DEFAULT_SETUP_MODEL_ID → user default CHAT → global default CHAT.
+     * Priority: preferredModelId → SUMMARIZE capability default → user default CHAT → global default CHAT.
      *
      * @return array{provider: string, model: string, model_id: int}
      *
@@ -60,7 +59,9 @@ final readonly class WidgetSetupService
     {
         $candidates = array_filter([
             $preferredModelId,
-            self::DEFAULT_SETUP_MODEL_ID,
+            // #1320: SUMMARIZE capability default (→ SORT → CHAT) instead of a
+            // hardcoded lightweight model id.
+            $this->modelConfigService->getSummaryModelConfig($user->getId())['model_id'],
             $this->modelConfigService->getDefaultModel('CHAT', $user->getId()),
             $this->modelConfigService->getDefaultModel('CHAT', 0),
         ]);
@@ -672,13 +673,14 @@ PROMPT;
     /**
      * Resolve setup interview prompt and model for a widget.
      *
-     * Fallback chain: custom per-widget -> system default -> hardcoded.
+     * Fallback chain: custom per-widget -> system default -> SUMMARIZE capability default.
      *
      * @return array{prompt: string, modelId: int}
      */
     private function resolveSetupConfig(Widget $widget): array
     {
-        $modelId = self::DEFAULT_SETUP_MODEL_ID;
+        // #1320: SUMMARIZE capability default instead of a hardcoded model id.
+        $modelId = $this->modelConfigService->getSummaryModelConfig($widget->getOwnerId())['model_id'] ?? 0;
 
         // 1. Try custom per-widget prompt
         $customTopic = self::getSetupTopicForWidget($widget);

@@ -5,6 +5,7 @@ namespace App\Service\Message\Handler;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Service\File\FileTypeResolver;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\LanguageDirectiveBuilder;
@@ -1121,42 +1122,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      */
     private function resolveFileType(string $type, string $name, string $path): string
     {
-        $type = strtolower(trim($type));
-
-        // A concrete extension already lines up with the *_EXTENSIONS lists.
-        if ('' !== $type && !$this->isGenericFileKind($type)) {
-            return $type;
-        }
-
-        // Generic kind (or missing type): recover the real extension from the
-        // filename first, then the stored path.
-        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-        if ('' === $extension) {
-            $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        }
-        if ('' !== $extension) {
-            return $extension;
-        }
-
-        // No usable extension anywhere — map the generic kind onto a
-        // representative extension so a typeless generated file is still
-        // routed to the correct handler instead of "unsupported".
-        return match ($type) {
-            'image' => 'png',
-            'audio' => 'mp3',
-            'video' => 'mp4',
-            'document' => 'txt',
-            default => $type,
-        };
-    }
-
-    /**
-     * Whether the BFILETYPE value is a generic media kind (as stored by the
-     * generated-media pipelines) rather than a concrete file extension.
-     */
-    private function isGenericFileKind(string $type): bool
-    {
-        return in_array($type, ['image', 'audio', 'video', 'document'], true);
+        // Delegated to the single canonical resolver (#1300) so the classifier,
+        // this handler, and any future consumer share one normalization.
+        return FileTypeResolver::resolveExtension($type, $name, $path);
     }
 
     /**

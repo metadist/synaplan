@@ -131,4 +131,69 @@ final class TaskPlanStoreTest extends TestCase
 
         self::assertSame(0, $written);
     }
+
+    public function testUpdateNodeStatusTargetsSingleRow(): void
+    {
+        $captured = [];
+        $this->connection->expects(self::once())
+            ->method('update')
+            ->willReturnCallback(function (string $table, array $data, array $criteria) use (&$captured): int {
+                $captured = ['table' => $table, 'data' => $data, 'criteria' => $criteria];
+
+                return 1;
+            });
+
+        $this->store->updateNodeStatus(42, 'n2', 'done');
+
+        self::assertSame('BMESSAGE_TASKS', $captured['table']);
+        self::assertSame(['BSTATUS' => 'done'], $captured['data']);
+        self::assertSame(['BMESSAGEID' => 42, 'BNODEID' => 'n2'], $captured['criteria']);
+    }
+
+    public function testUpdateNodeStatusIgnoresEmptyNodeId(): void
+    {
+        $this->connection->expects(self::never())->method('update');
+
+        $this->store->updateNodeStatus(42, '', 'done');
+    }
+
+    public function testUpdateNodeStatusSwallowsFailures(): void
+    {
+        $this->connection->method('update')->willThrowException(new \RuntimeException('db down'));
+
+        // Best-effort — a live-progress miss must never break the turn.
+        $this->store->updateNodeStatus(42, 'n1', 'failed');
+
+        $this->expectNotToPerformAssertions();
+    }
+
+    public function testLoadCardsMapsRowsAndExcludesHiddenAssemblerNode(): void
+    {
+        $this->connection->expects(self::once())
+            ->method('fetchAllAssociative')
+            ->willReturnCallback(function (string $sql, array $params): array {
+                self::assertStringContainsString('BMESSAGE_TASKS', $sql);
+                self::assertSame([777], $params);
+
+                return [
+                    ['BNODEID' => 'n1', 'BCAPABILITY' => 'image_generation', 'BSTATUS' => 'done'],
+                    ['BNODEID' => 'n2', 'BCAPABILITY' => 'chat', 'BSTATUS' => 'running'],
+                    // compose_reply is the hidden assembler — never a user card.
+                    ['BNODEID' => 'n3', 'BCAPABILITY' => 'compose_reply', 'BSTATUS' => 'pending'],
+                ];
+            });
+
+        $cards = $this->store->loadCards(777);
+
+        self::assertCount(2, $cards);
+        self::assertSame(['nodeId' => 'n1', 'capability' => 'image_generation', 'kind' => 'image', 'state' => 'done'], $cards[0]);
+        self::assertSame(['nodeId' => 'n2', 'capability' => 'chat', 'kind' => 'text', 'state' => 'running'], $cards[1]);
+    }
+
+    public function testLoadCardsReturnsEmptyOnFailure(): void
+    {
+        $this->connection->method('fetchAllAssociative')->willThrowException(new \RuntimeException('db down'));
+
+        self::assertSame([], $this->store->loadCards(1));
+    }
 }

@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import {
+  IN_PROGRESS_TURN_ID,
   mapApiMessageRow,
+  mapInProgressTurn,
   reconcileLocalMessage,
+  type ApiInProgressTurn,
   type ApiLoadedMessageRow,
 } from '@/utils/messageMapper'
 import type { Message } from '@/stores/history'
@@ -550,6 +553,54 @@ describe('messageMapper (issue #1070)', () => {
       expect(local.parts).toEqual([
         { partId: 'p1', type: 'text', content: 'Live streamed answer.' },
       ])
+    })
+  })
+
+  describe('mapInProgressTurn (issue #1142)', () => {
+    const turn = (overrides: Partial<ApiInProgressTurn> = {}): ApiInProgressTurn => ({
+      reply_node: 'n2',
+      cards: [
+        { nodeId: 'n1', capability: 'image_generation', kind: 'image', state: 'running' },
+        { nodeId: 'n2', capability: 'chat', kind: 'text', state: 'done' },
+      ],
+      ...overrides,
+    })
+
+    it('builds a streaming assistant bubble with a stable synthetic id', () => {
+      const msg = mapInProgressTurn(turn())
+
+      expect(msg.id).toBe(IN_PROGRESS_TURN_ID)
+      expect(msg.id.startsWith('backend-')).toBe(false)
+      expect(msg.role).toBe('assistant')
+      expect(msg.isStreaming).toBe(true)
+      expect(msg.wasMultitask).toBe(true)
+      // No persisted backend id — the reconcile path (keyed on it) must skip it.
+      expect(msg.backendMessageId).toBeUndefined()
+    })
+
+    it('maps every card and preserves the reply node + per-node state', () => {
+      const msg = mapInProgressTurn(turn())
+
+      expect(msg.taskPlan?.active).toBe(true)
+      expect(msg.taskPlan?.replyNode).toBe('n2')
+      expect(msg.taskPlan?.cards).toHaveLength(2)
+      expect(msg.taskPlan?.cards[0]).toMatchObject({
+        nodeId: 'n1',
+        kind: 'image',
+        state: 'running',
+      })
+      expect(msg.taskPlan?.cards[1]).toMatchObject({ nodeId: 'n2', kind: 'text', state: 'done' })
+    })
+
+    it('falls back to safe defaults for unknown kind/state values from the wire', () => {
+      const msg = mapInProgressTurn(
+        turn({
+          cards: [{ nodeId: 'n1', capability: 'mystery', kind: 'bogus', state: 'weird' }],
+        })
+      )
+
+      expect(msg.taskPlan?.cards[0].kind).toBe('text')
+      expect(msg.taskPlan?.cards[0].state).toBe('running')
     })
   })
 })

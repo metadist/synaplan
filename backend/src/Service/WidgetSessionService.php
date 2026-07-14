@@ -262,14 +262,15 @@ final class WidgetSessionService
                 $conversationText .= "- {$text}\n";
             }
 
-            // Use gpt-4o-mini for cheap, fast summarization
-            $titleModelId = ModelConfigService::DEFAULT_LIGHTWEIGHT_MODEL_ID;
+            // Resolve a cheap, fast summarization model via the SUMMARIZE
+            // capability default (SUMMARIZE → SORT → CHAT) instead of a
+            // hardcoded model id (#1320).
+            $summaryConfig = $this->modelConfigService->getSummaryModelConfig($ownerId);
+            $titleModelId = $summaryConfig['model_id'];
             $aiOptions = ['temperature' => 0.3];
-            $provider = $this->modelConfigService->getProviderForModel($titleModelId);
-            $modelName = $this->modelConfigService->getModelName($titleModelId);
-            if ($provider && $modelName) {
-                $aiOptions['provider'] = $provider;
-                $aiOptions['model'] = $modelName;
+            if ($summaryConfig['provider'] && $summaryConfig['model']) {
+                $aiOptions['provider'] = $summaryConfig['provider'];
+                $aiOptions['model'] = $summaryConfig['model'];
             }
 
             $prompt = <<<PROMPT

@@ -82,6 +82,21 @@ class Model
         return $this;
     }
 
+    /**
+     * Case-insensitive provider (service) name check.
+     *
+     * The catalog stores provider names in CamelCase (e.g. 'Anthropic',
+     * 'OpenAI', 'Google') while call sites historically compared against
+     * lowercase literals — a mismatch that silently disabled Anthropic's
+     * cache-read discount (#1313). Route every provider-name comparison
+     * through this helper (or {@see ModelCatalog::normalizeProvider()}) so a
+     * casing difference can never cause a silent billing/logic bug again.
+     */
+    public function isProvider(string $provider): bool
+    {
+        return 0 === strcasecmp(trim($this->service), trim($provider));
+    }
+
     public function getName(): string
     {
         return $this->name;

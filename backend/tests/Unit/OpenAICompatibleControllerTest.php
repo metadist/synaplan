@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -18,11 +19,14 @@ use Symfony\Component\HttpFoundation\Request;
 
 class OpenAICompatibleControllerTest extends TestCase
 {
-    private AiFacade $aiFacade;
-    private ModelRepository $modelRepository;
-    private ModelConfigService $modelConfigService;
-    private RateLimitService $rateLimitService;
-    private LoggerInterface $logger;
+    // Intersection types so PHPStan sees both the collaborator API and PHPUnit's
+    // mock API (`method()`/`expects()`) — avoids method.notFound baseline churn
+    // every time a test stubs another method.
+    private AiFacade&MockObject $aiFacade;
+    private ModelRepository&MockObject $modelRepository;
+    private ModelConfigService&MockObject $modelConfigService;
+    private RateLimitService&MockObject $rateLimitService;
+    private LoggerInterface&MockObject $logger;
     private OpenAICompatibleController $controller;
 
     protected function setUp(): void
@@ -88,8 +92,15 @@ class OpenAICompatibleControllerTest extends TestCase
         $user = $this->createMockUser();
 
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
-        $this->modelRepository->method('find')->willReturn(null);
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        // A resolvable model must exist — the controller no longer falls back
+        // to a hardcoded gpt-4o (#1320). Resolve via the CHAT default.
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('OpenAI');
+        $model->method('getProviderId')->willReturn('gpt-4o');
+        $model->method('getId')->willReturn(5);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(5);
+        $this->modelRepository->method('find')->willReturn($model);
 
         $this->aiFacade->method('chat')->willReturn([
             'content' => 'Hello! How can I help?',
@@ -166,7 +177,8 @@ class OpenAICompatibleControllerTest extends TestCase
         $model->method('getName')->willReturn('GPT-4o');
         $model->method('getService')->willReturn('OpenAI');
 
-        $this->modelRepository->method('findBy')
+        $this->modelRepository->expects($this->once())
+            ->method('findBy')
             ->with(['active' => 1])
             ->willReturn([$model]);
 
@@ -189,6 +201,16 @@ class OpenAICompatibleControllerTest extends TestCase
         $user = $this->createMockUser();
 
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+
+        // Resolve a model so the request reaches the provider call that throws
+        // (the point of this test) rather than short-circuiting on model lookup.
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('OpenAI');
+        $model->method('getProviderId')->willReturn('gpt-4o');
+        $model->method('getId')->willReturn(5);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(5);
+        $this->modelRepository->method('find')->willReturn($model);
+
         $this->aiFacade->method('chat')->willThrowException(new \RuntimeException('Provider unavailable'));
 
         $body = json_encode([
@@ -206,6 +228,32 @@ class OpenAICompatibleControllerTest extends TestCase
         $this->assertArrayHasKey('type', $data['error']);
         $this->assertArrayHasKey('code', $data['error']);
         $this->assertSame('server_error', $data['error']['type']);
+    }
+
+    public function testChatCompletionsReturns404WhenNoModelResolves(): void
+    {
+        $user = $this->createMockUser();
+
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        // No requested model matches and no CHAT default is configured: the
+        // controller must 404 rather than silently route to a hardcoded model
+        // and record usage with a null model_id (#1320).
+        $this->modelRepository->method('find')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $body = json_encode([
+            'model' => 'nonexistent-model',
+            'messages' => [['role' => 'user', 'content' => 'Hello!']],
+        ]);
+        $request = Request::create('/v1/chat/completions', 'POST', [], [], [], [], $body);
+        $request->headers->set('Content-Type', 'application/json');
+
+        $response = $this->controller->chatCompletions($request, $user);
+
+        $this->assertSame(404, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertSame('model_not_found', $data['error']['code']);
     }
 
     private function createMockUser(): User

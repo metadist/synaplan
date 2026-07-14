@@ -336,6 +336,9 @@ final class RateLimitService
             $outputQty = match ($pricingMode) {
                 'per_image' => (float) ($mediaUsage['images'] ?? 0),
                 'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
+                // Flat per-clip billing (#1317): one generation = one clip.
+                // Providers that ever return a multi-clip batch can pass `clips`.
+                'per_generation' => (float) ($mediaUsage['clips'] ?? 1),
                 default => 0.0,
             };
 

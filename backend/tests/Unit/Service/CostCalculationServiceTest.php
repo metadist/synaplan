@@ -293,6 +293,46 @@ class CostCalculationServiceTest extends TestCase
     }
 
     /**
+     * #1317: Higgsfield bills a flat credit amount per clip, so a per_generation
+     * model charges its authored price once per generation — independent of the
+     * clip duration passed in.
+     */
+    public function testCalculateMediaCostChargesFlatPricePerGeneration(): void
+    {
+        $model = $this->createModelMock('Higgsfield', 0.0, 2.50, '-', 'per_generation', [
+            'pricing_mode' => 'per_generation',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // One generation (one clip) → flat $2.50 regardless of duration.
+        $result = $this->service->calculateMediaCost(302, 0, 1.0);
+
+        $this->assertSame('2.500000', $result->totalCost);
+        $this->assertSame('2.500000', $result->outputCost);
+    }
+
+    public function testCalculateMediaCostPerGenerationScalesWithClipCount(): void
+    {
+        $model = $this->createModelMock('Higgsfield', 0.0, 1.75, '-', 'per_generation', [
+            'pricing_mode' => 'per_generation',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // A hypothetical 2-clip batch bills 2 × the flat per-clip price.
+        $result = $this->service->calculateMediaCost(308, 0, 2.0);
+
+        $this->assertSame('3.500000', $result->totalCost);
+    }
+
+    /**
      * Regression test for issue #886a: image generation models had no
      * `pricing_mode` set in the catalog, so MediaGenerationHandler's
      * `media_usage['images']` was ignored by `recordUsage()` and cost

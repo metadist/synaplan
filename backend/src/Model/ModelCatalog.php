@@ -103,6 +103,32 @@ class ModelCatalog
     }
 
     /**
+     * Provider (service) name aliases → the canonical lowercase key. Only names
+     * that appear in more than one spelling need an entry; everything else is
+     * normalized by lowercasing + trimming.
+     */
+    private const PROVIDER_ALIASES = [
+        'hugging face' => 'huggingface',
+    ];
+
+    /**
+     * Normalize a provider/service name to a single canonical, comparable key
+     * (lowercase, trimmed, aliases collapsed).
+     *
+     * The catalog authors provider names in CamelCase ('Anthropic', 'OpenAI',
+     * 'Google'); comparison code must never match those against a raw lowercase
+     * literal (the #1313 class of silent bug). Route provider-name comparisons
+     * through this normalizer (services) or {@see \App\Entity\Model::isProvider()}
+     * (entities) so casing can never diverge.
+     */
+    public static function normalizeProvider(string $service): string
+    {
+        $key = strtolower(trim($service));
+
+        return self::PROVIDER_ALIASES[$key] ?? $key;
+    }
+
+    /**
      * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
      *
      * Field ownership rules:
@@ -2555,14 +2581,17 @@ class ModelCatalog
             'providerId' => 'higgsfield-ai/dop/standard',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.50,
-            'outUnit' => 'per_second',
+            // Higgsfield bills a flat credit amount PER CLIP, not per second
+            // (#1317). Flat USD estimate = the previous per-second rate × the
+            // default 5s clip, so recorded cost matches a per-clip deduction.
+            'priceOut' => 2.50,
+            'outUnit' => 'per_generation',
             'quality' => 9,
             'rating' => 2,
             'json' => [
                 'description' => 'Higgsfield DoP Standard - high-quality image-to-video animation with cinematic camera movements. Default 5s clips; provide image_url or attach a reference image.',
                 'params' => ['model' => 'higgsfield-ai/dop/standard'],
-                'pricing_mode' => 'per_second',
+                'pricing_mode' => 'per_generation',
                 'allowed_resolutions' => ['720p', '1080p'],
                 'default_resolution' => '1080p',
                 'default_duration' => 5,
@@ -2581,14 +2610,15 @@ class ModelCatalog
             'providerId' => 'kling-video/v2.1/pro/image-to-video',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.60,
-            'outUnit' => 'per_second',
+            // Flat per-clip credit billing (#1317) — see DoP Standard above.
+            'priceOut' => 3.00,
+            'outUnit' => 'per_generation',
             'quality' => 9,
             'rating' => 3,
             'json' => [
                 'description' => 'Kling Video 2.1 Pro (via Higgsfield) - professional cinematic animations from a reference image. Excels at smooth camera moves and motion realism.',
                 'params' => ['model' => 'kling-video/v2.1/pro/image-to-video'],
-                'pricing_mode' => 'per_second',
+                'pricing_mode' => 'per_generation',
                 'allowed_resolutions' => ['720p', '1080p'],
                 'default_resolution' => '1080p',
                 'default_duration' => 5,
@@ -2607,14 +2637,15 @@ class ModelCatalog
             'providerId' => 'kling-video/v2.1/master/image-to-video',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.90,
-            'outUnit' => 'per_second',
+            // Flat per-clip credit billing (#1317) — see DoP Standard above.
+            'priceOut' => 4.50,
+            'outUnit' => 'per_generation',
             'quality' => 10,
             'rating' => 3,
             'json' => [
                 'description' => 'Kling Video 2.1 Master (via Higgsfield) - top-tier image-to-video with the strongest motion realism and prompt adherence. Requires a reference image.',
                 'params' => ['model' => 'kling-video/v2.1/master/image-to-video'],
-                'pricing_mode' => 'per_second',
+                'pricing_mode' => 'per_generation',
                 'allowed_resolutions' => ['720p', '1080p'],
                 'default_resolution' => '1080p',
                 'default_duration' => 5,
@@ -2633,14 +2664,15 @@ class ModelCatalog
             'providerId' => 'higgsfield-ai/dop/lite',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.25,
-            'outUnit' => 'per_second',
+            // Flat per-clip credit billing (#1317) — see DoP Standard above.
+            'priceOut' => 1.25,
+            'outUnit' => 'per_generation',
             'quality' => 7,
             'rating' => 2,
             'json' => [
                 'description' => 'Higgsfield DoP Lite - fast, lower-cost image-to-video animation. Good for quick iterations. Requires a reference image.',
                 'params' => ['model' => 'higgsfield-ai/dop/lite'],
-                'pricing_mode' => 'per_second',
+                'pricing_mode' => 'per_generation',
                 'allowed_resolutions' => ['720p', '1080p'],
                 'default_resolution' => '720p',
                 'default_duration' => 5,
@@ -2659,14 +2691,15 @@ class ModelCatalog
             'providerId' => 'higgsfield-ai/dop/turbo',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.35,
-            'outUnit' => 'per_second',
+            // Flat per-clip credit billing (#1317) — see DoP Standard above.
+            'priceOut' => 1.75,
+            'outUnit' => 'per_generation',
             'quality' => 8,
             'rating' => 2,
             'json' => [
                 'description' => 'Higgsfield DoP Turbo - balanced speed/quality image-to-video animation with cinematic camera movements. Requires a reference image.',
                 'params' => ['model' => 'higgsfield-ai/dop/turbo'],
-                'pricing_mode' => 'per_second',
+                'pricing_mode' => 'per_generation',
                 'allowed_resolutions' => ['720p', '1080p'],
                 'default_resolution' => '1080p',
                 'default_duration' => 5,

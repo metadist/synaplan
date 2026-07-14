@@ -18,8 +18,6 @@ use Psr\Cache\CacheItemPoolInterface;
  */
 final readonly class ModelConfigService
 {
-    public const DEFAULT_LIGHTWEIGHT_MODEL_ID = 73;
-
     public function __construct(
         private ConfigRepository $configRepository,
         private ModelRepository $modelRepository,
@@ -454,11 +452,11 @@ final readonly class ModelConfigService
      * Resolve the model that condenses long conversations into a rolling summary.
      *
      * Priority:
-     *   1. User-scoped DEFAULTMODEL.SUMMARY  (per-user override, e.g. GPT-OSS-120B)
-     *   2. Global DEFAULTMODEL.SUMMARY       (operator-configured summary model)
-     *   3. User/global DEFAULTMODEL.SORT     (default: reuse the sorting model —
+     *   1. User-scoped DEFAULTMODEL.SUMMARIZE (per-user override, e.g. GPT-OSS-120B)
+     *   2. Global DEFAULTMODEL.SUMMARIZE      (operator-configured summary model)
+     *   3. User/global DEFAULTMODEL.SORT      (default: reuse the sorting model —
      *                                          cheap + fast, and always seeded)
-     *   4. User/global DEFAULTMODEL.CHAT     (last resort)
+     *   4. User/global DEFAULTMODEL.CHAT      (last resort)
      *
      * Keeping this next to getMemoryModelConfig()/getToolsModelConfig() means the
      * ConversationSummaryService never hardcodes a model name; operators pick the
@@ -468,7 +466,10 @@ final readonly class ModelConfigService
      */
     public function getSummaryModelConfig(?int $userId = null): array
     {
-        $modelId = $this->getDefaultModel('SUMMARY', $userId)
+        // Capability key is 'SUMMARIZE' end to end (seeder, ModelCatalog map,
+        // ChatRunner). Reading 'SUMMARY' here silently missed the seeded default
+        // and always fell through to SORT (#1320).
+        $modelId = $this->getDefaultModel('SUMMARIZE', $userId)
             ?? $this->getDefaultModel('SORT', $userId)
             ?? $this->getDefaultModel('CHAT', $userId);
 

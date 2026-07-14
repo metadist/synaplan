@@ -138,6 +138,16 @@ class OpenAICompatibleController extends AbstractController
         $stream = (bool) ($body['stream'] ?? false);
 
         $resolvedModel = $this->resolveModel($modelString, $user->getId());
+        if (null === $resolvedModel) {
+            return $this->openAiError(
+                null !== $modelString && '' !== $modelString
+                    ? sprintf('The model `%s` does not exist or is not available.', $modelString)
+                    : 'No model specified and no default chat model is configured.',
+                'invalid_request_error',
+                'model_not_found',
+                404,
+            );
+        }
         $completionId = 'chatcmpl-synaplan-'.bin2hex(random_bytes(12));
         $created = time();
 
@@ -413,9 +423,9 @@ class OpenAICompatibleController extends AbstractController
     /**
      * Resolve a model string (e.g., "gpt-4o") to a Synaplan model with provider info.
      *
-     * @return array{provider: string, providerModelId: string, displayModel: string, model_id: ?int}
+     * @return array{provider: string, providerModelId: string, displayModel: string, model_id: int}|null
      */
-    private function resolveModel(?string $modelString, int $userId): array
+    private function resolveModel(?string $modelString, int $userId): ?array
     {
         if ($modelString) {
             $model = $this->modelRepository->createQueryBuilder('m')
@@ -431,7 +441,7 @@ class OpenAICompatibleController extends AbstractController
                     'provider' => strtolower($model->getService()),
                     'providerModelId' => $model->getProviderId(),
                     'displayModel' => $model->getProviderId(),
-                    'model_id' => $model->getId(),
+                    'model_id' => (int) $model->getId(),
                 ];
             }
 
@@ -448,7 +458,7 @@ class OpenAICompatibleController extends AbstractController
                     'provider' => strtolower($model->getService()),
                     'providerModelId' => $model->getProviderId(),
                     'displayModel' => $model->getProviderId(),
-                    'model_id' => $model->getId(),
+                    'model_id' => (int) $model->getId(),
                 ];
             }
         }
@@ -461,22 +471,21 @@ class OpenAICompatibleController extends AbstractController
                     'provider' => strtolower($defaultModel->getService()),
                     'providerModelId' => $defaultModel->getProviderId(),
                     'displayModel' => $defaultModel->getProviderId(),
-                    'model_id' => $defaultModel->getId(),
+                    'model_id' => (int) $defaultModel->getId(),
                 ];
             }
         }
 
-        $this->logger->warning('OpenAI-compatible: No matching model found, falling back to OpenAI', [
+        // No requested model matched and no CHAT default is configured. Return
+        // null so the caller responds with a 4xx instead of silently routing to
+        // a hardcoded OpenAI model — which would bill an unconfigured vendor and
+        // record usage with a null model_id (unattributable cost) (#1320).
+        $this->logger->warning('OpenAI-compatible: No matching model and no CHAT default configured', [
             'requested_model' => $modelString,
             'user_id' => $userId,
         ]);
 
-        return [
-            'provider' => 'openai',
-            'providerModelId' => $modelString ?? 'gpt-4o',
-            'displayModel' => $modelString ?? 'gpt-4o',
-            'model_id' => null,
-        ];
+        return null;
     }
 
     private function writeSSE(array $data): void
