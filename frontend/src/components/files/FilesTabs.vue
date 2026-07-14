@@ -83,7 +83,10 @@
     </div>
 
     <!-- §4.8 #1: one vocabulary — say what the chat input already implies. -->
-    <p class="text-sm txt-secondary mt-3">{{ $t('files.intro') }}</p>
+    <div class="mt-3">
+      <h2 class="text-lg font-semibold txt-primary">{{ $t('files.intro') }}</h2>
+      <p class="text-sm txt-secondary mt-1">{{ $t('files.introCta') }}</p>
+    </div>
   </div>
 </template>
 
