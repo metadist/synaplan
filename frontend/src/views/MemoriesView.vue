@@ -83,8 +83,17 @@
                 <li>{{ $t('memories.unavailable.reason3') }}</li>
               </ul>
             </div>
-            <button class="btn-primary" @click="retryConnection">
-              <Icon icon="mdi:refresh" class="w-5 h-5 mr-2" />
+            <button
+              class="btn-primary inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg disabled:opacity-60"
+              :disabled="retryingConnection"
+              data-testid="memories-retry"
+              @click="retryConnection"
+            >
+              <Icon
+                :icon="retryingConnection ? 'mdi:loading' : 'mdi:refresh'"
+                class="w-5 h-5"
+                :class="{ 'animate-spin': retryingConnection }"
+              />
               {{ $t('memories.unavailable.retry') }}
             </button>
           </div>
@@ -336,10 +345,14 @@ watch(
   }
 )
 
+const retryingConnection = ref(false)
+
 async function retryConnection() {
+  if (retryingConnection.value) return
+  retryingConnection.value = true
   isServiceUnavailable.value = false
-  await memoriesStore.init()
   try {
+    await memoriesStore.init()
     availableCategories.value = await getCategories()
     isServiceUnavailable.value = false
   } catch (err) {
@@ -349,6 +362,8 @@ async function retryConnection() {
     ) {
       isServiceUnavailable.value = true
     }
+  } finally {
+    retryingConnection.value = false
   }
 }
 

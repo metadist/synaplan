@@ -472,11 +472,15 @@ function processMemoryBadges(html: string): string {
         result.push(line)
         continue
       }
+      // #430: never emit a bare badge as its own line — that becomes a block
+      // break after markdown. Splice into the previous HTML chunk when possible.
       const badge = buildMemoryBadgeHtml(memory, String(memory.id))
       if (result.length > 0 && result[result.length - 1].trimEnd().endsWith('</p>')) {
         result[result.length - 1] = result[result.length - 1].replace(/<\/p>\s*$/, ` ${badge}</p>`)
+      } else if (result.length > 0 && result[result.length - 1].trim() !== '') {
+        result[result.length - 1] = `${result[result.length - 1].replace(/\s+$/, '')} ${badge}`
       } else {
-        result.push(badge)
+        result.push(`<span class="memory-badge-inline">${badge}</span>`)
       }
     }
     content = result.join('\n')

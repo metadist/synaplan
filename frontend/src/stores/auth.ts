@@ -15,6 +15,13 @@ export const authReady = new Promise<void>((resolve) => {
   authReadyResolve = resolve
 })
 
+/** Cross-tab principal marker (#623). HttpOnly cookies are shared; this key
+ * lets other tabs notice when login/logout changed the session owner. */
+const AUTH_PRINCIPAL_KEY = 'synaplan_auth_principal'
+const AUTH_PRINCIPAL_CHANNEL = 'synaplan_auth_principal'
+
+type AuthPrincipalPayload = { userId: number | null; ts: number }
+
 export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref<User | null>(null)
@@ -22,6 +29,77 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const initialized = ref(false)
+
+  let applyingRemotePrincipal = false
+  let principalChannel: BroadcastChannel | null = null
+
+  function currentPrincipalId(): number | null {
+    return user.value?.id ?? null
+  }
+
+  function publishPrincipal(userId: number | null = currentPrincipalId()) {
+    if (typeof window === 'undefined' || applyingRemotePrincipal) return
+    const payload: AuthPrincipalPayload = { userId, ts: Date.now() }
+    try {
+      localStorage.setItem(AUTH_PRINCIPAL_KEY, JSON.stringify(payload))
+    } catch {
+      /* ignore quota / private mode */
+    }
+    try {
+      principalChannel?.postMessage(payload)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function applyRemotePrincipal(nextUserId: number | null) {
+    if (applyingRemotePrincipal) return
+    if (nextUserId === currentPrincipalId()) return
+    applyingRemotePrincipal = true
+    try {
+      await resetUserScopedClientState()
+      const currentUser = await authService.getCurrentUser()
+      if (currentUser) {
+        syncFromAuthService()
+        await useConfigStore().reload()
+      } else {
+        user.value = null
+        impersonator.value = null
+      }
+    } catch (err) {
+      console.warn('Cross-tab auth sync failed', err)
+      user.value = null
+      impersonator.value = null
+    } finally {
+      applyingRemotePrincipal = false
+    }
+  }
+
+  function setupCrossTabAuthSync() {
+    if (typeof window === 'undefined') return
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        principalChannel = new BroadcastChannel(AUTH_PRINCIPAL_CHANNEL)
+        principalChannel.onmessage = (event: MessageEvent<AuthPrincipalPayload>) => {
+          const nextId = event.data?.userId ?? null
+          void applyRemotePrincipal(nextId)
+        }
+      } catch {
+        principalChannel = null
+      }
+    }
+    window.addEventListener('storage', (event: StorageEvent) => {
+      if (event.key !== AUTH_PRINCIPAL_KEY || event.newValue == null) return
+      try {
+        const payload = JSON.parse(event.newValue) as AuthPrincipalPayload
+        void applyRemotePrincipal(payload.userId ?? null)
+      } catch {
+        /* ignore malformed */
+      }
+    })
+  }
+
+  setupCrossTabAuthSync()
 
   // Computed
   const isAuthenticated = computed(() => !!user.value)
@@ -60,6 +138,7 @@ export const useAuthStore = defineStore('auth', () => {
   function syncFromAuthService(): void {
     user.value = authService.getUser().value
     impersonator.value = authService.getImpersonator().value
+    publishPrincipal()
   }
 
   /**
@@ -154,6 +233,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Clear user immediately to prevent any auth checks during logout
     user.value = null
     impersonator.value = null
+    publishPrincipal(null)
     loading.value = true
     // Drop any in-flight deep-link intent so the next login isn't hijacked
     // by a stale entry from this session.

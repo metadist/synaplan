@@ -1552,6 +1552,8 @@
       "masterTitle": "Multi-Task-Routing",
       "masterDesc": "Nachrichten über den Planer leiten, sodass eine Anfrage mehrere Aufgaben gleichzeitig auslösen kann. Wenn aus, übernimmt der bisherige Einzelthema-AI-Sorter das Routing.",
       "masterHint": "Globale Voreinstellung für den Workspace. Bestehende Nutzer behalten ihre eigene Einstellung, bis sie zustimmen; das Aktivieren hier schaltet es auch für dein eigenes Konto frei.",
+      "personalOverrideWarning": "Dein Konto hat noch eine persönliche Überschreibung (wirksam: {effective}), die von der Workspace-Voreinstellung ({global}) abweicht.",
+      "clearPersonalOverride": "Workspace-Standard für mich übernehmen",
       "masterOn": "An",
       "masterOff": "Aus",
       "masterEnabledNotice": "Multi-Task-Routing aktiviert.",

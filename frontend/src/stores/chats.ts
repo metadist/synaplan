@@ -4,6 +4,7 @@ import { httpClient } from '@/services/api/httpClient'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useConfigStore } from '@/stores/config'
 import { useIncognitoStore } from '@/stores/incognito'
+import { useHistoryStore } from '@/stores/history'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -269,8 +270,18 @@ export const useChatsStore = defineStore('chats', () => {
       void incognitoStore.endSession()
     }
 
-    // Find all empty chats (not widget sessions, no messages, default title)
-    const emptyChats = chats.value.filter((chat) => isChatEmpty(chat))
+    // Find all empty chats (not widget sessions, no messages, default title).
+    // #732: exclude the active chat when local history already has messages
+    // (e.g. cancelled stream) — list metadata can still look empty, so reuse
+    // would leave the user on the same thread with no visible change.
+    const historyStore = useHistoryStore()
+    const emptyChats = chats.value.filter((chat) => {
+      if (!isChatEmpty(chat)) return false
+      if (chat.id === activeChatId.value && historyStore.messages.length > 0) {
+        return false
+      }
+      return true
+    })
 
     if (emptyChats.length > 0) {
       // Use the first (most recent) empty chat

@@ -151,9 +151,9 @@ final readonly class SystemConfigService
     /**
      * Get current configuration values with sensitive fields masked.
      *
-     * @return array<string, array{value: string, isSet: bool, isMasked: bool}>
+     * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool}>
      */
-    public function getValues(): array
+    public function getValues(?int $actingUserId = null): array
     {
         $values = [];
 
@@ -190,6 +190,26 @@ final readonly class SystemConfigService
                     ];
                 }
             }
+        }
+
+        // #1079: surface effective multitask routing for the acting admin so the
+        // UI can warn when a personal BCONFIG override shadows the global toggle.
+        if (null !== $actingUserId && $actingUserId > 0 && isset($values['MULTITASK_ROUTING_ENABLED'])) {
+            $personal = $this->configRepository->getValue(
+                $actingUserId,
+                MultitaskRoutingConfig::CONFIG_GROUP,
+                MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
+            );
+            $hasOverride = null !== $personal && '' !== $personal;
+            $effective = $hasOverride
+                ? $personal
+                : $values['MULTITASK_ROUTING_ENABLED']['value'];
+            $values['MULTITASK_ROUTING_ENABLED']['hasPersonalOverride'] = $hasOverride;
+            $values['MULTITASK_ROUTING_ENABLED']['effectiveForMe'] = filter_var(
+                $effective,
+                \FILTER_VALIDATE_BOOL,
+                \FILTER_NULL_ON_FAILURE
+            ) ? 'true' : 'false';
         }
 
         return $values;

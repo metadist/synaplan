@@ -38,6 +38,8 @@ const ConfigValueZ = z.object({
   value: z.string(),
   isSet: z.boolean(),
   isMasked: z.boolean(),
+  effectiveForMe: z.string().optional(),
+  hasPersonalOverride: z.boolean().optional(),
 })
 
 const ConfigBackupZ = z.object({

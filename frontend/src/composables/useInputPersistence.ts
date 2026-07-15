@@ -260,3 +260,136 @@ export function useAutoPersist(
     clearInput,
   }
 }
+
+/** Persisted chat-composer attachments (already-uploaded File rows). */
+export interface PersistedChatAttachment {
+  file_id: number
+  filename: string
+  file_type: string
+  name?: string
+}
+
+interface PersistedAttachments {
+  files: PersistedChatAttachment[]
+  timestamp: number
+}
+
+/**
+ * Persist already-uploaded chat attachments across navigation (#1345).
+ * Scoped per chat ID; skipped when `disabled` (incognito).
+ * Accepts richer upload rows (e.g. `processing`); only stable fields are saved.
+ */
+export function useAttachmentPersist<T extends PersistedChatAttachment>(
+  filesRef: Ref<T[]>,
+  baseKey: string,
+  chatId?: Ref<number | null>,
+  disabled?: Ref<boolean>
+) {
+  const ATTACH_PREFIX = `${STORAGE_KEY_PREFIX}attach_${baseKey}`
+
+  function storageKey(idOverride?: number | null): string {
+    const id = idOverride !== undefined ? idOverride : chatId?.value
+    if (id !== undefined && id !== null) {
+      return `${ATTACH_PREFIX}_${id}`
+    }
+    return ATTACH_PREFIX
+  }
+
+  const isDisabled = () => disabled?.value === true
+
+  function save(files: PersistedChatAttachment[], idOverride?: number | null) {
+    const key = storageKey(idOverride)
+    if (files.length === 0) {
+      try {
+        localStorage.removeItem(key)
+      } catch {
+        /* ignore */
+      }
+      return
+    }
+    const data: PersistedAttachments = { files, timestamp: Date.now() }
+    try {
+      localStorage.setItem(key, JSON.stringify(data))
+    } catch (error) {
+      console.error('Failed to save chat attachments:', error)
+    }
+  }
+
+  function load(idOverride?: number | null): PersistedChatAttachment[] {
+    try {
+      const stored = localStorage.getItem(storageKey(idOverride))
+      if (!stored) return []
+      const data: PersistedAttachments = JSON.parse(stored)
+      if (Date.now() - data.timestamp > MAX_AGE_MS) {
+        clear(idOverride)
+        return []
+      }
+      return Array.isArray(data.files) ? data.files : []
+    } catch {
+      return []
+    }
+  }
+
+  function clear(idOverride?: number | null) {
+    try {
+      localStorage.removeItem(storageKey(idOverride))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function toPersisted(files: T[]): PersistedChatAttachment[] {
+    return files
+      .filter((f) => f.file_id > 0)
+      .map((f) => ({
+        file_id: f.file_id,
+        filename: f.filename,
+        file_type: f.file_type,
+        name: f.name,
+      }))
+  }
+
+  function fromPersisted(files: PersistedChatAttachment[]): T[] {
+    return files.map((f) => ({ ...f, processing: false }) as unknown as T)
+  }
+
+  // Restore on mount for the current chat.
+  if (!isDisabled()) {
+    const restored = load()
+    if (restored.length > 0 && filesRef.value.length === 0) {
+      filesRef.value = fromPersisted(restored)
+    }
+  }
+
+  if (chatId) {
+    watch(
+      chatId,
+      (newId, oldId) => {
+        if (newId === oldId) return
+        if (isDisabled()) {
+          filesRef.value = []
+          return
+        }
+        save(toPersisted(filesRef.value), oldId)
+        filesRef.value = fromPersisted(load(newId))
+      },
+      { immediate: false }
+    )
+  }
+
+  watch(
+    filesRef,
+    (files) => {
+      if (isDisabled()) return
+      save(toPersisted(files))
+    },
+    { deep: true }
+  )
+
+  onBeforeUnmount(() => {
+    if (isDisabled()) return
+    save(toPersisted(filesRef.value))
+  })
+
+  return { clearAttachments: clear }
+}

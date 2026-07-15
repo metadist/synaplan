@@ -3583,6 +3583,19 @@ const handleUserStop = async () => {
     }
   }
 
+  // #732: cancelled turns leave local history non-empty while chat list
+  // metadata can still look empty — bump activity so "New chat" won't reuse
+  // this thread via isChatEmpty().
+  if (streamingMessage && chatsStore.activeChatId) {
+    chatsStore.bumpChatActivity(chatsStore.activeChatId, {
+      incrementMessageCount: true,
+      firstMessagePreview: streamingMessage
+        ? (streamingMessage.parts?.find((p) => p.type === 'text')?.content ?? '').slice(0, 120) ||
+          undefined
+        : undefined,
+    })
+  }
+
   // Clear references AFTER saving
   streamingAbortController = null
   currentTrackId = undefined

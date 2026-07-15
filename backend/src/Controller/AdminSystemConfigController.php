@@ -100,6 +100,18 @@ final class AdminSystemConfigController extends AbstractController
                             new OA\Property(property: 'value', type: 'string'),
                             new OA\Property(property: 'isSet', type: 'boolean'),
                             new OA\Property(property: 'isMasked', type: 'boolean'),
+                            new OA\Property(
+                                property: 'effectiveForMe',
+                                type: 'string',
+                                nullable: true,
+                                description: 'Effective value for the acting admin when a personal override exists (MULTITASK_ROUTING_ENABLED)'
+                            ),
+                            new OA\Property(
+                                property: 'hasPersonalOverride',
+                                type: 'boolean',
+                                nullable: true,
+                                description: 'True when the acting admin has a per-user BCONFIG override'
+                            ),
                         ]
                     )
                 ),
@@ -108,11 +120,11 @@ final class AdminSystemConfigController extends AbstractController
     )]
     #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    public function getValues(): JsonResponse
+    public function getValues(#[CurrentUser] ?User $user = null): JsonResponse
     {
         return $this->json([
             'success' => true,
-            'values' => $this->configService->getValues(),
+            'values' => $this->configService->getValues($user?->getId()),
         ]);
     }
 
