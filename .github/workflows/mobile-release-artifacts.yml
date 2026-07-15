@@ -118,7 +118,7 @@ jobs:
       - name: Create GitHub App token
         id: app-token
         if: steps.dispatch-config.outputs.configured == 'true' && steps.manifest.outputs.needs_sync == 'true'
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           app-id: ${{ secrets.MOBILE_APPS_APP_ID }}
           private-key: ${{ secrets.MOBILE_APPS_APP_PRIVATE_KEY }}
