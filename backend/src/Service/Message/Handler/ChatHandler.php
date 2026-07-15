@@ -5,6 +5,7 @@ namespace App\Service\Message\Handler;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\Model;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
 use App\Repository\ModelRepository;
@@ -263,10 +264,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $includeImagesInMessages = true;
                 $this->logger->info('ChatHandler: Current model supports vision, including images (non-streaming)');
             } else {
-                $this->logger->info('ChatHandler: Message has images but model does not support vision, searching for vision model (non-streaming)');
+                $this->logger->info('ChatHandler: Message has images but model does not support vision, resolving configured vision model (non-streaming)');
 
-                // Find a vision-capable model
-                $visionModel = $this->modelRepository->findByFeature('vision', 'chat', true);
+                // Prefer the account's configured image model (PIC2TEXT); only
+                // fall back to the global catalog pick when none is usable.
+                $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+                $visionModel = $this->resolveVisionFallbackModel($effectiveUserId);
 
                 if ($visionModel) {
                     $modelId = $visionModel->getId();
@@ -809,10 +812,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $includeImagesInMessages = true;
                 $this->logger->info('ChatHandler: Current model supports vision, including images (streaming)');
             } else {
-                $this->logger->info('ChatHandler: Message has images but model does not support vision, searching for vision model');
+                $this->logger->info('ChatHandler: Message has images but model does not support vision, resolving configured vision model');
 
-                // Find a vision-capable model
-                $visionModel = $this->modelRepository->findByFeature('vision', 'chat', true);
+                // Prefer the account's configured image model (PIC2TEXT); only
+                // fall back to the global catalog pick when none is usable.
+                $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+                $visionModel = $this->resolveVisionFallbackModel($effectiveUserId);
 
                 if ($visionModel) {
                     $modelId = $visionModel->getId();
@@ -1642,6 +1647,36 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         return $messages;
+    }
+
+    /**
+     * Resolve the vision-capable model to use when the active chat model cannot
+     * see images.
+     *
+     * Order of preference:
+     *   1. The account's CONFIGURED image-recognition model
+     *      (DEFAULTMODEL.PIC2TEXT), when it exists and is vision-capable.
+     *   2. The global catalog fallback (highest-quality selectable vision chat
+     *      model) — used only when the account has no usable configured model.
+     *
+     * Before this, the vision fallback always used the global catalog pick, so
+     * an account whose chat model lacks vision got answers from whichever
+     * provider happened to rank highest (Anthropic Claude), even though the
+     * account never configured that provider — e.g. a WhatsApp image reply
+     * arriving as an Anthropic answer. Honouring PIC2TEXT keeps image turns on
+     * the standard configured multimodal model.
+     */
+    private function resolveVisionFallbackModel(?int $effectiveUserId): ?Model
+    {
+        $configuredId = $this->modelConfigService->getDefaultModel('PIC2TEXT', $effectiveUserId);
+        if ($configuredId) {
+            $configured = $this->modelRepository->find($configuredId);
+            if ($configured instanceof Model && $configured->hasFeature('vision')) {
+                return $configured;
+            }
+        }
+
+        return $this->modelRepository->findByFeature('vision', 'chat', true);
     }
 
     /**
