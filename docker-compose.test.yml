@@ -39,6 +39,9 @@ services:
       DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama-stub:11434
       TIKA_BASE_URL: http://tika_test:9998
+      # Real Qdrant for memory/vector E2E flows (overrides the empty
+      # QDRANT_URL in backend/.env.test, which keeps PHPUnit Qdrant-free).
+      QDRANT_URL: http://qdrant_test:6333
       AI_DEFAULT_PROVIDER: test
       MAILER_DSN: smtp://mailhog_test:1025
       AUTO_DOWNLOAD_MODELS: "false"
@@ -63,6 +66,8 @@ services:
       mailhog_test:
         condition: service_started
       ollama-stub:
+        condition: service_started
+      qdrant_test:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
@@ -96,6 +101,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+  # Qdrant vector store — required by the memory service (user memories).
+  # Ephemeral by design: no volume, every stack start begins with empty
+  # collections (the backend auto-creates them on first use). Not published
+  # to a host port; only app_test talks to it.
+  qdrant_test:
+    image: qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c
+    container_name: synaplan-qdrant-test
     restart: "no"
     networks:
       - synaplan-test-network
