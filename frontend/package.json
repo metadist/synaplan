@@ -86,7 +86,7 @@
     "globals": "17.7.0",
     "happy-dom": "20.10.6",
     "openapi-zod-client": "1.18.3",
-    "postcss": "8.5.16",
+    "postcss": "8.5.17",
     "prettier": "3.9.5",
     "tailwindcss": "4.3.2",
     "terser": "5.49.0",
