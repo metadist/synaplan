@@ -29,8 +29,10 @@ final readonly class GeneratedFileRegistrar
      * @param int|null    $messageId    originating BMESSAGES.BID, for "jump to chat" (03_file-management.md §3.1)
      * @param string|null $provider     generating provider/model, for the Generated gallery
      * @param bool        $ephemeral    incognito-session artefact: hidden from listings, deleted after the session
+     * @param string|null $fileText     optional searchable body (e.g. TTS source script — #1251). Prefer this over
+     *                                  later Tika/Whisper extraction for generated audio.
      */
-    public function register(int $userId, ?string $relativePath, string $type, ?int $messageId = null, ?string $provider = null, bool $ephemeral = false): ?File
+    public function register(int $userId, ?string $relativePath, string $type, ?int $messageId = null, ?string $provider = null, bool $ephemeral = false, ?string $fileText = null): ?File
     {
         if (null === $relativePath || '' === $relativePath) {
             return null;
@@ -63,6 +65,14 @@ final readonly class GeneratedFileRegistrar
             // inline + async media paths both reaching the same file).
             $existing = $this->files->findOneBy(['userId' => $userId, 'filePath' => $relativePath]);
             if ($existing instanceof File) {
+                // Backfill source text on an existing row that was registered
+                // before #1251 (empty BFILETEXT) so "Add to knowledge base"
+                // / describe can use the script without Whisper.
+                if (null !== $fileText && '' !== trim($fileText) && '' === trim($existing->getFileText())) {
+                    $existing->setFileText($fileText);
+                    $this->files->save($existing);
+                }
+
                 return $existing;
             }
 
@@ -92,6 +102,9 @@ final readonly class GeneratedFileRegistrar
             // manager ("Add prompt to knowledge base").
             $file->setVectorState(File::VECTOR_STATE_NONE);
             $file->setEphemeral($ephemeral);
+            if (null !== $fileText && '' !== trim($fileText)) {
+                $file->setFileText($fileText);
+            }
 
             $this->files->save($file);
 

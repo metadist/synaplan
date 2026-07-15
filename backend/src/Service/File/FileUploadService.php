@@ -663,7 +663,11 @@ final readonly class FileUploadService
         $this->vectorStorageFacade->deleteByFile($user->getId(), $file->getId());
 
         $extractedText = $file->getFileText();
-        $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+        $fileExtension = FileTypeResolver::resolveExtension(
+            $file->getFileType() ?: '',
+            $file->getFileName() ?: '',
+            $file->getFilePath() ?: '',
+        );
 
         if ('' === trim($extractedText)) {
             $absolutePath = $this->uploadDir.'/'.ltrim($file->getFilePath(), '/');
@@ -740,23 +744,44 @@ final readonly class FileUploadService
             return ['success' => false, 'error' => 'File not found on disk', 'errorType' => 'not_found'];
         }
 
-        $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+        // #1251: generated TTS/media stores BFILETYPE as a GENERIC kind ("audio"),
+        // which isTranscribableMedia() rejects — extractText then falls through to
+        // Tika and stores the MP3 duration ("41.856") as BFILETEXT. Always resolve
+        // via FileTypeResolver (same as MessageClassifier / FileAnalysisHandler).
+        $fileExtension = FileTypeResolver::resolveExtension(
+            $file->getFileType() ?: '',
+            $file->getFileName() ?: '',
+            $file->getFilePath() ?: '',
+        );
+        $category = FileTypeResolver::resolveCategory(
+            $file->getFileType() ?: '',
+            $file->getFileName() ?: '',
+            $file->getFilePath() ?: '',
+        );
 
         $file->setStatus('extracting');
         $this->em->flush();
 
-        try {
-            [$extractedText] = $this->fileProcessor->extractText(
-                $file->getFilePath(),
-                $fileExtension,
-                $user->getId(),
-                $file->isMedia(),
-            );
-        } catch (\Throwable $e) {
-            $file->setStatus('error');
-            $this->em->flush();
+        // Prefer pre-stored source text for generated audio (TTS registers the
+        // synthesized script into BFILETEXT). Re-running Whisper/Tika would
+        // either fail or overwrite that with duration metadata.
+        $existingText = trim($file->getFileText());
+        if ('audio' === $category && '' !== $existingText) {
+            $extractedText = $file->getFileText();
+        } else {
+            try {
+                [$extractedText] = $this->fileProcessor->extractText(
+                    $file->getFilePath(),
+                    $fileExtension,
+                    $user->getId(),
+                    $file->isMedia(),
+                );
+            } catch (\Throwable $e) {
+                $file->setStatus('error');
+                $this->em->flush();
 
-            return ['success' => false, 'error' => 'Description failed: '.$e->getMessage(), 'errorType' => 'extraction_failed'];
+                return ['success' => false, 'error' => 'Description failed: '.$e->getMessage(), 'errorType' => 'extraction_failed'];
+            }
         }
 
         if ('' === trim($extractedText)) {

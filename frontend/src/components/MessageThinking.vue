@@ -11,7 +11,7 @@
       @click="isExpanded = !isExpanded"
     >
       <span class="text-sm font-medium txt-secondary">
-        Thought for {{ thinkingTime || 8 }} seconds
+        {{ headerLabel }}
       </span>
       <svg
         class="w-4 h-4 txt-tertiary transition-transform flex-shrink-0"
@@ -71,14 +71,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 interface Props {
   content: string
   thinkingTime?: number
+  isStreaming?: boolean
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
+const { t } = useI18n()
 
 const isExpanded = ref(false)
+
+// #1058: never invent a fake "8 seconds". While streaming show a live label;
+// when finished, show the measured duration if we have one.
+const headerLabel = computed(() => {
+  if (props.isStreaming) {
+    return t('message.thinkingInProgress')
+  }
+  if (typeof props.thinkingTime === 'number' && props.thinkingTime > 0) {
+    return t('message.thoughtFor', { n: props.thinkingTime })
+  }
+  return t('message.thinking')
+})
 </script>

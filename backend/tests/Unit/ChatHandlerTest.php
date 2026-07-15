@@ -1325,6 +1325,59 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
+     * #1115: empty assistant history turns must be dropped before the provider
+     * payload — Mistral 400s on `{role:assistant, content:""}` and openai-php
+     * swallows that into a silent empty stream.
+     */
+    public function testBuildStreamingMessagesSkipsEmptyAssistantTurns(): void
+    {
+        $current = new Message();
+        $current->setDirection('IN');
+        $current->setText('hi again');
+        $current->setUnixTimestamp(time());
+        $current->setDateTime(date('YmdHis'));
+
+        $priorUser = new Message();
+        $priorUser->setDirection('IN');
+        $priorUser->setText('hello');
+        $priorUser->setUnixTimestamp(time() - 20);
+        $priorUser->setDateTime(date('YmdHis', time() - 20));
+
+        $emptyAssistant = new Message();
+        $emptyAssistant->setDirection('OUT');
+        $emptyAssistant->setText('');
+        $emptyAssistant->setUnixTimestamp(time() - 10);
+        $emptyAssistant->setDateTime(date('YmdHis', time() - 10));
+
+        $goodAssistant = new Message();
+        $goodAssistant->setDirection('OUT');
+        $goodAssistant->setText('prior answer');
+        $goodAssistant->setUnixTimestamp(time() - 5);
+        $goodAssistant->setDateTime(date('YmdHis', time() - 5));
+
+        $method = new \ReflectionMethod(ChatHandler::class, 'buildStreamingMessages');
+        $method->setAccessible(true);
+
+        /** @var list<array{role: string, content: mixed}> $messages */
+        $messages = $method->invoke(
+            $this->handler,
+            null,
+            [$priorUser, $emptyAssistant, $goodAssistant],
+            $current,
+            [],
+        );
+
+        $assistantContents = [];
+        foreach ($messages as $row) {
+            if ('assistant' === $row['role']) {
+                $assistantContents[] = $row['content'];
+            }
+        }
+
+        $this->assertSame(['prior answer'], $assistantContents);
+    }
+
+    /**
      * @param array<string, mixed> $options
      */
     private function invokeFormatQuotedReference(array $options): string

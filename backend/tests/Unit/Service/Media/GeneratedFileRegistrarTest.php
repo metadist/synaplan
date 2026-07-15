@@ -136,4 +136,42 @@ final class GeneratedFileRegistrarTest extends TestCase
 
         self::assertSame($existing, $file);
     }
+
+    public function testStoresSourceTextOnRegister(): void
+    {
+        $this->files->expects(self::once())->method('save')->with(self::callback(
+            static function (File $file): bool {
+                return 'Hello poem' === $file->getFileText()
+                    && 'audio' === $file->getFileType();
+            }
+        ));
+
+        $file = $this->registrar()->register(
+            42,
+            'voice_123.mp3',
+            'audio',
+            fileText: 'Hello poem',
+        );
+
+        self::assertNotNull($file);
+        self::assertSame('Hello poem', $file->getFileText());
+    }
+
+    public function testBackfillsSourceTextOnExistingRowWithEmptyFileText(): void
+    {
+        $existing = new File();
+        // Default BFILETEXT is '' — leave it so the #1251 backfill path runs.
+        $this->files->expects(self::once())->method('findOneBy')->willReturn($existing);
+        $this->files->expects(self::once())->method('save')->with($existing);
+
+        $file = $this->registrar()->register(
+            9,
+            '41/tts.mp3',
+            'audio',
+            fileText: 'spoken script',
+        );
+
+        self::assertSame($existing, $file);
+        self::assertSame('spoken script', $existing->getFileText());
+    }
 }

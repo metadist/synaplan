@@ -38,7 +38,10 @@ use Psr\Log\NullLogger;
  * generated document vanished from the chat after a page reload. The
  * helper now registers index 0 too, except for image/video/audio, which
  * the legacy single-file channel already renders inline on reload
- * (registering those twice would duplicate the media player).
+ * (attaching those to the message would duplicate the media player).
+ * Since #1251, index-0 media is still written to BFILES (gallery + optional
+ * TTS source_text) via GeneratedFileRegistrar, but is not returned for
+ * Message::addFile().
  */
 class StreamControllerTaskPlanFilesTest extends TestCase
 {
@@ -91,13 +94,16 @@ class StreamControllerTaskPlanFilesTest extends TestCase
     public function testSkipsPrimaryMediaFileButRegistersExtras(): void
     {
         // Index 0 media rides the legacy BFILE/BFILEPATH channel, which the
-        // frontend already renders inline on reload — registering it again
-        // would double the player. Extra files are always registered.
+        // frontend already renders inline on reload — attaching it to the
+        // message again would double the player. Extra files are always
+        // returned for Message::addFile(). Index 0 is still registered into
+        // BFILES (Generated gallery / #1251 source text) but omitted here.
         $entities = $this->invokeHelper([
             [
                 'path' => '/api/v1/files/uploads/7/2026/06/poem.mp3',
                 'type' => 'audio',
                 'local_path' => '7/2026/06/poem.mp3',
+                'source_text' => 'a short poem',
             ],
             [
                 'path' => '/api/v1/files/uploads/7/2026/06/spring.png',

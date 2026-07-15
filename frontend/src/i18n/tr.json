@@ -1326,6 +1326,8 @@
   },
   "message": {
     "thinking": "Düşünme süreci",
+    "thinkingInProgress": "Düşünüyor…",
+    "thoughtFor": "{n} saniye düşündü",
     "reasoning": "AI Akıl Yürütme",
     "downloadImage": "Görseli indir",
     "fileGenerated": "Sizin için '{filename}' dosyasını oluşturdum. Şimdi indirebilirsiniz.",

@@ -70,6 +70,28 @@ describe('History Store', () => {
     expect(store.messages[0].isStreaming).toBe(false)
   })
 
+  // #1058: measured thinking duration from thinkingStartedAt
+  it('finishStreamingMessage sets thinkingTime from thinkingStartedAt', () => {
+    const store = useHistoryStore()
+    const id = store.addStreamingMessage('assistant')
+    store.messages[0].parts = [
+      {
+        type: 'thinking',
+        content: 'step by step…',
+        isStreaming: true,
+        thinkingStartedAt: Date.now() - 4500,
+      },
+    ]
+
+    store.finishStreamingMessage(id)
+
+    const thinking = store.messages[0].parts.find((p) => p.type === 'thinking')!
+    expect(thinking.isStreaming).toBeUndefined()
+    expect(thinking.thinkingStartedAt).toBeUndefined()
+    expect(thinking.thinkingTime).toBeGreaterThanOrEqual(4)
+    expect(thinking.thinkingTime).toBeLessThanOrEqual(6)
+  })
+
   it('should mark message as superseded', () => {
     const store = useHistoryStore()
     store.addMessage('assistant', [{ type: 'text', content: 'Old response' }])

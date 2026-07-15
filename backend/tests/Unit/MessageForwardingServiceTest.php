@@ -271,7 +271,7 @@ class MessageForwardingServiceTest extends TestCase
 
         $this->whatsAppService->expects($this->once())
             ->method('sendMessage')
-            ->with('+491234567890', 'What is the weather today?', 'phone-number-id-123')
+            ->with('+491234567890', '👤 Operator: What is the weather today?', 'phone-number-id-123')
             ->willReturn(['success' => true, 'message_id' => 'wa_prompt_123']);
 
         $this->service->forwardUserPromptIfNeeded($chat, 'What is the weather today?');
@@ -287,7 +287,7 @@ class MessageForwardingServiceTest extends TestCase
 
         $this->whatsAppService->expects($this->once())
             ->method('sendMessage')
-            ->with('+491234567890', 'Hello', 'phone-id')
+            ->with('+491234567890', '👤 Operator: Hello', 'phone-id')
             ->willReturn(['success' => true, 'message_id' => 'wa_prompt_456']);
 
         $this->service->forwardUserPromptIfNeeded($chat, '  Hello  ');

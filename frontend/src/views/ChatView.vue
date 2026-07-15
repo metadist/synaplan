@@ -1525,7 +1525,13 @@ const handleContinueResponse = async (message: Message) => {
         if (msg) {
           let reasoningPart = msg.parts.find((p) => p.type === 'thinking' && p.isStreaming)
           if (!reasoningPart) {
-            reasoningPart = { type: 'thinking', content: '', isStreaming: true }
+            // #1058: record wall-clock start so we can show real duration.
+            reasoningPart = {
+              type: 'thinking',
+              content: '',
+              isStreaming: true,
+              thinkingStartedAt: Date.now(),
+            }
             msg.parts.push(reasoningPart)
           }
           reasoningPart.content += data.chunk
@@ -1916,10 +1922,17 @@ const streamAIResponse = async (
           if (streamingAbortController?.signal.aborted) return
 
           if (data.status === 'guest_limit_reached') {
+            // #1128: drop the empty assistant placeholder — same as the
+            // authenticated rate-limit path (removeMessage), otherwise the
+            // guest sees a blank bubble above the signup modal.
+            historyStore.removeMessage(messageId)
             showGuestSignupModal.value = true
             processingStatus.value = ''
             processingMetadata.value = {}
-            historyStore.finishStreamingMessage(messageId)
+            streamingAbortController = null
+            stopStreamingFn = null
+            currentTrackId = undefined
+            currentStreamingChatId = undefined
             return
           }
 
@@ -2119,7 +2132,13 @@ const streamAIResponse = async (
             if (message) {
               let reasoningPart = message.parts.find((p) => p.type === 'thinking' && p.isStreaming)
               if (!reasoningPart) {
-                reasoningPart = { type: 'thinking', content: '', isStreaming: true }
+                // #1058
+                reasoningPart = {
+                  type: 'thinking',
+                  content: '',
+                  isStreaming: true,
+                  thinkingStartedAt: Date.now(),
+                }
                 message.parts.unshift(reasoningPart)
               }
               reasoningPart.content += data.chunk
@@ -2714,11 +2733,12 @@ const streamAIResponse = async (
               let reasoningPart = message.parts.find((p) => p.type === 'thinking' && p.isStreaming)
 
               if (!reasoningPart) {
-                // Create new reasoning part at the beginning
+                // Create new reasoning part at the beginning (#1058)
                 reasoningPart = {
                   type: 'thinking',
                   content: '',
                   isStreaming: true,
+                  thinkingStartedAt: Date.now(),
                 }
                 message.parts.unshift(reasoningPart)
               }

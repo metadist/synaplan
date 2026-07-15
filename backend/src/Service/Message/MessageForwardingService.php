@@ -67,6 +67,10 @@ final readonly class MessageForwardingService
      * originating channel (e.g. WhatsApp). The prompt is forwarded as-is — no think-block
      * stripping or memory-tag resolution is needed since it is plain user input.
      *
+     * #1257: WhatsApp always shows outbound messages as the business number, so an
+     * unprefixed operator prompt is indistinguishable from an AI reply. Prefix with a
+     * stable "Operator:" marker (language-neutral product term) so the phone user can tell.
+     *
      * This is a best-effort operation: failures are logged but never propagated.
      */
     public function forwardUserPromptIfNeeded(Chat $chat, string $text): void
@@ -84,7 +88,9 @@ final readonly class MessageForwardingService
             return;
         }
 
-        $this->forwardToWhatsApp($chat, $text);
+        // Keep the marker ASCII + emoji so it survives WhatsApp clients without
+        // needing a per-locale string table in this backend path.
+        $this->forwardToWhatsApp($chat, '👤 Operator: '.$text);
     }
 
     /**

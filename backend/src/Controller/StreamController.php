@@ -3108,80 +3108,30 @@ class StreamController extends AbstractController
             }
 
             $type = is_string($taskFile['type'] ?? null) ? $taskFile['type'] : '';
-            if (0 === $idx && in_array($type, ['image', 'video', 'audio'], true)) {
-                continue;
-            }
+            $sourceText = is_string($taskFile['source_text'] ?? null) ? $taskFile['source_text'] : null;
+            $relativePath = is_string($taskFile['local_path'] ?? null) ? $taskFile['local_path'] : null;
 
-            $entity = $this->registerExistingGeneratedFile(
+            // Index 0 image/video/audio already rides the legacy BFILE* columns
+            // (rendered inline on reload). Still register a BFILES row for the
+            // Generated gallery + #1251 source text, but do NOT attach it to the
+            // message (that would duplicate the media player — see #1055).
+            $attachToMessage = !(0 === $idx && in_array($type, ['image', 'video', 'audio'], true));
+
+            $entity = $this->generatedFileRegistrar->register(
                 $userId,
-                is_string($taskFile['local_path'] ?? null) ? $taskFile['local_path'] : null,
+                $relativePath,
                 $type,
-                $ephemeral,
+                null,
+                null,
+                ephemeral: $ephemeral,
+                fileText: $sourceText,
             );
-            if ($entity instanceof File) {
+            if ($entity instanceof File && $attachToMessage) {
                 $entities[] = $entity;
             }
         }
 
         return $entities;
-    }
-
-    /**
-     * Register a File row for an already-on-disk generated file (multi-task
-     * extra output, Sprint 3b). The media/TTS runners save bytes to the user's
-     * upload path; this only records the DB row so the file shows in history and
-     * is access-controlled. Best-effort — never throws.
-     */
-    private function registerExistingGeneratedFile(int $userId, ?string $relativePath, string $type, bool $ephemeral = false): ?File
-    {
-        if (null === $relativePath || '' === $relativePath) {
-            return null;
-        }
-
-        try {
-            // Issue #1170: a document-generation node persists its File via
-            // ChatHandler::storeGeneratedFile() (with the clean display name)
-            // BEFORE this runs. Re-registering the same on-disk file here would
-            // create a second File row pointing at the identical path, so the
-            // file shows up twice on the Files page. Reuse the existing row
-            // instead — it already carries the nicer display name.
-            $existing = $this->em->getRepository(File::class)->findOneBy([
-                'userId' => $userId,
-                'filePath' => $relativePath,
-            ]);
-            if ($existing instanceof File) {
-                return $existing;
-            }
-
-            $absolutePath = $this->uploadDir.'/'.$relativePath;
-            $fileSize = is_file($absolutePath) ? (filesize($absolutePath) ?: 0) : 0;
-            $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
-
-            $file = new File();
-            $file->setUserId($userId);
-            $file->setFilePath($relativePath);
-            $file->setFileType('' !== $type ? $type : $extension);
-            $file->setFileName(basename($relativePath));
-            $file->setFileSize($fileSize);
-            $file->setFileMime($this->getMimeTypeForExtension($extension));
-            $file->setStatus('generated');
-            // Issue #1190: mark provenance so generated files are distinguishable
-            // from uploads (default 'web_upload') and can be targeted for repair.
-            $file->setSource('generated');
-            $file->setEphemeral($ephemeral);
-
-            $this->em->persist($file);
-            $this->em->flush();
-
-            return $file;
-        } catch (\Throwable $e) {
-            $this->logger->warning('StreamController: failed to register multi-task file', [
-                'path' => $relativePath,
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
     }
 
     private function storeGeneratedFileInStream(array $fileData, Message $message, bool $ephemeral = false): ?File

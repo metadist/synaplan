@@ -1326,6 +1326,8 @@
   },
   "message": {
     "thinking": "Proceso de pensamiento",
+    "thinkingInProgress": "Pensando…",
+    "thoughtFor": "Pensó durante {n} segundos",
     "reasoning": "Razonamiento de IA",
     "downloadImage": "Descargar imagen",
     "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
