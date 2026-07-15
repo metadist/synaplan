@@ -815,6 +815,7 @@ final class WhatsAppService
         $responseText = $result['response']['content'] ?? $collectedResponse;
         $responseText = $this->memoryService->resolveMemoryTags($responseText, $user);
         $metadata = $result['response']['metadata'] ?? [];
+        $classification = is_array($result['classification'] ?? null) ? $result['classification'] : null;
         $fileData = $metadata['file'] ?? null;
 
         // Issue #652: WhatsApp responses must surface web search citations
@@ -939,6 +940,8 @@ final class WhatsAppService
                         $chat,
                         $searchResults,
                         ['path' => $mediaPath, 'type' => $generatedMediaType],
+                        $metadata,
+                        $classification,
                     );
                     $responseSent = true;
 
@@ -974,7 +977,17 @@ final class WhatsAppService
                     // The text already reached the user as its own message —
                     // persist it and don't let PRIORITY 3 send it twice.
                     if ($textSentSeparately) {
-                        $this->storeOutgoingMessage($user, $dto, $responseText, $textMessageId, $chat, $searchResults);
+                        $this->storeOutgoingMessage(
+                            $user,
+                            $dto,
+                            $responseText,
+                            $textMessageId,
+                            $chat,
+                            $searchResults,
+                            null,
+                            $metadata,
+                            $classification,
+                        );
                         $responseSent = true;
                     }
                 }
@@ -1057,6 +1070,8 @@ final class WhatsAppService
                         $chat,
                         $searchResults,
                         ['path' => $ttsServePath, 'type' => 'audio'],
+                        $metadata,
+                        $classification,
                     );
                     $responseSent = true;
 
@@ -1110,7 +1125,17 @@ final class WhatsAppService
                 // Persist the response WITHOUT the appended source block — the
                 // platform UI renders sources from metadata, so duplicating
                 // them in the stored text would clutter the history view.
-                $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id'], $chat, $searchResults);
+                $this->storeOutgoingMessage(
+                    $user,
+                    $dto,
+                    $responseText,
+                    $sendResult['message_id'],
+                    $chat,
+                    $searchResults,
+                    null,
+                    $metadata,
+                    $classification,
+                );
                 $responseSent = true;
 
                 // Discord notification: Text response sent
@@ -1668,14 +1693,19 @@ final class WhatsAppService
      * the asset via sendMedia(), but the cross-channel mirror lives in the DB
      * row.
      *
-     * @param array{query?: string, results?: array}|null $searchResults web-search payload
-     *                                                                   carried alongside the
-     *                                                                   AI response
-     * @param array{path: string, type: string}|null      $generatedFile optional file metadata
-     *                                                                   produced by
-     *                                                                   MediaGenerationHandler
-     *                                                                   (already normalized to a
-     *                                                                   serve URL)
+     * @param array{query?: string, results?: array}|null $searchResults  web-search payload
+     *                                                                    carried alongside the
+     *                                                                    AI response
+     * @param array{path: string, type: string}|null      $generatedFile  optional file metadata
+     *                                                                    produced by
+     *                                                                    MediaGenerationHandler
+     *                                                                    (already normalized to a
+     *                                                                    serve URL)
+     * @param array<string, mixed>|null                   $aiMetadata     chat model metadata from
+     *                                                                    processStream (provider,
+     *                                                                    model, model_id, usage)
+     * @param array<string, mixed>|null                   $classification sorter metadata for
+     *                                                                    ai_sorting_* MessageMeta
      */
     private function storeOutgoingMessage(
         User $user,
@@ -1685,6 +1715,8 @@ final class WhatsAppService
         ?Chat $chat = null,
         ?array $searchResults = null,
         ?array $generatedFile = null,
+        ?array $aiMetadata = null,
+        ?array $classification = null,
     ): void {
         $outgoingMessage = new Message();
         $outgoingMessage->setUserId($user->getId());
@@ -1699,8 +1731,8 @@ final class WhatsAppService
         $outgoingMessage->setFile(null !== $generatedFile ? 1 : 0);
         $outgoingMessage->setFilePath($generatedFile['path'] ?? '');
         $outgoingMessage->setFileType($generatedFile['type'] ?? '');
-        $outgoingMessage->setTopic('CHAT');
-        $outgoingMessage->setLanguage('en');
+        $outgoingMessage->setTopic($classification['topic'] ?? 'CHAT');
+        $outgoingMessage->setLanguage($classification['language'] ?? 'en');
         $outgoingMessage->setText($text);
         $outgoingMessage->setDirection('OUT');
         $outgoingMessage->setStatus('sent');
@@ -1715,6 +1747,26 @@ final class WhatsAppService
             $outgoingMessage->setMeta('from_display_phone', $dto->displayPhoneNumber);
         }
         $outgoingMessage->setMeta('external_id', $externalId);
+
+        // #975: mirror web StreamController model metadata so the platform
+        // chat lightbulb shows which chat/sorting models produced the reply.
+        $outgoingMessage->setMeta('ai_chat_provider', (string) ($aiMetadata['provider'] ?? 'unknown'));
+        $outgoingMessage->setMeta('ai_chat_model', (string) ($aiMetadata['model'] ?? 'unknown'));
+        if (!empty($aiMetadata['model_id'])) {
+            $outgoingMessage->setMeta('ai_chat_model_id', (string) $aiMetadata['model_id']);
+        }
+        if (!empty($aiMetadata['usage']) && is_array($aiMetadata['usage'])) {
+            $outgoingMessage->setMeta('ai_chat_usage', (string) json_encode($aiMetadata['usage']));
+        }
+        if (!empty($classification['sorting_provider'])) {
+            $outgoingMessage->setMeta('ai_sorting_provider', (string) $classification['sorting_provider']);
+        }
+        if (!empty($classification['sorting_model_name'])) {
+            $outgoingMessage->setMeta('ai_sorting_model', (string) $classification['sorting_model_name']);
+        }
+        if (!empty($classification['sorting_model_id'])) {
+            $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
+        }
 
         $resultsList = $searchResults['results'] ?? null;
         if (is_array($resultsList) && [] !== $resultsList) {

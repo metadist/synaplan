@@ -2035,6 +2035,8 @@
       "masterTitle": "Enrutamiento multitarea",
       "masterDesc": "Enruta los mensajes a través del planificador para que una solicitud pueda desencadenar varias tareas a la vez. Si está desactivado, el clasificador de IA de un solo tema se encarga del enrutamiento.",
       "masterHint": "Valor predeterminado global del espacio de trabajo. Los usuarios existentes conservan su propia configuración hasta que opten por activarlo; activarlo aquí también lo habilita para tu propia cuenta.",
+      "personalOverrideWarning": "Tu cuenta aún tiene una anulación personal (efectiva: {effective}) distinta del valor predeterminado del espacio de trabajo ({global}).",
+      "clearPersonalOverride": "Usar el valor predeterminado para mí",
       "masterOn": "Activado",
       "masterOff": "Desactivado",
       "masterEnabledNotice": "Enrutamiento multitarea activado.",

@@ -359,7 +359,7 @@ import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechServ
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { useAutoPersist } from '@/composables/useInputPersistence'
+import { useAutoPersist, useAttachmentPersist } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
 import { useAuthStore } from '@/stores/auth'
 import { useIncognitoStore } from '@/stores/incognito'
@@ -552,6 +552,14 @@ const useWebSpeech = computed(() => {
 // incognito session: drafts must never survive in localStorage.
 const { clearInput: clearPersistedInput } = useAutoPersist(
   message,
+  'chat',
+  computed(() => chatsStore.activeChatId),
+  computed(() => incognitoStore.active)
+)
+
+// #1345: also persist already-uploaded attachments per chat (file_id + meta).
+const { clearAttachments: clearPersistedAttachments } = useAttachmentPersist(
+  uploadedFiles,
   'chat',
   computed(() => chatsStore.activeChatId),
   computed(() => incognitoStore.active)
@@ -781,6 +789,7 @@ const sendMessage = () => {
   enhancedMessage.value = ''
   // Clear persisted input after successful send
   clearPersistedInput()
+  clearPersistedAttachments()
 }
 
 const toggleThinking = () => {

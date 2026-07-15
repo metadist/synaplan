@@ -1516,6 +1516,8 @@
       "masterTitle": "Multi-task routing",
       "masterDesc": "Route messages through the planner so one request can trigger several tasks at once. When off, the legacy single-topic AI sorter handles routing instead.",
       "masterHint": "Global default for the workspace. Existing users keep their own setting until they opt in; turning this on here also enables it for your own account.",
+      "personalOverrideWarning": "Your account still has a personal override (effective: {effective}) that differs from the workspace default ({global}).",
+      "clearPersonalOverride": "Use workspace default for me",
       "masterOn": "On",
       "masterOff": "Off",
       "masterEnabledNotice": "Multi-task routing enabled.",

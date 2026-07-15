@@ -2036,6 +2036,8 @@
       "masterTitle": "Çoklu görev yönlendirmesi",
       "masterDesc": "Bir isteğin aynı anda birden fazla görevi tetikleyebilmesi için mesajları planlayıcı üzerinden yönlendirin. Kapalıyken, eski tek konulu yapay zeka sıralayıcısı yönlendirmeyi üstlenir.",
       "masterHint": "Çalışma alanı için genel varsayılan. Mevcut kullanıcılar kendi tercih edene kadar kendi ayarlarını korur; bunu burada açmak kendi hesabınız için de etkinleştirir.",
+      "personalOverrideWarning": "Hesabınızda hâlâ kişisel bir geçersiz kılma var (geçerli: {effective}); çalışma alanı varsayılanından ({global}) farklı.",
+      "clearPersonalOverride": "Benim için çalışma alanı varsayılanını kullan",
       "masterOn": "Açık",
       "masterOff": "Kapalı",
       "masterEnabledNotice": "Çoklu görev yönlendirmesi etkinleştirildi.",

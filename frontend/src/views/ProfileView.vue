@@ -326,6 +326,7 @@
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.changePassword.currentPasswordPlaceholder')"
                   data-testid="input-current-password"
+                  @input="markPasswordTouched"
                 />
               </div>
 
@@ -340,6 +341,7 @@
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.changePassword.newPasswordPlaceholder')"
                   data-testid="input-new-password"
+                  @input="markPasswordTouched"
                 />
                 <p class="txt-secondary text-sm mt-1">
                   {{ $t('profile.changePassword.newPasswordHint') }}
@@ -357,6 +359,7 @@
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.changePassword.confirmPasswordPlaceholder')"
                   data-testid="input-confirm-password"
+                  @input="markPasswordTouched"
                 />
                 <p class="txt-secondary text-sm mt-1">
                   {{ $t('profile.changePassword.confirmPasswordHint') }}
@@ -730,8 +733,14 @@ const canConfirmDelete = computed(() => {
   return deleteConfirmPassword.value.length > 0
 })
 
+// #344: browser password autofill can fill fields without a real user edit.
+// Only treat password fields as dirty after an explicit input/change event.
+const passwordTouchedByUser = ref(false)
+
 const hasPasswordChanges = computed(
-  () => !!(passwordData.value.current || passwordData.value.new || passwordData.value.confirm)
+  () =>
+    passwordTouchedByUser.value &&
+    !!(passwordData.value.current || passwordData.value.new || passwordData.value.confirm)
 )
 
 const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
@@ -739,6 +748,10 @@ const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } =
   originalData,
   { extraDirtyCheck: hasPasswordChanges }
 )
+
+function markPasswordTouched() {
+  passwordTouchedByUser.value = true
+}
 
 let cleanupGuard: (() => void) | undefined
 
@@ -829,6 +842,7 @@ const handleSave = saveChanges(async () => {
     if (canChangePassword.value && passwordData.value.current && passwordData.value.new) {
       await profileApi.changePassword(passwordData.value.current, passwordData.value.new)
       passwordData.value = { current: '', new: '', confirm: '' }
+      passwordTouchedByUser.value = false
     }
 
     originalData.value = { ...formData.value }
@@ -843,6 +857,7 @@ const handleSave = saveChanges(async () => {
 const handleDiscard = () => {
   discardChanges()
   passwordData.value = { current: '', new: '', confirm: '' }
+  passwordTouchedByUser.value = false
 }
 
 const handleDeleteAccount = async () => {

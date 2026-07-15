@@ -56,6 +56,31 @@
             <p class="text-xs txt-secondary mt-2">
               {{ $t('config.routing.masterHint') }}
             </p>
+            <p
+              v-if="multitaskPersonalOverride && multitaskEffectiveForMe !== multitaskEnabled"
+              class="text-xs mt-2 px-3 py-2 rounded-lg border border-amber-300/60 dark:border-amber-700/50 bg-amber-50/80 dark:bg-amber-950/30 text-amber-900 dark:text-amber-100"
+              data-testid="multitask-override-warning"
+            >
+              {{
+                $t('config.routing.personalOverrideWarning', {
+                  effective: multitaskEffectiveForMe
+                    ? $t('config.routing.masterOn')
+                    : $t('config.routing.masterOff'),
+                  global: multitaskEnabled
+                    ? $t('config.routing.masterOn')
+                    : $t('config.routing.masterOff'),
+                })
+              }}
+              <button
+                type="button"
+                class="ml-2 underline font-medium disabled:opacity-50"
+                :disabled="togglingMultitask"
+                data-testid="btn-clear-multitask-override"
+                @click="clearMultitaskPersonalOverride"
+              >
+                {{ $t('config.routing.clearPersonalOverride') }}
+              </button>
+            </p>
           </div>
           <label
             class="inline-flex items-center gap-3 cursor-pointer flex-shrink-0"
@@ -482,6 +507,8 @@ import { getMarkdownRenderer } from '@/composables/useMarkdown'
 // This is the primary router; when OFF, the legacy AI sorter handles routing
 // (see the collapsed "Legacy fallback" section).
 const multitaskEnabled = ref(false)
+const multitaskPersonalOverride = ref(false)
+const multitaskEffectiveForMe = ref(true)
 const togglingMultitask = ref(false)
 
 // --- Planner prompt (tools:plan) editor state ------------------------------
@@ -712,7 +739,12 @@ const loadRoutingToggles = async () => {
   if (!isAdmin.value) return
   try {
     const values = await getConfigValues()
-    multitaskEnabled.value = parseBoolConfigValue(values['MULTITASK_ROUTING_ENABLED']?.value)
+    const routing = values['MULTITASK_ROUTING_ENABLED']
+    multitaskEnabled.value = parseBoolConfigValue(routing?.value)
+    multitaskPersonalOverride.value = routing?.hasPersonalOverride === true
+    multitaskEffectiveForMe.value = parseBoolConfigValue(
+      routing?.effectiveForMe ?? routing?.value ?? 'true'
+    )
   } catch (err) {
     const message = err instanceof Error ? err.message : t('config.routing.togglesLoadFailed')
     showError(message)
@@ -731,6 +763,9 @@ const onToggleMultitask = async (next: boolean) => {
     if (!result.success) {
       throw new Error(result.error || t('config.routing.masterUpdateFailed'))
     }
+    // Side-effect on the backend clears the acting admin's personal override.
+    multitaskPersonalOverride.value = false
+    multitaskEffectiveForMe.value = next
     success(
       next ? t('config.routing.masterEnabledNotice') : t('config.routing.masterDisabledNotice')
     )
@@ -741,6 +776,12 @@ const onToggleMultitask = async (next: boolean) => {
   } finally {
     togglingMultitask.value = false
   }
+}
+
+/** Re-apply the workspace default to this admin account (#1079). */
+const clearMultitaskPersonalOverride = async () => {
+  if (!isAdmin.value) return
+  await onToggleMultitask(multitaskEnabled.value)
 }
 
 // --- Planner prompt (tools:plan) load / save --------------------------------
