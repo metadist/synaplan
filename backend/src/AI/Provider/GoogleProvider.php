@@ -1854,18 +1854,32 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         $contents = [];
 
         foreach ($messages as $message) {
-            $role = 'assistant' === $message['role'] ? 'model' : 'user';
+            $role = 'assistant' === ($message['role'] ?? 'user') ? 'model' : 'user';
+            $content = $message['content'] ?? '';
 
             $parts = [];
-            if (is_string($message['content'])) {
-                $parts[] = ['text' => $message['content']];
-            } elseif (is_array($message['content'])) {
-                foreach ($message['content'] as $part) {
-                    if ('text' === $part['type']) {
-                        $parts[] = ['text' => $part['text']];
-                    } elseif ('image_url' === $part['type']) {
+            if (is_string($content)) {
+                // Skip blank turns: Gemini rejects empty text parts with a 400
+                // ("empty text parameter"), so a blank history row (WhatsApp
+                // media-only / placeholder / error rows) would break the turn.
+                if ('' !== trim($content)) {
+                    $parts[] = ['text' => $content];
+                }
+            } elseif (is_array($content)) {
+                foreach ($content as $part) {
+                    if (!is_array($part)) {
+                        continue;
+                    }
+
+                    $type = $part['type'] ?? '';
+                    if ('text' === $type) {
+                        $text = (string) ($part['text'] ?? '');
+                        if ('' !== trim($text)) {
+                            $parts[] = ['text' => $text];
+                        }
+                    } elseif ('image_url' === $type) {
                         $imageUrl = $part['image_url']['url'] ?? $part['image_url'];
-                        if (str_starts_with($imageUrl, 'data:image')) {
+                        if (is_string($imageUrl) && str_starts_with($imageUrl, 'data:image')) {
                             // Base64 image
                             list($mime, $data) = explode(';', $imageUrl);
                             list(, $data) = explode(',', $data);
@@ -1880,10 +1894,70 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 }
             }
 
+            // Drop turns that produced no usable parts — an empty `parts` array
+            // is itself a 400 on Gemini.
+            if ([] === $parts) {
+                continue;
+            }
+
             $contents[] = [
                 'role' => $role,
                 'parts' => $parts,
             ];
+        }
+
+        // Gemini requires strictly alternating user/model turns that begin with
+        // a `user` turn. Dropping blank rows above can leave two same-role turns
+        // adjacent, and the loaded history window can begin on an assistant/OUT
+        // row — both are 400s. Mirror the AnthropicProvider normalisation.
+        $contents = $this->mergeConsecutiveGeminiContents($contents);
+        $contents = $this->dropLeadingModelContents($contents);
+
+        return $contents;
+    }
+
+    /**
+     * Merge consecutive same-role Gemini contents by concatenating their parts.
+     *
+     * @param list<array{role: string, parts: list<array<string, mixed>>}> $contents
+     *
+     * @return list<array{role: string, parts: list<array<string, mixed>>}>
+     */
+    private function mergeConsecutiveGeminiContents(array $contents): array
+    {
+        if (count($contents) < 2) {
+            return $contents;
+        }
+
+        $merged = [$contents[0]];
+
+        for ($i = 1, $count = count($contents); $i < $count; ++$i) {
+            $last = &$merged[count($merged) - 1];
+
+            if ($contents[$i]['role'] === $last['role']) {
+                $last['parts'] = array_merge($last['parts'], $contents[$i]['parts']);
+            } else {
+                $merged[] = $contents[$i];
+            }
+
+            unset($last);
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Drop leading `model` turns so the conversation starts with a `user` turn,
+     * as Gemini requires.
+     *
+     * @param list<array{role: string, parts: list<array<string, mixed>>}> $contents
+     *
+     * @return list<array{role: string, parts: list<array<string, mixed>>}>
+     */
+    private function dropLeadingModelContents(array $contents): array
+    {
+        while ([] !== $contents && 'user' !== $contents[0]['role']) {
+            array_shift($contents);
         }
 
         return $contents;
