@@ -492,6 +492,21 @@ export const selectors = {
     inputNewPassword: '[data-testid="input-new-password"]',
     inputConfirmPassword: '[data-testid="input-confirm-password"]',
   },
+  memories: {
+    btnCreate: '[data-testid="btn-memory-create"]',
+    /** Rendered twice per memory (desktop row + mobile card) — filter visible */
+    item: '[data-testid="item-memory"]',
+    btnEdit: '[data-testid="btn-memory-edit"]',
+    btnDelete: '[data-testid="btn-memory-delete"]',
+    stateEmpty: '[data-testid="state-memories-empty"]',
+    formModal: '[data-testid="modal-memory-form"]',
+    /** Form dialog: switch to the AI-free advanced form */
+    btnModeAdvanced: '[data-testid="btn-memory-mode-advanced"]',
+    inputCategory: '[data-testid="input-memory-category"]',
+    inputKey: '[data-testid="input-memory-key"]',
+    inputValue: '[data-testid="input-memory-value"]',
+    btnSave: '[data-testid="btn-memory-save"]',
+  },
   /** UnsavedChangesBar.vue (profile & config pages) */
   unsavedBar: {
     save: '[data-testid="btn-unsaved-save"]',
