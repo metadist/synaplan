@@ -154,22 +154,11 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $model = $options['model'];
             $reasoning = $options['reasoning'] ?? false;
 
-            // Convert multimodal content (images) to Anthropic format
+            // Convert multimodal content (images) to Anthropic format, then
+            // normalise the thread to Anthropic's stricter Messages API rules
+            // (non-empty content, alternating roles, leading `user` turn).
             $convertedMessages = $this->convertMessagesToAnthropicFormat($messages);
-
-            // Separate system message from conversation
-            $systemMessage = null;
-            $conversationMessages = [];
-
-            foreach ($convertedMessages as $message) {
-                if (($message['role'] ?? '') === 'system') {
-                    $systemMessage = is_string($message['content']) ? $message['content'] : json_encode($message['content']);
-                } else {
-                    $conversationMessages[] = $message;
-                }
-            }
-
-            $conversationMessages = $this->mergeConsecutiveRoles($conversationMessages);
+            [$systemMessage, $conversationMessages] = $this->prepareConversation($convertedMessages);
 
             $thinkingEnabled = $reasoning && $this->supportsThinking($model);
 
@@ -289,22 +278,11 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $model = $options['model'];
             $reasoning = $options['reasoning'] ?? false;
 
-            // Convert multimodal content (images) to Anthropic format
+            // Convert multimodal content (images) to Anthropic format, then
+            // normalise the thread to Anthropic's stricter Messages API rules
+            // (non-empty content, alternating roles, leading `user` turn).
             $convertedMessages = $this->convertMessagesToAnthropicFormat($messages);
-
-            // Separate system message from conversation
-            $systemMessage = null;
-            $conversationMessages = [];
-
-            foreach ($convertedMessages as $message) {
-                if (($message['role'] ?? '') === 'system') {
-                    $systemMessage = is_string($message['content']) ? $message['content'] : json_encode($message['content']);
-                } else {
-                    $conversationMessages[] = $message;
-                }
-            }
-
-            $conversationMessages = $this->mergeConsecutiveRoles($conversationMessages);
+            [$systemMessage, $conversationMessages] = $this->prepareConversation($convertedMessages);
 
             $thinkingEnabled = $reasoning && $this->supportsThinking($model);
 
@@ -348,12 +326,28 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'buffer' => false, // Don't buffer the response
             ]);
 
+            // Surface HTTP errors BEFORE streaming. With `buffer: false` the SSE
+            // body cannot be re-read once parseSSEStream() has consumed it, so a
+            // 400 would otherwise reach the user as the opaque Symfony message
+            // "HTTP/2 400 returned for …" with Anthropic's real reason lost.
+            // getStatusCode() waits for the response headers but never throws on
+            // a 4xx/5xx, and getContent(false) is still readable here because the
+            // stream has not been consumed yet.
+            $statusCode = $response->getStatusCode();
+            if ($statusCode >= 400) {
+                throw new ProviderException($this->formatStreamHttpError($response, $model, $statusCode), 'anthropic');
+            }
+
             // Parse SSE stream and collect usage
             $usage = $this->parseSSEStream($response, $callback);
 
             $this->logger->info('🔵 Anthropic: Streaming completed', ['usage' => $usage]);
 
             return ['usage' => $usage];
+        } catch (ProviderException $e) {
+            // Already carries a formatted, user-safe message (e.g. the up-front
+            // HTTP error detection above) — surface it as-is without re-wrapping.
+            throw $e;
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
 
@@ -614,6 +608,142 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         }
 
         return ['type' => 'enabled', 'budget_tokens' => 5000];
+    }
+
+    /**
+     * Split the system message out and normalise the conversation so it
+     * satisfies Anthropic's Messages API constraints, which are stricter than
+     * the OpenAI-style providers the rest of the app targets:
+     *   - every message must have non-empty content,
+     *   - user/assistant turns must strictly alternate,
+     *   - the first message must be a `user` turn.
+     *
+     * WhatsApp/e-mail threads routinely carry blank-text rows (media-only,
+     * placeholder or error rows) and the loaded history window can begin on an
+     * assistant turn; either one makes Anthropic reject the WHOLE request with
+     * an HTTP 400 invalid_request_error, while other providers silently accept
+     * it. Sanitising here fixes every channel (WhatsApp, e-mail, web, task DAG)
+     * in one place.
+     *
+     * @param list<array<string, mixed>> $convertedMessages
+     *
+     * @return array{0: string|null, 1: list<array<string, mixed>>}
+     */
+    private function prepareConversation(array $convertedMessages): array
+    {
+        $systemMessage = null;
+        $conversationMessages = [];
+
+        foreach ($convertedMessages as $message) {
+            if (($message['role'] ?? '') === 'system') {
+                $content = $message['content'] ?? '';
+                $systemMessage = is_string($content) ? $content : (json_encode($content) ?: null);
+
+                continue;
+            }
+
+            // Drop empty-content turns: Anthropic rejects "" / empty content
+            // blocks with a 400, unlike OpenAI/Groq/Gemini.
+            if (!$this->hasMeaningfulContent($message['content'] ?? null)) {
+                continue;
+            }
+
+            $conversationMessages[] = $message;
+        }
+
+        $conversationMessages = $this->mergeConsecutiveRoles($conversationMessages);
+        $conversationMessages = $this->dropLeadingAssistantTurns($conversationMessages);
+
+        return [$systemMessage, $conversationMessages];
+    }
+
+    /**
+     * Whether a message's content carries anything Anthropic will accept.
+     *
+     * A string must be non-blank; a multimodal array must contain at least one
+     * non-text block (image, …) or a non-blank text block — an array whose only
+     * text block is empty is treated as empty, since Anthropic rejects empty
+     * text content blocks too.
+     */
+    private function hasMeaningfulContent(mixed $content): bool
+    {
+        if (is_string($content)) {
+            return '' !== trim($content);
+        }
+
+        if (is_array($content)) {
+            foreach ($content as $block) {
+                if (!is_array($block)) {
+                    continue;
+                }
+
+                if ('text' === ($block['type'] ?? '')) {
+                    if ('' !== trim((string) ($block['text'] ?? ''))) {
+                        return true;
+                    }
+
+                    continue;
+                }
+
+                // Any non-text block (image, document, …) is real content.
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Drop leading assistant turns so the conversation starts with a `user`
+     * message. The loaded chat history window can begin on an assistant/OUT row
+     * (e.g. the char-limit trim cut off the opening user turn), which Anthropic
+     * rejects with a 400.
+     *
+     * @param list<array<string, mixed>> $messages
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function dropLeadingAssistantTurns(array $messages): array
+    {
+        while ([] !== $messages && 'user' !== ($messages[0]['role'] ?? '')) {
+            array_shift($messages);
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Build a human-readable error for a failed streaming request, preferring
+     * Anthropic's own `error.message`/`error.type` over the opaque transport
+     * message. Safe to call before the SSE stream is consumed (see caller).
+     */
+    private function formatStreamHttpError(ResponseInterface $response, string $model, int $statusCode): string
+    {
+        $detail = null;
+
+        try {
+            $body = $response->getContent(false);
+            $decoded = json_decode($body, true);
+            if (is_array($decoded) && isset($decoded['error']) && is_array($decoded['error'])) {
+                $detail = sprintf(
+                    'Anthropic API Error: %s (type: %s)',
+                    $decoded['error']['message'] ?? 'Unknown error',
+                    $decoded['error']['type'] ?? 'unknown'
+                );
+            }
+        } catch (\Throwable) {
+            // Body unavailable — fall back to the generic status message.
+        }
+
+        $message = $detail ?? sprintf('Anthropic API request failed with HTTP %d', $statusCode);
+
+        $this->logger->error('Anthropic streaming request failed', [
+            'model' => $model,
+            'status_code' => $statusCode,
+            'error' => $message,
+        ]);
+
+        return $message;
     }
 
     /**

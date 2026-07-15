@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\AI\Provider;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Provider\AnthropicProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -226,6 +227,106 @@ class AnthropicProviderStreamingTest extends TestCase
         $this->assertSame(20, $result['usage']['total_tokens']);
     }
 
+    // ==================== MESSAGE SANITISATION (WhatsApp 400 fix) ====================
+
+    /**
+     * Empty-content turns (e.g. a WhatsApp media-only / placeholder / error row
+     * stored with blank text) must be dropped before the request — Anthropic
+     * rejects empty content with a 400 while OpenAI-style providers tolerate it.
+     * The two surviving user turns collapse into one via role merging.
+     */
+    public function testEmptyHistoryTurnsAreDroppedBeforeRequest(): void
+    {
+        $captured = null;
+        $sse = $this->buildOkStream();
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$captured, $sse): MockResponse {
+            $captured = $this->decodeRequestBody($options);
+
+            return new MockResponse($sse, ['response_headers' => ['content-type' => 'text/event-stream']]);
+        });
+
+        $this->makeProvider(httpClient: $client)->chatStream(
+            [
+                ['role' => 'system', 'content' => 'You are helpful.'],
+                ['role' => 'user', 'content' => 'first question'],
+                ['role' => 'assistant', 'content' => '   '], // blank OUT row
+                ['role' => 'user', 'content' => 'second question'],
+            ],
+            static fn () => null,
+            ['model' => 'claude-haiku-4-5'],
+        );
+
+        $this->assertNotNull($captured);
+        $messages = $captured['messages'];
+
+        foreach ($messages as $message) {
+            $this->assertNotSame('', trim((string) $message['content']), 'no empty-content message may be sent to Anthropic');
+        }
+
+        $this->assertCount(1, $messages, 'the two user turns merge once the blank assistant row is dropped');
+        $this->assertSame('user', $messages[0]['role']);
+        $this->assertStringContainsString('first question', $messages[0]['content']);
+        $this->assertStringContainsString('second question', $messages[0]['content']);
+    }
+
+    /**
+     * When the loaded history window begins on an assistant turn (the opening
+     * user message was trimmed off), the leading assistant turn must be dropped
+     * so the request starts with a `user` message — Anthropic 400s otherwise.
+     */
+    public function testLeadingAssistantTurnsAreDropped(): void
+    {
+        $captured = null;
+        $sse = $this->buildOkStream();
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$captured, $sse): MockResponse {
+            $captured = $this->decodeRequestBody($options);
+
+            return new MockResponse($sse, ['response_headers' => ['content-type' => 'text/event-stream']]);
+        });
+
+        $this->makeProvider(httpClient: $client)->chatStream(
+            [
+                ['role' => 'assistant', 'content' => 'leftover reply from trimmed history'],
+                ['role' => 'user', 'content' => 'actual question'],
+            ],
+            static fn () => null,
+            ['model' => 'claude-haiku-4-5'],
+        );
+
+        $this->assertNotNull($captured);
+        $messages = $captured['messages'];
+        $this->assertNotEmpty($messages);
+        $this->assertSame('user', $messages[0]['role'], 'conversation must start with a user turn');
+        $this->assertSame('actual question', $messages[0]['content']);
+    }
+
+    /**
+     * A streaming HTTP error (buffer:false) must surface Anthropic's real
+     * error.message/type — not the opaque "HTTP 400 returned for …" transport
+     * message the WhatsApp user previously saw.
+     */
+    public function testStreamingSurfacesAnthropicErrorDetailOnHttpError(): void
+    {
+        $errorJson = json_encode([
+            'type' => 'error',
+            'error' => [
+                'type' => 'invalid_request_error',
+                'message' => 'messages: text content blocks must be non-empty',
+            ],
+        ]);
+
+        $client = new MockHttpClient(static fn (): MockResponse => new MockResponse((string) $errorJson, ['http_code' => 400]));
+
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('messages: text content blocks must be non-empty');
+
+        $this->makeProvider(httpClient: $client)->chatStream(
+            [['role' => 'user', 'content' => 'hi']],
+            static fn () => null,
+            ['model' => 'claude-haiku-4-5'],
+        );
+    }
+
     // ==================== HELPERS ====================
 
     /**
@@ -243,6 +344,62 @@ class AnthropicProviderStreamingTest extends TestCase
         }
 
         return implode("\n\n", $parts)."\n\n";
+    }
+
+    /**
+     * A minimal, well-formed success SSE stream (single text delta) for tests
+     * that only care about the outgoing request body.
+     */
+    private function buildOkStream(): string
+    {
+        return $this->buildSseStream([
+            ['event' => 'message_start', 'data' => [
+                'type' => 'message_start',
+                'message' => ['usage' => ['input_tokens' => 1, 'output_tokens' => 0]],
+            ]],
+            ['event' => 'content_block_start', 'data' => [
+                'type' => 'content_block_start',
+                'index' => 0,
+                'content_block' => ['type' => 'text', 'text' => ''],
+            ]],
+            ['event' => 'content_block_delta', 'data' => [
+                'type' => 'content_block_delta',
+                'index' => 0,
+                'delta' => ['type' => 'text_delta', 'text' => 'ok'],
+            ]],
+            ['event' => 'content_block_stop', 'data' => ['type' => 'content_block_stop', 'index' => 0]],
+            ['event' => 'message_delta', 'data' => [
+                'type' => 'message_delta',
+                'delta' => ['stop_reason' => 'end_turn'],
+                'usage' => ['output_tokens' => 1],
+            ]],
+            ['event' => 'message_stop', 'data' => ['type' => 'message_stop']],
+        ]);
+    }
+
+    /**
+     * Decode the JSON request body captured from the MockHttpClient callback.
+     * Symfony normalises the `json` option into a `body` string before the
+     * response factory runs, so read that back.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function decodeRequestBody(array $options): array
+    {
+        if (isset($options['json']) && is_array($options['json'])) {
+            return $options['json'];
+        }
+
+        $body = $options['body'] ?? '';
+        if (is_string($body) && '' !== $body) {
+            $decoded = json_decode($body, true);
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
     }
 
     private function makeProvider(?HttpClientInterface $httpClient = null): AnthropicProvider
