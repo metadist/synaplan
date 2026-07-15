@@ -204,6 +204,28 @@ final readonly class VectorizationService
                 $this->vectorStorage->storeChunkBatch($vectorChunks);
             }
 
+            // #1344: every chunk embedding can fail (continue above) while we still
+            // reach this return. Reporting success:true with chunks_created:0 lets
+            // describeVectorizeAndSort set BSTATUS=vectorized for a file with zero
+            // BRAG/Qdrant rows — UI shows a success toast while the brain icon stays.
+            // Treat "had chunks to embed but stored none" as failure so callers do
+            // not mark the file vectorized.
+            if (0 === $chunksCreated) {
+                $this->logger->error('VectorizationService: no chunks embedded', [
+                    'user_id' => $userId,
+                    'message_id' => $messageId,
+                    'chunk_count' => count($chunks),
+                    'failed_embeddings' => $embedResult['failed'],
+                ]);
+
+                return [
+                    'success' => false,
+                    'chunks_created' => 0,
+                    'error' => 'No chunks could be embedded (all embeddings empty or failed)',
+                    'provider' => $this->vectorStorage->getProviderName(),
+                ];
+            }
+
             $this->logger->info('VectorizationService: Vectorization complete', [
                 'user_id' => $userId,
                 'message_id' => $messageId,

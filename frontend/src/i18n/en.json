@@ -3352,6 +3352,8 @@
   },
   "message": {
     "thinking": "Thinking process",
+    "thinkingInProgress": "Thinking…",
+    "thoughtFor": "Thought for {n} seconds",
     "reasoning": "AI Reasoning",
     "downloadImage": "Download image",
     "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",

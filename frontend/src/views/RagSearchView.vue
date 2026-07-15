@@ -427,8 +427,9 @@ const performSearch = async () => {
 }
 
 const viewFile = (messageId: number) => {
-  router.push('/files')
-  showSuccess(t('rag.navigateToFile', { id: messageId }))
+  // #1268: pass the file id so FilesView can open FileContentModal on mount.
+  // Search results alias file_id as message_id (legacy RAG payload shape).
+  router.push({ path: '/files', query: { file: String(messageId) } })
 }
 
 const findSimilarDocs = async (chunkId: number | string) => {

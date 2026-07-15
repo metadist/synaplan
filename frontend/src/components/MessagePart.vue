@@ -105,6 +105,7 @@ const componentProps = computed(() => {
       return {
         content: props.part.content || '',
         thinkingTime: props.part.thinkingTime,
+        isStreaming: props.part.isStreaming,
       }
     default:
       return { content: props.part.content || '', memories: props.memories }

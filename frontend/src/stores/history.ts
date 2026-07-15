@@ -70,6 +70,8 @@ export interface Part {
   result?: string
   expiresAt?: string
   thinkingTime?: number // Time in seconds for thinking process
+  /** Epoch ms when the first reasoning chunk arrived (live stream only, #1058). */
+  thinkingStartedAt?: number
   isStreaming?: boolean // For reasoning parts that are still being streamed
   autoplay?: boolean // Auto-play audio (voice reply)
 }
@@ -361,6 +363,20 @@ export const useHistoryStore = defineStore('history', () => {
         if (currentContent && currentContent.includes('<think>')) {
           message.parts = parseContentWithThinking(currentContent)
         }
+      }
+
+      // #1058: convert live wall-clock start → thinkingTime seconds, then clear
+      // the ephemeral startedAt so history payloads stay lean.
+      const now = Date.now()
+      for (const part of message.parts) {
+        if (part.type !== 'thinking') continue
+        if (part.isStreaming) {
+          delete part.isStreaming
+        }
+        if (typeof part.thinkingStartedAt === 'number' && !part.thinkingTime) {
+          part.thinkingTime = Math.max(1, Math.round((now - part.thinkingStartedAt) / 1000))
+        }
+        delete part.thinkingStartedAt
       }
     }
   }

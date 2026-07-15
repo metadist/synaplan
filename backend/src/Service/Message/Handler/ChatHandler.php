@@ -1277,6 +1277,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $messageContent = $content;
             }
 
+            // #1115: Mistral rejects assistant turns with empty content
+            // ("Assistant message must have either content or tool_calls") and
+            // openai-php silently yields 0 stream chunks — which we then persist
+            // as another empty OUT, poisoning the chat forever. Skip empty
+            // assistant history turns for every provider (harmless elsewhere).
+            if ('assistant' === $role && $this->isEmptyAssistantContent($messageContent)) {
+                continue;
+            }
+
             $messages[] = [
                 'role' => $role,
                 'content' => $messageContent,
@@ -1291,6 +1300,38 @@ final readonly class ChatHandler implements MessageHandlerInterface
         ];
 
         return $messages;
+    }
+
+    /**
+     * True when an assistant history turn has no usable text (and no multimodal
+     * parts). Used to keep empty OUT rows out of provider payloads (#1115).
+     *
+     * @param string|array<int, mixed> $content
+     */
+    private function isEmptyAssistantContent(string|array $content): bool
+    {
+        if (is_string($content)) {
+            // Non-streaming JSON path prefixes "[datetime]: " even when the body
+            // is empty — treat that as empty too.
+            $stripped = preg_replace('/^\[[^\]]*\]:\s*/u', '', $content) ?? $content;
+
+            return '' === trim($stripped);
+        }
+
+        foreach ($content as $part) {
+            if (!is_array($part)) {
+                continue;
+            }
+            $type = $part['type'] ?? '';
+            if ('text' === $type && '' !== trim((string) ($part['text'] ?? ''))) {
+                return false;
+            }
+            if (in_array($type, ['image_url', 'image', 'input_image'], true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -1496,6 +1537,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $messageContent = $this->buildMultimodalContent('['.$msg->getDateTime().']: '.$content, $imageUrls);
             } else {
                 $messageContent = '['.$msg->getDateTime().']: '.$content;
+            }
+
+            // #1115 — same empty-assistant filter as buildStreamingMessages.
+            if ('assistant' === $role && $this->isEmptyAssistantContent($messageContent)) {
+                continue;
             }
 
             $messages[] = [

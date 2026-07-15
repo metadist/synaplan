@@ -676,6 +676,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     $message->getId(),
                     $result['provider'] ?? $provider,
                     ephemeral: !empty($options['incognito']),
+                    // #1251: persist the spoken script so Files → describe /
+                    // knowledge-base never falls back to Tika MP3 duration.
+                    fileText: $prompt,
                 );
 
                 // Clean, localized confirmation (the audio player + download is the

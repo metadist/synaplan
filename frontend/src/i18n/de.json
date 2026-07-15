@@ -1091,6 +1091,8 @@
   },
   "message": {
     "thinking": "Denkprozess",
+    "thinkingInProgress": "Denke nach…",
+    "thoughtFor": "{n} Sekunden nachgedacht",
     "reasoning": "KI-Überlegung",
     "downloadImage": "Bild herunterladen",
     "fileGenerated": "Ich habe die Datei '{filename}' für dich erstellt. Du kannst sie jetzt herunterladen.",

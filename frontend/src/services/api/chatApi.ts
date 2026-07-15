@@ -298,7 +298,14 @@ function cacheSseToken(token: string | null): void {
  */
 function warmSseTokenViaRefresh(): void {
   void refreshAccessToken()
-    .then(() => getSseToken())
+    .then((ok) => {
+      // #1140 residual: a failed refresh must not call GET /auth/token —
+      // that is what produces the console 401 when the session is gone.
+      if (!ok) {
+        return null
+      }
+      return getSseToken()
+    })
     .catch(() => {
       // Network blip — next call will retry. Don't crash the page.
     })

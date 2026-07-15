@@ -1616,10 +1616,11 @@ import filesService, {
 } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useFilePersistence } from '@/composables/useInputPersistence'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 
 /** §4.8 #2: open a chat with this knowledge folder preselected (chat-input picker). */
 function useFolderInChat(folderName: string): void {
@@ -2605,6 +2606,20 @@ const vectorStateOf = (file: FileItem) =>
 onMounted(async () => {
   document.addEventListener('click', closeFolderMenu)
   await Promise.all([loadFileGroups(), loadFiles(), loadFacets()])
+
+  // #1268: deep-link from /files/search "View file" (?file=<id>).
+  const fileQuery = route.query.file
+  const fileId =
+    'string' === typeof fileQuery
+      ? Number.parseInt(fileQuery, 10)
+      : Array.isArray(fileQuery) && 'string' === typeof fileQuery[0]
+        ? Number.parseInt(fileQuery[0], 10)
+        : NaN
+  if (Number.isFinite(fileId) && fileId > 0) {
+    viewFileContent(fileId)
+    // Drop the query so a later refresh / back navigation does not reopen.
+    router.replace({ path: '/files', query: { ...route.query, file: undefined } })
+  }
 
   const persistedFiles = loadFileMetadata()
   if (persistedFiles && persistedFiles.length > 0) {

@@ -84,6 +84,9 @@ final readonly class Text2SoundRunner implements TaskRunner
             'path' => '/api/v1/files/uploads/'.$relativePath,
             'type' => 'audio',
             'local_path' => $relativePath,
+            // #1251: carried through ResultAssembler → persistTaskPlanFiles so
+            // GeneratedFileRegistrar can store the spoken script as BFILETEXT.
+            'source_text' => $text,
         ];
 
         return NodeResult::ok(null, [$file], [
