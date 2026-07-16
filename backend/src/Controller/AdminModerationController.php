@@ -99,7 +99,25 @@ final class AdminModerationController extends AbstractController
             ]
         )
     )]
-    #[OA\Response(response: 200, description: 'Updated report')]
+    #[OA\Response(
+        response: 200,
+        description: 'Updated report',
+        content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'id', type: 'integer', example: 42),
+            new OA\Property(property: 'contentType', type: 'string', example: 'message'),
+            new OA\Property(property: 'contentId', type: 'integer', example: 12345),
+            new OA\Property(property: 'reason', type: 'string', example: 'harassment'),
+            new OA\Property(property: 'details', type: 'string', nullable: true),
+            new OA\Property(property: 'status', type: 'string', example: 'reviewed'),
+            new OA\Property(property: 'reporterId', type: 'integer', example: 7),
+            new OA\Property(property: 'reportedUserId', type: 'integer', nullable: true, example: 9),
+            new OA\Property(property: 'reportedUserEmail', type: 'string', nullable: true),
+            new OA\Property(property: 'reportedUserStatus', type: 'string', nullable: true, example: 'active'),
+            new OA\Property(property: 'created', type: 'string', example: '2026-07-16 12:00:00'),
+            new OA\Property(property: 'reviewedBy', type: 'integer', nullable: true),
+            new OA\Property(property: 'reviewedAt', type: 'string', nullable: true),
+        ])
+    )]
     #[OA\Response(response: 400, description: 'Invalid status')]
     #[OA\Response(response: 404, description: 'Report not found')]
     public function updateReport(int $id, Request $request, #[CurrentUser] ?User $admin): JsonResponse
@@ -137,7 +155,15 @@ final class AdminModerationController extends AbstractController
             ]
         )
     )]
-    #[OA\Response(response: 200, description: 'Updated account status')]
+    #[OA\Response(
+        response: 200,
+        description: 'Updated account status',
+        content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'id', type: 'integer', example: 9),
+            new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
+            new OA\Property(property: 'accountStatus', type: 'string', enum: ['active', 'suspended', 'banned'], example: 'suspended'),
+        ])
+    )]
     #[OA\Response(response: 400, description: 'Invalid status')]
     #[OA\Response(response: 404, description: 'User not found')]
     public function updateUserStatus(int $id, Request $request, #[CurrentUser] ?User $admin): JsonResponse

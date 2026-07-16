@@ -196,6 +196,54 @@
     "fileOnlyDefaultMessage": "Por favor, revisa el archivo adjunto.",
     "voiceMessageDefaultMessage": "Por favor, responde a mi mensaje de voz."
   },
+  "moderation": {
+    "report": {
+      "button": "Reportar",
+      "title": "Reportar contenido",
+      "subtitle": "Marca esta respuesta para revisión",
+      "reasonLabel": "¿Por qué lo reportas?",
+      "detailsLabel": "Detalles adicionales (opcional)",
+      "detailsPlaceholder": "Añade lo que nos ayude a revisar este reporte.",
+      "explanation": "Nuestro equipo revisa cada reporte. El contenido objetable se elimina y los infractores reincidentes son suspendidos. Gracias por ayudar a mantener Synaplan seguro.",
+      "submit": "Enviar reporte",
+      "success": "Gracias. Tu reporte ha sido enviado.",
+      "error": "No se pudo enviar el reporte. Inténtalo de nuevo."
+    },
+    "reasons": {
+      "harassment": {
+        "label": "Acoso o intimidación",
+        "hint": "Contenido amenazante, intimidatorio o abusivo."
+      },
+      "hate_speech": {
+        "label": "Discurso de odio",
+        "hint": "Ataca a una persona o grupo por su identidad."
+      },
+      "violence": {
+        "label": "Violencia o amenazas",
+        "hint": "Promueve o amenaza con violencia o autolesión."
+      },
+      "sexual_content": {
+        "label": "Contenido sexual",
+        "hint": "Material sexualmente explícito o inapropiado."
+      },
+      "csae": {
+        "label": "Abuso o explotación sexual infantil",
+        "hint": "Contenido que pone en peligro a un menor. Se trata con máxima prioridad."
+      },
+      "spam": {
+        "label": "Spam o engañoso",
+        "hint": "Contenido no solicitado, engañoso o repetitivo."
+      },
+      "illegal": {
+        "label": "Actividad ilegal",
+        "hint": "Promueve o facilita actos ilegales."
+      },
+      "other": {
+        "label": "Otra cosa",
+        "hint": "Cualquier otro contenido objetable."
+      }
+    }
+  },
   "admin": {
     "title": "Panel de Administración",
     "description": "Gestión y configuración del sistema",
@@ -204,6 +252,7 @@
       "users": "Usuarios",
       "prompts": "Prompts",
       "usage": "Uso",
+      "moderation": "Moderación",
       "appServer": "Servidor de la app"
     },
     "overview": {
@@ -338,6 +387,60 @@
       "loadError": "No se pudieron cargar las suscripciones",
       "noSubscriptions": "No se encontraron planes de suscripción. Crea primero los planes en la base de datos.",
       "budgetHint": "El presupuesto define el costo máximo de tokens (en EUR) por período de facturación. Establécelo en 0 para uso ilimitado. Los precios son los precios públicos mostrados; las compras en la app móvil usan el precio de la tienda de aplicaciones."
+    },
+    "moderation": {
+      "title": "Moderación de contenido",
+      "description": "Revisa el contenido reportado y, si es necesario, suspende o bloquea la cuenta infractora.",
+      "empty": "Ningún reporte coincide con este filtro.",
+      "loadError": "No se pudieron cargar los reportes",
+      "updateError": "Error al actualizar",
+      "reportUpdated": "Reporte actualizado",
+      "userStatusUpdated": "Estado de la cuenta actualizado",
+      "unresolvedUser": "Autor no identificado",
+      "totalCount": "{count} reportes",
+      "suspend": "Suspender",
+      "ban": "Bloquear",
+      "reactivate": "Reactivar",
+      "filters": {
+        "all": "Todos",
+        "open": "Abiertos",
+        "reviewed": "Revisados",
+        "actioned": "Resueltos",
+        "dismissed": "Descartados"
+      },
+      "col": {
+        "reason": "Motivo",
+        "content": "Contenido",
+        "reportedUser": "Usuario reportado",
+        "created": "Reportado",
+        "status": "Estado",
+        "actions": "Acciones"
+      },
+      "reportStatus": {
+        "open": "Abierto",
+        "reviewed": "Revisado",
+        "actioned": "Resuelto",
+        "dismissed": "Descartado"
+      },
+      "accountStatus": {
+        "active": "Activa",
+        "suspended": "Suspendida",
+        "banned": "Bloqueada"
+      },
+      "confirm": {
+        "suspended": {
+          "title": "¿Suspender la cuenta?",
+          "message": "¿Suspender a {user}? Se cerrará su sesión y no podrá usar la plataforma hasta que se reactive."
+        },
+        "banned": {
+          "title": "¿Bloquear la cuenta?",
+          "message": "¿Bloquear a {user}? Esto bloquea la cuenta de forma permanente. Resérvalo para infracciones graves."
+        },
+        "active": {
+          "title": "¿Reactivar la cuenta?",
+          "message": "¿Reactivar a {user}? Podrá iniciar sesión y usar la plataforma de nuevo."
+        }
+      }
     },
     "config": {
       "title": "Configuración del Sistema",

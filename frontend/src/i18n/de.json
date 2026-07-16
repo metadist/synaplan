@@ -198,6 +198,54 @@
     "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei.",
     "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht."
   },
+  "moderation": {
+    "report": {
+      "button": "Melden",
+      "title": "Inhalt melden",
+      "subtitle": "Diese Antwort zur Prüfung melden",
+      "reasonLabel": "Warum meldest du das?",
+      "detailsLabel": "Zusätzliche Angaben (optional)",
+      "detailsPlaceholder": "Alles, was uns bei der Prüfung hilft.",
+      "explanation": "Unser Team prüft jede Meldung. Anstößige Inhalte werden entfernt und Wiederholungstäter gesperrt. Danke, dass du hilfst, Synaplan sicher zu halten.",
+      "submit": "Meldung senden",
+      "success": "Danke. Deine Meldung wurde übermittelt.",
+      "error": "Meldung konnte nicht gesendet werden. Bitte erneut versuchen."
+    },
+    "reasons": {
+      "harassment": {
+        "label": "Belästigung oder Mobbing",
+        "hint": "Bedrohende, einschüchternde oder beleidigende Inhalte."
+      },
+      "hate_speech": {
+        "label": "Hassrede",
+        "hint": "Angriffe auf Personen oder Gruppen aufgrund ihrer Identität."
+      },
+      "violence": {
+        "label": "Gewalt oder Drohungen",
+        "hint": "Fördert oder droht mit Gewalt oder Selbstverletzung."
+      },
+      "sexual_content": {
+        "label": "Sexuelle Inhalte",
+        "hint": "Sexuell explizites oder unangemessenes Material."
+      },
+      "csae": {
+        "label": "Sexueller Kindesmissbrauch oder -ausbeutung",
+        "hint": "Inhalte, die Minderjährige gefährden. Wird mit höchster Priorität behandelt."
+      },
+      "spam": {
+        "label": "Spam oder irreführend",
+        "hint": "Unerwünschte, täuschende oder wiederholte Inhalte."
+      },
+      "illegal": {
+        "label": "Illegale Aktivität",
+        "hint": "Fördert oder ermöglicht illegale Handlungen."
+      },
+      "other": {
+        "label": "Etwas anderes",
+        "hint": "Sonstige anstößige Inhalte."
+      }
+    }
+  },
   "admin": {
     "title": "Admin-Panel",
     "description": "Systemverwaltung und Konfiguration",
@@ -207,6 +255,7 @@
       "prompts": "Prompts",
       "usage": "Nutzung",
       "subscriptions": "Abonnements",
+      "moderation": "Moderation",
       "appServer": "App-Server"
     },
     "overview": {
@@ -341,6 +390,60 @@
       "loadError": "Abonnements konnten nicht geladen werden",
       "noSubscriptions": "Keine Abo-Pläne gefunden. Erstellen Sie zuerst Abo-Pläne in der Datenbank.",
       "budgetHint": "Das Budget definiert die maximalen Token-Kosten (in EUR) pro Abrechnungszeitraum. Setzen Sie es auf 0 für unbegrenzte Nutzung. Die Preise sind die öffentlichen Anzeigepreise; Käufe in der Mobil-App nutzen den App-Store-Preis."
+    },
+    "moderation": {
+      "title": "Inhaltsmoderation",
+      "description": "Gemeldete Inhalte prüfen und bei Bedarf das betreffende Konto sperren oder bannen.",
+      "empty": "Keine Meldungen für diesen Filter.",
+      "loadError": "Meldungen konnten nicht geladen werden",
+      "updateError": "Aktualisierung fehlgeschlagen",
+      "reportUpdated": "Meldung aktualisiert",
+      "userStatusUpdated": "Kontostatus aktualisiert",
+      "unresolvedUser": "Urheber nicht ermittelt",
+      "totalCount": "{count} Meldungen",
+      "suspend": "Sperren",
+      "ban": "Bannen",
+      "reactivate": "Reaktivieren",
+      "filters": {
+        "all": "Alle",
+        "open": "Offen",
+        "reviewed": "Geprüft",
+        "actioned": "Bearbeitet",
+        "dismissed": "Verworfen"
+      },
+      "col": {
+        "reason": "Grund",
+        "content": "Inhalt",
+        "reportedUser": "Gemeldeter Nutzer",
+        "created": "Gemeldet",
+        "status": "Status",
+        "actions": "Aktionen"
+      },
+      "reportStatus": {
+        "open": "Offen",
+        "reviewed": "Geprüft",
+        "actioned": "Bearbeitet",
+        "dismissed": "Verworfen"
+      },
+      "accountStatus": {
+        "active": "Aktiv",
+        "suspended": "Gesperrt",
+        "banned": "Gebannt"
+      },
+      "confirm": {
+        "suspended": {
+          "title": "Konto sperren?",
+          "message": "{user} sperren? Die Person wird abgemeldet und kann die Plattform bis zur Reaktivierung nicht nutzen."
+        },
+        "banned": {
+          "title": "Konto bannen?",
+          "message": "{user} bannen? Das sperrt das Konto dauerhaft. Nur bei schweren Verstößen verwenden."
+        },
+        "active": {
+          "title": "Konto reaktivieren?",
+          "message": "{user} reaktivieren? Die Person kann sich wieder anmelden und die Plattform nutzen."
+        }
+      }
     },
     "config": {
       "title": "Systemkonfiguration",
