@@ -165,6 +165,16 @@
                     d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"
                   />
                 </svg>
+                <svg
+                  v-else-if="provider.id === 'apple'"
+                  class="w-4.5 h-4.5"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"
+                  />
+                </svg>
                 <Icon
                   v-else-if="provider.id === 'keycloak'"
                   icon="mdi:key-variant"
@@ -349,7 +359,7 @@
             <p class="mt-4 text-center text-[11px] txt-secondary leading-relaxed opacity-60">
               {{ $t('auth.termsAgree') }}
               <a
-                href="https://www.synaplan.com/de/imprint"
+                :href="config.branding.termsUrl"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="text-brand hover:underline underline-offset-2"
@@ -357,7 +367,7 @@
               >
               {{ $t('auth.and') }}
               <a
-                href="https://www.synaplan.com/de/privacy-policy"
+                :href="config.branding.privacyUrl"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="text-brand hover:underline underline-offset-2"
@@ -406,7 +416,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   SunIcon,
@@ -427,9 +437,19 @@ import { useRecaptcha } from '../composables/useRecaptcha'
 import { usePasswordValidation, validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
-import { isNativeApp } from '@/services/api/nativeRuntime'
+import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
+import { startNativeOAuth } from '@/services/api/nativeOAuth'
+import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
+import { useAuthStore } from '@/stores/auth'
+import {
+  consumePendingRedirect,
+  isSafeRedirectPath,
+  setPendingRedirect,
+} from '@/utils/pendingAuthRedirect'
 
 const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
 const { locale } = useI18n()
 const themeStore = useTheme()
 const { getToken: getReCaptchaToken } = useRecaptcha()
@@ -480,10 +500,13 @@ const goBack = () => {
   }
 }
 
-const { register, error, loading, clearError } = useAuth()
+const { register, error: authError, loading, clearError } = useAuth()
 const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
+// Native OAuth errors surface through the same banner as registration errors.
+const socialError = ref('')
+const error = computed(() => socialError.value || authError.value)
 
 const onEmailBlur = () => {
   focusedField.value = null
@@ -537,7 +560,39 @@ const handleRegister = async () => {
   if (success) registrationSuccess.value = true
 }
 
-const handleSocialLogin = (provider: string) => {
+const handleSocialLogin = async (provider: string) => {
+  // OAuth round-trip strips the SPA's URL state, so stash the intent
+  // for OAuthCallback to pick up. setPendingRedirect validates internally.
+  const redirect = route.query.redirect as string | undefined
+  if (redirect) setPendingRedirect(redirect)
+
+  // Native shell: providers block embedded WebViews, so run OAuth in the system
+  // browser and complete via a deep-link handoff (no full-page redirect).
+  if (isNativeApp()) {
+    socialError.value = ''
+    // iOS must use the native Sign-in-with-Apple sheet (Guideline 4.8); every
+    // other provider (and Apple on Android) uses the system-browser OAuth flow.
+    const result =
+      'apple' === provider && 'ios' === getNativePlatform()
+        ? await startNativeAppleSignIn()
+        : await startNativeOAuth(provider)
+    if (!result.success) {
+      // A user-dismissed browser is a silent cancellation, not an error.
+      if (!result.cancelled) {
+        socialError.value = result.error || 'Login failed'
+      }
+      return
+    }
+    const ok = await authStore.handleOAuthCallback()
+    if (ok) {
+      const queryPath = isSafeRedirectPath(redirect) ? redirect : null
+      router.push(queryPath ?? consumePendingRedirect() ?? '/')
+    } else {
+      socialError.value = 'Login failed'
+    }
+    return
+  }
+
   window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
 }
 </script>

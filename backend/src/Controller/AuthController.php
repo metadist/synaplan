@@ -348,6 +348,16 @@ class AuthController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
+        // Suspended/banned accounts cannot sign in (Apple Guideline 1.2).
+        if (!$user->isActive()) {
+            $this->logger->warning('Login blocked for suspended account', ['user_id' => $user->getId()]);
+
+            return $this->json([
+                'error' => 'Account suspended',
+                'message' => 'This account has been suspended. Please contact support.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         // Generate tokens
         $accessToken = $this->tokenService->generateAccessToken($user);
         $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());

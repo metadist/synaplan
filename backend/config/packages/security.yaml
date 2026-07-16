@@ -19,6 +19,7 @@ security:
             pattern: ^/v1
             stateless: true
             provider: app_user_provider
+            user_checker: App\Security\AccountStatusChecker
             entry_point: App\Security\ApiAuthenticationEntryPoint
             custom_authenticators:
                 - App\Security\ApiKeyAuthenticator
@@ -31,6 +32,7 @@ security:
             pattern: ^/mcp
             stateless: true
             provider: app_user_provider
+            user_checker: App\Security\AccountStatusChecker
             entry_point: App\Security\McpAuthenticationEntryPoint
             custom_authenticators:
                 - App\Security\OidcBearerAuthenticator
@@ -44,6 +46,7 @@ security:
             # ExceptionListener escalate anonymous requests into uncaught
             # HttpExceptions (which otherwise spam the request channel with
             # ERROR-level stack traces for every unauthenticated call).
+            user_checker: App\Security\AccountStatusChecker
             entry_point: App\Security\ApiAuthenticationEntryPoint
             custom_authenticators:
                 - App\Security\CookieTokenAuthenticator
@@ -54,6 +57,7 @@ security:
         main:
             lazy: true
             provider: app_user_provider
+            user_checker: App\Security\AccountStatusChecker
 
     access_control:
         # OpenAI-compatible endpoints (require API key auth)
@@ -109,6 +113,9 @@ security:
         - { path: ^/api/v1/auth/github/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/keycloak/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/keycloak/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/apple/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/apple/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/apple/native, roles: PUBLIC_ACCESS }
 
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
