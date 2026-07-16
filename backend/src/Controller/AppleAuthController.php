@@ -190,6 +190,8 @@ class AppleAuthController extends AbstractController
             return new JsonResponse(['success' => false, 'error' => 'Invalid identity token'], Response::HTTP_UNAUTHORIZED);
         }
 
+        // $body is guaranteed to be a non-empty array here: reaching this point means the
+        // identity-token guard above passed, which required is_array($body) to be true.
         $profile = [
             'firstName' => isset($body['firstName']) && is_string($body['firstName']) ? $body['firstName'] : null,
             'lastName' => isset($body['lastName']) && is_string($body['lastName']) ? $body['lastName'] : null,
