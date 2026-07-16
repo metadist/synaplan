@@ -307,6 +307,54 @@ class SubscriptionControllerEndpointTest extends WebTestCase
         $this->assertIsString($body['remaining']);
     }
 
+    public function testCheckoutIsBlockedForNativeClient(): void
+    {
+        // Anti-steering backstop: a native client (server-parsed UA) must never
+        // reach Stripe web checkout, even with an otherwise valid plan. The guard
+        // runs before plan validation, so a valid planId still returns 403.
+        $this->client->request(
+            'POST',
+            '/api/v1/subscription/checkout',
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->accessToken,
+                'HTTP_USER_AGENT' => 'Synaplan Mobile V1.2.3 (iOS)',
+            ],
+            json_encode(['planId' => 'PRO'], JSON_THROW_ON_ERROR),
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $this->assertSame('NATIVE_CHANNEL_REQUIRES_IAP', $body['code']);
+
+        // The block must short-circuit before any Stripe customer is created.
+        $this->em->refresh($this->user);
+        $this->assertNull($this->user->getStripeCustomerId());
+    }
+
+    public function testPortalIsBlockedForNativeClient(): void
+    {
+        // The billing portal is a Stripe web surface too — native clients manage
+        // their subscription in the app store, so the portal must be refused.
+        $this->client->request(
+            'POST',
+            '/api/v1/subscription/portal',
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->accessToken,
+                'HTTP_USER_AGENT' => 'Synaplan Mobile V1.2.3 (Android)',
+            ],
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $this->assertSame('NATIVE_CHANNEL_REQUIRES_IAP', $body['code']);
+    }
+
     public function testCheckoutReturns400ForInvalidPlanId(): void
     {
         $this->client->request(

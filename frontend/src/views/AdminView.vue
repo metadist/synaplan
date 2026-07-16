@@ -679,6 +679,11 @@
           <AdminSubscriptionsPanel />
         </div>
 
+        <!-- Moderation Tab -->
+        <div v-if="activeTab === 'moderation'" data-testid="section-moderation">
+          <AdminModerationPanel />
+        </div>
+
         <!-- App server Tab (native shell only) -->
         <div v-if="activeTab === 'appServer'">
           <NativeServerControl />
@@ -768,6 +773,9 @@ import {
 const AdminSubscriptionsPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSubscriptionsPanel.vue')
 )
+const AdminModerationPanel = defineAsyncComponent(
+  () => import('@/components/admin/AdminModerationPanel.vue')
+)
 const AdminSystemInfoPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSystemInfoPanel.vue')
 )
@@ -792,7 +800,8 @@ const { success, error: showError } = useNotification()
 const { confirm } = useDialog()
 const router = useRouter()
 
-type TabId = 'overview' | 'users' | 'prompts' | 'usage' | 'subscriptions' | 'appServer'
+type TabId =
+  'overview' | 'users' | 'prompts' | 'usage' | 'subscriptions' | 'moderation' | 'appServer'
 interface AdminTab {
   id: TabId
   label: string
@@ -808,6 +817,7 @@ const tabs = computed<AdminTab[]>(() => {
     { id: 'prompts', label: t('admin.tabs.prompts'), icon: 'mdi:text-box-multiple' },
     { id: 'usage', label: t('admin.tabs.usage'), icon: 'mdi:chart-bar' },
     { id: 'subscriptions', label: t('admin.tabs.subscriptions'), icon: 'mdi:credit-card-outline' },
+    { id: 'moderation', label: t('admin.tabs.moderation'), icon: 'mdi:flag-outline' },
   ]
   // Native shell only: the backend the app connects to is a client-side bootstrap
   // value with no meaning on the web build, so the tab is hidden there.

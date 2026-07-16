@@ -203,6 +203,7 @@
               @retry-task="handleTaskRetry"
               @cancel-task="handleTaskCancel"
               @false-positive="openFalsePositiveModal"
+              @report="openReportModal"
               @click-memory="handleClickMemory"
               @continue="handleContinueResponse(message)"
               @media-job-update="message.mediaJob = $event"
@@ -361,6 +362,13 @@
       @regenerate="regenerateFalsePositiveSummary"
     />
 
+    <ReportContentModal
+      :is-open="reportModalOpen"
+      :is-submitting="reportSubmitting"
+      @close="closeReportModal"
+      @submit="submitReport"
+    />
+
     <ContradictionModal
       :is-open="contradictionModalOpen"
       :contradictions="contradictionList"
@@ -456,6 +464,8 @@ import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/u
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
 import MemoryToast from '@/components/MemoryToast.vue'
 import FalsePositiveModal from '@/components/feedback/FalsePositiveModal.vue'
+import ReportContentModal from '@/components/feedback/ReportContentModal.vue'
+import { submitContentReport, type ReportReason } from '@/services/api/moderationApi'
 import ContradictionModal from '@/components/feedback/ContradictionModal.vue'
 import {
   previewFalsePositive,
@@ -589,6 +599,11 @@ const memoryToastMessage = ref('')
 // Memory suggestion toasts
 const activeMemoryToasts = ref<Array<UserMemory & { toastId: number }>>([])
 let memoryToastIdCounter = 0
+
+// Content report modal (Apple Guideline 1.2)
+const reportModalOpen = ref(false)
+const reportSubmitting = ref(false)
+const reportMessageId = ref<number | null>(null)
 
 const falsePositiveModalOpen = ref(false)
 const falsePositiveSegments = ref<string[]>([])
@@ -3935,6 +3950,38 @@ function handleMemoryToastClose(toastId: number) {
   const index = activeMemoryToasts.value.findIndex((m) => m.toastId === toastId)
   if (index !== -1) {
     activeMemoryToasts.value.splice(index, 1)
+  }
+}
+
+function openReportModal(messageId: number) {
+  reportMessageId.value = messageId
+  reportModalOpen.value = true
+}
+
+function closeReportModal() {
+  reportModalOpen.value = false
+  reportMessageId.value = null
+}
+
+async function submitReport(data: { reason: ReportReason; details: string }) {
+  if (reportMessageId.value === null) {
+    return
+  }
+  reportSubmitting.value = true
+  try {
+    await submitContentReport({
+      contentType: 'message',
+      contentId: reportMessageId.value,
+      reason: data.reason,
+      details: data.details || null,
+    })
+    closeReportModal()
+    showSuccessToast(t('moderation.report.success'))
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : t('moderation.report.error')
+    showErrorToast(errorMsg)
+  } finally {
+    reportSubmitting.value = false
   }
 }
 

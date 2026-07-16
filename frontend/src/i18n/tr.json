@@ -196,6 +196,54 @@
     "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin.",
     "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin."
   },
+  "moderation": {
+    "report": {
+      "button": "Bildir",
+      "title": "İçeriği bildir",
+      "subtitle": "Bu yanıtı inceleme için işaretle",
+      "reasonLabel": "Bunu neden bildiriyorsun?",
+      "detailsLabel": "Ek ayrıntılar (isteğe bağlı)",
+      "detailsPlaceholder": "İncelememize yardımcı olacak her şeyi ekle.",
+      "explanation": "Ekibimiz her bildirimi inceler. Sakıncalı içerik kaldırılır ve tekrar ihlal edenler askıya alınır. Synaplan'ı güvende tutmaya yardımcı olduğun için teşekkürler.",
+      "submit": "Bildirimi gönder",
+      "success": "Teşekkürler. Bildirimin gönderildi.",
+      "error": "Bildirim gönderilemedi. Lütfen tekrar dene."
+    },
+    "reasons": {
+      "harassment": {
+        "label": "Taciz veya zorbalık",
+        "hint": "Tehdit edici, korkutucu veya saldırgan içerik."
+      },
+      "hate_speech": {
+        "label": "Nefret söylemi",
+        "hint": "Bir kişiye veya gruba kimliği nedeniyle saldırır."
+      },
+      "violence": {
+        "label": "Şiddet veya tehdit",
+        "hint": "Şiddeti veya kendine zarar vermeyi teşvik eder ya da tehdit eder."
+      },
+      "sexual_content": {
+        "label": "Cinsel içerik",
+        "hint": "Cinsel açıdan açık veya uygunsuz materyal."
+      },
+      "csae": {
+        "label": "Çocuğun cinsel istismarı veya sömürüsü",
+        "hint": "Bir çocuğu tehlikeye atan içerik. En yüksek öncelikle ele alınır."
+      },
+      "spam": {
+        "label": "Spam veya yanıltıcı",
+        "hint": "İstenmeyen, aldatıcı veya tekrarlayan içerik."
+      },
+      "illegal": {
+        "label": "Yasa dışı faaliyet",
+        "hint": "Yasa dışı eylemleri teşvik eder veya kolaylaştırır."
+      },
+      "other": {
+        "label": "Başka bir şey",
+        "hint": "Diğer sakıncalı içerikler."
+      }
+    }
+  },
   "admin": {
     "title": "Yönetici Paneli",
     "description": "Sistem yönetimi ve yapılandırma",
@@ -204,6 +252,7 @@
       "users": "Kullanıcılar",
       "prompts": "Promptlar",
       "usage": "Kullanım",
+      "moderation": "Moderasyon",
       "appServer": "Uygulama sunucusu"
     },
     "overview": {
@@ -338,6 +387,60 @@
       "loadError": "Abonelikler yüklenemedi",
       "noSubscriptions": "Abonelik planı bulunamadı. Önce veritabanında abonelik planları oluşturun.",
       "budgetHint": "Bütçe, fatura dönemi başına izin verilen maksimum token maliyetini (EUR cinsinden) tanımlar. Sınırsız kullanım için 0 olarak ayarlayın. Fiyatlar herkese açık gösterim fiyatlarıdır; mobil uygulamadaki satın almalar uygulama mağazası fiyatını kullanır."
+    },
+    "moderation": {
+      "title": "İçerik moderasyonu",
+      "description": "Bildirilen içeriği inceleyin ve gerekirse ilgili hesabı askıya alın veya yasaklayın.",
+      "empty": "Bu filtreye uyan bildirim yok.",
+      "loadError": "Bildirimler yüklenemedi",
+      "updateError": "Güncelleme başarısız",
+      "reportUpdated": "Bildirim güncellendi",
+      "userStatusUpdated": "Hesap durumu güncellendi",
+      "unresolvedUser": "Sahibi belirlenemedi",
+      "totalCount": "{count} bildirim",
+      "suspend": "Askıya al",
+      "ban": "Yasakla",
+      "reactivate": "Yeniden etkinleştir",
+      "filters": {
+        "all": "Tümü",
+        "open": "Açık",
+        "reviewed": "İncelendi",
+        "actioned": "İşlem yapıldı",
+        "dismissed": "Reddedildi"
+      },
+      "col": {
+        "reason": "Neden",
+        "content": "İçerik",
+        "reportedUser": "Bildirilen kullanıcı",
+        "created": "Bildirildi",
+        "status": "Durum",
+        "actions": "İşlemler"
+      },
+      "reportStatus": {
+        "open": "Açık",
+        "reviewed": "İncelendi",
+        "actioned": "İşlem yapıldı",
+        "dismissed": "Reddedildi"
+      },
+      "accountStatus": {
+        "active": "Aktif",
+        "suspended": "Askıya alındı",
+        "banned": "Yasaklandı"
+      },
+      "confirm": {
+        "suspended": {
+          "title": "Hesap askıya alınsın mı?",
+          "message": "{user} askıya alınsın mı? Oturumu kapatılır ve yeniden etkinleştirilene kadar platformu kullanamaz."
+        },
+        "banned": {
+          "title": "Hesap yasaklansın mı?",
+          "message": "{user} yasaklansın mı? Bu, hesabı kalıcı olarak engeller. Yalnızca ağır ihlaller için kullanın."
+        },
+        "active": {
+          "title": "Hesap yeniden etkinleştirilsin mi?",
+          "message": "{user} yeniden etkinleştirilsin mi? Yeniden giriş yapıp platformu kullanabilir."
+        }
+      }
     },
     "config": {
       "title": "Sistem Yapılandırması",

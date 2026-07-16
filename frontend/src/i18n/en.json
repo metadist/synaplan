@@ -203,6 +203,54 @@
     "fileOnlyDefaultMessage": "Please review the attached file.",
     "voiceMessageDefaultMessage": "Please respond to my voice message."
   },
+  "moderation": {
+    "report": {
+      "button": "Report",
+      "title": "Report content",
+      "subtitle": "Flag this response for review",
+      "reasonLabel": "Why are you reporting this?",
+      "detailsLabel": "Additional details (optional)",
+      "detailsPlaceholder": "Add anything that helps us review this report.",
+      "explanation": "Our team reviews every report. Objectionable content is removed and repeat offenders are suspended. Thank you for helping keep Synaplan safe.",
+      "submit": "Submit report",
+      "success": "Thank you. Your report has been submitted.",
+      "error": "Could not submit the report. Please try again."
+    },
+    "reasons": {
+      "harassment": {
+        "label": "Harassment or bullying",
+        "hint": "Threatening, intimidating, or abusive content."
+      },
+      "hate_speech": {
+        "label": "Hate speech",
+        "hint": "Attacks a person or group based on identity."
+      },
+      "violence": {
+        "label": "Violence or threats",
+        "hint": "Promotes or threatens violence or self-harm."
+      },
+      "sexual_content": {
+        "label": "Sexual content",
+        "hint": "Sexually explicit or inappropriate material."
+      },
+      "csae": {
+        "label": "Child sexual abuse or exploitation",
+        "hint": "Content that endangers a minor. Reported with top priority."
+      },
+      "spam": {
+        "label": "Spam or misleading",
+        "hint": "Unsolicited, deceptive, or repetitive content."
+      },
+      "illegal": {
+        "label": "Illegal activity",
+        "hint": "Promotes or facilitates illegal acts."
+      },
+      "other": {
+        "label": "Something else",
+        "hint": "Any other objectionable content."
+      }
+    }
+  },
   "admin": {
     "title": "Admin Panel",
     "description": "System management and configuration",
@@ -212,6 +260,7 @@
       "prompts": "Prompts",
       "usage": "Usage",
       "subscriptions": "Subscriptions",
+      "moderation": "Moderation",
       "appServer": "App server"
     },
     "overview": {
@@ -346,6 +395,60 @@
       "loadError": "Failed to load subscriptions",
       "noSubscriptions": "No subscription plans found. Create subscription plans in the database first.",
       "budgetHint": "Budget defines the maximum token cost (in EUR) allowed per billing period. Set to 0 for unlimited usage. Prices are the public display prices; purchases in the mobile app use the app store price."
+    },
+    "moderation": {
+      "title": "Content moderation",
+      "description": "Review reported content and, if needed, suspend or ban the offending account.",
+      "empty": "No reports match this filter.",
+      "loadError": "Failed to load reports",
+      "updateError": "Update failed",
+      "reportUpdated": "Report updated",
+      "userStatusUpdated": "Account status updated",
+      "unresolvedUser": "Owner not resolved",
+      "totalCount": "{count} reports",
+      "suspend": "Suspend",
+      "ban": "Ban",
+      "reactivate": "Reactivate",
+      "filters": {
+        "all": "All",
+        "open": "Open",
+        "reviewed": "Reviewed",
+        "actioned": "Actioned",
+        "dismissed": "Dismissed"
+      },
+      "col": {
+        "reason": "Reason",
+        "content": "Content",
+        "reportedUser": "Reported user",
+        "created": "Reported",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "reportStatus": {
+        "open": "Open",
+        "reviewed": "Reviewed",
+        "actioned": "Actioned",
+        "dismissed": "Dismissed"
+      },
+      "accountStatus": {
+        "active": "Active",
+        "suspended": "Suspended",
+        "banned": "Banned"
+      },
+      "confirm": {
+        "suspended": {
+          "title": "Suspend account?",
+          "message": "Suspend {user}? They will be signed out and cannot use the platform until reactivated."
+        },
+        "banned": {
+          "title": "Ban account?",
+          "message": "Ban {user}? This blocks the account permanently. This action should be reserved for severe violations."
+        },
+        "active": {
+          "title": "Reactivate account?",
+          "message": "Reactivate {user}? They will be able to sign in and use the platform again."
+        }
+      }
     },
     "config": {
       "title": "System Configuration",

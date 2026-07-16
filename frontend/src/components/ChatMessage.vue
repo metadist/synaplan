@@ -849,6 +849,21 @@
               />
             </button>
 
+            <!-- Report Button (Apple Guideline 1.2) - flag objectionable content.
+                 Available to any signed-in user; hidden in guest mode. -->
+            <button
+              v-if="!isGuestMode"
+              type="button"
+              class="pill text-xs"
+              :aria-label="$t('moderation.report.button')"
+              :title="$t('moderation.report.button')"
+              data-testid="btn-message-report"
+              @click="handleReport"
+            >
+              <Icon icon="mdi:flag-outline" class="w-4 h-4" />
+              <span class="font-medium hidden sm:inline">{{ $t('moderation.report.button') }}</span>
+            </button>
+
             <!-- Multitask (DAG) turn: a single model pick can't represent the
                  whole plan, so offer one plain "Again" that re-runs the full
                  pipeline (re-classify + re-plan). -->
@@ -1509,6 +1524,7 @@ const emit = defineEmits<{
   retryTask: [payload: { prompt: string; modelId: number }]
   cancelTask: [nodeId: string]
   falsePositive: [text: string, messageId?: number]
+  report: [messageId: number]
   'click-memory': [memory: UserMemory]
   continue: []
   mediaJobUpdate: [job: MediaJobInfo]
@@ -1637,6 +1653,12 @@ const handleFalsePositive = () => {
   }
 
   emit('falsePositive', textContent, props.backendMessageId)
+}
+
+const handleReport = () => {
+  if (props.backendMessageId) {
+    emit('report', props.backendMessageId)
+  }
 }
 
 const toggleModelDropdown = () => {

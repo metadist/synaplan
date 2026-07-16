@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
 use App\Service\BillingService;
+use App\Service\Client\ClientContextResolver;
 use App\Service\IapPricingService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -103,10 +104,37 @@ class SubscriptionController extends AbstractController
         private BillingService $billingService,
         private IapPricingService $iapPricingService,
         private RateLimitService $rateLimitService,
+        private ClientContextResolver $clientContextResolver,
         private bool $stripeAutomaticTaxEnabled = false,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
     ) {
+    }
+
+    /**
+     * Anti-steering backstop (Apple App Review 3.1.1 / Google Play Payments):
+     * digital subscriptions inside the native apps MUST use In-App Purchase and
+     * the app must not steer users to an external (Stripe) web checkout. The
+     * frontend already routes native purchases to IAP and hides Stripe UI; this
+     * is the SERVER-SIDE guarantee so a tampered or out-of-date native client
+     * still cannot open a Stripe checkout, portal, or top-up.
+     *
+     * Safe default: only native clients (identified by the server-parsed
+     * `Synaplan Mobile Vx.x` User-Agent) are blocked — web and self-host
+     * behaviour is completely unchanged.
+     */
+    private function blockNativeStripeChannel(Request $request): ?JsonResponse
+    {
+        if (!$this->clientContextResolver->fromRequest($request)->isMobileApp) {
+            return null;
+        }
+
+        $this->logger->warning('Blocked Stripe web-payment attempt from native client (anti-steering)');
+
+        return $this->json([
+            'error' => 'In-app purchases are handled through the app store on this device.',
+            'code' => 'NATIVE_CHANNEL_REQUIRES_IAP',
+        ], Response::HTTP_FORBIDDEN);
     }
 
     /**
@@ -261,6 +289,10 @@ class SubscriptionController extends AbstractController
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (null !== ($blocked = $this->blockNativeStripeChannel($request))) {
+            return $blocked;
         }
 
         // Rate limiting check
@@ -511,6 +543,10 @@ class SubscriptionController extends AbstractController
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (null !== ($blocked = $this->blockNativeStripeChannel($request))) {
+            return $blocked;
         }
 
         if (!$this->checkCheckoutRateLimit($user)) {
@@ -892,10 +928,15 @@ class SubscriptionController extends AbstractController
         )
     )]
     public function createPortalSession(
+        Request $request,
         #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (null !== ($blocked = $this->blockNativeStripeChannel($request))) {
+            return $blocked;
         }
 
         if (!$this->billingService->isEnabled()) {
