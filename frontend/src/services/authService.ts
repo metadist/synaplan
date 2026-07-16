@@ -320,9 +320,17 @@ export const authService = {
       )
 
       if (!response.ok) {
-        // Refresh token invalid/expired (expected behavior, don't spam console)
-        clearSessionHint()
-        await this.logout(true) // Silent logout
+        // Only a genuine auth rejection (401/403) means the refresh token is
+        // invalid/expired → end the session. A transient server/proxy error
+        // (e.g. 502/503/504 while a backend node is restarting or cold-starting
+        // during a rolling deploy) must NOT log the user out: keep the session
+        // and let the caller retry once the node is back. This matches the
+        // network-error branch below, which also preserves the session.
+        if (401 === response.status || 403 === response.status) {
+          clearSessionHint()
+          await this.logout(true) // Silent logout
+        }
+
         return false
       }
 
