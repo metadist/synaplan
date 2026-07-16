@@ -17,10 +17,16 @@
  *
  * Web and Android never call this (see the platform guard in the auth views);
  * they fall back to the system-browser OAuth flow in `nativeOAuth.ts` /
- * the full-page redirect. The plugin ships a web stub, so importing it here does
- * not break the shared web bundle.
+ * the full-page redirect.
+ *
+ * The Capacitor plugin is loaded via a lazy `import()` INSIDE the function (not
+ * a static top-level import) so the shared web bundle never statically
+ * references or evaluates it — web.synaplan.com must work with no app plugins.
+ * The type-only import below is erased at build time and adds nothing to the
+ * bundle. This mirrors the lazy-load seam used by the other native modules
+ * (nativeBackButton, nativeStatusBar, nativeDownload, …).
  */
-import { SignInWithApple, type SignInWithAppleOptions } from '@capacitor-community/apple-sign-in'
+import type { SignInWithAppleOptions } from '@capacitor-community/apple-sign-in'
 import { getNativeApiBaseUrl } from '@/services/api/nativeRuntime'
 import { setNativeTokens } from '@/services/api/nativeAuth'
 import type { NativeOAuthResult } from '@/services/api/nativeOAuth'
@@ -49,6 +55,9 @@ export async function startNativeAppleSignIn(): Promise<NativeOAuthResult> {
   let familyName: string | null
   let email: string | null
   try {
+    // Lazy-loaded so the plugin is only pulled in inside the native iOS shell,
+    // never into the web bundle (callers guard with isNativeApp() + 'ios').
+    const { SignInWithApple } = await import('@capacitor-community/apple-sign-in')
     const { response } = await SignInWithApple.authorize(options)
     identityToken = response.identityToken
     givenName = response.givenName ?? null
