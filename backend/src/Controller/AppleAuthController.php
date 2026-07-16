@@ -172,8 +172,9 @@ class AppleAuthController extends AbstractController
     #[OA\Response(response: 401, description: 'Invalid identity token')]
     public function native(Request $request): JsonResponse
     {
-        $body = json_decode($request->getContent(), true);
-        $identityToken = is_array($body) && isset($body['identityToken']) && is_string($body['identityToken'])
+        $decoded = json_decode($request->getContent(), true);
+        $body = is_array($decoded) ? $decoded : [];
+        $identityToken = isset($body['identityToken']) && is_string($body['identityToken'])
             ? $body['identityToken']
             : null;
 
@@ -190,9 +191,9 @@ class AppleAuthController extends AbstractController
         }
 
         $profile = [
-            'firstName' => is_array($body) && isset($body['firstName']) && is_string($body['firstName']) ? $body['firstName'] : null,
-            'lastName' => is_array($body) && isset($body['lastName']) && is_string($body['lastName']) ? $body['lastName'] : null,
-            'email' => is_array($body) && isset($body['email']) && is_string($body['email']) ? $body['email'] : null,
+            'firstName' => isset($body['firstName']) && is_string($body['firstName']) ? $body['firstName'] : null,
+            'lastName' => isset($body['lastName']) && is_string($body['lastName']) ? $body['lastName'] : null,
+            'email' => isset($body['email']) && is_string($body['email']) ? $body['email'] : null,
         ];
 
         $user = $this->findOrCreateUser($claims, $profile);

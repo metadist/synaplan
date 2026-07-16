@@ -38,6 +38,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(name: 'BUSERLEVEL', length: 32, options: ['default' => 'NEW'])]
     private string $userLevel = 'NEW';
 
+    /** Moderation account states (independent of the billing-tier BUSERLEVEL). */
+    public const ACCOUNT_STATUS_ACTIVE = 'active';
+    public const ACCOUNT_STATUS_SUSPENDED = 'suspended';
+    public const ACCOUNT_STATUS_BANNED = 'banned';
+
+    #[ORM\Column(name: 'BACCOUNTSTATUS', length: 16, options: ['default' => 'active'])]
+    private string $accountStatus = self::ACCOUNT_STATUS_ACTIVE;
+
     #[ORM\Column(name: 'BEMAILVERIFIED', type: 'boolean', options: ['default' => false])]
     private bool $emailVerified = false;
 
@@ -126,6 +134,27 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->userLevel = $userLevel;
 
         return $this;
+    }
+
+    public function getAccountStatus(): string
+    {
+        return $this->accountStatus;
+    }
+
+    public function setAccountStatus(string $accountStatus): self
+    {
+        $this->accountStatus = $accountStatus;
+
+        return $this;
+    }
+
+    /**
+     * Whether the account may authenticate and use the platform. A suspended or
+     * banned account is rejected by the security UserChecker and password login.
+     */
+    public function isActive(): bool
+    {
+        return self::ACCOUNT_STATUS_ACTIVE === $this->accountStatus;
     }
 
     public function isEmailVerified(): bool

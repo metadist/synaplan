@@ -59,7 +59,7 @@ final readonly class SystemConfigService
             'email' => [
                 'label' => 'Email',
                 'sections' => [
-                    'mailer' => ['label' => 'Primary Mailer', 'fields' => ['MAILER_DSN', 'APP_SENDER_EMAIL', 'APP_SENDER_NAME']],
+                    'mailer' => ['label' => 'Primary Mailer', 'fields' => ['MAILER_DSN', 'APP_SENDER_EMAIL', 'APP_SENDER_NAME', 'APP_ADMIN_EMAIL']],
                 ],
             ],
             'branding' => [
@@ -1051,6 +1051,11 @@ final readonly class SystemConfigService
                 'tab' => 'email', 'section' => 'mailer', 'type' => 'text',
                 'sensitive' => false, 'description' => 'Sender name',
                 'default' => 'Synaplan',
+            ],
+            'APP_ADMIN_EMAIL' => [
+                'tab' => 'email', 'section' => 'mailer', 'type' => 'email',
+                'sensitive' => false, 'description' => 'Operator inbox for incident + content-moderation alerts',
+                'default' => '',
             ],
 
             // === Authentication ===
