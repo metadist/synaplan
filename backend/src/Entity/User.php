@@ -474,6 +474,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return match ($this->providerId) {
             'google' => 'Google',
             'github' => 'GitHub',
+            'apple' => 'Apple',
             'keycloak' => 'Keycloak/OIDC',
             'local' => 'Email/Password',
             default => ucfirst($this->providerId) ?: 'Unknown',

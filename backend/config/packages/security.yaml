@@ -109,6 +109,9 @@ security:
         - { path: ^/api/v1/auth/github/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/keycloak/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/keycloak/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/apple/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/apple/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/auth/apple/native, roles: PUBLIC_ACCESS }
 
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
