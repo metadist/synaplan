@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isRecoverableStreamError } from '@/utils/streamError'
+import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 
 /**
  * Issue #1265: a pure SSE transport drop must be recoverable (reconcile with the
@@ -50,5 +50,40 @@ describe('isRecoverableStreamError (issue #1265)', () => {
         install_command: 'ollama pull llama3',
       })
     ).toBe(false)
+  })
+})
+
+/**
+ * A user-initiated cancellation of a multitask/DAG text node re-surfaces the raw
+ * StreamCancelledException message through the generic error path. It must be
+ * detected so the chat renders the lightweight translated cancel notice instead
+ * of a big `## ⚠️` error heading (and never leaks the English backend text).
+ */
+describe('isCancellationError', () => {
+  it('detects the raw backend cancellation message', () => {
+    expect(isCancellationError({ status: 'error', error: 'Stream cancelled by user' })).toBe(true)
+  })
+
+  it('detects the message when wrapped by the generic failure prefix', () => {
+    expect(
+      isCancellationError({
+        status: 'error',
+        error: 'Failed to process message: Stream cancelled by user',
+      })
+    ).toBe(true)
+  })
+
+  it('reads the cancellation text from the message field too', () => {
+    expect(isCancellationError({ status: 'error', message: 'Stream cancelled by user' })).toBe(true)
+  })
+
+  it('is false for a non-error status', () => {
+    expect(isCancellationError({ status: 'complete', error: 'Stream cancelled by user' })).toBe(
+      false
+    )
+  })
+
+  it('is false for a genuine backend error', () => {
+    expect(isCancellationError({ status: 'error', error: 'No model configured' })).toBe(false)
   })
 })

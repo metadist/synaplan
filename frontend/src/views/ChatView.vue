@@ -451,7 +451,7 @@ import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaP
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
-import { isRecoverableStreamError } from '@/utils/streamError'
+import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
 import {
@@ -3359,6 +3359,28 @@ const streamAIResponse = async (
                 phoneVerified: data.phone_verified || false,
                 topupAvailable: data.topup_available === true,
               })
+
+              streamingAbortController = null
+              stopStreamingFn = null
+              currentTrackId = undefined
+              currentStreamingChatId = undefined
+              return
+            }
+
+            // A user-initiated cancellation is not a failure: render the same
+            // lightweight, translated notice as the Stop button (handleUserStop)
+            // instead of the big `## ⚠️` heading. This keeps every cancellation
+            // notice identical in size/wording and avoids leaking the raw
+            // English backend message ('Stream cancelled by user').
+            if (isCancellationError(data)) {
+              const message = historyStore.messages.find((m) => m.id === messageId)
+              const hasContent = message?.parts.some(
+                (p) => p.type === 'text' && p.content && p.content.trim() !== ''
+              )
+              if (!(message && hasContent)) {
+                historyStore.updateStreamingMessage(messageId, t('message.cancelledByUser'))
+              }
+              historyStore.finishStreamingMessage(messageId)
 
               streamingAbortController = null
               stopStreamingFn = null
