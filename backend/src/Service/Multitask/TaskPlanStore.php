@@ -48,8 +48,9 @@ final readonly class TaskPlanStore
      * map. Used by the DAG executor to record each node's final outcome.
      * Atomic (delete + inserts in one transaction) and best-effort.
      *
-     * @param array<string, string> $statuses
-     * @param array<string, string> $jobKeys  nodeId => MediaJob job_key (async media)
+     * @param array<string, string>                                                                                                      $statuses
+     * @param array<string, string>                                                                                                      $jobKeys  nodeId => MediaJob job_key (async media)
+     * @param array<string, array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string}> $results
      */
     public function persistWithStatuses(
         int $messageId,
@@ -58,9 +59,10 @@ final readonly class TaskPlanStore
         array $statuses,
         string $default = 'pending',
         array $jobKeys = [],
+        array $results = [],
     ): int {
         try {
-            return (int) $this->connection->transactional(function (Connection $connection) use ($messageId, $plan, $modelId, $statuses, $default, $jobKeys): int {
+            return (int) $this->connection->transactional(function (Connection $connection) use ($messageId, $plan, $modelId, $statuses, $default, $jobKeys, $results): int {
                 $connection->delete('BMESSAGE_TASKS', ['BMESSAGEID' => $messageId]);
 
                 $written = 0;
@@ -75,6 +77,13 @@ final readonly class TaskPlanStore
                     ];
                     if (isset($jobKeys[$node->id]) && '' !== $jobKeys[$node->id]) {
                         $row['BJOBKEY'] = $jobKeys[$node->id];
+                    }
+                    $payload = $this->encodeResultPayload($results[$node->id] ?? []);
+                    if (null !== $payload['BRESULTREF']) {
+                        $row['BRESULTREF'] = $payload['BRESULTREF'];
+                    }
+                    if (null !== $payload['BERROR']) {
+                        $row['BERROR'] = $payload['BERROR'];
                     }
                     $connection->insert('BMESSAGE_TASKS', $row);
                     ++$written;
@@ -100,17 +109,30 @@ final readonly class TaskPlanStore
      * can then rebuild running/completed cards instead of seeing only the bare
      * user prompt. A miss only affects that transient reload view, never the
      * turn, so failures are logged and swallowed.
+     *
+     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string} $result
      */
-    public function updateNodeStatus(int $messageId, string $nodeId, string $status): void
+    public function updateNodeStatus(int $messageId, string $nodeId, string $status, array $result = []): void
     {
         if ('' === $nodeId) {
             return;
         }
 
         try {
+            $data = ['BSTATUS' => $status];
+            $payload = $this->encodeResultPayload($result);
+            if (null !== $payload['BRESULTREF']) {
+                $data['BRESULTREF'] = $payload['BRESULTREF'];
+            }
+            if (array_key_exists('error', $result)) {
+                // Explicit null clears a previous error; omit key to leave column alone.
+                $data['BERROR'] = $payload['BERROR'];
+            } elseif (null !== $payload['BERROR']) {
+                $data['BERROR'] = $payload['BERROR'];
+            }
             $this->connection->update(
                 'BMESSAGE_TASKS',
-                ['BSTATUS' => $status],
+                $data,
                 ['BMESSAGEID' => $messageId, 'BNODEID' => $nodeId],
             );
         } catch (\Throwable $e) {
@@ -125,20 +147,20 @@ final readonly class TaskPlanStore
 
     /**
      * Load the persisted per-node cards for a message as the client-facing
-     * shape used to render task cards on reload (#1142). Hidden assembler nodes
-     * (compose_reply) are excluded — they are not user-visible cards. Ordered by
-     * insertion (BID) so cards render in plan order.
+     * shape used to render task cards on reload (#1142 / #1343). Hidden
+     * assembler nodes (compose_reply) are excluded — they are not user-visible
+     * cards. Ordered by insertion (BID) so cards render in plan order.
      *
      * Best-effort: a read failure returns an empty list (the caller falls back
      * to showing only the persisted messages).
      *
-     * @return list<array{nodeId: string, capability: string, kind: string, state: string}>
+     * @return list<array{nodeId: string, capability: string, kind: string, state: string, text?: string, url?: string, error?: string, query?: string, resultsCount?: int, type?: string}>
      */
     public function loadCards(int $messageId): array
     {
         try {
             $rows = $this->connection->fetchAllAssociative(
-                'SELECT BNODEID, BCAPABILITY, BSTATUS FROM BMESSAGE_TASKS WHERE BMESSAGEID = ? ORDER BY BID ASC',
+                'SELECT BNODEID, BCAPABILITY, BSTATUS, BRESULTREF, BERROR FROM BMESSAGE_TASKS WHERE BMESSAGEID = ? ORDER BY BID ASC',
                 [$messageId],
             );
         } catch (\Throwable $e) {
@@ -157,15 +179,83 @@ final readonly class TaskPlanStore
             if ('hidden' === $kind) {
                 continue;
             }
-            $cards[] = [
+            $card = [
                 'nodeId' => (string) $row['BNODEID'],
                 'capability' => $capability,
                 'kind' => $kind,
                 'state' => (string) $row['BSTATUS'],
             ];
+            foreach ($this->decodeResultPayload($row['BRESULTREF'] ?? null) as $key => $value) {
+                $card[$key] = $value;
+            }
+            $error = $row['BERROR'] ?? null;
+            if (is_string($error) && '' !== $error) {
+                $card['error'] = $error;
+            }
+            $cards[] = $card;
         }
 
         return $cards;
+    }
+
+    /**
+     * Encode card body fields into the BRESULTREF / BERROR columns (#1343).
+     *
+     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string} $result
+     *
+     * @return array{BRESULTREF: ?string, BERROR: ?string}
+     */
+    private function encodeResultPayload(array $result): array
+    {
+        $ref = [];
+        foreach (['text', 'url', 'query', 'type'] as $key) {
+            $value = $result[$key] ?? null;
+            if (is_string($value) && '' !== $value) {
+                $ref[$key] = $value;
+            }
+        }
+        $resultsCount = $result['resultsCount'] ?? null;
+        if (is_int($resultsCount) && $resultsCount > 0) {
+            $ref['resultsCount'] = $resultsCount;
+        }
+
+        $error = $result['error'] ?? null;
+        $errorValue = is_string($error) && '' !== $error ? $error : null;
+
+        return [
+            'BRESULTREF' => [] === $ref
+                ? null
+                : (json_encode($ref, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE) ?: null),
+            'BERROR' => $errorValue,
+        ];
+    }
+
+    /**
+     * @return array{text?: string, url?: string, query?: string, resultsCount?: int, type?: string}
+     */
+    private function decodeResultPayload(mixed $raw): array
+    {
+        if (!is_string($raw) || '' === $raw) {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $out = [];
+        foreach (['text', 'url', 'query', 'type'] as $key) {
+            $value = $decoded[$key] ?? null;
+            if (is_string($value) && '' !== $value) {
+                $out[$key] = $value;
+            }
+        }
+        $resultsCount = $decoded['resultsCount'] ?? null;
+        if (is_int($resultsCount) && $resultsCount > 0) {
+            $out['resultsCount'] = $resultsCount;
+        }
+
+        return $out;
     }
 
     /**
@@ -173,17 +263,28 @@ final readonly class TaskPlanStore
      *
      * The DAG persists such nodes as 'running' (the background job outlives the
      * request); when the job reaches its terminal state the worker heals the row
-     * via the job key stamped at persist time (#1239). Best-effort like the rest
-     * of this store — a miss only affects observability, never the user turn.
+     * via the job key stamped at persist time (#1239 / #1343). Best-effort like
+     * the rest of this store — a miss only affects observability, never the user
+     * turn.
+     *
+     * @param array{text?: ?string, url?: ?string, error?: ?string, type?: ?string} $result
      */
-    public function updateStatusByJobKey(string $jobKey, string $status): void
+    public function updateStatusByJobKey(string $jobKey, string $status, array $result = []): void
     {
         if ('' === $jobKey) {
             return;
         }
 
         try {
-            $this->connection->update('BMESSAGE_TASKS', ['BSTATUS' => $status], ['BJOBKEY' => $jobKey]);
+            $data = ['BSTATUS' => $status];
+            $payload = $this->encodeResultPayload($result);
+            if (null !== $payload['BRESULTREF']) {
+                $data['BRESULTREF'] = $payload['BRESULTREF'];
+            }
+            if (null !== $payload['BERROR']) {
+                $data['BERROR'] = $payload['BERROR'];
+            }
+            $this->connection->update('BMESSAGE_TASKS', $data, ['BJOBKEY' => $jobKey]);
         } catch (\Throwable $e) {
             $this->logger->warning('TaskPlanStore: failed to update node status by job key', [
                 'job_key' => $jobKey,

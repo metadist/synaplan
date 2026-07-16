@@ -416,6 +416,7 @@ final readonly class TaskPlanExecutor
                     $assembled['node_statuses'],
                     'pending',
                     $assembled['node_job_keys'],
+                    $this->cardResultsFromAssembled($assembled),
                 );
             } catch (\Throwable $e) {
                 $this->logger->warning('TaskPlanExecutor: failed to persist DAG plan (ignored)', [
@@ -429,8 +430,12 @@ final readonly class TaskPlanExecutor
     }
 
     /**
-     * Wrap the client progress callback so a terminal per-node `task_update`
-     * (done/failed/skipped) also updates that node's BMESSAGE_TASKS row (#1142).
+     * Wrap the client progress callback so per-node progress also updates
+     * BMESSAGE_TASKS (#1142 / #1343). Terminal `task_update` rows store status
+     * plus settled card body (text/url/error/search summary); `task_chunk` /
+     * `task_file` accumulate content so a mid-turn reload can rebuild completed
+     * cards with the same payload the live SSE session showed.
+     *
      * The wrapped callback always forwards the event verbatim first — persistence
      * is a side effect and must never alter or drop the client stream. Returns
      * the original callback unchanged when there is nothing to track (no
@@ -443,23 +448,122 @@ final readonly class TaskPlanExecutor
         }
 
         $terminal = ['done', 'failed', 'skipped'];
+        /** @var array<string, string> $chunkText */
+        $chunkText = [];
+        /** @var array<string, string> $fileUrls */
+        $fileUrls = [];
+        /** @var array<string, string> $fileTypes */
+        $fileTypes = [];
 
-        return function (array $event) use ($progressCallback, $messageId, $terminal): void {
+        return function (array $event) use ($progressCallback, $messageId, $terminal, &$chunkText, &$fileUrls, &$fileTypes): void {
             $progressCallback($event);
 
-            if ('task_update' !== ($event['status'] ?? null)) {
-                return;
-            }
+            $status = $event['status'] ?? null;
             $metadata = $event['metadata'] ?? null;
             if (!is_array($metadata)) {
                 return;
             }
             $nodeId = $metadata['node_id'] ?? null;
-            $state = $metadata['state'] ?? null;
-            if (is_string($nodeId) && is_string($state) && in_array($state, $terminal, true)) {
-                $this->store->updateNodeStatus($messageId, $nodeId, $state);
+            if (!is_string($nodeId) || '' === $nodeId) {
+                return;
             }
+
+            if ('task_chunk' === $status) {
+                $chunk = $metadata['chunk'] ?? null;
+                if (is_string($chunk) && '' !== $chunk) {
+                    $chunkText[$nodeId] = ($chunkText[$nodeId] ?? '').$chunk;
+                }
+
+                return;
+            }
+
+            if ('task_file' === $status) {
+                $url = $metadata['url'] ?? null;
+                if (is_string($url) && '' !== $url) {
+                    $fileUrls[$nodeId] = $url;
+                }
+                $type = $metadata['type'] ?? null;
+                if (is_string($type) && '' !== $type) {
+                    $fileTypes[$nodeId] = $type;
+                }
+
+                return;
+            }
+
+            if ('task_update' !== $status) {
+                return;
+            }
+            $state = $metadata['state'] ?? null;
+            if (!is_string($state) || !in_array($state, $terminal, true)) {
+                return;
+            }
+
+            $text = is_string($metadata['text'] ?? null) && '' !== $metadata['text']
+                ? $metadata['text']
+                : ($chunkText[$nodeId] ?? null);
+            $url = is_string($metadata['url'] ?? null) && '' !== $metadata['url']
+                ? $metadata['url']
+                : ($fileUrls[$nodeId] ?? null);
+            $type = is_string($metadata['type'] ?? null) && '' !== $metadata['type']
+                ? $metadata['type']
+                : ($fileTypes[$nodeId] ?? null);
+            $error = is_string($metadata['error'] ?? null) && '' !== $metadata['error']
+                ? $metadata['error']
+                : null;
+            $query = is_string($metadata['query'] ?? null) && '' !== $metadata['query']
+                ? $metadata['query']
+                : null;
+            $resultsCount = is_int($metadata['results_count'] ?? null)
+                ? $metadata['results_count']
+                : null;
+
+            $this->store->updateNodeStatus($messageId, $nodeId, $state, [
+                'text' => $text,
+                'url' => $url,
+                'type' => $type,
+                'error' => $error,
+                'query' => $query,
+                'resultsCount' => $resultsCount,
+            ]);
         };
+    }
+
+    /**
+     * Extract per-node card bodies from the assembler's render cards so the
+     * final BMESSAGE_TASKS rewrite keeps text/url/error (#1343) instead of
+     * wiping the mid-turn rows written by {@see wrapProgressForPersistence()}.
+     *
+     * @param array<string, mixed> $assembled
+     *
+     * @return array<string, array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string}>
+     */
+    private function cardResultsFromAssembled(array $assembled): array
+    {
+        $cards = $assembled['metadata']['task_plan_render']['cards'] ?? null;
+        if (!is_array($cards)) {
+            return [];
+        }
+
+        $results = [];
+        foreach ($cards as $card) {
+            if (!is_array($card)) {
+                continue;
+            }
+            $nodeId = $card['nodeId'] ?? null;
+            if (!is_string($nodeId) || '' === $nodeId) {
+                continue;
+            }
+            $results[$nodeId] = [
+                'text' => is_string($card['text'] ?? null) ? $card['text'] : null,
+                'url' => is_string($card['url'] ?? null) ? $card['url'] : null,
+                'type' => is_string($card['type'] ?? null) ? $card['type'] : null,
+                'error' => is_string($card['error'] ?? null) ? $card['error'] : null,
+                'query' => is_string($card['query'] ?? null) ? $card['query'] : null,
+                'resultsCount' => is_int($card['resultsCount'] ?? null) ? $card['resultsCount'] : null,
+            ];
+        }
+
+        return $results;
     }
 
     /**

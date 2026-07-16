@@ -209,7 +209,19 @@ final readonly class MediaJobMessageSync
      */
     private function syncTaskPlanCard(MediaJob $job, \App\Entity\Message $message, string $state): void
     {
-        $this->taskPlanStore->updateStatusByJobKey($job->getJobKey(), $state);
+        $jobResult = $job->getResult();
+        $file = is_array($jobResult['file'] ?? null) ? $jobResult['file'] : null;
+        $fileUrl = null !== $file && is_string($file['url'] ?? null) && '' !== $file['url']
+            ? $file['url']
+            : null;
+        $fileType = null !== $file && is_string($file['type'] ?? null) && '' !== $file['type']
+            ? $file['type']
+            : $job->getType();
+        $this->taskPlanStore->updateStatusByJobKey($job->getJobKey(), $state, [
+            'url' => $fileUrl,
+            'type' => $fileType,
+            'error' => null !== $job->getError() && '' !== $job->getError() ? $job->getError() : null,
+        ]);
 
         $raw = $message->getMeta('task_plan');
         if (null === $raw || '' === $raw) {
@@ -229,13 +241,11 @@ final readonly class MediaJobMessageSync
             if (null !== $job->getError() && '' !== $job->getError()) {
                 $card['error'] = $job->getError();
             }
-            $result = $job->getResult();
-            $file = is_array($result['file'] ?? null) ? $result['file'] : null;
-            if (null !== $file && is_string($file['url'] ?? null) && '' !== $file['url']) {
+            if (null !== $fileUrl) {
                 // Stored as the public upload URL — the frontend mapper's
                 // buildUploadUrl() passes that form through unchanged.
-                $card['url'] = $file['url'];
-                $card['type'] = is_string($file['type'] ?? null) ? $file['type'] : $job->getType();
+                $card['url'] = $fileUrl;
+                $card['type'] = $fileType;
             }
             $patched = true;
             break;

@@ -511,7 +511,7 @@ class ChatController extends AbstractController
                         ),
                         new OA\Property(
                             property: 'inProgressTurn',
-                            description: 'Present only on the first page (offset 0) when the newest message is a still-running multi-task turn: the per-node task cards rebuilt from persisted plan state so a mid-stream reload shows running/completed cards before the assistant reply row exists (#1142).',
+                            description: 'Present only on the first page (offset 0) when the newest message is a still-running multi-task turn: the per-node task cards rebuilt from persisted plan state so a mid-stream reload shows running/completed cards before the assistant reply row exists (#1142). Settled cards include text/url/error so content survives reload (#1343).',
                             type: 'object',
                             nullable: true,
                             properties: [
@@ -525,6 +525,12 @@ class ChatController extends AbstractController
                                             new OA\Property(property: 'capability', type: 'string'),
                                             new OA\Property(property: 'kind', type: 'string'),
                                             new OA\Property(property: 'state', type: 'string'),
+                                            new OA\Property(property: 'text', type: 'string', nullable: true),
+                                            new OA\Property(property: 'url', type: 'string', nullable: true),
+                                            new OA\Property(property: 'error', type: 'string', nullable: true),
+                                            new OA\Property(property: 'query', type: 'string', nullable: true),
+                                            new OA\Property(property: 'resultsCount', type: 'integer', nullable: true),
+                                            new OA\Property(property: 'type', type: 'string', nullable: true),
                                         ]
                                     )
                                 ),

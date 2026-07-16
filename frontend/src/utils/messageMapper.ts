@@ -539,7 +539,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   }
 }
 
-/** In-progress turn payload from GET /chats/{id}/messages (#1142). */
+/** In-progress turn payload from GET /chats/{id}/messages (#1142 / #1343). */
 export interface ApiInProgressTurn {
   reply_node: string
   cards: Array<{
@@ -547,6 +547,12 @@ export interface ApiInProgressTurn {
     capability: string
     kind: string
     state: string
+    text?: string | null
+    url?: string | null
+    error?: string | null
+    query?: string | null
+    resultsCount?: number | null
+    type?: string | null
   }>
 }
 
@@ -554,11 +560,12 @@ export interface ApiInProgressTurn {
 export const IN_PROGRESS_TURN_ID = 'in-progress-turn'
 
 /**
- * Issue #1142: build a provisional assistant message from the in-progress turn
- * payload so that reloading (or returning to) a chat while a multi-task turn is
- * still running shows the running/completed task cards instead of only the bare
- * user prompt. The real assistant message replaces this on the next reload once
- * the turn completes and its OUT row exists.
+ * Issue #1142 / #1343: build a provisional assistant message from the
+ * in-progress turn payload so that reloading (or returning to) a chat while a
+ * multi-task turn is still running shows the running/completed task cards —
+ * including settled text/url/error — instead of only the bare user prompt. The
+ * real assistant message replaces this on the next reload once the turn
+ * completes and its OUT row exists.
  *
  * The bubble carries a fixed synthetic id (never `backend-*`), so it can't
  * collide with a persisted row and is ignored by the reconcile path (which
@@ -570,7 +577,14 @@ export function mapInProgressTurn(turn: ApiInProgressTurn): Message {
     capability: c.capability,
     kind: isTaskCardKind(c.kind) ? c.kind : ('text' as TaskCardKind),
     state: isTaskCardState(c.state) ? c.state : ('running' as TaskCardState),
-    text: '',
+    text: typeof c.text === 'string' ? c.text : '',
+    ...(typeof c.url === 'string' && c.url ? { url: c.url } : {}),
+    ...(typeof c.error === 'string' && c.error ? { error: c.error } : {}),
+    ...(typeof c.query === 'string' && c.query ? { query: c.query } : {}),
+    ...(typeof c.resultsCount === 'number' && c.resultsCount > 0
+      ? { resultsCount: c.resultsCount }
+      : {}),
+    ...(typeof c.type === 'string' && c.type ? { mediaType: c.type } : {}),
   }))
 
   return {

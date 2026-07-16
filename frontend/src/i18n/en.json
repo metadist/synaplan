@@ -3401,7 +3401,7 @@
     "copyFailed": "Could not copy",
     "expand": "Show text",
     "collapse": "Hide text",
-    "redundantCollapsed": "This text is part of the answer below."
+    "redundantCollapsed": "Step output collapsed — expand to inspect, or read the answer below."
   },
   "processing": {
     "started": "Starting processing...",
