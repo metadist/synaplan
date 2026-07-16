@@ -301,7 +301,27 @@ final readonly class MediaJobMessageSync
             }
         }
 
-        $file = $this->fileRegistrar->register($job->getUserId(), $relativePath, $job->getType(), $message->getId());
+        // #1251: async TTS stores a GENERIC BFILETYPE ('audio') and, without the
+        // spoken script, a later "what was said?" follow-up / knowledge-base add
+        // falls through to Whisper/Tika and records the MP3 duration instead of
+        // the text. The synchronous MediaGenerationHandler path already persists
+        // the prompt as BFILETEXT; mirror that here for the detached job path so
+        // both channels behave the same. Only audio carries usable source text.
+        $fileText = null;
+        if (MediaJob::TYPE_AUDIO === $job->getType()) {
+            $prompt = $job->getPrompt();
+            if (null !== $prompt && '' !== trim($prompt)) {
+                $fileText = $prompt;
+            }
+        }
+
+        $file = $this->fileRegistrar->register(
+            $job->getUserId(),
+            $relativePath,
+            $job->getType(),
+            $message->getId(),
+            fileText: $fileText,
+        );
         if (null === $file) {
             $this->logger->warning('MediaJobMessageSync: failed to register generated file', [
                 'job_key' => $job->getJobKey(),
