@@ -445,6 +445,75 @@ final readonly class InternalEmailService
     }
 
     /**
+     * Notify the operator inbox about a new content report (Apple Guideline 1.2).
+     *
+     * Sent to APP_ADMIN_EMAIL, falling back to the sender address and finally the
+     * fixed abuse contact so a report is never silently dropped. Best-effort: a
+     * transport failure is logged, never surfaced to the reporting user.
+     *
+     * @param array{id:int,contentType:string,contentId:int,reason:string,details:?string,reporterId:int,reporterEmail:?string,reportedUserId:?int,reportedUserEmail:?string,created:string} $report
+     */
+    public function sendModerationReportEmail(array $report): void
+    {
+        $adminEmail = $_ENV['APP_ADMIN_EMAIL'] ?? $_ENV['APP_SENDER_EMAIL'] ?? 'team@synaplan.com';
+        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
+
+        $reason = htmlspecialchars($report['reason'], ENT_QUOTES);
+        $details = null !== $report['details'] && '' !== $report['details']
+            ? nl2br(htmlspecialchars($report['details'], ENT_QUOTES))
+            : '<em>(none)</em>';
+        $reporter = htmlspecialchars(($report['reporterEmail'] ?? '').' (#'.$report['reporterId'].')', ENT_QUOTES);
+        $reportedUser = null !== $report['reportedUserId']
+            ? htmlspecialchars(($report['reportedUserEmail'] ?? '').' (#'.$report['reportedUserId'].')', ENT_QUOTES)
+            : '<em>(unresolved)</em>';
+        $contentType = htmlspecialchars($report['contentType'], ENT_QUOTES);
+        $contentId = (int) $report['contentId'];
+        $created = htmlspecialchars($report['created'], ENT_QUOTES);
+
+        $html = <<<HTML
+            <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #c62828; color: #fff; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px;">
+                    <strong style="font-size: 18px;">Content report #{$report['id']}</strong>
+                </div>
+                <p>A user reported potentially objectionable content. Please review within 24 hours
+                   and, if warranted, suspend the offending account in the admin moderation panel.</p>
+                <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reason</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$reason}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Content</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$contentType} #{$contentId}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reported user</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$reportedUser}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reporter</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$reporter}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Details</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$details}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Time</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$created}</td></tr>
+                </table>
+            </div>
+            HTML;
+
+        $email = (new Email())
+            ->from(sprintf('%s <%s>', $fromName, $fromEmail))
+            ->to($adminEmail)
+            ->subject('[MODERATION][Synaplan] Content report #'.$report['id'].' — '.$report['reason'])
+            ->priority(Email::PRIORITY_HIGH)
+            ->html($html);
+
+        try {
+            $this->sendWithRetry($email);
+            $this->logger->info('Moderation report email sent', ['to' => $adminEmail, 'report_id' => $report['id']]);
+        } catch (\Exception $e) {
+            $this->logger->warning('Failed to send moderation report email', [
+                'to' => $adminEmail,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Render email template with locale support
      * Translates all strings before passing to template.
      */

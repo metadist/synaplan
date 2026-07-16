@@ -30,6 +30,10 @@ parameters:
     # (synaplan-apps). Default matches the production bundle id.
     env(NATIVE_DEEPLINK_SCHEME): 'com.synaplan.app'
 
+    # Sign in with Apple: the native iOS identity-token audience is the app
+    # bundle id. Default matches the production bundle id (synaplan-apps).
+    env(APPLE_APP_BUNDLE_ID): 'com.synaplan.app'
+
     # Realtime (Centrifugo) defaults so the backend boots even when no realtime
     # gateway is configured (bare/custom deployment). With these unset,
     # CentrifugoPublisher short-circuits (enabled=false → no publish, never
@@ -529,6 +533,24 @@ services:
             $githubClientSecret: '%env(GITHUB_CLIENT_SECRET)%'
             $appUrl: '%env(APP_URL)%'
 
+    # Sign in with Apple (web/Android OAuth + native identity-token flow)
+    App\Controller\AppleAuthController:
+        arguments:
+            $appleClientId: '%env(string:default::APPLE_CLIENT_ID)%'
+            $appUrl: '%env(APP_URL)%'
+
+    App\Service\Auth\AppleClientSecretGenerator:
+        arguments:
+            $teamId: '%env(string:default::APPLE_TEAM_ID)%'
+            $keyId: '%env(string:default::APPLE_KEY_ID)%'
+            $clientId: '%env(string:default::APPLE_CLIENT_ID)%'
+            $privateKey: '%env(string:default::APPLE_PRIVATE_KEY)%'
+
+    App\Service\Auth\AppleIdentityTokenVerifier:
+        arguments:
+            $webClientId: '%env(string:default::APPLE_CLIENT_ID)%'
+            $appBundleId: '%env(APPLE_APP_BUNDLE_ID)%'
+
     # OIDC Discovery Controller
     App\Controller\OidcController:
         arguments:
@@ -631,6 +653,7 @@ services:
             $oidcClientId: '%env(string:default::OIDC_CLIENT_ID)%'
             $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
             $oidcAutoRedirect: '%env(string:default::OIDC_AUTO_REDIRECT)%'
+            $appleClientId: '%env(string:default::APPLE_CLIENT_ID)%'
 
     # OAuth State Service (signed tokens for CSRF protection)
     App\Service\OAuthStateService:

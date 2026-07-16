@@ -59,7 +59,7 @@ final readonly class SystemConfigService
             'email' => [
                 'label' => 'Email',
                 'sections' => [
-                    'mailer' => ['label' => 'Primary Mailer', 'fields' => ['MAILER_DSN', 'APP_SENDER_EMAIL', 'APP_SENDER_NAME']],
+                    'mailer' => ['label' => 'Primary Mailer', 'fields' => ['MAILER_DSN', 'APP_SENDER_EMAIL', 'APP_SENDER_NAME', 'APP_ADMIN_EMAIL']],
                 ],
             ],
             'branding' => [
@@ -86,6 +86,7 @@ final readonly class SystemConfigService
                     'recaptcha' => ['label' => 'reCAPTCHA v3', 'fields' => ['RECAPTCHA_ENABLED', 'RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY', 'RECAPTCHA_MIN_SCORE']],
                     'google' => ['label' => 'Google OAuth 2.0', 'fields' => ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CLOUD_PROJECT_ID']],
                     'github' => ['label' => 'GitHub OAuth 2.0', 'fields' => ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']],
+                    'apple' => ['label' => 'Sign in with Apple', 'fields' => ['APPLE_CLIENT_ID', 'APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY', 'APPLE_APP_BUNDLE_ID']],
                     'oidc' => ['label' => 'OIDC (Enterprise SSO)', 'fields' => ['OIDC_DISCOVERY_URL', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET']],
                 ],
             ],
@@ -1051,6 +1052,11 @@ final readonly class SystemConfigService
                 'sensitive' => false, 'description' => 'Sender name',
                 'default' => 'Synaplan',
             ],
+            'APP_ADMIN_EMAIL' => [
+                'tab' => 'email', 'section' => 'mailer', 'type' => 'email',
+                'sensitive' => false, 'description' => 'Operator inbox for incident + content-moderation alerts',
+                'default' => '',
+            ],
 
             // === Authentication ===
             'RECAPTCHA_ENABLED' => [
@@ -1097,6 +1103,31 @@ final readonly class SystemConfigService
                 'tab' => 'auth', 'section' => 'github', 'type' => 'password',
                 'sensitive' => true, 'description' => 'GitHub OAuth client secret',
                 'default' => '',
+            ],
+            'APPLE_CLIENT_ID' => [
+                'tab' => 'auth', 'section' => 'apple', 'type' => 'text',
+                'sensitive' => false, 'description' => 'Apple Services ID (web OAuth client ID / id_token audience)',
+                'default' => '',
+            ],
+            'APPLE_TEAM_ID' => [
+                'tab' => 'auth', 'section' => 'apple', 'type' => 'text',
+                'sensitive' => false, 'description' => 'Apple Developer Team ID (10 chars)',
+                'default' => '',
+            ],
+            'APPLE_KEY_ID' => [
+                'tab' => 'auth', 'section' => 'apple', 'type' => 'text',
+                'sensitive' => false, 'description' => 'Key ID of the Sign-in-with-Apple private key (.p8)',
+                'default' => '',
+            ],
+            'APPLE_PRIVATE_KEY' => [
+                'tab' => 'auth', 'section' => 'apple', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Contents of the AuthKey_XXXX.p8 (PKCS#8 PEM)',
+                'default' => '',
+            ],
+            'APPLE_APP_BUNDLE_ID' => [
+                'tab' => 'auth', 'section' => 'apple', 'type' => 'text',
+                'sensitive' => false, 'description' => 'Native iOS bundle id (identity-token audience)',
+                'default' => 'com.synaplan.app',
             ],
             'OIDC_DISCOVERY_URL' => [
                 'tab' => 'auth', 'section' => 'oidc', 'type' => 'url',

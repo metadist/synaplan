@@ -16,6 +16,7 @@ class AuthProvidersController extends AbstractController
         private ?string $oidcClientId,
         private ?string $oidcDiscoveryUrl,
         private ?string $oidcAutoRedirect,
+        private ?string $appleClientId = null,
     ) {
     }
 
@@ -60,6 +61,13 @@ class AuthProvidersController extends AbstractController
                 'enabled' => !empty($this->githubClientId)
                             && !in_array($this->githubClientId, ['your-github-client-id', 'change-me', ''], true),
                 'icon' => 'github',
+            ],
+            [
+                'id' => 'apple',
+                'name' => 'Apple',
+                'enabled' => !empty($this->appleClientId)
+                            && !in_array($this->appleClientId, ['your-apple-client-id', 'change-me', ''], true),
+                'icon' => 'apple',
             ],
             [
                 'id' => 'keycloak',
