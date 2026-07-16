@@ -534,6 +534,7 @@
   },
   "chatInput": {
     "placeholder": "Mesajınızı yazın...",
+    "placeholderShort": "Mesaj...",
     "provider": "Sağlayıcı",
     "model": "Model",
     "modelCaption": "Model: {name}",

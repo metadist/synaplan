@@ -520,6 +520,7 @@
   "chatInput": {
     "attach": "Anhängen",
     "placeholder": "Schreibe deine Nachricht hier...",
+    "placeholderShort": "Nachricht...",
     "provider": "Anbieter",
     "model": "Modell",
     "modelCaption": "Modell: {name}",
