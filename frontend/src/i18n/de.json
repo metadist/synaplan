@@ -1138,7 +1138,7 @@
     "copyFailed": "Kopieren fehlgeschlagen",
     "expand": "Text anzeigen",
     "collapse": "Text ausblenden",
-    "redundantCollapsed": "Dieser Text ist Teil der Antwort unten."
+    "redundantCollapsed": "Schrittausgabe eingeklappt — zum Prüfen aufklappen oder die Antwort unten lesen."
   },
   "processing": {
     "started": "Starte Verarbeitung...",

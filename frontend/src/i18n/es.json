@@ -1382,7 +1382,7 @@
     "copyFailed": "No se pudo copiar",
     "expand": "Mostrar texto",
     "collapse": "Ocultar texto",
-    "redundantCollapsed": "Este texto forma parte de la respuesta de abajo."
+    "redundantCollapsed": "Salida del paso oculta — expande para verla o lee la respuesta abajo."
   },
   "processing": {
     "started": "Iniciando procesamiento...",

@@ -592,6 +592,49 @@ describe('messageMapper (issue #1070)', () => {
       expect(msg.taskPlan?.cards[1]).toMatchObject({ nodeId: 'n2', kind: 'text', state: 'done' })
     })
 
+    it('restores settled text/url/error from the wire (#1343)', () => {
+      const msg = mapInProgressTurn(
+        turn({
+          cards: [
+            {
+              nodeId: 'n1',
+              capability: 'image_generation',
+              kind: 'image',
+              state: 'done',
+              url: '/uploads/pic.png',
+              type: 'image',
+            },
+            {
+              nodeId: 'n2',
+              capability: 'chat',
+              kind: 'text',
+              state: 'done',
+              text: 'Docker is a container platform.',
+            },
+            {
+              nodeId: 'n3',
+              capability: 'chat',
+              kind: 'text',
+              state: 'failed',
+              error: 'provider timeout',
+            },
+          ],
+        })
+      )
+
+      expect(msg.taskPlan?.cards[0]).toMatchObject({
+        url: '/uploads/pic.png',
+        mediaType: 'image',
+        text: '',
+      })
+      expect(msg.taskPlan?.cards[1]).toMatchObject({
+        text: 'Docker is a container platform.',
+      })
+      expect(msg.taskPlan?.cards[2]).toMatchObject({
+        error: 'provider timeout',
+      })
+    })
+
     it('falls back to safe defaults for unknown kind/state values from the wire', () => {
       const msg = mapInProgressTurn(
         turn({

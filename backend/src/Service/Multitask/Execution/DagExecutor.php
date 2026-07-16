@@ -532,31 +532,46 @@ final readonly class DagExecutor
     }
 
     /**
-     * Extra `task_update` metadata for a successfully completed node. Nodes
-     * with a search-style card (web_search: query + results_count; url_fetch:
-     * fetched hostnames as the query) carry a compact summary so the live task
-     * card matches the reload state (QA feedback PR #1076 — card body parity).
+     * Extra `task_update` metadata for a successfully completed node.
+     *
+     * Search-style cards (web_search / url_fetch / …) carry a compact summary
+     * (query + results_count) so the live card matches reload state (QA #1076).
+     * Other nodes include settled text / first-file url so mid-turn reload can
+     * rebuild card bodies from BMESSAGE_TASKS without waiting for the OUT row
+     * (#1343).
      *
      * @return array<string, mixed>
      */
     private function successMetadata(TaskNode $node, NodeResult $result): array
     {
-        if (!in_array($node->capability, [Capability::WebSearch, Capability::UrlFetch, Capability::McpFetch, Capability::EmailSearch], true)) {
-            return [];
+        if (in_array($node->capability, [Capability::WebSearch, Capability::UrlFetch, Capability::McpFetch, Capability::EmailSearch], true)) {
+            $extra = [];
+            $query = $result->metadata['query'] ?? null;
+            if (is_string($query) && '' !== $query) {
+                $extra['query'] = $query;
+            }
+            $sr = $result->metadata['search_results'] ?? null;
+            if (is_array($sr) && is_array($sr['results'] ?? null)) {
+                $extra['results_count'] = count($sr['results']);
+            } elseif (is_int($result->metadata['results_count'] ?? null)) {
+                // Data nodes without the web-search result shape (email_search)
+                // report their hit count directly.
+                $extra['results_count'] = $result->metadata['results_count'];
+            }
+
+            return $extra;
         }
 
         $extra = [];
-        $query = $result->metadata['query'] ?? null;
-        if (is_string($query) && '' !== $query) {
-            $extra['query'] = $query;
+        if (null !== $result->text && '' !== $result->text) {
+            $extra['text'] = $result->text;
         }
-        $sr = $result->metadata['search_results'] ?? null;
-        if (is_array($sr) && is_array($sr['results'] ?? null)) {
-            $extra['results_count'] = count($sr['results']);
-        } elseif (is_int($result->metadata['results_count'] ?? null)) {
-            // Data nodes without the web-search result shape (email_search)
-            // report their hit count directly.
-            $extra['results_count'] = $result->metadata['results_count'];
+        $firstFile = $result->firstFile();
+        if (null !== $firstFile && isset($firstFile['path']) && is_string($firstFile['path']) && '' !== $firstFile['path']) {
+            $extra['url'] = $firstFile['path'];
+            if (isset($firstFile['type']) && is_string($firstFile['type']) && '' !== $firstFile['type']) {
+                $extra['type'] = $firstFile['type'];
+            }
         }
 
         return $extra;

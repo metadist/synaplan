@@ -86,14 +86,12 @@ const isProseKind = computed(() => ['text', 'extract'].includes(props.card.kind)
 // The full results are available via the Sources dropdown on the message body.
 const isSearchKind = computed(() => props.card.kind === 'search')
 
-// #1229 smart collapse: a DONE prose card whose text is already contained in
-// the answer body collapses to its header — the body is the canonical answer
-// surface. The chevron lets the user peek anyway; cards with unique content
-// stay open. Streaming cards are never collapsed.
+// #1129 / #1229: DONE prose cards collapse to their header by default — the
+// compose_reply MessagePart below is the canonical answer surface. The chevron
+// lets the user expand any card to inspect that step. Media cards stay open so
+// images/audio remain visible. Streaming cards are never collapsed.
 const userExpanded = ref<boolean | null>(null)
-const isCollapsible = computed(
-  () => isProseKind.value && props.card.state === 'done' && props.card.redundant === true
-)
+const isCollapsible = computed(() => isProseKind.value && props.card.state === 'done')
 const collapsed = computed(() => isCollapsible.value && userExpanded.value !== true)
 const toggleCollapsed = () => {
   userExpanded.value = collapsed.value
@@ -303,7 +301,7 @@ const handleRetry = () => {
         <span v-else-if="card.query">{{ card.query }}</span>
       </div>
 
-      <!-- Redundant prose collapsed to a one-line hint (#1229) -->
+      <!-- Collapsed prose: one-line hint; expand via chevron (#1129 / #1229) -->
       <p
         v-if="!isSearchKind && card.text && collapsed"
         class="text-xs txt-muted"

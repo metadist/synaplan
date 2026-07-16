@@ -36,7 +36,7 @@ final readonly class InProgressTurnResolver
      * turn completes, so an inbound-and-processing tail means the assistant is
      * still working.
      *
-     * @return array{reply_node: string, cards: list<array{nodeId: string, capability: string, kind: string, state: string}>}|null
+     * @return array{reply_node: string, cards: list<array{nodeId: string, capability: string, kind: string, state: string, text?: string, url?: string, error?: string, query?: string, resultsCount?: int, type?: string}>}|null
      */
     public function resolve(?Message $newestMessage): ?array
     {
@@ -68,7 +68,7 @@ final readonly class InProgressTurnResolver
      * falling back to the first card. Empty string when there are no cards
      * (unreachable — the caller guards on a non-empty list).
      *
-     * @param list<array{nodeId: string, capability: string, kind: string, state: string}> $cards
+     * @param list<array{nodeId: string, capability: string, kind: string, state: string, text?: string, url?: string, error?: string, query?: string, resultsCount?: int, type?: string}> $cards
      */
     private function pickReplyNode(array $cards): string
     {

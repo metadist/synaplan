@@ -1382,7 +1382,7 @@
     "copyFailed": "Kopyalanamadı",
     "expand": "Metni göster",
     "collapse": "Metni gizle",
-    "redundantCollapsed": "Bu metin aşağıdaki yanıtın bir parçasıdır."
+    "redundantCollapsed": "Adım çıktısı daraltıldı — incelemek için genişletin veya aşağıdaki yanıtı okuyun."
   },
   "processing": {
     "started": "İşlem başlatılıyor...",

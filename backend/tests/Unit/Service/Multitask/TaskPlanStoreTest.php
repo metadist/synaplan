@@ -150,6 +150,32 @@ final class TaskPlanStoreTest extends TestCase
         self::assertSame(['BMESSAGEID' => 42, 'BNODEID' => 'n2'], $captured['criteria']);
     }
 
+    public function testUpdateNodeStatusPersistsCardBodyFields(): void
+    {
+        $captured = [];
+        $this->connection->expects(self::once())
+            ->method('update')
+            ->willReturnCallback(function (string $table, array $data, array $criteria) use (&$captured): int {
+                $captured = ['table' => $table, 'data' => $data, 'criteria' => $criteria];
+
+                return 1;
+            });
+
+        $this->store->updateNodeStatus(42, 'n2', 'done', [
+            'text' => 'Docker explanation',
+            'url' => '/uploads/a.mp3',
+            'error' => 'boom',
+        ]);
+
+        self::assertSame('BMESSAGE_TASKS', $captured['table']);
+        self::assertSame('done', $captured['data']['BSTATUS']);
+        self::assertSame('boom', $captured['data']['BERROR']);
+        $ref = json_decode((string) $captured['data']['BRESULTREF'], true);
+        self::assertIsArray($ref);
+        self::assertSame('Docker explanation', $ref['text']);
+        self::assertSame('/uploads/a.mp3', $ref['url']);
+    }
+
     public function testUpdateNodeStatusIgnoresEmptyNodeId(): void
     {
         $this->connection->expects(self::never())->method('update');
@@ -173,21 +199,80 @@ final class TaskPlanStoreTest extends TestCase
             ->method('fetchAllAssociative')
             ->willReturnCallback(function (string $sql, array $params): array {
                 self::assertStringContainsString('BMESSAGE_TASKS', $sql);
+                self::assertStringContainsString('BRESULTREF', $sql);
                 self::assertSame([777], $params);
 
                 return [
-                    ['BNODEID' => 'n1', 'BCAPABILITY' => 'image_generation', 'BSTATUS' => 'done'],
-                    ['BNODEID' => 'n2', 'BCAPABILITY' => 'chat', 'BSTATUS' => 'running'],
+                    [
+                        'BNODEID' => 'n1',
+                        'BCAPABILITY' => 'image_generation',
+                        'BSTATUS' => 'done',
+                        'BRESULTREF' => '{"url":"/uploads/pic.png","type":"image"}',
+                        'BERROR' => null,
+                    ],
+                    [
+                        'BNODEID' => 'n2',
+                        'BCAPABILITY' => 'chat',
+                        'BSTATUS' => 'done',
+                        'BRESULTREF' => '{"text":"Hello from n2"}',
+                        'BERROR' => null,
+                    ],
                     // compose_reply is the hidden assembler — never a user card.
-                    ['BNODEID' => 'n3', 'BCAPABILITY' => 'compose_reply', 'BSTATUS' => 'pending'],
+                    [
+                        'BNODEID' => 'n3',
+                        'BCAPABILITY' => 'compose_reply',
+                        'BSTATUS' => 'pending',
+                        'BRESULTREF' => null,
+                        'BERROR' => null,
+                    ],
                 ];
             });
 
         $cards = $this->store->loadCards(777);
 
         self::assertCount(2, $cards);
-        self::assertSame(['nodeId' => 'n1', 'capability' => 'image_generation', 'kind' => 'image', 'state' => 'done'], $cards[0]);
-        self::assertSame(['nodeId' => 'n2', 'capability' => 'chat', 'kind' => 'text', 'state' => 'running'], $cards[1]);
+        self::assertSame('n1', $cards[0]['nodeId']);
+        self::assertSame('image', $cards[0]['kind']);
+        self::assertSame('done', $cards[0]['state']);
+        self::assertSame('/uploads/pic.png', $cards[0]['url']);
+        self::assertSame('image', $cards[0]['type']);
+        self::assertSame('n2', $cards[1]['nodeId']);
+        self::assertSame('Hello from n2', $cards[1]['text']);
+    }
+
+    public function testPersistWithStatusesWritesResultPayload(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1,
+            'language' => 'en',
+            'reply_node' => 'n1',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'chat'],
+            ],
+        ]);
+
+        $captured = [];
+        $this->connection->method('insert')
+            ->willReturnCallback(function (string $table, array $data) use (&$captured): int {
+                $captured[] = $data;
+
+                return 1;
+            });
+
+        $this->store->persistWithStatuses(
+            555,
+            $plan,
+            76,
+            ['n1' => 'done'],
+            'pending',
+            [],
+            ['n1' => ['text' => 'Settled answer', 'error' => null]],
+        );
+
+        self::assertCount(1, $captured);
+        $ref = json_decode((string) $captured[0]['BRESULTREF'], true);
+        self::assertSame('Settled answer', $ref['text']);
+        self::assertArrayNotHasKey('BERROR', $captured[0]);
     }
 
     public function testLoadCardsReturnsEmptyOnFailure(): void
