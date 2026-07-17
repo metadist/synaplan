@@ -704,6 +704,84 @@
     background: rgba(107, 143, 214, 0.12) !important;
   }
 
+  /*
+   * Tab navigation — canonical pill style (matches /admin/config).
+   * Always use these classes (via TabNav.vue or directly) so font size
+   * and active/inactive colors stay consistent across the app.
+   */
+  .tab-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .dark .tab-nav {
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+  }
+  @media (min-width: 640px) {
+    .tab-nav {
+      gap: 0.5rem;
+    }
+  }
+
+  .tab-nav-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+    color: var(--txt-secondary);
+    transition:
+      color 0.15s,
+      background-color 0.15s;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+  }
+  @media (min-width: 640px) {
+    .tab-nav-item {
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+  }
+  .tab-nav-item:hover {
+    color: var(--txt-primary);
+    background: rgba(0, 63, 199, 0.06);
+  }
+  .dark .tab-nav-item:hover {
+    background: rgba(107, 143, 214, 0.12);
+  }
+  .tab-nav-item:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+
+  .tab-nav-item--active {
+    background: rgba(0, 63, 199, 0.1);
+    color: var(--brand);
+  }
+  .tab-nav-item--active:hover {
+    background: rgba(0, 63, 199, 0.1);
+    color: var(--brand);
+  }
+  .dark .tab-nav-item--active {
+    background: rgba(107, 143, 214, 0.15);
+    color: var(--brand-light);
+  }
+  .dark .tab-nav-item--active:hover {
+    background: rgba(107, 143, 214, 0.15);
+    color: var(--brand-light);
+  }
+
   /* Light overlay backgrounds */
   .bg-overlay-light {
     background: rgba(0, 0, 0, 0.05);

@@ -1,115 +1,15 @@
 <template>
   <div class="space-y-6" data-testid="admin-ai-models-panel">
-    <div class="surface-card p-6">
-      <h2 class="text-xl font-semibold txt-primary mb-4">
-        {{ t('config.aiModels.admin.addModels') }}
-      </h2>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium txt-secondary mb-2">{{
-            t('config.aiModels.admin.urlsLabel')
-          }}</label>
-          <textarea
-            v-model="urlsText"
-            class="w-full h-28 px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-            :placeholder="t('config.aiModels.admin.urlsPlaceholder')"
-          />
-        </div>
-        <div>
-          <label class="block text-sm font-medium txt-secondary mb-2">{{
-            t('config.aiModels.admin.textDumpLabel')
-          }}</label>
-          <textarea
-            v-model="textDump"
-            class="w-full h-28 px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-            :placeholder="t('config.aiModels.admin.textDumpPlaceholder')"
-          />
-        </div>
-      </div>
-
-      <div class="mt-4 flex flex-wrap items-center gap-3">
-        <label class="flex items-center gap-2 text-sm txt-secondary">
-          <input
-            v-model="allowDelete"
-            type="checkbox"
-            class="rounded border-light-border/30 dark:border-dark-border/20"
-          />
-          {{ t('config.aiModels.admin.allowDelete') }}
-        </label>
-
-        <button
-          type="button"
-          class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:opacity-90 transition"
-          :disabled="importLoading"
-          @click="generatePreview"
-        >
-          {{
-            importLoading
-              ? t('config.aiModels.admin.generating')
-              : t('config.aiModels.admin.generateSql')
-          }}
-        </button>
-
-        <button
-          type="button"
-          class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition"
-          :disabled="applyLoading || !sqlPreview || !validationOk"
-          @click="applySql"
-        >
-          {{
-            applyLoading ? t('config.aiModels.admin.applying') : t('config.aiModels.admin.applySql')
-          }}
-        </button>
-      </div>
-
-      <div class="mt-4">
-        <label class="block text-sm font-medium txt-secondary mb-2">{{
-          t('config.aiModels.admin.sqlPreview')
-        }}</label>
-        <textarea
-          v-model="sqlPreview"
-          class="w-full h-48 px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 font-mono text-xs txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          :placeholder="t('config.aiModels.admin.sqlPreviewPlaceholder')"
-        />
-
-        <div
-          v-if="validationErrors.length > 0"
-          class="mt-3 p-3 rounded-lg bg-red-500/5 border border-red-500/20"
-        >
-          <div class="text-sm font-semibold text-red-500 mb-1">
-            {{ t('config.aiModels.admin.validationErrors') }}
-          </div>
-          <ul class="text-sm txt-primary list-disc pl-5">
-            <li v-for="(e, i) in validationErrors" :key="i">{{ e }}</li>
-          </ul>
-        </div>
-
-        <div
-          v-else-if="sqlPreview"
-          class="mt-3 p-3 rounded-lg bg-green-500/5 border border-green-500/20"
-        >
-          <div class="text-sm txt-primary">
-            {{ t('config.aiModels.admin.validated') }}:
-            <span class="font-semibold">{{ statements.length }}</span>
-            {{ t('config.aiModels.admin.statements') }}
-          </div>
-          <div v-if="aiProvider || aiModel" class="text-xs txt-secondary mt-1">
-            {{ t('config.aiModels.admin.generatedBy') }}:
-            {{ aiProvider || t('config.aiModels.admin.unknown') }} /
-            {{ aiModel || t('config.aiModels.admin.unknown') }}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <AddModelForm @created="loadModels" />
-
     <div class="surface-card p-6" data-testid="admin-ai-models-editor">
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-        <h2 class="text-xl font-semibold txt-primary">
-          {{ t('config.aiModels.admin.editModels') }}
-        </h2>
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
+        <div>
+          <h2 class="text-xl font-semibold txt-primary">
+            {{ t('config.aiModels.admin.editModels') }}
+          </h2>
+          <p class="text-sm txt-secondary mt-1">
+            {{ t('config.aiModels.admin.catalogSubtitle') }}
+          </p>
+        </div>
         <div class="flex items-center gap-3">
           <input
             v-model="adminSearch"
@@ -431,17 +331,141 @@
         </div>
       </div>
     </div>
+
+    <!-- Bulk SQL import — secondary / collapsed so catalog + add stay primary -->
+    <div class="surface-card p-6">
+      <button
+        type="button"
+        class="w-full flex items-center justify-between gap-3 text-left"
+        data-testid="btn-toggle-bulk-import"
+        @click="importOpen = !importOpen"
+      >
+        <div>
+          <h2 class="text-lg font-semibold txt-primary">
+            {{ t('config.aiModels.admin.addModels') }}
+          </h2>
+          <p class="text-sm txt-secondary mt-0.5">
+            {{ t('config.aiModels.admin.bulkImportSubtitle') }}
+          </p>
+        </div>
+        <Icon
+          :icon="importOpen ? 'mdi:chevron-up' : 'mdi:chevron-down'"
+          class="w-5 h-5 txt-secondary flex-shrink-0"
+        />
+      </button>
+
+      <div v-if="importOpen" class="mt-5">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium txt-secondary mb-2">{{
+              t('config.aiModels.admin.urlsLabel')
+            }}</label>
+            <textarea
+              v-model="urlsText"
+              class="w-full h-28 px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              :placeholder="t('config.aiModels.admin.urlsPlaceholder')"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium txt-secondary mb-2">{{
+              t('config.aiModels.admin.textDumpLabel')
+            }}</label>
+            <textarea
+              v-model="textDump"
+              class="w-full h-28 px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              :placeholder="t('config.aiModels.admin.textDumpPlaceholder')"
+            />
+          </div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <label class="flex items-center gap-2 text-sm txt-secondary">
+            <input
+              v-model="allowDelete"
+              type="checkbox"
+              class="rounded border-light-border/30 dark:border-dark-border/20"
+            />
+            {{ t('config.aiModels.admin.allowDelete') }}
+          </label>
+
+          <button
+            type="button"
+            class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+            :disabled="importLoading"
+            @click="generatePreview"
+          >
+            {{
+              importLoading
+                ? t('config.aiModels.admin.generating')
+                : t('config.aiModels.admin.generateSql')
+            }}
+          </button>
+
+          <button
+            type="button"
+            class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover-surface transition"
+            :disabled="applyLoading || !sqlPreview || !validationOk"
+            @click="applySql"
+          >
+            {{
+              applyLoading
+                ? t('config.aiModels.admin.applying')
+                : t('config.aiModels.admin.applySql')
+            }}
+          </button>
+        </div>
+
+        <div class="mt-4">
+          <label class="block text-sm font-medium txt-secondary mb-2">{{
+            t('config.aiModels.admin.sqlPreview')
+          }}</label>
+          <textarea
+            v-model="sqlPreview"
+            class="w-full h-48 px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 font-mono text-xs txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            :placeholder="t('config.aiModels.admin.sqlPreviewPlaceholder')"
+          />
+
+          <div
+            v-if="validationErrors.length > 0"
+            class="mt-3 p-3 rounded-lg bg-red-500/5 border border-red-500/20"
+          >
+            <div class="text-sm font-semibold text-red-500 mb-1">
+              {{ t('config.aiModels.admin.validationErrors') }}
+            </div>
+            <ul class="text-sm txt-primary list-disc pl-5">
+              <li v-for="(e, i) in validationErrors" :key="i">{{ e }}</li>
+            </ul>
+          </div>
+
+          <div
+            v-else-if="sqlPreview"
+            class="mt-3 p-3 rounded-lg bg-green-500/5 border border-green-500/20"
+          >
+            <div class="text-sm txt-primary">
+              {{ t('config.aiModels.admin.validated') }}:
+              <span class="font-semibold">{{ statements.length }}</span>
+              {{ t('config.aiModels.admin.statements') }}
+            </div>
+            <div v-if="aiProvider || aiModel" class="text-xs txt-secondary mt-1">
+              {{ t('config.aiModels.admin.generatedBy') }}:
+              {{ aiProvider || t('config.aiModels.admin.unknown') }} /
+              {{ aiModel || t('config.aiModels.admin.unknown') }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { Icon } from '@iconify/vue'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { adminModelsApi, type AdminModel } from '@/services/api/adminModelsApi'
-import AddModelForm from '@/components/config/AddModelForm.vue'
 
 const { t } = useI18n()
 const dialog = useDialog()
@@ -466,6 +490,7 @@ interface EditForm {
 
 const { success, error: showError } = useNotification()
 
+const importOpen = ref(false)
 const urlsText = ref('')
 const textDump = ref('')
 const allowDelete = ref(false)
@@ -689,5 +714,9 @@ async function deleteModel(m: AdminModel) {
 
 onMounted(async () => {
   await loadModels()
+})
+
+defineExpose({
+  refresh: loadModels,
 })
 </script>
