@@ -31,14 +31,15 @@
           </select>
         </div>
 
-        <!-- Session Tabs -->
-        <div class="flex border-b border-light-border/30 dark:border-dark-border/20">
+        <!-- Session Tabs (shared tab-nav style; compact sidebar, no mobile dropdown) -->
+        <div class="tab-nav !mb-0 px-2 pt-2" role="tablist" :aria-label="$t('liveSupport.title')">
           <button
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === 'waiting'"
             :class="[
-              'flex-1 px-3 py-2 text-xs font-medium transition-colors',
-              activeTab === 'waiting'
-                ? 'txt-brand border-b-2 border-[var(--brand)]'
-                : 'txt-secondary hover:txt-primary',
+              'tab-nav-item flex-1 justify-center',
+              activeTab === 'waiting' && 'tab-nav-item--active',
             ]"
             @click="activeTab = 'waiting'"
           >
@@ -51,11 +52,12 @@
             </span>
           </button>
           <button
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === 'active'"
             :class="[
-              'flex-1 px-3 py-2 text-xs font-medium transition-colors',
-              activeTab === 'active'
-                ? 'txt-brand border-b-2 border-[var(--brand)]'
-                : 'txt-secondary hover:txt-primary',
+              'tab-nav-item flex-1 justify-center',
+              activeTab === 'active' && 'tab-nav-item--active',
             ]"
             @click="activeTab = 'active'"
           >

@@ -1,24 +1,26 @@
 <template>
   <div class="surface-card p-6" data-testid="openai-endpoints-panel">
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
-      <h2 class="text-xl font-semibold txt-primary">
-        {{ t('config.openaiEndpoints.title') }}
-      </h2>
+      <div>
+        <h2 class="text-xl font-semibold txt-primary">
+          {{ t('config.openaiEndpoints.title') }}
+        </h2>
+        <p class="text-sm txt-secondary mt-1">
+          {{ t('config.openaiEndpoints.subtitle') }}
+        </p>
+      </div>
       <button
         type="button"
-        class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition"
+        class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover-surface transition"
         :disabled="loading"
         @click="load"
       >
         {{ t('config.openaiEndpoints.refresh') }}
       </button>
     </div>
-    <p class="text-sm txt-secondary mb-5">
-      {{ t('config.openaiEndpoints.subtitle') }}
-    </p>
 
     <!-- Add / edit form -->
-    <div class="rounded-lg border border-light-border/30 dark:border-dark-border/20 p-4 mb-6">
+    <div class="rounded-lg border border-light-border/30 dark:border-dark-border/20 p-4 mb-6 mt-5">
       <div class="text-sm font-semibold txt-primary mb-3">
         {{
           editingName
@@ -55,11 +57,28 @@
           }}</label>
           <input
             v-model="form.base_url"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
             placeholder="https://localai.example.com/v1"
           />
         </div>
+
+        <!-- Auth type (MCP-style: none / bearer / custom header) -->
         <div class="md:col-span-2">
+          <label class="block text-xs font-medium txt-secondary mb-1">{{
+            t('config.openaiEndpoints.authTypeLabel')
+          }}</label>
+          <select
+            v-model="form.authType"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="openai-endpoint-auth-type"
+          >
+            <option value="none">{{ t('config.openaiEndpoints.authTypeNone') }}</option>
+            <option value="bearer">{{ t('config.openaiEndpoints.authTypeBearer') }}</option>
+            <option value="header">{{ t('config.openaiEndpoints.authTypeHeader') }}</option>
+          </select>
+        </div>
+
+        <div v-if="form.authType === 'bearer'" class="md:col-span-2">
           <label class="block text-xs font-medium txt-secondary mb-1">{{
             t('config.openaiEndpoints.apiKeyLabel')
           }}</label>
@@ -67,17 +86,53 @@
             v-model="form.api_key"
             type="password"
             autocomplete="off"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
             :placeholder="
               editingName
                 ? t('config.openaiEndpoints.apiKeyKeepPlaceholder')
                 : t('config.openaiEndpoints.apiKeyPlaceholder')
             "
+            data-testid="openai-endpoint-api-key"
           />
           <p v-if="editingName" class="text-xs txt-secondary mt-1">
             {{ t('config.openaiEndpoints.apiKeyKeepHint') }}
           </p>
         </div>
+
+        <template v-if="form.authType === 'header'">
+          <div>
+            <label class="block text-xs font-medium txt-secondary mb-1">{{
+              t('config.openaiEndpoints.authHeaderLabel')
+            }}</label>
+            <input
+              v-model="form.authHeader"
+              type="text"
+              class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
+              :placeholder="t('config.openaiEndpoints.authHeaderPlaceholder')"
+              data-testid="openai-endpoint-auth-header"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-medium txt-secondary mb-1">{{
+              t('config.openaiEndpoints.authTokenLabel')
+            }}</label>
+            <input
+              v-model="form.authToken"
+              type="password"
+              autocomplete="off"
+              class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
+              :placeholder="
+                editingName && editingHasHeaderToken
+                  ? t('config.openaiEndpoints.authTokenKeepPlaceholder')
+                  : t('config.openaiEndpoints.authTokenPlaceholder')
+              "
+              data-testid="openai-endpoint-auth-token"
+            />
+            <p v-if="editingName && editingHasHeaderToken" class="text-xs txt-secondary mt-1">
+              {{ t('config.openaiEndpoints.authTokenKeepHint') }}
+            </p>
+          </div>
+        </template>
       </div>
 
       <div class="mt-3">
@@ -104,7 +159,7 @@
       <div class="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:opacity-90 transition"
+          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
           :disabled="saving"
           @click="save"
         >
@@ -112,7 +167,7 @@
         </button>
         <button
           type="button"
-          class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition"
+          class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover-surface transition"
           :disabled="testingForm"
           @click="testForm"
         >
@@ -165,7 +220,7 @@
             <th
               class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide"
             >
-              {{ t('config.openaiEndpoints.colKey') }}
+              {{ t('config.openaiEndpoints.colAuth') }}
             </th>
             <th
               class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide"
@@ -193,15 +248,7 @@
               {{ ep.base_url }}
             </td>
             <td class="py-2 px-2">
-              <span
-                class="inline-block w-2 h-2 rounded-full"
-                :class="ep.has_api_key ? 'bg-green-500' : 'bg-gray-400'"
-                :title="
-                  ep.has_api_key
-                    ? t('config.openaiEndpoints.keySet')
-                    : t('config.openaiEndpoints.noKey')
-                "
-              />
+              <span class="pill text-xs">{{ authModeLabel(detectAuthType(ep)) }}</span>
             </td>
             <td class="py-2 px-2">
               <span v-for="cap in ep.capabilities" :key="cap" class="pill text-xs mr-1">{{
@@ -268,6 +315,8 @@ import {
   type OpenAiEndpointTestResponse,
 } from '@/services/api/adminOpenAiEndpointsApi'
 
+type AuthType = 'none' | 'bearer' | 'header'
+
 const { t } = useI18n()
 const dialog = useDialog()
 const { success, error: showError } = useNotification()
@@ -278,6 +327,7 @@ const loading = ref(false)
 const saving = ref(false)
 const testingForm = ref(false)
 const editingName = ref<string | null>(null)
+const editingHasHeaderToken = ref(false)
 const rowTestingName = ref<string | null>(null)
 const rowDeletingName = ref<string | null>(null)
 const formTestResult = ref<OpenAiEndpointTestResponse | null>(null)
@@ -287,32 +337,105 @@ interface EndpointForm {
   name: string
   label: string
   base_url: string
+  authType: AuthType
   api_key: string
+  authHeader: string
+  authToken: string
   capabilities: string[]
 }
 
 const form = ref<EndpointForm>(emptyForm())
 
 function emptyForm(): EndpointForm {
-  return { name: '', label: '', base_url: '', api_key: '', capabilities: ['chat', 'vectorize'] }
+  return {
+    name: '',
+    label: '',
+    base_url: '',
+    authType: 'none',
+    api_key: '',
+    authHeader: 'Authorization',
+    authToken: '',
+    capabilities: ['chat', 'vectorize'],
+  }
+}
+
+function detectAuthType(ep: OpenAiEndpoint): AuthType {
+  if (ep.has_api_key) return 'bearer'
+  const headers = ep.headers ?? {}
+  if (Object.keys(headers).length > 0) return 'header'
+  return 'none'
+}
+
+function authModeLabel(mode: AuthType): string {
+  if (mode === 'bearer') return t('config.openaiEndpoints.authBearer')
+  if (mode === 'header') return t('config.openaiEndpoints.authHeader')
+  return t('config.openaiEndpoints.authNone')
+}
+
+function primaryHeaderEntry(headers: Record<string, string>): { name: string; value: string } {
+  const entries = Object.entries(headers)
+  if (entries.length === 0) return { name: 'Authorization', value: '' }
+  return { name: entries[0][0], value: entries[0][1] }
 }
 
 function resetForm() {
   form.value = emptyForm()
   editingName.value = null
+  editingHasHeaderToken.value = false
   formTestResult.value = null
 }
 
 function startEdit(ep: OpenAiEndpoint) {
   editingName.value = ep.name
   formTestResult.value = null
+  const mode = detectAuthType(ep)
+  const header = primaryHeaderEntry(ep.headers ?? {})
+  editingHasHeaderToken.value = mode === 'header' && header.value !== ''
   form.value = {
     name: ep.name,
     label: ep.label,
     base_url: ep.base_url,
+    authType: mode,
     api_key: '',
+    authHeader: header.name || 'Authorization',
+    // Header values are returned by the list API (non-secret custom headers).
+    // Still leave blank for keep-on-empty when editing so we don't force a retype
+    // of bearer secrets; for header mode we prefill the known value.
+    authToken: mode === 'header' ? header.value : '',
     capabilities: [...ep.capabilities],
   }
+}
+
+function buildAuthPayload(forTest = false): {
+  api_key?: string | null
+  headers: Record<string, string>
+} {
+  const mode = form.value.authType
+  if (mode === 'none') {
+    return { api_key: '', headers: {} }
+  }
+  if (mode === 'bearer') {
+    const key = form.value.api_key
+    if (key !== '') return { api_key: key, headers: {} }
+    // Editing + empty → keep existing key (null/undefined); create → no key
+    if (editingName.value) {
+      return { api_key: forTest ? undefined : null, headers: {} }
+    }
+    return { api_key: '', headers: {} }
+  }
+  // Custom header
+  const headerName = form.value.authHeader.trim() || 'Authorization'
+  const token = form.value.authToken
+  if (token !== '') {
+    return { api_key: '', headers: { [headerName]: token } }
+  }
+  if (editingName.value && editingHasHeaderToken.value) {
+    // Keep existing header value from the stored endpoint
+    const existing = endpoints.value.find((e) => e.name === editingName.value)
+    const existingHeaders = existing?.headers ?? {}
+    return { api_key: '', headers: { ...existingHeaders } }
+  }
+  return { api_key: '', headers: headerName ? { [headerName]: '' } : {} }
 }
 
 function formatTestResult(r: OpenAiEndpointTestResponse): string {
@@ -351,13 +474,13 @@ async function save() {
 
   saving.value = true
   try {
+    const auth = buildAuthPayload(false)
     const res = await adminOpenAiEndpointsApi.save({
       name,
       label: form.value.label.trim() || undefined,
       base_url: baseUrl,
-      // Empty while editing → keep existing key (send null); empty while
-      // creating → no key (send '').
-      api_key: form.value.api_key !== '' ? form.value.api_key : editingName.value ? null : '',
+      api_key: auth.api_key,
+      headers: auth.headers,
       capabilities: form.value.capabilities,
     })
     endpoints.value = res.endpoints
@@ -374,9 +497,11 @@ async function testForm() {
   testingForm.value = true
   formTestResult.value = null
   try {
+    const auth = buildAuthPayload(true)
     formTestResult.value = await adminOpenAiEndpointsApi.test({
       base_url: form.value.base_url.trim(),
-      api_key: form.value.api_key !== '' ? form.value.api_key : editingName.value ? undefined : '',
+      api_key: auth.api_key,
+      headers: auth.headers,
       name: editingName.value ?? undefined,
     })
   } catch (e: unknown) {

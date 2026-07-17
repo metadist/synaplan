@@ -25,25 +25,18 @@
     </div>
 
     <!-- Tabs -->
-    <div
-      class="flex gap-2 border-b border-light-border/30 dark:border-dark-border/20"
-      data-testid="section-tabs"
-    >
+    <div class="tab-nav" role="tablist" data-testid="section-tabs">
       <button
         v-for="tab in tabs"
         :key="tab"
-        :class="[
-          'px-4 py-3 font-medium text-sm transition-colors relative',
-          activeTab === tab ? 'txt-primary' : 'txt-secondary hover:txt-primary',
-        ]"
+        type="button"
+        role="tab"
+        :aria-selected="activeTab === tab"
+        :class="['tab-nav-item', activeTab === tab && 'tab-nav-item--active']"
         data-testid="btn-tab"
         @click="activeTab = tab"
       >
         {{ $t(`widget.tabs.${tab}`) }}
-        <div
-          v-if="activeTab === tab"
-          class="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--brand)]"
-        ></div>
       </button>
     </div>
 

@@ -301,16 +301,14 @@
             v-if="fallbackOpen"
             class="border-t border-light-border/30 dark:border-dark-border/20"
           >
-            <div class="flex border-b border-light-border/30 dark:border-dark-border/20">
+            <div class="tab-nav !mb-0 px-2 pt-2" role="tablist">
               <button
                 v-for="tab in tabs"
                 :key="tab.id"
-                :class="[
-                  'px-6 py-3 text-sm font-medium transition-colors relative',
-                  activeTab === tab.id
-                    ? 'txt-primary bg-[var(--brand)]/5 border-b-2 border-[var(--brand)]'
-                    : 'txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
-                ]"
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === tab.id"
+                :class="['tab-nav-item', activeTab === tab.id && 'tab-nav-item--active']"
                 data-testid="btn-tab"
                 @click="activeTab = tab.id"
               >

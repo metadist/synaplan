@@ -116,7 +116,7 @@
 
       <button
         type="button"
-        class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+        class="btn-primary px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
         :disabled="submitting"
         data-testid="add-model-submit"
         @click="submit"

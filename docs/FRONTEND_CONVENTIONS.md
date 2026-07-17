@@ -41,6 +41,7 @@ Always use CSS variables from `frontend/src/style.css`. **NEVER** use Tailwind c
 | `hover-surface` | Hover state |
 | `pill`, `pill--active` | Pill buttons |
 | `nav-item`, `nav-item--active` | Navigation items |
+| `tab-nav`, `tab-nav-item`, `tab-nav-item--active` | Page tab bars (canonical pill style; prefer `TabNav.vue`) |
 
 ### Standard Layout
 

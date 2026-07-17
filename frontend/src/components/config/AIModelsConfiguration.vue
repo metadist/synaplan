@@ -1,6 +1,16 @@
 <template>
   <div class="space-y-6" data-testid="page-config-ai-models">
+    <TabNav
+      :model-value="activeTab"
+      :tabs="tabNavItems"
+      :aria-label="$t('config.aiModels.title')"
+      mobile-trigger-testid="tab-ai-models-mobile-trigger"
+      mobile-menu-testid="tab-ai-models-mobile-menu"
+      @update:model-value="onModelsTabChange"
+    />
+
     <div
+      v-show="activeTab === 'choice'"
       class="surface-card p-6 relative"
       :class="openDropdown ? 'z-20' : 'z-0'"
       data-testid="section-default-config"
@@ -153,277 +163,287 @@
       </div>
     </div>
 
-    <div class="surface-card p-6" data-testid="section-purpose-filters">
-      <h2 class="text-xl font-semibold txt-primary mb-4 flex items-center gap-2">
-        <FunnelIcon class="w-5 h-5" />
-        {{ $t('config.aiModels.modelsPurposesTitle') }}
-      </h2>
-
-      <div class="flex flex-wrap gap-2">
-        <button
-          :class="[
-            'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
-            selectedPurpose === null
-              ? 'bg-[var(--brand)] text-white'
-              : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
-          ]"
-          data-testid="btn-filter-all"
-          @click="selectedPurpose = null"
-        >
-          {{ $t('config.aiModels.allModels') }}
-        </button>
-        <button
-          v-for="capability in Object.keys(purposeLabels)"
-          :key="capability"
-          :class="[
-            'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
-            selectedPurpose === capability
-              ? 'bg-[var(--brand)] text-white'
-              : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
-          ]"
-          data-testid="btn-filter"
-          @click="selectedPurpose = capability as Capability"
-        >
-          {{ purposeLabels[capability as Capability] }}
-        </button>
-      </div>
-    </div>
-
-    <div class="surface-card p-6" data-testid="section-models-table">
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-        <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
-          <ListBulletIcon class="w-5 h-5" />
-          {{ $t('config.aiModels.availableModelsTitle') }}
+    <div v-show="activeTab === 'list'" class="space-y-6">
+      <div class="surface-card p-6" data-testid="section-purpose-filters">
+        <h2 class="text-xl font-semibold txt-primary mb-4 flex items-center gap-2">
+          <FunnelIcon class="w-5 h-5" />
+          {{ $t('config.aiModels.modelsPurposesTitle') }}
         </h2>
 
-        <div class="flex flex-wrap items-center gap-3">
-          <!-- Search / Filter -->
-          <div class="relative">
-            <MagnifyingGlassIcon
-              class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
-            />
-            <input
-              v-model="modelSearch"
-              type="search"
-              :placeholder="$t('config.aiModels.searchPlaceholder')"
-              :aria-label="$t('config.aiModels.searchPlaceholder')"
-              class="w-full sm:w-64 pl-9 pr-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-              data-testid="input-model-search"
-            />
-          </div>
-
-          <!-- Show Rating Toggle -->
-          <label class="flex items-center gap-2 cursor-pointer group">
-            <input
-              v-model="showRatings"
-              type="checkbox"
-              class="w-4 h-4 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-[var(--brand)] cursor-pointer"
-            />
-            <span class="text-sm txt-secondary group-hover:txt-primary transition-colors">{{
-              $t('config.aiModels.showRating')
-            }}</span>
-          </label>
-
-          <!-- Sort Dropdown -->
-          <div class="relative">
-            <select
-              v-model="sortBy"
-              class="px-3 py-2 pr-8 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer appearance-none"
-              @change="sortDirection = sortBy === 'quality' || sortBy === 'rating' ? 'desc' : 'asc'"
-            >
-              <option value="alphabet">{{ $t('config.aiModels.sortAlphabet') }}</option>
-              <option value="service">{{ $t('config.aiModels.sortService') }}</option>
-              <option value="quality">{{ $t('config.aiModels.sortQuality') }}</option>
-              <option value="purpose">{{ $t('config.aiModels.sortPurpose') }}</option>
-            </select>
-            <ChevronDownIcon
-              class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
-            />
-          </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            :class="[
+              'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
+              selectedPurpose === null
+                ? 'bg-[var(--brand)] text-white'
+                : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
+            ]"
+            data-testid="btn-filter-all"
+            @click="selectedPurpose = null"
+          >
+            {{ $t('config.aiModels.allModels') }}
+          </button>
+          <button
+            v-for="capability in Object.keys(purposeLabels)"
+            :key="capability"
+            :class="[
+              'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
+              selectedPurpose === capability
+                ? 'bg-[var(--brand)] text-white'
+                : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
+            ]"
+            data-testid="btn-filter"
+            @click="selectedPurpose = capability as Capability"
+          >
+            {{ purposeLabels[capability as Capability] }}
+          </button>
         </div>
       </div>
 
-      <div
-        v-if="filteredModels.length === 0"
-        class="text-center py-12 txt-secondary"
-        data-testid="section-models-empty"
-      >
-        {{ $t('config.aiModels.noModelsAvailable') }}
-      </div>
+      <div class="surface-card p-6" data-testid="section-models-table">
+        <div
+          class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4"
+        >
+          <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
+            <ListBulletIcon class="w-5 h-5" />
+            {{ $t('config.aiModels.availableModelsTitle') }}
+          </h2>
 
-      <div v-else class="overflow-x-auto scroll-thin">
-        <table class="w-full min-w-[640px]">
-          <thead>
-            <tr class="border-b-2 border-light-border/30 dark:border-dark-border/20">
-              <th
-                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide cursor-pointer hover:txt-primary transition-colors select-none"
-                @click="toggleSort('alphabet')"
+          <div class="flex flex-wrap items-center gap-3">
+            <!-- Search / Filter -->
+            <div class="relative">
+              <MagnifyingGlassIcon
+                class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
+              />
+              <input
+                v-model="modelSearch"
+                type="search"
+                :placeholder="$t('config.aiModels.searchPlaceholder')"
+                :aria-label="$t('config.aiModels.searchPlaceholder')"
+                class="w-full sm:w-64 pl-9 pr-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-model-search"
+              />
+            </div>
+
+            <!-- Show Rating Toggle -->
+            <label class="flex items-center gap-2 cursor-pointer group">
+              <input
+                v-model="showRatings"
+                type="checkbox"
+                class="w-4 h-4 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-[var(--brand)] cursor-pointer"
+              />
+              <span class="text-sm txt-secondary group-hover:txt-primary transition-colors">{{
+                $t('config.aiModels.showRating')
+              }}</span>
+            </label>
+
+            <!-- Sort Dropdown -->
+            <div class="relative">
+              <select
+                v-model="sortBy"
+                class="px-3 py-2 pr-8 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer appearance-none"
+                @change="
+                  sortDirection = sortBy === 'quality' || sortBy === 'rating' ? 'desc' : 'asc'
+                "
               >
-                <div class="flex items-center gap-1">
-                  {{ $t('config.aiModels.tableName') }}
-                  <SortIndicator :active="sortBy === 'alphabet'" :direction="sortDirection" />
-                </div>
-              </th>
-              <th
-                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide cursor-pointer hover:txt-primary transition-colors select-none"
-                @click="toggleSort('service')"
-              >
-                <div class="flex items-center gap-1">
-                  {{ $t('config.aiModels.tableService') }}
-                  <SortIndicator :active="sortBy === 'service'" :direction="sortDirection" />
-                </div>
-              </th>
-              <th
-                v-if="showRatings"
-                class="text-center py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide cursor-pointer hover:txt-primary transition-colors select-none"
-                @click="toggleSort('quality')"
-              >
-                <div class="flex items-center justify-center gap-1">
-                  {{ $t('config.aiModels.tableRating') }}
-                  <SortIndicator :active="sortBy === 'quality'" :direction="sortDirection" />
-                </div>
-              </th>
-              <th
-                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden sm:table-cell cursor-pointer hover:txt-primary transition-colors select-none"
-                @click="toggleSort('purpose')"
-              >
-                <div class="flex items-center gap-1">
-                  {{ $t('config.aiModels.tablePurpose') }}
-                  <SortIndicator :active="sortBy === 'purpose'" :direction="sortDirection" />
-                </div>
-              </th>
-              <th
-                class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden lg:table-cell"
-              >
-                {{ $t('config.aiModels.tableDescription') }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="model in paginatedModels"
-              :key="`${model.service}\u0000${model.name}`"
-              class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-              data-testid="item-model"
-              :data-model-service="model.service"
-              :data-model-name="model.name"
-            >
-              <td class="py-3 px-2 sm:px-3">
-                <div class="flex items-center gap-2">
-                  <ServiceIcon :service="model.service" :size="16" />
-                  <span class="txt-primary text-sm font-medium">{{ model.name }}</span>
-                </div>
-              </td>
-              <td class="py-3 px-2 sm:px-3">
-                <span
-                  :class="[
-                    'px-2 sm:px-3 py-1 rounded-full text-xs font-medium text-white',
-                    serviceColors[model.service] || 'bg-gray-500',
-                  ]"
+                <option value="alphabet">{{ $t('config.aiModels.sortAlphabet') }}</option>
+                <option value="service">{{ $t('config.aiModels.sortService') }}</option>
+                <option value="quality">{{ $t('config.aiModels.sortQuality') }}</option>
+                <option value="purpose">{{ $t('config.aiModels.sortPurpose') }}</option>
+              </select>
+              <ChevronDownIcon
+                class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="filteredModels.length === 0"
+          class="text-center py-12 txt-secondary"
+          data-testid="section-models-empty"
+        >
+          {{ $t('config.aiModels.noModelsAvailable') }}
+        </div>
+
+        <div v-else class="overflow-x-auto scroll-thin">
+          <table class="w-full min-w-[640px]">
+            <thead>
+              <tr class="border-b-2 border-light-border/30 dark:border-dark-border/20">
+                <th
+                  class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide cursor-pointer hover:txt-primary transition-colors select-none"
+                  @click="toggleSort('alphabet')"
                 >
-                  {{ model.service }}
-                </span>
-              </td>
-              <td v-if="showRatings" class="py-3 px-2 sm:px-3">
-                <div
-                  class="flex items-center justify-center gap-0.5"
-                  :title="$t('config.aiModels.qualityScore', { score: model.quality.toFixed(1) })"
+                  <div class="flex items-center gap-1">
+                    {{ $t('config.aiModels.tableName') }}
+                    <SortIndicator :active="sortBy === 'alphabet'" :direction="sortDirection" />
+                  </div>
+                </th>
+                <th
+                  class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide cursor-pointer hover:txt-primary transition-colors select-none"
+                  @click="toggleSort('service')"
                 >
-                  <svg
-                    v-for="star in 5"
-                    :key="star"
-                    class="w-4 h-4"
-                    :class="
-                      star <= getStarRating(model.quality)
-                        ? 'text-yellow-500'
-                        : 'text-gray-300 dark:text-gray-600'
-                    "
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-                    />
-                  </svg>
-                </div>
-              </td>
-              <td class="py-3 px-2 sm:px-3 hidden sm:table-cell">
-                <div class="flex flex-wrap gap-1.5">
-                  <button
-                    v-for="chip in model.purposes"
-                    :key="chip.purpose"
-                    type="button"
+                  <div class="flex items-center gap-1">
+                    {{ $t('config.aiModels.tableService') }}
+                    <SortIndicator :active="sortBy === 'service'" :direction="sortDirection" />
+                  </div>
+                </th>
+                <th
+                  v-if="showRatings"
+                  class="text-center py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide cursor-pointer hover:txt-primary transition-colors select-none"
+                  @click="toggleSort('quality')"
+                >
+                  <div class="flex items-center justify-center gap-1">
+                    {{ $t('config.aiModels.tableRating') }}
+                    <SortIndicator :active="sortBy === 'quality'" :direction="sortDirection" />
+                  </div>
+                </th>
+                <th
+                  class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden sm:table-cell cursor-pointer hover:txt-primary transition-colors select-none"
+                  @click="toggleSort('purpose')"
+                >
+                  <div class="flex items-center gap-1">
+                    {{ $t('config.aiModels.tablePurpose') }}
+                    <SortIndicator :active="sortBy === 'purpose'" :direction="sortDirection" />
+                  </div>
+                </th>
+                <th
+                  class="text-left py-3 px-2 sm:px-3 txt-secondary text-xs font-semibold uppercase tracking-wide hidden lg:table-cell"
+                >
+                  {{ $t('config.aiModels.tableDescription') }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="model in paginatedModels"
+                :key="`${model.service}\u0000${model.name}`"
+                class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                data-testid="item-model"
+                :data-model-service="model.service"
+                :data-model-name="model.name"
+              >
+                <td class="py-3 px-2 sm:px-3">
+                  <div class="flex items-center gap-2">
+                    <ServiceIcon :service="model.service" :size="16" />
+                    <span class="txt-primary text-sm font-medium">{{ model.name }}</span>
+                  </div>
+                </td>
+                <td class="py-3 px-2 sm:px-3">
+                  <span
                     :class="[
-                      'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors border',
-                      isPurposeChipActive(chip)
-                        ? 'bg-[var(--brand)] text-white border-[var(--brand)] hover:bg-[var(--brand)]/90'
-                        : 'border-light-border/40 dark:border-dark-border/30 txt-secondary hover:border-[var(--brand)] hover:text-[var(--brand)]',
-                      isPurposeDisabled(chip.purpose) &&
-                        'opacity-50 cursor-not-allowed hover:border-light-border/40 hover:text-inherit',
-                      !isPurposeDisabled(chip.purpose) &&
-                        !isPurposeChipActive(chip) &&
-                        'cursor-pointer',
+                      'px-2 sm:px-3 py-1 rounded-full text-xs font-medium text-white',
+                      serviceColors[model.service] || 'bg-gray-500',
                     ]"
-                    :disabled="isPurposeDisabled(chip.purpose)"
-                    :title="getPurposeChipTitle(model, chip)"
-                    :aria-pressed="isPurposeChipActive(chip)"
-                    data-testid="btn-purpose-chip"
-                    :data-purpose="chip.purpose"
-                    :data-model-id="chip.modelId"
-                    @click.stop="onPurposeChipClick(chip)"
                   >
-                    {{ purposeLabels[chip.purpose] }}
-                  </button>
-                </div>
-              </td>
-              <td class="py-3 px-2 sm:px-3 txt-secondary text-sm hidden lg:table-cell">
-                {{ model.description }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                    {{ model.service }}
+                  </span>
+                </td>
+                <td v-if="showRatings" class="py-3 px-2 sm:px-3">
+                  <div
+                    class="flex items-center justify-center gap-0.5"
+                    :title="$t('config.aiModels.qualityScore', { score: model.quality.toFixed(1) })"
+                  >
+                    <svg
+                      v-for="star in 5"
+                      :key="star"
+                      class="w-4 h-4"
+                      :class="
+                        star <= getStarRating(model.quality)
+                          ? 'text-yellow-500'
+                          : 'text-gray-300 dark:text-gray-600'
+                      "
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                      />
+                    </svg>
+                  </div>
+                </td>
+                <td class="py-3 px-2 sm:px-3 hidden sm:table-cell">
+                  <div class="flex flex-wrap gap-1.5">
+                    <button
+                      v-for="chip in model.purposes"
+                      :key="chip.purpose"
+                      type="button"
+                      :class="[
+                        'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors border',
+                        isPurposeChipActive(chip)
+                          ? 'bg-[var(--brand)] text-white border-[var(--brand)] hover:bg-[var(--brand)]/90'
+                          : 'border-light-border/40 dark:border-dark-border/30 txt-secondary hover:border-[var(--brand)] hover:text-[var(--brand)]',
+                        isPurposeDisabled(chip.purpose) &&
+                          'opacity-50 cursor-not-allowed hover:border-light-border/40 hover:text-inherit',
+                        !isPurposeDisabled(chip.purpose) &&
+                          !isPurposeChipActive(chip) &&
+                          'cursor-pointer',
+                      ]"
+                      :disabled="isPurposeDisabled(chip.purpose)"
+                      :title="getPurposeChipTitle(model, chip)"
+                      :aria-pressed="isPurposeChipActive(chip)"
+                      data-testid="btn-purpose-chip"
+                      :data-purpose="chip.purpose"
+                      :data-model-id="chip.modelId"
+                      @click.stop="onPurposeChipClick(chip)"
+                    >
+                      {{ purposeLabels[chip.purpose] }}
+                    </button>
+                  </div>
+                </td>
+                <td class="py-3 px-2 sm:px-3 txt-secondary text-sm hidden lg:table-cell">
+                  {{ model.description }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-      <div
-        v-if="modelsTotalPages > 1"
-        class="flex items-center justify-between pt-4 border-t border-light-border/10 dark:border-dark-border/10 mt-4"
-      >
-        <span class="text-sm txt-secondary">
-          {{
-            $t('config.aiModels.pagination.showing', {
-              start: (modelsPage - 1) * MODELS_PER_PAGE + 1,
-              end: Math.min(modelsPage * MODELS_PER_PAGE, sortedModels.length),
-              total: sortedModels.length,
-            })
-          }}
-        </span>
-        <div class="flex items-center gap-1">
-          <button
-            class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            :disabled="modelsPage <= 1"
-            @click="modelsPage--"
-          >
-            <ChevronLeftIcon class="w-4 h-4" />
-          </button>
-          <span class="px-3 text-sm txt-primary font-medium">
-            {{ modelsPage }} / {{ modelsTotalPages }}
+        <div
+          v-if="modelsTotalPages > 1"
+          class="flex items-center justify-between pt-4 border-t border-light-border/10 dark:border-dark-border/10 mt-4"
+        >
+          <span class="text-sm txt-secondary">
+            {{
+              $t('config.aiModels.pagination.showing', {
+                start: (modelsPage - 1) * MODELS_PER_PAGE + 1,
+                end: Math.min(modelsPage * MODELS_PER_PAGE, sortedModels.length),
+                total: sortedModels.length,
+              })
+            }}
           </span>
-          <button
-            class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            :disabled="modelsPage >= modelsTotalPages"
-            @click="modelsPage++"
-          >
-            <ChevronRightIcon class="w-4 h-4" />
-          </button>
+          <div class="flex items-center gap-1">
+            <button
+              class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              :disabled="modelsPage <= 1"
+              @click="modelsPage--"
+            >
+              <ChevronLeftIcon class="w-4 h-4" />
+            </button>
+            <span class="px-3 text-sm txt-primary font-medium">
+              {{ modelsPage }} / {{ modelsTotalPages }}
+            </span>
+            <button
+              class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              :disabled="modelsPage >= modelsTotalPages"
+              @click="modelsPage++"
+            >
+              <ChevronRightIcon class="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <EmbeddingRunsPanel v-if="authStore.isAdmin" ref="runsPanelRef" />
+    <div v-if="authStore.isAdmin && activeTab === 'runs'">
+      <EmbeddingRunsPanel ref="runsPanelRef" />
+    </div>
 
-    <AIModelsAdminPanel v-if="authStore.isAdmin" />
-
-    <OpenAiCompatibleEndpointsPanel v-if="authStore.isAdmin" />
+    <div v-if="authStore.isAdmin && activeTab === 'edit'" class="space-y-6">
+      <OpenAiCompatibleEndpointsPanel />
+      <AddModelForm @created="onAdminModelCreated" />
+      <AIModelsAdminPanel ref="adminPanelRef" />
+    </div>
 
     <EmbeddingSwitchModal
       :open="switchModalOpen"
@@ -452,11 +472,13 @@ import {
   LockClosedIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
+import AddModelForm from '@/components/config/AddModelForm.vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import OpenAiCompatibleEndpointsPanel from '@/components/config/OpenAiCompatibleEndpointsPanel.vue'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
+import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import { useDialog } from '@/composables/useDialog'
@@ -481,10 +503,56 @@ import {
 import { useI18n } from 'vue-i18n'
 
 type ModelsData = Partial<Record<Capability, AIModel[]>>
+type ModelsTabId = 'choice' | 'list' | 'runs' | 'edit'
 
 const authStore = useAuthStore()
 const route = useRoute()
 const { t } = useI18n()
+
+const activeTab = ref<ModelsTabId>('choice')
+const adminPanelRef = ref<InstanceType<typeof AIModelsAdminPanel> | null>(null)
+
+const tabNavItems = computed<TabNavItem[]>(() => {
+  const items: TabNavItem[] = [
+    {
+      id: 'choice',
+      label: t('config.aiModels.tabs.choice'),
+      icon: 'mdi:tune-variant',
+      testid: 'tab-ai-models-choice',
+    },
+    {
+      id: 'list',
+      label: t('config.aiModels.tabs.list'),
+      icon: 'mdi:format-list-bulleted',
+      testid: 'tab-ai-models-list',
+    },
+  ]
+  if (authStore.isAdmin) {
+    items.push(
+      {
+        id: 'runs',
+        label: t('config.aiModels.tabs.runs'),
+        icon: 'mdi:vector-polyline',
+        testid: 'tab-ai-models-runs',
+      },
+      {
+        id: 'edit',
+        label: t('config.aiModels.tabs.edit'),
+        icon: 'mdi:pencil-ruler',
+        testid: 'tab-ai-models-edit',
+      }
+    )
+  }
+  return items
+})
+
+function onModelsTabChange(id: string) {
+  activeTab.value = id as ModelsTabId
+}
+
+function onAdminModelCreated() {
+  void adminPanelRef.value?.refresh()
+}
 
 const purposeLabels = computed<Record<Capability, string>>(() => ({
   SORT: t('config.aiModels.capabilities.sort'),
@@ -615,6 +683,7 @@ onMounted(async () => {
   const highlight = normalizeHighlight(highlightParam)
   if (!highlight) return
 
+  activeTab.value = 'choice'
   if (highlight === 'ALL') {
     // Highlight all model dropdowns
     highlightedCapability.value = 'ALL'
@@ -652,6 +721,7 @@ watch(
     const newHighlight = normalizeHighlight(newHighlightParam)
     if (!newHighlight) return
 
+    activeTab.value = 'choice'
     if (newHighlight === 'ALL') {
       highlightedCapability.value = 'ALL'
 
@@ -873,7 +943,11 @@ const onEmbeddingSwitchSuccess = async (runId: number) => {
   switchModalTargetId.value = null
   success(t('config.embeddingSwitch.queued', { runId }))
   await loadEmbeddingGuard()
-  await runsPanelRef.value?.refresh()
+  if (authStore.isAdmin) {
+    activeTab.value = 'runs'
+    await nextTick()
+    await runsPanelRef.value?.refresh()
+  }
 }
 
 const loadEmbeddingGuard = async () => {

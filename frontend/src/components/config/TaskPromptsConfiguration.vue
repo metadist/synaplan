@@ -378,33 +378,22 @@
           </div>
 
           <!-- Tab nav -->
-          <div
-            class="surface-card p-1 mb-4 flex gap-1 overflow-x-auto"
-            role="tablist"
-            data-testid="section-prompt-tabs"
-          >
+          <div class="tab-nav !mb-4" role="tablist" data-testid="section-prompt-tabs">
             <button
               v-for="tab in editorTabs"
               :key="tab.id"
               type="button"
               role="tab"
               :aria-selected="activeTab === tab.id"
-              class="flex-1 min-w-fit px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
-              :class="
-                activeTab === tab.id
-                  ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
-                  : 'txt-secondary hover:txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10'
-              "
+              :class="[
+                'tab-nav-item flex-1 min-w-fit justify-center',
+                activeTab === tab.id && 'tab-nav-item--active',
+              ]"
               :data-testid="`tab-${tab.id}`"
               @click="activeTab = tab.id"
             >
               <Icon :icon="tab.icon" class="w-4 h-4" />
               <span>{{ tab.label }}</span>
-              <span
-                v-if="tab.id === 'danger' && (currentPrompt.isDefault ? !isAdmin : false)"
-                class="hidden"
-                aria-hidden="true"
-              />
             </button>
           </div>
 

@@ -383,10 +383,8 @@ onBeforeUnmount(() => {
                 <button
                   type="button"
                   :class="[
-                    'w-full sm:w-auto flex items-center justify-between gap-2 px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-colors',
-                    group.tabs.some((t) => t.id === activeTab)
-                      ? 'bg-[var(--brand)]/10 txt-brand'
-                      : 'txt-secondary hover:txt-primary hover-surface',
+                    'tab-nav-item w-full sm:w-auto justify-between',
+                    group.tabs.some((t) => t.id === activeTab) && 'tab-nav-item--active',
                   ]"
                   :data-testid="`btn-config-group-${group.id}`"
                   @click="toggleGroup(group.id)"
