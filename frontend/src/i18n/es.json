@@ -534,6 +534,7 @@
   },
   "chatInput": {
     "placeholder": "Escribe tu mensaje...",
+    "placeholderShort": "Mensaje...",
     "provider": "Proveedor",
     "model": "Modelo",
     "modelCaption": "Modelo: {name}",

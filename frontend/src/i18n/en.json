@@ -523,6 +523,7 @@
   },
   "chatInput": {
     "placeholder": "Type your message...",
+    "placeholderShort": "Message...",
     "provider": "Provider",
     "model": "Model",
     "modelCaption": "Model: {name}",

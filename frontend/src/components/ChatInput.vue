@@ -112,7 +112,9 @@
               <Textarea
                 ref="textareaRef"
                 v-model="message"
-                :placeholder="isMobile ? 'Message...' : $t('chatInput.placeholder')"
+                :placeholder="
+                  isMobile ? $t('chatInput.placeholderShort') : $t('chatInput.placeholder')
+                "
                 :rows="1"
                 class="flex-1 min-w-0"
                 data-testid="input-chat-message"

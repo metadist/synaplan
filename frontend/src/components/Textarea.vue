@@ -39,7 +39,19 @@ const adjustHeight = () => {
   if (!el) return
 
   el.style.height = 'auto'
-  el.style.height = el.scrollHeight + 'px'
+  // With `box-sizing: border-box`, scrollHeight (content + padding, no border)
+  // is NOT the value to assign to `height`: the border eats into the content
+  // box, leaving it shorter than one line-height. The single line then top-clips
+  // and the caret detaches from the placeholder baseline — on iOS WKWebView this
+  // shows up as a caret pinned to the top-left while the placeholder sits lower.
+  // Add the border back so the content box always fits a full line. No-op when
+  // there is no border.
+  const style = getComputedStyle(el)
+  const borderY =
+    'border-box' === style.boxSizing
+      ? parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth)
+      : 0
+  el.style.height = `${el.scrollHeight + borderY}px`
 }
 
 const handleInput = (event: Event) => {
