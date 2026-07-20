@@ -104,15 +104,17 @@ class SubscriptionControllerEndpointTest extends WebTestCase
             $this->assertNotEmpty($plan['features']);
             $this->assertSame('EUR', $plan['currency']);
             $this->assertSame('month', $plan['interval']);
-            // MOBILE-APP SEAM: the in-app fallback price carries the store
-            // commission on top of the web price (IAP_PRICE_MARKUP_PERCENT,
-            // default 30 %), snapped to the nearest x.99 store price point —
-            // never below the web price.
+            // MOBILE-APP SEAM: in-app fallback = ASC/Play catalogue price
+            // (IAP_STORE_PRICE_*), never below the web price, on a x.99 point.
             $this->assertArrayHasKey('appPrice', $plan);
             $this->assertGreaterThan($plan['price'], $plan['appPrice']);
-            $this->assertEqualsWithDelta($plan['price'] * 1.3, $plan['appPrice'], 0.5);
             $this->assertEqualsWithDelta(0.99, fmod($plan['appPrice'], 1.0), 0.001, 'appPrice must sit on a x.99 store price point');
         }
+
+        // German-launch ASC catalogue (PRO €24.99 decided 2026-07-20).
+        $this->assertSame(24.99, $byId['PRO']['appPrice']);
+        $this->assertSame(64.99, $byId['TEAM']['appPrice']);
+        $this->assertSame(129.99, $byId['BUSINESS']['appPrice']);
     }
 
     public function testGetSubscriptionStatusReturns401WhenUnauthenticated(): void

@@ -61,24 +61,26 @@ the store keeps a commission:
 comparable to the Stripe (web) price. Concretely: the web (Stripe) price and the store (IAP) price
 are configured **independently per channel**, and the store price is set higher to absorb the cut.
 
-The markup is operator-configurable via `IAP_PRICE_MARKUP_PERCENT` (default `30`).
-`GET /api/v1/subscription/plans` exposes it as `appPrice = price × (1 + markup/100)`, snapped to
-the nearest x.99 store price point (stores only allow fixed price points), never below the web
-price:
+Store EUR price points are operator-configurable via `IAP_STORE_PRICE_{PRO,TEAM,BUSINESS}`
+(must match App Store Connect / Play Console). `GET /api/v1/subscription/plans` exposes them as
+`appPrice`. If a tier's store price is `0`, the fallback is
+`price × (1 + IAP_PRICE_MARKUP_PERCENT/100)` (default markup `30`), snapped to the nearest x.99
+price point, never below the web price:
 
 - the **web** always displays the plain `price`;
 - the **native app** displays the store's own localized price once its catalogue is loaded, and
   `appPrice` as the fallback before that — the cheaper web price is never shown in the app
   (anti-steering).
 
-| Tier | Web reference price (Stripe) | App price (30 % markup, .99-snapped) |
-|------|------------------------------|--------------------------------------|
-| PRO | €19.95 | €25.99 |
+| Tier | Web reference price (Stripe) | App / ASC price (EUR, DE) |
+|------|------------------------------|---------------------------|
+| PRO | €19.95 | **€24.99** (decided 2026-07-20; slightly under pure 30 % pass-through) |
 | TEAM | €49.95 | €64.99 |
 | BUSINESS | €99.95 | €129.99 |
 
-When creating the store products in App Store Connect / Play Console, set exactly the `appPrice`
-price point — the store price is what the buyer actually pays and what the app shows once loaded.
+When creating the store products in App Store Connect / Play Console, set exactly these
+`IAP_STORE_PRICE_*` price points — the store price is what the buyer actually pays and what the
+app shows once loaded.
 
 > Finance/tax note: on web, Synaplan is Merchant of Record (Stripe Tax/OSS handles VAT). On IAP,
 > Apple/Google are MoR — they collect/remit consumer VAT and pay net after their 15–30 %. Book

@@ -101,7 +101,13 @@ parameters:
     env(IAP_PRODUCT_TEAM): 'com.synaplan.app.team.monthly'
     env(IAP_PRODUCT_BUSINESS): 'com.synaplan.app.business.monthly'
     # Store commission passed on to app buyers (percent on top of the web price).
+    # Used only when a tier has no fixed IAP_STORE_PRICE_* (0 / unset).
     env(IAP_PRICE_MARKUP_PERCENT): '30'
+    # Fixed App Store / Play EUR price points (German launch catalogue).
+    # PRO €24.99 decided 2026-07-20; TEAM/BUSINESS keep the ~30 % pass-through.
+    env(IAP_STORE_PRICE_PRO): '24.99'
+    env(IAP_STORE_PRICE_TEAM): '64.99'
+    env(IAP_STORE_PRICE_BUSINESS): '129.99'
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
     env(CLOUDFLARE_ACCOUNT_ID): ''
@@ -595,6 +601,9 @@ services:
             $iapProductTeam: '%env(IAP_PRODUCT_TEAM)%'
             $iapProductBusiness: '%env(IAP_PRODUCT_BUSINESS)%'
             $storeMarkupPercent: '%env(float:IAP_PRICE_MARKUP_PERCENT)%'
+            $storePricePro: '%env(float:IAP_STORE_PRICE_PRO)%'
+            $storePriceTeam: '%env(float:IAP_STORE_PRICE_TEAM)%'
+            $storePriceBusiness: '%env(float:IAP_STORE_PRICE_BUSINESS)%'
 
     # Native IAP server-side receipt validation (Epic 5.4). Both verifiers are
     # no-ops until store credentials are configured (isConfigured() === false),

@@ -47,7 +47,7 @@ const proPlan = {
   name: 'Pro',
   stripePriceId: 'price_pro',
   price: 19.95,
-  appPrice: 25.99,
+  appPrice: 24.99,
   currency: 'EUR',
   interval: 'month',
   features: ['Feature A', 'Feature B', 'Feature C', 'Feature D', 'Feature E'],
@@ -130,7 +130,7 @@ describe('OnboardingPlansStep', () => {
       const wrapper = mount(OnboardingPlansStep)
       await flushPromises()
 
-      expect(wrapper.text()).toContain('€25.99')
+      expect(wrapper.text()).toContain('€24.99')
       expect(wrapper.text()).not.toContain('€19.95')
     } finally {
       mockIsNativeApp.mockReturnValue(false)

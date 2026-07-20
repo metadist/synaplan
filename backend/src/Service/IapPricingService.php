@@ -15,11 +15,13 @@ namespace App\Service;
  * The STORE price for each tier intentionally BAKES IN the store commission
  * (≈30 %, sometimes 15 % — first $1M/yr or Google subs in year 2+). That
  * assumption is documented in `docs/PAYMENTS_CHANNELS.md` so finance can reason
- * about net revenue; this service only owns the product-id ↔ tier mapping.
+ * about net revenue; this service owns the product-id ↔ tier mapping and the
+ * ASC/Play catalogue prices used as the in-app display fallback.
  *
- * Product IDs are injected from env (configured once the store products exist,
- * Epic 5.5). Defaults are the documented placeholder naming convention so that
- * open-source / web-only deployments keep working with IAP effectively disabled.
+ * Product IDs and store price points are injected from env (configured once the
+ * store products exist, Epic 5.5). Defaults match the App Store Connect
+ * catalogue for the German launch. Open-source / web-only deployments keep
+ * working with IAP effectively disabled via {@see isConfigured()}.
  */
 final readonly class IapPricingService
 {
@@ -31,21 +33,29 @@ final readonly class IapPricingService
     /** Default store commission passed on to app buyers (Apple/Google ≈30 %). */
     private const DEFAULT_STORE_MARKUP_PERCENT = 30.0;
 
+    /**
+     * Default App Store / Play EUR price points (German launch catalogue).
+     * PRO is intentionally €24.99 (slightly under a pure 30 % pass-through).
+     */
+    private const DEFAULT_STORE_PRICE_PRO = 24.99;
+    private const DEFAULT_STORE_PRICE_TEAM = 64.99;
+    private const DEFAULT_STORE_PRICE_BUSINESS = 129.99;
+
     public function __construct(
         private string $iapProductPro = self::PLACEHOLDER_PRO,
         private string $iapProductTeam = self::PLACEHOLDER_TEAM,
         private string $iapProductBusiness = self::PLACEHOLDER_BUSINESS,
         private float $storeMarkupPercent = self::DEFAULT_STORE_MARKUP_PERCENT,
+        private float $storePricePro = self::DEFAULT_STORE_PRICE_PRO,
+        private float $storePriceTeam = self::DEFAULT_STORE_PRICE_TEAM,
+        private float $storePriceBusiness = self::DEFAULT_STORE_PRICE_BUSINESS,
     ) {
     }
 
     /**
-     * The price a tier costs when bought IN THE APP: the operator's web price
-     * plus the configured store-commission markup (IAP_PRICE_MARKUP_PERCENT),
-     * snapped to the nearest store price point (x.99 — Apple/Google only allow
-     * fixed price points). Used as the app's display fallback and as the
-     * reference when creating the store products — the store's own localized
-     * price always wins in the purchase sheet.
+     * Markup-only price: web price + store-commission markup, snapped to the
+     * nearest x.99 store price point. Used when no fixed store price is set for
+     * a tier, and by unit tests of the snap math.
      */
     public function appPrice(float $webPrice): float
     {
@@ -60,6 +70,30 @@ final readonly class IapPricingService
         }
 
         return round($pricePoint, 2);
+    }
+
+    /**
+     * Price shown as the native-app fallback for a tier: the configured store
+     * catalogue price (App Store Connect / Play) when set, otherwise the
+     * markup snap of {@see appPrice()}. Never below the web price.
+     *
+     * The store's own localized price always wins in the purchase sheet once
+     * the native catalogue is loaded.
+     */
+    public function appPriceForTier(string $tier, float $webPrice): float
+    {
+        $fixed = match ($tier) {
+            'PRO' => $this->storePricePro,
+            'TEAM' => $this->storePriceTeam,
+            'BUSINESS' => $this->storePriceBusiness,
+            default => 0.0,
+        };
+
+        if ($fixed > 0.0) {
+            return round(max($fixed, $webPrice), 2);
+        }
+
+        return $this->appPrice($webPrice);
     }
 
     /** The configured store-commission markup in percent (never negative). */
