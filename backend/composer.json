@@ -39,7 +39,7 @@
         "phpstan/phpdoc-parser": "^2.3.2",
         "predis/predis": "^3.0.0",
         "smalot/pdfparser": "^2.12.5",
-        "stripe/stripe-php": "^20.1",
+        "stripe/stripe-php": "^21.0",
         "symfony/asset": "8.1.*",
         "symfony/console": "8.1.*",
         "symfony/doctrine-messenger": "8.1.*",
