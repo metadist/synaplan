@@ -23,7 +23,7 @@
 services:
   # Vue.js Frontend
   frontend:
-    image: node:22@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37
+    image: node:24@sha256:5711a0d445a1af54af9589066c646df387d1831a608226f4cd694fc59e745059
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -55,7 +55,7 @@ services:
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
-    image: node:22@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37
+    image: node:24@sha256:5711a0d445a1af54af9589066c646df387d1831a608226f4cd694fc59e745059
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
