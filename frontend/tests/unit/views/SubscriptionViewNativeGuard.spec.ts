@@ -89,7 +89,7 @@ describe('SubscriptionView — native purchase guard (Epic 5.2)', () => {
           name: 'Pro',
           stripePriceId: 'price_pro',
           price: 19.95,
-          appPrice: 25.99,
+          appPrice: 24.99,
           currency: 'EUR',
           interval: 'month',
           features: ['a'],

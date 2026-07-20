@@ -177,11 +177,12 @@ class SubscriptionController extends AbstractController
                             new OA\Property(
                                 property: 'appPrice',
                                 type: 'number',
-                                example: 25.99,
-                                description: 'Price when bought in the mobile app: the web price plus '
-                                    .'the store-commission markup (IAP_PRICE_MARKUP_PERCENT), snapped to '
-                                    .'the nearest x.99 store price point. The native app shows this as '
-                                    .'its fallback; the store\'s own localized price wins once loaded. '
+                                example: 24.99,
+                                description: 'Price when bought in the mobile app: the configured store '
+                                    .'catalogue price (IAP_STORE_PRICE_*), or web price plus '
+                                    .'IAP_PRICE_MARKUP_PERCENT snapped to the nearest x.99 point when no '
+                                    .'fixed store price is set. The native app shows this as its '
+                                    .'fallback; the store\'s own localized price wins once loaded. '
                                     .'The web NEVER shows this.',
                             ),
                             new OA\Property(property: 'currency', type: 'string', example: 'EUR'),
@@ -231,10 +232,11 @@ class SubscriptionController extends AbstractController
                 // MOBILE-APP SEAM (Epic 5.5): the store product the app buys for this tier.
                 'iapProductId' => $this->iapPricingService->productIdForTier($tier),
                 'price' => $price,
-                // MOBILE-APP SEAM: in-app price = web price + store-commission
-                // markup. Shown ONLY by the native app (store price wins once
-                // its catalogue is loaded); the web always shows `price`.
-                'appPrice' => $this->iapPricingService->appPrice($price),
+                // MOBILE-APP SEAM: in-app price = ASC/Play catalogue price
+                // (or markup snap as fallback). Shown ONLY by the native app
+                // (store price wins once its catalogue is loaded); the web
+                // always shows `price`.
+                'appPrice' => $this->iapPricingService->appPriceForTier($tier, $price),
                 'currency' => null !== $subscription ? $subscription->getCurrency() : 'EUR',
                 'interval' => 'month',
                 'features' => $defaults['features'],

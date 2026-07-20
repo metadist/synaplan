@@ -69,14 +69,35 @@ final class IapPricingServiceTest extends TestCase
 
     public function testAppPriceAddsDefaultStoreMarkupAndSnapsToPricePoint(): void
     {
-        // Default markup is 30 % — the Apple/Google commission passed on to app
-        // buyers — snapped to the nearest x.99 store price point.
-        $svc = new IapPricingService();
+        // Markup snap (used when a tier has no fixed store price). Default
+        // constructor still ships ASC catalogue prices for appPriceForTier().
+        $svc = new IapPricingService(
+            storePricePro: 0.0,
+            storePriceTeam: 0.0,
+            storePriceBusiness: 0.0,
+        );
 
         $this->assertSame(25.99, $svc->appPrice(19.95)); // 25.935 → 25.99
         $this->assertSame(64.99, $svc->appPrice(49.95)); // 64.935 → 64.99
         $this->assertSame(129.99, $svc->appPrice(99.95)); // 129.935 → 129.99
         $this->assertSame(30.0, $svc->storeMarkupPercent());
+    }
+
+    public function testAppPriceForTierUsesAscCatalogueDefaults(): void
+    {
+        // German-launch ASC price points: PRO €24.99 (decided 2026-07-20).
+        $svc = new IapPricingService();
+
+        $this->assertSame(24.99, $svc->appPriceForTier('PRO', 19.95));
+        $this->assertSame(64.99, $svc->appPriceForTier('TEAM', 49.95));
+        $this->assertSame(129.99, $svc->appPriceForTier('BUSINESS', 99.95));
+    }
+
+    public function testAppPriceForTierNeverUndercutsWebPrice(): void
+    {
+        $svc = new IapPricingService(storePricePro: 10.0);
+
+        $this->assertSame(19.95, $svc->appPriceForTier('PRO', 19.95));
     }
 
     public function testAppPriceHonoursConfiguredMarkup(): void
