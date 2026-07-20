@@ -91,7 +91,7 @@
     "prettier": "3.9.5",
     "tailwindcss": "4.3.3",
     "terser": "5.49.0",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vite": "8.1.5",
     "vitest": "4.1.10",
     "vue-tsc": "3.3.7"
