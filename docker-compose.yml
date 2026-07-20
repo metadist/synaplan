@@ -533,7 +533,7 @@ services:
 
   # Ollama - Local AI Models (GPU-accelerated if NVIDIA available)
   ollama:
-    image: ollama/ollama:latest@sha256:57f573b47f1f71ebb445789f279fe3e596a8beab182f7cf486db9205bad87c5a
+    image: ollama/ollama:latest@sha256:6345fbc18bd73a1e16404be681dbc6fd291a027cab43ed541abe78c4c81051b0
     container_name: synaplan-ollama
     ports:
       - "11435:11434"
@@ -722,7 +722,7 @@ services:
 
   # Qdrant Vector Database (memories + document vectors)
   qdrant:
-    image: qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c
+    image: qdrant/qdrant:v1.18.3@sha256:0bd98fa7977f1e75694779359ca4e212822e5a71334e28421182f72f209d5286
     container_name: synaplan-qdrant
     ports:
       - "6333:6333"
