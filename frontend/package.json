@@ -85,7 +85,7 @@
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-vue": "10.9.2",
     "globals": "17.7.0",
-    "happy-dom": "20.10.6",
+    "happy-dom": "20.11.0",
     "openapi-zod-client": "1.18.3",
     "postcss": "8.5.17",
     "prettier": "3.9.5",
