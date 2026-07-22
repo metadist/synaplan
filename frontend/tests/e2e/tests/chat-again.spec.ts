@@ -1,21 +1,18 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 import { PROMPTS } from '../config/test-data'
 
 test.describe('@ci @smoke Chat Again', () => {
-  test('again via button then dropdown works repeatedly without refresh', async ({
-    page,
-    credentials,
-  }) => {
+  test('again via button then dropdown works repeatedly without refresh', async ({ page }) => {
     // 3 sequential AI responses require extended timeout
     test.setTimeout(90_000)
     const chat = new ChatHelper(page)
 
     await test.step('Arrange: login and start new chat', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await chat.startNewChat()
     })
 
@@ -93,9 +90,9 @@ test.describe('@ci @smoke Chat Again', () => {
         }
         expect(clicked, 'At least one dropdown option should be visible and enabled').toBe(true)
 
-        await dropdown.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT }).catch(() => {
-          // Dropdown may auto-close after selection — not critical
-        })
+        // 'hidden' also resolves when the panel left the DOM; a timeout means
+        // the dropdown is stuck open after selection — a real bug, so fail.
+        await dropdown.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
       }
     )
 

@@ -20,7 +20,18 @@ const WEBHOOK_PATH = '/api/v1/webhooks/email'
 const MAILHOG_POLL_TIMEOUT_MS = 10_000
 const MAILHOG_POLL_INTERVAL_MS = 200
 
-const { TEST_FROM, TEST_TO } = INTEGRATION.EMAIL
+const { TEST_TO } = INTEGRATION.EMAIL
+
+/**
+ * Unique sender per test: the webhook maps each sender address to an
+ * auto-created ANONYMOUS user whose MESSAGES limit is a LIFETIME total —
+ * a fixed address would hit 429 "Rate limit exceeded" after enough runs
+ * against a long-lived test DB. Unique senders also make the MailHog
+ * baseline trivially 0.
+ */
+function uniqueEmailSender(): string {
+  return `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`
+}
 
 function webhookUrl(): string {
   return `${getApiUrl()}${WEBHOOK_PATH}`
@@ -30,10 +41,11 @@ test.describe('@ci @smoke Smart-Email', () => {
   test.describe.configure({ mode: 'serial' })
 
   test('inbound webhook triggers exactly one reply in MailHog', async ({ request }) => {
+    const testFrom = uniqueEmailSender()
     let baselineCount = 0
     await test.step('Arrange: count existing messages to sender', async () => {
       const messages = await fetchMessages(request)
-      baselineCount = messages.filter((m) => toMatches(m, TEST_FROM)).length
+      baselineCount = messages.filter((m) => toMatches(m, testFrom)).length
     })
 
     const subject = `Smoke ${Date.now()}`
@@ -42,7 +54,7 @@ test.describe('@ci @smoke Smart-Email', () => {
     await test.step('Act: POST /api/v1/webhooks/email', async () => {
       const res = await request.post(webhookUrl(), {
         data: {
-          from: TEST_FROM,
+          from: testFrom,
           to: TEST_TO,
           subject,
           body,
@@ -66,7 +78,7 @@ test.describe('@ci @smoke Smart-Email', () => {
           async () => {
             const messages = await fetchMessages(request)
             matching = messages
-              .filter((m) => toMatches(m, TEST_FROM))
+              .filter((m) => toMatches(m, testFrom))
               .map((m) => ({ body: getPlainTextBody(m) }))
             return matching.length >= baselineCount + 1 ? matching : null
           },
@@ -83,16 +95,17 @@ test.describe('@ci @smoke Smart-Email', () => {
   })
 
   test('invalid payload returns 400 and sends no reply', async ({ request }) => {
+    const testFrom = uniqueEmailSender()
     let baselineCount = 0
     await test.step('Arrange: count existing messages to sender', async () => {
       const messages = await fetchMessages(request)
-      baselineCount = messages.filter((m) => toMatches(m, TEST_FROM)).length
+      baselineCount = messages.filter((m) => toMatches(m, testFrom)).length
     })
 
     await test.step('Act: POST with missing required body', async () => {
       const res = await request.post(webhookUrl(), {
         data: {
-          from: TEST_FROM,
+          from: testFrom,
           to: TEST_TO,
           subject: 'No body',
         },
@@ -108,7 +121,7 @@ test.describe('@ci @smoke Smart-Email', () => {
 
     await test.step('Assert: no new reply sent to sender', async () => {
       const messages = await fetchMessages(request)
-      const toSender = messages.filter((m) => toMatches(m, TEST_FROM))
+      const toSender = messages.filter((m) => toMatches(m, testFrom))
       expect(toSender.length, 'Invalid request must not trigger reply').toBe(baselineCount)
     })
   })

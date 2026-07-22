@@ -13,7 +13,7 @@
  */
 import AxeBuilder from '@axe-core/playwright'
 import { test, expect, type Page } from '../test-setup'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS } from '../config/config'
 
@@ -117,19 +117,16 @@ async function axeReportOnly(page: Page, surface: string, colorScheme: 'light' |
 }
 
 test.describe('@ci @layout UI guard — chat surface', () => {
-  test('chat page has no overflow and input is reachable', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('chat page has no overflow and input is reachable', async ({ page }) => {
+    await openApp(page)
     await expectNoHorizontalOverflow(page, 'chat')
 
     await expectInsideViewport(page, CHAT.textInput, 'chat input')
     await expectInsideViewport(page, CHAT.sendBtn, 'send button')
   })
 
-  test('primary nav controls carry visible labels and meet target size', async ({
-    page,
-    credentials,
-  }) => {
-    await login(page, credentials)
+  test('primary nav controls carry visible labels and meet target size', async ({ page }) => {
+    await openApp(page)
     await ensureAdvancedMode(page)
 
     if (isMobileViewport(page)) {
@@ -193,13 +190,10 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     }
   })
 
-  test('More section expands with accordion sections and 44px rows (mobile)', async ({
-    page,
-    credentials,
-  }) => {
+  test('More section expands with accordion sections and 44px rows (mobile)', async ({ page }) => {
     test.skip(!isMobileViewport(page), 'the push-drawer exists only below md')
 
-    await login(page, credentials)
+    await openApp(page)
     await ensureAdvancedMode(page)
 
     // Open the push-drawer first, then reveal the "More" section inline.
@@ -214,11 +208,11 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     // §4.4: the section carries the remaining sections + the account block.
     const sections = sheet.locator('[data-testid^="btn-mobile-more-"]')
     expect(await sections.count(), 'more section renders section rows').toBeGreaterThanOrEqual(2)
-    await expect(sheet.locator('[data-testid="section-mobile-more-account"]')).toBeVisible()
+    await expect(sheet.locator(NAV.mobileMoreAccountSection)).toBeVisible()
 
     // Accordion: tapping Channels expands its children inline (§4.3 #3).
-    await sheet.locator('[data-testid="btn-mobile-more-channels"]').click()
-    await expect(sheet.locator('[data-testid="link-mobile-more-inbound"]')).toBeVisible({
+    await sheet.locator(NAV.mobileMoreChannels).click()
+    await expect(sheet.locator(NAV.mobileMoreInbound)).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
 
@@ -241,18 +235,15 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     // Account rows navigate (regression: dead Subscription tap). Preferences
     // exists for every user level, and shares handleNavigate with the
     // Subscription/Upgrade rows. Navigating closes the drawer (scrim removed).
-    const preferencesRow = sheet.locator('[data-testid="btn-mobile-more-preferences"]')
+    const preferencesRow = sheet.locator(NAV.mobileMorePreferences)
     await preferencesRow.scrollIntoViewIfNeeded()
     await preferencesRow.tap()
     await expect(page).toHaveURL(/\/settings/, { timeout: TIMEOUTS.STANDARD })
     await expect(page.locator(NAV.mobileDrawerScrim)).toHaveCount(0, { timeout: TIMEOUTS.SHORT })
   })
 
-  test('chat-input "+" menu does not navigate (menu collision guard)', async ({
-    page,
-    credentials,
-  }) => {
-    await login(page, credentials)
+  test('chat-input "+" menu does not navigate (menu collision guard)', async ({ page }) => {
+    await openApp(page)
     await ensureAdvancedMode(page)
 
     const toggle = page.locator(CHAT.plusToggle)
@@ -272,11 +263,11 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await expect(panel.locator('a, [role="link"]')).toHaveCount(0)
 
     // The standalone manage-folders navigation pill must not come back.
-    await expect(panel.locator('[data-testid="btn-manage-knowledge-groups"]')).toHaveCount(0)
+    await expect(panel.locator(CHAT.legacyManageKnowledgeGroupsBtn)).toHaveCount(0)
   })
 
-  test('chat history opens within the viewport', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('chat history opens within the viewport', async ({ page }) => {
+    await openApp(page)
 
     // Two surfaces: the in-drawer history list on mobile, the rail modal on
     // desktop.
@@ -295,17 +286,17 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     }
   })
 
-  test('chat survives a 320px ultra-narrow viewport', async ({ page, credentials }) => {
+  test('chat survives a 320px ultra-narrow viewport', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 800 })
-    await login(page, credentials)
+    await openApp(page)
     await expectNoHorizontalOverflow(page, 'chat @320px')
     await expectInsideViewport(page, CHAT.sendBtn, 'send button @320px')
   })
 })
 
 test.describe('@ci @layout UI guard — key pages', () => {
-  test('files page has no overflow and tappable primary action', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('files page has no overflow and tappable primary action', async ({ page }) => {
+    await openApp(page)
     await page.goto('/files')
     await expect(page.locator(selectors.files.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expectNoHorizontalOverflow(page, 'files')
@@ -323,30 +314,27 @@ test.describe('@ci @layout UI guard — key pages', () => {
     }
   })
 
-  test('channels page (inbound config) has no overflow', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('channels page (inbound config) has no overflow', async ({ page }) => {
+    await openApp(page)
     await page.goto('/channels')
-    await expect(page.locator('[data-testid="page-config-inbound"]')).toBeVisible({
+    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
     await expectNoHorizontalOverflow(page, 'channels (inbound)')
   })
 
-  test('AI models page header stays inside the card (B1 regression)', async ({
-    page,
-    credentials,
-  }) => {
-    await login(page, credentials)
+  test('AI models page header stays inside the card (B1 regression)', async ({ page }) => {
+    await openApp(page)
     await page.goto('/ai/models')
     await expect(page.locator(selectors.models.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expectNoHorizontalOverflow(page, 'ai models')
 
     // §2.8 B1: the "reset defaults" header button used to overflow the card
     // on ~390px viewports. It must render fully inside the viewport.
-    const resetBtn = page.locator('[data-testid="btn-reset-defaults"]')
+    const resetBtn = page.locator(selectors.inboundConfig.resetDefaults)
     await expect(resetBtn).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await resetBtn.scrollIntoViewIfNeeded()
-    await expectInsideViewport(page, '[data-testid="btn-reset-defaults"]', 'reset-defaults button')
+    await expectInsideViewport(page, selectors.inboundConfig.resetDefaults, 'reset-defaults button')
   })
 
   test('login page has no overflow and reachable submit', async ({ page }) => {
@@ -365,8 +353,8 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
     await axeReportOnly(page, 'login', 'dark')
   })
 
-  test('chat and files — light and dark', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('chat and files — light and dark', async ({ page }) => {
+    await openApp(page)
     await axeReportOnly(page, 'chat', 'light')
     await axeReportOnly(page, 'chat', 'dark')
 
@@ -376,8 +364,8 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
     await axeReportOnly(page, 'files', 'dark')
   })
 
-  test('AI models — light and dark', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('AI models — light and dark', async ({ page }) => {
+    await openApp(page)
     await page.goto('/ai/models')
     await expect(page.locator(selectors.models.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await axeReportOnly(page, 'ai-models', 'light')

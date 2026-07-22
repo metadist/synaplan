@@ -1,6 +1,6 @@
 import { test, expect } from '../test-setup'
 import { request as playwrightRequest } from '@playwright/test'
-import { login, getAuthHeaders } from '../helpers/auth'
+import { openApp, getAuthHeaders } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { CREDENTIALS } from '../config/credentials'
 import { getApiUrl, URLS } from '../config/config'
@@ -62,11 +62,11 @@ test.describe('@ci @smoke Ollama Integration', () => {
     await apiCtx.dispose()
   })
 
-  test('chat via Ollama provider produces response', async ({ page, credentials }) => {
+  test('chat via Ollama provider produces response', async ({ page }) => {
     const chat = new ChatHelper(page)
 
     await test.step('Arrange: login and start new chat', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await chat.startNewChat()
     })
 
@@ -91,7 +91,7 @@ test.describe('@ci @smoke Ollama Integration', () => {
     })
   })
 
-  test('thinking/reasoning tokens are forwarded', async ({ page, credentials }) => {
+  test('thinking/reasoning tokens are forwarded', async ({ page }) => {
     await test.step('Arrange: configure stub with thinking enabled', async () => {
       await resetStub(apiCtx)
       await configureStub(apiCtx, { enableThinking: true })
@@ -100,7 +100,7 @@ test.describe('@ci @smoke Ollama Integration', () => {
     const chat = new ChatHelper(page)
 
     await test.step('Arrange: login and start new chat', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await chat.startNewChat()
     })
 

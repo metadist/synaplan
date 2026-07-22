@@ -8,7 +8,7 @@
  * to be a conscious, documented decision.
  */
 import { test, expect } from '../test-setup'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { TIMEOUTS } from '../config/config'
 
 /** old path → canonical path (§4.6 URL map) */
@@ -31,8 +31,8 @@ const REDIRECTS: Array<[string, string]> = [
 ]
 
 test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
-  test('@ci every legacy path redirects to its successor', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('@ci every legacy path redirects to its successor', async ({ page }) => {
+    await openApp(page)
 
     for (const [oldPath, newPath] of REDIRECTS) {
       await test.step(`${oldPath} → ${newPath}`, async () => {
@@ -45,8 +45,8 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
     }
   })
 
-  test('@ci redirect preserves the query string', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('@ci redirect preserves the query string', async ({ page }) => {
+    await openApp(page)
     await page.goto('/config/task-prompts?topic=mail')
     await expect(page).toHaveURL(/\/ai\/instructions\?topic=mail$/, {
       timeout: TIMEOUTS.STANDARD,

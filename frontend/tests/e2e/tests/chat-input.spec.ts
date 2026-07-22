@@ -9,7 +9,7 @@
  * as clearly marked link rows (Manage folders…, Summarizer).
  */
 import { test, expect, type Page } from '../test-setup'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS } from '../config/config'
 
@@ -59,8 +59,8 @@ async function openToolsDropdown(page: Page) {
 }
 
 test.describe('Chat input: "+" menu (§5)', () => {
-  test.beforeEach(async ({ page, credentials }) => {
-    await login(page, credentials)
+  test.beforeEach(async ({ page }) => {
+    await openApp(page)
     await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(page.locator(CHAT.plusToggle)).toBeVisible({ timeout: TIMEOUTS.SHORT })
   })
@@ -73,9 +73,9 @@ test.describe('Chat input: "+" menu (§5)', () => {
     await expect(panel.locator(CHAT.knowledgeFolderBtn)).toBeVisible()
 
     // The retired standalone pills must not come back.
-    await expect(panel.locator('[data-testid="btn-chat-thinking"]')).toHaveCount(0)
-    await expect(panel.locator('[data-testid="btn-chat-voice-reply"]')).toHaveCount(0)
-    await expect(panel.locator('[data-testid="btn-manage-knowledge-groups"]')).toHaveCount(0)
+    await expect(panel.locator(CHAT.legacyThinkingPill)).toHaveCount(0)
+    await expect(panel.locator(CHAT.legacyVoiceReplyPill)).toHaveCount(0)
+    await expect(panel.locator(CHAT.legacyManageKnowledgeGroupsBtn)).toHaveCount(0)
   })
 
   test('@ci Tools dropdown lists command tools, toggles and the Summarizer link', async ({
@@ -84,9 +84,9 @@ test.describe('Chat input: "+" menu (§5)', () => {
     await openToolsDropdown(page)
     const panel = page.locator(CHAT.toolsPanel)
 
-    await expect(panel.locator('[data-testid="btn-tool-web-search"]')).toBeVisible()
-    await expect(panel.locator('[data-testid="btn-tool-image-gen"]')).toBeVisible()
-    await expect(panel.locator('[data-testid="btn-tool-video-gen"]')).toBeVisible()
+    await expect(panel.locator(CHAT.toolWebSearch)).toBeVisible()
+    await expect(panel.locator(CHAT.toolImageGen)).toBeVisible()
+    await expect(panel.locator(CHAT.toolVideoGen)).toBeVisible()
     await expect(panel.locator(CHAT.toolThinking)).toBeVisible()
     await expect(panel.locator(CHAT.toolVoiceReply)).toBeVisible()
     await expect(panel.locator(CHAT.toolSummarizerLink)).toBeVisible()

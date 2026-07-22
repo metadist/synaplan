@@ -1,5 +1,5 @@
 import { test, expect } from '../test-setup'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { FIXTURE_PATHS, PROMPTS } from '../config/test-data'
 import { readFileSync } from 'fs'
@@ -13,8 +13,8 @@ const e2eDir = path.join(__dirname, '..')
 const VISION_FIXTURE = readFileSync(path.join(e2eDir, FIXTURE_PATHS.VISION_PATTERN_64))
 
 test.describe('@ci @smoke Chat', () => {
-  test('standard model generates answer', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('standard model generates answer', async ({ page }) => {
+    await openApp(page)
     const chat = new ChatHelper(page)
 
     await test.step('Arrange: start new chat', async () => {
@@ -32,15 +32,12 @@ test.describe('@ci @smoke Chat', () => {
 })
 
 test.describe('@noci @nightly Chat — all models', () => {
-  test('user can chat with all models and get a "success" answer', async ({
-    page,
-    credentials,
-  }) => {
+  test('user can chat with all models and get a "success" answer', async ({ page }) => {
     test.setTimeout(120_000)
     const failures: string[] = []
     const chat = new ChatHelper(page)
 
-    await login(page, credentials)
+    await openApp(page)
     await chat.startNewChat()
 
     try {
@@ -63,14 +60,11 @@ test.describe('@noci @nightly Chat — all models', () => {
 })
 
 test.describe('@noci @regression Chat — vision', () => {
-  test('user can upload an image and gets a description from all models', async ({
-    page,
-    credentials,
-  }) => {
+  test('user can upload an image and gets a description from all models', async ({ page }) => {
     const failures: string[] = []
     const chat = new ChatHelper(page)
 
-    await login(page, credentials)
+    await openApp(page)
     await chat.ensureAdvancedMode()
     await chat.startNewChat()
 
@@ -94,11 +88,11 @@ test.describe('@noci @regression Chat — vision', () => {
 })
 
 test.describe('@noci @regression Chat — image generation', () => {
-  test('user can generate an image and test all models', async ({ page, credentials }) => {
+  test('user can generate an image and test all models', async ({ page }) => {
     const failures: string[] = []
     const chat = new ChatHelper(page)
 
-    await login(page, credentials)
+    await openApp(page)
     await chat.ensureAdvancedMode()
     await chat.startNewChat()
 
@@ -116,11 +110,11 @@ test.describe('@noci @regression Chat — image generation', () => {
 })
 
 test.describe('@noci @regression Chat — video generation', () => {
-  test('user can generate a video and test all models', async ({ page, credentials }) => {
+  test('user can generate a video and test all models', async ({ page }) => {
     const failures: string[] = []
     const chat = new ChatHelper(page)
 
-    await login(page, credentials)
+    await openApp(page)
     await chat.ensureAdvancedMode()
     await chat.startNewChat()
 

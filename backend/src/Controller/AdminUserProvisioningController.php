@@ -53,6 +53,7 @@ final class AdminUserProvisioningController extends AbstractController
                 new OA\Property(property: 'email', type: 'string', example: 'alice@example.com'),
                 new OA\Property(property: 'display_name', type: 'string', nullable: true, example: 'Alice Example'),
                 new OA\Property(property: 'level', type: 'string', enum: ['NEW', 'PRO', 'TEAM', 'BUSINESS'], example: 'NEW'),
+                new OA\Property(property: 'password', type: 'string', format: 'password', nullable: true, minLength: 8, description: 'Optional. When set at creation, the user can also sign in via the regular email/password login (used e.g. by test tooling). Ignored on idempotent hits.', example: 'SecurePass123!'),
             ]
         )
     )]
@@ -79,6 +80,7 @@ final class AdminUserProvisioningController extends AbstractController
                 (string) ($data['email'] ?? ''),
                 isset($data['display_name']) ? (string) $data['display_name'] : null,
                 (string) ($data['level'] ?? 'NEW'),
+                isset($data['password']) && is_string($data['password']) && '' !== $data['password'] ? $data['password'] : null,
             );
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);

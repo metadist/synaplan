@@ -36,6 +36,16 @@ function metaBase(messageId: string, from: string, type: string, extra: Record<s
   }
 }
 
+/**
+ * Unique sender phone number per test. The backend maps each number to an
+ * auto-created ANONYMOUS user whose MESSAGES limit is a LIFETIME total (10)
+ * — a fixed number would burn through it across runs on a long-lived test
+ * DB and start failing with "Rate limit exceeded".
+ */
+export function uniqueWaSender(): string {
+  return `49151${String(Date.now()).slice(-8)}${Math.floor(Math.random() * 10)}`
+}
+
 export function metaPayloadText(messageId: string, from: string, body: string): object {
   return metaBase(messageId, from, 'text', {
     text: { body },

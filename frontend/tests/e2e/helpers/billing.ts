@@ -1,11 +1,10 @@
 import { randomUUID } from 'crypto'
 import type { APIRequestContext, Page } from '@playwright/test'
 import { expect, request as playwrightRequest } from '@playwright/test'
-import { deleteUser, getAuthHeaders } from './auth'
-import { waitForVerificationHref } from './email'
+import { deleteUser, getAuthHeaders, provisionUser } from './auth'
 import { selectors } from './selectors'
 import { CREDENTIALS } from '../config/credentials'
-import { getApiUrl, INTERVALS, TIMEOUTS, URLS } from '../config/config'
+import { getApiUrl, TIMEOUTS, URLS } from '../config/config'
 import {
   sendCheckoutCompletedWebhook,
   sendSubscriptionCreatedWebhook,
@@ -78,10 +77,10 @@ export async function authBundle(
 }
 
 /**
- * Register, verify-email and return credentials for a one-off user that is
- * isolated from the worker-scoped `workerUser` fixture. Use this for tests that
- * REQUIRE a user with no prior subscription state (e.g. the checkout happy path),
- * since the worker user accumulates state from earlier tests in the same worker.
+ * Provision a one-off, already-verified user that is isolated from the
+ * worker-scoped `workerUser` fixture. Use this for tests that REQUIRE a user
+ * with no prior subscription state (e.g. the checkout happy path), since the
+ * worker user accumulates state from earlier tests in the same worker.
  *
  * Returns a `dispose()` callback that deletes the user via the admin API. Callers
  * should invoke it in a `test.afterAll`/`test.afterEach` or — since this is meant
@@ -95,28 +94,11 @@ export async function registerFreshUser(): Promise<{
   const email = `e2e-fresh-${randomUUID()}@test.synaplan.com`
   const ctx = await playwrightRequest.newContext({ baseURL: URLS.BASE_URL })
 
-  const regRes = await ctx.post(`${API_URL}/api/v1/auth/register`, {
-    data: { email, password, recaptchaToken: '' },
-  })
-  if (!regRes.ok()) {
+  try {
+    await provisionUser(ctx, { email, password })
+  } catch (error) {
     await ctx.dispose()
-    throw new Error(`Fresh-user registration failed for ${email}: ${regRes.status()}`)
-  }
-
-  const href = await waitForVerificationHref(ctx, email, {
-    timeout: TIMEOUTS.LONG,
-    intervals: INTERVALS.FAST(),
-  })
-  const token = new URL(href, URLS.BASE_URL).searchParams.get('token')
-  if (!token) {
-    await ctx.dispose()
-    throw new Error(`No verification token in URL: ${href}`)
-  }
-
-  const verifyRes = await ctx.post(`${API_URL}/api/v1/auth/verify-email`, { data: { token } })
-  if (!verifyRes.ok()) {
-    await ctx.dispose()
-    throw new Error(`Email verification failed for ${email}: ${verifyRes.status()}`)
+    throw error
   }
 
   return {

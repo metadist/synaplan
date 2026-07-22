@@ -4,10 +4,9 @@
  */
 
 export const INTEGRATION = {
-  WHATSAPP: {
-    /** Sender phone number (E.164-like, no +). */
-    TEST_FROM: '4915112345678',
-  },
+  // WhatsApp sender numbers are generated per test (uniqueWaSender() in
+  // helpers/whatsapp-payload.ts) — a fixed number exhausts the mapped
+  // ANONYMOUS user's lifetime MESSAGES limit on long-lived test DBs.
   EMAIL: {
     /** Sender address in webhook payload. */
     TEST_FROM: 'user@example.com',

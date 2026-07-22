@@ -1,15 +1,15 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
 test.describe('@ci @smoke Chat Share', () => {
-  test('user can share chat and open shared link in incognito', async ({ page, credentials }) => {
+  test('user can share chat and open shared link in incognito', async ({ page }) => {
     const uniqueMessage = `Chat share E2E ${Date.now()} – please reply briefly.`
 
     await test.step('Arrange: login via UI', async () => {
-      await login(page, credentials)
+      await openApp(page)
     })
 
     const chat = new ChatHelper(page)
@@ -30,7 +30,7 @@ test.describe('@ci @smoke Chat Share', () => {
 
     await test.step('Open share modal: chat manager → last chat (first row, newest first) → 3 dots → Share', async () => {
       const v2ChatNav = page.locator(selectors.nav.sidebarV2ChatNav)
-      const v2Visible = await v2ChatNav.isVisible().catch(() => false)
+      const v2Visible = await v2ChatNav.isVisible()
       if (v2Visible) {
         await v2ChatNav.click()
         const modal = page.locator(selectors.nav.modalChatManager)
@@ -48,7 +48,7 @@ test.describe('@ci @smoke Chat Share', () => {
         const dropdownSection = page.locator(selectors.share.chatDropdownSection)
         if (!(await dropdownSection.isVisible())) {
           const expandBtn = page.locator(selectors.nav.sidebarExpand)
-          if (await expandBtn.isVisible().catch(() => false)) {
+          if (await expandBtn.isVisible()) {
             await expandBtn.click()
           }
           await page.locator(selectors.chat.chatBtnToggle).click()

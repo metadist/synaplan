@@ -11,12 +11,15 @@ use App\Repository\ConfigRepository;
 use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\FileRepository;
 use App\Repository\InboundEmailHandlerRepository;
+use App\Repository\McpServerConfigRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PluginDataRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
+use App\Repository\RevectorizeRunRepository;
 use App\Repository\SessionRepository;
 use App\Repository\TokenRepository;
+use App\Repository\TopupRepository;
 use App\Repository\UseLogRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Repository\WidgetRepository;
@@ -46,6 +49,9 @@ final readonly class UserDeletionService
         private PromptMetaRepository $promptMetaRepository,
         private PluginDataRepository $pluginDataRepository,
         private WidgetSessionRepository $widgetSessionRepository,
+        private TopupRepository $topupRepository,
+        private McpServerConfigRepository $mcpServerConfigRepository,
+        private RevectorizeRunRepository $revectorizeRunRepository,
         private FileStorageService $fileStorageService,
         private VectorStorageFacade $vectorStorageFacade,
         private UserMemoryService $userMemoryService,
@@ -88,6 +94,9 @@ final readonly class UserDeletionService
             $this->deleteConfigs($userId);
             $this->deletePrompts($userId);
             $this->deletePluginData($userId);
+            $this->deleteTopups($userId);
+            $this->deleteMcpServerConfigs($userId);
+            $this->deleteRevectorizeRuns($userId);
 
             // Finally, delete the user account
             $this->em->remove($user);
@@ -154,6 +163,9 @@ final readonly class UserDeletionService
             $this->deleteConfigs($userId);
             $this->deletePrompts($userId);
             $this->deletePluginData($userId);
+            $this->deleteTopups($userId);
+            $this->deleteMcpServerConfigs($userId);
+            $this->deleteRevectorizeRuns($userId);
 
             $this->em->flush();
             $this->em->getConnection()->commit();
@@ -356,6 +368,30 @@ final readonly class UserDeletionService
         $pluginData = $this->pluginDataRepository->findBy(['userId' => $userId]);
         foreach ($pluginData as $item) {
             $this->em->remove($item);
+        }
+    }
+
+    private function deleteTopups(int $userId): void
+    {
+        $topups = $this->topupRepository->findBy(['userId' => $userId]);
+        foreach ($topups as $topup) {
+            $this->em->remove($topup);
+        }
+    }
+
+    private function deleteMcpServerConfigs(int $userId): void
+    {
+        $configs = $this->mcpServerConfigRepository->findBy(['userId' => $userId]);
+        foreach ($configs as $config) {
+            $this->em->remove($config);
+        }
+    }
+
+    private function deleteRevectorizeRuns(int $userId): void
+    {
+        $runs = $this->revectorizeRunRepository->findBy(['userId' => $userId]);
+        foreach ($runs as $run) {
+            $this->em->remove($run);
         }
     }
 

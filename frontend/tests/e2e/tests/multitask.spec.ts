@@ -1,6 +1,6 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
@@ -23,8 +23,8 @@ const MULTITASK_PROMPT =
   'marketing strategy for the next two quarters.'
 
 test.describe('@ci @multitask Multi-task routing', () => {
-  test('a multi-node request renders task cards that complete', async ({ page, credentials }) => {
-    await login(page, credentials)
+  test('a multi-node request renders task cards that complete', async ({ page }) => {
+    await openApp(page)
     const chat = new ChatHelper(page)
 
     await test.step('Arrange: start a new chat', async () => {
@@ -39,25 +39,25 @@ test.describe('@ci @multitask Multi-task routing', () => {
     await bubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
     await test.step('Assert: the task-plan bubble with per-task cards appears', async () => {
-      const plan = bubble.locator('[data-testid="task-plan"]')
+      const plan = bubble.locator(selectors.multitask.plan)
       await plan.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
 
       // Two visible task cards (summarize + translate); compose_reply is hidden.
       await bubble
-        .locator('[data-testid="task-card-n1"]')
+        .locator(selectors.multitask.card(1))
         .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await bubble
-        .locator('[data-testid="task-card-n2"]')
+        .locator(selectors.multitask.card(2))
         .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     })
 
     await test.step('Assert: both task cards reach the done state', async () => {
-      await expect(bubble.locator('[data-testid="task-card-n1"]')).toHaveAttribute(
+      await expect(bubble.locator(selectors.multitask.card(1))).toHaveAttribute(
         'data-state',
         'done',
         { timeout: TIMEOUTS.LONG }
       )
-      await expect(bubble.locator('[data-testid="task-card-n2"]')).toHaveAttribute(
+      await expect(bubble.locator(selectors.multitask.card(2))).toHaveAttribute(
         'data-state',
         'done',
         { timeout: TIMEOUTS.LONG }
@@ -69,7 +69,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
         .locator(selectors.chat.messageDone)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
 
-      const cardText = (await bubble.locator('[data-testid="task-card-n1"]').innerText()).trim()
+      const cardText = (await bubble.locator(selectors.multitask.card(1)).innerText()).trim()
       expect(cardText.length).toBeGreaterThan(0)
     })
 
@@ -77,9 +77,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
       // The reply node (compose_reply) has no card — its assembled text must
       // land in the regular message body below the task plan. Before the fix
       // it was dropped while taskPlan.active and only appeared after a reload.
-      const answerText = bubble.locator(
-        '[data-testid="message-text"]:not([data-testid="task-plan"] [data-testid="message-text"])'
-      )
+      const answerText = bubble.locator(selectors.multitask.answerTextOutsidePlan)
       await answerText.first().waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       expect((await answerText.first().innerText()).trim().length).toBeGreaterThan(0)
     })
@@ -91,15 +89,15 @@ test.describe('@ci @multitask Multi-task routing', () => {
       const reloadedBubble = chat.conversationBubbles().nth(previousCount)
       await reloadedBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
-      const plan = reloadedBubble.locator('[data-testid="task-plan"]')
+      const plan = reloadedBubble.locator(selectors.multitask.plan)
       await plan.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
-      await expect(reloadedBubble.locator('[data-testid="task-card-n1"]')).toHaveAttribute(
+      await expect(reloadedBubble.locator(selectors.multitask.card(1))).toHaveAttribute(
         'data-state',
         'done',
         { timeout: TIMEOUTS.STANDARD }
       )
-      await expect(reloadedBubble.locator('[data-testid="task-card-n2"]')).toHaveAttribute(
+      await expect(reloadedBubble.locator(selectors.multitask.card(2))).toHaveAttribute(
         'data-state',
         'done',
         { timeout: TIMEOUTS.STANDARD }
@@ -120,9 +118,8 @@ test.describe('@ci @multitask Multi-task routing', () => {
    */
   test('@webSearch @noci Sources dropdown appears after a DAG web-search turn (PR #1076)', async ({
     page,
-    credentials,
   }) => {
-    await login(page, credentials)
+    await openApp(page)
     const chat = new ChatHelper(page)
 
     await test.step('Arrange: start a new chat', async () => {
@@ -146,10 +143,10 @@ test.describe('@ci @multitask Multi-task routing', () => {
     await bubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
     await test.step('Assert: task-plan cards appear with web_search card', async () => {
-      const plan = bubble.locator('[data-testid="task-plan"]')
+      const plan = bubble.locator(selectors.multitask.plan)
       await plan.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
       await bubble
-        .locator('[data-testid="task-card-n1"]')
+        .locator(selectors.multitask.card(1))
         .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     })
 
@@ -185,11 +182,8 @@ test.describe('@ci @multitask Multi-task routing', () => {
    * re-fetches the persisted message after `complete` and reconciles it
    * (GET /api/v1/messages/{id} — the single authoritative source).
    */
-  test('TTS audio in a DAG turn is visible live and after reload (#1070)', async ({
-    page,
-    credentials,
-  }) => {
-    await login(page, credentials)
+  test('TTS audio in a DAG turn is visible live and after reload (#1070)', async ({ page }) => {
+    await openApp(page)
     const chat = new ChatHelper(page)
 
     const openPlusMenu = async () => {
@@ -240,7 +234,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
 
     await test.step('Assert: the DAG turn streams task cards and completes', async () => {
       await bubble
-        .locator('[data-testid="task-plan"]')
+        .locator(selectors.multitask.plan)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
       await bubble
         .locator(selectors.chat.messageDone)

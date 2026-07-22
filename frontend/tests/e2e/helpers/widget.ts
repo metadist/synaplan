@@ -1,13 +1,64 @@
-import type { Page } from '@playwright/test'
+import type { Page, APIRequestContext } from '@playwright/test'
 import { expect } from '@playwright/test'
 import { TIMEOUTS, INTERVALS, getApiUrl } from '../config/config'
 import { WIDGET_DEFAULTS, WIDGET_TEST_URLS } from '../config/test-data'
+import { getAuthHeaders } from './auth'
 import { selectors } from './selectors'
 import path from 'path'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 
 export { getApiUrl }
+
+/**
+ * Create a widget via the REST API (setup shortcut — the UI creation modal
+ * is covered by the "applies settings and auto-open" spec). Returns the
+ * public widgetId used by the embed script.
+ */
+export async function createWidgetViaApi(
+  request: APIRequestContext,
+  credentials: { user: string; pass: string },
+  name: string,
+  options: { websiteUrl?: string; config?: Record<string, unknown> } = {}
+): Promise<{ widgetId: string; name: string }> {
+  const headers = await getAuthHeaders(request, credentials)
+  const response = await request.post(`${getApiUrl()}/api/v1/widgets`, {
+    headers,
+    data: {
+      name,
+      websiteUrl: options.websiteUrl ?? WIDGET_TEST_URLS.EXAMPLE_DOMAIN,
+      ...(options.config ? { config: options.config } : {}),
+    },
+  })
+  if (response.status() !== 201) {
+    const body = await response.text()
+    throw new Error(`Widget API create failed: ${response.status()} ${body}`)
+  }
+  const json = await response.json()
+  return { widgetId: json.widget.widgetId as string, name }
+}
+
+/**
+ * Patch widget config/status via the REST API. The backend merges the given
+ * config keys into the existing config (array_replace), so partial patches
+ * are safe.
+ */
+export async function updateWidgetViaApi(
+  request: APIRequestContext,
+  credentials: { user: string; pass: string },
+  widgetId: string,
+  patch: { config?: Record<string, unknown>; status?: 'active' | 'inactive' }
+): Promise<void> {
+  const headers = await getAuthHeaders(request, credentials)
+  const response = await request.put(`${getApiUrl()}/api/v1/widgets/${widgetId}`, {
+    headers,
+    data: patch,
+  })
+  if (!response.ok()) {
+    const body = await response.text()
+    throw new Error(`Widget API update failed: ${response.status()} ${body}`)
+  }
+}
 
 const widgetTestHtml = readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/widget-test.html'),
@@ -27,7 +78,7 @@ export async function gotoWidgetTestPage(
   const url = `/widget-test.html?widgetId=${encodeURIComponent(widgetId)}&apiUrl=${encodeURIComponent(apiUrl)}`
   await page.goto(url, { waitUntil: 'domcontentloaded' })
 
-  const loadError = page.locator('[data-testid="widget-load-error"]')
+  const loadError = page.locator(selectors.widget.loadError)
   if (await loadError.isVisible()) {
     const msg = await loadError.textContent()
     throw new Error(`Widget script failed to load. Page error: ${msg?.trim() ?? 'unknown'}`)
@@ -46,7 +97,7 @@ export async function openWidgetOnTestPage(
   try {
     await widgetButton.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
   } catch {
-    const loadError = page.locator('[data-testid="widget-load-error"]')
+    const loadError = page.locator(selectors.widget.loadError)
     if ((await loadError.count()) > 0) {
       const msg = await loadError.textContent()
       throw new Error(`Widget did not load. Page error: ${msg?.trim() ?? 'unknown'}`)
@@ -174,7 +225,7 @@ export async function updateWidgetSettings(
   await page.waitForSelector(selectors.widgets.advancedConfig.modal, { timeout: TIMEOUTS.STANDARD })
 
   const behaviorSection = page.locator(selectors.widgets.advancedConfig.behaviorTab)
-  const isBehaviorTabVisible = await behaviorSection.isVisible().catch(() => false)
+  const isBehaviorTabVisible = await behaviorSection.isVisible()
   if (!isBehaviorTabVisible) {
     await page.locator(selectors.widgets.advancedConfig.tabGroupSetup).click()
     await page.locator(selectors.widgets.advancedConfig.tabButtonBehavior).click()
@@ -196,13 +247,15 @@ export async function updateWidgetSettings(
     await behaviorSection.locator(selectors.widgets.advancedConfig.allowFileUploadLabel).click()
     if (finalSettings.allowFileUpload) {
       await behaviorSection
-        .locator('[data-testid="input-file-limit"]')
+        .locator(selectors.widgets.advancedConfig.fileUploadLimitInput)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     }
   }
 
   if (finalSettings.allowFileUpload) {
-    const fileUploadLimitInput = behaviorSection.locator('[data-testid="input-file-limit"]')
+    const fileUploadLimitInput = behaviorSection.locator(
+      selectors.widgets.advancedConfig.fileUploadLimitInput
+    )
     await fileUploadLimitInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     await fileUploadLimitInput.fill(finalSettings.fileUploadLimit.toString())
     await page
@@ -267,15 +320,15 @@ export async function setWidgetTaskPrompt(
   await page.waitForSelector(selectors.widgets.advancedConfig.modal, { timeout: TIMEOUTS.STANDARD })
 
   const assistantTab = page.locator(selectors.widgets.advancedConfig.assistantTab)
-  const isAssistantTabVisible = await assistantTab.isVisible().catch(() => false)
+  const isAssistantTabVisible = await assistantTab.isVisible()
   if (!isAssistantTabVisible) {
     await page.locator(selectors.widgets.advancedConfig.tabGroupAiSetup).click()
     await page.locator(selectors.widgets.advancedConfig.tabButtonAssistant).click()
     await assistantTab.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
   }
 
-  const manualCreateButton = page.locator('[data-testid="btn-manual-create"]')
-  const isManualCreateVisible = await manualCreateButton.isVisible().catch(() => false)
+  const manualCreateButton = page.locator(selectors.widgets.advancedConfig.manualCreateButton)
+  const isManualCreateVisible = await manualCreateButton.isVisible()
 
   if (isManualCreateVisible) {
     await manualCreateButton.click()
@@ -304,7 +357,7 @@ export async function setWidgetTaskPrompt(
       timeout: TIMEOUTS.STANDARD,
     })
     const assistantTab = page.locator(selectors.widgets.advancedConfig.assistantTab)
-    const isAssistantTabVisible = await assistantTab.isVisible().catch(() => false)
+    const isAssistantTabVisible = await assistantTab.isVisible()
     if (!isAssistantTabVisible) {
       await page.locator(selectors.widgets.advancedConfig.tabGroupAiSetup).click()
       await page.locator(selectors.widgets.advancedConfig.tabButtonAssistant).click()

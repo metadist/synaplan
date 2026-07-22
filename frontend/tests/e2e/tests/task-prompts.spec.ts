@@ -1,5 +1,5 @@
 import { test, expect } from '../test-setup'
-import { login } from '../helpers/auth'
+import { login, openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS } from '../config/config'
@@ -8,12 +8,7 @@ const PAGE = '/ai/instructions'
 const SEL = selectors.taskPrompts
 
 test.describe('@ci Task Prompts', () => {
-  test('admin can edit AI model, rules and content on system prompt', async ({
-    page,
-    credentials,
-  }) => {
-    void credentials
-
+  test('admin can edit AI model, rules and content on system prompt', async ({ page }) => {
     await test.step('Arrange: login as admin and pick the first card', async () => {
       await login(page, CREDENTIALS.getAdminCredentials())
       await page.goto(PAGE)
@@ -38,12 +33,9 @@ test.describe('@ci Task Prompts', () => {
     })
   })
 
-  test('non-admin can edit AI model, rules and content on system prompt', async ({
-    page,
-    credentials,
-  }) => {
+  test('non-admin can edit AI model, rules and content on system prompt', async ({ page }) => {
     await test.step('Arrange: login and pick the first card', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await page.goto(PAGE)
 
       const firstCard = page.locator(SEL.cardAny).first()
@@ -63,9 +55,9 @@ test.describe('@ci Task Prompts', () => {
     })
   })
 
-  test('overview shows stats and search filters cards', async ({ page, credentials }) => {
+  test('overview shows stats and search filters cards', async ({ page }) => {
     await test.step('Arrange: login and open task prompts page', async () => {
-      await login(page, credentials)
+      await openApp(page)
       await page.goto(PAGE)
       await expect(page.locator(SEL.overview)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
@@ -80,13 +72,13 @@ test.describe('@ci Task Prompts', () => {
       await page
         .locator(SEL.promptSearch)
         .fill('zzz_no_topic_should_match_this_arbitrary_string_xyz')
-      await expect(page.locator('[data-testid="text-no-prompts-match"]')).toBeVisible({
+      await expect(page.locator(selectors.taskPrompts.noPromptsMatch)).toBeVisible({
         timeout: TIMEOUTS.SHORT,
       })
     })
 
     await test.step('Act: clear filters and pick the first card', async () => {
-      await page.locator('[data-testid="btn-clear-filters"]').click()
+      await page.locator(selectors.taskPrompts.btnClearFilters).click()
       const firstCard = page.locator(SEL.cardAny).first()
       await expect(firstCard).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await firstCard.click()

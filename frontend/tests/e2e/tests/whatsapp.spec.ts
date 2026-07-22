@@ -6,7 +6,6 @@
 import type { APIRequestContext } from '@playwright/test'
 import { test, expect } from '../test-setup'
 import { getApiUrl } from '../config/config'
-import { INTEGRATION } from '../config/integration-data'
 import {
   getStubBaseUrl,
   getStubRequests,
@@ -23,12 +22,12 @@ import {
   metaPayloadText,
   metaPayloadImage,
   metaPayloadAudio,
+  uniqueWaSender,
   PHONE_NUMBER_ID,
 } from '../helpers/whatsapp-payload'
 
 const WEBHOOK_PATH = '/api/v1/webhooks/whatsapp'
 const EXPECTED_PATH_MESSAGES = `/v21.0/${PHONE_NUMBER_ID}/messages`
-const TEST_FROM = INTEGRATION.WHATSAPP.TEST_FROM
 
 function webhookUrl(): string {
   return `${getApiUrl()}${WEBHOOK_PATH}`
@@ -54,8 +53,9 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
   }, testInfo) => {
     const baseUrl = getStubBaseUrl()
     const runId = makeRunId(testInfo.testId)
+    const testFrom = uniqueWaSender()
     const messageId = `smoke-text-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const payload = metaPayloadText(messageId, TEST_FROM, 'ping')
+    const payload = metaPayloadText(messageId, testFrom, 'ping')
 
     await test.step('Act: POST webhook', async () => {
       await postWebhookAndAssert2xx(request, payload)
@@ -70,7 +70,7 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
       })
       const bodies = getPostMessageBodies(reqs)
       expect(bodies.length).toBe(1)
-      expect(bodies[0].to).toBe(TEST_FROM)
+      expect(bodies[0].to).toBe(testFrom)
       expect(bodies[0].type).toBe('text')
       const textBody = (bodies[0].text as { body?: string })?.body
       expect(textBody).toBeDefined()
@@ -91,8 +91,9 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
     await resetStub(request, baseUrl, runId)
     await simulateStubFail(request, baseUrl, 1)
 
+    const testFrom = uniqueWaSender()
     const messageId = `smoke-neg-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const payload = metaPayloadText(messageId, TEST_FROM, 'ping')
+    const payload = metaPayloadText(messageId, testFrom, 'ping')
 
     await test.step('Act: POST webhook (stub 500 on outbound)', async () => {
       const res = await request.post(webhookUrl(), { data: payload })
@@ -121,9 +122,10 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
   }, testInfo) => {
     const baseUrl = getStubBaseUrl()
     const runId = makeRunId(testInfo.testId)
+    const testFrom = uniqueWaSender()
     const messageId = `smoke-image-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const mediaId = `img-${Date.now()}`
-    const payload = metaPayloadImage(messageId, TEST_FROM, mediaId)
+    const payload = metaPayloadImage(messageId, testFrom, mediaId)
 
     await test.step('Act: POST webhook with image payload', async () => {
       await postWebhookAndAssert2xx(request, payload)
@@ -138,7 +140,7 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
       })
       const bodies = getPostMessageBodies(reqs)
       expect(bodies.length).toBe(1)
-      expect(bodies[0].to).toBe(TEST_FROM)
+      expect(bodies[0].to).toBe(testFrom)
       const msgType = bodies[0].type as string
       expect(['text', 'image']).toContain(msgType)
       if (msgType === 'text') {
@@ -156,9 +158,10 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
   }, testInfo) => {
     const baseUrl = getStubBaseUrl()
     const runId = makeRunId(testInfo.testId)
+    const testFrom = uniqueWaSender()
     const messageId = `smoke-audio-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const mediaId = `audio-${Date.now()}`
-    const payload = metaPayloadAudio(messageId, TEST_FROM, mediaId)
+    const payload = metaPayloadAudio(messageId, testFrom, mediaId)
 
     await test.step('Act: POST webhook with audio payload', async () => {
       await postWebhookAndAssert2xx(request, payload)
@@ -179,7 +182,7 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
       })
       const bodies = getPostMessageBodies(reqs)
       expect(bodies.length).toBe(1)
-      expect(bodies[0].to).toBe(TEST_FROM)
+      expect(bodies[0].to).toBe(testFrom)
       const msgType = bodies[0].type as string
       expect(['text', 'audio']).toContain(msgType)
       if (msgType === 'text') {

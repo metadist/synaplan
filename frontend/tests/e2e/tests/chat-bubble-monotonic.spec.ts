@@ -1,6 +1,6 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
-import { login } from '../helpers/auth'
+import { openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { PROMPTS } from '../config/test-data'
 
@@ -20,13 +20,10 @@ import { PROMPTS } from '../config/test-data'
  * (<1 px) because subpixel rounding in some browsers can wobble.
  */
 test.describe('@noci @nightly Chat bubble flicker guard', () => {
-  test('streaming bubble height grows monotonically — no flicker', async ({
-    page,
-    credentials,
-  }) => {
+  test('streaming bubble height grows monotonically — no flicker', async ({ page }) => {
     test.setTimeout(60_000)
 
-    await login(page, credentials)
+    await openApp(page)
     const chat = new ChatHelper(page)
     await chat.startNewChat()
 

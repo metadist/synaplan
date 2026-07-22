@@ -9,7 +9,7 @@ use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\UserRepository;
 use App\Service\Admin\AdminUserProvisioningService;
-use App\Service\ModelConfigService;
+use App\Service\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
@@ -21,7 +21,7 @@ final class AdminUserProvisioningServiceTest extends TestCase
     private UserRepository&Stub $userRepository;
     private ApiKeyRepository&MockObject $apiKeyRepository;
     private EntityManagerInterface&Stub $em;
-    private ModelConfigService&Stub $modelConfig;
+    private UserLifecycleService&Stub $userLifecycle;
     private AdminUserProvisioningService $service;
 
     protected function setUp(): void
@@ -29,13 +29,13 @@ final class AdminUserProvisioningServiceTest extends TestCase
         $this->userRepository = $this->createStub(UserRepository::class);
         $this->apiKeyRepository = $this->createMock(ApiKeyRepository::class);
         $this->em = $this->createStub(EntityManagerInterface::class);
-        $this->modelConfig = $this->createStub(ModelConfigService::class);
+        $this->userLifecycle = $this->createStub(UserLifecycleService::class);
 
         $this->service = new AdminUserProvisioningService(
             $this->userRepository,
             $this->apiKeyRepository,
             $this->em,
-            $this->modelConfig,
+            $this->userLifecycle,
             new NullLogger(),
         );
     }
@@ -56,6 +56,42 @@ final class AdminUserProvisioningServiceTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->service->provision('nextcloud', 'ext-1', 'a@b.test', 'Name', 'ADMIN');
+    }
+
+    public function testProvisionRejectsTooShortPassword(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service->provision('e2e', 'ext-1', 'a@b.test', null, 'NEW', 'short');
+    }
+
+    public function testProvisionPassesPasswordToLifecycleService(): void
+    {
+        $lifecycle = $this->createMock(UserLifecycleService::class);
+        $lifecycle->expects($this->once())
+            ->method('createUser')
+            ->with(
+                'a@b.test',
+                'SecurePass123!',
+                AdminUserProvisioningService::PROVIDER_ID,
+                'WEB',
+                'NEW',
+                true,
+                $this->isArray(),
+            )
+            ->willReturn($this->userWithId(151));
+
+        $service = new AdminUserProvisioningService(
+            $this->userRepository,
+            $this->apiKeyRepository,
+            $this->em,
+            $lifecycle,
+            new NullLogger(),
+        );
+
+        $result = $service->provision('e2e', 'ext-1', 'a@b.test', null, 'NEW', 'SecurePass123!');
+
+        $this->assertTrue($result['created']);
+        $this->assertSame(151, $result['user']->getId());
     }
 
     public function testMintApiKeyGeneratesPrefixedKeyWithScopes(): void
