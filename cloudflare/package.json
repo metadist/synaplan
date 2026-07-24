@@ -8,7 +8,7 @@
     "deploy:production": "wrangler deploy --env production"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260712.1",
-    "wrangler": "4.110.0"
+    "@cloudflare/workers-types": "5.20260721.1",
+    "wrangler": "4.112.0"
   }
 }
