@@ -234,6 +234,12 @@ Retired on 2026-07-27 by `Version20260727120000` (rows deactivated, never delete
 
 The same orphan cleanup continues in `Version20260727180000` for two non-Anthropic rows: **OpenAI `gpt-4.1` (BID 30)** → GPT-5.6 Terra (253) and **Groq `llama-4-maverick-17b-128e-instruct` (BID 49)** → Groq `gpt-oss-120b` (76).
 
+### A non-zero price under a "free" unit is silently free
+
+`normaliseToPerUnit()` maps `-`, `` and `free` to **0**, so a price stored under one of those units is displayed but never billed. Two Ollama rows shipped exactly that — BID 3 (`deepseek-r1:32b`, out 0.91) and BID 6 (`mistral:7b`, out 0.475) had `BOUTUNIT = '-'` while their input side was `per1M`, so their output tokens were free while input was charged. `Version20260727190000` corrects the unit only; the price values stay as they were, since Ollama rows are an operator-hosted synthetic resale basis and re-pricing them is a decision, not a fix.
+
+`ModelCatalogTest::testNoCatalogPriceIsAuthoredUnderAUnitThatNormalisesToZero()` now fails the build if a catalog row is ever authored this way again. Note that `per_generation` (Higgsfield video, BIDs 302–308) is *not* this bug — unknown units fall through as per-1, which is what a flat per-clip fee needs.
+
 > **Removing a model from the catalog is only half a retirement.** `ModelSeeder` never deletes or deactivates rows, so a model dropped from `ModelCatalog.php` without a companion migration stays `BACTIVE=1, BSELECTABLE=1` in every existing database — still pickable in the UI and still billed at whatever price the stale row holds. That is how Opus 4.1/4.5 survived several releases. Always pair a catalog removal with a deactivation migration.
 
 ## Related issues

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Model;
 
 use App\Model\ModelCatalog;
+use App\Service\CostCalculationService;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 
@@ -324,6 +325,42 @@ class ModelCatalogTest extends TestCase
 
         $this->assertFalse($chat['json']['supportsStreaming']);
         $this->assertFalse($vision['json']['supportsStreaming']);
+    }
+
+    /**
+     * A non-zero price authored under a unit that normalises to 0 is silently free:
+     * `normaliseToPerUnit()` maps '-', '' and 'free' to 0.0, so the price is stored,
+     * shown, and never billed. Two Ollama rows shipped exactly that combination and
+     * gave away their output tokens until Version20260727190000 fixed the unit.
+     *
+     * Note `per_generation` and friends are fine — unknown units fall through as
+     * per-1, which is what a flat per-clip fee needs.
+     */
+    public function testNoCatalogPriceIsAuthoredUnderAUnitThatNormalisesToZero(): void
+    {
+        foreach (ModelCatalog::all() as $model) {
+            foreach ([['priceIn', 'inUnit'], ['priceOut', 'outUnit']] as [$priceField, $unitField]) {
+                $price = (float) ($model[$priceField] ?? 0.0);
+                if ($price <= 0.0) {
+                    continue;
+                }
+
+                $unit = (string) ($model[$unitField] ?? '');
+                $this->assertNotSame(
+                    0.0,
+                    CostCalculationService::normaliseToPerUnit($price, $unit),
+                    sprintf(
+                        'BID %s (%s) authors %s=%s under %s="%s", which normalises to 0 — the price would never be billed.',
+                        (string) ($model['id'] ?? '?'),
+                        (string) ($model['name'] ?? '?'),
+                        $priceField,
+                        (string) $price,
+                        $unitField,
+                        $unit,
+                    ),
+                );
+            }
+        }
     }
 
     public function testFingerprintIsDeterministic(): void
