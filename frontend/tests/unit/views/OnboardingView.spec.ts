@@ -32,8 +32,18 @@ const stubs = {
       '<button data-testid="stub-guest" @click="$emit(\'guest\')" />' +
       '<button data-testid="stub-select" @click="$emit(\'select-plan\', \'PRO\')" />' +
       '<button data-testid="stub-login" @click="$emit(\'login\')" />' +
+      '<button data-testid="stub-purchased-unlinked" @click="$emit(\'purchased-unlinked\')" />' +
+      '<button data-testid="stub-purchased" @click="$emit(\'purchased\')" />' +
       '</div>',
-    emits: ['back', 'guest', 'login', 'register', 'select-plan'],
+    emits: ['back', 'guest', 'login', 'register', 'select-plan', 'purchased-unlinked', 'purchased'],
+  },
+  OnboardingAccountStep: {
+    template:
+      '<div data-testid="stub-account">' +
+      '<button data-testid="stub-authenticated" @click="$emit(\'authenticated\')" />' +
+      '<button data-testid="stub-account-register" @click="$emit(\'register\')" />' +
+      '</div>',
+    emits: ['authenticated', 'register', 'login'],
   },
 }
 
@@ -121,5 +131,58 @@ describe('OnboardingView', () => {
     await advanceToPlans(wrapper)
     const dotsAfter = wrapper.findAll('[data-testid="section-progress"] button')
     expect(dotsAfter[1].classes()).toContain('onboarding-dot--active')
+  })
+
+  describe('purchase-first flow (account step)', () => {
+    async function advanceToAccount(wrapper: ReturnType<typeof mountView>) {
+      await advanceToPlans(wrapper)
+      await wrapper.find('[data-testid="stub-purchased-unlinked"]').trigger('click')
+      await nextTick()
+      await nextTick()
+    }
+
+    it('a signed-out purchase advances to the account step and persists completion', async () => {
+      const wrapper = mountView()
+      await advanceToAccount(wrapper)
+
+      expect(wrapper.find('[data-testid="stub-account"]').exists()).toBe(true)
+      // Completion is persisted NOW: backgrounding the app must lead to the
+      // guest-chat reminder banner, never a second onboarding run.
+      expect(isOnboardingCompleted()).toBe(true)
+    })
+
+    it('the account step is terminal: no skip, no dot navigation back to the paywall', async () => {
+      const wrapper = mountView()
+      await advanceToAccount(wrapper)
+
+      expect(wrapper.find('[data-testid="btn-skip-onboarding"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="section-progress"]').exists()).toBe(false)
+    })
+
+    it('an in-place sign-in on the account step enters the app', async () => {
+      const wrapper = mountView()
+      await advanceToAccount(wrapper)
+
+      await wrapper.find('[data-testid="stub-authenticated"]').trigger('click')
+      expect(mockReplace).toHaveBeenCalledWith('/')
+    })
+
+    it('the e-mail path on the account step routes to plain register (redemption is post-login)', async () => {
+      const wrapper = mountView()
+      await advanceToAccount(wrapper)
+
+      await wrapper.find('[data-testid="stub-account-register"]').trigger('click')
+      expect(mockReplace).toHaveBeenCalledWith({ name: 'register' })
+    })
+
+    it('a purchase verified against an existing session finishes straight to the app', async () => {
+      const wrapper = mountView()
+      await advanceToPlans(wrapper)
+
+      await wrapper.find('[data-testid="stub-purchased"]').trigger('click')
+
+      expect(isOnboardingCompleted()).toBe(true)
+      expect(mockReplace).toHaveBeenCalledWith('/')
+    })
   })
 })

@@ -3177,9 +3177,26 @@
       "guestCta": "Continuar sin cuenta",
       "popular": "Popular",
       "continueWith": "Continuar con {plan}",
+      "purchasing": "Completando la compra…",
+      "restore": "Restaurar compras",
+      "restoring": "Restaurando…",
+      "restoreNone": "No se encontró ninguna compra anterior. Si compraste con una cuenta, inicia sesión.",
       "registerCta": "Crear una cuenta gratuita",
       "loginHint": "¿Ya tienes una cuenta?",
       "loginCta": "Iniciar sesión"
+    },
+    "account": {
+      "title": "Pago completado",
+      "subtitle": "Crea tu cuenta ahora para activar tu suscripción — tarda menos de un minuto.",
+      "providerCta": "Continuar con {provider}",
+      "emailCta": "Continuar con correo electrónico",
+      "note": "Tu compra se vincula automáticamente a tu nueva cuenta."
+    }
+  },
+  "iap": {
+    "pendingBanner": {
+      "text": "Tu compra está esperando tu cuenta",
+      "cta": "Crear cuenta"
     }
   },
   "mcpServers": {

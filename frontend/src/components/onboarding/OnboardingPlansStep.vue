@@ -100,12 +100,26 @@
       </div>
 
       <button
-        class="mt-4 w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-6"
+        class="mt-4 w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-6 disabled:opacity-60 disabled:pointer-events-none"
         data-testid="btn-plan-continue"
-        @click="selectedPlanId && emit('select-plan', selectedPlanId)"
+        :disabled="purchasing"
+        @click="continueWithPlan"
       >
-        {{ $t('onboarding.plans.continueWith', { plan: selectedPlanName }) }}
+        <span v-if="purchasing" class="inline-flex items-center gap-2">
+          <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" aria-hidden="true" />
+          {{ $t('onboarding.plans.purchasing') }}
+        </span>
+        <span v-else>{{ $t('onboarding.plans.continueWith', { plan: selectedPlanName }) }}</span>
       </button>
+
+      <p
+        v-if="purchaseError"
+        class="mt-2 text-xs text-red-500 dark:text-red-400"
+        data-testid="text-purchase-error"
+        role="alert"
+      >
+        {{ purchaseError }}
+      </p>
 
       <!-- Quiet secondary actions: never wall the app behind a purchase. -->
       <div class="mt-4 flex flex-col items-center gap-1.5 onb-enter-6">
@@ -125,6 +139,21 @@
           >
             {{ $t('onboarding.plans.loginCta') }}
           </button>
+        </p>
+        <!-- Apple requirement: a visible restore affordance wherever purchases
+             start. A signed-out restore flows through the same unlinked path
+             as a fresh purchase (account step → post-auth redemption). -->
+        <button
+          v-if="showRestore"
+          class="text-xs font-medium txt-secondary hover:txt-primary transition-colors disabled:opacity-60"
+          data-testid="btn-restore-purchases"
+          :disabled="restoring"
+          @click="restorePurchases"
+        >
+          {{ restoring ? $t('onboarding.plans.restoring') : $t('onboarding.plans.restore') }}
+        </button>
+        <p v-if="restoreHint" class="text-xs txt-secondary" data-testid="text-restore-hint">
+          {{ restoreHint }}
         </p>
       </div>
     </template>
@@ -177,9 +206,14 @@
  * selected tier's benefits shown once, a single "continue with" CTA). The guest
  * chat and sign-in stay available as quiet secondary actions — the app is never
  * walled behind a purchase (Apple/Google policy and onboarding best practice).
- * Selecting a plan routes through register/login into the subscription page,
- * where the purchase uses the native IAP path (never Stripe web checkout in the
- * app).
+ *
+ * Purchase-first (industry-standard onboarding): when the native store channel
+ * is available, the CTA starts the store purchase DIRECTLY — no app account is
+ * needed for the store sheet. The approved transaction is held unfinished
+ * (`purchased_unlinked`) and the parent advances to the account step, where the
+ * purchase is linked to the freshly created account (never Stripe web checkout
+ * in the app). Without a native store channel the CTA keeps the register-first
+ * path.
  *
  * The catalogue request is deliberately NOT gated on the runtime-config billing
  * flag: that flag reads a cached config whose fetch has a 2s abort timeout, so
@@ -196,7 +230,14 @@ import { subscriptionApi, type SubscriptionPlan } from '@/services/api/subscript
 import { formatPlanPrice } from '@/utils/formatPrice'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
-import { getStorePrice, initNativeIap, isNativeIapAvailable } from '@/services/nativeIap'
+import {
+  getStorePrice,
+  hasPendingIapRedemption,
+  initNativeIap,
+  isNativeIapAvailable,
+  purchaseProduct,
+  restoreNativePurchases,
+} from '@/services/nativeIap'
 
 const emit = defineEmits<{
   back: []
@@ -204,6 +245,10 @@ const emit = defineEmits<{
   login: []
   register: []
   'select-plan': [planId: string]
+  /** Store purchase done while signed out — continue to the account step. */
+  'purchased-unlinked': []
+  /** Purchase verified against an existing session — onboarding is done. */
+  purchased: []
 }>()
 
 const { t, te } = useI18n()
@@ -265,6 +310,87 @@ function displayPrice(plan: SubscriptionPlan): string {
 function intervalLabel(interval: string): string {
   const key = `subscription.per${interval.charAt(0).toUpperCase()}${interval.slice(1)}`
   return te(key) ? t(key) : interval
+}
+
+// ---------------------------------------------------------------------------
+// Direct purchase (purchase-first onboarding)
+// ---------------------------------------------------------------------------
+
+const purchasing = ref(false)
+const purchaseError = ref<string | null>(null)
+const restoring = ref(false)
+const restoreHint = ref<string | null>(null)
+
+/** Restore is only meaningful where the store channel actually exists. */
+const showRestore = computed(() => plans.value.length > 0 && isNativeIapAvailable())
+
+/**
+ * Primary CTA. With a native store channel the purchase starts immediately
+ * (store sheet, paid via the Apple ID / Google account — no app account
+ * needed); the account step follows AFTER the payment. Without the channel
+ * (web preview, Stripe-only server) the register-first path stays.
+ */
+async function continueWithPlan(): Promise<void> {
+  const plan = selectedPlan.value
+  if (!plan || purchasing.value) return
+
+  const productId = plan.iapProductId
+  if (!isNativeIapAvailable() || 'string' !== typeof productId || '' === productId) {
+    emit('select-plan', plan.id)
+    return
+  }
+
+  purchasing.value = true
+  purchaseError.value = null
+  try {
+    const outcome = await purchaseProduct(productId)
+    switch (outcome.status) {
+      case 'purchased_unlinked':
+        emit('purchased-unlinked')
+        break
+      case 'granted':
+      case 'pending':
+        // Verified against an existing session (edge case: signed-in user in
+        // the onboarding) — no account step needed.
+        emit('purchased')
+        break
+      case 'cancelled':
+        // The user closed the store sheet — stay on the plans, no message.
+        break
+      case 'error':
+        purchaseError.value = t(purchaseErrorKey(outcome.code))
+        break
+    }
+  } finally {
+    purchasing.value = false
+  }
+}
+
+function purchaseErrorKey(code: string): string {
+  if ('ownership_conflict' === code) return 'subscription.native.purchaseConflict'
+  if ('not_available' === code) return 'subscription.native.purchaseUnavailable'
+  return 'subscription.native.purchaseFailed'
+}
+
+/**
+ * Signed-out restore: re-delivered transactions flow through the same
+ * unlinked path as a fresh purchase, so a pending redemption afterwards means
+ * "there is a purchase — continue to the account step".
+ */
+async function restorePurchases(): Promise<void> {
+  if (restoring.value) return
+  restoring.value = true
+  restoreHint.value = null
+  try {
+    const ran = await restoreNativePurchases()
+    if (ran && hasPendingIapRedemption()) {
+      emit('purchased-unlinked')
+      return
+    }
+    restoreHint.value = t('onboarding.plans.restoreNone')
+  } finally {
+    restoring.value = false
+  }
 }
 
 async function loadPlans(): Promise<boolean> {

@@ -4159,9 +4159,26 @@
       "guestCta": "Ohne Konto fortfahren",
       "popular": "Beliebt",
       "continueWith": "Weiter mit {plan}",
+      "purchasing": "Kauf wird abgeschlossen…",
+      "restore": "Käufe wiederherstellen",
+      "restoring": "Wird wiederhergestellt…",
+      "restoreNone": "Kein früherer Kauf gefunden. Wenn du mit einem Konto gekauft hast, melde dich stattdessen an.",
       "registerCta": "Kostenloses Konto erstellen",
       "loginHint": "Du hast schon ein Konto?",
       "loginCta": "Anmelden"
+    },
+    "account": {
+      "title": "Zahlung erfolgreich",
+      "subtitle": "Erstelle jetzt dein Konto, um dein Abo zu aktivieren — das dauert weniger als eine Minute.",
+      "providerCta": "Weiter mit {provider}",
+      "emailCta": "Weiter mit E-Mail",
+      "note": "Dein Kauf wird automatisch mit deinem neuen Konto verknüpft."
+    }
+  },
+  "iap": {
+    "pendingBanner": {
+      "text": "Dein Kauf wartet auf dein Konto",
+      "cta": "Konto erstellen"
     }
   },
   "mcpServers": {

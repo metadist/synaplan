@@ -65,7 +65,10 @@
           </ul>
         </Transition>
       </div>
+      <!-- No skip on the post-purchase account step: leaving would strand the
+           already-paid, still-unlinked purchase. -->
       <button
+        v-if="step <= totalSteps"
         class="h-9 px-3 rounded-lg surface-card ring-1 ring-black/[0.06] dark:ring-white/[0.1] shadow-sm text-sm font-medium txt-primary transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
         data-testid="btn-skip-onboarding"
         @click="skip"
@@ -92,20 +95,31 @@
         <Transition name="onb-step" mode="out-in">
           <OnboardingWelcomeStep v-if="step === 1" key="welcome" @next="goTo(2)" />
           <OnboardingPlansStep
-            v-else
+            v-else-if="step === 2"
             key="plans"
             @back="goTo(1)"
             @guest="finishAsGuest"
             @login="finishToLogin"
             @register="finishToRegister()"
             @select-plan="finishToRegister"
+            @purchased-unlinked="showAccountStep"
+            @purchased="finishPurchased"
+          />
+          <OnboardingAccountStep
+            v-else
+            key="account"
+            @authenticated="finishPurchased"
+            @register="finishToRegister()"
+            @login="finishToLogin"
           />
         </Transition>
       </div>
     </div>
 
-    <!-- Progress dots -->
+    <!-- Progress dots (hidden on the terminal post-purchase account step:
+         navigating back to the paywall after paying would only confuse) -->
     <div
+      v-if="step <= totalSteps"
       class="relative z-10 flex items-center justify-center gap-2 pb-4"
       :style="{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }"
       data-testid="section-progress"
@@ -134,6 +148,11 @@
  *      pills that open modals (own server URL entry, RAG info, chat widget info)
  *   2. Plans — paid plans in focus, with guest chat / sign in as quiet actions
  *
+ * Plus a conditional terminal page (not skippable, not in the dot navigation):
+ *   3. Account — shown only after a successful signed-out store purchase
+ *      (purchase-first flow); creates/links the account the purchase is
+ *      redeemed against.
+ *
  * The router guard only sends true first-run native users here; finishing or
  * skipping persists completion so the flow never shows again.
  */
@@ -143,6 +162,7 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import OnboardingWelcomeStep from '@/components/onboarding/OnboardingWelcomeStep.vue'
 import OnboardingPlansStep from '@/components/onboarding/OnboardingPlansStep.vue'
+import OnboardingAccountStep from '@/components/onboarding/OnboardingAccountStep.vue'
 import { markOnboardingCompleted, consumeOnboardingResumeStep } from '@/composables/useOnboarding'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
 
@@ -150,6 +170,8 @@ const router = useRouter()
 const { locale } = useI18n()
 
 const totalSteps = 2
+/** Terminal post-purchase page, outside the dot navigation and not skippable. */
+const ACCOUNT_STEP = 3
 
 const languages = [
   { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
@@ -227,9 +249,11 @@ function finishToLogin() {
 }
 
 /**
- * Register first, buy after: a selected plan is remembered as a pending
- * post-login redirect to the subscription page, where the purchase runs
- * through the existing native IAP path (never Stripe web checkout in the app).
+ * Register-first fallback (no native store channel, e.g. a Stripe-only or
+ * custom server): a selected plan is remembered as a pending post-login
+ * redirect to the subscription page, where the purchase runs through the
+ * existing native IAP path (never Stripe web checkout in the app). With a
+ * store channel the plans step purchases directly instead (purchase-first).
  */
 function finishToRegister(planId?: string) {
   markOnboardingCompleted()
@@ -239,6 +263,28 @@ function finishToRegister(planId?: string) {
     return
   }
   router.replace({ name: 'register' })
+}
+
+/**
+ * A signed-out store purchase succeeded (purchase-first flow) — advance to
+ * the terminal account step. Completion is persisted NOW: if the user
+ * backgrounds the app before creating the account, the guest-chat reminder
+ * banner takes over instead of a second onboarding run.
+ */
+function showAccountStep() {
+  markOnboardingCompleted()
+  direction.value = 'forward'
+  step.value = ACCOUNT_STEP
+}
+
+/**
+ * Purchase is verified and linked (either bought with an existing session or
+ * the account step finished signing in — redemption runs in the central
+ * post-auth hook). Enter the app.
+ */
+function finishPurchased() {
+  markOnboardingCompleted()
+  router.replace('/')
 }
 </script>
 

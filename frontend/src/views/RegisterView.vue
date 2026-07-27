@@ -437,19 +437,12 @@ import { useRecaptcha } from '../composables/useRecaptcha'
 import { usePasswordValidation, validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
-import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
-import { startNativeOAuth } from '@/services/api/nativeOAuth'
-import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
-import { useAuthStore } from '@/stores/auth'
-import {
-  consumePendingRedirect,
-  isSafeRedirectPath,
-  setPendingRedirect,
-} from '@/utils/pendingAuthRedirect'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import { useSocialAuth } from '@/composables/useSocialAuth'
+import { consumePendingRedirect, isSafeRedirectPath } from '@/utils/pendingAuthRedirect'
 
 const router = useRouter()
 const route = useRoute()
-const authStore = useAuthStore()
 const { locale } = useI18n()
 const themeStore = useTheme()
 const { getToken: getReCaptchaToken } = useRecaptcha()
@@ -505,32 +498,18 @@ const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
 // Native OAuth errors surface through the same banner as registration errors.
-const socialError = ref('')
+// Provider catalogue + the provider round trip live in the shared composable.
+const {
+  providers: socialProviders,
+  loadProviders: loadSocialProviders,
+  signInWith,
+  error: socialError,
+} = useSocialAuth()
 const error = computed(() => socialError.value || authError.value)
 
 const onEmailBlur = () => {
   focusedField.value = null
   emailError.value = !validateEmail(email.value) && email.value ? 'Invalid email format' : ''
-}
-
-interface SocialProvider {
-  id: string
-  name: string
-  enabled: boolean
-  icon: string
-}
-
-const socialProviders = ref<SocialProvider[]>([])
-
-const loadSocialProviders = async () => {
-  try {
-    const response = await fetch(`${config.appBaseUrl}/api/v1/auth/providers`)
-    const data = await response.json()
-    socialProviders.value = data.providers || []
-  } catch (e) {
-    console.error('Failed to load social providers:', e)
-    socialProviders.value = []
-  }
 }
 
 onMounted(() => {
@@ -561,39 +540,14 @@ const handleRegister = async () => {
 }
 
 const handleSocialLogin = async (provider: string) => {
-  // OAuth round-trip strips the SPA's URL state, so stash the intent
-  // for OAuthCallback to pick up. setPendingRedirect validates internally.
+  // The composable handles the web redirect and the native round trip
+  // (system browser / native Apple sheet + token handoff). `true` means the
+  // session is established in place — apply the deep-link intent and enter.
   const redirect = route.query.redirect as string | undefined
-  if (redirect) setPendingRedirect(redirect)
-
-  // Native shell: providers block embedded WebViews, so run OAuth in the system
-  // browser and complete via a deep-link handoff (no full-page redirect).
-  if (isNativeApp()) {
-    socialError.value = ''
-    // iOS must use the native Sign-in-with-Apple sheet (Guideline 4.8); every
-    // other provider (and Apple on Android) uses the system-browser OAuth flow.
-    const result =
-      'apple' === provider && 'ios' === getNativePlatform()
-        ? await startNativeAppleSignIn()
-        : await startNativeOAuth(provider)
-    if (!result.success) {
-      // A user-dismissed browser is a silent cancellation, not an error.
-      if (!result.cancelled) {
-        socialError.value = result.error || 'Login failed'
-      }
-      return
-    }
-    const ok = await authStore.handleOAuthCallback()
-    if (ok) {
-      const queryPath = isSafeRedirectPath(redirect) ? redirect : null
-      router.push(queryPath ?? consumePendingRedirect() ?? '/')
-    } else {
-      socialError.value = 'Login failed'
-    }
-    return
+  if (await signInWith(provider, redirect)) {
+    const queryPath = isSafeRedirectPath(redirect) ? redirect : null
+    router.push(queryPath ?? consumePendingRedirect() ?? '/')
   }
-
-  window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
 }
 </script>
 

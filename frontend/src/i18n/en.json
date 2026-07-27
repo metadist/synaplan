@@ -4225,9 +4225,26 @@
       "guestCta": "Continue without an account",
       "popular": "Popular",
       "continueWith": "Continue with {plan}",
+      "purchasing": "Completing purchase…",
+      "restore": "Restore purchases",
+      "restoring": "Restoring…",
+      "restoreNone": "No previous purchase found. If you bought with an account, sign in instead.",
       "registerCta": "Create a free account",
       "loginHint": "Already have an account?",
       "loginCta": "Sign in"
+    },
+    "account": {
+      "title": "Payment successful",
+      "subtitle": "Create your account now to activate your subscription — it takes less than a minute.",
+      "providerCta": "Continue with {provider}",
+      "emailCta": "Continue with email",
+      "note": "Your purchase is linked to your new account automatically."
+    }
+  },
+  "iap": {
+    "pendingBanner": {
+      "text": "Your purchase is waiting for your account",
+      "cta": "Create account"
     }
   },
   "mcpServers": {

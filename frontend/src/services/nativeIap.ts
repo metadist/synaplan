@@ -14,6 +14,7 @@
 import { subscriptionApi } from '@/services/api/subscriptionApi'
 import { ApiError } from '@/services/api/httpClient'
 import { getNativePlatform, isNativeApp } from '@/services/api/nativeRuntime'
+import { hasNativeTokens } from '@/services/api/nativeAuth'
 
 // ---------------------------------------------------------------------------
 // Minimal structural types for the CdvPurchase global (not an API response,
@@ -75,6 +76,14 @@ export type IapPurchaseOutcome =
   | { status: 'granted'; tier: string }
   /** Deferred by the store (e.g. Ask to Buy) — entitlement follows via webhook. */
   | { status: 'pending' }
+  /**
+   * Purchase-first onboarding: the store transaction succeeded while the user
+   * was signed out. `/api/v1/iap/verify` requires a Bearer, so the transaction
+   * is held UNFINISHED and redeemed after account creation / sign-in
+   * ({@link redeemPendingIapPurchase}). The plugin re-delivers unfinished
+   * transactions on every store initialization, so this survives restarts.
+   */
+  | { status: 'purchased_unlinked' }
   | { status: 'cancelled' }
   | {
       status: 'error'
@@ -91,6 +100,52 @@ export type IapPurchaseOutcome =
 export function isNativeIapAvailable(): boolean {
   return isNativeApp() && null !== getCdvPurchase()
 }
+
+// ---------------------------------------------------------------------------
+// Pending redemption (purchase-first onboarding)
+// ---------------------------------------------------------------------------
+
+/**
+ * Marks that a store purchase completed while the user was signed out and
+ * still has to be linked to an account. `localStorage` (not sessionStorage)
+ * on purpose: the e-mail registration path forces the user out of the app to
+ * verify their address, and the reminder banner + post-login redemption must
+ * survive that restart. Cleared once the server accepts (or definitively
+ * rejects) the receipt.
+ */
+const PENDING_REDEMPTION_KEY = 'synaplan.iapPendingRedemption'
+
+/** True while a signed-out purchase is still waiting to be linked to an account. */
+export function hasPendingIapRedemption(): boolean {
+  try {
+    return '1' === localStorage.getItem(PENDING_REDEMPTION_KEY)
+  } catch {
+    return false
+  }
+}
+
+function markPendingIapRedemption(): void {
+  try {
+    localStorage.setItem(PENDING_REDEMPTION_KEY, '1')
+  } catch {
+    /* no-op: the in-memory transaction hold still covers the same session */
+  }
+}
+
+function clearPendingIapRedemption(): void {
+  try {
+    localStorage.removeItem(PENDING_REDEMPTION_KEY)
+  } catch {
+    /* no-op */
+  }
+}
+
+/**
+ * Transactions approved by the store while signed out, held unfinished until
+ * the user authenticates (same-session fast path — after a restart the plugin
+ * re-delivers them through `initialize()` instead).
+ */
+let unlinkedTransactions: CdvTransaction[] = []
 
 // ---------------------------------------------------------------------------
 // Initialization
@@ -178,14 +233,27 @@ function extractReceipt(transaction: CdvTransaction, platform: 'apple' | 'google
   )
 }
 
-async function handleApproved(transaction: CdvTransaction): Promise<void> {
+async function handleApproved(transaction: CdvTransaction): Promise<IapPurchaseOutcome> {
   const platform: 'apple' | 'google' = 'android' === getNativePlatform() ? 'google' : 'apple'
   const productId = transaction.products[0]?.id ?? ''
   const receipt = extractReceipt(transaction, platform)
 
   if (!receipt) {
-    resolvePending({ status: 'error', code: 'verification_failed' })
-    return
+    const outcome: IapPurchaseOutcome = { status: 'error', code: 'verification_failed' }
+    resolvePending(outcome)
+    return outcome
+  }
+
+  // Purchase-first onboarding: the store sheet needs no app account, but
+  // `/api/v1/iap/verify` does. Hold the transaction UNFINISHED (the plugin
+  // re-delivers it on the next initialize) and let the post-auth redemption
+  // hook verify + finish it once the user has an account.
+  if (!hasNativeTokens()) {
+    unlinkedTransactions.push(transaction)
+    markPendingIapRedemption()
+    const outcome: IapPurchaseOutcome = { status: 'purchased_unlinked' }
+    resolvePending(outcome)
+    return outcome
   }
 
   try {
@@ -196,24 +264,34 @@ async function handleApproved(transaction: CdvTransaction): Promise<void> {
       // Acknowledge with the store so it stops re-delivering the transaction —
       // on Android an unacknowledged purchase is auto-refunded after 3 days.
       await transaction.finish()
+      clearPendingIapRedemption()
     }
 
+    let outcome: IapPurchaseOutcome
     if (result.granted) {
-      resolvePending({ status: 'granted', tier: result.tier ?? '' })
+      outcome = { status: 'granted', tier: result.tier ?? '' }
     } else if (result.pending) {
-      resolvePending({ status: 'pending' })
+      outcome = { status: 'pending' }
     } else {
-      resolvePending({ status: 'error', code: 'verification_failed' })
+      outcome = { status: 'error', code: 'verification_failed' }
     }
+    resolvePending(outcome)
+    return outcome
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     // 409 = receipt owned by another account / other channel owns the sub.
     const isConflict = error instanceof ApiError && 409 === error.status
-    resolvePending({
+    if (isConflict) {
+      // Retrying with the same account can never succeed — stop reminding.
+      clearPendingIapRedemption()
+    }
+    const outcome: IapPurchaseOutcome = {
       status: 'error',
       code: isConflict ? 'ownership_conflict' : 'verification_failed',
       message,
-    })
+    }
+    resolvePending(outcome)
+    return outcome
   }
 }
 
@@ -271,4 +349,64 @@ export async function restoreNativePurchases(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * Redeem a purchase that was completed while signed out (purchase-first
+ * onboarding), now that the user has an account. Call after every successful
+ * native authentication — it is a cheap no-op unless a redemption is pending.
+ *
+ * Returns the verification outcome when it ran synchronously (same-session
+ * fast path: the approved transaction is still held in memory), or `null`
+ * when there was nothing to redeem or the redemption was handed off to the
+ * plugin's asynchronous re-delivery (post-restart path).
+ */
+export async function redeemPendingIapPurchase(): Promise<IapPurchaseOutcome | null> {
+  if (!isNativeApp() || !hasNativeTokens() || !hasPendingIapRedemption()) {
+    return null
+  }
+
+  // Same-session fast path: the transactions approved while signed out are
+  // still in memory — verify + finish them directly.
+  if (unlinkedTransactions.length > 0) {
+    const pending = unlinkedTransactions
+    unlinkedTransactions = []
+    let outcome: IapPurchaseOutcome | null = null
+    for (const transaction of pending) {
+      outcome = await handleApproved(transaction)
+    }
+    return outcome
+  }
+
+  // Post-restart path (e.g. the e-mail verification detour killed the app):
+  // initializing the store makes the plugin re-deliver every unfinished
+  // transaction through the `approved` handler, which now runs authenticated
+  // and verifies + finishes it. `restorePurchases()` additionally re-syncs
+  // with the store as a safety net.
+  const cdv = getCdvPurchase()
+  if (!cdv) {
+    return null
+  }
+  if (!initPromise) {
+    try {
+      const { plans } = await subscriptionApi.getPlans()
+      const productIds = plans
+        .map((plan) => plan.iapProductId)
+        .filter((id): id is string => 'string' === typeof id && '' !== id)
+      if (!(await initNativeIap(productIds))) {
+        return null
+      }
+    } catch {
+      return null
+    }
+  } else {
+    await initPromise
+  }
+
+  try {
+    await cdv.store.restorePurchases()
+  } catch {
+    /* best-effort — the SubscriptionView restore affordance remains */
+  }
+  return null
 }

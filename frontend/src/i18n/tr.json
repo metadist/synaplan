@@ -3178,9 +3178,26 @@
       "guestCta": "Hesapsız devam et",
       "popular": "Popüler",
       "continueWith": "{plan} ile devam et",
+      "purchasing": "Satın alma tamamlanıyor…",
+      "restore": "Satın alımları geri yükle",
+      "restoring": "Geri yükleniyor…",
+      "restoreNone": "Önceki bir satın alma bulunamadı. Bir hesapla satın aldıysan bunun yerine giriş yap.",
       "registerCta": "Ücretsiz hesap oluştur",
       "loginHint": "Zaten bir hesabın var mı?",
       "loginCta": "Giriş yap"
+    },
+    "account": {
+      "title": "Ödeme başarılı",
+      "subtitle": "Aboneliğini etkinleştirmek için şimdi hesabını oluştur — bir dakikadan az sürer.",
+      "providerCta": "{provider} ile devam et",
+      "emailCta": "E-posta ile devam et",
+      "note": "Satın alman otomatik olarak yeni hesabına bağlanır."
+    }
+  },
+  "iap": {
+    "pendingBanner": {
+      "text": "Satın alman hesabını bekliyor",
+      "cta": "Hesap oluştur"
     }
   },
   "mcpServers": {
