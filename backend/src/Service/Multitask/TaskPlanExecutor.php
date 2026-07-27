@@ -94,11 +94,21 @@ final readonly class TaskPlanExecutor
     ): array {
         $plan = $this->planForExecution($message, $thread, $classification, $options);
 
-        if (null === $plan || $this->shouldUseLegacyRouter($plan->plan)) {
+        if (null === $plan) {
             return $this->runSingleNode(
                 fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
                 $message,
                 $classification,
+            );
+        }
+        if ($this->shouldUseLegacyRouter($plan->plan)) {
+            return $this->withPlanningUsage(
+                $this->runSingleNode(
+                    fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
+                    $message,
+                    $classification,
+                ),
+                $plan,
             );
         }
 
@@ -114,10 +124,13 @@ final readonly class TaskPlanExecutor
             // "step failed" box sitting above a correct reply.
             $this->discardPlan($progressCallback);
 
-            return $this->runSingleNode(
-                fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
-                $message,
-                $classification,
+            return $this->withPlanningUsage(
+                $this->runSingleNode(
+                    fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
+                    $message,
+                    $classification,
+                ),
+                $plan,
             );
         }
 
@@ -146,11 +159,21 @@ final readonly class TaskPlanExecutor
     ): array {
         $plan = $this->planForExecution($message, $thread, $classification, $options);
 
-        if (null === $plan || $this->shouldUseLegacyRouter($plan->plan)) {
+        if (null === $plan) {
             return $this->runSingleNode(
                 fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
                 $message,
                 $classification,
+            );
+        }
+        if ($this->shouldUseLegacyRouter($plan->plan)) {
+            return $this->withPlanningUsage(
+                $this->runSingleNode(
+                    fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
+                    $message,
+                    $classification,
+                ),
+                $plan,
             );
         }
 
@@ -159,10 +182,13 @@ final readonly class TaskPlanExecutor
         if ($assembled['all_failed']) {
             $this->discardPlan($progressCallback);
 
-            return $this->runSingleNode(
-                fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
-                $message,
-                $classification,
+            return $this->withPlanningUsage(
+                $this->runSingleNode(
+                    fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
+                    $message,
+                    $classification,
+                ),
+                $plan,
             );
         }
 
@@ -246,6 +272,7 @@ final readonly class TaskPlanExecutor
                     $result->modelId,
                     $result->rawResponse,
                     $result->errors,
+                    $result->planningUsage,
                 );
             }
 
@@ -406,6 +433,9 @@ final readonly class TaskPlanExecutor
         $trackedCallback = $this->wrapProgressForPersistence($messageId, $progressCallback);
 
         $assembled = $this->dagExecutor->execute($plan->plan, $context, $trackedCallback);
+        if (null !== $plan->planningUsage) {
+            $assembled['metadata']['planning_usage'] = $plan->planningUsage;
+        }
 
         if (null !== $messageId) {
             try {
@@ -427,6 +457,34 @@ final readonly class TaskPlanExecutor
         }
 
         return $assembled;
+    }
+
+    /**
+     * Preserve the billable planner call when a generated plan is delegated
+     * back to the legacy router or when a failed DAG falls back to it.
+     *
+     * @param array<string, mixed> $handlerResult
+     *
+     * @return array<string, mixed>
+     */
+    private function withPlanningUsage(array $handlerResult, TaskPlanResult $plan): array
+    {
+        if (null === $plan->planningUsage) {
+            return $handlerResult;
+        }
+
+        $response = $handlerResult['response'] ?? null;
+        if (!is_array($response)) {
+            return $handlerResult;
+        }
+        $metadata = $response['metadata'] ?? [];
+        if (!is_array($metadata)) {
+            $metadata = [];
+        }
+        $metadata['planning_usage'] = $plan->planningUsage;
+        $handlerResult['response']['metadata'] = $metadata;
+
+        return $handlerResult;
     }
 
     /**

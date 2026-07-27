@@ -13,6 +13,7 @@ use App\Service\DiscordNotificationService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
+use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -101,6 +102,9 @@ class AiFacadeTranscribeTest extends TestCase
         $this->registry->expects(self::any())->method('getSpeechToTextProvider')
             ->with('groq')
             ->willReturn($groq);
+        $this->transcriptionUsageRecorder->expects(self::once())
+            ->method('record')
+            ->willReturn(new RecordedUsage('0.004000', '0.004000', 0, 0, 0));
 
         $result = $this->facade->transcribe('audio.mp3', 42);
 
@@ -110,6 +114,9 @@ class AiFacadeTranscribeTest extends TestCase
         // model_id must be surfaced so the message-details popover can resolve
         // the concrete BMODELS row (and the "AI Model" badge stays clickable).
         $this->assertSame(21, $result['model_id']);
+        $this->assertSame('0.004000', $result['transcription_usage']['cost']);
+        $this->assertSame('groq:whisper-large-v3', $result['transcription_usage']['modelKey']);
+        $this->assertSame('TRANSCRIPTION', $result['transcription_usage']['kind']);
     }
 
     public function testTranscribeForwardsNonTurboModelWhenSameProviderHasMultiple(): void

@@ -29,7 +29,11 @@ vi.mock('@/api/usageApi', () => ({
   getUsageSummary: () => getUsageSummary(),
 }))
 
-import { useUsageTaximeterStore, type MessageUsage } from '@/stores/usageTaximeter'
+import {
+  aggregateTurnUsage,
+  useUsageTaximeterStore,
+  type MessageUsage,
+} from '@/stores/usageTaximeter'
 
 function usage(modelKey: string, cost: string, tokens = 100, kind = 'LLM'): MessageUsage {
   return {
@@ -48,6 +52,19 @@ describe('usageTaximeter store', () => {
     mockEnabled = true
     getUsageSummary.mockReset()
     setActivePinia(createPinia())
+  })
+
+  describe('turn aggregation', () => {
+    it('includes chat, sorting, planning, and transcription in the badge total', () => {
+      const total = aggregateTurnUsage(usage('openai:gpt-4o', '0.02', 80), [
+        { ...usage('groq:sorter', '0.001', 20), kind: 'SORT' },
+        { ...usage('openai:planner', '0.002', 30), kind: 'PLANNING' },
+        { ...usage('groq:whisper', '0.003', 0), kind: 'TRANSCRIPTION' },
+      ])
+
+      expect(total?.totalTokens).toBe(130)
+      expect(total?.cost).toBeCloseTo(0.026, 6)
+    })
   })
 
   describe('active gate', () => {

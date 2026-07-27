@@ -1051,7 +1051,7 @@ import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'
 import type { Part, MessageFile, MediaJobInfo, TaskPlanState } from '@/stores/history'
-import type { MessageUsage } from '@/stores/usageTaximeter'
+import { aggregateTurnUsage, type MessageUsage } from '@/stores/usageTaximeter'
 import { formatCostDisplay, formatTokens } from '@/utils/usageFormat'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import MediaJobStatus from '@/components/MediaJobStatus.vue'
@@ -1153,6 +1153,8 @@ interface Props {
   // Usage taximeter: per-message token/cost usage (assistant only). When the
   // display is enabled, a small hover badge shows "<tokens> · <cost>".
   usage?: MessageUsage | null
+  // Other billed steps in the same turn (sorting, planning, transcription, media).
+  usageExtra?: MessageUsage[] | null
   // Whether the taximeter display is active (admin switch + authed web user).
   usageTaximeterActive?: boolean
   // Status for failed/pending messages
@@ -1173,23 +1175,19 @@ interface Props {
 const props = defineProps<Props>()
 
 /**
- * Usage taximeter hover badge: "<tokens> · <cost>" for an assistant reply that
- * recorded usage, shown only while the display is active. Cost below one cent
- * renders "< 0.01 €".
+ * Usage taximeter hover badge: "<tokens> · <cost>" for the complete assistant
+ * turn, including routing, planning, transcription and media usage.
  */
 const usageBadge = computed<{ tokens: string; cost: string } | null>(() => {
-  if (props.role !== 'assistant' || !props.usageTaximeterActive || !props.usage) {
+  if (props.role !== 'assistant' || !props.usageTaximeterActive) {
     return null
   }
-  const u = props.usage
-  const costValue = u.cost != null ? Number.parseFloat(u.cost) : 0
+  const total = aggregateTurnUsage(props.usage, props.usageExtra)
+  if (!total) return null
+
   return {
-    tokens: formatTokens(u.totalTokens, locale.value),
-    cost: formatCostDisplay(
-      Number.isFinite(costValue) ? costValue : 0,
-      locale.value,
-      t('usageTaximeter.lessThanCent')
-    ),
+    tokens: formatTokens(total.totalTokens, locale.value),
+    cost: formatCostDisplay(total.cost, locale.value, t('usageTaximeter.lessThanCent')),
   }
 })
 

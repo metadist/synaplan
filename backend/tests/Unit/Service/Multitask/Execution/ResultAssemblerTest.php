@@ -74,6 +74,25 @@ final class ResultAssemblerTest extends TestCase
         $this->assertNotContains('n3', $cardIds);
     }
 
+    public function testUsageIncludesEarlierNodesWhenReplyNodeAlreadyHasUsage(): void
+    {
+        $plan = $this->plan();
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok('Summary', metadata: [
+            'usage' => ['prompt_tokens' => 40, 'completion_tokens' => 10, 'total_tokens' => 50],
+        ]));
+        $ctx->setResult('n2', NodeResult::ok());
+        $ctx->setResult('n3', NodeResult::ok('Summary', metadata: [
+            'usage' => ['prompt_tokens' => 20, 'completion_tokens' => 5, 'total_tokens' => 25],
+        ]));
+
+        $usage = $this->assembler->assemble($plan, $ctx)['metadata']['usage'];
+
+        self::assertSame(60, $usage['prompt_tokens']);
+        self::assertSame(15, $usage['completion_tokens']);
+        self::assertSame(75, $usage['total_tokens']);
+    }
+
     public function testRedundantFlagMarksProseContainedInTheFinalAnswer(): void
     {
         // #1229 smart collapse: n1's text is passed through by the reply node

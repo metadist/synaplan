@@ -196,7 +196,7 @@ final readonly class MessageApiFormatter
             'webSearch' => $webSearchData, // Web search metadata
             'searchResults' => !empty($searchResultsData) ? $searchResultsData : null, // Actual search results
             'usage' => $usage, // Per-message token/cost usage (taximeter); null when absent
-            'usageExtra' => $usageExtra, // Auxiliary usage of this turn (sorting/media/TTS); null when absent
+            'usageExtra' => $usageExtra, // Auxiliary usage of this turn (sorting/planning/transcription/media/TTS); null when absent
             'multitask' => $wasMultitask, // True when the turn ran the multi-task DAG
             // Per-node task-plan render state for reload (issue #1070 — DAG divergence).
             // Null for non-DAG turns, non-null only on OUT messages of DAG turns.
@@ -263,7 +263,7 @@ final readonly class MessageApiFormatter
 
     /**
      * Decode the persisted `ai_usage_extra` meta (auxiliary usage of the turn:
-     * sorting/routing call, media renders, TTS) back into the API list shape.
+     * sorting, planning, transcription, media renders, TTS) back into the API list shape.
      * Null when absent or malformed — the field is simply omitted.
      *
      * @return list<array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}>|null

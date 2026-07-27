@@ -16,6 +16,7 @@ use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\TtsTextSanitizer;
+use App\Service\Usage\RecordedUsage;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -404,7 +405,7 @@ class WebhookController extends AbstractController
             $provider = $metadata['provider'] ?? null;
             $model = $metadata['model'] ?? null;
 
-            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+            $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                 'provider' => $provider ?? 'unknown',
                 'model' => $model ?? 'unknown',
                 'usage' => $metadata['usage'] ?? [],
@@ -511,6 +512,35 @@ class WebhookController extends AbstractController
             }
             if (!empty($metadata['model_id'])) {
                 $outgoingMessage->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
+            }
+            $outgoingMessage->setMeta('ai_chat_cost', $recordedChatUsage->chargedCost);
+
+            $usageExtra = [];
+            if (is_array($classification['sorting_usage'] ?? null)) {
+                $usageExtra[] = [
+                    'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
+                    'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
+                    'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
+                    'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
+                    'modelKey' => RecordedUsage::modelKey(
+                        $classification['sorting_provider'] ?? null,
+                        $classification['sorting_model_name'] ?? null,
+                    ),
+                    'kind' => 'SORT',
+                ];
+            }
+            if (is_array($metadata['planning_usage'] ?? null)) {
+                $usageExtra[] = $metadata['planning_usage'];
+            }
+            $rawTranscriptionUsage = $message->getMeta('ai_transcription_usage');
+            if (null !== $rawTranscriptionUsage && '' !== $rawTranscriptionUsage) {
+                $transcriptionUsage = json_decode($rawTranscriptionUsage, true);
+                if (is_array($transcriptionUsage)) {
+                    $usageExtra[] = $transcriptionUsage;
+                }
+            }
+            if ([] !== $usageExtra) {
+                $outgoingMessage->setMeta('ai_usage_extra', (string) json_encode($usageExtra));
             }
 
             $chat->updateTimestamp();

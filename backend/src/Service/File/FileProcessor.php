@@ -813,6 +813,7 @@ final readonly class FileProcessor
             return [$text, [
                 'strategy' => 'whisper_api',
                 'provider' => $result['provider'] ?? 'unknown',
+                'transcription_usage' => $result['transcription_usage'] ?? null,
             ] + $baseMeta];
         } catch (ProviderException $e) {
             $this->logger->error('FileProcessor: External API transcription failed (provider error)', [

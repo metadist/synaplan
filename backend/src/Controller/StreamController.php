@@ -1852,13 +1852,14 @@ class StreamController extends AbstractController
                         'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
                         'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
                         'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
-                        'modelKey' => $this->buildUsageModelKey(
+                        'modelKey' => RecordedUsage::modelKey(
                             $classification['sorting_provider'] ?? null,
                             $classification['sorting_model_name'] ?? null,
                         ),
                         'kind' => 'SORT',
                     ];
                 }
+                $usageExtra = $this->appendContextUsage($usageExtra, $response['metadata'] ?? [], $incomingMessage);
 
                 // Record AI-generated media usage (IMAGES, VIDEOS, AUDIOS) separately.
                 // Issue #1146: MediaGenerationHandler now records this itself (the
@@ -2634,13 +2635,14 @@ class StreamController extends AbstractController
                     'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
                     'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
                     'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
-                    'modelKey' => $this->buildUsageModelKey(
+                    'modelKey' => RecordedUsage::modelKey(
                         $classification['sorting_provider'] ?? null,
                         $classification['sorting_model_name'] ?? null,
                     ),
                     'kind' => 'SORT',
                 ];
             }
+            $usageExtra = $this->appendContextUsage($usageExtra, $metadata, $message);
             $recordedMediaUsage = ($metadata['media_recorded_usage'] ?? null) instanceof RecordedUsage
                 ? $metadata['media_recorded_usage']
                 : null;
@@ -2991,14 +2993,7 @@ class StreamController extends AbstractController
         // ai_chat_usage meta; the model identity comes from ai_chat_model(_*).
         $message->setMeta('ai_chat_cost', $recorded->chargedCost);
 
-        return [
-            'promptTokens' => $recorded->promptTokens,
-            'completionTokens' => $recorded->completionTokens,
-            'totalTokens' => $recorded->totalTokens,
-            'cost' => $recorded->chargedCost,
-            'modelKey' => $this->buildUsageModelKey($provider, $model),
-            'kind' => 'LLM',
-        ];
+        return $recorded->toMessageUsage($provider, $model, 'LLM');
     }
 
     /**
@@ -3009,31 +3004,35 @@ class StreamController extends AbstractController
      */
     private function buildExtraUsageEntry(string $kind, ?string $provider, ?string $model, RecordedUsage $recorded): array
     {
-        return [
-            'promptTokens' => $recorded->promptTokens,
-            'completionTokens' => $recorded->completionTokens,
-            'totalTokens' => $recorded->totalTokens,
-            'cost' => $recorded->chargedCost,
-            'modelKey' => $this->buildUsageModelKey($provider, $model),
-            'kind' => $kind,
-        ];
+        return $recorded->toMessageUsage($provider, $model, $kind);
     }
 
     /**
-     * Compose a stable model key ("provider:model") for taximeter session
-     * grouping. Never hard-codes model names — the parts come from the
-     * response metadata (which originates from the model catalog).
+     * Add usage that happened before or around the answer generation itself:
+     * multi-task planning from response metadata and transcription from the
+     * incoming message. Both already use the canonical message-usage shape.
+     *
+     * @param list<array<string, mixed>> $usageExtra
+     * @param array<string, mixed>       $responseMetadata
+     *
+     * @return list<array<string, mixed>>
      */
-    private function buildUsageModelKey(?string $provider, ?string $model): string
+    private function appendContextUsage(array $usageExtra, array $responseMetadata, Message $incomingMessage): array
     {
-        $p = strtolower(trim((string) $provider));
-        $m = trim((string) $model);
-
-        if ('' !== $p && '' !== $m) {
-            return $p.':'.$m;
+        $planningUsage = $responseMetadata['planning_usage'] ?? null;
+        if (is_array($planningUsage)) {
+            $usageExtra[] = $planningUsage;
         }
 
-        return '' !== $m ? $m : ('' !== $p ? $p : 'unknown');
+        $rawTranscriptionUsage = $incomingMessage->getMeta('ai_transcription_usage');
+        if (null !== $rawTranscriptionUsage && '' !== $rawTranscriptionUsage) {
+            $transcriptionUsage = json_decode($rawTranscriptionUsage, true);
+            if (is_array($transcriptionUsage)) {
+                $usageExtra[] = $transcriptionUsage;
+            }
+        }
+
+        return $usageExtra;
     }
 
     private function sendSSE(string $status, array $data): void

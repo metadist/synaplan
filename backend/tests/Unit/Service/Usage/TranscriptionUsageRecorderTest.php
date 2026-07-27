@@ -36,6 +36,7 @@ class TranscriptionUsageRecorderTest extends TestCase
         $user = $this->createMock(User::class);
         $this->userRepository->expects($this->any())->method('find')->with(42)->willReturn($user);
 
+        $recordedUsage = $this->recordedUsage();
         $this->rateLimitService->expects($this->once())
             ->method('recordUsage')
             ->with(
@@ -48,9 +49,12 @@ class TranscriptionUsageRecorderTest extends TestCase
                         && 'en' === $meta['language'];
                 })
             )
-            ->willReturn($this->recordedUsage());
+            ->willReturn($recordedUsage);
 
-        $this->recorder->record(42, 21, 'groq', 'whisper-large-v3', 12.5, ['language' => 'en']);
+        self::assertSame(
+            $recordedUsage,
+            $this->recorder->record(42, 21, 'groq', 'whisper-large-v3', 12.5, ['language' => 'en']),
+        );
     }
 
     public function testSkipsWhenNoUserId(): void

@@ -37,6 +37,8 @@ final readonly class TranscriptionUsageRecorder
 
     /**
      * @param array<string, mixed> $extraMetadata Non-billing context (e.g. language) stored on the row
+     *
+     * @return RecordedUsage|null The billed row details, or null when recording was skipped or failed
      */
     public function record(
         ?int $userId,
@@ -45,11 +47,11 @@ final readonly class TranscriptionUsageRecorder
         string $model,
         float $durationSeconds,
         array $extraMetadata = [],
-    ): void {
+    ): ?RecordedUsage {
         // No user or no priced model → nothing to bill. (model_id is required
         // because the per-second price lives on the model.)
         if (null === $userId || $userId <= 0 || null === $modelId) {
-            return;
+            return null;
         }
 
         // A priced STT call without a usable duration would silently bill $0 —
@@ -64,16 +66,16 @@ final readonly class TranscriptionUsageRecorder
                 'model' => $model,
             ]);
 
-            return;
+            return null;
         }
 
         $user = $this->userRepository->find($userId);
         if (null === $user) {
-            return;
+            return null;
         }
 
         try {
-            $this->rateLimitService->recordUsage($user, self::ACTION, [
+            return $this->rateLimitService->recordUsage($user, self::ACTION, [
                 'provider' => $provider,
                 'model' => $model,
                 'model_id' => $modelId,
@@ -86,6 +88,8 @@ final readonly class TranscriptionUsageRecorder
                 'provider' => $provider,
                 'error' => $e->getMessage(),
             ]);
+
+            return null;
         }
     }
 }
