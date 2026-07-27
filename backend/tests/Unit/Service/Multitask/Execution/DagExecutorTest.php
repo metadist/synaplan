@@ -330,6 +330,34 @@ final class DagExecutorTest extends TestCase
         self::assertSame([['node_id' => 'n1', 'chunk' => 'Hel'], ['node_id' => 'n1', 'chunk' => 'lo']], $chunks);
     }
 
+    public function testBatchTextResultEmitsFinalChunkBeforeDoneState(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1,
+            'language' => 'en',
+            'reply_node' => 'n1',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'extract_text'],
+            ],
+        ]);
+        $runner = $this->runner(fn (): NodeResult => NodeResult::ok('Complete extracted text'));
+
+        $events = [];
+        $this->executor($runner)->execute($plan, $this->context(), function (array $event) use (&$events): void {
+            $events[] = $event;
+        });
+
+        $chunkEvents = array_values(array_filter($events, static fn (array $event): bool => 'task_chunk' === $event['status']));
+        self::assertSame([
+            [
+                'node_id' => 'n1',
+                'chunk' => 'Complete extracted text',
+            ],
+        ], array_column($chunkEvents, 'metadata'));
+
+        self::assertSame(['task_update', 'task_chunk', 'task_update'], array_column($events, 'status'));
+    }
+
     // ---- Sprint 4: parallel mode ----
 
     private function dogMp3Plan(): TaskPlan

@@ -38,6 +38,9 @@ final class NodeContext
     /** @var (callable(string, string): void)|null sink for streamed token chunks: (nodeId, chunk) */
     private $chunkSink;
 
+    /** @var array<string, true> node ids that emitted at least one text chunk */
+    private array $streamedNodeIds = [];
+
     /** @var (callable(string, array<string, mixed>): void)|null sink for live media progress: (nodeId, progress) */
     private $progressSink;
 
@@ -96,8 +99,15 @@ final class NodeContext
     public function streamChunk(string $chunk): void
     {
         if (null !== $this->chunkSink && null !== $this->currentNodeId && '' !== $chunk) {
+            $this->streamedNodeIds[$this->currentNodeId] = true;
             ($this->chunkSink)($this->currentNodeId, $chunk);
         }
+    }
+
+    /** Whether the node already emitted text through the live chunk sink. */
+    public function hasStreamedChunksFor(string $nodeId): bool
+    {
+        return isset($this->streamedNodeIds[$nodeId]);
     }
 
     /**

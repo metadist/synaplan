@@ -255,6 +255,26 @@ final readonly class DagExecutor
             return;
         }
 
+        // Batch text runners return their complete result without calling
+        // NodeContext::streamChunk(). Emit that text once before the terminal
+        // state so the live card matches its persisted/reloaded representation.
+        // Streaming runners are left untouched to avoid duplicating their text.
+        if (
+            null !== $progressCallback
+            && $result->isSuccessful()
+            && null !== $result->text
+            && '' !== $result->text
+            && in_array($node->capability->uiKind(), ['text', 'extract'], true)
+            && !$context->hasStreamedChunksFor($node->id)
+        ) {
+            $progressCallback([
+                'status' => 'task_chunk',
+                'message' => '',
+                'metadata' => ['node_id' => $node->id, 'chunk' => $result->text],
+                'timestamp' => time(),
+            ]);
+        }
+
         $extra = $result->isSuccessful()
             ? $this->successMetadata($node, $result)
             : $this->failureMetadata($node, $result, $context);

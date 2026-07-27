@@ -86,28 +86,41 @@ const isProseKind = computed(() => ['text', 'extract'].includes(props.card.kind)
 // The full results are available via the Sources dropdown on the message body.
 const isSearchKind = computed(() => props.card.kind === 'search')
 
-// #1129 / #1229: DONE prose cards collapse to their header by default — the
-// compose_reply MessagePart below is the canonical answer surface. The chevron
-// lets the user expand any card to inspect that step. Media cards stay open so
-// images/audio remain visible. Streaming cards are never collapsed.
+// #1229 smart collapse: only DONE prose that is repeated in the answer body
+// collapses. Unique card content stays visible; media and streaming cards never
+// collapse.
 const userExpanded = ref<boolean | null>(null)
-const isCollapsible = computed(() => isProseKind.value && props.card.state === 'done')
+const isCollapsible = computed(
+  () => isProseKind.value && props.card.state === 'done' && props.card.redundant === true
+)
 const collapsed = computed(() => isCollapsible.value && userExpanded.value !== true)
 const toggleCollapsed = () => {
   userExpanded.value = collapsed.value
 }
 
-// Copy-to-clipboard for text-bearing done cards (#1229). Media cards get
-// download/lightbox via TaskCardMedia instead; search cards carry only a
-// compact summary (query + source count, no text) so there is nothing to copy.
+// Copy-to-clipboard for completed prose and search cards (#1229). Search cards
+// copy their query plus the visible source summary; media cards expose download
+// and lightbox actions through TaskCardMedia.
 const { t } = useI18n()
 const { success: notifySuccess, error: notifyError } = useNotification()
-const canCopy = computed(
-  () => props.card.state === 'done' && !!props.card.text && isProseKind.value
-)
+const copyContent = computed(() => {
+  if (props.card.state !== 'done') return ''
+  if (isProseKind.value) return props.card.text?.trim() ?? ''
+  if (!isSearchKind.value) return ''
+
+  const content: string[] = []
+  if (props.card.query) content.push(props.card.query)
+  if (props.card.resultsCount !== undefined) {
+    content.push(
+      t('taskPlan.searchSummary', { count: props.card.resultsCount }, props.card.resultsCount)
+    )
+  }
+  return content.join('\n')
+})
+const canCopy = computed(() => copyContent.value.length > 0)
 const copyText = async () => {
   try {
-    await navigator.clipboard.writeText(props.card.text ?? '')
+    await navigator.clipboard.writeText(copyContent.value)
     notifySuccess(t('taskPlan.copied'))
   } catch {
     notifyError(t('taskPlan.copyFailed'))
@@ -301,7 +314,7 @@ const handleRetry = () => {
         <span v-else-if="card.query">{{ card.query }}</span>
       </div>
 
-      <!-- Collapsed prose: one-line hint; expand via chevron (#1129 / #1229) -->
+      <!-- Redundant prose collapsed to a one-line hint (#1129 / #1229) -->
       <p
         v-if="!isSearchKind && card.text && collapsed"
         class="text-xs txt-muted"
