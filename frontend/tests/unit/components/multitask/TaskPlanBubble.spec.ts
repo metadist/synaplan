@@ -166,6 +166,35 @@ describe('TaskPlanBubble', () => {
     expect(writeText).toHaveBeenCalledWith('current pension rules\nSearched the web · 3 sources')
   })
 
+  it('copies only the visible query when a search has no sources', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          {
+            nodeId: 'n1',
+            capability: 'web_search',
+            kind: 'search',
+            state: 'done',
+            query: 'query without results',
+            resultsCount: 0,
+          },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    const card = wrapper.find('[data-testid="task-card-n1"]')
+    expect(card.text()).not.toContain('0 sources')
+
+    await card.find('[data-testid="task-card-copy"]').trigger('click')
+    expect(writeText).toHaveBeenCalledWith('query without results')
+  })
+
   it('shows a media skeleton while an image card is running without a file', () => {
     const wrapper = mount(TaskPlanBubble, {
       props: {

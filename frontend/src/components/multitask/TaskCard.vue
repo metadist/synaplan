@@ -110,10 +110,9 @@ const copyContent = computed(() => {
 
   const content: string[] = []
   if (props.card.query) content.push(props.card.query)
-  if (props.card.resultsCount !== undefined) {
-    content.push(
-      t('taskPlan.searchSummary', { count: props.card.resultsCount }, props.card.resultsCount)
-    )
+  const resultsCount = props.card.resultsCount ?? 0
+  if (resultsCount > 0) {
+    content.push(t('taskPlan.searchSummary', { count: resultsCount }, resultsCount))
   }
   return content.join('\n')
 })

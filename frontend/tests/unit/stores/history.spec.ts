@@ -314,4 +314,120 @@ describe('History Store', () => {
       vi.useRealTimers()
     }
   })
+
+  it('preserves all loaded pages when polling an in-progress turn', async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+    vi.doUnmock('@/services/api')
+
+    const rows = (start: number, count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: start + index,
+        direction: 'IN',
+        text: `Message ${start + index}`,
+        timestamp: 1700000000 + start + index,
+      }))
+    const firstPage = rows(51, 50)
+    const olderPage = rows(1, 50)
+    const getChatMessages = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: true,
+        messages: firstPage,
+        pagination: { hasMore: true },
+        inProgressTurn: {
+          reply_node: 'n1',
+          cards: [{ nodeId: 'n1', capability: 'chat', kind: 'text', state: 'running' }],
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        messages: olderPage,
+        pagination: { hasMore: false },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        messages: [...olderPage, ...firstPage],
+        pagination: { hasMore: false },
+      })
+
+    vi.doMock('@/services/api', () => ({
+      chatApi: { getChatMessages },
+    }))
+
+    try {
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+
+      await store.loadMessages(42)
+      await store.loadMoreMessages(42)
+      await vi.advanceTimersByTimeAsync(2000)
+
+      expect(getChatMessages).toHaveBeenNthCalledWith(3, 42, 0, 100)
+      expect(store.messages).toHaveLength(100)
+      expect(store.messages.some((message) => message.backendMessageId === 1)).toBe(true)
+      expect(store.messages.some((message) => message.backendMessageId === 100)).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('defers an in-progress poll while load-more is still running', async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+    vi.doUnmock('@/services/api')
+
+    let resolveLoadMore!: (value: unknown) => void
+    const loadMoreResponse = new Promise((resolve) => {
+      resolveLoadMore = resolve
+    })
+    const getChatMessages = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: true,
+        messages: [{ id: 2, direction: 'IN', text: 'Newer', timestamp: 1700000002 }],
+        pagination: { hasMore: true },
+        inProgressTurn: {
+          reply_node: 'n1',
+          cards: [{ nodeId: 'n1', capability: 'chat', kind: 'text', state: 'running' }],
+        },
+      })
+      .mockReturnValueOnce(loadMoreResponse)
+      .mockResolvedValueOnce({
+        success: true,
+        messages: [
+          { id: 1, direction: 'IN', text: 'Older', timestamp: 1700000001 },
+          { id: 2, direction: 'IN', text: 'Newer', timestamp: 1700000002 },
+        ],
+        pagination: { hasMore: false },
+      })
+
+    vi.doMock('@/services/api', () => ({
+      chatApi: { getChatMessages },
+    }))
+
+    try {
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      await store.loadMessages(42)
+
+      const loadMore = store.loadMoreMessages(42)
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(getChatMessages).toHaveBeenCalledTimes(2)
+
+      resolveLoadMore({
+        success: true,
+        messages: [{ id: 1, direction: 'IN', text: 'Older', timestamp: 1700000001 }],
+        pagination: { hasMore: false },
+      })
+      await loadMore
+      expect(store.messages.some((message) => message.backendMessageId === 1)).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(getChatMessages).toHaveBeenCalledTimes(3)
+      expect(store.messages).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

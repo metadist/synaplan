@@ -306,7 +306,17 @@ export const useHistoryStore = defineStore('history', () => {
       inProgressPollTimer = null
       if (inProgressPollChatId !== chatId) return
 
-      void loadMessages(chatId, 0, 50, true)
+      // A foreground page load owns the message list until it settles. Defer
+      // the poll so it cannot replace or invalidate a concurrent load-more.
+      if (isLoadingMessages.value) {
+        scheduleInProgressPoll(chatId)
+        return
+      }
+
+      const loadedMessageCount = messages.value.filter(
+        (message) => message.id !== IN_PROGRESS_TURN_ID
+      ).length
+      void loadMessages(chatId, 0, Math.max(50, loadedMessageCount), true)
     }, inProgressPollIntervalMs)
   }
 
@@ -454,16 +464,18 @@ export const useHistoryStore = defineStore('history', () => {
       stopInProgressPolling()
     }
 
-    // Fresh load (offset 0) bumps the generation so any in-flight response
-    // for a *previous* chat is silently discarded when it lands.
-    const myGeneration = offset === 0 ? ++loadGeneration : loadGeneration
+    // Only a foreground load from the beginning starts a new generation.
+    // Silent same-chat polls share the current generation so they cannot
+    // invalidate a concurrent load-more request.
+    const startsNewGeneration = offset === 0 && !silent
+    const myGeneration = startsNewGeneration ? ++loadGeneration : loadGeneration
 
     if (!silent) {
       isLoadingMessages.value = true
     }
 
     // Reset pagination state when loading from start (prevents stale state on error)
-    if (offset === 0) {
+    if (offset === 0 && !silent) {
       currentOffset.value = 0
       hasMoreMessages.value = false
     }
@@ -499,7 +511,7 @@ export const useHistoryStore = defineStore('history', () => {
           messages.value = [...loadedMessages, ...messages.value]
         }
 
-        currentOffset.value = offset + loadedMessages.length
+        currentOffset.value = offset + response.messages.length
         hasMoreMessages.value = response.pagination?.hasMore || false
       }
     } catch (error) {

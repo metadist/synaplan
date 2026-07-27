@@ -86,17 +86,17 @@ final readonly class DocumentGeneratorService
         }
 
         $temporaryImages = [];
-        foreach ($images as $reference => $imagePath) {
-            if ('webp' !== strtolower(pathinfo($imagePath, PATHINFO_EXTENSION))) {
-                continue;
+        try {
+            foreach ($images as $reference => $imagePath) {
+                if ('webp' !== strtolower(pathinfo($imagePath, PATHINFO_EXTENSION))) {
+                    continue;
+                }
+
+                $convertedPath = $this->convertWebpForWord($imagePath);
+                $images[$reference] = $convertedPath;
+                $temporaryImages[] = $convertedPath;
             }
 
-            $convertedPath = $this->convertWebpForWord($imagePath);
-            $images[$reference] = $convertedPath;
-            $temporaryImages[] = $convertedPath;
-        }
-
-        try {
             // Ensure special characters (like '&', '<', '>') are escaped in the XML to prevent document corruption.
             WordSettings::setOutputEscapingEnabled(true);
 

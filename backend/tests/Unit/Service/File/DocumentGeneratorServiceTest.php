@@ -116,6 +116,54 @@ class DocumentGeneratorServiceTest extends TestCase
         $this->assertTrue($this->docxContainsMedia($path), 'DOCX must contain the embedded image binary');
     }
 
+    public function testDocxCleansConvertedWebpFilesWhenLaterConversionFails(): void
+    {
+        if (!class_exists(\Imagick::class) && !function_exists('imagewebp')) {
+            $this->markTestSkipped('WebP generation requires Imagick or GD');
+        }
+
+        $validWebp = $this->tmpDir.'/valid.webp';
+        if (class_exists(\Imagick::class)) {
+            $image = new \Imagick();
+            $image->newImage(1, 1, new \ImagickPixel('white'));
+            $image->setImageFormat('webp');
+            $image->writeImage($validWebp);
+            $image->clear();
+            $image->destroy();
+        } else {
+            $image = imagecreatetruecolor(1, 1);
+            $this->assertNotFalse($image);
+            $this->assertTrue(imagewebp($image, $validWebp));
+            imagedestroy($image);
+        }
+
+        $invalidWebp = $this->tmpDir.'/invalid.webp';
+        file_put_contents($invalidWebp, 'not a webp image');
+        $temporaryFilesBefore = glob(sys_get_temp_dir().'/docx_image_*') ?: [];
+
+        try {
+            $this->service->write(
+                '{{IMAGE:file:1}}{{IMAGE:file:2}}',
+                'docx',
+                $this->tmpDir.'/conversion_failure.docx',
+                ['file:1' => $validWebp, 'file:2' => $invalidWebp],
+            );
+            $this->fail('The invalid WebP image should fail conversion');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Failed to convert a WebP document image', $e->getMessage());
+        }
+
+        $leakedFiles = array_values(array_diff(
+            glob(sys_get_temp_dir().'/docx_image_*') ?: [],
+            $temporaryFilesBefore,
+        ));
+        foreach ($leakedFiles as $leakedFile) {
+            @unlink($leakedFile);
+        }
+
+        $this->assertSame([], $leakedFiles, 'Converted WebP temporary files must be removed after a later failure');
+    }
+
     public function testDocxRejectsUnresolvedImageReference(): void
     {
         $this->expectException(\RuntimeException::class);
