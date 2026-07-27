@@ -232,6 +232,8 @@ Source: https://platform.claude.com/docs/en/about-claude/models/overview
 
 Retired on 2026-07-27 by `Version20260727120000` (rows deactivated, never deleted — `BMESSAGES` FKs; BIDs must never be reused): Claude Sonnet 4.5 (112/109), Claude Opus 4.6 (160/164), Claude Sonnet 4.6 (161/163), Claude Opus 4.7 (165/166), plus the catalog-orphans Claude Opus 4.1 (69/93, deprecated upstream and retired by Anthropic on 2026-08-05) and Claude Opus 4.5 (121).
 
+The same orphan cleanup continues in `Version20260727180000` for two non-Anthropic rows: **OpenAI `gpt-4.1` (BID 30)** → GPT-5.6 Terra (253) and **Groq `llama-4-maverick-17b-128e-instruct` (BID 49)** → Groq `gpt-oss-120b` (76).
+
 > **Removing a model from the catalog is only half a retirement.** `ModelSeeder` never deletes or deactivates rows, so a model dropped from `ModelCatalog.php` without a companion migration stays `BACTIVE=1, BSELECTABLE=1` in every existing database — still pickable in the UI and still billed at whatever price the stale row holds. That is how Opus 4.1/4.5 survived several releases. Always pair a catalog removal with a deactivation migration.
 
 ## Related issues

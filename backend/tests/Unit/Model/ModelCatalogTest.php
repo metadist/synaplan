@@ -300,6 +300,23 @@ class ModelCatalogTest extends TestCase
         }
     }
 
+    /**
+     * OpenAI gpt-4.1 (BID 30) and Groq llama-4-maverick (BID 49) are superseded and
+     * deactivated by Version20260727180000. Re-adding either — under its old BID or
+     * its upstream model id — would resurrect a model we deliberately took out of
+     * the picker.
+     */
+    public function testSupersededOpenAiAndGroqModelsAreAbsentFromCatalog(): void
+    {
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+        $this->assertNotContains('gpt-4.1', $providerIds);
+        $this->assertNotContains('meta-llama/llama-4-maverick-17b-128e-instruct', $providerIds);
+
+        $ids = array_column(ModelCatalog::all(), 'id');
+        $this->assertNotContains(30, $ids);
+        $this->assertNotContains(49, $ids);
+    }
+
     public function testGpt55ProModelsAreMarkedAsNonStreaming(): void
     {
         $chat = ModelCatalog::find('openai:gpt-5.5-pro:chat')[0];
