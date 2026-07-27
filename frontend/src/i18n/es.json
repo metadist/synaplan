@@ -1382,8 +1382,7 @@
     "copied": "Copiado al portapapeles",
     "copyFailed": "No se pudo copiar",
     "expand": "Mostrar texto",
-    "collapse": "Ocultar texto",
-    "redundantCollapsed": "Salida del paso oculta — expande para verla o lee la respuesta abajo."
+    "collapse": "Ocultar texto"
   },
   "processing": {
     "started": "Iniciando procesamiento...",

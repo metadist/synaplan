@@ -100,6 +100,36 @@ describe('TaskPlanBubble', () => {
     })
 
     expect(wrapper.find('[data-testid="task-card-n2"]').text()).toContain('Half a sum')
+    expect(wrapper.find('[data-testid="task-card-toggle"]').exists()).toBe(false)
+  })
+
+  it('collapses completed prose to the header and expands it on request', async () => {
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          {
+            nodeId: 'n2',
+            capability: 'summarize',
+            kind: 'text',
+            state: 'done',
+            text: 'Completed summary',
+          },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    const card = wrapper.find('[data-testid="task-card-n2"]')
+    const toggle = wrapper.find('[data-testid="task-card-toggle"]')
+
+    expect(card.find('.task-card__body').exists()).toBe(false)
+    expect(card.text()).not.toContain('Completed summary')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+
+    await toggle.trigger('click')
+
+    expect(card.find('.task-card__body').text()).toContain('Completed summary')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
   })
 
   it('shows a media skeleton while an image card is running without a file', () => {

@@ -1382,8 +1382,7 @@
     "copied": "Panoya kopyalandı",
     "copyFailed": "Kopyalanamadı",
     "expand": "Metni göster",
-    "collapse": "Metni gizle",
-    "redundantCollapsed": "Adım çıktısı daraltıldı — incelemek için genişletin veya aşağıdaki yanıtı okuyun."
+    "collapse": "Metni gizle"
   },
   "processing": {
     "started": "İşlem başlatılıyor...",

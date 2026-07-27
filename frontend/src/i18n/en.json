@@ -3423,8 +3423,7 @@
     "copied": "Copied to clipboard",
     "copyFailed": "Could not copy",
     "expand": "Show text",
-    "collapse": "Hide text",
-    "redundantCollapsed": "Step output collapsed — expand to inspect, or read the answer below."
+    "collapse": "Hide text"
   },
   "processing": {
     "started": "Starting processing...",

@@ -1138,8 +1138,7 @@
     "copied": "In die Zwischenablage kopiert",
     "copyFailed": "Kopieren fehlgeschlagen",
     "expand": "Text anzeigen",
-    "collapse": "Text ausblenden",
-    "redundantCollapsed": "Schrittausgabe eingeklappt — zum Prüfen aufklappen oder die Antwort unten lesen."
+    "collapse": "Text ausblenden"
   },
   "processing": {
     "started": "Starte Verarbeitung...",
