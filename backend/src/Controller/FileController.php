@@ -10,6 +10,7 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\File\DocumentGeneratorService;
+use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileHelper;
 use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
@@ -46,6 +47,7 @@ class FileController extends AbstractController
         private VectorStorageFacade $vectorStorageFacade,
         private VectorMigrationService $migrationService,
         private DocumentGeneratorService $documentGenerator,
+        private DocumentImageReferenceResolver $documentImageReferenceResolver,
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
@@ -492,7 +494,8 @@ class FileController extends AbstractController
 
         try {
             $tmpPath = tempnam(sys_get_temp_dir(), 'regen_').'.'.$extension;
-            $this->documentGenerator->write($text, $extension, $tmpPath);
+            $images = $this->documentImageReferenceResolver->resolvePersistent($text, $file->getUserId());
+            $this->documentGenerator->write($text, $extension, $tmpPath, $images);
         } catch (\Throwable $e) {
             $this->logger->warning('FileController: failed to regenerate missing binary from BFILETEXT', [
                 'file_id' => $file->getId(),

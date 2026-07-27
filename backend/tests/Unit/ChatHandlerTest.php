@@ -14,6 +14,7 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\FeedbackConfigService;
 use App\Service\File\DocumentGeneratorService;
+use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\Handler\ChatHandler;
@@ -81,6 +82,7 @@ class ChatHandlerTest extends TestCase
             $this->memoryExtractionDispatcher,
             $this->perfPipelineFlag,
             $this->createMock(DocumentGeneratorService::class),
+            $this->createMock(DocumentImageReferenceResolver::class),
             new TimeContextBuilder(),
         );
     }

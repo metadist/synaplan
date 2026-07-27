@@ -168,6 +168,10 @@ services:
     App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
         alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
 
+    App\Service\File\DocumentImageReferenceResolver:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     # email_me DAG node: resolves upstream file descriptors to absolute paths
     # under the shared uploads dir before attaching them to the result mail.
     App\Service\Multitask\Execution\Runner\EmailMeRunner:

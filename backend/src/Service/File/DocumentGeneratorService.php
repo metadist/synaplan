@@ -48,13 +48,15 @@ final readonly class DocumentGeneratorService
      * Office formats are rendered as valid OOXML; all other formats are
      * written as UTF-8 text.
      *
+     * @param array<string, string> $images image marker reference => absolute path
+     *
      * @throws \RuntimeException when the file cannot be written
      */
-    public function write(string $content, string $extension, string $absolutePath): void
+    public function write(string $content, string $extension, string $absolutePath, array $images = []): void
     {
         switch (strtolower($extension)) {
             case 'docx':
-                $this->writeDocx($content, $absolutePath);
+                $this->writeDocx($content, $absolutePath, $images);
                 break;
             case 'xlsx':
                 $this->writeXlsx($content, $absolutePath);
@@ -74,73 +76,187 @@ final readonly class DocumentGeneratorService
      * converted to HTML so headings, lists, bold text and tables are kept.
      * If HTML parsing fails, fall back to plain paragraphs so the file is
      * still valid and openable.
+     *
+     * @param array<string, string> $images
      */
-    private function writeDocx(string $content, string $absolutePath): void
+    private function writeDocx(string $content, string $absolutePath, array $images): void
     {
         if ('' === trim($content)) {
             throw new \RuntimeException('Cannot generate DOCX from empty content');
         }
 
-        $html = (new \Parsedown())->text($content);
+        $temporaryImages = [];
+        foreach ($images as $reference => $imagePath) {
+            if ('webp' !== strtolower(pathinfo($imagePath, PATHINFO_EXTENSION))) {
+                continue;
+            }
 
-        // PhpWord parses the HTML with DOMDocument::loadXML() (XHTML), which
-        // rejects unclosed void tags. LLMs routinely emit bare `<br>` (and
-        // sometimes `<hr>` / `<img>`) inside markdown table cells; Parsedown
-        // passes those through verbatim, the XML parse then fails mid-table and
-        // PhpWord silently produces a structurally valid but EMPTY document
-        // (no <w:t> runs). Self-closing the void tags first keeps the table
-        // content intact (issue #1196).
-        $html = $this->normalizeVoidTags($html);
-
-        // Ensure special characters (like '&', '<', '>') are escaped in the XML to prevent document corruption.
-        WordSettings::setOutputEscapingEnabled(true);
-
-        $usedFallback = false;
-        try {
-            $phpWord = new PhpWord();
-            $section = $phpWord->addSection();
-            WordHtml::addHtml($section, $html, false, false);
-        } catch (\Throwable $e) {
-            $this->logger->warning('DocumentGeneratorService: DOCX HTML parsing failed, using plain text fallback', [
-                'error' => $e->getMessage(),
-            ]);
-
-            $phpWord = $this->buildPlainTextDocx($content);
-            $usedFallback = true;
+            $convertedPath = $this->convertWebpForWord($imagePath);
+            $images[$reference] = $convertedPath;
+            $temporaryImages[] = $convertedPath;
         }
 
-        WordIOFactory::createWriter($phpWord, 'Word2007')->save($absolutePath);
+        try {
+            // Ensure special characters (like '&', '<', '>') are escaped in the XML to prevent document corruption.
+            WordSettings::setOutputEscapingEnabled(true);
 
-        // Defense in depth: even when addHtml() does not throw, a malformed
-        // fragment can leave the body without a single text run. Assert the
-        // saved document actually contains text and, if not, rebuild it from
-        // the plain-text fallback so we never ship a blank-but-valid DOCX.
-        if (!$usedFallback && !$this->docxHasText($absolutePath)) {
-            $this->logger->warning('DocumentGeneratorService: DOCX produced no text runs, rebuilding with plain text fallback', [
-                'path' => $absolutePath,
-            ]);
+            $usedFallback = false;
+            try {
+                $phpWord = new PhpWord();
+                $section = $phpWord->addSection();
+                $this->addDocxContent($section, $content, $images);
+            } catch (\Throwable $e) {
+                $this->logger->warning('DocumentGeneratorService: DOCX HTML parsing failed, using plain text fallback', [
+                    'error' => $e->getMessage(),
+                ]);
 
-            WordIOFactory::createWriter($this->buildPlainTextDocx($content), 'Word2007')->save($absolutePath);
+                $phpWord = $this->buildPlainTextDocx($content, $images);
+                $usedFallback = true;
+            }
+
+            WordIOFactory::createWriter($phpWord, 'Word2007')->save($absolutePath);
+
+            // Defense in depth: even when addHtml() does not throw, a malformed
+            // fragment can leave the body without a single text run. Assert the
+            // saved document actually contains text and, if not, rebuild it from
+            // the plain-text fallback so we never ship a blank-but-valid DOCX.
+            if (!$usedFallback && !$this->docxHasContent($absolutePath)) {
+                $this->logger->warning('DocumentGeneratorService: DOCX produced no content, rebuilding with plain text fallback', [
+                    'path' => $absolutePath,
+                ]);
+
+                WordIOFactory::createWriter($this->buildPlainTextDocx($content, $images), 'Word2007')->save($absolutePath);
+            }
+        } finally {
+            foreach ($temporaryImages as $temporaryImage) {
+                @unlink($temporaryImage);
+            }
+        }
+    }
+
+    private function convertWebpForWord(string $sourcePath): string
+    {
+        $temporaryPath = tempnam(sys_get_temp_dir(), 'docx_image_');
+        if (false === $temporaryPath) {
+            throw new \RuntimeException('Failed to create a temporary file for a WebP document image');
+        }
+
+        try {
+            if (class_exists(\Imagick::class)) {
+                $image = new \Imagick($sourcePath);
+                $image->setImageFormat('png');
+                $image->writeImage($temporaryPath);
+                $image->clear();
+                $image->destroy();
+
+                return $temporaryPath;
+            }
+
+            if (function_exists('imagecreatefromwebp')) {
+                $image = imagecreatefromwebp($sourcePath);
+                if (false !== $image && imagepng($image, $temporaryPath)) {
+                    imagedestroy($image);
+
+                    return $temporaryPath;
+                }
+                if (false !== $image) {
+                    imagedestroy($image);
+                }
+            }
+        } catch (\Throwable $e) {
+            @unlink($temporaryPath);
+            throw new \RuntimeException('Failed to convert a WebP document image: '.$sourcePath, 0, $e);
+        }
+
+        @unlink($temporaryPath);
+        throw new \RuntimeException('WebP document images require Imagick or GD WebP support');
+    }
+
+    /**
+     * Add markdown and image markers to a Word section in source order.
+     *
+     * @param array<string, string> $images
+     */
+    private function addDocxContent(\PhpOffice\PhpWord\Element\Section $section, string $content, array $images): void
+    {
+        foreach ($this->splitImageMarkers($content) as $part) {
+            if ($part['image']) {
+                $path = $images[$part['value']] ?? null;
+                if (null === $path) {
+                    throw new \RuntimeException('Document image reference could not be resolved: '.$part['value']);
+                }
+                $section->addImage($path, ['width' => 180, 'ratio' => true]);
+                continue;
+            }
+
+            if ('' === trim($part['value'])) {
+                continue;
+            }
+
+            $html = (new \Parsedown())->text($part['value']);
+
+            // PhpWord parses HTML as XHTML. Self-close void tags that models
+            // commonly leave open so table and paragraph content survives.
+            WordHtml::addHtml($section, $this->normalizeVoidTags($html), false, false);
         }
     }
 
     /**
      * Build a DOCX from the raw content as plain paragraphs. Used as the
      * always-valid fallback when HTML conversion fails or yields no text.
+     *
+     * @param array<string, string> $images
      */
-    private function buildPlainTextDocx(string $content): PhpWord
+    private function buildPlainTextDocx(string $content, array $images = []): PhpWord
     {
         $phpWord = new PhpWord();
         $section = $phpWord->addSection();
-        foreach ($this->splitLines($content) as $line) {
-            if ('' === trim($line)) {
-                $section->addTextBreak();
-            } else {
-                $section->addText($line);
+
+        foreach ($this->splitImageMarkers($content) as $part) {
+            if ($part['image']) {
+                $path = $images[$part['value']] ?? null;
+                if (null === $path) {
+                    throw new \RuntimeException('Document image reference could not be resolved: '.$part['value']);
+                }
+                $section->addImage($path, ['width' => 180, 'ratio' => true]);
+                continue;
+            }
+
+            foreach ($this->splitLines($part['value']) as $line) {
+                if ('' === trim($line)) {
+                    $section->addTextBreak();
+                } else {
+                    $section->addText($line);
+                }
             }
         }
 
         return $phpWord;
+    }
+
+    /**
+     * @return list<array{image: bool, value: string}>
+     */
+    private function splitImageMarkers(string $content): array
+    {
+        $parts = preg_split(
+            '/\{\{IMAGE:([a-z]+:\d+)}}/',
+            $content,
+            -1,
+            PREG_SPLIT_DELIM_CAPTURE,
+        );
+        if (false === $parts) {
+            return [['image' => false, 'value' => $content]];
+        }
+
+        return array_map(
+            static fn (string $part, int $index): array => [
+                'image' => 1 === $index % 2,
+                'value' => $part,
+            ],
+            $parts,
+            array_keys($parts),
+        );
     }
 
     /**
@@ -160,10 +276,10 @@ final readonly class DocumentGeneratorService
     }
 
     /**
-     * Whether the saved DOCX contains at least one text run (`<w:t>`), i.e.
-     * the body is not blank. Reads word/document.xml from the OOXML zip.
+     * Whether the saved DOCX contains at least one text or image element.
+     * Reads word/document.xml from the OOXML zip.
      */
-    private function docxHasText(string $absolutePath): bool
+    private function docxHasContent(string $absolutePath): bool
     {
         $zip = new \ZipArchive();
         if (true !== $zip->open($absolutePath)) {
@@ -178,7 +294,10 @@ final readonly class DocumentGeneratorService
             return true;
         }
 
-        return str_contains($xml, '<w:t>') || str_contains($xml, '<w:t ');
+        return str_contains($xml, '<w:t>')
+            || str_contains($xml, '<w:t ')
+            || str_contains($xml, '<w:drawing>')
+            || str_contains($xml, '<w:pict>');
     }
 
     /**

@@ -14,6 +14,7 @@ use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
 use App\Service\File\DocumentGeneratorService;
+use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
@@ -71,6 +72,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private PerfPipelineFlag $perfPipelineFlag,
         private DocumentGeneratorService $documentGenerator,
+        private DocumentImageReferenceResolver $documentImageReferenceResolver,
         private TimeContextBuilder $timeContextBuilder,
         iterable $pluginContextProviders = [],
     ) {
@@ -2209,6 +2211,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $extension = $fileData['extension'];
 
         try {
+            $resolvedDocument = $this->documentImageReferenceResolver->resolve($content, $message);
+            $content = $resolvedDocument['content'];
+
             // Generate storage path similar to FileStorageService
             $year = date('Y');
             $month = date('m');
@@ -2239,7 +2244,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
             // Write file content (real OOXML for docx/xlsx/pptx, text otherwise)
             try {
-                $this->documentGenerator->write($content, $extension, $absolutePath);
+                $this->documentGenerator->write($content, $extension, $absolutePath, $resolvedDocument['images']);
             } catch (\Throwable $e) {
                 $this->logger->error('ChatHandler: Failed to write file', [
                     'path' => $absolutePath,

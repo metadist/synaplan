@@ -88,6 +88,42 @@ class DocumentGeneratorServiceTest extends TestCase
         $this->assertStringContainsString('<w:t', $documentXml, 'A non-empty source must always yield a non-empty DOCX body');
     }
 
+    /**
+     * Issue #1228: an image marker must become an embedded OOXML image at the
+     * requested position instead of being ignored or rendered as marker text.
+     */
+    public function testDocxEmbedsReferencedImage(): void
+    {
+        $imagePath = $this->tmpDir.'/profile.png';
+        file_put_contents($imagePath, base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        ));
+
+        $path = $this->tmpDir.'/with_image.docx';
+        $this->service->write(
+            "# Application\n\n{{IMAGE:file:42}}\n\nCover letter",
+            'docx',
+            $path,
+            ['file:42' => $imagePath],
+        );
+
+        $documentXml = $this->readDocxDocument($path);
+        $this->assertTrue(
+            str_contains($documentXml, '<w:drawing>') || str_contains($documentXml, '<w:pict>'),
+            'DOCX must contain an OOXML image element',
+        );
+        $this->assertStringNotContainsString('{{IMAGE:', $documentXml);
+        $this->assertTrue($this->docxContainsMedia($path), 'DOCX must contain the embedded image binary');
+    }
+
+    public function testDocxRejectsUnresolvedImageReference(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Document image reference could not be resolved');
+
+        $this->service->write('{{IMAGE:file:999}}', 'docx', $this->tmpDir.'/missing_image.docx');
+    }
+
     public function testWriteDocxThrowsOnEmptyContent(): void
     {
         $this->expectException(\RuntimeException::class);
@@ -151,5 +187,26 @@ class DocumentGeneratorServiceTest extends TestCase
         $zip->close();
 
         return $found;
+    }
+
+    private function docxContainsMedia(string $path): bool
+    {
+        $zip = new \ZipArchive();
+        if (true !== $zip->open($path)) {
+            return false;
+        }
+
+        for ($index = 0; $index < $zip->numFiles; ++$index) {
+            $name = $zip->getNameIndex($index);
+            if (is_string($name) && str_starts_with($name, 'word/media/')) {
+                $zip->close();
+
+                return true;
+            }
+        }
+
+        $zip->close();
+
+        return false;
     }
 }

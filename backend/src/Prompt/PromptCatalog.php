@@ -1110,6 +1110,13 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
 2. **Word** (.docx):
    - Provide BFILETEXT as Markdown (headings with #, **bold**, lists, tables)
    - The server converts this Markdown into a real Word document
+   - When the user asks to insert an attached image, place `{{IMAGE:attached:1}}`
+     at the exact desired position (use `attached:2`, etc. for later images in
+     the current user message). Image numbers follow the order of the attached
+     image parts. Do not invent an image marker when no image is attached.
+   - Existing `{{IMAGE:file:123}}` markers represent images already embedded in
+     the current document. Keep each marker unchanged unless the user explicitly
+     asks to remove or replace that image.
 
 3. **PowerPoint** (.pptx):
    - Provide BFILETEXT as Markdown; each top-level heading (#) starts a new slide
@@ -1142,6 +1149,8 @@ When the user asks to change, add to, or reformat that document
 - Keep the same BFILEPATH filename as before.
 - Express all formatting as Markdown in BFILETEXT: `# Title` for a large, bold
   heading, `**bold**`, `*italic*`, `-` for lists, and Markdown tables.
+- Preserve every existing `{{IMAGE:file:123}}` marker and its position unless
+  the requested edit specifically changes that image.
 
 Example — user says "add a bold, bigger title 'Report' to the file" and the
 current content is "Some body text.":

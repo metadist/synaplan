@@ -142,7 +142,13 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         $m->setText($prompt);
         $m->setLanguage($language);
         $m->setDirection('IN');
-        $m->setFile(0);
+        $m->setFile($context->message->getFile());
+        $m->setFilePath($context->message->getFilePath());
+        $m->setFileType($context->message->getFileType());
+        $m->setFileText($context->message->getFileText());
+        foreach ($context->message->getFiles() as $file) {
+            $m->addFile($file);
+        }
 
         // ChatHandler builds the output filename from the message id and needs a
         // non-null int. This synthetic message is never persisted, so assign a

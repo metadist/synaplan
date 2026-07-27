@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
+use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
@@ -83,6 +84,7 @@ class StreamController extends AbstractController
         private MessageForwardingService $messageForwardingService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private DocumentGeneratorService $documentGenerator,
+        private DocumentImageReferenceResolver $documentImageReferenceResolver,
         private MediaCancellationStore $cancellationStore,
         private MediaJobService $mediaJobService,
         private MediaJobMessageSync $mediaJobMessageSync,
@@ -3153,6 +3155,9 @@ class StreamController extends AbstractController
         }
 
         try {
+            $resolvedDocument = $this->documentImageReferenceResolver->resolve($content, $message);
+            $content = $resolvedDocument['content'];
+
             // Generate storage path similar to FileStorageService
             $year = date('Y');
             $month = date('m');
@@ -3183,7 +3188,7 @@ class StreamController extends AbstractController
 
             // Write file content (real OOXML for docx/xlsx/pptx, text otherwise)
             try {
-                $this->documentGenerator->write($content, $extension, $absolutePath);
+                $this->documentGenerator->write($content, $extension, $absolutePath, $resolvedDocument['images']);
             } catch (\Throwable $e) {
                 $this->logger->error('StreamController: Failed to write file', [
                     'path' => $absolutePath,

@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
 use App\Repository\FileRepository;
 use App\Service\File\DocumentGeneratorService;
+use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
@@ -66,6 +67,7 @@ final class StreamControllerRagGroupKeyTest extends TestCase
             $this->createMock(MessageForwardingService::class),
             $this->createMock(MemoryExtractionDispatcher::class),
             $this->createMock(DocumentGeneratorService::class),
+            $this->createMock(DocumentImageReferenceResolver::class),
             $this->createMock(MediaCancellationStore::class),
             $this->createMock(MediaJobService::class),
             $this->createMock(MediaJobMessageSync::class),
