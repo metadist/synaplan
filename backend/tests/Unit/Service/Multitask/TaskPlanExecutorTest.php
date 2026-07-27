@@ -273,7 +273,11 @@ final class TaskPlanExecutorTest extends TestCase
             planningUsage: $planningUsage,
         ));
         $this->router->method('routeStream')->willReturn([
-            'response' => ['content' => 'router answer', 'metadata' => []],
+            'metadata' => [
+                'provider' => 'openai',
+                'model' => 'gpt-4o',
+                'usage' => ['total_tokens' => 25],
+            ],
         ]);
 
         $result = $this->executor->executeStream(
@@ -283,7 +287,9 @@ final class TaskPlanExecutorTest extends TestCase
             static function (): void {},
         );
 
-        self::assertSame($planningUsage, $result['response']['metadata']['planning_usage']);
+        self::assertSame($planningUsage, $result['metadata']['planning_usage']);
+        self::assertSame('openai', $result['metadata']['provider']);
+        self::assertSame(['total_tokens' => 25], $result['metadata']['usage']);
     }
 
     public function testFileAttachmentMultiIntentRunsDag(): void
