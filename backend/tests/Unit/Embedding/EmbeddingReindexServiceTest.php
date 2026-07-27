@@ -6,7 +6,9 @@ namespace App\Tests\Unit\Embedding;
 
 use App\AI\Service\AiFacade;
 use App\Entity\RevectorizeRun;
+use App\Entity\UserMemory;
 use App\Repository\RevectorizeRunRepository;
+use App\Repository\UserMemoryRepository;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingReindexService;
 use App\Service\Memory\MemoryEmbeddingModelResolver;
@@ -22,8 +24,7 @@ use Psr\Log\NullLogger;
  * confirming the new model actually produced the catalog-claimed
  * dimensions. These tests pin the new safety net: a probe-embed runs
  * first, dimension mismatches abort BEFORE any destructive operation,
- * and `SCOPE_ALL` no longer routes memories through the reindex at all
- * while the temporary disable from the team consensus is in place.
+ * and successful runs rebuild Qdrant exclusively from durable SQL rows.
  */
 final class EmbeddingReindexServiceTest extends TestCase
 {
@@ -32,6 +33,7 @@ final class EmbeddingReindexServiceTest extends TestCase
     private EmbeddingMetadataService&MockObject $metadata;
     private MemoryEmbeddingModelResolver&MockObject $memoryResolver;
     private RevectorizeRunRepository&MockObject $runRepository;
+    private UserMemoryRepository&MockObject $memoryRepository;
     private Connection&MockObject $connection;
     private EmbeddingReindexService $service;
 
@@ -42,6 +44,7 @@ final class EmbeddingReindexServiceTest extends TestCase
         $this->metadata = $this->createMock(EmbeddingMetadataService::class);
         $this->memoryResolver = $this->createMock(MemoryEmbeddingModelResolver::class);
         $this->runRepository = $this->createMock(RevectorizeRunRepository::class);
+        $this->memoryRepository = $this->createMock(UserMemoryRepository::class);
         $this->connection = $this->createMock(Connection::class);
 
         $this->service = new EmbeddingReindexService(
@@ -50,6 +53,7 @@ final class EmbeddingReindexServiceTest extends TestCase
             $this->metadata,
             $this->memoryResolver,
             $this->runRepository,
+            $this->memoryRepository,
             $this->connection,
             new NullLogger(),
         );
@@ -73,7 +77,7 @@ final class EmbeddingReindexServiceTest extends TestCase
         ]);
 
         $this->qdrantClient->expects($this->never())->method('recreateMemoriesCollection');
-        $this->qdrantClient->expects($this->never())->method('scrollAllMemoriesForReindex');
+        $this->memoryRepository->expects($this->never())->method('findActiveBatchAfterId');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('catalog metadata for model "text-embedding-3-large" claims 3072');
@@ -121,15 +125,13 @@ final class EmbeddingReindexServiceTest extends TestCase
             'embedding' => array_fill(0, 1536, 0.01),
         ]);
 
-        $this->qdrantClient
-            ->expects($this->once())
-            ->method('scrollAllMemoriesForReindex')
-            ->willReturn([]);
+        $this->memoryRepository->method('findActiveNamespaces')->willReturn([]);
+        $this->memoryRepository->method('findActiveBatchAfterId')->willReturn([]);
 
         $this->qdrantClient
             ->expects($this->once())
             ->method('recreateMemoriesCollection')
-            ->with(1536);
+            ->with(1536, null);
 
         // After a successful memories re-index the sticky pointer must
         // advance to the new model — otherwise UserMemoryService would
@@ -167,7 +169,55 @@ final class EmbeddingReindexServiceTest extends TestCase
         $this->service->execute($run);
     }
 
-    public function testScopeAllSkipsMemoriesWhileTemporaryDisableIsActive(): void
+    public function testMemoriesScopeRebuildsQdrantFromSqlRows(): void
+    {
+        $this->metadata->method('getCurrentModel')->willReturn([
+            'provider' => 'openai',
+            'model' => 'text-embedding-3-small',
+            'model_id' => 21,
+            'vector_dim' => 3,
+        ]);
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => [0.1, 0.2, 0.3],
+        ]);
+        $memory = new UserMemory(
+            id: 456,
+            userId: 12,
+            category: 'preferences',
+            key: 'ui_theme',
+            value: 'dark',
+            source: UserMemory::SOURCE_USER_CREATED,
+        );
+        $this->memoryRepository->method('findActiveNamespaces')->willReturn([null]);
+        $this->memoryRepository->expects($this->exactly(2))
+            ->method('findActiveBatchAfterId')
+            ->willReturnOnConsecutiveCalls([$memory], []);
+        $this->aiFacade->expects($this->once())
+            ->method('embedBatch')
+            ->with(['ui_theme: dark'], 0, 'openai', $this->anything())
+            ->willReturn([
+                'embeddings' => [[0.1, 0.2, 0.3]],
+                'usage' => ['total_tokens' => 2],
+            ]);
+        $this->qdrantClient->expects($this->once())
+            ->method('upsertMemory')
+            ->with(
+                'mem_12_456',
+                [0.1, 0.2, 0.3],
+                $this->callback(static fn (array $payload): bool => 'dark' === $payload['value']),
+                null,
+            );
+        $this->qdrantClient->expects($this->never())->method('scrollAllMemoriesForReindex');
+        $this->memoryResolver->expects($this->once())->method('rememberModel')->with(21);
+
+        $run = $this->makeRun(RevectorizeRun::SCOPE_MEMORIES, fromId: 10, toId: 21);
+        $this->service->execute($run);
+
+        self::assertSame(1, $run->getChunksProcessed());
+        self::assertSame(0, $run->getChunksFailed());
+    }
+
+    public function testScopeAllRebuildsMemoriesFromSql(): void
     {
         $this->metadata->method('getCurrentModel')->willReturn([
             'provider' => 'openai',
@@ -176,13 +226,15 @@ final class EmbeddingReindexServiceTest extends TestCase
             'vector_dim' => 1536,
         ]);
 
-        // SCOPE_ALL must NOT trigger any memories work — the
-        // controller already refuses scope=memories explicitly, and
-        // we don't want the "switch everything" UX to re-introduce
-        // the data-loss path through the back door.
-        $this->aiFacade->expects($this->never())->method('embed');
-        $this->qdrantClient->expects($this->never())->method('scrollAllMemoriesForReindex');
-        $this->qdrantClient->expects($this->never())->method('recreateMemoriesCollection');
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1536, 0.01),
+        ]);
+        $this->memoryRepository->method('findActiveNamespaces')->willReturn([]);
+        $this->memoryRepository->method('findActiveBatchAfterId')->willReturn([]);
+        $this->qdrantClient->expects($this->once())
+            ->method('recreateMemoriesCollection')
+            ->with(1536, null);
+        $this->memoryResolver->expects($this->once())->method('rememberModel')->with(21);
 
         // Documents are still invoked. Stub to no-op.
         $this->connection->method('fetchAllAssociative')->willReturn([]);

@@ -171,22 +171,6 @@ final class AdminEmbeddingController extends AbstractController
             return $this->json(['error' => 'Invalid field: scope'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Issue #985 — re-vectorising the memories collection is
-        // temporarily refused because a model switch with a different
-        // output dimension destroys the entire user memory store before
-        // probe-time safety checks were added. The probe + collection
-        // rollback in EmbeddingReindexService / ReVectorizeMessageHandler
-        // protect against catastrophic dim mismatches now, but the team
-        // also agreed (see #985 discussion) that memory migration should
-        // stay disabled until a separate per-user collection design lands.
-        // The documents scope remains available.
-        if (RevectorizeRun::SCOPE_MEMORIES === $scope) {
-            return $this->json([
-                'error' => 'memories_switch_disabled',
-                'message' => 'Re-vectorising the memories collection is temporarily disabled (see #985). Use scope=documents instead.',
-            ], Response::HTTP_FORBIDDEN);
-        }
-
         $model = $this->modelRepository->find($toModelId);
         if (!$model) {
             return $this->json(['error' => 'Model not found'], Response::HTTP_NOT_FOUND);

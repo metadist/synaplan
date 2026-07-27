@@ -98,10 +98,6 @@ class UserMemoryController extends AbstractController
         Request $request,
         #[CurrentUser] User $user,
     ): JsonResponse {
-        if (null !== $response = $this->assertMemoryServiceAvailable($user)) {
-            return $response;
-        }
-
         $category = $request->query->get('category');
 
         $memories = $this->memoryService->getUserMemories($user->getId(), $category);
@@ -150,10 +146,6 @@ class UserMemoryController extends AbstractController
         int $id,
         #[CurrentUser] User $user,
     ): JsonResponse {
-        if (null !== $response = $this->assertMemoryServiceAvailable($user)) {
-            return $response;
-        }
-
         $memory = $this->memoryService->getMemoryById($id, $user);
 
         if (!$memory) {
@@ -193,10 +185,6 @@ class UserMemoryController extends AbstractController
     )]
     public function getCategories(#[CurrentUser] User $user): JsonResponse
     {
-        if (null !== $response = $this->assertMemoryServiceAvailable($user)) {
-            return $response;
-        }
-
         $categories = $this->memoryService->getCategoriesWithCounts($user);
 
         return $this->json([
@@ -391,8 +379,8 @@ class UserMemoryController extends AbstractController
                 $value,
                 'user_edited',
                 null,
-                $category,
-                $key
+                $key,
+                $category
             );
 
             return $this->json([
@@ -539,6 +527,57 @@ class UserMemoryController extends AbstractController
         ]);
     }
 
+    #[Route('/export', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/user/memories/export',
+        summary: 'Export all user memories',
+        description: 'Downloads every memory stored for the current user as JSON for data portability',
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Memory export',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'exportedAt', type: 'string', format: 'date-time'),
+                        new OA\Property(
+                            property: 'memories',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 123),
+                                    new OA\Property(property: 'userId', type: 'integer', example: 42),
+                                    new OA\Property(property: 'category', type: 'string', example: 'preferences'),
+                                    new OA\Property(property: 'key', type: 'string', example: 'ui_theme'),
+                                    new OA\Property(property: 'value', type: 'string', example: 'Prefers dark mode'),
+                                    new OA\Property(property: 'source', type: 'string', example: 'user_created'),
+                                    new OA\Property(property: 'messageId', type: 'integer', nullable: true, example: 456),
+                                    new OA\Property(property: 'created', type: 'integer', example: 1705234567),
+                                    new OA\Property(property: 'updated', type: 'integer', example: 1705234567),
+                                    new OA\Property(property: 'active', type: 'boolean', example: true),
+                                    new OA\Property(property: 'namespace', type: 'string', nullable: true, example: null),
+                                ],
+                                type: 'object'
+                            )
+                        ),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function exportMemories(#[CurrentUser] User $user): JsonResponse
+    {
+        $response = $this->json([
+            'exportedAt' => date(\DATE_ATOM),
+            'memories' => $this->memoryService->exportUserMemories($user->getId()),
+        ]);
+        $response->headers->set(
+            'Content-Disposition',
+            sprintf('attachment; filename="synaplan-memories-%s.json"', date('Y-m-d')),
+        );
+
+        return $response;
+    }
+
     #[Route('/parse', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/user/memories/parse',
@@ -583,10 +622,6 @@ class UserMemoryController extends AbstractController
         Request $request,
         #[CurrentUser] User $user,
     ): JsonResponse {
-        if (null !== $response = $this->assertMemoryServiceAvailable($user)) {
-            return $response;
-        }
-
         $data = $request->toArray();
         $input = $data['input'] ?? '';
         $suggestedCategory = $data['suggestedCategory'] ?? null;

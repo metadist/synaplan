@@ -1447,8 +1447,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             return;
         }
 
-        // Incognito: memories are read-only — extraction would write
-        // conversation content to Qdrant, which the mode forbids.
+        // Incognito: memories are read-only — extraction would persist
+        // conversation content, which the mode forbids.
         if (!empty($options['incognito'])) {
             $this->logger->debug('MediaGenerationHandler: Skipping memory extraction (incognito)', [
                 'user_id' => $message->getUserId(),
