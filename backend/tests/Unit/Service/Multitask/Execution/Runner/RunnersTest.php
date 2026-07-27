@@ -305,6 +305,7 @@ final class RunnersTest extends TestCase
         self::assertSame('audio', $result->files[0]['type']);
         self::assertSame('/api/v1/files/uploads/1/000/2026/06/tts_x.mp3', $result->files[0]['path']);
         self::assertSame('1/000/2026/06/tts_x.mp3', $result->files[0]['local_path']);
+        self::assertSame('read this aloud', $result->files[0]['source_text']);
     }
 
     public function testText2SoundFailsWhenNoText(): void
