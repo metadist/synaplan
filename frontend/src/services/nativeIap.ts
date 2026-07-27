@@ -306,7 +306,17 @@ export async function purchaseProduct(productId: string): Promise<IapPurchaseOut
   }
   await initPromise
 
-  const offer = cdv.store.get(productId, storePlatform(cdv))?.getOffer()
+  let offer = cdv.store.get(productId, storePlatform(cdv))?.getOffer()
+  if (!offer) {
+    // The store catalogue may not have loaded yet (slow store connection on a
+    // cold start) — refresh once before giving up.
+    try {
+      await cdv.store.update()
+    } catch {
+      /* fall through to the product_unknown outcome */
+    }
+    offer = cdv.store.get(productId, storePlatform(cdv))?.getOffer()
+  }
   if (!offer) {
     return { status: 'error', code: 'product_unknown' }
   }

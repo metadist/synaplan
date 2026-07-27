@@ -368,7 +368,11 @@ async function continueWithPlan(): Promise<void> {
 
 function purchaseErrorKey(code: string): string {
   if ('ownership_conflict' === code) return 'subscription.native.purchaseConflict'
-  if ('not_available' === code) return 'subscription.native.purchaseUnavailable'
+  // `product_unknown` = the store catalogue did not load (e.g. store outage,
+  // or a simulator run without the StoreKit test configuration) — that is a
+  // "purchases unavailable" situation, not a failed charge.
+  if ('not_available' === code || 'product_unknown' === code)
+    return 'subscription.native.purchaseUnavailable'
   return 'subscription.native.purchaseFailed'
 }
 
