@@ -15,7 +15,7 @@ use Psr\Log\LoggerInterface;
  *
  * Chat and vision share the same `/v1/chat/completions` endpoint. Vision is
  * only offered by models that advertise it (currently Qwen3.6); GLM-5.2 and
- * the R1T2 Chimera are text-only.
+ * GPT OSS 120B are text-only.
  *
  * @see https://trustedtokens.eu/docs/
  * @see https://api.trustedtokens.eu/v1

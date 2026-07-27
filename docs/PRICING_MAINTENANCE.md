@@ -136,7 +136,7 @@ German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`)
 | --- | ----- | -------------- | --------------- | ------- |
 | 309 | `zai-org/GLM-5.2` | $1.50 / $4.50 | $1.50 / $4.50 (cache $0.30) | 230k |
 | 310 / 311 | `Qwen/Qwen3.6-35B-A3B-FP8` (chat + vision) | $0.25 / $1.50 | $0.25 / $1.50 (cache $0.05) | 262k |
-| 312 | `tngtech/DeepSeek-TNG-R1T2-Chimera` | $1.00 / $3.00 | $1.00 / $3.00 (cache $0.20) | 164k |
+| 312 | `openai/gpt-oss-120b` | $0.15 / $0.60 | $0.15 / $0.60 (cache $0.05) | 131k |
 
 Not in LiteLLM → lands in the sync's `unmatched` bucket; re-verify via `curl https://trustedtokens.eu/api/billing/models`.
 

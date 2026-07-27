@@ -266,25 +266,25 @@ class ModelCatalogTest extends TestCase
         $glm = ModelCatalog::find('trustedtokens:zai-org/glm-5.2:chat');
         $qwenChat = ModelCatalog::find('trustedtokens:qwen/qwen3.6-35b-a3b-fp8:chat');
         $qwenVision = ModelCatalog::find('trustedtokens:qwen/qwen3.6-35b-a3b-fp8:pic2text');
-        $chimera = ModelCatalog::find('trustedtokens:tngtech/deepseek-tng-r1t2-chimera:chat');
+        $gptOss = ModelCatalog::find('trustedtokens:openai/gpt-oss-120b:chat');
 
         $this->assertCount(1, $glm);
         $this->assertCount(1, $qwenChat);
         $this->assertCount(1, $qwenVision);
-        $this->assertCount(1, $chimera);
+        $this->assertCount(1, $gptOss);
 
         $this->assertSame('zai-org/GLM-5.2', $glm[0]['providerId']);
         $this->assertSame('Qwen/Qwen3.6-35B-A3B-FP8', $qwenChat[0]['providerId']);
-        $this->assertSame('tngtech/DeepSeek-TNG-R1T2-Chimera', $chimera[0]['providerId']);
+        $this->assertSame('openai/gpt-oss-120b', $gptOss[0]['providerId']);
 
         $this->assertEqualsWithDelta(1.50, (float) $glm[0]['priceIn'], 1e-9);
         $this->assertEqualsWithDelta(4.50, (float) $glm[0]['priceOut'], 1e-9);
         $this->assertEqualsWithDelta(0.25, (float) $qwenChat[0]['priceIn'], 1e-9);
         $this->assertEqualsWithDelta(1.50, (float) $qwenChat[0]['priceOut'], 1e-9);
-        $this->assertEqualsWithDelta(1.00, (float) $chimera[0]['priceIn'], 1e-9);
-        $this->assertEqualsWithDelta(3.00, (float) $chimera[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $gptOss[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.60, (float) $gptOss[0]['priceOut'], 1e-9);
 
-        foreach ([$glm[0], $qwenChat[0], $qwenVision[0], $chimera[0]] as $row) {
+        foreach ([$glm[0], $qwenChat[0], $qwenVision[0], $gptOss[0]] as $row) {
             $this->assertSame('TrustedTokens', $row['service']);
             $this->assertSame('DE', $row['json']['meta']['jurisdiction'] ?? null);
         }
