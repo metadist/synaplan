@@ -86,7 +86,8 @@ final class SystemConfigServiceTest extends TestCase
      */
     public function testGetValuesReadsMultitaskFlagFromTheMultitaskGroup(): void
     {
-        $this->configRepository->method('getValue')
+        $this->configRepository->expects($this->atLeastOnce())
+            ->method('getValue')
             ->willReturnCallback(
                 static fn (int $owner, string $group, string $setting): ?string => 'MULTITASK' === $group && 'ROUTING_ENABLED' === $setting ? 'false' : null
             );
@@ -95,5 +96,47 @@ final class SystemConfigServiceTest extends TestCase
 
         $this->assertSame('false', $values['MULTITASK_ROUTING_ENABLED']['value']);
         $this->assertTrue($values['MULTITASK_ROUTING_ENABLED']['isSet']);
+    }
+
+    public function testGetValuesExposesActingAdminsEffectiveRoutingOverride(): void
+    {
+        $this->configRepository->expects($this->atLeastOnce())
+            ->method('getValue')
+            ->willReturnCallback(
+                static function (int $owner, string $group, string $setting): ?string {
+                    if ('MULTITASK' !== $group || 'ROUTING_ENABLED' !== $setting) {
+                        return null;
+                    }
+
+                    return 7 === $owner ? 'false' : 'true';
+                }
+            );
+
+        $values = $this->service->getValues(7);
+        $routing = $values['MULTITASK_ROUTING_ENABLED'];
+
+        $this->assertSame('true', $routing['value']);
+        $this->assertTrue($routing['hasPersonalOverride']);
+        $this->assertSame('false', $routing['effectiveForMe']);
+    }
+
+    public function testGetValuesFallsBackToGlobalRoutingValueWithoutPersonalOverride(): void
+    {
+        $this->configRepository->expects($this->atLeastOnce())
+            ->method('getValue')
+            ->willReturnCallback(
+                static fn (int $owner, string $group, string $setting): ?string => 0 === $owner
+                    && 'MULTITASK' === $group
+                    && 'ROUTING_ENABLED' === $setting
+                        ? 'true'
+                        : null
+            );
+
+        $values = $this->service->getValues(7);
+        $routing = $values['MULTITASK_ROUTING_ENABLED'];
+
+        $this->assertSame('true', $routing['value']);
+        $this->assertFalse($routing['hasPersonalOverride']);
+        $this->assertSame('true', $routing['effectiveForMe']);
     }
 }
