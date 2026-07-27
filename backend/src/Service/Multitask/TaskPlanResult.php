@@ -16,8 +16,9 @@ use App\Service\Multitask\Plan\TaskPlan;
 final readonly class TaskPlanResult
 {
     /**
-     * @param list<string>                                                                                                         $errors
-     * @param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $planningUsage
+     * @param list<string> $errors
+     *
+     * @phpstan-param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $planningUsage
      */
     public function __construct(
         public TaskPlan $plan,

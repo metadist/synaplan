@@ -168,8 +168,9 @@ final readonly class TaskPlanner
     }
 
     /**
-     * @param list<string>                                                                                                         $errors
-     * @param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $planningUsage
+     * @param list<string> $errors
+     *
+     * @phpstan-param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $planningUsage
      */
     private function fallback(
         string $language,
