@@ -104,6 +104,7 @@ Catalog now set to DeepInfra rates. Note K2.7 was previously $0.95/$4.00 (ABOVE 
 - Higgsfield (dashboard only — no public table): https://cloud.higgsfield.ai/ · docs https://docs.higgsfield.ai/
 - DeepInfra (Kimi partner we pin): https://deepinfra.com/pricing
 - Kimi direct: https://platform.kimi.ai/docs/pricing/chat
+- TrustedTokens (JSON catalog, not the JS marketing page): https://trustedtokens.eu/api/billing/models · docs https://trustedtokens.eu/docs/
 
 **Tooling / cross-checks:**
 
@@ -124,7 +125,20 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | Higgsfield | ⚠️ NOT publicly verifiable — see below | dashboard only |
 | **Mistral** | ✅ verified 2026-07-13 — all correct | https://mistral.ai/pricing/api/ |
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
+| **TrustedTokens** | ✅ verified 2026-07-27 | https://trustedtokens.eu/api/billing/models |
 | Piper / Triton | n/a — free/local | — |
+
+### TrustedTokens (verified 2026-07-27)
+
+German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`). Per-token rates come from the public billing catalog (not the JS-rendered marketing page); subscription plans (€50 / €200 / €2,000) are prepaid usage credits that draw down against these rates. Catalog stores **USD per 1M tokens** (same unit as every other cloud provider). Cache-read rates are authored in `json.cache_read_price_per_1M`.
+
+| BID | Model | Catalog in/out | Official (×1e6) | Context |
+| --- | ----- | -------------- | --------------- | ------- |
+| 309 | `zai-org/GLM-5.2` | $1.50 / $4.50 | $1.50 / $4.50 (cache $0.30) | 230k |
+| 310 / 311 | `Qwen/Qwen3.6-35B-A3B-FP8` (chat + vision) | $0.25 / $1.50 | $0.25 / $1.50 (cache $0.05) | 262k |
+| 312 | `tngtech/DeepSeek-TNG-R1T2-Chimera` | $1.00 / $3.00 | $1.00 / $3.00 (cache $0.20) | 164k |
+
+Not in LiteLLM → lands in the sync's `unmatched` bucket; re-verify via `curl https://trustedtokens.eu/api/billing/models`.
 
 ### TheHive (verified 2026-07-13)
 
