@@ -1189,7 +1189,7 @@ class AiFacade
         // local whisper.cpp bypasses AiFacade and is free — so recording here
         // meters all channels exactly once (#1314). No-ops without a user, a
         // priced model_id, or a positive duration.
-        $this->transcriptionUsageRecorder->record(
+        $recordedTranscriptionUsage = $this->transcriptionUsageRecorder->record(
             userId: $userId,
             modelId: $sttModelId,
             provider: $provider->getName(),
@@ -1197,6 +1197,13 @@ class AiFacade
             durationSeconds: (float) ($result['duration'] ?? 0),
             extraMetadata: ['language' => $result['language'] ?? 'unknown'],
         );
+        if (null !== $recordedTranscriptionUsage) {
+            $enriched['transcription_usage'] = $recordedTranscriptionUsage->toMessageUsage(
+                $provider->getName(),
+                (string) $enriched['model'],
+                'TRANSCRIPTION',
+            );
+        }
 
         return $enriched;
     }

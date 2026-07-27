@@ -256,6 +256,36 @@ final class TaskPlanExecutorTest extends TestCase
         self::assertSame(['content' => 'router answer'], $result);
     }
 
+    public function testPlanningUsageSurvivesDelegationToLegacyRouter(): void
+    {
+        $planningUsage = [
+            'promptTokens' => 40,
+            'completionTokens' => 10,
+            'totalTokens' => 50,
+            'cost' => '0.001500',
+            'modelKey' => 'openai:planner',
+            'kind' => 'PLANNING',
+        ];
+        $this->planner->method('plan')->willReturn(new TaskPlanResult(
+            TaskPlan::singleChatPlan('en'),
+            fallback: false,
+            modelId: 76,
+            planningUsage: $planningUsage,
+        ));
+        $this->router->method('routeStream')->willReturn([
+            'response' => ['content' => 'router answer', 'metadata' => []],
+        ]);
+
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting'],
+            static function (): void {},
+        );
+
+        self::assertSame($planningUsage, $result['response']['metadata']['planning_usage']);
+    }
+
     public function testFileAttachmentMultiIntentRunsDag(): void
     {
         // Issue #1192: a non-image attachment carrying multiple intents

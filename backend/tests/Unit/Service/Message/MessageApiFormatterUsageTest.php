@@ -113,6 +113,25 @@ final class MessageApiFormatterUsageTest extends TestCase
         self::assertSame(42, $usage['totalTokens']);
     }
 
+    public function testAuxiliaryTurnUsageSurvivesHistorySerialization(): void
+    {
+        $m = $this->makeOutMessage();
+        $m->setMeta('ai_usage_extra', json_encode([[
+            'promptTokens' => 12,
+            'completionTokens' => 3,
+            'totalTokens' => 15,
+            'cost' => '0.004200',
+            'modelKey' => 'openai:planner',
+            'kind' => 'PLANNING',
+        ]]));
+
+        $usageExtra = $this->formatter->format($m)['usageExtra'];
+
+        self::assertIsArray($usageExtra);
+        self::assertSame('PLANNING', $usageExtra[0]['kind']);
+        self::assertSame('0.004200', $usageExtra[0]['cost']);
+    }
+
     public function testIncomingMessageHasNoUsage(): void
     {
         $m = $this->makeMessage('IN', 'question');

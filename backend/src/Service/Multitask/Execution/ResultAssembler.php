@@ -147,7 +147,7 @@ final class ResultAssembler
             $completionTokens += $nodeCompletion;
             $totalTokens += (int) ($nodeUsage['total_tokens'] ?? ($nodePrompt + $nodeCompletion));
         }
-        if ($totalTokens > 0 && empty($metadata['usage'])) {
+        if ($totalTokens > 0) {
             $metadata['usage'] = [
                 'prompt_tokens' => $promptTokens,
                 'completion_tokens' => $completionTokens,

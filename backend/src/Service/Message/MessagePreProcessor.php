@@ -223,6 +223,7 @@ final readonly class MessagePreProcessor
                     $fileType,
                     $messageFile->getUserId(),
                 );
+                $this->persistTranscriptionUsage($message, $extractMeta);
 
                 if ('' !== trim((string) $text)) {
                     $messageFile->setFileText($text);
@@ -268,6 +269,7 @@ final readonly class MessagePreProcessor
                 $result = $useExternal
                     ? $this->aiFacade->transcribe($fullPath, $userId)
                     : $this->transcribeWithWhisper($fullPath, null);
+                $this->persistTranscriptionUsage($message, $result);
                 if ($result && !empty($result['text'])) {
                     $transcribedText = $result['text'];
                     $messageFile->setFileText($transcribedText);
@@ -433,6 +435,7 @@ final readonly class MessagePreProcessor
                 $result = $useExternal
                     ? $this->aiFacade->transcribe($fullPath, $userId)
                     : $this->transcribeWithWhisper($fullPath, $message->getLanguage());
+                $this->persistTranscriptionUsage($message, $result);
                 if ($result && !empty($result['text'])) {
                     $transcribedText = $result['text'];
                     $message->setFileText($transcribedText);
@@ -476,11 +479,12 @@ final readonly class MessagePreProcessor
             ]);
 
             try {
-                [$text] = $this->fileProcessor->extractText(
+                [$text, $extractMeta] = $this->fileProcessor->extractText(
                     $filePath,
                     $fileType,
                     $message->getUserId(),
                 );
+                $this->persistTranscriptionUsage($message, $extractMeta);
 
                 if ('' !== trim((string) $text)) {
                     $message->setFileText($text);
@@ -581,6 +585,22 @@ final readonly class MessagePreProcessor
 
             return null;
         }
+    }
+
+    /**
+     * Keep the billed external STT call attached to the incoming turn so the
+     * eventual assistant message can expose it in its complete usage details.
+     *
+     * @param array<string, mixed>|null $result
+     */
+    private function persistTranscriptionUsage(Message $message, ?array $result): void
+    {
+        $usage = $result['transcription_usage'] ?? null;
+        if (null === $message->getId() || !is_array($usage)) {
+            return;
+        }
+
+        $message->setMeta('ai_transcription_usage', (string) json_encode($usage));
     }
 
     /**

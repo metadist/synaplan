@@ -271,7 +271,7 @@ class MessageController extends AbstractController
             // above (same DEFAULTMODEL/CHAT lookup the facade uses).
             $resolvedModelId = $modelId;
 
-            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+            $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                 'provider' => $aiResponse['provider'] ?? 'unknown',
                 'model' => $aiResponse['model'] ?? 'unknown',
                 'model_id' => $resolvedModelId,
@@ -280,6 +280,7 @@ class MessageController extends AbstractController
                 'response_text' => $responseText,
                 'source' => 'WEB',
             ]);
+            $outgoingMessage->setMeta('ai_chat_cost', $recordedChatUsage->chargedCost);
 
             // NOTE: MessageController doesn't use MessageProcessor, so there's no sorting model info here
             // Only StreamController (which uses MessageProcessor) has sorting model metadata

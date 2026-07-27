@@ -15,6 +15,7 @@ use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
+use App\Service\Usage\RecordedUsage;
 use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -76,6 +77,9 @@ class WhatsAppServiceTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->rateLimitService->method('recordUsage')->willReturn(
+            new RecordedUsage('0.001000', '0.001000', 10, 5, 15),
+        );
         $this->messageProcessor = $this->createMock(MessageProcessor::class);
         $this->fileProcessor = $this->createMock(FileProcessor::class);
         $this->aiFacade = $this->createMock(AiFacade::class);

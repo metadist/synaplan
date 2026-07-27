@@ -67,6 +67,23 @@ function parseCost(raw: string | number | null | undefined): number {
   return Number.isFinite(n) && n > 0 ? n : 0
 }
 
+/** Sum every billed step that belongs to one assistant turn. */
+export function aggregateTurnUsage(
+  usage?: MessageUsage | null,
+  extra?: MessageUsage[] | null
+): { totalTokens: number; cost: number } | null {
+  const entries = [...(usage ? [usage] : []), ...(extra ?? [])]
+  if (entries.length === 0) return null
+
+  return entries.reduce(
+    (total, entry) => ({
+      totalTokens: total.totalTokens + entry.totalTokens,
+      cost: total.cost + parseCost(entry.cost),
+    }),
+    { totalTokens: 0, cost: 0 }
+  )
+}
+
 /** Human label from a "provider:model" key (strip the provider prefix). */
 function labelFromModelKey(key: string): string {
   const idx = key.indexOf(':')

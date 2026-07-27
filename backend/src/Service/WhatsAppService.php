@@ -12,6 +12,7 @@ use App\Entity\User;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
+use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
@@ -837,7 +838,7 @@ final class WhatsAppService
             $this->em->flush();
         }
 
-        $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+        $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', [
             'provider' => $metadata['provider'] ?? 'unknown',
             'model' => $metadata['model'] ?? 'unknown',
             'usage' => $metadata['usage'] ?? [],
@@ -846,6 +847,14 @@ final class WhatsAppService
             'response_text' => $responseText,
             'input_text' => $message->getText(),
         ]);
+        $metadata['recorded_chat_usage'] = $recordedChatUsage;
+        $rawTranscriptionUsage = $message->getMeta('ai_transcription_usage');
+        if (null !== $rawTranscriptionUsage && '' !== $rawTranscriptionUsage) {
+            $transcriptionUsage = json_decode($rawTranscriptionUsage, true);
+            if (is_array($transcriptionUsage)) {
+                $metadata['transcription_usage'] = $transcriptionUsage;
+            }
+        }
 
         // 8. Send Response based on input type
         $responseSent = false;
@@ -1758,6 +1767,10 @@ final class WhatsAppService
         if (!empty($aiMetadata['usage']) && is_array($aiMetadata['usage'])) {
             $outgoingMessage->setMeta('ai_chat_usage', (string) json_encode($aiMetadata['usage']));
         }
+        $recordedChatUsage = $aiMetadata['recorded_chat_usage'] ?? null;
+        if ($recordedChatUsage instanceof RecordedUsage) {
+            $outgoingMessage->setMeta('ai_chat_cost', $recordedChatUsage->chargedCost);
+        }
         if (!empty($classification['sorting_provider'])) {
             $outgoingMessage->setMeta('ai_sorting_provider', (string) $classification['sorting_provider']);
         }
@@ -1766,6 +1779,29 @@ final class WhatsAppService
         }
         if (!empty($classification['sorting_model_id'])) {
             $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
+        }
+
+        $usageExtra = [];
+        if (is_array($classification['sorting_usage'] ?? null)) {
+            $usageExtra[] = [
+                'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
+                'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
+                'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
+                'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
+                'modelKey' => RecordedUsage::modelKey(
+                    $classification['sorting_provider'] ?? null,
+                    $classification['sorting_model_name'] ?? null,
+                ),
+                'kind' => 'SORT',
+            ];
+        }
+        foreach (['planning_usage', 'transcription_usage'] as $usageKey) {
+            if (is_array($aiMetadata[$usageKey] ?? null)) {
+                $usageExtra[] = $aiMetadata[$usageKey];
+            }
+        }
+        if ([] !== $usageExtra) {
+            $outgoingMessage->setMeta('ai_usage_extra', (string) json_encode($usageExtra));
         }
 
         $resultsList = $searchResults['results'] ?? null;

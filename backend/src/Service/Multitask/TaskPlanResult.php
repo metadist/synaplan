@@ -17,6 +17,8 @@ final readonly class TaskPlanResult
 {
     /**
      * @param list<string> $errors
+     *
+     * @phpstan-param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $planningUsage
      */
     public function __construct(
         public TaskPlan $plan,
@@ -24,6 +26,7 @@ final readonly class TaskPlanResult
         public ?int $modelId = null,
         public string $rawResponse = '',
         public array $errors = [],
+        public ?array $planningUsage = null,
     ) {
     }
 }

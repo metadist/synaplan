@@ -83,7 +83,7 @@ final readonly class TaskPlanner
             // The planner call is a billable LLM request like the sorter's —
             // record it so DAG turns don't get their routing tokens for free.
             // Never let a recording hiccup break planning.
-            $this->recordPlanningUsage($userId, $modelId, $response);
+            $planningUsage = $this->recordPlanningUsage($userId, $modelId, $response);
         } catch (\Throwable $e) {
             $this->logger->warning('TaskPlanner: planner model call failed, falling back', [
                 'error' => $e->getMessage(),
@@ -94,7 +94,7 @@ final readonly class TaskPlanner
 
         $decoded = $this->decodeJson($raw);
         if (null === $decoded) {
-            return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw);
+            return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage);
         }
 
         $errors = $this->validator->validate($decoded);
@@ -103,17 +103,24 @@ final readonly class TaskPlanner
                 'errors' => $errors,
             ]);
 
-            return $this->fallback($language, $errors, $modelId, $raw);
+            return $this->fallback($language, $errors, $modelId, $raw, $planningUsage);
         }
 
         try {
             /** @var array<string, mixed> $decoded */
             $plan = TaskPlan::fromArray($decoded, $this->validator);
         } catch (\Throwable $e) {
-            return $this->fallback($language, ['plan build failed: '.$e->getMessage()], $modelId, $raw);
+            return $this->fallback($language, ['plan build failed: '.$e->getMessage()], $modelId, $raw, $planningUsage);
         }
 
-        return new TaskPlanResult($plan, fallback: false, modelId: $modelId, rawResponse: $raw, errors: []);
+        return new TaskPlanResult(
+            $plan,
+            fallback: false,
+            modelId: $modelId,
+            rawResponse: $raw,
+            errors: [],
+            planningUsage: $planningUsage,
+        );
     }
 
     /**
@@ -121,20 +128,22 @@ final readonly class TaskPlanner
      * MessageSorter::recordSortingUsage — never throws, best-effort.
      *
      * @param array<string, mixed> $response
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null
      */
-    private function recordPlanningUsage(?int $userId, ?int $modelId, array $response): void
+    private function recordPlanningUsage(?int $userId, ?int $modelId, array $response): ?array
     {
         if (null === $userId || $userId <= 0) {
-            return;
+            return null;
         }
 
         try {
             $user = $this->userRepository->find($userId);
             if (null === $user) {
-                return;
+                return null;
             }
 
-            $this->rateLimitService->recordUsage($user, 'PLANNING', [
+            $recorded = $this->rateLimitService->recordUsage($user, 'PLANNING', [
                 'usage' => $response['usage'] ?? [],
                 'model_id' => $modelId,
                 'provider' => $response['provider'] ?? '',
@@ -142,25 +151,41 @@ final readonly class TaskPlanner
                 'input_text' => '',
                 'response_text' => $response['content'] ?? '',
             ]);
+
+            return $recorded->toMessageUsage(
+                $response['provider'] ?? null,
+                $response['model'] ?? null,
+                'PLANNING',
+            );
         } catch (\Throwable $e) {
             $this->logger->warning('TaskPlanner: failed to record planning usage', [
                 'error' => $e->getMessage(),
                 'user_id' => $userId,
             ]);
+
+            return null;
         }
     }
 
     /**
      * @param list<string> $errors
+     *
+     * @phpstan-param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $planningUsage
      */
-    private function fallback(string $language, array $errors, ?int $modelId = null, string $raw = ''): TaskPlanResult
-    {
+    private function fallback(
+        string $language,
+        array $errors,
+        ?int $modelId = null,
+        string $raw = '',
+        ?array $planningUsage = null,
+    ): TaskPlanResult {
         return new TaskPlanResult(
             TaskPlan::singleChatPlan($language),
             fallback: true,
             modelId: $modelId,
             rawResponse: $raw,
             errors: $errors,
+            planningUsage: $planningUsage,
         );
     }
 

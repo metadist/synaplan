@@ -195,6 +195,7 @@
               :media-job="message.mediaJob"
               :was-multitask="message.wasMultitask"
               :usage="message.usage"
+              :usage-extra="message.usageExtra"
               :usage-taximeter-active="usageTaximeterStore.active"
               :is-guest-mode="isGuestMode"
               @regenerate="handleRegenerate(message, $event)"

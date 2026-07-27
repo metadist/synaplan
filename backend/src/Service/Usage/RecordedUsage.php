@@ -26,4 +26,38 @@ final readonly class RecordedUsage
         public int $totalTokens,
     ) {
     }
+
+    /**
+     * Build the canonical message-usage shape shared by live SSE events and
+     * persisted message metadata.
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}
+     */
+    public function toMessageUsage(?string $provider, ?string $model, string $kind): array
+    {
+        return [
+            'promptTokens' => $this->promptTokens,
+            'completionTokens' => $this->completionTokens,
+            'totalTokens' => $this->totalTokens,
+            'cost' => $this->chargedCost,
+            'modelKey' => self::modelKey($provider, $model),
+            'kind' => $kind,
+        ];
+    }
+
+    /**
+     * Compose a stable provider/model key for session grouping.
+     */
+    public static function modelKey(?string $provider, ?string $model): string
+    {
+        $normalizedProvider = strtolower(trim((string) $provider));
+        $normalizedModel = trim((string) $model);
+        if ('' !== $normalizedProvider && '' !== $normalizedModel) {
+            return $normalizedProvider.':'.$normalizedModel;
+        }
+
+        return '' !== $normalizedModel
+            ? $normalizedModel
+            : ('' !== $normalizedProvider ? $normalizedProvider : 'unknown');
+    }
 }
