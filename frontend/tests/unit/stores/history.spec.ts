@@ -250,4 +250,68 @@ describe('History Store', () => {
       expect(audioParts).toHaveLength(0)
     })
   })
+
+  it('polls an in-progress turn until the persisted assistant reply replaces it (#1343)', async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+
+    const getChatMessages = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: true,
+        messages: [{ id: 1, direction: 'IN', text: 'Do two tasks', timestamp: 1700000000 }],
+        pagination: { hasMore: false },
+        inProgressTurn: {
+          reply_node: 'n2',
+          cards: [
+            {
+              nodeId: 'n1',
+              capability: 'chat',
+              kind: 'text',
+              state: 'done',
+              text: 'First task result',
+            },
+            { nodeId: 'n2', capability: 'chat', kind: 'text', state: 'running' },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        messages: [
+          { id: 1, direction: 'IN', text: 'Do two tasks', timestamp: 1700000000 },
+          {
+            id: 2,
+            direction: 'OUT',
+            text: 'Both tasks are complete',
+            timestamp: 1700000010,
+          },
+        ],
+        pagination: { hasMore: false },
+      })
+
+    vi.doMock('@/services/api', () => ({
+      chatApi: { getChatMessages },
+    }))
+
+    try {
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+
+      await store.loadMessages(42)
+
+      expect(store.messages.at(-1)?.id).toBe('in-progress-turn')
+      expect(store.messages.at(-1)?.taskPlan?.cards[0].text).toBe('First task result')
+
+      await vi.advanceTimersByTimeAsync(2000)
+
+      expect(getChatMessages).toHaveBeenCalledTimes(2)
+      expect(store.messages.some((message) => message.id === 'in-progress-turn')).toBe(false)
+      expect(store.messages.at(-1)?.parts[0].content).toBe('Both tasks are complete')
+
+      await vi.advanceTimersByTimeAsync(4000)
+      expect(getChatMessages).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

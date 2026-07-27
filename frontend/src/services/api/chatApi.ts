@@ -8,6 +8,7 @@ import { isNativeApp } from './nativeRuntime'
 import { getNativeAccessToken, hasNativeTokens } from './nativeAuth'
 import { UserMemorySchema } from './userMemoriesApi'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
+import { GetApiChatsMessagesResponseSchema } from '@/generated/api-schemas'
 import type { StreamUpdatePayload } from '@/types/chatStream'
 
 /**
@@ -596,9 +597,10 @@ export const chatApi = {
     })
   },
 
-  async getChatMessages(chatId: number, offset = 0, limit = 50): Promise<unknown> {
+  async getChatMessages(chatId: number, offset = 0, limit = 50) {
     return httpClient(`/api/v1/chats/${chatId}/messages?offset=${offset}&limit=${limit}`, {
       method: 'GET',
+      schema: GetApiChatsMessagesResponseSchema,
     })
   },
 
