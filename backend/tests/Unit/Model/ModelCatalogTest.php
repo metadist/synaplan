@@ -230,12 +230,21 @@ class ModelCatalogTest extends TestCase
         }
     }
 
+    /**
+     * Sonnet 5 also backs the MEM-tagged memory-extraction row (BID 222), so the
+     * bare `service:providerId` key resolves to three variants — capability
+     * bindings must therefore always use the tag-qualified key.
+     */
     public function testClaudeSonnet5ModelsAreAvailableWithExpectedApiIds(): void
     {
         $sonnet5 = ModelCatalog::find('anthropic:claude-sonnet-5');
+        $tags = array_column($sonnet5, 'tag');
+        sort($tags);
 
-        $this->assertCount(2, $sonnet5, 'Expected claude-sonnet-5 chat + vision variants');
-        $this->assertSame(['chat', 'pic2text'], array_column($sonnet5, 'tag'));
+        $this->assertCount(3, $sonnet5, 'Expected claude-sonnet-5 chat + vision + memory-extraction variants');
+        $this->assertSame(['chat', 'mem', 'pic2text'], $tags);
+        $this->assertNotNull(ModelCatalog::findBidByKey('anthropic:claude-sonnet-5:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('anthropic:claude-sonnet-5:pic2text'));
 
         foreach ($sonnet5 as $variant) {
             $this->assertSame('Anthropic', $variant['service']);
@@ -243,6 +252,51 @@ class ModelCatalogTest extends TestCase
             $this->assertSame('claude-sonnet-5', $variant['json']['params']['model'] ?? null);
             $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
             $this->assertEqualsWithDelta(10.0, (float) $variant['priceOut'], 1e-9);
+        }
+    }
+
+    public function testClaudeOpus5ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $opus5 = ModelCatalog::find('anthropic:claude-opus-5');
+
+        $this->assertCount(2, $opus5, 'Expected claude-opus-5 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($opus5, 'tag'));
+
+        foreach ($opus5 as $variant) {
+            $this->assertSame('Anthropic', $variant['service']);
+            $this->assertSame('claude-opus-5', $variant['providerId']);
+            $this->assertSame('claude-opus-5', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(5.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(25.0, (float) $variant['priceOut'], 1e-9);
+        }
+    }
+
+    /**
+     * The pre-4.8 Claude generations were retired in favour of Opus 4.8 and the
+     * 5-series (deactivated in existing installs by Version20260727120000). Their
+     * BIDs must never come back: BMESSAGES rows still reference them, and the
+     * migration's BPROVID guards assume the upstream model ids are gone from the
+     * catalog.
+     */
+    public function testRetiredClaudeGenerationsAreAbsentFromCatalog(): void
+    {
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+
+        $retiredProviderIds = [
+            'claude-opus-4-1-20250805',
+            'claude-opus-4-5',
+            'claude-opus-4-6',
+            'claude-opus-4-7',
+            'claude-sonnet-4-5-20250929',
+            'claude-sonnet-4-6',
+        ];
+        foreach ($retiredProviderIds as $retired) {
+            $this->assertNotContains($retired, $providerIds, sprintf('%s was retired and must not be re-added.', $retired));
+        }
+
+        $ids = array_column(ModelCatalog::all(), 'id');
+        foreach ([69, 93, 109, 112, 121, 160, 161, 163, 164, 165, 166] as $retiredBid) {
+            $this->assertNotContains($retiredBid, $ids, sprintf('BID %d belongs to a retired model and must not be reused.', $retiredBid));
         }
     }
 

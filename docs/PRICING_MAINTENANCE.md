@@ -216,7 +216,23 @@ You can run the same check locally: `docker compose exec -T backend php bin/cons
 
 ## Time-boxed / reminders
 
-- **Claude Sonnet 5**: introductory $2/$10 → revert to standard $3/$15 after **2026-08-31** (TODO in `ModelCatalog.php` BID 249/250).
+- **Claude Sonnet 5**: introductory $2/$10 → revert to standard $3/$15 after **2026-08-31** (TODO in `ModelCatalog.php` BID 249/250 **and** the MEM row BID 222, which now runs Sonnet 5 too).
+
+## Anthropic catalog generations (snapshot 2026-07-27)
+
+Source: https://platform.claude.com/docs/en/about-claude/models/overview
+
+| Model | BIDs (chat / vision) | Price in/out per 1M |
+| ----- | -------------------- | ------------------- |
+| Claude Fable 5 | 240 / 241 | $10 / $50 |
+| Claude Opus 5 | 257 / 258 | $5 / $25 |
+| Claude Sonnet 5 | 249 / 250 (+ 222 MEM) | $2 / $10 intro, $3 / $15 from 2026-09-01 |
+| Claude Opus 4.8 | 238 / 239 | $5 / $25 |
+| Claude Haiku 4.5 | 162 / 235 | $1 / $5 |
+
+Retired on 2026-07-27 by `Version20260727120000` (rows deactivated, never deleted — `BMESSAGES` FKs; BIDs must never be reused): Claude Sonnet 4.5 (112/109), Claude Opus 4.6 (160/164), Claude Sonnet 4.6 (161/163), Claude Opus 4.7 (165/166), plus the catalog-orphans Claude Opus 4.1 (69/93, deprecated upstream and retired by Anthropic on 2026-08-05) and Claude Opus 4.5 (121).
+
+> **Removing a model from the catalog is only half a retirement.** `ModelSeeder` never deletes or deactivates rows, so a model dropped from `ModelCatalog.php` without a companion migration stays `BACTIVE=1, BSELECTABLE=1` in every existing database — still pickable in the UI and still billed at whatever price the stale row holds. That is how Opus 4.1/4.5 survived several releases. Always pair a catalog removal with a deactivation migration.
 
 ## Related issues
 
@@ -245,7 +261,7 @@ gpt-image bills a different per-image price per quality × size (e.g. gpt-image-
 
 ## Long-context tiers — #1319
 
-Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 2.5/3.1 Pro and Claude Sonnet 4.5 above 200k, GPT-5.x above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches both input and output to the above rate when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
+Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 2.5/3.1 Pro above 200k, GPT-5.x above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches both input and output to the above rate when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
 
 | Model | Threshold | Base in/out (per 1M) | Above in/out (per 1M) |
 | ----- | --------- | -------------------- | --------------------- |
@@ -255,9 +271,8 @@ Some providers charge a higher per-token rate for the **whole request** once the
 | gpt-5.6-luna | 272k | 1.00 / 6 | 2.00 / 9 |
 | gemini-2.5-pro | 200k | 1.25 / 10 | 2.50 / 15 |
 | gemini-3.1-pro-preview | 200k | 2.00 / 12 | 4.00 / 18 |
-| claude-sonnet-4-5 | 200k | 3.00 / 15 | 6.00 / 22.50 |
 
-> `claude-sonnet-4-5`'s `max_input` is 200k, so its tier is currently unreachable — kept for completeness.
+> The `claude-sonnet-4-5` tier was dropped together with that model's catalog rows (retired 2026-07-27, see `Version20260727120000`). No current Claude model has a long-context tier — the 5-series bills one flat rate across its 1M window.
 
 ## Production rollout to existing installs
 

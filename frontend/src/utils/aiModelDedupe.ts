@@ -8,12 +8,12 @@
  *
  * The dedup key is `(service, name)` — not the model id — because the
  * BMODELS catalogue intentionally registers some models under multiple
- * ids: e.g. "Claude Opus 4.6" is two rows, one with BTAG=chat (id 160,
+ * ids: e.g. "Claude Sonnet 5" is two rows, one with BTAG=chat (id 249,
  * surfaced under CHAT/SORT/ANALYZE) and one with BTAG=mem (id 222,
  * surfaced under MEM). Both rows describe the same user-visible model;
  * what differs is the backend-side id we must persist when the user
  * picks a given purpose. Each chip therefore carries its own `modelId`,
- * so clicking "CHAT" stores id 160 while "MEM" stores id 222.
+ * so clicking "CHAT" stores id 249 while "MEM" stores id 222.
  */
 import type { AIModel, Capability } from '@/types/ai-models'
 
