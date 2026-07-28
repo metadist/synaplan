@@ -26,9 +26,10 @@
         <button
           data-testid="pending-purchase-banner-dismiss"
           class="p-0.5 -mr-0.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors txt-secondary"
+          :aria-label="$t('common.close')"
           @click="$emit('dismiss')"
         >
-          <Icon icon="mdi:close" class="w-3.5 h-3.5" />
+          <Icon icon="mdi:close" class="w-3.5 h-3.5" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -37,12 +38,15 @@
 
 <script setup lang="ts">
 /**
- * MOBILE-APP SEAM (purchase-first onboarding): reminder shown to a signed-out
- * guest whose store purchase is still waiting to be linked to an account
- * (`hasPendingIapRedemption()`). Without an account the entitlement cannot be
- * used — and an unacknowledged Android purchase is auto-refunded after ~3
- * days — so the banner keeps a quiet, dismissible path back into account
- * creation. Redemption itself runs automatically after the next sign-in.
+ * MOBILE-APP SEAM (native onboarding): reminder shown to a signed-out guest
+ * whose store purchase is still waiting to be linked to an account
+ * (`hasPendingIapRedemption()`). The auth-first flow buys only after sign-in,
+ * so this covers the remaining signed-out cases: a restore that surfaces an
+ * existing subscription, and purchases from an earlier app version. Without
+ * an account the entitlement cannot be used — and an unacknowledged Android
+ * purchase is auto-refunded after ~3 days — so the banner keeps a quiet,
+ * dismissible path back into account creation. Redemption itself runs
+ * automatically after the next sign-in.
  */
 import { Icon } from '@iconify/vue'
 

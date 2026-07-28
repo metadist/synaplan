@@ -191,7 +191,7 @@ export const useAuthStore = defineStore('auth', () => {
         const { useGuestStore } = await import('./guest')
         useGuestStore().$reset()
         await useConfigStore().reload()
-        // MOBILE-APP SEAM: link a purchase-first store purchase to the freshly
+        // MOBILE-APP SEAM: link a signed-out store purchase to the freshly
         // authenticated account (no-op unless a redemption is pending).
         void redeemPendingIapPurchaseAfterAuth()
         return true
@@ -344,7 +344,7 @@ export const useAuthStore = defineStore('auth', () => {
           authReadyResolve()
           authReadyResolve = null
         }
-        // MOBILE-APP SEAM: link a purchase-first store purchase to the freshly
+        // MOBILE-APP SEAM: link a signed-out store purchase to the freshly
         // authenticated account (no-op unless a redemption is pending).
         void redeemPendingIapPurchaseAfterAuth()
         return true

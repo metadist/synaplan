@@ -255,8 +255,8 @@
         @guest-feature-gate="handleGuestFeatureGate"
         @clear-quote="quoting.clearPendingQuote"
       >
-        <!-- Purchase-first onboarding: a signed-out store purchase waiting to
-             be linked to an account outranks the guest quota banner. -->
+        <!-- Native onboarding: a signed-out store purchase waiting to be
+             linked to an account outranks the guest quota banner. -->
         <template v-if="showPendingPurchaseBanner" #banner>
           <PendingPurchaseBanner
             :visible="showPendingPurchaseBanner"
@@ -545,7 +545,7 @@ const { getDateLabel } = useDateFormat()
 
 const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGuestMode)
 
-// MOBILE-APP SEAM (purchase-first onboarding): remind a signed-out user that
+// MOBILE-APP SEAM (native onboarding): remind a signed-out user that
 // their store purchase is still waiting for an account. Read once at setup —
 // the flag only changes through a sign-in (which flips isAuthenticated and
 // hides the banner anyway) or a new purchase (full navigation in between).

@@ -1,9 +1,11 @@
 /**
- * MOBILE-APP SEAM: post-auth redemption of a purchase-first store purchase.
+ * MOBILE-APP SEAM: post-auth redemption of a store purchase made while
+ * signed out.
  *
- * Purchase-first onboarding lets the store transaction complete while the
- * user is still signed out (`purchased_unlinked` in `nativeIap.ts`). This
- * hook runs after EVERY successful native authentication (password login,
+ * The auth-first onboarding buys only after sign-in, but a store transaction
+ * can still surface without a session (a restore, or a purchase from an older
+ * app version) and is then held as `purchased_unlinked` in `nativeIap.ts`.
+ * This hook runs after EVERY successful native authentication (password login,
  * system-browser OAuth, native Apple sheet) and links the held purchase to
  * the freshly authenticated account:
  *

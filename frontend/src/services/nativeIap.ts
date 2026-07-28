@@ -77,8 +77,8 @@ export type IapPurchaseOutcome =
   /** Deferred by the store (e.g. Ask to Buy) — entitlement follows via webhook. */
   | { status: 'pending' }
   /**
-   * Purchase-first onboarding: the store transaction succeeded while the user
-   * was signed out. `/api/v1/iap/verify` requires a Bearer, so the transaction
+   * The store transaction succeeded while the user was signed out (a restore
+   * or an older app version). `/api/v1/iap/verify` requires a Bearer, so it
    * is held UNFINISHED and redeemed after account creation / sign-in
    * ({@link redeemPendingIapPurchase}). The plugin re-delivers unfinished
    * transactions on every store initialization, so this survives restarts.
@@ -102,7 +102,7 @@ export function isNativeIapAvailable(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Pending redemption (purchase-first onboarding)
+// Pending redemption (store purchase found while signed out)
 // ---------------------------------------------------------------------------
 
 /**
@@ -258,8 +258,8 @@ async function handleApproved(transaction: CdvTransaction): Promise<IapPurchaseO
     return outcome
   }
 
-  // Purchase-first onboarding: the store sheet needs no app account, but
-  // `/api/v1/iap/verify` does. Hold the transaction UNFINISHED (the plugin
+  // The store sheet needs no app account, but `/api/v1/iap/verify` does.
+  // Hold the transaction UNFINISHED (the plugin
   // re-delivers it on the next initialize) and let the post-auth redemption
   // hook verify + finish it once the user has an account.
   if (!hasNativeTokens()) {
@@ -376,8 +376,8 @@ export async function restoreNativePurchases(): Promise<boolean> {
 }
 
 /**
- * Redeem a purchase that was completed while signed out (purchase-first
- * onboarding), now that the user has an account. Call after every successful
+ * Redeem a purchase that was completed while signed out, now that the user
+ * has an account. Call after every successful
  * native authentication — it is a cheap no-op unless a redemption is pending.
  *
  * Returns the verification outcome when it ran synchronously (same-session
