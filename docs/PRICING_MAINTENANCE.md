@@ -248,6 +248,21 @@ Retired on 2026-07-27 by `Version20260727120000` (rows deactivated, never delete
 
 The same orphan cleanup continues in `Version20260727180000` for two non-Anthropic rows: **OpenAI `gpt-4.1` (BID 30)** → GPT-5.6 Terra (253) and **Groq `llama-4-maverick-17b-128e-instruct` (BID 49)** → Groq `gpt-oss-120b` (76).
 
+### Orphan sweep 2026-07-28 (`Version20260728120000`)
+
+Comparing the production catalog (`GET /api/v1/admin/models`) against `ModelCatalog::all()` surfaced seven more rows that were still `BACTIVE=1, BSELECTABLE=1` in the database with no catalog entry behind them. **Diffing prod against the catalog is the only way to find these** — the code alone cannot tell you what an old install still offers.
+
+| Retired BID | Row | Successor |
+| ----------- | --- | --------- |
+| 70 / 106 | OpenAI `gpt-5`, `gpt-5.2-2025-12-11` | GPT-5.6 Terra (253) |
+| 150 | OpenAI `gpt-5-mini` | GPT-5.4 mini (232) |
+| 125 | HuggingFace `deepseek-ai/DeepSeek-R1` | Kimi K2.6 (202) |
+| 128 | HuggingFace `Qwen/Qwen2.5-Coder-32B-Instruct` | Kimi K2.7 Code (242) |
+| 126 | HuggingFace `stabilityai/stable-diffusion-xl-base-1.0` | TheHive SDXL (132) |
+| 129 | HuggingFace `intfloat/multilingual-e5-large` (vectorize) | none — see below |
+
+> **Never repoint `DEFAULTMODEL.VECTORIZE` from a migration.** Embedding models are not interchangeable: swapping the binding without re-vectorizing leaves every stored vector in the wrong space, which is exactly the failure mode of issue #948 (Qdrant HTTP 400, memory lost). The admin path pairs the switch with a re-vectorize run via `VectorizeBindingService`; a migration cannot. BID 129 is therefore deactivated only where nothing binds to it, guarded by a `NOT EXISTS` on `BCONFIG` — an install still using it keeps working search and switches through the UI.
+
 ### A non-zero price under a "free" unit is silently free
 
 `normaliseToPerUnit()` maps `-`, `` and `free` to **0**, so a price stored under one of those units is displayed but never billed. Two Ollama rows shipped exactly that — BID 3 (`deepseek-r1:32b`, out 0.91) and BID 6 (`mistral:7b`, out 0.475) had `BOUTUNIT = '-'` while their input side was `per1M`, so their output tokens were free while input was charged. `Version20260727190000` corrects the unit only; the price values stay as they were, since Ollama rows are an operator-hosted synthetic resale basis and re-pricing them is a decision, not a fix.

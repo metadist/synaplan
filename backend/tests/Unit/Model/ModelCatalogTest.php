@@ -352,6 +352,32 @@ class ModelCatalogTest extends TestCase
         $this->assertNotContains(49, $ids);
     }
 
+    /**
+     * The remaining orphans found on the production catalog on 2026-07-28 and
+     * deactivated by Version20260728120000. Same reasoning as the test above:
+     * re-adding one under its old BID or upstream model id would resurrect a row
+     * we deliberately took out of the picker.
+     */
+    public function testRetiredOpenAiAndHuggingFaceOrphansAreAbsentFromCatalog(): void
+    {
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+        $ids = array_column(ModelCatalog::all(), 'id');
+
+        $retired = [
+            70 => 'gpt-5',
+            106 => 'gpt-5.2-2025-12-11',
+            125 => 'deepseek-ai/DeepSeek-R1',
+            126 => 'stabilityai/stable-diffusion-xl-base-1.0',
+            128 => 'Qwen/Qwen2.5-Coder-32B-Instruct',
+            129 => 'intfloat/multilingual-e5-large',
+            150 => 'gpt-5-mini',
+        ];
+        foreach ($retired as $retiredBid => $retiredProviderId) {
+            $this->assertNotContains($retiredProviderId, $providerIds, sprintf('%s was retired and must not be re-added.', $retiredProviderId));
+            $this->assertNotContains($retiredBid, $ids, sprintf('BID %d belongs to a retired model and must not be reused.', $retiredBid));
+        }
+    }
+
     public function testGpt55ProModelsAreMarkedAsNonStreaming(): void
     {
         $chat = ModelCatalog::find('openai:gpt-5.5-pro:chat')[0];
