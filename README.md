@@ -77,7 +77,7 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 
 ## Features
 
-- **AI Chat** — Ollama, OpenAI, Anthropic, Groq, Gemini
+- **AI Chat** — Ollama, OpenAI, Anthropic, Gemini, Groq, Mistral, TrustedTokens (DE), HuggingFace ([provider list](#ai-providers--models))
 - **Multi-Task Routing** — An AI planner decomposes complex requests into a task graph (extract → summarize → generate → reply) and streams live task cards while the steps execute
 - **RAG Search** — Semantic document search with MariaDB VECTOR or Qdrant
 - **Chat Widget** — Embed on any website ([widget guide](https://docs.synaplan.com/index.php/widget))
@@ -91,6 +91,30 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 - **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
 - **MCP Server** *(early access)* — Connect AI clients (Claude, Cursor, …) over the Model Context Protocol; your RAG and memories become tools at `POST /mcp` ([MCP guide](https://docs.synaplan.com/index.php/mcp))
 - **MCP Client** *(early access)* — Connect *your* MCP servers (CRM, wiki, n8n, …) under **Channels → MCP Servers**; the multi-task planner pulls live data from them via `mcp_fetch` DAG nodes — read-only, SSRF-guarded, per-topic opt-in. Enabled by seeded `BCONFIG` flags (`MCP.CLIENT_ENABLED`, `MULTITASK.MCP_FETCH_ENABLED` — `app:seed` sets them ON on deploy; an explicit `0` row is the operator kill switch). See [docs/MULTITASK_DATA_NODES.md](docs/MULTITASK_DATA_NODES.md)
+
+---
+
+## AI Providers & Models
+
+Synaplan is provider-neutral: add the API keys you want to `backend/.env`, restart the backend, and the matching models appear in the selector. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
+
+| Provider | Variable in `backend/.env` | Models |
+|----------|---------------------------|--------|
+| OpenAI | `OPENAI_API_KEY` | GPT-5.6 Sol / Terra / Luna, GPT-5.5 (+ Pro), GPT-5.4 (+ mini / nano), GPT Image, Whisper, text-embedding-3 |
+| Anthropic | `ANTHROPIC_API_KEY` | Claude Opus 5, Sonnet 5, Fable 5, Opus 4.8, Haiku 4.5 (chat + vision) |
+| Google Gemini | `GOOGLE_GEMINI_API_KEY` | Gemini 3.x / 2.5 chat + vision, Imagen 4, Nano Banana, Veo 3.1, Gemini TTS |
+| Groq | `GROQ_API_KEY` | Llama 3.3 70B, Llama 3.1 8B Instant, Qwen3 32B, GPT-OSS 20B/120B, Whisper Large v3 |
+| Mistral 🇫🇷 | `MISTRAL_API_KEY` | Mistral Medium 3.5 (+ vision), Mistral Large 3, Voxtral transcription + TTS |
+| [TrustedTokens](https://trustedtokens.eu/) 🇩🇪 | `TRUSTEDTOKENS_API_KEY` | GLM 5.2, Qwen3.6 35B (+ vision), GPT OSS 120B — sovereign inference on German GPUs (TNG), zero data retention |
+| HuggingFace | `HUGGINGFACE_API_KEY` | Kimi K2.5 / K2.6 / K2.7 Code (chat + vision) |
+| TheHive | `THEHIVE_API_KEY` | Flux Schnell, SDXL |
+| Higgsfield | `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` | Soul, Reve, DoP, Kling 2.1 |
+| Cloudflare Workers AI | `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` | bge-m3 embeddings (also usable as embedding fallback) |
+| Ollama 🇩🇪 self-hosted | `OLLAMA_BASE_URL` (no key) | Any local model — chat, vision, bge-m3 embeddings |
+
+**Transparent pricing.** Every model carries its provider's own rate (USD per 1M tokens in/out, or per image / second / character for media) — no proprietary credit unit in between. The selector shows a Free / Low / Mid / High cost badge next to each model and on every answer, `GET /api/v1/config/models` returns `priceIn` / `priceOut`, and the Statistics page logs the real cost of each call. On the hosted instance at [web.synaplan.com](https://web.synaplan.com/) that same catalog is what your plan meters against; self-hosted with Ollama, the per-token cost is simply zero. Details: [Model pricing & cost transparency](https://docs.synaplan.com/index.php/faq).
+
+> Model catalog changes (new models, retired generations, price updates) ship as seeders plus a migration, so an existing install is repointed to a supported successor instead of silently keeping a dead model. See [docs/PRICING_MAINTENANCE.md](docs/PRICING_MAINTENANCE.md).
 
 ---
 
@@ -157,6 +181,7 @@ In-repo guides (for developers working on this codebase):
 |-------|-------------|
 | [Installation](docs/INSTALLATION.md) | Detailed setup instructions |
 | [Configuration](docs/CONFIGURATION.md) | Environment variables, API keys |
+| [AI Model Pricing](docs/PRICING_MAINTENANCE.md) | Model catalog, provider prices, retiring a model |
 | [Development](docs/DEVELOPMENT.md) | Commands, testing, architecture |
 | [Realtime / WebSockets](docs/REALTIME.md) | Centrifugo + Redis realtime layer, multi-node deployment |
 | [RAG System](docs/RAG.md) | Document search and processing |
