@@ -1283,6 +1283,23 @@ class StreamController extends AbstractController
                     $isBufferingJson = false;
                 }
 
+                if ($this->isCancelledResult($result)) {
+                    // Explicit user cancel, reported as a result instead of an
+                    // exception (media/multitask turns catch it per node). The
+                    // frontend already persisted the cancelled turn through
+                    // /save-cancelled — writing an error row on top of it gave
+                    // the user two cancellation cards for one Stop click, and
+                    // overwrote the incoming message status 'cancelled' with
+                    // 'error'. End the turn silently, exactly like the
+                    // StreamCancelledException path below.
+                    $this->logger->info('Stream stopped - cancelled by user', [
+                        'user_id' => $user->getId(),
+                        'track_id' => (string) $trackId,
+                    ]);
+
+                    return;
+                }
+
                 if (!$result['success']) {
                     // Build user-friendly error message as AI response
                     $isDev = 'dev' === $this->getParameter('kernel.environment');
@@ -2911,6 +2928,21 @@ class StreamController extends AbstractController
         if (!empty($mediaType)) {
             $message->setMeta('original_media_type', (string) $mediaType);
         }
+    }
+
+    /**
+     * Whether a processing result describes an explicit user cancellation
+     * rather than a failure.
+     *
+     * A cancelled turn is persisted exactly once, by /save-cancelled. Treating
+     * it as an error would add a second outgoing message for the same tracking
+     * id, so the chat showed two cancellation cards for one Stop click.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function isCancelledResult(array $result): bool
+    {
+        return true !== ($result['success'] ?? false) && true === ($result['cancelled'] ?? false);
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Tests\Unit;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Exception\StreamCancelledException;
 use App\Service\Message\ConversationSummaryService;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
@@ -204,6 +205,39 @@ class MessageProcessorTest extends TestCase
 
         $this->assertFalse($result['success']);
         $this->assertEquals('Generic error', $result['error']);
+    }
+
+    /**
+     * A user cancel must not look like a failure: the cancelled turn is
+     * already persisted by /save-cancelled, so a caller that renders errors
+     * would show a second cancellation card for the same Stop click.
+     */
+    public function testProcessStreamReportsUserCancellationAsCancelled(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(1);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'CHAT',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $this->router->method('routeStream')->willThrowException(
+            new StreamCancelledException('Stream cancelled by user')
+        );
+
+        $result = $this->processor->processStream($message, function (): void {});
+
+        $this->assertFalse($result['success']);
+        $this->assertTrue($result['cancelled']);
+        $this->assertSame('Stream cancelled by user', $result['error']);
     }
 
     public function testProcessStreamCallsStreamCallback(): void

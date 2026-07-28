@@ -5,6 +5,7 @@ namespace App\Service\Message;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Exception\StreamCancelledException;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -542,6 +543,21 @@ final readonly class MessageProcessor
                 'response' => $response,
                 'preprocessed' => $preprocessed,
                 'search_results' => $searchResults, // Include search results in return
+            ];
+        } catch (StreamCancelledException $e) {
+            // Explicit user cancel — not a failure. Callers must be able to
+            // tell it apart from an error: the cancelled turn is already
+            // persisted by /save-cancelled, so rendering an error on top of it
+            // would show the user two cancellation cards for one Stop click.
+            $this->logger->info('Streamed turn cancelled by user', [
+                'message_id' => $message->getId(),
+            ]);
+
+            return [
+                'success' => false,
+                'cancelled' => true,
+                'error' => $e->getMessage(),
+                'classification' => $classification ?? null,
             ];
         } catch (VisionModelRequiredException $e) {
             $this->logger->warning('Vision-capable model required for image attachments', [
