@@ -248,14 +248,22 @@
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
-        :banner-visible="isGuestMode && guestStore.shouldShowBanner"
+        :banner-visible="showPendingPurchaseBanner || (isGuestMode && guestStore.shouldShowBanner)"
         :quote="quoting.pendingQuote.value"
         @send="handleSendMessage"
         @stop="handleUserStop"
         @guest-feature-gate="handleGuestFeatureGate"
         @clear-quote="quoting.clearPendingQuote"
       >
-        <template v-if="isGuestMode" #banner>
+        <!-- Native onboarding: a signed-out store purchase waiting to be
+             linked to an account outranks the guest quota banner. -->
+        <template v-if="showPendingPurchaseBanner" #banner>
+          <PendingPurchaseBanner
+            :visible="showPendingPurchaseBanner"
+            @dismiss="pendingPurchaseBannerDismissed = true"
+          />
+        </template>
+        <template v-else-if="isGuestMode" #banner>
           <GuestBanner
             :visible="guestStore.shouldShowBanner"
             :remaining="guestStore.remainingMessages"
@@ -481,8 +489,10 @@ import MemoriesDialog from '@/components/MemoriesDialog.vue'
 import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
 import PromoTipBanner from '@/components/PromoTipBanner.vue'
 import GuestBanner from '@/components/guest/GuestBanner.vue'
+import PendingPurchaseBanner from '@/components/guest/PendingPurchaseBanner.vue'
 import GuestSignupModal from '@/components/guest/GuestSignupModal.vue'
 import GuestHintPopover from '@/components/guest/GuestHintPopover.vue'
+import { hasPendingIapRedemption } from '@/services/nativeIap'
 import { usePromoTips } from '@/composables/usePromoTips'
 import { useDateFormat } from '@/composables/useDateFormat'
 
@@ -534,6 +544,17 @@ const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
 
 const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGuestMode)
+
+// MOBILE-APP SEAM (native onboarding): remind a signed-out user that
+// their store purchase is still waiting for an account. Read once at setup —
+// the flag only changes through a sign-in (which flips isAuthenticated and
+// hides the banner anyway) or a new purchase (full navigation in between).
+const pendingPurchaseAtSetup = hasPendingIapRedemption()
+const pendingPurchaseBannerDismissed = ref(false)
+const showPendingPurchaseBanner = computed(
+  () =>
+    pendingPurchaseAtSetup && !pendingPurchaseBannerDismissed.value && !authStore.isAuthenticated
+)
 
 // Personalizes the empty-state heading with the user's first name (Personal
 // Information -> First Name) when they've set one; falls back to the

@@ -1138,8 +1138,7 @@
     "copied": "In die Zwischenablage kopiert",
     "copyFailed": "Kopieren fehlgeschlagen",
     "expand": "Text anzeigen",
-    "collapse": "Text ausblenden",
-    "redundantCollapsed": "Schrittausgabe eingeklappt — zum Prüfen aufklappen oder die Antwort unten lesen."
+    "collapse": "Text ausblenden"
   },
   "processing": {
     "started": "Starte Verarbeitung...",
@@ -2107,7 +2106,9 @@
       "restoreTitle": "Käufe wiederherstellen",
       "restoreDone": "Käufe wiederhergestellt – dein Abonnement ist aktiv.",
       "restoreNone": "Es wurde kein aktives Abonnement zum Wiederherstellen gefunden.",
-      "storeNote": "Käufe und Abonnements werden über den App Store oder Google Play abgewickelt und verwaltet."
+      "storeNote": "Käufe und Abonnements werden über den App Store oder Google Play abgewickelt und verwaltet.",
+      "redeemBlockedExistingIos": "Dieses Konto hat bereits ein aktives Abo, daher wurde dein letzter Store-Kauf nicht verknüpft. Prüfe deine Abos in deiner Apple-ID und fordere dort bei Bedarf eine Erstattung an, um doppelte Zahlungen zu vermeiden.",
+      "redeemBlockedExistingAndroid": "Dieses Konto hat bereits ein aktives Abo, daher wurde dein letzter Store-Kauf nicht verknüpft. Google Play erstattet nicht bestätigte Käufe innerhalb weniger Tage automatisch."
     },
     "plans": {
       "pro": "Pro",
@@ -4160,9 +4161,42 @@
       "guestCta": "Ohne Konto fortfahren",
       "popular": "Beliebt",
       "continueWith": "Weiter mit {plan}",
+      "restore": "Käufe wiederherstellen",
+      "restoring": "Wird wiederhergestellt…",
+      "restoreNone": "Kein früherer Kauf gefunden. Wenn du mit einem Konto gekauft hast, melde dich stattdessen an.",
       "registerCta": "Kostenloses Konto erstellen",
       "loginHint": "Du hast schon ein Konto?",
       "loginCta": "Anmelden"
+    },
+    "account": {
+      "title": "Fast geschafft",
+      "subtitle": "Melde dich an oder erstelle ein Konto, um dein Abo zu aktivieren.",
+      "providerCta": "Weiter mit {provider}",
+      "emailCta": "Weiter mit E-Mail",
+      "note": "Dein Abo wird mit diesem Konto verknüpft.",
+      "redeemTitle": "Zahlung erfolgreich",
+      "redeemSubtitle": "Erstelle jetzt dein Konto, um dein Abo zu aktivieren — das dauert weniger als eine Minute.",
+      "redeemNote": "Dein Kauf wird automatisch mit deinem neuen Konto verknüpft."
+    },
+    "purchase": {
+      "checking": "Dein Konto wird geprüft…",
+      "purchasing": "Der Kauf wird im Store abgeschlossen…",
+      "alreadyTitle": "Bereits abonniert",
+      "alreadyBody": "Dieses Konto hat bereits ein aktives Abo ({plan}). Es wird nichts erneut berechnet.",
+      "alreadyManage": "Abo verwalten",
+      "toChat": "Zum Chat",
+      "pendingTitle": "Kauf ausstehend",
+      "retryTitle": "Kauf nicht abgeschlossen",
+      "cancelledBody": "Der Kauf wurde abgebrochen. Es wurde nichts berechnet.",
+      "checkFailed": "Dein Abo-Status konnte nicht geprüft werden. Bitte versuche es erneut.",
+      "retryCta": "Erneut versuchen",
+      "later": "Vielleicht später"
+    }
+  },
+  "iap": {
+    "pendingBanner": {
+      "text": "Dein Kauf wartet auf dein Konto",
+      "cta": "Konto erstellen"
     }
   },
   "mcpServers": {

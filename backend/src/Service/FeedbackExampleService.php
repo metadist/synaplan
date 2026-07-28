@@ -42,13 +42,6 @@ final readonly class FeedbackExampleService
      */
     public function listFeedbacks(User $user, string $type = 'all'): array
     {
-        if (!$this->memoryService->isAvailable()) {
-            // Return empty array if service is unavailable (graceful degradation)
-            $this->logger->warning('FeedbackExampleService: Memory service (Vector DB) unavailable, returning empty list');
-
-            return [];
-        }
-
         $feedbacks = [];
 
         try {
@@ -95,8 +88,7 @@ final readonly class FeedbackExampleService
     }
 
     /**
-     * Map a memory array from Qdrant to a feedback array.
-     * Handles different data structures that may come from the service.
+     * Map a memory array to a feedback array.
      */
     private function mapMemoryToFeedback(array $memory, string $type): array
     {

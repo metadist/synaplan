@@ -7,7 +7,6 @@ namespace App\Tests\Unit\Embedding;
 use App\Service\Embedding\EmbeddingCostEstimator;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\ModelConfigService;
-use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -15,7 +14,6 @@ use Psr\Log\LoggerInterface;
 
 final class EmbeddingCostEstimatorTest extends TestCase
 {
-    private QdrantClientInterface&MockObject $qdrantClient;
     private ModelConfigService&MockObject $modelConfigService;
     private Connection&MockObject $connection;
     private EmbeddingMetadataService&MockObject $embeddingMetadata;
@@ -23,13 +21,11 @@ final class EmbeddingCostEstimatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->qdrantClient = $this->createMock(QdrantClientInterface::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->connection = $this->createMock(Connection::class);
         $this->embeddingMetadata = $this->createMock(EmbeddingMetadataService::class);
 
         $this->estimator = new EmbeddingCostEstimator(
-            $this->qdrantClient,
             $this->modelConfigService,
             $this->connection,
             $this->embeddingMetadata,
@@ -72,6 +68,12 @@ final class EmbeddingCostEstimatorTest extends TestCase
         // 100 BRAG rows × 200 chars each → ~5000 tokens for documents
         $this->connection->method('fetchOne')
             ->willReturnCallback(static function (string $sql) {
+                if (str_contains($sql, 'BUSERMEMORIES') && str_contains($sql, 'COUNT(*)')) {
+                    return 50;
+                }
+                if (str_contains($sql, 'BUSERMEMORIES') && str_contains($sql, 'SUM(LENGTH')) {
+                    return 4_000;
+                }
                 if (str_contains($sql, 'COUNT(*)')) {
                     return 100;
                 }
@@ -81,8 +83,6 @@ final class EmbeddingCostEstimatorTest extends TestCase
 
                 return false;
             });
-
-        $this->qdrantClient->method('scrollMemories')->willReturn(array_fill(0, 50, ['payload' => []]));
 
         $estimate = $this->estimator->estimateChange(99);
 
@@ -96,13 +96,13 @@ final class EmbeddingCostEstimatorTest extends TestCase
         // 20000 chars / 4 = 5000 tokens
         self::assertSame(5000, $estimate['scopes']['documents']['tokensEstimated']);
 
-        // 50 memories × 500 tokens heuristic = 25000
+        // 50 memories, 4000 chars / 4 = 1000 tokens
         self::assertSame(50, $estimate['scopes']['memories']['chunks']);
-        self::assertSame(25_000, $estimate['scopes']['memories']['tokensEstimated']);
+        self::assertSame(1000, $estimate['scopes']['memories']['tokensEstimated']);
 
         // documents (100) + memories (50)
         self::assertSame(150, $estimate['totals']['chunks']);
-        self::assertSame(30_000, $estimate['totals']['tokensEstimated']);
+        self::assertSame(6000, $estimate['totals']['tokensEstimated']);
         self::assertSame('info', $estimate['severity']);
     }
 
@@ -117,7 +117,6 @@ final class EmbeddingCostEstimatorTest extends TestCase
         $this->modelConfigService->method('getVectorDimForModel')->willReturn(null);
 
         $this->connection->method('fetchOne')->willReturn(0);
-        $this->qdrantClient->method('scrollMemories')->willReturn([]);
 
         $estimate = $this->estimator->estimateChange(42);
 
@@ -134,6 +133,9 @@ final class EmbeddingCostEstimatorTest extends TestCase
 
         $this->connection->method('fetchOne')
             ->willReturnCallback(static function (string $sql) {
+                if (str_contains($sql, 'BUSERMEMORIES')) {
+                    return 0;
+                }
                 if (str_contains($sql, 'COUNT(*)')) {
                     return 200_000;
                 }
@@ -143,8 +145,6 @@ final class EmbeddingCostEstimatorTest extends TestCase
 
                 return false;
             });
-
-        $this->qdrantClient->method('scrollMemories')->willReturn([]);
 
         $estimate = $this->estimator->estimateChange(99);
 

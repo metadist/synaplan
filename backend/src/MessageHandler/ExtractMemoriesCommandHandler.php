@@ -397,7 +397,7 @@ final readonly class ExtractMemoriesCommandHandler
      *
      * For every singleton `(category, key)` pair we touched in this
      * extraction batch, find every OTHER memory in the user's pre-batch
-     * snapshot that shares the same hash and delete it from Qdrant.
+     * snapshot that shares the same hash and delete it from SQL and Qdrant.
      *
      * Why auto-delete instead of suggesting deletion: singleton keys
      * (`name`, `age`, `location`, `job`, …) describe a single CURRENT

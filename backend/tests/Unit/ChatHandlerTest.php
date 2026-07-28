@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\Model;
@@ -460,6 +461,44 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
+     * #1115: SDKs may turn a provider HTTP error into an empty successful
+     * stream. This must fail before the controller persists an empty reply.
+     */
+    public function testHandleStreamRejectsEmptyProviderResponse(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Stream test');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturn(['provider' => 'mistral', 'model' => 'mistral-medium-latest']);
+
+        $this->logger
+            ->expects($this->once())
+            ->method('warning')
+            ->with(
+                'ChatHandler: Provider returned no visible streaming content',
+                $this->arrayHasKey('provider'),
+            );
+
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('The AI model returned an empty response');
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function (): void {},
+        );
+    }
+
+    /**
      * Rolling conversation summary: when MessageProcessor condenses older turns
      * and passes them via options['conversation_summary'], ChatHandler must fold
      * that text into the SYSTEM prompt so long threads keep their context.
@@ -878,7 +917,11 @@ class ChatHandlerTest extends TestCase
         $this->aiFacade
             ->expects($this->once())
             ->method('chatStream')
-            ->willReturn(['provider' => 'openai', 'model' => 'gpt-4.1']);
+            ->willReturnCallback(static function ($messages, $callback): array {
+                $callback('Response');
+
+                return ['provider' => 'openai', 'model' => 'gpt-4.1'];
+            });
 
         // Test passes if RAG context loading doesn't throw exception (graceful degradation)
         $this->handler->handleStream(

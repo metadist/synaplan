@@ -11,11 +11,22 @@ import { mount, flushPromises } from '@vue/test-utils'
 const mockGetPlans = vi.fn()
 const mockIsNativeApp = vi.fn(() => false)
 const mockIsPurchaseAllowed = vi.fn(() => true)
+const mockIsNativeIapAvailable = vi.fn(() => false)
+const mockRestoreNativePurchases = vi.fn()
+const mockHasPendingIapRedemption = vi.fn(() => false)
 
 vi.mock('@/services/api/subscriptionApi', () => ({
   subscriptionApi: {
     getPlans: (...args: unknown[]) => mockGetPlans(...args),
   },
+}))
+
+vi.mock('@/services/nativeIap', () => ({
+  getStorePrice: vi.fn(() => null),
+  initNativeIap: vi.fn(async () => false),
+  isNativeIapAvailable: () => mockIsNativeIapAvailable(),
+  restoreNativePurchases: () => mockRestoreNativePurchases(),
+  hasPendingIapRedemption: () => mockHasPendingIapRedemption(),
 }))
 
 vi.mock('@/services/api/nativeServer', async (importOriginal) => {
@@ -231,5 +242,68 @@ describe('OnboardingPlansStep', () => {
 
     await wrapper.find('[data-testid="btn-plans-back"]').trigger('click')
     expect(wrapper.emitted('back')).toHaveLength(1)
+  })
+
+  describe('auth-first plan handoff (native store channel)', () => {
+    const iapPlan = { ...proPlan, iapProductId: 'com.synaplan.app.pro.monthly' }
+
+    beforeEach(() => {
+      mockIsNativeIapAvailable.mockReturnValue(true)
+      mockGetPlans.mockResolvedValue({ plans: [iapPlan], iapConfigured: true })
+    })
+
+    it('emits buy-plan (account before payment) instead of purchasing directly', async () => {
+      const wrapper = mount(OnboardingPlansStep)
+      await flushPromises()
+
+      await wrapper.find('[data-testid="btn-plan-continue"]').trigger('click')
+
+      expect(wrapper.emitted('buy-plan')).toEqual([
+        [{ planId: 'PRO', productId: 'com.synaplan.app.pro.monthly' }],
+      ])
+      // The register-first fallback must NOT fire on the store-channel path.
+      expect(wrapper.emitted('select-plan')).toBeUndefined()
+    })
+
+    it('falls back to the register-first path when the plan has no store product', async () => {
+      mockGetPlans.mockResolvedValue({
+        plans: [proPlan],
+        iapConfigured: false,
+        stripeConfigured: true,
+      })
+      const wrapper = mount(OnboardingPlansStep)
+      await flushPromises()
+
+      await wrapper.find('[data-testid="btn-plan-continue"]').trigger('click')
+
+      expect(wrapper.emitted('buy-plan')).toBeUndefined()
+      expect(wrapper.emitted('select-plan')).toEqual([['PRO']])
+    })
+
+    it('offers restore; a restored signed-out purchase advances to the account step', async () => {
+      mockRestoreNativePurchases.mockResolvedValue(true)
+      mockHasPendingIapRedemption.mockReturnValue(true)
+      const wrapper = mount(OnboardingPlansStep)
+      await flushPromises()
+
+      await wrapper.find('[data-testid="btn-restore-purchases"]').trigger('click')
+      await flushPromises()
+
+      expect(mockRestoreNativePurchases).toHaveBeenCalled()
+      expect(wrapper.emitted('purchased-unlinked')).toHaveLength(1)
+    })
+
+    it('shows a hint when the restore finds nothing', async () => {
+      mockRestoreNativePurchases.mockResolvedValue(true)
+      mockHasPendingIapRedemption.mockReturnValue(false)
+      const wrapper = mount(OnboardingPlansStep)
+      await flushPromises()
+
+      await wrapper.find('[data-testid="btn-restore-purchases"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.emitted('purchased-unlinked')).toBeUndefined()
+      expect(wrapper.find('[data-testid="text-restore-hint"]').exists()).toBe(true)
+    })
   })
 })

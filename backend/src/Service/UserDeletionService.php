@@ -97,6 +97,7 @@ final readonly class UserDeletionService
             $this->deleteTopups($userId);
             $this->deleteMcpServerConfigs($userId);
             $this->deleteRevectorizeRuns($userId);
+            $this->deleteMemoriesFromSql($userId);
 
             // Finally, delete the user account
             $this->em->remove($user);
@@ -105,7 +106,7 @@ final readonly class UserDeletionService
             $this->em->getConnection()->commit();
 
             // Best-effort cleanup outside transaction (external services & filesystem)
-            $this->deleteMemories($userId);
+            $this->purgeMemoryIndex($userId);
             $this->cleanupUserDirectories($userId);
 
             $this->logger->info('User and all related data deleted successfully', [
@@ -166,12 +167,13 @@ final readonly class UserDeletionService
             $this->deleteTopups($userId);
             $this->deleteMcpServerConfigs($userId);
             $this->deleteRevectorizeRuns($userId);
+            $this->deleteMemoriesFromSql($userId);
 
             $this->em->flush();
             $this->em->getConnection()->commit();
 
             // Best-effort cleanup outside transaction (external services & filesystem)
-            $this->deleteMemories($userId);
+            $this->purgeMemoryIndex($userId);
             $this->cleanupUserDirectories($userId);
 
             $this->logger->info('User data cleanup completed successfully', [
@@ -238,9 +240,14 @@ final readonly class UserDeletionService
         $this->vectorStorageFacade->deleteAllForUser($userId);
     }
 
-    private function deleteMemories(int $userId): void
+    private function deleteMemoriesFromSql(int $userId): void
     {
-        $this->userMemoryService->deleteAllForUser($userId);
+        $this->userMemoryService->deleteAllFromSqlForUser($userId);
+    }
+
+    private function purgeMemoryIndex(int $userId): void
+    {
+        $this->userMemoryService->purgeIndexForUser($userId);
     }
 
     private function deleteUseLogs(int $userId): void

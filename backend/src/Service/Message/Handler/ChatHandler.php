@@ -2,6 +2,7 @@
 
 namespace App\Service\Message\Handler;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
@@ -1055,10 +1056,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $hasContent = false;
                 if (is_array($chunk)) {
                     $type = $chunk['type'] ?? null;
-                    if (in_array($type, ['content', 'reasoning'], true) && '' !== ($chunk['content'] ?? '')) {
+                    if (in_array($type, ['content', 'reasoning'], true)
+                        && '' !== trim((string) ($chunk['content'] ?? ''))) {
                         $hasContent = true;
                     }
-                } elseif ('' !== $chunk) {
+                } elseif ('' !== trim($chunk)) {
                     $hasContent = true;
                 }
 
@@ -1091,6 +1093,23 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $aiOptions
         );
         $perfTimer->stop('provider_total');
+
+        if (!$sawFirstToken) {
+            $responseProvider = is_string($metadata['provider'] ?? null)
+                ? $metadata['provider']
+                : ($provider ?? 'unknown');
+            $responseModel = is_string($metadata['model'] ?? null)
+                ? $metadata['model']
+                : ($modelName ?? 'unknown');
+
+            $this->logger->warning('ChatHandler: Provider returned no visible streaming content', [
+                'provider' => $responseProvider,
+                'model' => $responseModel,
+                'user_id' => $message->getUserId(),
+            ]);
+
+            throw new ProviderException('The AI model returned an empty response. Please try again or select a different model.', $responseProvider, ['model' => $responseModel]);
+        }
 
         $this->logger->info('ChatHandler: AiFacade chatStream returned', [
             'response_length' => strlen($fullResponseText),

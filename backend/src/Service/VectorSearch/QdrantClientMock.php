@@ -54,9 +54,12 @@ final class QdrantClientMock implements QdrantClientInterface
         return [];
     }
 
-    public function scrollAllMemoriesForReindex(int $limit = 5000): array
+    public function scrollAllMemoriesForReindex(int $limit = 5000, ?string $namespace = null): array
     {
-        $this->logger->info('QdrantClientMock: scrollAllMemoriesForReindex', ['limit' => $limit]);
+        $this->logger->info('QdrantClientMock: scrollAllMemoriesForReindex', [
+            'limit' => $limit,
+            'namespace' => $namespace,
+        ]);
 
         return [];
     }
@@ -184,9 +187,12 @@ final class QdrantClientMock implements QdrantClientInterface
         ];
     }
 
-    public function recreateMemoriesCollection(int $vectorDimension): void
+    public function recreateMemoriesCollection(int $vectorDimension, ?string $namespace = null): void
     {
-        $this->logger->info('QdrantClientMock: recreateMemoriesCollection', ['vector_dim' => $vectorDimension]);
+        $this->logger->info('QdrantClientMock: recreateMemoriesCollection', [
+            'vector_dim' => $vectorDimension,
+            'namespace' => $namespace,
+        ]);
     }
 
     // --- Health & Info ---

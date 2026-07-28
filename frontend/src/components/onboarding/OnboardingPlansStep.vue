@@ -102,7 +102,7 @@
       <button
         class="mt-4 w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-6"
         data-testid="btn-plan-continue"
-        @click="selectedPlanId && emit('select-plan', selectedPlanId)"
+        @click="continueWithPlan"
       >
         {{ $t('onboarding.plans.continueWith', { plan: selectedPlanName }) }}
       </button>
@@ -125,6 +125,21 @@
           >
             {{ $t('onboarding.plans.loginCta') }}
           </button>
+        </p>
+        <!-- Apple requirement: a visible restore affordance wherever purchases
+             start. A signed-out restore flows through the same unlinked path
+             as a fresh purchase (account step → post-auth redemption). -->
+        <button
+          v-if="showRestore"
+          class="text-xs font-medium txt-secondary hover:txt-primary transition-colors disabled:opacity-60"
+          data-testid="btn-restore-purchases"
+          :disabled="restoring"
+          @click="restorePurchases"
+        >
+          {{ restoring ? $t('onboarding.plans.restoring') : $t('onboarding.plans.restore') }}
+        </button>
+        <p v-if="restoreHint" class="text-xs txt-secondary" data-testid="text-restore-hint">
+          {{ restoreHint }}
         </p>
       </div>
     </template>
@@ -177,9 +192,14 @@
  * selected tier's benefits shown once, a single "continue with" CTA). The guest
  * chat and sign-in stay available as quiet secondary actions — the app is never
  * walled behind a purchase (Apple/Google policy and onboarding best practice).
- * Selecting a plan routes through register/login into the subscription page,
- * where the purchase uses the native IAP path (never Stripe web checkout in the
- * app).
+ *
+ * Auth-first purchase (account before payment): when the native store channel
+ * is available, the CTA hands the selected plan to the parent (`buy-plan`),
+ * which runs the 1-tap account step FIRST and only then opens the store sheet
+ * — the server checks for an existing subscription BEFORE any money moves
+ * (RevenueCat/Roku best practice for account-bound subscriptions; never Stripe
+ * web checkout in the app). Without a native store channel the CTA keeps the
+ * register-first path.
  *
  * The catalogue request is deliberately NOT gated on the runtime-config billing
  * flag: that flag reads a cached config whose fetch has a 2s abort timeout, so
@@ -196,7 +216,13 @@ import { subscriptionApi, type SubscriptionPlan } from '@/services/api/subscript
 import { formatPlanPrice } from '@/utils/formatPrice'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
-import { getStorePrice, initNativeIap, isNativeIapAvailable } from '@/services/nativeIap'
+import {
+  getStorePrice,
+  hasPendingIapRedemption,
+  initNativeIap,
+  isNativeIapAvailable,
+  restoreNativePurchases,
+} from '@/services/nativeIap'
 
 const emit = defineEmits<{
   back: []
@@ -204,6 +230,10 @@ const emit = defineEmits<{
   login: []
   register: []
   'select-plan': [planId: string]
+  /** Native store channel available — run account step, then purchase. */
+  'buy-plan': [payload: { planId: string; productId: string }]
+  /** Restore found a signed-out purchase — continue to the account step. */
+  'purchased-unlinked': []
 }>()
 
 const { t, te } = useI18n()
@@ -265,6 +295,56 @@ function displayPrice(plan: SubscriptionPlan): string {
 function intervalLabel(interval: string): string {
   const key = `subscription.per${interval.charAt(0).toUpperCase()}${interval.slice(1)}`
   return te(key) ? t(key) : interval
+}
+
+// ---------------------------------------------------------------------------
+// Plan handoff (auth-first purchase) & restore
+// ---------------------------------------------------------------------------
+
+const restoring = ref(false)
+const restoreHint = ref<string | null>(null)
+
+/** Restore is only meaningful where the store channel actually exists. */
+const showRestore = computed(() => plans.value.length > 0 && isNativeIapAvailable())
+
+/**
+ * Primary CTA. With a native store channel the parent runs the 1-tap account
+ * step first and starts the purchase AFTER authentication (so an existing
+ * subscription is caught before any money moves). Without the channel (web
+ * preview, Stripe-only server) the register-first path stays.
+ */
+function continueWithPlan(): void {
+  const plan = selectedPlan.value
+  if (!plan) return
+
+  const productId = plan.iapProductId
+  if (!isNativeIapAvailable() || 'string' !== typeof productId || '' === productId) {
+    emit('select-plan', plan.id)
+    return
+  }
+
+  emit('buy-plan', { planId: plan.id, productId })
+}
+
+/**
+ * Signed-out restore: re-delivered transactions flow through the same
+ * unlinked path as a fresh purchase, so a pending redemption afterwards means
+ * "there is a purchase — continue to the account step".
+ */
+async function restorePurchases(): Promise<void> {
+  if (restoring.value) return
+  restoring.value = true
+  restoreHint.value = null
+  try {
+    const ran = await restoreNativePurchases()
+    if (ran && hasPendingIapRedemption()) {
+      emit('purchased-unlinked')
+      return
+    }
+    restoreHint.value = t('onboarding.plans.restoreNone')
+  } finally {
+    restoring.value = false
+  }
 }
 
 async function loadPlans(): Promise<boolean> {

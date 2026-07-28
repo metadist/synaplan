@@ -216,6 +216,7 @@ const handleRetry = () => {
         type="button"
         class="p-1 rounded txt-muted hover:txt-primary transition-colors"
         :aria-label="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
+        :aria-expanded="!collapsed"
         :title="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
         data-testid="task-card-toggle"
         @click="toggleCollapsed"
@@ -324,7 +325,7 @@ const handleRetry = () => {
 
       <!-- Streaming / final text (prose and non-search kinds) -->
       <div
-        v-else-if="!isSearchKind && card.text"
+        v-if="!isSearchKind && card.text && !collapsed"
         class="task-card__body text-sm txt-primary break-words"
       >
         <MessageText

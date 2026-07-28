@@ -36,6 +36,13 @@ export const getProviderIcon = (provider: string): string => {
     return 'simple-icons:mistral'
   } else if (providerLower.includes('huggingface') || providerLower.includes('hugging face')) {
     return 'simple-icons:huggingface'
+  } else if (
+    providerCompact.includes('trustedtokens') ||
+    providerLower.includes('trusted tokens')
+  ) {
+    // TNG TrustedTokens — German sovereign inference. No brand glyph in
+    // simple-icons; use a shield that reads as "sovereign / secured".
+    return 'mdi:shield-check'
   }
 
   return 'mdi:robot'
@@ -55,8 +62,13 @@ export const getProviderFlag = (provider: string): string => {
     // Operator-defined, self-hosted endpoint — no fixed country. Use the
     // neutral "world" badge (and NOT the US flag the `openai` branch returns).
     return 'circle-flags:un'
-  } else if (p.includes('ollama') || p.includes('piper') || p.includes('synaplan')) {
-    // Ollama and the self-hosted Synaplan/Piper TTS are German-hosted.
+  } else if (
+    p.includes('ollama') ||
+    p.includes('piper') ||
+    p.includes('synaplan') ||
+    p.replace(/[\s_-]/g, '').includes('trustedtokens')
+  ) {
+    // Ollama / Synaplan / Piper TTS and TrustedTokens (TNG) are German-hosted.
     return 'circle-flags:de'
   } else if (p.includes('mistral')) {
     return 'circle-flags:fr'

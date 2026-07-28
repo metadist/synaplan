@@ -104,6 +104,7 @@ Catalog now set to DeepInfra rates. Note K2.7 was previously $0.95/$4.00 (ABOVE 
 - Higgsfield (dashboard only — no public table): https://cloud.higgsfield.ai/ · docs https://docs.higgsfield.ai/
 - DeepInfra (Kimi partner we pin): https://deepinfra.com/pricing
 - Kimi direct: https://platform.kimi.ai/docs/pricing/chat
+- TrustedTokens (JSON catalog, not the JS marketing page): https://trustedtokens.eu/api/billing/models · docs https://trustedtokens.eu/docs/
 
 **Tooling / cross-checks:**
 
@@ -124,7 +125,20 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | Higgsfield | ⚠️ NOT publicly verifiable — see below | dashboard only |
 | **Mistral** | ✅ verified 2026-07-13 — all correct | https://mistral.ai/pricing/api/ |
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
+| **TrustedTokens** | ✅ verified 2026-07-27 | https://trustedtokens.eu/api/billing/models |
 | Piper / Triton | n/a — free/local | — |
+
+### TrustedTokens (verified 2026-07-27)
+
+German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`). Per-token rates come from the public billing catalog (not the JS-rendered marketing page); subscription plans (€50 / €200 / €2,000) are prepaid usage credits that draw down against these rates. Catalog stores **USD per 1M tokens** (same unit as every other cloud provider). Cache-read rates are authored in `json.cache_read_price_per_1M`.
+
+| BID | Model | Catalog in/out | Official (×1e6) | Context |
+| --- | ----- | -------------- | --------------- | ------- |
+| 309 | `zai-org/GLM-5.2` | $1.50 / $4.50 | $1.50 / $4.50 (cache $0.30) | 230k |
+| 310 / 311 | `Qwen/Qwen3.6-35B-A3B-FP8` (chat + vision) | $0.25 / $1.50 | $0.25 / $1.50 (cache $0.05) | 262k |
+| 312 | `openai/gpt-oss-120b` | $0.15 / $0.60 | $0.15 / $0.60 (cache $0.05) | 131k |
+
+Not in LiteLLM → lands in the sync's `unmatched` bucket; re-verify via `curl https://trustedtokens.eu/api/billing/models`.
 
 ### TheHive (verified 2026-07-13)
 
@@ -216,7 +230,31 @@ You can run the same check locally: `docker compose exec -T backend php bin/cons
 
 ## Time-boxed / reminders
 
-- **Claude Sonnet 5**: introductory $2/$10 → revert to standard $3/$15 after **2026-08-31** (TODO in `ModelCatalog.php` BID 249/250).
+- **Claude Sonnet 5**: introductory $2/$10 → revert to standard $3/$15 after **2026-08-31** (TODO in `ModelCatalog.php` BID 249/250 **and** the MEM row BID 222, which now runs Sonnet 5 too).
+
+## Anthropic catalog generations (snapshot 2026-07-27)
+
+Source: https://platform.claude.com/docs/en/about-claude/models/overview
+
+| Model | BIDs (chat / vision) | Price in/out per 1M |
+| ----- | -------------------- | ------------------- |
+| Claude Fable 5 | 240 / 241 | $10 / $50 |
+| Claude Opus 5 | 257 / 258 | $5 / $25 |
+| Claude Sonnet 5 | 249 / 250 (+ 222 MEM) | $2 / $10 intro, $3 / $15 from 2026-09-01 |
+| Claude Opus 4.8 | 238 / 239 | $5 / $25 |
+| Claude Haiku 4.5 | 162 / 235 | $1 / $5 |
+
+Retired on 2026-07-27 by `Version20260727120000` (rows deactivated, never deleted — `BMESSAGES` FKs; BIDs must never be reused): Claude Sonnet 4.5 (112/109), Claude Opus 4.6 (160/164), Claude Sonnet 4.6 (161/163), Claude Opus 4.7 (165/166), plus the catalog-orphans Claude Opus 4.1 (69/93, deprecated upstream and retired by Anthropic on 2026-08-05) and Claude Opus 4.5 (121).
+
+The same orphan cleanup continues in `Version20260727180000` for two non-Anthropic rows: **OpenAI `gpt-4.1` (BID 30)** → GPT-5.6 Terra (253) and **Groq `llama-4-maverick-17b-128e-instruct` (BID 49)** → Groq `gpt-oss-120b` (76).
+
+### A non-zero price under a "free" unit is silently free
+
+`normaliseToPerUnit()` maps `-`, `` and `free` to **0**, so a price stored under one of those units is displayed but never billed. Two Ollama rows shipped exactly that — BID 3 (`deepseek-r1:32b`, out 0.91) and BID 6 (`mistral:7b`, out 0.475) had `BOUTUNIT = '-'` while their input side was `per1M`, so their output tokens were free while input was charged. `Version20260727190000` corrects the unit only; the price values stay as they were, since Ollama rows are an operator-hosted synthetic resale basis and re-pricing them is a decision, not a fix.
+
+`ModelCatalogTest::testNoCatalogPriceIsAuthoredUnderAUnitThatNormalisesToZero()` now fails the build if a catalog row is ever authored this way again. Note that `per_generation` (Higgsfield video, BIDs 302–308) is *not* this bug — unknown units fall through as per-1, which is what a flat per-clip fee needs.
+
+> **Removing a model from the catalog is only half a retirement.** `ModelSeeder` never deletes or deactivates rows, so a model dropped from `ModelCatalog.php` without a companion migration stays `BACTIVE=1, BSELECTABLE=1` in every existing database — still pickable in the UI and still billed at whatever price the stale row holds. That is how Opus 4.1/4.5 survived several releases. Always pair a catalog removal with a deactivation migration.
 
 ## Related issues
 
@@ -245,7 +283,7 @@ gpt-image bills a different per-image price per quality × size (e.g. gpt-image-
 
 ## Long-context tiers — #1319
 
-Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 2.5/3.1 Pro and Claude Sonnet 4.5 above 200k, GPT-5.x above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches both input and output to the above rate when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
+Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 2.5/3.1 Pro above 200k, GPT-5.x above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches both input and output to the above rate when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
 
 | Model | Threshold | Base in/out (per 1M) | Above in/out (per 1M) |
 | ----- | --------- | -------------------- | --------------------- |
@@ -255,9 +293,8 @@ Some providers charge a higher per-token rate for the **whole request** once the
 | gpt-5.6-luna | 272k | 1.00 / 6 | 2.00 / 9 |
 | gemini-2.5-pro | 200k | 1.25 / 10 | 2.50 / 15 |
 | gemini-3.1-pro-preview | 200k | 2.00 / 12 | 4.00 / 18 |
-| claude-sonnet-4-5 | 200k | 3.00 / 15 | 6.00 / 22.50 |
 
-> `claude-sonnet-4-5`'s `max_input` is 200k, so its tier is currently unreachable — kept for completeness.
+> The `claude-sonnet-4-5` tier was dropped together with that model's catalog rows (retired 2026-07-27, see `Version20260727120000`). No current Claude model has a long-context tier — the 5-series bills one flat rate across its 1M window.
 
 ## Production rollout to existing installs
 
