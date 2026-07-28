@@ -170,7 +170,9 @@ services:
     App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
         alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
 
-    App\Service\File\DocumentImageReferenceResolver:
+    # Images a document turn may embed: attachments, upstream node output and
+    # the pictures of the conversation, validated against the uploads dir.
+    App\Service\File\DocumentImageCatalog:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 

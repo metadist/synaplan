@@ -15,6 +15,7 @@ use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
 use App\Service\File\DocumentGeneratorService;
+use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
@@ -74,6 +75,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private PerfPipelineFlag $perfPipelineFlag,
         private DocumentGeneratorService $documentGenerator,
         private DocumentImageReferenceResolver $documentImageReferenceResolver,
+        private DocumentImageCatalog $documentImageCatalog,
         private TimeContextBuilder $timeContextBuilder,
         iterable $pluginContextProviders = [],
     ) {
@@ -136,6 +138,37 @@ final readonly class ChatHandler implements MessageHandlerInterface
             is_string($userTimezone) ? $userTimezone : null,
             is_string($country) ? $country : null,
         );
+    }
+
+    /**
+     * List the images this document turn may embed, so the model references an
+     * existing picture instead of guessing a marker (#1382). Only the
+     * officemaker topic writes `{{IMAGE:...}}` markers, so every other topic
+     * keeps its prompt shape unchanged.
+     *
+     * @param array<int, array{role: string, content: string}|Message> $thread
+     * @param array<string, mixed>                                     $options
+     */
+    private function buildDocumentImageContext(Message $message, array $thread, string $topic, array $options): string
+    {
+        if ('officemaker' !== $topic) {
+            return '';
+        }
+
+        $extraPaths = [];
+        foreach ($options['document_images'] ?? [] as $path) {
+            if (is_string($path) && '' !== trim($path)) {
+                $extraPaths[] = $path;
+            }
+        }
+
+        $images = $this->documentImageCatalog->build($message, $thread, $extraPaths);
+        $this->logger->info('ChatHandler: Document image catalog built', [
+            'available_images' => count($images),
+            'upstream_images' => count($extraPaths),
+        ]);
+
+        return $this->documentImageCatalog->renderPromptBlock($images);
     }
 
     /**
@@ -355,6 +388,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Current date/time: profile timezone → unambiguous country → server.
         $systemPrompt .= $this->buildTimeContext($user, $options);
+
+        // Images this document may embed (officemaker only).
+        $systemPrompt .= $this->buildDocumentImageContext($message, $thread, $topic, $options);
 
         $modelMaxTokens = null;
         $systemPromptFallback = null;
@@ -927,6 +963,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Current date/time: profile timezone → unambiguous country → server.
         $systemPrompt .= $this->buildTimeContext($user, $options);
+
+        // Images this document may embed (officemaker only).
+        $systemPrompt .= $this->buildDocumentImageContext($message, $thread, $topic, $options);
 
         // Check if model supports system messages (o1 models don't)
         $systemPromptFallback = null;

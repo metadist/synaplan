@@ -14,12 +14,10 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class DocumentImageReferenceResolver
 {
-    private const SUPPORTED_EXTENSIONS = ['gif', 'jpeg', 'jpg', 'png', 'webp'];
-
     public function __construct(
         private FileRepository $fileRepository,
+        private DocumentImageCatalog $catalog,
         private LoggerInterface $logger,
-        private string $uploadDir,
     ) {
     }
 
@@ -37,7 +35,7 @@ final readonly class DocumentImageReferenceResolver
     public function resolve(string $content, Message $message): array
     {
         $images = [];
-        $attachments = $this->imageAttachments($message);
+        $attachments = $this->catalog->attachments($message);
 
         $content = preg_replace_callback(
             '/\{\{IMAGE:attached:(\d+)}}/',
@@ -48,7 +46,7 @@ final readonly class DocumentImageReferenceResolver
                     return $matches[0];
                 }
 
-                $path = $this->absoluteImagePath($file);
+                $path = $this->catalog->absolutePath($file);
                 if (null === $path) {
                     return $matches[0];
                 }
@@ -88,7 +86,7 @@ final readonly class DocumentImageReferenceResolver
                     continue;
                 }
 
-                $path = $this->absoluteImagePath($file);
+                $path = $this->catalog->absolutePath($file);
                 if (null !== $path) {
                     $images['file:'.$id] = $path;
                 }
@@ -130,52 +128,10 @@ final readonly class DocumentImageReferenceResolver
             'references' => array_values(array_unique($dropped)),
             'message_id' => $message->getId(),
             'user_id' => $message->getUserId(),
-            'attached_images' => count($this->imageAttachments($message)),
+            'attached_images' => count($this->catalog->attachments($message)),
         ]);
 
         // A marker on its own line leaves an empty paragraph behind.
         return preg_replace('/\R{3,}/', "\n\n", $cleaned) ?? $cleaned;
-    }
-
-    /**
-     * @return list<File>
-     */
-    private function imageAttachments(Message $message): array
-    {
-        $files = [];
-        foreach ($message->getFiles() as $file) {
-            if ($this->isSupportedImage($file)) {
-                $files[] = $file;
-            }
-        }
-
-        return $files;
-    }
-
-    private function isSupportedImage(File $file): bool
-    {
-        $extension = strtolower(pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
-
-        return in_array($extension, self::SUPPORTED_EXTENSIONS, true);
-    }
-
-    private function absoluteImagePath(File $file): ?string
-    {
-        if (!$this->isSupportedImage($file)) {
-            return null;
-        }
-
-        $uploadRoot = realpath($this->uploadDir);
-        $path = realpath($this->uploadDir.'/'.ltrim($file->getFilePath(), '/'));
-        if (false === $uploadRoot || false === $path || !is_file($path)) {
-            return null;
-        }
-
-        $rootPrefix = rtrim($uploadRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
-        if (!str_starts_with($path, $rootPrefix)) {
-            return null;
-        }
-
-        return $path;
     }
 }

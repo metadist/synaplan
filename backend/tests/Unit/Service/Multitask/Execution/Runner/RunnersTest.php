@@ -610,6 +610,57 @@ final class RunnersTest extends TestCase
         self::assertSame('document_generation', $captured['intent']);
     }
 
+    /**
+     * #1382: the picture an upstream image node just rendered must reach the
+     * officemaker prompt, otherwise the document node can only guess a marker.
+     */
+    public function testDocumentGenerationForwardsUpstreamImagesToTheHandler(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $options = null;
+        $handler->method('handle')->willReturnCallback(function ($msg, $thread, $classification, $progress, $opts) use (&$options): array {
+            $options = $opts;
+
+            return ['metadata' => ['generated_file' => ['filename' => 'letter.docx', 'path' => '01/000/00001/2026/07/letter.docx']]];
+        });
+
+        $context = $this->context($this->message('write a letter with the photo'));
+        $context->setResult('n1', NodeResult::ok('image', [[
+            'path' => '/api/v1/files/uploads/01/000/00001/2026/07/photo.jpg',
+            'type' => 'image',
+            'local_path' => '01/000/00001/2026/07/photo.jpg',
+        ]]));
+
+        $node = new TaskNode('n1x', Capability::DocumentGeneration, ['n1'], ['prompt' => 'write a letter with the photo']);
+        $result = (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class)))->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(['01/000/00001/2026/07/photo.jpg'], $options['document_images']);
+    }
+
+    public function testDocumentGenerationIgnoresNonImageUpstreamFiles(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $options = null;
+        $handler->method('handle')->willReturnCallback(function ($msg, $thread, $classification, $progress, $opts) use (&$options): array {
+            $options = $opts;
+
+            return ['metadata' => ['generated_file' => ['filename' => 'summary.docx', 'path' => '01/000/00001/2026/07/summary.docx']]];
+        });
+
+        $context = $this->context($this->message('summarize the audio in a docx'));
+        $context->setResult('n1', NodeResult::ok('audio', [[
+            'path' => '/api/v1/files/uploads/01/000/00001/2026/07/voice.mp3',
+            'type' => 'audio',
+            'local_path' => '01/000/00001/2026/07/voice.mp3',
+        ]]));
+
+        $node = new TaskNode('n2', Capability::DocumentGeneration, ['n1'], ['prompt' => 'summarize the audio']);
+        (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class)))->run($node, $context);
+
+        self::assertArrayNotHasKey('document_images', (array) $options);
+    }
+
     public function testDocumentGenerationFailsWhenNoFileProduced(): void
     {
         $handler = $this->createMock(ChatHandler::class);

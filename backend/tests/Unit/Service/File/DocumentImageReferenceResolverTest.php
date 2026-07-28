@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\File;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\FileRepository;
+use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -66,6 +67,30 @@ class DocumentImageReferenceResolverTest extends TestCase
         $this->assertSame([], $result['images']);
     }
 
+    /**
+     * #1382: the model places an image generated earlier in the conversation.
+     * It is not attached to the new message — only the catalog told the model
+     * its id — and it must still be embedded.
+     */
+    public function testResolvesAnImageGeneratedEarlierInTheConversation(): void
+    {
+        file_put_contents($this->uploadDir.'/cat.jpg', 'image');
+        $file = $this->imageFile(377, 7, 'cat.jpg');
+
+        $message = (new Message())->setUserId(7);
+        $repository = $this->createMock(FileRepository::class);
+        $repository->expects($this->once())
+            ->method('findOneBy')
+            ->with(['id' => 377, 'userId' => 7])
+            ->willReturn($file);
+
+        $result = $this->resolver($repository)
+            ->resolve("Application\n\n{{IMAGE:file:377}}\n\nKind regards", $message);
+
+        $this->assertSame("Application\n\n{{IMAGE:file:377}}\n\nKind regards", $result['content']);
+        $this->assertSame(realpath($this->uploadDir.'/cat.jpg'), $result['images']['file:377']);
+    }
+
     public function testDropsPersistentMarkerTheUserDoesNotOwn(): void
     {
         $message = (new Message())->setUserId(7);
@@ -93,7 +118,11 @@ class DocumentImageReferenceResolverTest extends TestCase
 
     private function resolver(FileRepository $repository): DocumentImageReferenceResolver
     {
-        return new DocumentImageReferenceResolver($repository, new NullLogger(), $this->uploadDir);
+        return new DocumentImageReferenceResolver(
+            $repository,
+            new DocumentImageCatalog($repository, $this->uploadDir),
+            new NullLogger(),
+        );
     }
 
     private function imageFile(int $id, int $userId, string $path): File
