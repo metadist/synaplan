@@ -966,7 +966,7 @@ const loadEmbeddingGuard = async () => {
 /**
  * True when this chip's underlying model id is the current default for
  * its purpose. Each chip carries its own modelId because a dedup'd row
- * can represent several BMODELS ids (e.g. "Claude Opus 4.6" — id 160
+ * can represent several BMODELS ids (e.g. "Claude Sonnet 5" — id 249
  * for CHAT, id 222 for MEM); active state is therefore per-chip, not
  * per-row.
  */
