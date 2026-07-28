@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\File;
 
 use App\Service\File\DocumentGeneratorService;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
 
 class DocumentGeneratorServiceTest extends TestCase
@@ -116,7 +117,7 @@ class DocumentGeneratorServiceTest extends TestCase
         $this->assertTrue($this->docxContainsMedia($path), 'DOCX must contain the embedded image binary');
     }
 
-    public function testDocxCleansConvertedWebpFilesWhenLaterConversionFails(): void
+    public function testDocxSkipsUnconvertibleWebpImageAndCleansTemporaryFiles(): void
     {
         if (!class_exists(\Imagick::class) && !function_exists('imagewebp')) {
             $this->markTestSkipped('WebP generation requires Imagick or GD');
@@ -141,17 +142,16 @@ class DocumentGeneratorServiceTest extends TestCase
         file_put_contents($invalidWebp, 'not a webp image');
         $temporaryFilesBefore = glob(sys_get_temp_dir().'/docx_image_*') ?: [];
 
-        try {
-            $this->service->write(
-                '{{IMAGE:file:1}}{{IMAGE:file:2}}',
-                'docx',
-                $this->tmpDir.'/conversion_failure.docx',
-                ['file:1' => $validWebp, 'file:2' => $invalidWebp],
-            );
-            $this->fail('The invalid WebP image should fail conversion');
-        } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('Failed to convert a WebP document image', $e->getMessage());
-        }
+        $path = $this->tmpDir.'/conversion_failure.docx';
+        $this->service->write(
+            "Cover letter\n\n{{IMAGE:file:1}}{{IMAGE:file:2}}",
+            'docx',
+            $path,
+            ['file:1' => $validWebp, 'file:2' => $invalidWebp],
+        );
+
+        $this->assertFileExists($path, 'A broken image must not discard the document');
+        $this->assertStringContainsString('Cover letter', $this->readDocxDocument($path));
 
         $leakedFiles = array_values(array_diff(
             glob(sys_get_temp_dir().'/docx_image_*') ?: [],
@@ -161,15 +161,53 @@ class DocumentGeneratorServiceTest extends TestCase
             @unlink($leakedFile);
         }
 
-        $this->assertSame([], $leakedFiles, 'Converted WebP temporary files must be removed after a later failure');
+        $this->assertSame([], $leakedFiles, 'Converted WebP temporary files must be removed after the write');
     }
 
-    public function testDocxRejectsUnresolvedImageReference(): void
+    /**
+     * Issue #1228 follow-up: the model emits `{{IMAGE:attached:1}}` even when
+     * nothing is attached. An unresolvable marker must cost the image, never
+     * the whole document.
+     */
+    public function testDocxSkipsUnresolvedImageReference(): void
     {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Document image reference could not be resolved');
+        $path = $this->tmpDir.'/missing_image.docx';
+        $this->service->write("Dear Sir or Madam\n\n{{IMAGE:file:999}}\n\nKind regards", 'docx', $path);
 
-        $this->service->write('{{IMAGE:file:999}}', 'docx', $this->tmpDir.'/missing_image.docx');
+        $documentXml = $this->readDocxDocument($path);
+        $this->assertStringContainsString('Dear Sir or Madam', $documentXml);
+        $this->assertStringContainsString('Kind regards', $documentXml);
+        $this->assertStringNotContainsString('{{IMAGE:', $documentXml);
+        $this->assertFalse($this->docxContainsMedia($path));
+    }
+
+    /**
+     * The plain-text fallback exists so a document is always produced — it must
+     * not re-throw on the very image marker that can send it there. Content
+     * consisting only of an unresolvable marker leaves an empty body and
+     * therefore always takes the rebuild path.
+     */
+    public function testDocxPlainTextFallbackSurvivesUnresolvedImageReference(): void
+    {
+        $logger = new class extends AbstractLogger {
+            /** @var list<string> */
+            public array $messages = [];
+
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->messages[] = (string) $message;
+            }
+        };
+        $service = new DocumentGeneratorService($logger);
+
+        $path = $this->tmpDir.'/fallback_image.docx';
+        $service->write('{{IMAGE:file:999}}', 'docx', $path);
+
+        $this->assertContains(
+            'DocumentGeneratorService: DOCX produced no content, rebuilding with plain text fallback',
+            $logger->messages,
+        );
+        $this->assertTrue($this->isZipContaining($path, 'word/document.xml'));
     }
 
     public function testWriteDocxThrowsOnEmptyContent(): void
@@ -212,6 +250,17 @@ class DocumentGeneratorServiceTest extends TestCase
         $this->service->write($content, 'md', $path);
 
         $this->assertSame($content, file_get_contents($path));
+    }
+
+    /**
+     * Only DOCX can embed images — a text format would show the raw marker.
+     */
+    public function testTextFormatsDropImageMarkers(): void
+    {
+        $path = $this->tmpDir.'/markers.md';
+        $this->service->write("# Heading\n\n{{IMAGE:file:42}}\n\ntext", 'md', $path);
+
+        $this->assertSame("# Heading\n\ntext", file_get_contents($path));
     }
 
     private function readDocxDocument(string $path): string

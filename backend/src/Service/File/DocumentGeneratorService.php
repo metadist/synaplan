@@ -59,13 +59,15 @@ final readonly class DocumentGeneratorService
                 $this->writeDocx($content, $absolutePath, $images);
                 break;
             case 'xlsx':
-                $this->writeXlsx($content, $absolutePath);
+                $this->writeXlsx($this->stripImageMarkers($content), $absolutePath);
                 break;
             case 'pptx':
-                $this->writePptx($content, $absolutePath);
+                $this->writePptx($this->stripImageMarkers($content), $absolutePath);
                 break;
             default:
-                if (false === file_put_contents($absolutePath, $content)) {
+                // Only DOCX can embed images — every other format would show
+                // the raw marker to the user, so drop it.
+                if (false === file_put_contents($absolutePath, $this->stripImageMarkers($content))) {
                     throw new \RuntimeException('Failed to write file: '.$absolutePath);
                 }
         }
@@ -76,6 +78,9 @@ final readonly class DocumentGeneratorService
      * converted to HTML so headings, lists, bold text and tables are kept.
      * If HTML parsing fails, fall back to plain paragraphs so the file is
      * still valid and openable.
+     *
+     * An image that cannot be embedded never fails the document: it is skipped
+     * and the user receives the text without that image.
      *
      * @param array<string, string> $images
      */
@@ -92,7 +97,18 @@ final readonly class DocumentGeneratorService
                     continue;
                 }
 
-                $convertedPath = $this->convertWebpForWord($imagePath);
+                try {
+                    $convertedPath = $this->convertWebpForWord($imagePath);
+                } catch (\RuntimeException $e) {
+                    $this->logger->warning('DocumentGeneratorService: skipping WebP image that could not be converted', [
+                        'reference' => $reference,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    unset($images[$reference]);
+                    continue;
+                }
+
                 $images[$reference] = $convertedPath;
                 $temporaryImages[] = $convertedPath;
             }
@@ -183,7 +199,8 @@ final readonly class DocumentGeneratorService
             if ($part['image']) {
                 $path = $images[$part['value']] ?? null;
                 if (null === $path) {
-                    throw new \RuntimeException('Document image reference could not be resolved: '.$part['value']);
+                    $this->logUnresolvedImage($part['value']);
+                    continue;
                 }
                 $section->addImage($path, ['width' => 180, 'ratio' => true]);
                 continue;
@@ -203,7 +220,8 @@ final readonly class DocumentGeneratorService
 
     /**
      * Build a DOCX from the raw content as plain paragraphs. Used as the
-     * always-valid fallback when HTML conversion fails or yields no text.
+     * always-valid fallback when HTML conversion fails or yields no text, so
+     * this path must never throw on the document body itself.
      *
      * @param array<string, string> $images
      */
@@ -216,7 +234,8 @@ final readonly class DocumentGeneratorService
             if ($part['image']) {
                 $path = $images[$part['value']] ?? null;
                 if (null === $path) {
-                    throw new \RuntimeException('Document image reference could not be resolved: '.$part['value']);
+                    $this->logUnresolvedImage($part['value']);
+                    continue;
                 }
                 $section->addImage($path, ['width' => 180, 'ratio' => true]);
                 continue;
@@ -232,6 +251,31 @@ final readonly class DocumentGeneratorService
         }
 
         return $phpWord;
+    }
+
+    /**
+     * A marker without a resolved path is skipped, never fatal: losing one
+     * image is a far better outcome for the user than losing the document.
+     */
+    private function logUnresolvedImage(string $reference): void
+    {
+        $this->logger->warning('DocumentGeneratorService: skipping unresolved document image reference', [
+            'reference' => $reference,
+        ]);
+    }
+
+    /**
+     * Remove image markers from content that is written as text.
+     */
+    private function stripImageMarkers(string $content): string
+    {
+        if (!str_contains($content, '{{IMAGE:')) {
+            return $content;
+        }
+
+        $stripped = preg_replace('/\{\{IMAGE:[a-z]+:\d+}}/', '', $content) ?? $content;
+
+        return preg_replace('/\R{3,}/', "\n\n", $stripped) ?? $stripped;
     }
 
     /**
