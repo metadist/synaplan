@@ -65,10 +65,12 @@
           </ul>
         </Transition>
       </div>
-      <!-- No skip on the post-purchase account step: leaving would strand the
-           already-paid, still-unlinked purchase. -->
+      <!-- Skip stays available before any money moves (dots pages + the
+           pre-purchase account step). It disappears once a payment is at
+           stake: on the redeem account step (an unlinked purchase would be
+           stranded) and on the purchase step (it has its own "later" exit). -->
       <button
-        v-if="step <= totalSteps"
+        v-if="step <= totalSteps || (step === ACCOUNT_STEP && accountContext === 'purchase')"
         class="h-9 px-3 rounded-lg surface-card ring-1 ring-black/[0.06] dark:ring-white/[0.1] shadow-sm text-sm font-medium txt-primary transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
         data-testid="btn-skip-onboarding"
         @click="skip"
@@ -102,15 +104,24 @@
             @login="finishToLogin"
             @register="finishToRegister()"
             @select-plan="finishToRegister"
-            @purchased-unlinked="showAccountStep"
-            @purchased="finishPurchased"
+            @buy-plan="startPurchaseFlow"
+            @purchased-unlinked="showRedeemAccountStep"
           />
           <OnboardingAccountStep
-            v-else
+            v-else-if="step === ACCOUNT_STEP"
             key="account"
-            @authenticated="finishPurchased"
-            @register="finishToRegister()"
+            :context="accountContext"
+            @authenticated="onAccountAuthenticated"
+            @register="finishToRegister(selectedPurchase?.planId)"
             @login="finishToLogin"
+          />
+          <OnboardingPurchaseStep
+            v-else-if="step === PURCHASE_STEP && selectedPurchase"
+            key="purchase"
+            :product-id="selectedPurchase.productId"
+            @purchased="finishPurchased"
+            @done="finishPurchased"
+            @manage="finishToSubscription"
           />
         </Transition>
       </div>
@@ -148,10 +159,14 @@
  *      pills that open modals (own server URL entry, RAG info, chat widget info)
  *   2. Plans — paid plans in focus, with guest chat / sign in as quiet actions
  *
- * Plus a conditional terminal page (not skippable, not in the dot navigation):
- *   3. Account — shown only after a successful signed-out store purchase
- *      (purchase-first flow); creates/links the account the purchase is
- *      redeemed against.
+ * Plus two conditional pages outside the dot navigation (auth-first purchase:
+ * the account comes BEFORE the payment, so an existing subscription is caught
+ * by the server before any money moves):
+ *   3. Account — 1-tap sign-in (Apple/Google, e-mail fallback). Reached either
+ *      with a purchase intent from the plans CTA, or as the redeem path after
+ *      a signed-out restore re-delivered an unlinked purchase.
+ *   4. Purchase — subscription pre-check, then the store sheet, with
+ *      retry / "later" exits. Only reachable authenticated.
  *
  * The router guard only sends true first-run native users here; finishing or
  * skipping persists completion so the flow never shows again.
@@ -163,6 +178,7 @@ import { Icon } from '@iconify/vue'
 import OnboardingWelcomeStep from '@/components/onboarding/OnboardingWelcomeStep.vue'
 import OnboardingPlansStep from '@/components/onboarding/OnboardingPlansStep.vue'
 import OnboardingAccountStep from '@/components/onboarding/OnboardingAccountStep.vue'
+import OnboardingPurchaseStep from '@/components/onboarding/OnboardingPurchaseStep.vue'
 import { markOnboardingCompleted, consumeOnboardingResumeStep } from '@/composables/useOnboarding'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
 
@@ -170,8 +186,21 @@ const router = useRouter()
 const { locale } = useI18n()
 
 const totalSteps = 2
-/** Terminal post-purchase page, outside the dot navigation and not skippable. */
+/** Account page (sign in / create account), outside the dot navigation. */
 const ACCOUNT_STEP = 3
+/** Terminal purchase page (pre-check + store sheet), authenticated only. */
+const PURCHASE_STEP = 4
+
+/** Plan the user picked on the plans step; drives the auth-first purchase. */
+const selectedPurchase = ref<{ planId: string; productId: string } | null>(null)
+
+/**
+ * Why the account step is shown:
+ * - 'purchase': plan picked, nothing paid yet — sign in, then pay (skippable).
+ * - 'redeem': a signed-out purchase/restore is already waiting to be linked —
+ *   not skippable, an unlinked payment would be stranded.
+ */
+const accountContext = ref<'purchase' | 'redeem'>('purchase')
 
 const languages = [
   { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
@@ -243,17 +272,25 @@ function finishAsGuest() {
   router.replace('/')
 }
 
+/**
+ * Existing-account path. With a purchase intent pending, the user continues
+ * on the subscription page after logging in (account state visible there, the
+ * server-side pre-check rules out a conflicting second purchase).
+ */
 function finishToLogin() {
   markOnboardingCompleted()
+  if (selectedPurchase.value) {
+    setPendingRedirect('/subscription')
+  }
   router.replace({ name: 'login' })
 }
 
 /**
- * Register-first fallback (no native store channel, e.g. a Stripe-only or
- * custom server): a selected plan is remembered as a pending post-login
- * redirect to the subscription page, where the purchase runs through the
- * existing native IAP path (never Stripe web checkout in the app). With a
- * store channel the plans step purchases directly instead (purchase-first).
+ * E-mail registration path (also the register-first fallback when no native
+ * store channel exists, e.g. a Stripe-only or custom server): a selected plan
+ * is remembered as a pending post-login redirect to the subscription page,
+ * where the purchase runs through the existing native IAP path (never Stripe
+ * web checkout in the app).
  */
 function finishToRegister(planId?: string) {
   markOnboardingCompleted()
@@ -266,25 +303,58 @@ function finishToRegister(planId?: string) {
 }
 
 /**
- * A signed-out store purchase succeeded (purchase-first flow) — advance to
- * the terminal account step. Completion is persisted NOW: if the user
- * backgrounds the app before creating the account, the guest-chat reminder
- * banner takes over instead of a second onboarding run.
+ * Plans CTA with a native store channel: remember the plan and run the
+ * account step FIRST (auth-first purchase). Nothing is paid yet, so
+ * onboarding completion is not persisted and skipping stays possible.
  */
-function showAccountStep() {
-  markOnboardingCompleted()
+function startPurchaseFlow(payload: { planId: string; productId: string }) {
+  selectedPurchase.value = payload
+  accountContext.value = 'purchase'
   direction.value = 'forward'
   step.value = ACCOUNT_STEP
 }
 
 /**
- * Purchase is verified and linked (either bought with an existing session or
- * the account step finished signing in — redemption runs in the central
- * post-auth hook). Enter the app.
+ * A signed-out restore re-delivered an unlinked purchase — advance to the
+ * account step in redeem mode. Completion is persisted NOW: money is already
+ * at stake, so if the user backgrounds the app before signing in, the
+ * guest-chat reminder banner takes over instead of a second onboarding run.
+ */
+function showRedeemAccountStep() {
+  markOnboardingCompleted()
+  selectedPurchase.value = null
+  accountContext.value = 'redeem'
+  direction.value = 'forward'
+  step.value = ACCOUNT_STEP
+}
+
+/**
+ * Account step finished signing in in place. Purchase intent → the terminal
+ * purchase step (pre-check + store sheet). Redeem mode → enter the app; the
+ * unlinked purchase is redeemed by the central post-auth hook.
+ */
+function onAccountAuthenticated() {
+  if ('purchase' === accountContext.value && selectedPurchase.value) {
+    direction.value = 'forward'
+    step.value = PURCHASE_STEP
+    return
+  }
+  finishPurchased()
+}
+
+/**
+ * Terminal exit into the app (purchase granted, "later", or the redeem path
+ * signed in — redemption runs in the central post-auth hook).
  */
 function finishPurchased() {
   markOnboardingCompleted()
   router.replace('/')
+}
+
+/** "Already subscribed" on the purchase step: manage on the subscription page. */
+function finishToSubscription() {
+  markOnboardingCompleted()
+  router.replace('/subscription')
 }
 </script>
 

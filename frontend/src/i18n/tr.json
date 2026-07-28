@@ -1532,7 +1532,9 @@
       "restoreTitle": "Satın alımları geri yükle",
       "restoreDone": "Satın alımlar geri yüklendi — aboneliğiniz aktif.",
       "restoreNone": "Geri yüklenecek aktif bir abonelik bulunamadı.",
-      "storeNote": "Satın alımlar ve abonelikler App Store veya Google Play üzerinden işlenir ve yönetilir."
+      "storeNote": "Satın alımlar ve abonelikler App Store veya Google Play üzerinden işlenir ve yönetilir.",
+      "redeemBlockedExistingIos": "Bu hesabın zaten aktif bir aboneliği var, bu yüzden son mağaza satın alman bağlanmadı. Çifte ücretlendirmeyi önlemek için Apple ID aboneliklerini kontrol et ve gerekirse oradan iade talep et.",
+      "redeemBlockedExistingAndroid": "Bu hesabın zaten aktif bir aboneliği var, bu yüzden son mağaza satın alman bağlanmadı. Google Play, onaylanmayan satın almaları birkaç gün içinde otomatik olarak iade eder."
     },
     "plans": {
       "pro": "Pro",
@@ -3178,7 +3180,6 @@
       "guestCta": "Hesapsız devam et",
       "popular": "Popüler",
       "continueWith": "{plan} ile devam et",
-      "purchasing": "Satın alma tamamlanıyor…",
       "restore": "Satın alımları geri yükle",
       "restoring": "Geri yükleniyor…",
       "restoreNone": "Önceki bir satın alma bulunamadı. Bir hesapla satın aldıysan bunun yerine giriş yap.",
@@ -3187,11 +3188,28 @@
       "loginCta": "Giriş yap"
     },
     "account": {
-      "title": "Ödeme başarılı",
-      "subtitle": "Aboneliğini etkinleştirmek için şimdi hesabını oluştur — bir dakikadan az sürer.",
+      "title": "Neredeyse tamam",
+      "subtitle": "Aboneliğini etkinleştirmek için giriş yap veya bir hesap oluştur.",
       "providerCta": "{provider} ile devam et",
       "emailCta": "E-posta ile devam et",
-      "note": "Satın alman otomatik olarak yeni hesabına bağlanır."
+      "note": "Aboneliğin bu hesaba bağlanacak.",
+      "redeemTitle": "Ödeme başarılı",
+      "redeemSubtitle": "Aboneliğini etkinleştirmek için şimdi hesabını oluştur — bir dakikadan az sürer.",
+      "redeemNote": "Satın alman otomatik olarak yeni hesabına bağlanır."
+    },
+    "purchase": {
+      "checking": "Hesabın kontrol ediliyor…",
+      "purchasing": "Satın alma mağazada tamamlanıyor…",
+      "alreadyTitle": "Zaten abonesin",
+      "alreadyBody": "Bu hesabın zaten aktif bir aboneliği var ({plan}). Tekrar ücret alınmayacak.",
+      "alreadyManage": "Aboneliği yönet",
+      "toChat": "Sohbete git",
+      "pendingTitle": "Satın alma beklemede",
+      "retryTitle": "Satın alma tamamlanmadı",
+      "cancelledBody": "Satın alma iptal edildi. Ücret alınmadı.",
+      "checkFailed": "Abonelik durumun kontrol edilemedi. Lütfen tekrar dene.",
+      "retryCta": "Tekrar dene",
+      "later": "Belki daha sonra"
     }
   },
   "iap": {

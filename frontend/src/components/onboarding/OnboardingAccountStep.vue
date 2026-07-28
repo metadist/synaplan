@@ -3,17 +3,22 @@
 <template>
   <div class="w-full max-w-sm text-center" data-testid="section-onboarding-account">
     <div
-      class="mx-auto w-14 h-14 rounded-full bg-green-500/10 dark:bg-green-400/15 flex items-center justify-center onb-enter-1"
+      class="mx-auto w-14 h-14 rounded-full flex items-center justify-center onb-enter-1"
+      :class="isRedeem ? 'bg-green-500/10 dark:bg-green-400/15' : 'bg-brand/10 dark:bg-brand/20'"
       aria-hidden="true"
     >
-      <Icon icon="mdi:check-decagram" class="w-8 h-8 text-green-500 dark:text-green-400" />
+      <Icon
+        :icon="isRedeem ? 'mdi:check-decagram' : 'mdi:account-heart'"
+        class="w-8 h-8"
+        :class="isRedeem ? 'text-green-500 dark:text-green-400' : 'text-brand'"
+      />
     </div>
 
     <h1 class="mt-4 text-xl font-bold txt-primary onb-enter-2">
-      {{ $t('onboarding.account.title') }}
+      {{ isRedeem ? $t('onboarding.account.redeemTitle') : $t('onboarding.account.title') }}
     </h1>
     <p class="text-sm txt-secondary mt-1.5 onb-enter-2">
-      {{ $t('onboarding.account.subtitle') }}
+      {{ isRedeem ? $t('onboarding.account.redeemSubtitle') : $t('onboarding.account.subtitle') }}
     </p>
 
     <div class="mt-6 space-y-2.5 text-left onb-enter-3">
@@ -62,32 +67,39 @@
     </p>
 
     <p class="mt-4 text-xs txt-secondary onb-enter-4">
-      {{ $t('onboarding.account.note') }}
+      {{ isRedeem ? $t('onboarding.account.redeemNote') : $t('onboarding.account.note') }}
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * MOBILE-APP SEAM (first-run onboarding), page 3: create the account AFTER the
- * store purchase (purchase-first flow). The payment already succeeded against
- * the Apple ID / Google account; this step links it to a Synaplan account:
+ * MOBILE-APP SEAM (first-run onboarding), page 3: sign in / create the
+ * account. Serves two contexts (auth-first purchase):
  *
- * - Social providers lead (Sign in with Apple first on iOS: one tap, verified
- *   e-mail, no verification detour). A successful in-place sign-in emits
- *   `authenticated`; the pending purchase is redeemed by the central post-auth
- *   hook (`redeemPendingIapPurchaseAfterAuth`).
- * - E-mail registration routes to `/register`; the redemption then happens on
- *   the first login (plugin re-delivery, post-auth hook).
+ * - `purchase` (default): a plan was picked but nothing is paid yet. The
+ *   account comes BEFORE the store sheet so the server can check for an
+ *   existing subscription before any money moves. Neutral copy.
+ * - `redeem`: a signed-out purchase/restore already succeeded against the
+ *   Apple ID / Google account and waits to be linked. Success copy; the
+ *   pending purchase is redeemed by the central post-auth hook
+ *   (`redeemPendingIapPurchaseAfterAuth`).
  *
- * There is deliberately no skip here: an unredeemed purchase would strand the
- * payment (Android auto-refunds unacknowledged purchases after ~3 days). The
- * guest-chat reminder banner covers users who background the app anyway.
+ * Social providers lead (Sign in with Apple first on iOS: one tap, verified
+ * e-mail, no verification detour). A successful in-place sign-in emits
+ * `authenticated`; e-mail registration routes to `/register` and continues
+ * on the subscription page after the first login.
  */
 import { computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { getNativePlatform } from '@/services/api/nativeRuntime'
 import { useSocialAuth, type SocialProvider } from '@/composables/useSocialAuth'
+
+const props = withDefaults(defineProps<{ context?: 'purchase' | 'redeem' }>(), {
+  context: 'purchase',
+})
+
+const isRedeem = computed(() => 'redeem' === props.context)
 
 const emit = defineEmits<{
   /** Session established in place (native provider flow) — leave onboarding. */

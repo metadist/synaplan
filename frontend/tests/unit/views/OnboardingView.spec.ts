@@ -3,11 +3,13 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 /**
- * MOBILE-APP SEAM (first-run onboarding): orchestration of the two-page native
+ * MOBILE-APP SEAM (first-run onboarding): orchestration of the native
  * first-run flow. The step components are stubbed (per AGENTS_DEV: stub heavy
  * deps) — this spec pins the page wiring, the skip/finish paths (which must
- * persist completion so the flow never re-appears), and the plan-selection
- * handoff into register → subscription (IAP purchase path).
+ * persist completion so the flow never re-appears), and the auth-first
+ * purchase orchestration: plans CTA → account step (purchase mode) →
+ * terminal purchase step, plus the redeem fallback after a signed-out
+ * restore and the register-first fallback into register → subscription.
  */
 
 const mockReplace = vi.fn()
@@ -32,18 +34,30 @@ const stubs = {
       '<button data-testid="stub-guest" @click="$emit(\'guest\')" />' +
       '<button data-testid="stub-select" @click="$emit(\'select-plan\', \'PRO\')" />' +
       '<button data-testid="stub-login" @click="$emit(\'login\')" />' +
+      "<button data-testid=\"stub-buy\" @click=\"$emit('buy-plan', { planId: 'PRO', productId: 'com.synaplan.app.pro.monthly' })\" />" +
       '<button data-testid="stub-purchased-unlinked" @click="$emit(\'purchased-unlinked\')" />' +
-      '<button data-testid="stub-purchased" @click="$emit(\'purchased\')" />' +
       '</div>',
-    emits: ['back', 'guest', 'login', 'register', 'select-plan', 'purchased-unlinked', 'purchased'],
+    emits: ['back', 'guest', 'login', 'register', 'select-plan', 'buy-plan', 'purchased-unlinked'],
   },
   OnboardingAccountStep: {
     template:
-      '<div data-testid="stub-account">' +
+      '<div data-testid="stub-account" :data-context="context">' +
       '<button data-testid="stub-authenticated" @click="$emit(\'authenticated\')" />' +
       '<button data-testid="stub-account-register" @click="$emit(\'register\')" />' +
+      '<button data-testid="stub-account-login" @click="$emit(\'login\')" />' +
       '</div>',
+    props: ['context'],
     emits: ['authenticated', 'register', 'login'],
+  },
+  OnboardingPurchaseStep: {
+    template:
+      '<div data-testid="stub-purchase" :data-product-id="productId">' +
+      '<button data-testid="stub-purchase-purchased" @click="$emit(\'purchased\')" />' +
+      '<button data-testid="stub-purchase-done" @click="$emit(\'done\')" />' +
+      '<button data-testid="stub-purchase-manage" @click="$emit(\'manage\')" />' +
+      '</div>',
+    props: ['productId'],
+    emits: ['purchased', 'done', 'manage'],
   },
 }
 
@@ -133,56 +147,135 @@ describe('OnboardingView', () => {
     expect(dotsAfter[1].classes()).toContain('onboarding-dot--active')
   })
 
-  describe('purchase-first flow (account step)', () => {
-    async function advanceToAccount(wrapper: ReturnType<typeof mountView>) {
+  describe('auth-first purchase flow (buy-plan → account → purchase)', () => {
+    async function advanceToAccountWithIntent(wrapper: ReturnType<typeof mountView>) {
+      await advanceToPlans(wrapper)
+      await wrapper.find('[data-testid="stub-buy"]').trigger('click')
+      await nextTick()
+      await nextTick()
+    }
+
+    it('the plans CTA advances to the account step in purchase mode (nothing paid yet)', async () => {
+      const wrapper = mountView()
+      await advanceToAccountWithIntent(wrapper)
+
+      const account = wrapper.find('[data-testid="stub-account"]')
+      expect(account.exists()).toBe(true)
+      expect(account.attributes('data-context')).toBe('purchase')
+      // Nothing is paid yet: completion must NOT be persisted, skip stays,
+      // only the dot navigation is gone (the step is outside the dots).
+      expect(isOnboardingCompleted()).toBe(false)
+      expect(wrapper.find('[data-testid="btn-skip-onboarding"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="section-progress"]').exists()).toBe(false)
+    })
+
+    it('after an in-place sign-in the terminal purchase step runs with the selected product', async () => {
+      const wrapper = mountView()
+      await advanceToAccountWithIntent(wrapper)
+
+      await wrapper.find('[data-testid="stub-authenticated"]').trigger('click')
+      await nextTick()
+      await nextTick()
+
+      const purchase = wrapper.find('[data-testid="stub-purchase"]')
+      expect(purchase.exists()).toBe(true)
+      expect(purchase.attributes('data-product-id')).toBe('com.synaplan.app.pro.monthly')
+      // No skip on the purchase step — it has its own retry / "later" exits.
+      expect(wrapper.find('[data-testid="btn-skip-onboarding"]').exists()).toBe(false)
+    })
+
+    it('a granted purchase (and equally "later") finishes into the app', async () => {
+      const wrapper = mountView()
+      await advanceToAccountWithIntent(wrapper)
+      await wrapper.find('[data-testid="stub-authenticated"]').trigger('click')
+      await nextTick()
+      await nextTick()
+
+      await wrapper.find('[data-testid="stub-purchase-purchased"]').trigger('click')
+
+      expect(isOnboardingCompleted()).toBe(true)
+      expect(mockReplace).toHaveBeenCalledWith('/')
+    })
+
+    it('"already subscribed" routes to the subscription page for managing', async () => {
+      const wrapper = mountView()
+      await advanceToAccountWithIntent(wrapper)
+      await wrapper.find('[data-testid="stub-authenticated"]').trigger('click')
+      await nextTick()
+      await nextTick()
+
+      await wrapper.find('[data-testid="stub-purchase-manage"]').trigger('click')
+
+      expect(isOnboardingCompleted()).toBe(true)
+      expect(mockReplace).toHaveBeenCalledWith('/subscription')
+    })
+
+    it('the e-mail path keeps the purchase intent via the /subscription redirect', async () => {
+      const wrapper = mountView()
+      await advanceToAccountWithIntent(wrapper)
+
+      await wrapper.find('[data-testid="stub-account-register"]').trigger('click')
+
+      expect(peekPendingRedirect()).toBe('/subscription')
+      expect(mockReplace).toHaveBeenCalledWith({
+        name: 'register',
+        query: { redirect: '/subscription' },
+      })
+    })
+
+    it('the login path keeps the purchase intent via the /subscription redirect', async () => {
+      const wrapper = mountView()
+      await advanceToAccountWithIntent(wrapper)
+
+      await wrapper.find('[data-testid="stub-account-login"]').trigger('click')
+
+      expect(peekPendingRedirect()).toBe('/subscription')
+      expect(mockReplace).toHaveBeenCalledWith({ name: 'login' })
+    })
+  })
+
+  describe('redeem fallback (signed-out restore → account step)', () => {
+    async function advanceToRedeemAccount(wrapper: ReturnType<typeof mountView>) {
       await advanceToPlans(wrapper)
       await wrapper.find('[data-testid="stub-purchased-unlinked"]').trigger('click')
       await nextTick()
       await nextTick()
     }
 
-    it('a signed-out purchase advances to the account step and persists completion', async () => {
+    it('a re-delivered signed-out purchase advances to the account step in redeem mode', async () => {
       const wrapper = mountView()
-      await advanceToAccount(wrapper)
+      await advanceToRedeemAccount(wrapper)
 
-      expect(wrapper.find('[data-testid="stub-account"]').exists()).toBe(true)
+      const account = wrapper.find('[data-testid="stub-account"]')
+      expect(account.exists()).toBe(true)
+      expect(account.attributes('data-context')).toBe('redeem')
       // Completion is persisted NOW: backgrounding the app must lead to the
       // guest-chat reminder banner, never a second onboarding run.
       expect(isOnboardingCompleted()).toBe(true)
     })
 
-    it('the account step is terminal: no skip, no dot navigation back to the paywall', async () => {
+    it('the redeem account step is terminal: no skip, no dot navigation', async () => {
       const wrapper = mountView()
-      await advanceToAccount(wrapper)
+      await advanceToRedeemAccount(wrapper)
 
       expect(wrapper.find('[data-testid="btn-skip-onboarding"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="section-progress"]').exists()).toBe(false)
     })
 
-    it('an in-place sign-in on the account step enters the app', async () => {
+    it('an in-place sign-in enters the app (redemption runs in the post-auth hook)', async () => {
       const wrapper = mountView()
-      await advanceToAccount(wrapper)
+      await advanceToRedeemAccount(wrapper)
 
       await wrapper.find('[data-testid="stub-authenticated"]').trigger('click')
       expect(mockReplace).toHaveBeenCalledWith('/')
     })
 
-    it('the e-mail path on the account step routes to plain register (redemption is post-login)', async () => {
+    it('the e-mail path routes to plain register (redemption is post-login)', async () => {
       const wrapper = mountView()
-      await advanceToAccount(wrapper)
+      await advanceToRedeemAccount(wrapper)
 
       await wrapper.find('[data-testid="stub-account-register"]').trigger('click')
       expect(mockReplace).toHaveBeenCalledWith({ name: 'register' })
-    })
-
-    it('a purchase verified against an existing session finishes straight to the app', async () => {
-      const wrapper = mountView()
-      await advanceToPlans(wrapper)
-
-      await wrapper.find('[data-testid="stub-purchased"]').trigger('click')
-
-      expect(isOnboardingCompleted()).toBe(true)
-      expect(mockReplace).toHaveBeenCalledWith('/')
     })
   })
 })

@@ -2091,7 +2091,9 @@
       "restoreTitle": "Restore purchases",
       "restoreDone": "Purchases restored — your subscription is active.",
       "restoreNone": "No active subscription was found to restore.",
-      "storeNote": "Purchases and subscriptions are processed and managed through the App Store or Google Play."
+      "storeNote": "Purchases and subscriptions are processed and managed through the App Store or Google Play.",
+      "redeemBlockedExistingIos": "This account already has an active subscription, so your recent store purchase was not linked. Please check your Apple ID subscriptions and request a refund there if needed, to avoid double charges.",
+      "redeemBlockedExistingAndroid": "This account already has an active subscription, so your recent store purchase was not linked. Google Play automatically refunds unacknowledged purchases within a few days."
     },
     "plans": {
       "pro": "Pro",
@@ -4225,7 +4227,6 @@
       "guestCta": "Continue without an account",
       "popular": "Popular",
       "continueWith": "Continue with {plan}",
-      "purchasing": "Completing purchase…",
       "restore": "Restore purchases",
       "restoring": "Restoring…",
       "restoreNone": "No previous purchase found. If you bought with an account, sign in instead.",
@@ -4234,11 +4235,28 @@
       "loginCta": "Sign in"
     },
     "account": {
-      "title": "Payment successful",
-      "subtitle": "Create your account now to activate your subscription — it takes less than a minute.",
+      "title": "Almost there",
+      "subtitle": "Sign in or create your account to activate your subscription.",
       "providerCta": "Continue with {provider}",
       "emailCta": "Continue with email",
-      "note": "Your purchase is linked to your new account automatically."
+      "note": "Your subscription will be linked to this account.",
+      "redeemTitle": "Payment successful",
+      "redeemSubtitle": "Create your account now to activate your subscription — it takes less than a minute.",
+      "redeemNote": "Your purchase is linked to your new account automatically."
+    },
+    "purchase": {
+      "checking": "Checking your account…",
+      "purchasing": "Completing the purchase in the store…",
+      "alreadyTitle": "Already subscribed",
+      "alreadyBody": "This account already has an active subscription ({plan}). You will not be charged again.",
+      "alreadyManage": "Manage subscription",
+      "toChat": "Go to chat",
+      "pendingTitle": "Purchase pending",
+      "retryTitle": "Purchase not completed",
+      "cancelledBody": "The purchase was cancelled. You have not been charged.",
+      "checkFailed": "We could not check your subscription status. Please try again.",
+      "retryCta": "Try again",
+      "later": "Maybe later"
     }
   },
   "iap": {

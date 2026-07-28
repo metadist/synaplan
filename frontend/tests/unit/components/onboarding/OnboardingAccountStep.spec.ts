@@ -3,11 +3,12 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 
 /**
- * MOBILE-APP SEAM (first-run onboarding), page 3 (purchase-first): the account
- * step after a successful signed-out store purchase. Providers lead (Apple
- * first on iOS — the native sheet), e-mail registration and sign-in stay
- * available, and a successful in-place provider sign-in emits `authenticated`
- * (the purchase itself is redeemed by the central post-auth hook).
+ * MOBILE-APP SEAM (first-run onboarding), page 3 (auth-first): the account
+ * step, shown either BEFORE the purchase (purchase context, neutral copy) or
+ * after a signed-out restore re-delivered an unlinked purchase (redeem
+ * context, success copy). Providers lead (Apple first on iOS — the native
+ * sheet), e-mail registration and sign-in stay available, and a successful
+ * in-place provider sign-in emits `authenticated`.
  */
 
 const mockSignInWith = vi.fn()
@@ -106,6 +107,22 @@ describe('OnboardingAccountStep', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="text-account-error"]').text()).toBe('Login failed')
+  })
+
+  it('shows neutral pre-purchase copy by default (nothing is paid yet)', async () => {
+    const wrapper = mount(OnboardingAccountStep)
+    await flushPromises()
+
+    // Must NOT claim a successful payment before the store sheet ever ran.
+    expect(wrapper.text()).not.toContain('Payment successful')
+    expect(wrapper.text()).toContain('Almost there')
+  })
+
+  it('shows the payment-success copy in redeem context (unlinked purchase waiting)', async () => {
+    const wrapper = mount(OnboardingAccountStep, { props: { context: 'redeem' } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Payment successful')
   })
 
   it('routes the e-mail path to register and the existing account to login', async () => {

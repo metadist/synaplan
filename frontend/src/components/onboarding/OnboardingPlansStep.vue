@@ -100,26 +100,12 @@
       </div>
 
       <button
-        class="mt-4 w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-6 disabled:opacity-60 disabled:pointer-events-none"
+        class="mt-4 w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-6"
         data-testid="btn-plan-continue"
-        :disabled="purchasing"
         @click="continueWithPlan"
       >
-        <span v-if="purchasing" class="inline-flex items-center gap-2">
-          <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" aria-hidden="true" />
-          {{ $t('onboarding.plans.purchasing') }}
-        </span>
-        <span v-else>{{ $t('onboarding.plans.continueWith', { plan: selectedPlanName }) }}</span>
+        {{ $t('onboarding.plans.continueWith', { plan: selectedPlanName }) }}
       </button>
-
-      <p
-        v-if="purchaseError"
-        class="mt-2 text-xs text-red-500 dark:text-red-400"
-        data-testid="text-purchase-error"
-        role="alert"
-      >
-        {{ purchaseError }}
-      </p>
 
       <!-- Quiet secondary actions: never wall the app behind a purchase. -->
       <div class="mt-4 flex flex-col items-center gap-1.5 onb-enter-6">
@@ -207,13 +193,13 @@
  * chat and sign-in stay available as quiet secondary actions — the app is never
  * walled behind a purchase (Apple/Google policy and onboarding best practice).
  *
- * Purchase-first (industry-standard onboarding): when the native store channel
- * is available, the CTA starts the store purchase DIRECTLY — no app account is
- * needed for the store sheet. The approved transaction is held unfinished
- * (`purchased_unlinked`) and the parent advances to the account step, where the
- * purchase is linked to the freshly created account (never Stripe web checkout
- * in the app). Without a native store channel the CTA keeps the register-first
- * path.
+ * Auth-first purchase (account before payment): when the native store channel
+ * is available, the CTA hands the selected plan to the parent (`buy-plan`),
+ * which runs the 1-tap account step FIRST and only then opens the store sheet
+ * — the server checks for an existing subscription BEFORE any money moves
+ * (RevenueCat/Roku best practice for account-bound subscriptions; never Stripe
+ * web checkout in the app). Without a native store channel the CTA keeps the
+ * register-first path.
  *
  * The catalogue request is deliberately NOT gated on the runtime-config billing
  * flag: that flag reads a cached config whose fetch has a 2s abort timeout, so
@@ -235,7 +221,6 @@ import {
   hasPendingIapRedemption,
   initNativeIap,
   isNativeIapAvailable,
-  purchaseProduct,
   restoreNativePurchases,
 } from '@/services/nativeIap'
 
@@ -245,10 +230,10 @@ const emit = defineEmits<{
   login: []
   register: []
   'select-plan': [planId: string]
-  /** Store purchase done while signed out — continue to the account step. */
+  /** Native store channel available — run account step, then purchase. */
+  'buy-plan': [payload: { planId: string; productId: string }]
+  /** Restore found a signed-out purchase — continue to the account step. */
   'purchased-unlinked': []
-  /** Purchase verified against an existing session — onboarding is done. */
-  purchased: []
 }>()
 
 const { t, te } = useI18n()
@@ -313,11 +298,9 @@ function intervalLabel(interval: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Direct purchase (purchase-first onboarding)
+// Plan handoff (auth-first purchase) & restore
 // ---------------------------------------------------------------------------
 
-const purchasing = ref(false)
-const purchaseError = ref<string | null>(null)
 const restoring = ref(false)
 const restoreHint = ref<string | null>(null)
 
@@ -325,14 +308,14 @@ const restoreHint = ref<string | null>(null)
 const showRestore = computed(() => plans.value.length > 0 && isNativeIapAvailable())
 
 /**
- * Primary CTA. With a native store channel the purchase starts immediately
- * (store sheet, paid via the Apple ID / Google account — no app account
- * needed); the account step follows AFTER the payment. Without the channel
- * (web preview, Stripe-only server) the register-first path stays.
+ * Primary CTA. With a native store channel the parent runs the 1-tap account
+ * step first and starts the purchase AFTER authentication (so an existing
+ * subscription is caught before any money moves). Without the channel (web
+ * preview, Stripe-only server) the register-first path stays.
  */
-async function continueWithPlan(): Promise<void> {
+function continueWithPlan(): void {
   const plan = selectedPlan.value
-  if (!plan || purchasing.value) return
+  if (!plan) return
 
   const productId = plan.iapProductId
   if (!isNativeIapAvailable() || 'string' !== typeof productId || '' === productId) {
@@ -340,40 +323,7 @@ async function continueWithPlan(): Promise<void> {
     return
   }
 
-  purchasing.value = true
-  purchaseError.value = null
-  try {
-    const outcome = await purchaseProduct(productId)
-    switch (outcome.status) {
-      case 'purchased_unlinked':
-        emit('purchased-unlinked')
-        break
-      case 'granted':
-      case 'pending':
-        // Verified against an existing session (edge case: signed-in user in
-        // the onboarding) — no account step needed.
-        emit('purchased')
-        break
-      case 'cancelled':
-        // The user closed the store sheet — stay on the plans, no message.
-        break
-      case 'error':
-        purchaseError.value = t(purchaseErrorKey(outcome.code))
-        break
-    }
-  } finally {
-    purchasing.value = false
-  }
-}
-
-function purchaseErrorKey(code: string): string {
-  if ('ownership_conflict' === code) return 'subscription.native.purchaseConflict'
-  // `product_unknown` = the store catalogue did not load (e.g. store outage,
-  // or a simulator run without the StoreKit test configuration) — that is a
-  // "purchases unavailable" situation, not a failed charge.
-  if ('not_available' === code || 'product_unknown' === code)
-    return 'subscription.native.purchaseUnavailable'
-  return 'subscription.native.purchaseFailed'
+  emit('buy-plan', { planId: plan.id, productId })
 }
 
 /**

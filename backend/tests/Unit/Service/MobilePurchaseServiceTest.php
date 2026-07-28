@@ -109,6 +109,79 @@ final class MobilePurchaseServiceTest extends TestCase
         $service->redeem($user, IapPlatform::APPLE, 'signed-jws');
     }
 
+    public function testSameChannelParallelSubscriptionIsRejected(): void
+    {
+        // The account already has an ACTIVE Apple subscription under a
+        // DIFFERENT originalTransactionId (e.g. bought by another Apple ID
+        // signed in on the device). Applying the new receipt would silently
+        // overwrite the record while the old subscription keeps billing.
+        $apple = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX));
+        $service = $this->service(apple: $apple);
+        $user = $this->makeUser(11, 'BUSINESS', [
+            'subscription' => [
+                'source' => 'apple',
+                'status' => 'active',
+                'subscription_end' => time() + 3600,
+                'original_transaction_id' => 'other-apple-tx',
+            ],
+        ]);
+
+        try {
+            $service->redeem($user, IapPlatform::APPLE, 'signed-jws');
+            $this->fail('Expected IapConflictException');
+        } catch (IapConflictException) {
+            $this->assertSame('BUSINESS', $user->getUserLevel(), 'existing entitlement must stay untouched');
+            $this->assertSame(
+                'other-apple-tx',
+                $user->getPaymentDetails()['subscription']['original_transaction_id'],
+                'existing subscription record must not be overwritten'
+            );
+        }
+    }
+
+    public function testSameChannelSamePurchaseIdIsAllowed(): void
+    {
+        // Renewal / re-redeem / Apple plan change: the originalTransactionId
+        // stays stable, so the same store subscription may update itself.
+        $apple = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.team', self::APPLE_TX));
+        $user = $this->makeUser(12, 'PRO', [
+            'subscription' => [
+                'source' => 'apple',
+                'status' => 'active',
+                'subscription_end' => time() + 3600,
+                'original_transaction_id' => self::APPLE_TX,
+            ],
+        ]);
+        $service = $this->service(apple: $apple, ownerByPurchaseId: $user);
+
+        $result = $service->redeem($user, IapPlatform::APPLE, 'signed-jws');
+
+        $this->assertTrue($result->granted);
+        $this->assertSame('TEAM', $user->getUserLevel());
+    }
+
+    public function testSameChannelExpiredSubscriptionAllowsNewPurchase(): void
+    {
+        // A lapsed subscription is no conflict — re-subscribing with a fresh
+        // store subscription (new purchaseId) must work.
+        $apple = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX));
+        $service = $this->service(apple: $apple);
+        $user = $this->makeUser(13, 'NEW', [
+            'subscription' => [
+                'source' => 'apple',
+                'status' => 'expired',
+                'subscription_end' => time() - 3600,
+                'original_transaction_id' => 'old-apple-tx',
+            ],
+        ]);
+
+        $result = $service->redeem($user, IapPlatform::APPLE, 'signed-jws');
+
+        $this->assertTrue($result->granted);
+        $this->assertSame('PRO', $user->getUserLevel());
+        $this->assertSame(self::APPLE_TX, $user->getPaymentDetails()['subscription']['original_transaction_id']);
+    }
+
     public function testReplayBlockedWhenReceiptOwnedByAnotherUser(): void
     {
         $apple = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX));

@@ -12,7 +12,6 @@ const mockGetPlans = vi.fn()
 const mockIsNativeApp = vi.fn(() => false)
 const mockIsPurchaseAllowed = vi.fn(() => true)
 const mockIsNativeIapAvailable = vi.fn(() => false)
-const mockPurchaseProduct = vi.fn()
 const mockRestoreNativePurchases = vi.fn()
 const mockHasPendingIapRedemption = vi.fn(() => false)
 
@@ -26,7 +25,6 @@ vi.mock('@/services/nativeIap', () => ({
   getStorePrice: vi.fn(() => null),
   initNativeIap: vi.fn(async () => false),
   isNativeIapAvailable: () => mockIsNativeIapAvailable(),
-  purchaseProduct: (...args: unknown[]) => mockPurchaseProduct(...args),
   restoreNativePurchases: () => mockRestoreNativePurchases(),
   hasPendingIapRedemption: () => mockHasPendingIapRedemption(),
 }))
@@ -246,7 +244,7 @@ describe('OnboardingPlansStep', () => {
     expect(wrapper.emitted('back')).toHaveLength(1)
   })
 
-  describe('direct purchase (purchase-first onboarding)', () => {
+  describe('auth-first plan handoff (native store channel)', () => {
     const iapPlan = { ...proPlan, iapProductId: 'com.synaplan.app.pro.monthly' }
 
     beforeEach(() => {
@@ -254,54 +252,17 @@ describe('OnboardingPlansStep', () => {
       mockGetPlans.mockResolvedValue({ plans: [iapPlan], iapConfigured: true })
     })
 
-    it('starts the store purchase directly and advances on purchased_unlinked', async () => {
-      mockPurchaseProduct.mockResolvedValue({ status: 'purchased_unlinked' })
+    it('emits buy-plan (account before payment) instead of purchasing directly', async () => {
       const wrapper = mount(OnboardingPlansStep)
       await flushPromises()
 
       await wrapper.find('[data-testid="btn-plan-continue"]').trigger('click')
-      await flushPromises()
 
-      expect(mockPurchaseProduct).toHaveBeenCalledWith('com.synaplan.app.pro.monthly')
-      expect(wrapper.emitted('purchased-unlinked')).toHaveLength(1)
-      // The register-first fallback must NOT fire on the direct-purchase path.
+      expect(wrapper.emitted('buy-plan')).toEqual([
+        [{ planId: 'PRO', productId: 'com.synaplan.app.pro.monthly' }],
+      ])
+      // The register-first fallback must NOT fire on the store-channel path.
       expect(wrapper.emitted('select-plan')).toBeUndefined()
-    })
-
-    it('finishes as purchased when the store verifies against an existing session', async () => {
-      mockPurchaseProduct.mockResolvedValue({ status: 'granted', tier: 'PRO' })
-      const wrapper = mount(OnboardingPlansStep)
-      await flushPromises()
-
-      await wrapper.find('[data-testid="btn-plan-continue"]').trigger('click')
-      await flushPromises()
-
-      expect(wrapper.emitted('purchased')).toHaveLength(1)
-    })
-
-    it('stays quietly on the plans when the user dismisses the store sheet', async () => {
-      mockPurchaseProduct.mockResolvedValue({ status: 'cancelled' })
-      const wrapper = mount(OnboardingPlansStep)
-      await flushPromises()
-
-      await wrapper.find('[data-testid="btn-plan-continue"]').trigger('click')
-      await flushPromises()
-
-      expect(wrapper.emitted('purchased-unlinked')).toBeUndefined()
-      expect(wrapper.emitted('purchased')).toBeUndefined()
-      expect(wrapper.find('[data-testid="text-purchase-error"]').exists()).toBe(false)
-    })
-
-    it('surfaces a purchase error inline and keeps every fallback path', async () => {
-      mockPurchaseProduct.mockResolvedValue({ status: 'error', code: 'store_error' })
-      const wrapper = mount(OnboardingPlansStep)
-      await flushPromises()
-
-      await wrapper.find('[data-testid="btn-plan-continue"]').trigger('click')
-      await flushPromises()
-
-      expect(wrapper.find('[data-testid="text-purchase-error"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="btn-try-guest"]').exists()).toBe(true)
     })
 
     it('falls back to the register-first path when the plan has no store product', async () => {
@@ -315,7 +276,7 @@ describe('OnboardingPlansStep', () => {
 
       await wrapper.find('[data-testid="btn-plan-continue"]').trigger('click')
 
-      expect(mockPurchaseProduct).not.toHaveBeenCalled()
+      expect(wrapper.emitted('buy-plan')).toBeUndefined()
       expect(wrapper.emitted('select-plan')).toEqual([['PRO']])
     })
 

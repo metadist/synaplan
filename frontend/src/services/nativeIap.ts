@@ -141,6 +141,20 @@ function clearPendingIapRedemption(): void {
 }
 
 /**
+ * Drop the pending-redemption flag WITHOUT touching the held transaction.
+ * Used by the post-auth guard when the signed-in account already has an
+ * active subscription: the purchase is deliberately NOT linked (refund
+ * guidance is shown instead), and the unfinished store transaction is left
+ * to the store's own lifecycle (Android auto-refunds unacknowledged
+ * purchases; iOS is managed via the Apple ID). A later deliberate restore
+ * can still pick it up.
+ */
+export function dismissPendingIapRedemption(): void {
+  clearPendingIapRedemption()
+  unlinkedTransactions = []
+}
+
+/**
  * Transactions approved by the store while signed out, held unfinished until
  * the user authenticates (same-session fast path — after a restart the plugin
  * re-delivers them through `initialize()` instead).
