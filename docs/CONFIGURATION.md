@@ -46,6 +46,49 @@ ANTHROPIC_API_KEY=sk-ant-your_key_here
 GOOGLE_GEMINI_API_KEY=your_key_here
 ```
 
+Also unlocks the Google media models (Imagen 4, Nano Banana, Veo 3.1, Gemini TTS).
+
+### Mistral
+
+```bash
+MISTRAL_API_KEY=your_key_here
+```
+
+Chat and vision (Mistral Medium 3.5, Large 3) plus the Voxtral audio pair (transcription + TTS).
+
+### TrustedTokens (sovereign, Germany)
+
+```bash
+TRUSTEDTOKENS_API_KEY=your_key_here
+```
+
+Open-weight models (GLM 5.2, Qwen3.6 35B, GPT OSS 120B) served from GPUs in Munich by TNG
+Technology Consulting, under German jurisdiction with zero data retention. Synaplan talks to
+its OpenAI-compatible API at `https://api.trustedtokens.eu/v1`. Get a key at
+[trustedtokens.eu](https://trustedtokens.eu/) under **Account → API Access**.
+
+### HuggingFace
+
+```bash
+HUGGINGFACE_API_KEY=hf_your_key_here
+```
+
+### Image & video generation
+
+```bash
+THEHIVE_API_KEY=your_key_here          # Flux Schnell, SDXL
+HIGGSFIELD_API_KEY=your_key_here       # Soul, Reve, DoP, Kling 2.1
+HIGGSFIELD_API_SECRET=your_secret_here # both halves are required
+```
+
+### Cloudflare Workers AI (embeddings)
+
+```bash
+CLOUDFLARE_ACCOUNT_ID=your_account_id
+CLOUDFLARE_API_TOKEN=your_token_here
+EMBEDDING_FALLBACK_PROVIDER=cloudflare  # optional auto-failover
+```
+
 ### Local Ollama
 
 No API key needed. Models are pulled automatically.
@@ -54,6 +97,13 @@ No API key needed. Models are pulled automatically.
 # Disable auto-download if needed
 AUTO_DOWNLOAD_MODELS=false
 ```
+
+### Model prices
+
+Every catalog entry carries the provider's own in/out rate, which drives the cost badges in
+the model selector, the Statistics page, and the per-tier budgets. Adding a model, retiring
+one, or changing a price is a catalog + migration job — see
+[PRICING_MAINTENANCE.md](PRICING_MAINTENANCE.md).
 
 ---
 
