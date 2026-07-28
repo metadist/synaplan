@@ -217,6 +217,7 @@ class StreamController extends AbstractController
                     new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
                     new OA\Property(property: 'reasoning', type: 'string', enum: ['0', '1'], example: '0'),
                     new OA\Property(property: 'webSearch', type: 'string', enum: ['0', '1'], example: '0'),
+                    new OA\Property(property: 'language', type: 'string', enum: ['de', 'en', 'es', 'tr'], example: 'de', description: 'Active UI locale from the client. Seeds BLANG on the inbound message so the sorter / Brave search / reply language prefer the interface language when the message language cannot be detected.'),
                     new OA\Property(property: 'modelId', type: 'string', example: '53'),
                     new OA\Property(property: 'fileIds', type: 'string', example: '1,2,3'),
                     new OA\Property(property: 'guestSession', type: 'string', example: 'gs_abc123'),
@@ -272,6 +273,13 @@ class StreamController extends AbstractController
         required: false,
         description: 'Enable web search (1 or 0)',
         schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
+    )]
+    #[OA\Parameter(
+        name: 'language',
+        in: 'query',
+        required: false,
+        description: 'Active UI locale from the client (de/en/es/tr). Seeds inbound BLANG for sorting, Brave search_lang/ui_lang, and the reply language directive.',
+        schema: new OA\Schema(type: 'string', enum: ['de', 'en', 'es', 'tr'], example: 'de')
     )]
     #[OA\Parameter(
         name: 'modelId',
@@ -477,6 +485,11 @@ class StreamController extends AbstractController
         $chatId = $params->get('chatId', null);
         $includeReasoning = '1' === $params->get('reasoning', '0');
         $webSearch = '1' === $params->get('webSearch', '0');
+        // UI locale from the SPA (vue-i18n). Seeds inbound BLANG so the
+        // classifier fast-path, sorter "leave BLANG as is" fallback, Brave
+        // search_lang/ui_lang, and ChatHandler language directive all prefer
+        // the interface language instead of a hardcoded English default.
+        $uiLanguage = $this->resolveUiLanguage($params->get('language'), $user);
         $modelId = $params->get('modelId', null);
 
         $voiceReply = '1' === $params->get('voiceReply', '0');
@@ -628,7 +641,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -798,7 +811,7 @@ class StreamController extends AbstractController
                 $incomingMessage->setMessageType('WEB');
                 $incomingMessage->setFile(0);
                 $incomingMessage->setTopic($continueMessageId ? 'CONTINUE' : 'CHAT');
-                $incomingMessage->setLanguage($originalOutgoingMessage ? $originalOutgoingMessage->getLanguage() : 'en');
+                $incomingMessage->setLanguage($originalOutgoingMessage ? $originalOutgoingMessage->getLanguage() : $uiLanguage);
                 $incomingMessage->setText($messageText);
                 $incomingMessage->setDirection('IN');
                 $incomingMessage->setStatus($continueMessageId ? 'hidden' : 'processing');
@@ -3573,6 +3586,34 @@ class StreamController extends AbstractController
         ]);
 
         return $this->json(['success' => true]);
+    }
+
+    /**
+     * Resolve the inbound BLANG seed from the client UI locale.
+     *
+     * Preference: validated request `language` → user profile locale → `en`.
+     * Only the SPA-supported locales are accepted so a crafted value cannot
+     * poison BMESSAGES.BLANG (varchar(2)).
+     */
+    private function resolveUiLanguage(mixed $requested, ?User $user): string
+    {
+        $supported = ['de', 'en', 'es', 'tr'];
+
+        if (is_string($requested)) {
+            $normalized = strtolower(trim($requested));
+            if (in_array($normalized, $supported, true)) {
+                return $normalized;
+            }
+        }
+
+        if ($user instanceof User) {
+            $profileLocale = strtolower($user->getLocale());
+            if (in_array($profileLocale, $supported, true)) {
+                return $profileLocale;
+            }
+        }
+
+        return 'en';
     }
 
     /**

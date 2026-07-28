@@ -519,7 +519,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $details = $this->getUserDetails();
         $language = $details['language'] ?? 'en';
 
-        // Ensure we return a valid locale code
-        return in_array($language, ['de', 'en', 'fr', 'es'], true) ? $language : 'en';
+        // Ensure we return a valid locale code (matches SPA supportedLanguages)
+        return in_array($language, ['de', 'en', 'es', 'tr', 'fr'], true) ? $language : 'en';
     }
 }

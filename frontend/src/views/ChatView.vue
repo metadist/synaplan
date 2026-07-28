@@ -505,7 +505,7 @@ const SaveCancelledMessageResponseSchema = z
   })
   .passthrough()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
@@ -1543,6 +1543,7 @@ const handleContinueResponse = async (message: Message) => {
     message: '',
     chatId,
     trackId,
+    language: locale.value,
     continueMessageId: message.backendMessageId,
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
@@ -2432,6 +2433,7 @@ const streamAIResponse = async (
         history: incognitoHistory,
         includeReasoning,
         webSearch,
+        language: locale.value,
         modelId: finalModelId,
         fileIds,
         voiceReply: options?.voiceReply,

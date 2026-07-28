@@ -344,9 +344,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // across handlers and includes the anti-echo clause that prevents
         // smaller LLMs from leaking the directive back into the response
         // (e.g. "[Please reply in German]").
-        $systemPrompt .= 'auto' === $language
+        // Re-appended AFTER web-search injection below so the English results
+        // wrapper does not become the last system instruction.
+        $languageDirective = 'auto' === $language
             ? LanguageDirectiveBuilder::buildAutoDirective()
             : LanguageDirectiveBuilder::buildForLanguage($language);
+        $systemPrompt .= $languageDirective;
 
         // Country-only location awareness from the Cloudflare CF-IPCountry header.
         $systemPrompt .= $this->buildLocationContext($options);
@@ -376,9 +379,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // without system-message support.
         if (null !== $systemPrompt && is_array($searchResults) && !empty($searchResults['results'])) {
             $systemPrompt .= $this->formatSearchResultsForPrompt($searchResults);
+            $systemPrompt .= $languageDirective;
             $this->logger->info('ChatHandler: Web search context appended to system prompt', [
                 'results_count' => count($searchResults['results']),
                 'query' => $searchResults['query'] ?? '',
+                'language' => $language,
             ]);
             $searchResults = null;
         }
@@ -905,10 +910,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // "answer in the user's language" without specifying WHICH language was detected.
         // When conversation history contains mixed languages, the AI may default to the wrong one.
         // Anti-echo clause inside the builder also prevents leakage like "[Please reply in German]".
+        // Re-appended AFTER web-search injection below: the English search-results
+        // block otherwise becomes the last system prose and steers answers to English.
         $detectedLanguage = $classification['language'] ?? 'en';
-        $systemPrompt .= 'auto' === $detectedLanguage
+        $languageDirective = 'auto' === $detectedLanguage
             ? LanguageDirectiveBuilder::buildAutoDirective()
             : LanguageDirectiveBuilder::buildForLanguage($detectedLanguage);
+        $systemPrompt .= $languageDirective;
 
         // Continuation mode: instruct the model to continue from where it left off
         if (!empty($options['is_continuation'])) {
@@ -962,9 +970,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // support keep the legacy user-message fallback in buildCurrentMessageContent().
         if (null !== $systemPrompt && isset($options['search_results']) && !empty($options['search_results']['results'])) {
             $systemPrompt .= $this->formatSearchResultsForPrompt($options['search_results']);
+            // Reinforce language AFTER the English search-results wrapper so the
+            // model does not follow the trailing "Please use this information…"
+            // English instruction into an English reply.
+            $systemPrompt .= $languageDirective;
             $this->logger->info('ChatHandler: Web search context appended to system prompt', [
                 'results_count' => count($options['search_results']['results']),
                 'query' => $options['search_results']['query'] ?? '',
+                'language' => $detectedLanguage,
             ]);
             unset($options['search_results']);
         }

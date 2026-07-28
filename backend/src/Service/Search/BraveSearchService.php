@@ -65,13 +65,19 @@ final readonly class BraveSearchService
             throw new \InvalidArgumentException('Search query cannot be empty');
         }
 
-        // Normalize language and country codes with fallbacks
+        // Normalize language and country codes with fallbacks.
+        // Brave expects distinct formats:
+        //   search_lang = ISO 639-1 short code (e.g. "de")
+        //   ui_lang     = locale "language-COUNTRY" (e.g. "de-DE")
+        // Sending the wrong shape returns HTTP 422.
         $searchLang = $this->normalizeLanguageCode($options['search_lang'] ?? $this->defaultSearchLang);
         $country = $this->normalizeCountryCode($options['country'] ?? $this->defaultCountry);
+        $uiLang = $this->normalizeUiLangCode($options['ui_lang'] ?? $searchLang);
 
         $this->logger->info('🔍 Brave Search: Performing search', [
             'query' => $query,
             'search_lang' => $searchLang,
+            'ui_lang' => $uiLang,
             'country' => $country,
             'options' => $options,
         ]);
@@ -84,6 +90,7 @@ final readonly class BraveSearchService
                 'count' => $options['count'] ?? $this->defaultCount,
                 'country' => $country,
                 'search_lang' => $searchLang,
+                'ui_lang' => $uiLang,
             ];
 
             // Optional parameters
@@ -186,6 +193,69 @@ final readonly class BraveSearchService
         ]);
 
         return $this->defaultSearchLang;
+    }
+
+    /**
+     * Normalize Brave `ui_lang` to the RFC 9110 locale form (`language-COUNTRY`).
+     *
+     * Accepts either a short ISO 639-1 code (`de`) or an already-formed locale
+     * (`de-DE`). Short codes are mapped to a canonical Brave-supported locale.
+     */
+    private function normalizeUiLangCode(?string $uiLang): string
+    {
+        if (empty($uiLang)) {
+            return $this->languageToUiLang($this->defaultSearchLang);
+        }
+
+        $uiLang = str_replace('_', '-', trim($uiLang));
+
+        // Already a locale like "de-DE" / "en-US".
+        if (1 === preg_match('/^([a-z]{2})-([a-z]{2})$/i', $uiLang, $matches)) {
+            return strtolower($matches[1]).'-'.strtoupper($matches[2]);
+        }
+
+        return $this->languageToUiLang($this->normalizeLanguageCode($uiLang));
+    }
+
+    /**
+     * Map an ISO 639-1 language code to Brave's preferred `ui_lang` locale.
+     */
+    private function languageToUiLang(string $lang): string
+    {
+        $map = [
+            'en' => 'en-US',
+            'de' => 'de-DE',
+            'fr' => 'fr-FR',
+            'es' => 'es-ES',
+            'it' => 'it-IT',
+            'pt' => 'pt-BR',
+            'nl' => 'nl-NL',
+            'pl' => 'pl-PL',
+            'ru' => 'ru-RU',
+            'ja' => 'ja-JP',
+            'zh' => 'zh-CN',
+            'ko' => 'ko-KR',
+            'ar' => 'ar-SA',
+            'tr' => 'tr-TR',
+            'hi' => 'hi-IN',
+            'sv' => 'sv-SE',
+            'da' => 'da-DK',
+            'fi' => 'fi-FI',
+            'no' => 'nb-NO',
+            'cs' => 'cs-CZ',
+            'hu' => 'hu-HU',
+            'ro' => 'ro-RO',
+            'uk' => 'uk-UA',
+            'el' => 'el-GR',
+            'he' => 'he-IL',
+            'id' => 'id-ID',
+            'th' => 'th-TH',
+            'vi' => 'vi-VN',
+            'ms' => 'ms-MY',
+            'bn' => 'bn-BD',
+        ];
+
+        return $map[strtolower($lang)] ?? 'en-US';
     }
 
     /**

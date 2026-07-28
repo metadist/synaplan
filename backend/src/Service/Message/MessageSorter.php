@@ -138,7 +138,7 @@ final readonly class MessageSorter
 
             return [
                 'topic' => 'general',
-                'language' => 'en',
+                'language' => $messageData['BLANG'] ?? 'en',
                 'raw_response' => '',
             ];
         }
@@ -301,7 +301,7 @@ final readonly class MessageSorter
 
             return [
                 'topic' => 'general',
-                'language' => 'en',
+                'language' => $messageData['BLANG'] ?? 'en',
                 'raw_response' => '',
             ];
         }
