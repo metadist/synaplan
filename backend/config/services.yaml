@@ -69,6 +69,8 @@ parameters:
     env(HIGGSFIELD_API_KEY): ''
     env(HIGGSFIELD_API_SECRET): ''
     env(HUGGINGFACE_API_KEY): ''
+    # TrustedTokens (TNG) — German sovereign OpenAI-compatible inference.
+    env(TRUSTEDTOKENS_API_KEY): ''
     env(BRAVE_SEARCH_API_KEY): ''
     env(DISCORD_WEBHOOK_URL): ''
     env(GMAIL_USERNAME): ''
@@ -253,6 +255,14 @@ services:
             - { name: 'app.ai.vision' }
             - { name: 'app.ai.speech_to_text' }
             - { name: 'app.ai.text_to_speech' }
+
+    App\AI\Provider\TrustedTokensProvider:
+        arguments:
+            $apiKey: '%env(TRUSTEDTOKENS_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
 
     App\AI\Provider\GoogleProvider:
         arguments:

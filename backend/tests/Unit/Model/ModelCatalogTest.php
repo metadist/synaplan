@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Model;
 
 use App\Model\ModelCatalog;
+use App\Service\CostCalculationService;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 
@@ -230,12 +231,21 @@ class ModelCatalogTest extends TestCase
         }
     }
 
+    /**
+     * Sonnet 5 also backs the MEM-tagged memory-extraction row (BID 222), so the
+     * bare `service:providerId` key resolves to three variants — capability
+     * bindings must therefore always use the tag-qualified key.
+     */
     public function testClaudeSonnet5ModelsAreAvailableWithExpectedApiIds(): void
     {
         $sonnet5 = ModelCatalog::find('anthropic:claude-sonnet-5');
+        $tags = array_column($sonnet5, 'tag');
+        sort($tags);
 
-        $this->assertCount(2, $sonnet5, 'Expected claude-sonnet-5 chat + vision variants');
-        $this->assertSame(['chat', 'pic2text'], array_column($sonnet5, 'tag'));
+        $this->assertCount(3, $sonnet5, 'Expected claude-sonnet-5 chat + vision + memory-extraction variants');
+        $this->assertSame(['chat', 'mem', 'pic2text'], $tags);
+        $this->assertNotNull(ModelCatalog::findBidByKey('anthropic:claude-sonnet-5:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('anthropic:claude-sonnet-5:pic2text'));
 
         foreach ($sonnet5 as $variant) {
             $this->assertSame('Anthropic', $variant['service']);
@@ -246,6 +256,102 @@ class ModelCatalogTest extends TestCase
         }
     }
 
+    /**
+     * TrustedTokens (TNG, Germany) — three chat models + one Qwen vision row.
+     * Prices are USD/1M from https://trustedtokens.eu/api/billing/models
+     * (snapshot 2026-07-27). Provider ids keep the upstream org/name form.
+     */
+    public function testTrustedTokensModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $glm = ModelCatalog::find('trustedtokens:zai-org/glm-5.2:chat');
+        $qwenChat = ModelCatalog::find('trustedtokens:qwen/qwen3.6-35b-a3b-fp8:chat');
+        $qwenVision = ModelCatalog::find('trustedtokens:qwen/qwen3.6-35b-a3b-fp8:pic2text');
+        $gptOss = ModelCatalog::find('trustedtokens:openai/gpt-oss-120b:chat');
+
+        $this->assertCount(1, $glm);
+        $this->assertCount(1, $qwenChat);
+        $this->assertCount(1, $qwenVision);
+        $this->assertCount(1, $gptOss);
+
+        $this->assertSame('zai-org/GLM-5.2', $glm[0]['providerId']);
+        $this->assertSame('Qwen/Qwen3.6-35B-A3B-FP8', $qwenChat[0]['providerId']);
+        $this->assertSame('openai/gpt-oss-120b', $gptOss[0]['providerId']);
+
+        $this->assertEqualsWithDelta(1.50, (float) $glm[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(4.50, (float) $glm[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.25, (float) $qwenChat[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(1.50, (float) $qwenChat[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $gptOss[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.60, (float) $gptOss[0]['priceOut'], 1e-9);
+
+        foreach ([$glm[0], $qwenChat[0], $qwenVision[0], $gptOss[0]] as $row) {
+            $this->assertSame('TrustedTokens', $row['service']);
+            $this->assertSame('DE', $row['json']['meta']['jurisdiction'] ?? null);
+        }
+    }
+
+    public function testClaudeOpus5ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $opus5 = ModelCatalog::find('anthropic:claude-opus-5');
+
+        $this->assertCount(2, $opus5, 'Expected claude-opus-5 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($opus5, 'tag'));
+
+        foreach ($opus5 as $variant) {
+            $this->assertSame('Anthropic', $variant['service']);
+            $this->assertSame('claude-opus-5', $variant['providerId']);
+            $this->assertSame('claude-opus-5', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(5.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(25.0, (float) $variant['priceOut'], 1e-9);
+        }
+    }
+
+    /**
+     * The pre-4.8 Claude generations were retired in favour of Opus 4.8 and the
+     * 5-series (deactivated in existing installs by Version20260727120000). Their
+     * BIDs must never come back: BMESSAGES rows still reference them, and the
+     * migration's BPROVID guards assume the upstream model ids are gone from the
+     * catalog.
+     */
+    public function testRetiredClaudeGenerationsAreAbsentFromCatalog(): void
+    {
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+
+        $retiredProviderIds = [
+            'claude-opus-4-1-20250805',
+            'claude-opus-4-5',
+            'claude-opus-4-6',
+            'claude-opus-4-7',
+            'claude-sonnet-4-5-20250929',
+            'claude-sonnet-4-6',
+        ];
+        foreach ($retiredProviderIds as $retired) {
+            $this->assertNotContains($retired, $providerIds, sprintf('%s was retired and must not be re-added.', $retired));
+        }
+
+        $ids = array_column(ModelCatalog::all(), 'id');
+        foreach ([69, 93, 109, 112, 121, 160, 161, 163, 164, 165, 166] as $retiredBid) {
+            $this->assertNotContains($retiredBid, $ids, sprintf('BID %d belongs to a retired model and must not be reused.', $retiredBid));
+        }
+    }
+
+    /**
+     * OpenAI gpt-4.1 (BID 30) and Groq llama-4-maverick (BID 49) are superseded and
+     * deactivated by Version20260727180000. Re-adding either — under its old BID or
+     * its upstream model id — would resurrect a model we deliberately took out of
+     * the picker.
+     */
+    public function testSupersededOpenAiAndGroqModelsAreAbsentFromCatalog(): void
+    {
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+        $this->assertNotContains('gpt-4.1', $providerIds);
+        $this->assertNotContains('meta-llama/llama-4-maverick-17b-128e-instruct', $providerIds);
+
+        $ids = array_column(ModelCatalog::all(), 'id');
+        $this->assertNotContains(30, $ids);
+        $this->assertNotContains(49, $ids);
+    }
+
     public function testGpt55ProModelsAreMarkedAsNonStreaming(): void
     {
         $chat = ModelCatalog::find('openai:gpt-5.5-pro:chat')[0];
@@ -253,6 +359,42 @@ class ModelCatalogTest extends TestCase
 
         $this->assertFalse($chat['json']['supportsStreaming']);
         $this->assertFalse($vision['json']['supportsStreaming']);
+    }
+
+    /**
+     * A non-zero price authored under a unit that normalises to 0 is silently free:
+     * `normaliseToPerUnit()` maps '-', '' and 'free' to 0.0, so the price is stored,
+     * shown, and never billed. Two Ollama rows shipped exactly that combination and
+     * gave away their output tokens until Version20260727190000 fixed the unit.
+     *
+     * Note `per_generation` and friends are fine — unknown units fall through as
+     * per-1, which is what a flat per-clip fee needs.
+     */
+    public function testNoCatalogPriceIsAuthoredUnderAUnitThatNormalisesToZero(): void
+    {
+        foreach (ModelCatalog::all() as $model) {
+            foreach ([['priceIn', 'inUnit'], ['priceOut', 'outUnit']] as [$priceField, $unitField]) {
+                $price = (float) ($model[$priceField] ?? 0.0);
+                if ($price <= 0.0) {
+                    continue;
+                }
+
+                $unit = (string) ($model[$unitField] ?? '');
+                $this->assertNotSame(
+                    0.0,
+                    CostCalculationService::normaliseToPerUnit($price, $unit),
+                    sprintf(
+                        'BID %s (%s) authors %s=%s under %s="%s", which normalises to 0 — the price would never be billed.',
+                        (string) ($model['id'] ?? '?'),
+                        (string) ($model['name'] ?? '?'),
+                        $priceField,
+                        (string) $price,
+                        $unitField,
+                        $unit,
+                    ),
+                );
+            }
+        }
     }
 
     public function testFingerprintIsDeterministic(): void

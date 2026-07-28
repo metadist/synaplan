@@ -71,8 +71,8 @@ describe('dedupeModelsByPurpose (issue #261)', () => {
 
   it('returns one row per distinct (service, name) when multiple models share purposes', () => {
     const haiku = model(1, 'Claude Haiku 4.5')
-    const opus = model(2, 'Claude Opus 4.6')
-    const sonnet = model(3, 'Claude Sonnet 4.6')
+    const opus = model(2, 'Claude Opus 5')
+    const sonnet = model(3, 'Claude Sonnet 5')
 
     const dedupe = dedupeModelsByPurpose(
       {
@@ -86,8 +86,8 @@ describe('dedupeModelsByPurpose (issue #261)', () => {
     expect(dedupe).toHaveLength(3)
     expect(dedupe.map((m) => m.name)).toEqual([
       'Claude Haiku 4.5',
-      'Claude Opus 4.6',
-      'Claude Sonnet 4.6',
+      'Claude Opus 5',
+      'Claude Sonnet 5',
     ])
     for (const row of dedupe) {
       expect(row.purposes.map((c) => c.purpose)).toEqual(['SORT', 'CHAT', 'ANALYZE'])
@@ -95,30 +95,30 @@ describe('dedupeModelsByPurpose (issue #261)', () => {
   })
 
   it('merges (service, name) duplicates that have different backend ids, routing each chip to its own id', () => {
-    // Real-world scenario from the BMODELS catalogue: "Claude Opus 4.6"
+    // Real-world scenario from the BMODELS catalogue: "Claude Sonnet 5"
     // exists as two rows — one for general chat (BTAG=chat) and one
     // dedicated to memory extraction (BTAG=mem). They share name +
     // service but have distinct ids, and selecting CHAT vs MEM must
     // persist the correct id.
-    const opusChat = model(160, 'Claude Opus 4.6')
-    const opusMem = model(222, 'Claude Opus 4.6')
+    const sonnetChat = model(249, 'Claude Sonnet 5')
+    const sonnetMem = model(222, 'Claude Sonnet 5')
 
     const dedupe = dedupeModelsByPurpose(
       {
-        SORT: [opusChat],
-        CHAT: [opusChat],
-        MEM: [opusMem],
-        ANALYZE: [opusChat],
+        SORT: [sonnetChat],
+        CHAT: [sonnetChat],
+        MEM: [sonnetMem],
+        ANALYZE: [sonnetChat],
       },
       PURPOSE_ORDER
     )
 
     expect(dedupe).toHaveLength(1)
     expect(dedupe[0].purposes).toEqual([
-      { purpose: 'SORT', modelId: 160 },
-      { purpose: 'CHAT', modelId: 160 },
+      { purpose: 'SORT', modelId: 249 },
+      { purpose: 'CHAT', modelId: 249 },
       { purpose: 'MEM', modelId: 222 },
-      { purpose: 'ANALYZE', modelId: 160 },
+      { purpose: 'ANALYZE', modelId: 249 },
     ])
   })
 

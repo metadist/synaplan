@@ -51,6 +51,12 @@ describe('Provider Icons Utility', () => {
     expect(getProviderIcon('Hugging Face')).toBe('simple-icons:huggingface')
   })
 
+  it('should return a shield icon for TrustedTokens', () => {
+    expect(getProviderIcon('TrustedTokens')).toBe('mdi:shield-check')
+    expect(getProviderIcon('trustedtokens')).toBe('mdi:shield-check')
+    expect(getProviderIcon('trusted tokens')).toBe('mdi:shield-check')
+  })
+
   it('should return default robot icon for unknown service', () => {
     expect(getProviderIcon('unknown')).toBe('mdi:robot')
     expect(getProviderIcon('')).toBe('mdi:robot')
@@ -74,5 +80,11 @@ describe('Provider Flag Utility', () => {
 
   it('should return the German flag for self-hosted Ollama', () => {
     expect(getProviderFlag('ollama')).toBe('circle-flags:de')
+  })
+
+  it('should return the German flag for TrustedTokens', () => {
+    expect(getProviderFlag('TrustedTokens')).toBe('circle-flags:de')
+    expect(getProviderFlag('trustedtokens')).toBe('circle-flags:de')
+    expect(getProviderFlag('trusted-tokens')).toBe('circle-flags:de')
   })
 })
