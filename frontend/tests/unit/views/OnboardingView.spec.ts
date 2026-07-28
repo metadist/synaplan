@@ -21,6 +21,7 @@ vi.mock('vue-router', () => ({
 import OnboardingView from '@/views/OnboardingView.vue'
 import { isOnboardingCompleted, setOnboardingResumeStep } from '@/composables/useOnboarding'
 import { peekPendingRedirect } from '@/utils/pendingAuthRedirect'
+import { peekPurchaseIntent } from '@/services/iapPurchaseIntent'
 
 const stubs = {
   OnboardingWelcomeStep: {
@@ -167,6 +168,23 @@ describe('OnboardingView', () => {
       expect(isOnboardingCompleted()).toBe(false)
       expect(wrapper.find('[data-testid="btn-skip-onboarding"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="section-progress"]').exists()).toBe(false)
+      // The intent is persisted so the e-mail register / login round trip
+      // (verification, WebView re-creation, restart) can resume the purchase.
+      expect(peekPurchaseIntent()).toEqual({
+        planId: 'PRO',
+        productId: 'com.synaplan.app.pro.monthly',
+      })
+    })
+
+    it('skipping from the pre-purchase account step drops the persisted intent', async () => {
+      const wrapper = mountView()
+      await advanceToAccountWithIntent(wrapper)
+
+      await wrapper.find('[data-testid="btn-skip-onboarding"]').trigger('click')
+
+      // A deliberate opt-out: no later sign-in may resurrect the store sheet.
+      expect(peekPurchaseIntent()).toBeNull()
+      expect(mockReplace).toHaveBeenCalledWith('/')
     })
 
     it('after an in-place sign-in the terminal purchase step runs with the selected product', async () => {
@@ -195,6 +213,8 @@ describe('OnboardingView', () => {
 
       expect(isOnboardingCompleted()).toBe(true)
       expect(mockReplace).toHaveBeenCalledWith('/')
+      // Settled — the persisted intent must not linger.
+      expect(peekPurchaseIntent()).toBeNull()
     })
 
     it('"already subscribed" routes to the subscription page for managing', async () => {
@@ -208,6 +228,8 @@ describe('OnboardingView', () => {
 
       expect(isOnboardingCompleted()).toBe(true)
       expect(mockReplace).toHaveBeenCalledWith('/subscription')
+      // Settled ("already subscribed") — the persisted intent must not linger.
+      expect(peekPurchaseIntent()).toBeNull()
     })
 
     it('the e-mail path keeps the purchase intent via the /subscription redirect', async () => {
@@ -217,6 +239,9 @@ describe('OnboardingView', () => {
       await wrapper.find('[data-testid="stub-account-register"]').trigger('click')
 
       expect(peekPendingRedirect()).toBe('/subscription')
+      // The persisted intent survives the round trip and lets the
+      // subscription page continue the purchase after authentication.
+      expect(peekPurchaseIntent()).not.toBeNull()
       expect(mockReplace).toHaveBeenCalledWith({
         name: 'register',
         query: { redirect: '/subscription' },
@@ -230,6 +255,7 @@ describe('OnboardingView', () => {
       await wrapper.find('[data-testid="stub-account-login"]').trigger('click')
 
       expect(peekPendingRedirect()).toBe('/subscription')
+      expect(peekPurchaseIntent()).not.toBeNull()
       expect(mockReplace).toHaveBeenCalledWith({ name: 'login' })
     })
   })

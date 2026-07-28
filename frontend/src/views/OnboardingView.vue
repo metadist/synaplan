@@ -181,6 +181,7 @@ import OnboardingAccountStep from '@/components/onboarding/OnboardingAccountStep
 import OnboardingPurchaseStep from '@/components/onboarding/OnboardingPurchaseStep.vue'
 import { markOnboardingCompleted, consumeOnboardingResumeStep } from '@/composables/useOnboarding'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
+import { clearPurchaseIntent, setPurchaseIntent } from '@/services/iapPurchaseIntent'
 
 const router = useRouter()
 const { locale } = useI18n()
@@ -263,6 +264,10 @@ function goTo(target: number) {
 }
 
 function skip() {
+  // Skipping from the pre-purchase account step is a deliberate opt-out of
+  // the picked plan — drop the persisted intent so no later sign-in
+  // resurrects the store sheet unexpectedly.
+  clearPurchaseIntent()
   markOnboardingCompleted()
   router.replace('/')
 }
@@ -306,9 +311,15 @@ function finishToRegister(planId?: string) {
  * Plans CTA with a native store channel: remember the plan and run the
  * account step FIRST (auth-first purchase). Nothing is paid yet, so
  * onboarding completion is not persisted and skipping stays possible.
+ *
+ * The intent is ALSO persisted to localStorage: the e-mail register / login
+ * paths can involve leaving the app or a WebView re-creation (server
+ * switch), after which the subscription page continues the purchase
+ * automatically once the user is signed in.
  */
 function startPurchaseFlow(payload: { planId: string; productId: string }) {
   selectedPurchase.value = payload
+  setPurchaseIntent(payload)
   accountContext.value = 'purchase'
   direction.value = 'forward'
   step.value = ACCOUNT_STEP
@@ -344,15 +355,19 @@ function onAccountAuthenticated() {
 
 /**
  * Terminal exit into the app (purchase granted, "later", or the redeem path
- * signed in — redemption runs in the central post-auth hook).
+ * signed in — redemption runs in the central post-auth hook). The purchase
+ * intent is settled either way — a granted purchase needs no follow-up, and
+ * "later" is a deliberate opt-out.
  */
 function finishPurchased() {
+  clearPurchaseIntent()
   markOnboardingCompleted()
   router.replace('/')
 }
 
 /** "Already subscribed" on the purchase step: manage on the subscription page. */
 function finishToSubscription() {
+  clearPurchaseIntent()
   markOnboardingCompleted()
   router.replace('/subscription')
 }

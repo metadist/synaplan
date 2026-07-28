@@ -431,6 +431,7 @@ import {
   isSafeRedirectPath,
   setPendingRedirect,
 } from '@/utils/pendingAuthRedirect'
+import { postAuthTargetPath } from '@/services/iapPurchaseIntent'
 
 const router = useRouter()
 const route = useRoute()
@@ -556,7 +557,7 @@ const handleLogin = async () => {
     setTimeout(() => {
       const fromQuery = router.currentRoute.value.query.redirect as string | undefined
       const queryPath = isSafeRedirectPath(fromQuery) ? fromQuery : null
-      const target = queryPath ?? consumePendingRedirect() ?? '/'
+      const target = queryPath ?? consumePendingRedirect() ?? postAuthTargetPath()
       router.push(target)
     }, 400)
   }
@@ -590,7 +591,7 @@ const handleSocialLogin = async (provider: string) => {
     const ok = await authStore.handleOAuthCallback()
     if (ok) {
       const queryPath = isSafeRedirectPath(redirect) ? redirect : null
-      router.push(queryPath ?? consumePendingRedirect() ?? '/')
+      router.push(queryPath ?? consumePendingRedirect() ?? postAuthTargetPath())
     } else {
       socialError.value = 'Login failed'
     }

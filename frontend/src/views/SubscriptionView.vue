@@ -290,6 +290,7 @@ import {
   purchaseProduct,
   restoreNativePurchases,
 } from '@/services/nativeIap'
+import { clearPurchaseIntent, peekPurchaseIntent } from '@/services/iapPurchaseIntent'
 import { useNotification } from '@/composables/useNotification'
 import { formatPlanPrice } from '@/utils/formatPrice'
 import MainLayout from '@/components/MainLayout.vue'
@@ -300,7 +301,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const config = useConfigStore()
 const dialog = useDialog()
-const { success } = useNotification()
+const { success, info } = useNotification()
 const plans = ref<SubscriptionPlan[]>([])
 /** Set once the native store catalogue is loaded (native shell only). */
 const storePricesReady = ref(false)
@@ -637,6 +638,45 @@ function formatDate(timestamp: string | number): string {
   }
 }
 
+/**
+ * MOBILE-APP SEAM (auth-first onboarding): continue a purchase that was
+ * picked in the onboarding BEFORE the account existed. The e-mail register /
+ * login paths land here after authentication (persisted intent — survives
+ * the verification round trip, a WebView re-creation, and app restarts).
+ *
+ * Same order of operations as the onboarding purchase step: the freshly
+ * loaded subscription status acts as the pre-check, so an account that
+ * already has an active subscription (any channel, equal or higher tier) is
+ * never charged again — it gets an explanatory notice instead, with the
+ * account's state visible right on this page.
+ */
+async function continuePurchaseIntent(): Promise<void> {
+  if (!isNative) return
+  const intent = peekPurchaseIntent()
+  if (!intent) return
+
+  // The intent is settled on this page either way — a later visit must
+  // never surprise the user with a store sheet again.
+  clearPurchaseIntent()
+
+  const status = subscriptionStatus.value
+  if (null === status) {
+    // Unknown account state (status load failed): purchasing blind would
+    // reopen the double-charge window. The user can buy manually below.
+    return
+  }
+  if (status.active ?? status.hasSubscription) {
+    const tier = status.tier ?? status.plan ?? ''
+    const key = `subscription.plans.${tier.toLowerCase()}`
+    info(t('onboarding.purchase.alreadyBody', { plan: te(key) ? t(key) : tier }))
+    return
+  }
+
+  const plan = plans.value.find((p) => p.id === intent.planId)
+  if (!plan?.iapProductId || !isNativeIapAvailable()) return
+  await startNativePurchase(intent.planId)
+}
+
 onMounted(async () => {
   // Defense in depth next to the router guard: no billing, or a custom server
   // in the native app (no store purchase channel) → no subscription page.
@@ -646,5 +686,6 @@ onMounted(async () => {
   }
   await loadPlans()
   await loadSubscriptionStatus()
+  await continuePurchaseIntent()
 })
 </script>

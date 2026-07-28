@@ -12,7 +12,7 @@ import { mount, flushPromises } from '@vue/test-utils'
  */
 
 const mockGetSubscriptionStatus = vi.fn()
-const mockInitNativeIap = vi.fn(async (_ids: string[]) => true)
+const mockInitNativeIap = vi.fn<(ids: string[]) => Promise<boolean>>(async () => true)
 const mockPurchaseProduct = vi.fn()
 const mockSuccess = vi.fn()
 
