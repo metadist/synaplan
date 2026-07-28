@@ -81,12 +81,21 @@ export function clearPurchaseIntent(): void {
 }
 
 /**
- * Default post-auth route for the auth views (login / register / OAuth
- * callback): while a purchase intent is pending, continue on the
- * subscription page instead of the chat — that is where the purchase is
- * resumed. An explicit `?redirect=` or pending auth redirect always wins;
- * this is only the last fallback (and the one that survives a restart).
+ * Post-auth route for the auth views (login / register / OAuth callback).
+ *
+ * While a purchase intent is pending, the subscription page wins — that is
+ * where the purchase is resumed. It must win even over a `?redirect=` query
+ * or a pending auth redirect: the router guard stamps `?redirect=/` on every
+ * signed-out entry navigation (e.g. after the WebView reload of a native
+ * server switch), which is indistinguishable from a real deep link and would
+ * silently drop the purchase the user explicitly started. The intent is
+ * short-lived (TTL) and consumed by the subscription page either way, so a
+ * redirect hint can only ever be shadowed once.
+ *
+ * @param redirectHint an explicit `?redirect=` query or consumed pending
+ *   auth redirect, applied when no purchase intent is pending.
  */
-export function postAuthTargetPath(): string {
-  return peekPurchaseIntent() ? '/subscription' : '/'
+export function postAuthTargetPath(redirectHint?: string | null): string {
+  if (peekPurchaseIntent()) return '/subscription'
+  return redirectHint ?? '/'
 }

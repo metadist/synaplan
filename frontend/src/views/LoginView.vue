@@ -557,7 +557,8 @@ const handleLogin = async () => {
     setTimeout(() => {
       const fromQuery = router.currentRoute.value.query.redirect as string | undefined
       const queryPath = isSafeRedirectPath(fromQuery) ? fromQuery : null
-      const target = queryPath ?? consumePendingRedirect() ?? postAuthTargetPath()
+      // A pending purchase intent wins over redirect hints — see postAuthTargetPath.
+      const target = postAuthTargetPath(queryPath ?? consumePendingRedirect())
       router.push(target)
     }, 400)
   }
@@ -591,7 +592,7 @@ const handleSocialLogin = async (provider: string) => {
     const ok = await authStore.handleOAuthCallback()
     if (ok) {
       const queryPath = isSafeRedirectPath(redirect) ? redirect : null
-      router.push(queryPath ?? consumePendingRedirect() ?? postAuthTargetPath())
+      router.push(postAuthTargetPath(queryPath ?? consumePendingRedirect()))
     } else {
       socialError.value = 'Login failed'
     }

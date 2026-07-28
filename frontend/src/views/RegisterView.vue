@@ -547,7 +547,8 @@ const handleSocialLogin = async (provider: string) => {
   const redirect = route.query.redirect as string | undefined
   if (await signInWith(provider, redirect)) {
     const queryPath = isSafeRedirectPath(redirect) ? redirect : null
-    router.push(queryPath ?? consumePendingRedirect() ?? postAuthTargetPath())
+    // A pending purchase intent wins over redirect hints — see postAuthTargetPath.
+    router.push(postAuthTargetPath(queryPath ?? consumePendingRedirect()))
   }
 }
 </script>

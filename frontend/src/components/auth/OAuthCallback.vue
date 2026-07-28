@@ -136,7 +136,8 @@ onMounted(async () => {
         const result = await authStore.handleOAuthCallback()
 
         if (result) {
-          const target = consumePendingRedirect() ?? postAuthTargetPath()
+          // A pending purchase intent wins over redirect hints — see postAuthTargetPath.
+          const target = postAuthTargetPath(consumePendingRedirect())
           // Clear URL params for clean history
           window.history.replaceState({}, document.title, '/auth/callback')
 

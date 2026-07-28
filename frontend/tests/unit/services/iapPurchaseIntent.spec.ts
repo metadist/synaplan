@@ -64,4 +64,18 @@ describe('iapPurchaseIntent', () => {
     clearPurchaseIntent()
     expect(postAuthTargetPath()).toBe('/')
   })
+
+  it('lets a pending intent win over redirect hints (router-guard ?redirect=/)', () => {
+    setPurchaseIntent(INTENT)
+
+    // The router guard stamps ?redirect=/ on every signed-out entry navigation
+    // (e.g. after a native server switch reload) — it must not drop the purchase.
+    expect(postAuthTargetPath('/')).toBe('/subscription')
+    expect(postAuthTargetPath('/settings')).toBe('/subscription')
+  })
+
+  it('applies the redirect hint when no intent is pending', () => {
+    expect(postAuthTargetPath('/settings')).toBe('/settings')
+    expect(postAuthTargetPath(null)).toBe('/')
+  })
 })
