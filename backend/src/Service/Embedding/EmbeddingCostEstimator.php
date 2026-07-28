@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Service\Embedding;
 
 use App\Service\ModelConfigService;
-use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 
@@ -67,7 +66,6 @@ final class EmbeddingCostEstimator
     ];
 
     public function __construct(
-        private readonly QdrantClientInterface $qdrantClient,
         private readonly ModelConfigService $modelConfigService,
         private readonly Connection $connection,
         private readonly EmbeddingMetadataService $embeddingMetadata,
@@ -183,21 +181,24 @@ final class EmbeddingCostEstimator
      */
     private function estimateMemoriesScope(float $pricePerMTokens): array
     {
-        // Memories live in Qdrant only — count the points and apply the
-        // per-chunk heuristic. Scrolling every payload to measure exact
-        // text length would be O(n) HTTP round-trips, which we avoid on
-        // a UI-blocking pre-flight call.
+        // SQL is the durable source of truth; Qdrant may be empty while a
+        // recoverable re-index is in progress.
         try {
-            $points = $this->qdrantClient->scrollMemories(0, null, 10000);
+            $chunks = (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM BUSERMEMORIES WHERE BACTIVE = 1',
+            );
+            $textLen = (int) $this->connection->fetchOne(
+                'SELECT COALESCE(SUM(LENGTH(BKEY) + LENGTH(BVALUE) + 2), 0) FROM BUSERMEMORIES WHERE BACTIVE = 1',
+            );
         } catch (\Throwable $e) {
-            $this->logger->warning('CostEstimator: memories scope unreachable', [
+            $this->logger->warning('CostEstimator: memories SQL scope unreachable', [
                 'error' => $e->getMessage(),
             ]);
-            $points = [];
+            $chunks = 0;
+            $textLen = 0;
         }
 
-        $chunks = count($points);
-        $tokens = $chunks * self::TOKENS_PER_CHUNK_HEURISTIC;
+        $tokens = $textLen > 0 ? (int) ceil($textLen / 4) : $chunks * self::TOKENS_PER_CHUNK_HEURISTIC;
 
         return [
             'chunks' => $chunks,

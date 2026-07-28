@@ -170,7 +170,7 @@ const handleRetry = () => {
     :data-state="card.state"
   >
     <!-- Header: icon + title + state -->
-    <div class="flex items-center gap-2 mb-1">
+    <div class="flex items-center gap-2" :class="{ 'mb-1': !collapsed }">
       <Icon :icon="iconForKind" class="w-4 h-4 flex-shrink-0 txt-secondary" />
       <span class="text-sm font-medium txt-primary flex-1 truncate">
         {{ $t(title, $t(`taskPlan.kind.${card.kind}`)) }}
@@ -204,6 +204,7 @@ const handleRetry = () => {
         type="button"
         class="p-1 rounded txt-muted hover:txt-primary transition-colors"
         :aria-label="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
+        :aria-expanded="!collapsed"
         :title="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
         data-testid="task-card-toggle"
         @click="toggleCollapsed"
@@ -301,18 +302,9 @@ const handleRetry = () => {
         <span v-else-if="card.query">{{ card.query }}</span>
       </div>
 
-      <!-- Collapsed prose: one-line hint; expand via chevron (#1129 / #1229) -->
-      <p
-        v-if="!isSearchKind && card.text && collapsed"
-        class="text-xs txt-muted"
-        data-testid="task-card-collapsed-hint"
-      >
-        {{ $t('taskPlan.redundantCollapsed') }}
-      </p>
-
       <!-- Streaming / final text (prose and non-search kinds) -->
       <div
-        v-else-if="!isSearchKind && card.text"
+        v-if="!isSearchKind && card.text && !collapsed"
         class="task-card__body text-sm txt-primary break-words"
       >
         <MessageText

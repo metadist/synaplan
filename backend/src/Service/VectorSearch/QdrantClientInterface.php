@@ -77,7 +77,7 @@ interface QdrantClientInterface
      *
      * @return array Array of memories: [['id' => string, 'payload' => array], ...]
      */
-    public function scrollAllMemoriesForReindex(int $limit = 5000): array;
+    public function scrollAllMemoriesForReindex(int $limit = 5000, ?string $namespace = null): array;
 
     /**
      * Delete a memory point from Qdrant collection.
@@ -240,7 +240,7 @@ interface QdrantClientInterface
      *
      * Idempotent — safe to call when the collection does not yet exist.
      */
-    public function recreateMemoriesCollection(int $vectorDimension): void;
+    public function recreateMemoriesCollection(int $vectorDimension, ?string $namespace = null): void;
 
     // --- Health & Info ---
 

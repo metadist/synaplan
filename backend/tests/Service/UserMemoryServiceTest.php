@@ -6,8 +6,9 @@ namespace App\Tests\Service;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Entity\UserMemory;
+use App\Repository\UserMemoryRepository;
 use App\Service\Embedding\EmbeddingMetadataService;
-use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\Memory\MemoryEmbeddingModelResolver;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -19,11 +20,12 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * Tests für UserMemoryService (Qdrant-basiert).
+ * Tests for the SQL-backed memory service and its derived Qdrant index.
  */
 final class UserMemoryServiceTest extends TestCase
 {
     private EntityManagerInterface&MockObject $em;
+    private UserMemoryRepository&MockObject $memoryRepository;
     private QdrantClientInterface&MockObject $qdrantClient;
     private AiFacade&MockObject $aiFacade;
     private ModelConfigService&MockObject $modelConfigService;
@@ -36,6 +38,7 @@ final class UserMemoryServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->em = $this->createMock(EntityManagerInterface::class);
+        $this->memoryRepository = $this->createMock(UserMemoryRepository::class);
         $this->qdrantClient = $this->createMock(QdrantClientInterface::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
@@ -63,6 +66,7 @@ final class UserMemoryServiceTest extends TestCase
 
         $this->service = new UserMemoryService(
             $this->em,
+            $this->memoryRepository,
             $this->qdrantClient,
             $this->aiFacade,
             $this->modelConfigService,
@@ -109,6 +113,9 @@ final class UserMemoryServiceTest extends TestCase
         $memoryId = 1768900000;
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(123);
+        $memory = $this->makeMemory($memoryId, 123);
+        $this->memoryRepository->method('findForUser')->willReturn($memory);
+        $this->memoryRepository->expects($this->once())->method('remove')->with($memory);
 
         $this->qdrantClient
             ->expects($this->once())
@@ -123,11 +130,14 @@ final class UserMemoryServiceTest extends TestCase
         $this->service->deleteMemory($memoryId, $user);
     }
 
-    public function testDeleteMemoryThrowsWhenQdrantUnavailable(): void
+    public function testDeleteMemorySucceedsFromSqlWhenQdrantUnavailable(): void
     {
         $memoryId = 1768900000;
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(123);
+        $memory = $this->makeMemory($memoryId, 123);
+        $this->memoryRepository->method('findForUser')->willReturn($memory);
+        $this->memoryRepository->expects($this->once())->method('remove')->with($memory);
 
         $this->qdrantClient
             ->expects($this->once())
@@ -138,15 +148,15 @@ final class UserMemoryServiceTest extends TestCase
             ->expects($this->never())
             ->method('deleteMemory');
 
-        $this->expectException(MemoryServiceUnavailableException::class);
-
         $this->service->deleteMemory($memoryId, $user);
     }
 
-    public function testCreateMemoryThrowsWhenQdrantUnavailable(): void
+    public function testCreateMemoryPersistsSqlWhenQdrantUnavailable(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(123);
+        $this->memoryRepository->method('countActiveForUser')->willReturn(0);
+        $this->memoryRepository->expects($this->once())->method('save');
 
         $this->qdrantClient
             ->expects($this->once())
@@ -157,15 +167,18 @@ final class UserMemoryServiceTest extends TestCase
             ->expects($this->never())
             ->method('upsertMemory');
 
-        $this->expectException(MemoryServiceUnavailableException::class);
+        $memory = $this->service->createMemory($user, 'personal', 'favourite_colour', 'green');
 
-        $this->service->createMemory($user, 'personal', 'favourite_colour', 'green');
+        self::assertSame('green', $memory->value);
     }
 
-    public function testUpdateMemoryThrowsWhenQdrantUnavailable(): void
+    public function testUpdateMemoryPersistsSqlWhenQdrantUnavailable(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(123);
+        $memory = $this->makeMemory(1768900000, 123);
+        $this->memoryRepository->method('findForUser')->willReturn($memory);
+        $this->memoryRepository->expects($this->once())->method('save')->with($memory);
 
         $this->qdrantClient
             ->expects($this->once())
@@ -174,14 +187,11 @@ final class UserMemoryServiceTest extends TestCase
 
         $this->qdrantClient
             ->expects($this->never())
-            ->method('getMemory');
-        $this->qdrantClient
-            ->expects($this->never())
             ->method('upsertMemory');
 
-        $this->expectException(MemoryServiceUnavailableException::class);
+        $updated = $this->service->updateMemory(1768900000, $user, 'new value');
 
-        $this->service->updateMemory(1768900000, $user, 'new value');
+        self::assertSame('new value', $updated->value);
     }
 
     /**
@@ -191,11 +201,14 @@ final class UserMemoryServiceTest extends TestCase
      * so the controller returns 503 instead of leaking the raw error as a
      * misleading 400 or 500.
      */
-    public function testDeleteMemoryMapsRuntimeExceptionFromQdrantTo503(): void
+    public function testDeleteMemoryKeepsSqlDeletionWhenQdrantCleanupFails(): void
     {
         $memoryId = 1768900000;
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(123);
+        $memory = $this->makeMemory($memoryId, 123);
+        $this->memoryRepository->method('findForUser')->willReturn($memory);
+        $this->memoryRepository->expects($this->once())->method('remove')->with($memory);
 
         $this->qdrantClient
             ->expects($this->once())
@@ -208,8 +221,6 @@ final class UserMemoryServiceTest extends TestCase
             ->with("mem_123_{$memoryId}")
             ->willThrowException(new \RuntimeException('Qdrant request failed: HTTP 500'));
 
-        $this->expectException(MemoryServiceUnavailableException::class);
-
         $this->service->deleteMemory($memoryId, $user);
     }
 
@@ -217,26 +228,26 @@ final class UserMemoryServiceTest extends TestCase
      * Same race as above, but for updateMemory() where the failure happens
      * during the preflight getMemory() lookup.
      */
-    public function testUpdateMemoryMapsRuntimeExceptionFromQdrantTo503(): void
+    public function testUpdateMemoryKeepsSqlUpdateWhenQdrantIndexingFails(): void
     {
         $memoryId = 1768900000;
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(123);
+        $memory = $this->makeMemory($memoryId, 123);
+        $this->memoryRepository->method('findForUser')->willReturn($memory);
+        $this->memoryRepository->expects($this->once())->method('save')->with($memory);
 
         $this->qdrantClient
             ->expects($this->once())
             ->method('isAvailable')
             ->willReturn(true);
 
-        $this->qdrantClient
-            ->expects($this->once())
-            ->method('getMemory')
-            ->with("mem_123_{$memoryId}")
-            ->willThrowException(new \RuntimeException('Qdrant request failed: connection refused'));
+        $this->aiFacade->method('embed')
+            ->willThrowException(new \RuntimeException('Embedding provider unavailable'));
 
-        $this->expectException(MemoryServiceUnavailableException::class);
+        $updated = $this->service->updateMemory($memoryId, $user, 'new value');
 
-        $this->service->updateMemory($memoryId, $user, 'new value');
+        self::assertSame('new value', $updated->value);
     }
 
     public function testServiceIsAvailableWhenQdrantConfigured(): void
@@ -264,10 +275,9 @@ final class UserMemoryServiceTest extends TestCase
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
 
-        $this->qdrantClient->method('isAvailable')->willReturn(true);
-        $this->qdrantClient->expects(self::any())->method('getMemory')
-            ->with('mem_1_12345')
-            ->willReturn(['key' => 'name', 'value' => 'Cristian', 'category' => 'personal']);
+        $this->memoryRepository->method('findForUser')
+            ->with(12345, 1)
+            ->willReturn($this->makeMemory(12345, 1, 'Cristian'));
 
         $result = $this->service->resolveMemoryTags('Hallo [Memory:12345]', $user);
 
@@ -279,11 +289,10 @@ final class UserMemoryServiceTest extends TestCase
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
 
-        $this->qdrantClient->method('isAvailable')->willReturn(true);
-        $this->qdrantClient->method('getMemory')
-            ->willReturnCallback(fn (string $pointId): ?array => match ($pointId) {
-                'mem_1_111' => ['key' => 'name', 'value' => 'Cristian', 'category' => 'personal'],
-                'mem_1_222' => ['key' => 'city', 'value' => 'Berlin', 'category' => 'personal'],
+        $this->memoryRepository->method('findForUser')
+            ->willReturnCallback(fn (int $memoryId): ?UserMemory => match ($memoryId) {
+                111 => $this->makeMemory(111, 1, 'Cristian'),
+                222 => $this->makeMemory(222, 1, 'Berlin', 'city'),
                 default => null,
             });
 
@@ -300,11 +309,10 @@ final class UserMemoryServiceTest extends TestCase
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
 
-        $this->qdrantClient->method('isAvailable')->willReturn(true);
-        $this->qdrantClient->expects($this->once())
-            ->method('getMemory')
-            ->with('mem_1_111')
-            ->willReturn(['key' => 'name', 'value' => 'Cristian', 'category' => 'personal']);
+        $this->memoryRepository->expects($this->once())
+            ->method('findForUser')
+            ->with(111, 1)
+            ->willReturn($this->makeMemory(111, 1, 'Cristian'));
 
         $result = $this->service->resolveMemoryTags(
             '[Memory:111] ist [Memory:111]',
@@ -319,8 +327,7 @@ final class UserMemoryServiceTest extends TestCase
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
 
-        $this->qdrantClient->method('isAvailable')->willReturn(true);
-        $this->qdrantClient->method('getMemory')->willReturn(null);
+        $this->memoryRepository->method('findForUser')->willReturn(null);
 
         $result = $this->service->resolveMemoryTags('Hallo [Memory:99999]!', $user);
 
@@ -332,10 +339,9 @@ final class UserMemoryServiceTest extends TestCase
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
 
-        $this->qdrantClient->method('isAvailable')->willReturn(true);
-        $this->qdrantClient->expects(self::any())->method('getMemory')
-            ->with('mem_1_12345')
-            ->willReturn(['key' => 'name', 'value' => 'Cristian', 'category' => 'personal']);
+        $this->memoryRepository->method('findForUser')
+            ->with(12345, 1)
+            ->willReturn($this->makeMemory(12345, 1, 'Cristian'));
 
         $result = $this->service->resolveMemoryTags('Hallo [Memory:12345...]', $user);
 
@@ -354,7 +360,7 @@ final class UserMemoryServiceTest extends TestCase
      * surfaces as a clean RuntimeException (mapped to 503 / 5xx by the
      * outer layers).
      */
-    public function testCreateMemoryRejectsDimensionMismatchBeforeQdrantUpsert(): void
+    public function testCreateMemoryKeepsSqlRowOnDimensionMismatch(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(123);
@@ -383,10 +389,9 @@ final class UserMemoryServiceTest extends TestCase
         // The upsert MUST NOT be reached — that's the silent-data-loss path.
         $this->qdrantClient->expects($this->never())->method('upsertMemory');
 
-        $this->expectException(MemoryServiceUnavailableException::class);
-        $this->expectExceptionMessageMatches('/dimension mismatch/i');
+        $memory = $this->service->createMemory($user, 'personal', 'city', 'Berlin');
 
-        $this->service->createMemory($user, 'personal', 'city', 'Berlin');
+        self::assertSame('Berlin', $memory->value);
     }
 
     /**
@@ -415,6 +420,7 @@ final class UserMemoryServiceTest extends TestCase
         $resolver->method('getModelId')->willReturn(42);
         $service = new UserMemoryService(
             $this->em,
+            $this->memoryRepository,
             $this->qdrantClient,
             $this->aiFacade,
             $this->modelConfigService,
@@ -475,5 +481,21 @@ final class UserMemoryServiceTest extends TestCase
         $this->assertSame(42, $upsertedPayload['embedding_model_id']);
         $this->assertSame(3072, $upsertedPayload['vector_dim']);
         $this->assertSame('text-embedding-3-large', $upsertedPayload['embedding_model']);
+    }
+
+    private function makeMemory(
+        int $id,
+        int $userId,
+        string $value = 'old value',
+        string $key = 'name',
+    ): UserMemory {
+        return new UserMemory(
+            id: $id,
+            userId: $userId,
+            category: 'personal',
+            key: $key,
+            value: $value,
+            source: UserMemory::SOURCE_USER_CREATED,
+        );
     }
 }

@@ -6,7 +6,9 @@ namespace App\Service\Embedding;
 
 use App\AI\Service\AiFacade;
 use App\Entity\RevectorizeRun;
+use App\Entity\UserMemory;
 use App\Repository\RevectorizeRunRepository;
+use App\Repository\UserMemoryRepository;
 use App\Service\Memory\MemoryEmbeddingModelResolver;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\DBAL\Connection;
@@ -52,6 +54,7 @@ final readonly class EmbeddingReindexService
         private EmbeddingMetadataService $embeddingMetadata,
         private MemoryEmbeddingModelResolver $memoryEmbeddingResolver,
         private RevectorizeRunRepository $runRepository,
+        private UserMemoryRepository $memoryRepository,
         private Connection $connection,
         private LoggerInterface $logger,
     ) {
@@ -80,22 +83,8 @@ final readonly class EmbeddingReindexService
             $this->reindexDocuments($run, $modelInfo);
         }
 
-        // Issue #985 — `SCOPE_MEMORIES` is blocked at the controller
-        // layer for now (a dim-mismatched recreate used to wipe every
-        // user memory, see AdminEmbeddingController::switch and the
-        // probe check in reindexMemories()). `SCOPE_ALL` is still
-        // accepted for documents but skips memories so the
-        // legacy "switch everything at once" UX cannot trip the same
-        // data-loss path. The reindex stays callable directly with
-        // `SCOPE_MEMORIES` from a CLI / messenger replay once the
-        // separate-collection design lands and the controller gate is
-        // lifted.
-        if (RevectorizeRun::SCOPE_MEMORIES === $scope) {
+        if (RevectorizeRun::SCOPE_MEMORIES === $scope || RevectorizeRun::SCOPE_ALL === $scope) {
             $this->reindexMemories($run, $modelInfo);
-        } elseif (RevectorizeRun::SCOPE_ALL === $scope) {
-            $this->logger->warning('EmbeddingReindex: memories scope skipped in scope=all (temporarily disabled per #985)', [
-                'run_id' => $run->getId(),
-            ]);
         }
     }
 
@@ -295,39 +284,25 @@ final readonly class EmbeddingReindexService
             throw new \RuntimeException(sprintf('EmbeddingReindex: memories probe returned %d-dim vector but catalog metadata for model "%s" claims %d. Refusing to recreate collection (#985 — would corrupt the memory store).', $probeDim, $modelName, $vectorDim));
         }
 
-        // Snapshot existing points BEFORE the drop so a mid-run failure
-        // can be surfaced to operators with an accurate count. The
-        // upserts below run against the freshly recreated collection,
-        // not the snapshot itself.
-        try {
-            $points = $this->qdrantClient->scrollAllMemoriesForReindex(50000);
-        } catch (\Throwable $e) {
-            $this->logger->error('EmbeddingReindex: memories scroll failed', ['error' => $e->getMessage()]);
-            $run->incrementChunksFailed();
-            $this->runRepository->save($run);
-
-            return;
+        $namespaces = $this->memoryRepository->findActiveNamespaces();
+        if (!in_array(null, $namespaces, true)) {
+            $namespaces[] = null;
+        }
+        foreach ($namespaces as $namespace) {
+            $this->qdrantClient->recreateMemoriesCollection($vectorDim, $namespace);
         }
 
-        $this->qdrantClient->recreateMemoriesCollection($vectorDim);
-
-        foreach (array_chunk($points, self::MEMORIES_BATCH) as $batchPoints) {
-            $texts = [];
-            $payloads = [];
-            foreach ($batchPoints as $point) {
-                $payload = $point['payload'] ?? [];
-                $key = (string) ($payload['key'] ?? '');
-                $value = (string) ($payload['value'] ?? '');
-                if ('' === $key && '' === $value) {
-                    continue;
-                }
-                $texts[] = "{$key}: {$value}";
-                $payloads[] = $payload + ['_id' => $point['id'] ?? ''];
+        $afterId = 0;
+        while (true) {
+            $memories = $this->memoryRepository->findActiveBatchAfterId($afterId, self::MEMORIES_BATCH);
+            if ([] === $memories) {
+                break;
             }
 
-            if (empty($texts)) {
-                continue;
-            }
+            $texts = array_map(
+                static fn (UserMemory $memory): string => "{$memory->getKey()}: {$memory->getValue()}",
+                $memories,
+            );
 
             try {
                 $batch = $this->aiFacade->embedBatch($texts, 0, $provider, [
@@ -345,10 +320,11 @@ final readonly class EmbeddingReindexService
                 ]);
                 $run->incrementChunksFailed(count($texts));
                 $this->runRepository->save($run);
+                $afterId = $memories[array_key_last($memories)]->getId();
                 continue;
             }
 
-            foreach ($payloads as $i => $payload) {
+            foreach ($memories as $i => $memory) {
                 $vector = $embeddings[$i] ?? [];
                 if (empty($vector)) {
                     $run->incrementChunksFailed();
@@ -356,26 +332,38 @@ final readonly class EmbeddingReindexService
                 }
 
                 $vector = array_map('floatval', $vector);
+                $pointId = sprintf('mem_%d_%d', $memory->getUserId(), $memory->getId());
 
-                $pointId = (string) ($payload['_id'] ?? '');
-                if ('' === $pointId) {
-                    $userId = (int) ($payload['user_id'] ?? 0);
-                    $messageId = (int) ($payload['message_id'] ?? 0);
-                    $pointId = sprintf('mem_%d_%d', $userId, $messageId);
+                try {
+                    $this->qdrantClient->upsertMemory($pointId, $vector, [
+                        'user_id' => $memory->getUserId(),
+                        'category' => $memory->getCategory(),
+                        'key' => $memory->getKey(),
+                        'value' => $memory->getValue(),
+                        'source' => $memory->getSource(),
+                        'message_id' => $memory->getMessageId(),
+                        'created' => $memory->getCreated(),
+                        'updated' => $memory->getUpdated(),
+                        'active' => $memory->isActive(),
+                        'embedding_model_id' => $modelId,
+                        'embedding_provider' => $provider,
+                        'embedding_model' => $modelName,
+                        'vector_dim' => $vectorDim,
+                        'indexed_at' => date(\DATE_ATOM),
+                    ], $memory->getNamespace());
+                    $run->incrementChunksProcessed();
+                } catch (\Throwable $e) {
+                    $run->incrementChunksFailed();
+                    $this->logger->error('EmbeddingReindex: memory upsert failed', [
+                        'memory_id' => $memory->getId(),
+                        'user_id' => $memory->getUserId(),
+                        'error' => $e->getMessage(),
+                    ]);
                 }
-
-                unset($payload['_id']);
-                $payload['embedding_model_id'] = $modelId;
-                $payload['embedding_provider'] = $provider;
-                $payload['embedding_model'] = $modelName;
-                $payload['vector_dim'] = $vectorDim;
-                $payload['indexed_at'] = date(\DATE_ATOM);
-
-                $this->qdrantClient->upsertMemory($pointId, $vector, $payload);
-                $run->incrementChunksProcessed();
             }
 
             $this->runRepository->save($run);
+            $afterId = $memories[array_key_last($memories)]->getId();
         }
 
         // Migration complete — every memory point now lives in a

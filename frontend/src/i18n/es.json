@@ -1382,8 +1382,7 @@
     "copied": "Copiado al portapapeles",
     "copyFailed": "No se pudo copiar",
     "expand": "Mostrar texto",
-    "collapse": "Ocultar texto",
-    "redundantCollapsed": "Salida del paso oculta — expande para verla o lee la respuesta abajo."
+    "collapse": "Ocultar texto"
   },
   "processing": {
     "started": "Iniciando procesamiento...",
@@ -1532,7 +1531,9 @@
       "restoreTitle": "Restaurar compras",
       "restoreDone": "Compras restauradas: tu suscripción está activa.",
       "restoreNone": "No se encontró ninguna suscripción activa para restaurar.",
-      "storeNote": "Las compras y suscripciones se procesan y gestionan a través de App Store o Google Play."
+      "storeNote": "Las compras y suscripciones se procesan y gestionan a través de App Store o Google Play.",
+      "redeemBlockedExistingIos": "Esta cuenta ya tiene una suscripción activa, por lo que tu última compra en la tienda no se vinculó. Revisa las suscripciones de tu Apple ID y solicita allí un reembolso si es necesario, para evitar cargos duplicados.",
+      "redeemBlockedExistingAndroid": "Esta cuenta ya tiene una suscripción activa, por lo que tu última compra en la tienda no se vinculó. Google Play reembolsa automáticamente las compras no confirmadas en unos días."
     },
     "plans": {
       "pro": "Pro",
@@ -3178,9 +3179,42 @@
       "guestCta": "Continuar sin cuenta",
       "popular": "Popular",
       "continueWith": "Continuar con {plan}",
+      "restore": "Restaurar compras",
+      "restoring": "Restaurando…",
+      "restoreNone": "No se encontró ninguna compra anterior. Si compraste con una cuenta, inicia sesión.",
       "registerCta": "Crear una cuenta gratuita",
       "loginHint": "¿Ya tienes una cuenta?",
       "loginCta": "Iniciar sesión"
+    },
+    "account": {
+      "title": "Casi listo",
+      "subtitle": "Inicia sesión o crea tu cuenta para activar tu suscripción.",
+      "providerCta": "Continuar con {provider}",
+      "emailCta": "Continuar con correo electrónico",
+      "note": "Tu suscripción se vinculará a esta cuenta.",
+      "redeemTitle": "Pago completado",
+      "redeemSubtitle": "Crea tu cuenta ahora para activar tu suscripción — tarda menos de un minuto.",
+      "redeemNote": "Tu compra se vincula automáticamente a tu nueva cuenta."
+    },
+    "purchase": {
+      "checking": "Comprobando tu cuenta…",
+      "purchasing": "Completando la compra en la tienda…",
+      "alreadyTitle": "Ya tienes una suscripción",
+      "alreadyBody": "Esta cuenta ya tiene una suscripción activa ({plan}). No se te cobrará de nuevo.",
+      "alreadyManage": "Gestionar suscripción",
+      "toChat": "Ir al chat",
+      "pendingTitle": "Compra pendiente",
+      "retryTitle": "Compra no completada",
+      "cancelledBody": "La compra se canceló. No se te ha cobrado nada.",
+      "checkFailed": "No se pudo comprobar el estado de tu suscripción. Inténtalo de nuevo.",
+      "retryCta": "Intentar de nuevo",
+      "later": "Quizás más tarde"
+    }
+  },
+  "iap": {
+    "pendingBanner": {
+      "text": "Tu compra está esperando tu cuenta",
+      "cta": "Crear cuenta"
     }
   },
   "mcpServers": {

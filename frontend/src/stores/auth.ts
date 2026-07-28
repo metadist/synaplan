@@ -5,6 +5,7 @@ import { ref, computed } from 'vue'
 import { authService, type AuthUser, type ImpersonatorInfo } from '@/services/authService'
 import { useConfigStore } from '@/stores/config'
 import { clearPendingRedirect } from '@/utils/pendingAuthRedirect'
+import { redeemPendingIapPurchaseAfterAuth } from '@/services/iapPostAuthRedemption'
 
 export type User = AuthUser
 export type { ImpersonatorInfo } from '@/services/authService'
@@ -190,6 +191,9 @@ export const useAuthStore = defineStore('auth', () => {
         const { useGuestStore } = await import('./guest')
         useGuestStore().$reset()
         await useConfigStore().reload()
+        // MOBILE-APP SEAM: link a signed-out store purchase to the freshly
+        // authenticated account (no-op unless a redemption is pending).
+        void redeemPendingIapPurchaseAfterAuth()
         return true
       } else {
         error.value = result.error || 'Login failed'
@@ -340,6 +344,9 @@ export const useAuthStore = defineStore('auth', () => {
           authReadyResolve()
           authReadyResolve = null
         }
+        // MOBILE-APP SEAM: link a signed-out store purchase to the freshly
+        // authenticated account (no-op unless a redemption is pending).
+        void redeemPendingIapPurchaseAfterAuth()
         return true
       } else {
         error.value = result.error || 'OAuth login failed'

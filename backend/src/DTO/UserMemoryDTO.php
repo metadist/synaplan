@@ -7,8 +7,7 @@ namespace App\DTO;
 /**
  * UserMemoryDTO - Data Transfer Object for user memories.
  *
- * All memory data lives in Qdrant microservice (not in MariaDB).
- * This DTO is used for API responses and internal data transfer.
+ * This DTO is used for API responses and transfer to the Qdrant index.
  */
 final class UserMemoryDTO
 {

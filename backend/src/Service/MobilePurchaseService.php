@@ -88,6 +88,7 @@ final readonly class MobilePurchaseService
         }
 
         $this->assertNoCrossChannelConflict($user, $platform);
+        $this->assertNoParallelSameChannelSubscription($user, $platform, $entitlement);
         $this->assertReceiptNotOwnedByAnotherUser($user, $entitlement);
 
         // Acknowledge Google purchases within the 3-day window once we've
@@ -229,6 +230,40 @@ final readonly class MobilePurchaseService
         if (null !== $existing && $existing !== $platform->source()) {
             throw new IapConflictException(sprintf('Active subscription already owned by "%s"; manage it there.', $existing));
         }
+    }
+
+    /**
+     * Same-channel guard: while the account has an ACTIVE subscription on this
+     * store, a receipt for a *different* store subscription must not be
+     * applied — {@see applyEntitlement()} would silently overwrite (or even
+     * downgrade) the existing record while the old subscription keeps billing.
+     *
+     * Legitimate flows are unaffected: renewals and re-redeems carry the SAME
+     * purchaseId, and an Apple plan change keeps its originalTransactionId
+     * stable. A Google plan change issues a new token, but the app never
+     * starts an in-app purchase while a subscription is active (auth-first
+     * pre-check) — subscribed users manage/upgrade via the store surface,
+     * whose changes arrive through RTDN, not through redeem().
+     */
+    private function assertNoParallelSameChannelSubscription(User $user, IapPlatform $platform, IapEntitlement $entitlement): void
+    {
+        if (!$user->hasActiveSubscription() || $user->getSubscriptionSource() !== $platform->source()) {
+            return;
+        }
+
+        $subscription = $user->getSubscriptionData();
+        $currentId = $subscription['original_transaction_id'] ?? $subscription['purchase_token'] ?? null;
+        if (!is_string($currentId) || '' === $currentId || $currentId === $entitlement->purchaseId) {
+            return;
+        }
+
+        $this->logger->warning('IAP redeem blocked: parallel subscription on the same channel', [
+            'user_id' => $user->getId(),
+            'platform' => $platform->value,
+            'product' => $entitlement->productId,
+        ]);
+
+        throw new IapConflictException('This account already has an active subscription from this store; the new purchase was not applied. Manage the subscription in the store.');
     }
 
     /**

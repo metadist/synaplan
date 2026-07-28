@@ -273,34 +273,49 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
-    public function scrollAllMemoriesForReindex(int $limit = 5000): array
+    public function scrollAllMemoriesForReindex(int $limit = 5000, ?string $namespace = null): array
     {
-        $collection = $this->memoriesCollection;
+        if ($limit <= 0) {
+            return [];
+        }
+
+        $collection = $this->resolveMemoriesCollection($namespace);
 
         try {
-            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/scroll", [
-                // Only filter on `active`; the re-index runs once per
-                // VECTORIZE switch and must walk every user's memories.
-                'filter' => [
-                    'must' => [
-                        ['key' => 'active', 'match' => ['value' => true]],
-                    ],
-                ],
-                'limit' => $limit,
-                'with_payload' => true,
-                'with_vector' => false,
-            ]);
-
             $memoriesByLogical = [];
-            foreach ($response['result']['points'] ?? [] as $point) {
-                $logical = $point['payload']['_point_id'] ?? (string) $point['id'];
-                if (!isset($memoriesByLogical[$logical])) {
-                    $memoriesByLogical[$logical] = [
-                        'id' => $logical,
-                        'payload' => $point['payload'] ?? [],
-                    ];
+            $offset = null;
+
+            do {
+                $remaining = $limit - count($memoriesByLogical);
+                $request = [
+                    // Only filter on `active`; system-wide maintenance must
+                    // walk every user's memories.
+                    'filter' => [
+                        'must' => [
+                            ['key' => 'active', 'match' => ['value' => true]],
+                        ],
+                    ],
+                    'limit' => min(1000, $remaining),
+                    'with_payload' => true,
+                    'with_vector' => false,
+                ];
+                if (null !== $offset) {
+                    $request['offset'] = $offset;
                 }
-            }
+
+                $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/scroll", $request);
+                foreach ($response['result']['points'] ?? [] as $point) {
+                    $logical = $point['payload']['_point_id'] ?? (string) $point['id'];
+                    if (!isset($memoriesByLogical[$logical])) {
+                        $memoriesByLogical[$logical] = [
+                            'id' => $logical,
+                            'payload' => $point['payload'] ?? [],
+                        ];
+                    }
+                }
+
+                $offset = $response['result']['next_page_offset'] ?? null;
+            } while (null !== $offset && count($memoriesByLogical) < $limit);
 
             return array_values($memoriesByLogical);
         } catch (\Throwable $e) {
@@ -972,9 +987,9 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
-    public function recreateMemoriesCollection(int $vectorDimension): void
+    public function recreateMemoriesCollection(int $vectorDimension, ?string $namespace = null): void
     {
-        $collection = $this->memoriesCollection;
+        $collection = $this->resolveMemoriesCollection($namespace);
 
         try {
             $this->qdrantRequest('DELETE', "/collections/{$collection}");
