@@ -373,13 +373,11 @@ final readonly class MessageProcessor
                     );
                     $perfTimer->stop('search_query');
 
-                    // Get language from classification (e.g., "de", "en", "fr")
-                    // Use it directly as both search_lang and country (ISO 639-1 codes)
-                    $language = $classification['language'] ?? 'en';
-
-                    // Use language code as country code (most languages match their country code)
-                    // Brave Search will handle it gracefully and fall back if needed
-                    $country = strtolower($language);
+                    // Prefer classifier BLANG; fall back to inbound message language
+                    // (seeded from the UI locale). Brave needs a real ISO 639-1 code —
+                    // "auto" is a directive sentinel, not a search_lang value.
+                    $language = $this->resolveSearchLanguage($classification, $message);
+                    $country = $language;
 
                     // Incognito: never log the user's message content.
                     $this->logger->info('🔍 Performing web search', [
@@ -390,7 +388,8 @@ final readonly class MessageProcessor
                         'message_id' => $message->getId(),
                     ]);
 
-                    // Pass language and country to search service
+                    // search_lang (ISO 639-1) + country; BraveSearchService also
+                    // derives ui_lang (e.g. de → de-DE) for response metadata.
                     $perfTimer->start('search_brave');
                     $searchResults = $this->braveSearchService->search($searchQuery, [
                         'country' => $country,
@@ -849,8 +848,8 @@ final readonly class MessageProcessor
                         $message->getUserId()
                     );
 
-                    $language = $classification['language'] ?? 'en';
-                    $country = strtolower($language);
+                    $language = $this->resolveSearchLanguage($classification, $message);
+                    $country = $language;
 
                     // Incognito: never log the user's message content.
                     $this->logger->info('🔍 Performing web search', [
@@ -1228,6 +1227,29 @@ final readonly class MessageProcessor
         }
 
         return $out;
+    }
+
+    /**
+     * Resolve the ISO 639-1 language code for Brave search_lang / country.
+     *
+     * Preference: classifier BLANG → inbound message language (UI locale seed)
+     * → `en`. The `auto` sentinel is not a Brave language code.
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function resolveSearchLanguage(array $classification, Message $message): string
+    {
+        foreach ([$classification['language'] ?? null, $message->getLanguage()] as $candidate) {
+            if (!is_string($candidate)) {
+                continue;
+            }
+            $normalized = strtolower(trim($candidate));
+            if ('' !== $normalized && 'auto' !== $normalized && 'nn' !== $normalized) {
+                return $normalized;
+            }
+        }
+
+        return 'en';
     }
 
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void

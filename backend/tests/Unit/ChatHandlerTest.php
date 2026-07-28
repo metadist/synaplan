@@ -297,6 +297,15 @@ class ChatHandlerTest extends TestCase
         $this->assertStringContainsString('https://example.com/wetter', $capturedMessages[0]['content']);
         $this->assertStringContainsString('NOT provided by the user', $capturedMessages[0]['content']);
 
+        // Language directive must appear AFTER the English search-results block so
+        // the model does not follow the trailing English wrap-up into English.
+        $systemContent = $capturedMessages[0]['content'];
+        $searchPos = strpos($systemContent, 'Web Search Results');
+        $languagePos = strrpos($systemContent, 'Respond in German');
+        $this->assertNotFalse($searchPos);
+        $this->assertNotFalse($languagePos);
+        $this->assertGreaterThan($searchPos, $languagePos);
+
         foreach ($capturedMessages as $msg) {
             if ('user' !== $msg['role']) {
                 continue;

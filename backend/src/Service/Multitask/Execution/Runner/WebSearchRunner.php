@@ -90,11 +90,18 @@ final readonly class WebSearchRunner implements TaskRunner
         $language = is_string($context->classification['language'] ?? null)
             ? $context->classification['language']
             : ($context->message->getLanguage() ?: 'en');
+        if ('auto' === $language || '' === $language) {
+            $language = $context->message->getLanguage() ?: 'en';
+        }
+        $language = strtolower($language);
 
         $query = $this->queryGenerator->generate($request, $context->userId);
 
         try {
-            $results = $this->braveSearch->search($query, ['search_lang' => $language]);
+            $results = $this->braveSearch->search($query, [
+                'search_lang' => $language,
+                'country' => $language,
+            ]);
         } catch (\Throwable $e) {
             $this->logger->warning('WebSearchRunner: search failed', [
                 'error' => $e->getMessage(),

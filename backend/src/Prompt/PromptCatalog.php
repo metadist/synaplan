@@ -453,7 +453,7 @@ You must respond with the **same JSON object as received**, modifying only:
 * "BDURATION": integer (only when BMEDIA is "video" AND user specified a duration)
 * "BRESOLUTION": "720p" | "1080p" | "4K" (only when BMEDIA is "video" AND user specified a resolution)
 
-If you cannot define the language from the text, leave "BLANG" as "en".
+If you cannot define the language from the text, leave "BLANG" unchanged (keep the incoming value — usually the UI locale). Do NOT force "en".
 If you cannot define the topic, leave "BTOPIC" as "general".
 If BTEXT is empty, but BFILETEXT is set, use BFILETEXT primarily to define the topic.
 

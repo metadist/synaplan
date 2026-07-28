@@ -328,6 +328,13 @@ class MessageProcessorTest extends TestCase
         $this->braveSearchService
             ->expects($this->once())
             ->method('search')
+            ->with(
+                'aktuelle News Berlin',
+                $this->callback(static function (array $options): bool {
+                    return ($options['search_lang'] ?? null) === 'de'
+                        && ($options['country'] ?? null) === 'de';
+                })
+            )
             ->willReturn(['results' => []]);
 
         $this->router

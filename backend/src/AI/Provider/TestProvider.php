@@ -158,7 +158,9 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         $text = strtolower($data['BTEXT'] ?? '');
         $fileText = strtolower($data['BFILETEXT'] ?? '');
 
-        $data['BLANG'] = $this->detectLanguage($text ?: $fileText);
+        // Keep the inbound BLANG (UI locale / previous detection) when the
+        // heuristic cannot confidently detect a language from the text.
+        $data['BLANG'] = $this->detectLanguage($text ?: $fileText, is_string($data['BLANG'] ?? null) ? $data['BLANG'] : 'en');
         $data['BWEBSEARCH'] = $this->needsWebSearch($text) ? 1 : 0;
 
         $availableTopics = $this->extractAvailableTopics($systemContent);
@@ -232,10 +234,10 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         ], JSON_THROW_ON_ERROR);
     }
 
-    private function detectLanguage(string $text): string
+    private function detectLanguage(string $text, string $fallback = 'en'): string
     {
         if ('' === $text) {
-            return 'en';
+            return $fallback;
         }
 
         $patterns = [
@@ -258,7 +260,7 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         }
 
         if (empty($scores)) {
-            return 'en';
+            return $fallback;
         }
 
         arsort($scores);

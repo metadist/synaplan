@@ -538,6 +538,8 @@ export const chatApi = {
     onUpdate: (data: StreamUpdatePayload) => void
     includeReasoning?: boolean
     webSearch?: boolean
+    /** Active vue-i18n locale — seeds inbound BLANG / Brave search language. */
+    language?: string
     modelId?: number
     fileIds?: number[]
     voiceReply?: boolean
@@ -564,6 +566,7 @@ export const chatApi = {
     if (opts.trackId) paramsObj.trackId = opts.trackId.toString()
     if (opts.includeReasoning) paramsObj.reasoning = '1'
     if (opts.webSearch) paramsObj.webSearch = '1'
+    if (opts.language) paramsObj.language = opts.language
     if (opts.modelId) paramsObj.modelId = opts.modelId.toString()
     if (opts.voiceReply) paramsObj.voiceReply = '1'
     if (opts.isAgain) paramsObj.isAgain = '1'
