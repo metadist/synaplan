@@ -301,7 +301,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const config = useConfigStore()
 const dialog = useDialog()
-const { success, info } = useNotification()
+const { success, info, error: showError } = useNotification()
 const plans = ref<SubscriptionPlan[]>([])
 /** Set once the native store catalogue is loaded (native shell only). */
 const storePricesReady = ref(false)
@@ -655,25 +655,35 @@ async function continuePurchaseIntent(): Promise<void> {
   const intent = peekPurchaseIntent()
   if (!intent) return
 
-  // The intent is settled on this page either way — a later visit must
-  // never surprise the user with a store sheet again.
-  clearPurchaseIntent()
-
   const status = subscriptionStatus.value
   if (null === status) {
-    // Unknown account state (status load failed): purchasing blind would
-    // reopen the double-charge window. The user can buy manually below.
+    // Unknown account state (the status load fails silently): purchasing blind
+    // would reopen the double-charge window. KEEP the intent — surviving a
+    // transient failure is exactly what its TTL is for, so a retry or a later
+    // visit still resumes the purchase — and say what happened, otherwise the
+    // pick from the onboarding would vanish without a word.
+    showError(t('onboarding.purchase.checkFailed'))
     return
   }
+
   if (status.active ?? status.hasSubscription) {
+    // Settled: the account is entitled, so the pick needs no payment.
+    clearPurchaseIntent()
     const tier = status.tier ?? status.plan ?? ''
     const key = `subscription.plans.${tier.toLowerCase()}`
     info(t('onboarding.purchase.alreadyBody', { plan: te(key) ? t(key) : tier }))
     return
   }
 
+  // No purchase channel for the picked plan yet (catalogue still loading, or
+  // no store plugin): keep the intent so a later visit can resume. The page
+  // itself already shows that no purchase is possible right now.
   const plan = plans.value.find((p) => p.id === intent.planId)
   if (!plan?.iapProductId || !isNativeIapAvailable()) return
+
+  // Settled: the store sheet is the answer to the pick. Clearing BEFORE the
+  // sheet opens keeps a cancelled purchase from re-prompting on the next visit.
+  clearPurchaseIntent()
   await startNativePurchase(intent.planId)
 }
 

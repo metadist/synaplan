@@ -7,13 +7,16 @@ import { mount, flushPromises } from '@vue/test-utils'
  * (e-mail register / login round trip, WebView re-creation, restart). The
  * contract pinned here: the freshly loaded subscription status acts as the
  * pre-check — an account that already has an active subscription is never
- * charged again — and the intent is settled (cleared) either way.
+ * charged again. The intent is cleared only once it is actually settled (store
+ * sheet opened or "already subscribed" explained); a transient failure leaves
+ * it in place so the purchase stays resumable within its TTL.
  */
 
 const mockGetPlans = vi.fn()
 const mockGetSubscriptionStatus = vi.fn()
 const mockPurchaseProduct = vi.fn()
 const mockInfo = vi.fn()
+const mockError = vi.fn()
 const mockRouterPush = vi.fn()
 
 vi.mock('@/services/api/nativeRuntime', async (importOriginal) => {
@@ -62,7 +65,7 @@ vi.mock('@/composables/useDialog', () => ({
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ success: vi.fn(), info: mockInfo }),
+  useNotification: () => ({ success: vi.fn(), info: mockInfo, error: mockError }),
 }))
 
 vi.mock('@/composables/useDateFormat', () => ({
@@ -154,6 +157,37 @@ describe('SubscriptionView — persisted purchase intent (auth-first onboarding)
     await flushPromises()
 
     expect(mockPurchaseProduct).not.toHaveBeenCalled()
+    // A transient failure must not swallow the pick: the intent survives for a
+    // retry and the user is told why nothing happened.
+    expect(peekPurchaseIntent()).toEqual({ planId: 'BUSINESS', productId: PRODUCT_ID })
+    expect(mockError).toHaveBeenCalled()
+  })
+
+  it('resumes the surviving intent once the status check succeeds', async () => {
+    setPurchaseIntent({ planId: 'BUSINESS', productId: PRODUCT_ID })
+    mockGetSubscriptionStatus.mockRejectedValueOnce(new Error('network down'))
+
+    mountView()
+    await flushPromises()
+    expect(mockPurchaseProduct).not.toHaveBeenCalled()
+
+    // Second visit (or retry) with a reachable backend.
+    mountView()
+    await flushPromises()
+
+    expect(mockPurchaseProduct).toHaveBeenCalledWith(PRODUCT_ID)
+    expect(peekPurchaseIntent()).toBeNull()
+  })
+
+  it('keeps the intent when the picked plan has no store product yet', async () => {
+    setPurchaseIntent({ planId: 'BUSINESS', productId: PRODUCT_ID })
+    mockGetPlans.mockResolvedValue({ plans: [], stripeConfigured: true, iapConfigured: true })
+
+    mountView()
+    await flushPromises()
+
+    expect(mockPurchaseProduct).not.toHaveBeenCalled()
+    expect(peekPurchaseIntent()).toEqual({ planId: 'BUSINESS', productId: PRODUCT_ID })
   })
 
   it('is inert without a pending intent', async () => {
