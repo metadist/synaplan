@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
@@ -28,19 +29,56 @@ class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInte
     private const DEFAULT_VISION_MODEL = 'Qwen/Qwen3.6-35B-A3B-FP8';
     private const VISION_MAX_TOKENS = 2048;
 
-    private $client;
+    private ?\OpenAI\Client $client = null;
 
+    /** Key the cached client was built with (rebuild on key change). */
+    private ?string $clientKey = null;
+
+    /**
+     * $apiKey is an explicit override (tests, custom wiring) that wins over
+     * the ProviderKeyStore. Production wiring passes only the store, so keys
+     * saved in the admin UI (or imported from env) apply without a restart.
+     */
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly ?string $apiKey = null,
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
+        private readonly ?ProviderKeyStore $keyStore = null,
     ) {
-        if (!empty($apiKey)) {
+    }
+
+    private function resolveApiKey(): ?string
+    {
+        if (null !== $this->apiKey && '' !== $this->apiKey) {
+            return $this->apiKey;
+        }
+
+        return $this->keyStore?->getKey($this->getName());
+    }
+
+    /**
+     * Lazily build the API client with the CURRENT key; rebuilt when the key
+     * changes at runtime (admin UI save / env import).
+     */
+    private function client(): ?\OpenAI\Client
+    {
+        $key = $this->resolveApiKey();
+        if (null === $key || '' === $key) {
+            $this->client = null;
+            $this->clientKey = null;
+
+            return null;
+        }
+
+        if (null === $this->client || $this->clientKey !== $key) {
             $this->client = \OpenAI::factory()
-                ->withApiKey($apiKey)
+                ->withApiKey($key)
                 ->withBaseUri(self::BASE_URI)
                 ->make();
+            $this->clientKey = $key;
         }
+
+        return $this->client;
     }
 
     // ==================== METADATA ====================
@@ -92,7 +130,7 @@ class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInte
 
     public function isAvailable(): bool
     {
-        return !empty($this->apiKey) && null !== $this->client;
+        return null !== $this->client();
     }
 
     public function getRequiredEnvVars(): array
@@ -113,7 +151,7 @@ class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInte
 
         try {
             $requestOptions = $this->buildChatOptions($messages, $options, false);
-            $response = $this->client->chat()->create($requestOptions);
+            $response = $this->client()->chat()->create($requestOptions);
             $responseArray = $response->toArray();
 
             return [
@@ -138,7 +176,7 @@ class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInte
 
         try {
             $requestOptions = $this->buildChatOptions($messages, $options, true);
-            $stream = $this->client->chat()->createStreamed($requestOptions);
+            $stream = $this->client()->chat()->createStreamed($requestOptions);
 
             $usage = $this->parseUsage([]);
             $finishReason = null;
@@ -192,7 +230,7 @@ class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInte
         $prompt = '' !== $prompt ? $prompt : 'Please describe this image in detail.';
 
         try {
-            $response = $this->client->chat()->create([
+            $response = $this->client()->chat()->create([
                 'model' => $model,
                 'messages' => [[
                     'role' => 'user',
@@ -225,7 +263,7 @@ class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInte
         $this->assertApiKey();
 
         try {
-            $response = $this->client->chat()->create([
+            $response = $this->client()->chat()->create([
                 'model' => self::DEFAULT_VISION_MODEL,
                 'messages' => [[
                     'role' => 'user',
@@ -266,7 +304,7 @@ class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInte
 
     private function assertApiKey(): void
     {
-        if (!$this->client) {
+        if (null === $this->client()) {
             throw ProviderException::missingApiKey(self::PROVIDER_NAME, 'TRUSTEDTOKENS_API_KEY');
         }
     }

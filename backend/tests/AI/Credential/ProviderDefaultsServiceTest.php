@@ -1,0 +1,92 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\AI\Credential;
+
+use App\AI\Credential\ProviderDefaultsService;
+use App\AI\Credential\ProviderKeyStore;
+use App\Entity\Config;
+use App\Repository\ConfigRepository;
+use PHPUnit\Framework\MockObject\Stub;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+
+final class ProviderDefaultsServiceTest extends TestCase
+{
+    /** @var array<string, string> keyed by "owner|group|setting" */
+    private array $written = [];
+
+    private ConfigRepository&Stub $configRepository;
+    private ArrayAdapter $cache;
+    private ProviderDefaultsService $service;
+
+    protected function setUp(): void
+    {
+        $this->written = [];
+
+        $this->configRepository = $this->createStub(ConfigRepository::class);
+        $this->configRepository->method('setValue')->willReturnCallback(
+            function (int $ownerId, string $group, string $setting, string $value): Config {
+                $this->written[$ownerId.'|'.$group.'|'.$setting] = $value;
+
+                return (new Config())->setOwnerId($ownerId)->setGroup($group)->setSetting($setting)->setValue($value);
+            }
+        );
+
+        $this->cache = new ArrayAdapter();
+        $this->service = new ProviderDefaultsService($this->configRepository, $this->cache, new NullLogger());
+    }
+
+    /**
+     * Locks the mapping promised in the class docblock: every catalog key in
+     * PROVIDER_DEFAULTS must resolve to exactly one ModelCatalog entry. Fails
+     * on catalog drift (renamed/removed models) at test time instead of at
+     * apply time in an operator's install.
+     */
+    public function testEveryRecommendedDefaultResolvesInTheModelCatalog(): void
+    {
+        foreach (ProviderKeyStore::SUPPORTED_PROVIDERS as $provider) {
+            self::assertTrue(ProviderDefaultsService::supports($provider), sprintf('No recommended defaults defined for supported provider "%s"', $provider));
+
+            $defaults = $this->service->getRecommendedDefaults($provider);
+
+            self::assertNotEmpty($defaults);
+            self::assertArrayHasKey('CHAT', $defaults, sprintf('Provider "%s" must at least bind a CHAT default', $provider));
+            foreach ($defaults as $capability => $bid) {
+                self::assertGreaterThan(0, $bid, sprintf('%s/%s resolved to an invalid BID', $provider, $capability));
+            }
+        }
+    }
+
+    public function testUnknownProviderIsRejected(): void
+    {
+        self::assertFalse(ProviderDefaultsService::supports('not-a-provider'));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service->getRecommendedDefaults('not-a-provider');
+    }
+
+    public function testApplyGlobalDefaultsWritesBindingsProviderFlagAndClearsCache(): void
+    {
+        $item = $this->cache->getItem('model_config_probe');
+        $item->set('cached');
+        $this->cache->save($item);
+
+        $applied = $this->service->applyGlobalDefaults('groq');
+
+        foreach ($applied as $capability => $bid) {
+            self::assertSame((string) $bid, $this->written['0|DEFAULTMODEL|'.$capability] ?? null, sprintf('capability %s must be written as a global default', $capability));
+        }
+        self::assertSame('groq', $this->written['0|ai|default_chat_provider'] ?? null);
+        self::assertFalse($this->cache->getItem('model_config_probe')->isHit(), 'model_config cache must be invalidated');
+    }
+
+    public function testApplyDoesNotTouchUnrelatedCapabilities(): void
+    {
+        $this->service->applyGlobalDefaults('groq');
+
+        self::assertArrayNotHasKey('0|DEFAULTMODEL|VECTORIZE', $this->written, 'VECTORIZE (local embeddings) must keep its current value');
+    }
+}

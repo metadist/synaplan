@@ -32,6 +32,8 @@ docker compose up -d
 
 Open http://localhost:5173 — the **UI is ready in ~2 minutes**. With the standard install, local Ollama models (`gpt-oss:20b`, `bge-m3`, ~14 GB total) continue downloading in the background — chat that uses local AI will start working once that download finishes (`docker compose logs -f backend` shows progress). For the fastest first experience, use the [Minimal](#install-options) install below.
 
+**Then connect an AI provider:** log in as `admin@synaplan.com` / `admin123` and open **Admin → AI Providers** — paste any provider key (free tier: [Groq](https://console.groq.com)), it is tested live, stored encrypted, and chat works immediately. No key at hand? The standard install falls back to local Ollama once its download finishes.
+
 ---
 
 ## Install Options
@@ -41,16 +43,13 @@ Open http://localhost:5173 — the **UI is ready in ~2 minutes**. With the stand
 | **Standard** | `docker compose up -d` | ~9 GB | Full features, local AI |
 | **Minimal** | `docker compose -f docker-compose-minimal.yml up -d` | ~5 GB | Cloud AI only (Groq/OpenAI) |
 
-For the minimal install, set your API key **before** starting the stack so the first boot already sees it (avoids a restart). Get a free key at [console.groq.com](https://console.groq.com):
+**Connecting a cloud AI provider (recommended: the UI).** Log in as admin and open **Admin → AI Providers** (`/admin/setup`): paste a key, it is tested live, stored **encrypted in the database**, and active immediately — no restart, no `.env` editing. Get a free key at [console.groq.com](https://console.groq.com).
+
+Prefer the shell? Keys in `backend/.env` still work — they are imported into the encrypted store on first use:
 
 ```bash
 echo "GROQ_API_KEY=your_key" >> backend/.env
 docker compose -f docker-compose-minimal.yml up -d
-```
-
-Already started without a key? Add it and restart the backend:
-```bash
-echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 ```
 
 ---
@@ -96,7 +95,7 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 
 ## AI Providers & Models
 
-Synaplan is provider-neutral: add the API keys you want to `backend/.env`, restart the backend, and the matching models appear in the selector. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
+Synaplan is provider-neutral: connect the providers you want in **Admin → AI Providers** (keys are validated live and stored encrypted in the database, active without a restart), or set the env variables below in `backend/.env` — they are imported into the encrypted store on first use. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
 
 | Provider | Variable in `backend/.env` | Models |
 |----------|---------------------------|--------|

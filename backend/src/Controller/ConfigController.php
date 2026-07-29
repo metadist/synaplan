@@ -349,6 +349,20 @@ class ConfigController extends AbstractController
                     items: new OA\Items(type: 'string', example: 'Anthropic'),
                     nullable: true
                 ),
+                new OA\Property(
+                    property: 'setup',
+                    type: 'object',
+                    description: 'First-run setup status (only for authenticated users). Drives the "connect an AI provider" banner and the admin setup wizard.',
+                    nullable: true,
+                    properties: [
+                        new OA\Property(
+                            property: 'chatReady',
+                            type: 'boolean',
+                            example: true,
+                            description: 'True when the provider serving the global default chat model is available (key configured / local AI reachable), i.e. sending a chat message can work.'
+                        ),
+                    ]
+                ),
             ]
         )
     )]
@@ -431,15 +445,25 @@ class ConfigController extends AbstractController
         ];
 
         $unavailableProviders = [];
+        $setup = null;
         if ($user) {
+            $availabilityByName = [];
             foreach ($this->providerRegistry->getUniqueProviders() as $name => $provider) {
                 if ('test' === $name) {
                     continue;
                 }
-                if (!$provider->isAvailable()) {
+                $available = $provider->isAvailable();
+                $availabilityByName[strtolower($name)] = $available;
+                if (!$available) {
                     $unavailableProviders[] = $provider->getDisplayName();
                 }
             }
+
+            // First-run signal: can a plain chat message work right now? The
+            // frontend shows a "connect an AI provider" banner (admins get a
+            // wizard CTA) while this is false — e.g. a fresh install whose
+            // default chat model points at a provider without a key.
+            $setup = ['chatReady' => $this->isDefaultChatModelReady($availabilityByName)];
         }
 
         // Realtime / WebSocket gateway settings.
@@ -511,8 +535,32 @@ class ConfigController extends AbstractController
         if ($user && !empty($unavailableProviders)) {
             $response['unavailableProviders'] = $unavailableProviders;
         }
+        if (null !== $setup) {
+            $response['setup'] = $setup;
+        }
 
         return $this->json($response);
+    }
+
+    /**
+     * Whether the provider serving the GLOBAL default chat model is currently
+     * available. Falls back to "any non-test chat provider available" when no
+     * default binding resolves (fresh DB, retired model).
+     *
+     * @param array<string, bool> $availabilityByName lowercase provider name => isAvailable()
+     */
+    private function isDefaultChatModelReady(array $availabilityByName): bool
+    {
+        $bid = $this->modelConfigService->getDefaultModel('CHAT');
+        if (null !== $bid) {
+            $model = $this->modelRepository->find($bid);
+            $service = null !== $model ? strtolower($model->getService()) : null;
+            if (null !== $service && isset($availabilityByName[$service])) {
+                return $availabilityByName[$service];
+            }
+        }
+
+        return [] !== $this->providerRegistry->getAvailableProviders('chat', false);
     }
 
     /**

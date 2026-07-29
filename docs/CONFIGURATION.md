@@ -18,7 +18,21 @@ All configuration is done via environment variables in `backend/.env`.
 
 ## AI Providers
 
-Synaplan supports multiple AI providers. Configure one or more:
+Synaplan supports multiple AI providers. Configure one or more.
+
+**Recommended: the setup UI.** Log in as admin and open **Admin → AI Providers**
+(`/admin/setup`). Keys entered there are validated with a live request, stored
+**AES-256-CBC encrypted in the database** (`BCONFIG`, group `provider_keys`,
+keyed off `APP_SECRET`), and take effect immediately — no restart needed. The
+wizard can also apply the recommended default models for a provider in one
+click (same as `php bin/console app:provider:apply-defaults <provider>`).
+
+**Env variables still work** and are the right tool for scripted/orchestrated
+deploys: on first use, a key found in the environment is imported into the
+encrypted store automatically ("transfer on first load"). Rotating the env
+value rotates the stored copy; a key saved through the UI permanently wins
+over the env var, so you can delete it from `.env` afterwards. Keys never
+appear in migrations, seeders, or anything tracked by git.
 
 ### Groq (Recommended - Free Tier)
 

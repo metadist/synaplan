@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Admin;
 
+use App\AI\Credential\ProviderKeyCatalog;
+use App\AI\Credential\ProviderKeyStore;
 use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
@@ -35,6 +37,7 @@ final readonly class SystemConfigService
         private readonly LoggerInterface $logger,
         private readonly ConfigRepository $configRepository,
         private readonly string $defaultTtsUrl,
+        private readonly ProviderKeyStore $providerKeyStore,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -161,6 +164,20 @@ final readonly class SystemConfigService
         foreach ($this->schema as $key => $field) {
             $source = $field['source'] ?? 'env';
 
+            // Cloud provider API keys live in the encrypted ProviderKeyStore
+            // (BCONFIG), not in .env — report their status from there so this
+            // legacy surface and the provider-key wizard agree.
+            $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
+            if (null !== $storeProvider) {
+                $status = $this->providerKeyStore->getStatus($storeProvider);
+                $values[$key] = [
+                    'value' => $status['configured'] ? self::MASK : $field['default'],
+                    'isSet' => $status['configured'],
+                    'isMasked' => $status['configured'],
+                ];
+                continue;
+            }
+
             if ('database' === $source) {
                 $rawValue = $this->configRepository->getValue(
                     self::DB_OWNER_ID,
@@ -229,6 +246,30 @@ final readonly class SystemConfigService
 
         $field = $this->schema[$key];
         $source = $field['source'] ?? 'env';
+
+        // Cloud provider API keys are stored encrypted in the ProviderKeyStore
+        // and apply without a restart (providers resolve keys per call). An
+        // empty value removes the stored key (env fallback, if any, applies).
+        $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
+        if (null !== $storeProvider) {
+            try {
+                if ('' === trim($value)) {
+                    $this->providerKeyStore->deleteKey($storeProvider);
+                } else {
+                    $this->providerKeyStore->saveKey($storeProvider, $value, ProviderKeyStore::ORIGIN_UI);
+                }
+                $this->logChange($key, $value);
+
+                return ['success' => true, 'requiresRestart' => false];
+            } catch (\Throwable $e) {
+                $this->logger->error('Failed to save provider key via system config', [
+                    'key' => $key,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to save the API key'];
+            }
+        }
 
         // Database-backed fields: write to BCONFIG, no restart needed
         if ('database' === $source) {

@@ -71,6 +71,7 @@
     "admin": "Admin Panel",
     "adminFeatures": "Feature Status",
     "adminConfig": "System Configuration",
+    "adminSetup": "AI Provider Setup",
     "subscription": "Subscription",
     "subscriptionSuccess": "Subscription Successful",
     "subscriptionCancel": "Subscription Cancelled",
@@ -517,6 +518,7 @@
     "adminDashboard": "Dashboard",
     "adminFeatureStatus": "Feature Status",
     "adminSystemConfig": "System Config",
+    "adminProviderSetup": "AI Providers",
     "more": "More",
     "moreDescription": "More sections and account",
     "menu": "Menu"
@@ -2135,6 +2137,49 @@
       "tryAgain": "Try Again",
       "backToPlans": "Back to Plans"
     }
+  },
+  "adminSetup": {
+    "title": "AI Provider Setup",
+    "description": "Connect an AI provider so your team can chat. Keys are stored encrypted on your server and take effect immediately — no restart needed.",
+    "statusReadyTitle": "Your AI is ready",
+    "statusReadyText": "The default chat model has a working provider. You can add more providers below at any time.",
+    "statusNotReadyTitle": "No AI provider connected yet",
+    "statusNotReadyText": "Chat will not work until a provider is connected. Add an API key below — Groq offers a free key that works in under a minute.",
+    "cloudProviders": "Cloud providers",
+    "cloudProvidersHint": "Paste an API key, it is tested live and stored encrypted. Keys from your .env file are picked up automatically.",
+    "recommended": "Recommended",
+    "freeTier": "Free tier available",
+    "connected": "Connected",
+    "sourceEnv": "imported from .env",
+    "currentDefault": "Current default",
+    "keyPlaceholder": "Paste API key…",
+    "replaceKeyPlaceholder": "Paste new API key to replace…",
+    "saveAndTest": "Test & Save",
+    "applyDefaultsOnSave": "Also use this provider for chat and other AI tasks",
+    "getKey": "Get API key",
+    "testKey": "Test",
+    "makeDefault": "Use as default",
+    "removeKey": "Remove",
+    "saved": "{provider} key saved — active immediately",
+    "savedWithDefaults": "{provider} key saved and set as your default AI provider",
+    "saveFailed": "Saving the key failed",
+    "testOk": "{provider} key works",
+    "testFailed": "{provider} key test failed",
+    "defaultsApplied": "{provider} is now the default AI provider",
+    "removeConfirmTitle": "Remove API key",
+    "removeConfirmMessage": "Remove the stored {provider} API key? Chat via {provider} will stop working unless a key is set in the .env file.",
+    "removed": "{provider} key removed",
+    "loadFailed": "Could not load provider status",
+    "localAi": {
+      "title": "Local AI (Ollama) — no key needed",
+      "description": "The standard installation includes local AI models that run entirely on your hardware. Downloading models can take a while on first start; cloud providers above are available instantly."
+    }
+  },
+  "setupBanner": {
+    "title": "No AI provider connected",
+    "adminText": "Chat needs an AI provider. Connect one in a minute — free options available.",
+    "userText": "Chat is not ready yet. Please ask your administrator to connect an AI provider.",
+    "cta": "Set up AI provider"
   },
   "common": {
     "ok": "OK",

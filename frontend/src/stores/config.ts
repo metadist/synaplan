@@ -242,6 +242,20 @@ const config = {
   },
 
   /**
+   * First-run setup status (authenticated users only).
+   * chatReady is false when the provider serving the global default chat
+   * model has no usable key/connection — the chat shows a "connect an AI
+   * provider" banner and admins are pointed at /admin/setup.
+   * Defaults to true so anonymous pages and the pre-config phase never flash
+   * the banner.
+   */
+  setup: {
+    get chatReady(): boolean {
+      return getConfigSync().setup?.chatReady ?? true
+    },
+  },
+
+  /**
    * Installed plugins for the current user
    */
   get plugins(): NonNullable<ReturnType<typeof getConfigSync>['plugins']> {

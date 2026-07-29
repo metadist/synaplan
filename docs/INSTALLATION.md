@@ -71,12 +71,17 @@ Fastest way to start—uses cloud AI providers, skips large local models.
 ```bash
 # Start minimal stack
 docker compose -f docker-compose-minimal.yml up -d
+```
 
-# Add your API key (get free key at https://console.groq.com)
+Then connect a cloud provider: log in as admin, open **Admin → AI Providers**
+(`http://localhost:5173/admin/setup`), and paste your key (get a free one at
+[console.groq.com](https://console.groq.com)). The key is tested live, stored
+encrypted in the database, and works immediately — no restart.
+
+Alternatively via the shell (imported into the encrypted store on first use):
+
+```bash
 echo "GROQ_API_KEY=your_key_here" >> backend/.env
-
-# Restart to apply
-docker compose restart backend
 ```
 
 **Excluded (saves ~4 GB):**

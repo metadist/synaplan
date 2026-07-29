@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\ConfigRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ConfigRepository::class)]
@@ -26,7 +27,10 @@ class Config
     #[ORM\Column(name: 'BSETTING', length: 96)]
     private string $setting = '';
 
-    #[ORM\Column(name: 'BVALUE', length: 250)]
+    // TEXT (not VARCHAR): rows may hold AES-256-CBC ciphertext (encrypted
+    // provider API keys, OpenAI-compatible endpoint JSON) that exceeds 250
+    // chars. Widened by Version20260729120000.
+    #[ORM\Column(name: 'BVALUE', type: Types::TEXT)]
     private string $value = '';
 
     public function getId(): ?int

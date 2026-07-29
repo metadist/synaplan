@@ -173,6 +173,11 @@ export function useNavItems() {
         adminChildren.push(featureStatusItem)
       }
       adminChildren.push({
+        key: 'admin-setup',
+        path: '/admin/setup',
+        label: t('nav.adminProviderSetup'),
+      })
+      adminChildren.push({
         key: 'admin-config',
         path: '/admin/config',
         label: t('nav.adminSystemConfig'),

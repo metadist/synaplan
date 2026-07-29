@@ -71,6 +71,7 @@
     "admin": "Admin-Panel",
     "adminFeatures": "Feature-Status",
     "adminConfig": "Systemkonfiguration",
+    "adminSetup": "KI-Anbieter einrichten",
     "subscription": "Abonnement",
     "subscriptionSuccess": "Abonnement erfolgreich",
     "subscriptionCancel": "Abonnement gekündigt",
@@ -513,6 +514,7 @@
     "adminDashboard": "Dashboard",
     "adminFeatureStatus": "Feature-Status",
     "adminSystemConfig": "Systemkonfiguration",
+    "adminProviderSetup": "KI-Anbieter",
     "more": "Mehr",
     "moreDescription": "Weitere Bereiche und Konto",
     "menu": "Menü"
@@ -2150,6 +2152,49 @@
       "tryAgain": "Erneut versuchen",
       "backToPlans": "Zurück zu den Plänen"
     }
+  },
+  "adminSetup": {
+    "title": "KI-Anbieter einrichten",
+    "description": "Verbinde einen KI-Anbieter, damit dein Team chatten kann. Schlüssel werden verschlüsselt auf deinem Server gespeichert und gelten sofort — kein Neustart nötig.",
+    "statusReadyTitle": "Deine KI ist bereit",
+    "statusReadyText": "Das Standard-Chat-Modell hat einen funktionierenden Anbieter. Du kannst unten jederzeit weitere Anbieter hinzufügen.",
+    "statusNotReadyTitle": "Noch kein KI-Anbieter verbunden",
+    "statusNotReadyText": "Der Chat funktioniert erst, wenn ein Anbieter verbunden ist. Füge unten einen API-Schlüssel hinzu — Groq bietet einen kostenlosen Schlüssel, der in unter einer Minute funktioniert.",
+    "cloudProviders": "Cloud-Anbieter",
+    "cloudProvidersHint": "API-Schlüssel einfügen — er wird live getestet und verschlüsselt gespeichert. Schlüssel aus deiner .env-Datei werden automatisch übernommen.",
+    "recommended": "Empfohlen",
+    "freeTier": "Kostenlose Stufe verfügbar",
+    "connected": "Verbunden",
+    "sourceEnv": "aus .env importiert",
+    "currentDefault": "Aktueller Standard",
+    "keyPlaceholder": "API-Schlüssel einfügen…",
+    "replaceKeyPlaceholder": "Neuen API-Schlüssel zum Ersetzen einfügen…",
+    "saveAndTest": "Testen & Speichern",
+    "applyDefaultsOnSave": "Diesen Anbieter auch für Chat und andere KI-Aufgaben verwenden",
+    "getKey": "API-Schlüssel holen",
+    "testKey": "Testen",
+    "makeDefault": "Als Standard verwenden",
+    "removeKey": "Entfernen",
+    "saved": "{provider}-Schlüssel gespeichert — sofort aktiv",
+    "savedWithDefaults": "{provider}-Schlüssel gespeichert und als Standard-KI-Anbieter gesetzt",
+    "saveFailed": "Speichern des Schlüssels fehlgeschlagen",
+    "testOk": "{provider}-Schlüssel funktioniert",
+    "testFailed": "Test des {provider}-Schlüssels fehlgeschlagen",
+    "defaultsApplied": "{provider} ist jetzt der Standard-KI-Anbieter",
+    "removeConfirmTitle": "API-Schlüssel entfernen",
+    "removeConfirmMessage": "Gespeicherten {provider}-API-Schlüssel entfernen? Chat über {provider} funktioniert dann nur noch, wenn ein Schlüssel in der .env-Datei gesetzt ist.",
+    "removed": "{provider}-Schlüssel entfernt",
+    "loadFailed": "Anbieter-Status konnte nicht geladen werden",
+    "localAi": {
+      "title": "Lokale KI (Ollama) — kein Schlüssel nötig",
+      "description": "Die Standard-Installation enthält lokale KI-Modelle, die vollständig auf deiner Hardware laufen. Der Modell-Download kann beim ersten Start etwas dauern; die Cloud-Anbieter oben sind sofort verfügbar."
+    }
+  },
+  "setupBanner": {
+    "title": "Kein KI-Anbieter verbunden",
+    "adminText": "Der Chat braucht einen KI-Anbieter. Verbinde einen in einer Minute — kostenlose Optionen verfügbar.",
+    "userText": "Der Chat ist noch nicht bereit. Bitte deinen Administrator, einen KI-Anbieter zu verbinden.",
+    "cta": "KI-Anbieter einrichten"
   },
   "common": {
     "ok": "OK",
