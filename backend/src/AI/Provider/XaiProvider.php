@@ -483,6 +483,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             'prompt_length' => strlen($prompt),
             'duration' => $body['duration'],
             'resolution' => $body['resolution'] ?? null,
+            'aspect_ratio' => $body['aspect_ratio'] ?? null,
             'has_reference' => isset($body['image']),
         ]);
 
@@ -893,14 +894,19 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             $body['resolution'] = $resolution;
         }
 
-        $aspectRatio = $this->aspectRatioFromOptions($options, $modelConfig);
-        if (null !== $aspectRatio) {
-            $body['aspect_ratio'] = $aspectRatio;
-        }
-
         $imageUrl = $this->videoReferenceImage($options);
         if (null !== $imageUrl) {
             $body['image'] = ['url' => $imageUrl];
+        }
+
+        // Only text-to-video gets an aspect ratio. On image-to-video the
+        // reference frame defines the geometry and xAI satisfies an explicit
+        // aspect_ratio by STRETCHING the still into it — a square 1024x1024
+        // input plus the caller's 16:9 default came back as a visibly distorted
+        // 1280x720 render. Omitting the field makes xAI keep the frame's shape.
+        $aspectRatio = $this->aspectRatioFromOptions($options, $modelConfig);
+        if (null !== $aspectRatio && !isset($body['image'])) {
+            $body['aspect_ratio'] = $aspectRatio;
         }
 
         if (!isset($body['prompt']) && !isset($body['image'])) {

@@ -491,6 +491,47 @@ class XaiProviderTest extends TestCase
         $this->assertSame('https://cdn.example.test/frame.png', $captured['image']['url']);
     }
 
+    /**
+     * xAI satisfies an explicit aspect_ratio by stretching the reference frame
+     * into it, so forwarding MediaGenerationHandler's 16:9 default distorted
+     * every image-to-video render started from a square still.
+     */
+    public function testStartVideoOperationDropsTheAspectRatioForImageToVideo(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return $this->jsonResponse(['request_id' => 'req-i2v']);
+        });
+
+        $this->makeProvider(httpClient: $client)->startVideoOperation('animate it', [
+            'model' => 'grok-imagine-video-1.5',
+            'image_url' => 'https://cdn.example.test/square.png',
+            'aspect_ratio' => '16:9',
+        ]);
+
+        $this->assertArrayNotHasKey('aspect_ratio', $captured);
+        $this->assertSame('https://cdn.example.test/square.png', $captured['image']['url']);
+    }
+
+    public function testStartVideoOperationKeepsTheAspectRatioForTextToVideo(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return $this->jsonResponse(['request_id' => 'req-t2v']);
+        });
+
+        $this->makeProvider(httpClient: $client)->startVideoOperation('a red cube spinning', [
+            'aspect_ratio' => '16:9',
+        ]);
+
+        $this->assertSame('16:9', $captured['aspect_ratio']);
+        $this->assertArrayNotHasKey('image', $captured);
+    }
+
     public function testVideoResolutionFallsBackToAPriceableValue(): void
     {
         $captured = [];
