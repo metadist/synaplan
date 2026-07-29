@@ -564,6 +564,12 @@ Allowed topic keys: [KEYLIST]
    node falls back to text-to-video.
 5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
    chat). Real PDFs are NOT supported — say so in a single `chat` node.
+   To put a picture generated in the SAME turn INTO the document ("create a
+   photo and a job application containing it"), let the document node depend on
+   the image node and pass its file:
+   `"depends_on": ["n1"], "inputs": { "prompt": "...", "images": ["$n1.file"] }`.
+   Pictures from EARLIER turns need no wiring — the document node already sees
+   the images of this conversation.
 6. Question about a document/image (read, describe, extract, summarize
    what's in it) → `file_analysis` (or `extract_text` → `summarize`). This
    applies to BOTH a file the user attached AND a file produced by an earlier
@@ -758,6 +764,26 @@ NOT an independent `chat` node. This guarantees the description sees the real
 generated file instead of hallucinating one. The SAME pattern applies to
 `video_generation` → `file_analysis` ("make a video and describe what happens")
 and `document_generation` → `file_analysis` ("create a table and summarize it").
+
+### Image INSIDE a generated document (picture flows into the document node)
+User: "Erstelle ein Bewerbungsfoto und ein Bewerbungsschreiben als Word-Datei mit dem Foto darin."
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Professionelles Bewerbungsfoto, neutraler Hintergrund" } },
+    { "id": "n2", "capability": "document_generation", "depends_on": ["n1"], "inputs": { "prompt": "Schreibe ein Bewerbungsschreiben als Word-Datei und füge das erzeugte Bewerbungsfoto ein.", "images": ["$n1.file"] } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "Foto und Bewerbungsschreiben sind fertig.", "attachments": ["$n1.file","$n2.file"] } }
+  ]
+}
+
+`inputs.images` is what lets the document EMBED the picture. Without the
+dependency the document node runs before the image exists and produces a
+document with a missing picture. The photo is attached too because the user
+asked for BOTH artefacts; when the picture is only meant to sit inside the
+document, attach the document alone.
 
 ### Image, then a poem about it, read aloud (creative text about generated media)
 User: "Erstelle das Bild einer Katze, schreibe ein Gedicht darüber und lies es mir am Ende vor."
@@ -1110,6 +1136,15 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
 2. **Word** (.docx):
    - Provide BFILETEXT as Markdown (headings with #, **bold**, lists, tables)
    - The server converts this Markdown into a real Word document
+   - To place a picture, copy one of the markers listed under "Images available
+     for this document" (e.g. `{{IMAGE:file:123}}`) to the exact desired
+     position, on its own line. That list is complete: it covers images the user
+     attached now AND images created earlier in this conversation.
+   - NEVER invent a marker or a number that is not in that list. When the
+     requested picture is not listed, write the document without it.
+   - Existing `{{IMAGE:file:123}}` markers represent images already embedded in
+     the current document. Keep each marker unchanged unless the user explicitly
+     asks to remove or replace that image.
 
 3. **PowerPoint** (.pptx):
    - Provide BFILETEXT as Markdown; each top-level heading (#) starts a new slide
@@ -1142,6 +1177,8 @@ When the user asks to change, add to, or reformat that document
 - Keep the same BFILEPATH filename as before.
 - Express all formatting as Markdown in BFILETEXT: `# Title` for a large, bold
   heading, `**bold**`, `*italic*`, `-` for lists, and Markdown tables.
+- Preserve every existing `{{IMAGE:file:123}}` marker and its position unless
+  the requested edit specifically changes that image.
 
 Example — user says "add a bold, bigger title 'Report' to the file" and the
 current content is "Some body text.":

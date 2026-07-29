@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
@@ -103,7 +103,7 @@ describe('TaskPlanBubble', () => {
     expect(wrapper.find('[data-testid="task-card-toggle"]').exists()).toBe(false)
   })
 
-  it('collapses completed prose to the header and expands it on request', async () => {
+  it('collapses redundant completed prose to the header and expands it on request', async () => {
     const wrapper = mount(TaskPlanBubble, {
       props: {
         plan: plan([
@@ -113,6 +113,7 @@ describe('TaskPlanBubble', () => {
             kind: 'text',
             state: 'done',
             text: 'Completed summary',
+            redundant: true,
           },
         ]),
       },
@@ -130,6 +131,99 @@ describe('TaskPlanBubble', () => {
 
     expect(card.find('.task-card__body').text()).toContain('Completed summary')
     expect(toggle.attributes('aria-expanded')).toBe('true')
+  })
+
+  it('collapses only redundant completed prose cards', async () => {
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          {
+            nodeId: 'n1',
+            capability: 'chat',
+            kind: 'text',
+            state: 'done',
+            text: 'Repeated answer',
+            redundant: true,
+          },
+          {
+            nodeId: 'n2',
+            capability: 'chat',
+            kind: 'text',
+            state: 'done',
+            text: 'Unique answer that exists only in this card',
+          },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    const redundantCard = wrapper.find('[data-testid="task-card-n1"]')
+    expect(redundantCard.find('[data-testid="task-card-collapsed-hint"]').exists()).toBe(true)
+    expect(redundantCard.find('[data-testid="task-card-toggle"]').exists()).toBe(true)
+
+    const uniqueCard = wrapper.find('[data-testid="task-card-n2"]')
+    expect(uniqueCard.text()).toContain('Unique answer that exists only in this card')
+    expect(uniqueCard.find('[data-testid="task-card-collapsed-hint"]').exists()).toBe(false)
+    expect(uniqueCard.find('[data-testid="task-card-toggle"]').exists()).toBe(false)
+
+    await redundantCard.find('[data-testid="task-card-toggle"]').trigger('click')
+    expect(redundantCard.text()).toContain('Repeated answer')
+  })
+
+  it('copies the query and summary from a completed search card', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          {
+            nodeId: 'n1',
+            capability: 'web_search',
+            kind: 'search',
+            state: 'done',
+            query: 'current pension rules',
+            resultsCount: 3,
+          },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    await wrapper.find('[data-testid="task-card-copy"]').trigger('click')
+
+    expect(writeText).toHaveBeenCalledWith('current pension rules\nSearched the web · 3 sources')
+  })
+
+  it('copies only the visible query when a search has no sources', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          {
+            nodeId: 'n1',
+            capability: 'web_search',
+            kind: 'search',
+            state: 'done',
+            query: 'query without results',
+            resultsCount: 0,
+          },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    const card = wrapper.find('[data-testid="task-card-n1"]')
+    expect(card.text()).not.toContain('0 sources')
+
+    await card.find('[data-testid="task-card-copy"]').trigger('click')
+    expect(writeText).toHaveBeenCalledWith('query without results')
   })
 
   it('shows a media skeleton while an image card is running without a file', () => {

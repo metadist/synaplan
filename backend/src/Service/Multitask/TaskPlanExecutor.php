@@ -473,16 +473,12 @@ final readonly class TaskPlanExecutor
             return $handlerResult;
         }
 
-        $response = $handlerResult['response'] ?? null;
-        if (!is_array($response)) {
-            return $handlerResult;
-        }
-        $metadata = $response['metadata'] ?? [];
+        $metadata = $handlerResult['metadata'] ?? [];
         if (!is_array($metadata)) {
             $metadata = [];
         }
         $metadata['planning_usage'] = $plan->planningUsage;
-        $handlerResult['response']['metadata'] = $metadata;
+        $handlerResult['metadata'] = $metadata;
 
         return $handlerResult;
     }

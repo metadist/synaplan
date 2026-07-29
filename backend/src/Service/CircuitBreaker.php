@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Service\Exception\StreamCancelledException;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
@@ -85,6 +86,10 @@ final readonly class CircuitBreaker
             $this->recordSuccess($serviceName);
 
             return $result;
+        } catch (StreamCancelledException $e) {
+            // The user pressed Stop. The provider was healthy — counting this
+            // would open the circuit for everyone after a few cancellations.
+            throw $e;
         } catch (\Exception $e) {
             // Failure
             $this->recordFailure($serviceName);

@@ -236,6 +236,37 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
+     * Image files linked to the given chat messages, newest first.
+     *
+     * Generated media rides the legacy path channel on the message and is only
+     * connected to BFILES through BMESSAGEID, so a picture created earlier in
+     * the conversation is invisible to the message relation (#1382).
+     *
+     * @param list<int> $messageIds
+     *
+     * @return list<File>
+     */
+    public function findImagesByMessageIds(int $userId, array $messageIds, int $limit = 30): array
+    {
+        if ([] === $messageIds) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('f')
+            ->where('f.userId = :userId')
+            ->andWhere('f.messageId IN (:messageIds)')
+            ->andWhere('f.fileMime LIKE :imageMime OR f.fileType IN (:imageTypes)')
+            ->setParameter('userId', $userId)
+            ->setParameter('messageIds', $messageIds)
+            ->setParameter('imageMime', 'image/%')
+            ->setParameter('imageTypes', ['image', 'png', 'jpg', 'jpeg', 'gif', 'webp'])
+            ->orderBy('f.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Resolve the existing file to replace for a CORE-4 overwrite upload.
      *
      * Primary match is the stable external identity (user, source, source_id);

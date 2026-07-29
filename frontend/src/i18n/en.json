@@ -3421,7 +3421,7 @@
       "calendar_event": "Calendar invite",
       "email_me": "Email result"
     },
-    "copyText": "Copy text",
+    "copyText": "Copy content",
     "copied": "Copied to clipboard",
     "copyFailed": "Could not copy",
     "expand": "Show text",

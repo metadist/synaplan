@@ -10,6 +10,7 @@ use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Provider\GoogleProvider;
 use App\Service\CircuitBreaker;
 use App\Service\DiscordNotificationService;
+use App\Service\Exception\StreamCancelledException;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\InternalEmailService;
@@ -240,7 +241,10 @@ class AiFacade
                 serviceName: 'ai_provider_'.$provider->getName(),
                 fallback: null // NO FALLBACK - let ProviderException bubble up
             );
-        } catch (ProviderException $e) {
+        } catch (ProviderException|StreamCancelledException $e) {
+            // A user cancel travels up through the stream callback. Wrapping it
+            // in a ProviderException would turn "you pressed Stop" into a
+            // provider outage for every caller downstream.
             throw $e;
         } catch (\Exception $e) {
             $this->logger->error('🔴 AiFacade: Chat stream failed', [

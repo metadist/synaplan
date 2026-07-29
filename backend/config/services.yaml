@@ -170,6 +170,12 @@ services:
     App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
         alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
 
+    # Images a document turn may embed: attachments, upstream node output and
+    # the pictures of the conversation, validated against the uploads dir.
+    App\Service\File\DocumentImageCatalog:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     # email_me DAG node: resolves upstream file descriptors to absolute paths
     # under the shared uploads dir before attaching them to the result mail.
     App\Service\Multitask\Execution\Runner\EmailMeRunner:

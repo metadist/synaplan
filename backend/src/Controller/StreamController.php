@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
+use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
@@ -83,6 +84,7 @@ class StreamController extends AbstractController
         private MessageForwardingService $messageForwardingService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private DocumentGeneratorService $documentGenerator,
+        private DocumentImageReferenceResolver $documentImageReferenceResolver,
         private MediaCancellationStore $cancellationStore,
         private MediaJobService $mediaJobService,
         private MediaJobMessageSync $mediaJobMessageSync,
@@ -1292,6 +1294,23 @@ class StreamController extends AbstractController
                     $responseText .= $jsonBuffer;
                     $jsonBuffer = '';
                     $isBufferingJson = false;
+                }
+
+                if ($this->isCancelledResult($result)) {
+                    // Explicit user cancel, reported as a result instead of an
+                    // exception (media/multitask turns catch it per node). The
+                    // frontend already persisted the cancelled turn through
+                    // /save-cancelled — writing an error row on top of it gave
+                    // the user two cancellation cards for one Stop click, and
+                    // overwrote the incoming message status 'cancelled' with
+                    // 'error'. End the turn silently, exactly like the
+                    // StreamCancelledException path below.
+                    $this->logger->info('Stream stopped - cancelled by user', [
+                        'user_id' => $user->getId(),
+                        'track_id' => (string) $trackId,
+                    ]);
+
+                    return;
                 }
 
                 if (!$result['success']) {
@@ -2925,6 +2944,21 @@ class StreamController extends AbstractController
     }
 
     /**
+     * Whether a processing result describes an explicit user cancellation
+     * rather than a failure.
+     *
+     * A cancelled turn is persisted exactly once, by /save-cancelled. Treating
+     * it as an error would add a second outgoing message for the same tracking
+     * id, so the chat showed two cancellation cards for one Stop click.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function isCancelledResult(array $result): bool
+    {
+        return true !== ($result['success'] ?? false) && true === ($result['cancelled'] ?? false);
+    }
+
+    /**
      * Build the nested aiModels payload mirroring the ChatController
      * /api/v1/chats/{id}/messages response shape.
      *
@@ -3166,6 +3200,9 @@ class StreamController extends AbstractController
         }
 
         try {
+            $resolvedDocument = $this->documentImageReferenceResolver->resolve($content, $message);
+            $content = $resolvedDocument['content'];
+
             // Generate storage path similar to FileStorageService
             $year = date('Y');
             $month = date('m');
@@ -3196,7 +3233,7 @@ class StreamController extends AbstractController
 
             // Write file content (real OOXML for docx/xlsx/pptx, text otherwise)
             try {
-                $this->documentGenerator->write($content, $extension, $absolutePath);
+                $this->documentGenerator->write($content, $extension, $absolutePath, $resolvedDocument['images']);
             } catch (\Throwable $e) {
                 $this->logger->error('StreamController: Failed to write file', [
                     'path' => $absolutePath,

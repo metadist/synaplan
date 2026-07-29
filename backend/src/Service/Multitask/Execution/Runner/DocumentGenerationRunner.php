@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask\Execution\Runner;
 
 use App\Entity\Message;
+use App\Service\File\DocumentImageCatalog;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -30,6 +31,9 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class DocumentGenerationRunner implements TaskRunner
 {
+    /** A document illustrated by a whole gallery is not what the planner means. */
+    private const MAX_UPSTREAM_IMAGES = 4;
+
     public function __construct(
         private ChatHandler $handler,
         private LoggerInterface $logger,
@@ -74,10 +78,19 @@ final readonly class DocumentGenerationRunner implements TaskRunner
             'language' => $language,
         ];
 
+        $options = ['disable_memories' => true];
+        $upstreamImages = $this->upstreamImagePaths($node, $context, $inputs);
+        if ([] !== $upstreamImages) {
+            // Hand the pictures produced by an upstream node to the officemaker
+            // prompt, so a document can embed the image the same turn generated
+            // instead of guessing a marker for it (#1382).
+            $options['document_images'] = $upstreamImages;
+        }
+
         try {
             // disable_memories: an intermediate generation node must not trigger
             // memory extraction on the synthetic prompt.
-            $result = $this->handler->handle($synthetic, $context->thread, $classification, null, ['disable_memories' => true]);
+            $result = $this->handler->handle($synthetic, $context->thread, $classification, null, $options);
         } catch (\Throwable $e) {
             $this->logger->warning('DocumentGenerationRunner: handler threw', [
                 'error' => $e->getMessage(),
@@ -135,6 +148,74 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         return null;
     }
 
+    /**
+     * Upload-dir-relative paths of the images this node may embed: the ones the
+     * planner wired explicitly (`inputs.images` / `inputs.image`) plus every
+     * image any node it depends on produced.
+     *
+     * @param array<string, mixed> $inputs already-resolved node inputs
+     *
+     * @return list<string>
+     */
+    private function upstreamImagePaths(TaskNode $node, NodeContext $context, array $inputs): array
+    {
+        $descriptors = [];
+        foreach (['images', 'image'] as $key) {
+            $value = $inputs[$key] ?? null;
+            if (is_array($value)) {
+                $descriptors = array_merge($descriptors, isset($value['path']) ? [$value] : $value);
+            }
+        }
+
+        foreach ($node->dependsOn as $dependencyId) {
+            $result = $context->getResult($dependencyId);
+            if (null !== $result) {
+                $descriptors = array_merge($descriptors, $result->files);
+            }
+        }
+
+        $paths = [];
+        foreach ($descriptors as $descriptor) {
+            if (!is_array($descriptor)) {
+                continue;
+            }
+
+            $relative = $this->relativeImagePath($descriptor);
+            if (null !== $relative && !in_array($relative, $paths, true)) {
+                $paths[] = $relative;
+            }
+        }
+
+        return array_slice($paths, 0, self::MAX_UPSTREAM_IMAGES);
+    }
+
+    /**
+     * @param array<string, mixed> $descriptor node file descriptor
+     */
+    private function relativeImagePath(array $descriptor): ?string
+    {
+        $relative = is_string($descriptor['local_path'] ?? null) ? $descriptor['local_path'] : null;
+        if (null === $relative || '' === trim($relative)) {
+            $relative = is_string($descriptor['path'] ?? null) ? $descriptor['path'] : null;
+        }
+
+        if (null === $relative || '' === trim($relative)) {
+            return null;
+        }
+
+        $servePrefix = '/api/v1/files/uploads/';
+        if (str_starts_with($relative, $servePrefix)) {
+            $relative = substr($relative, strlen($servePrefix));
+        }
+
+        $extension = strtolower(pathinfo($relative, PATHINFO_EXTENSION));
+        if (!in_array($extension, DocumentImageCatalog::SUPPORTED_EXTENSIONS, true)) {
+            return null;
+        }
+
+        return ltrim($relative, '/');
+    }
+
     private function syntheticMessage(NodeContext $context, string $prompt, string $language): Message
     {
         $m = new Message();
@@ -142,7 +223,13 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         $m->setText($prompt);
         $m->setLanguage($language);
         $m->setDirection('IN');
-        $m->setFile(0);
+        $m->setFile($context->message->getFile());
+        $m->setFilePath($context->message->getFilePath());
+        $m->setFileType($context->message->getFileType());
+        $m->setFileText($context->message->getFileText());
+        foreach ($context->message->getFiles() as $file) {
+            $m->addFile($file);
+        }
 
         // ChatHandler builds the output filename from the message id and needs a
         // non-null int. This synthetic message is never persisted, so assign a

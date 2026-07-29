@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import type { AgainData } from '@/types/ai-models'
 import type { ApiInProgressTurn, ApiLoadedMessageRow } from '@/utils/messageMapper'
 import {
+  IN_PROGRESS_TURN_ID,
   mapApiMessageRow,
   mapInProgressTurn,
   parseContentWithThinking,
@@ -278,12 +279,46 @@ export const useHistoryStore = defineStore('history', () => {
   const isLoadingMessages = ref(false)
   const hasMoreMessages = ref(false)
   const currentOffset = ref(0)
+  const inProgressPollIntervalMs = 2000
 
   // Monotonic generation counter: incremented each time loadMessages is called
   // for a fresh chat (offset === 0). Responses from older generations are
   // discarded so a slow response for a previous chat never overwrites the
   // messages of the current one.
   let loadGeneration = 0
+  let inProgressPollTimer: ReturnType<typeof setTimeout> | null = null
+  let inProgressPollChatId: number | null = null
+
+  const stopInProgressPolling = () => {
+    if (inProgressPollTimer !== null) {
+      clearTimeout(inProgressPollTimer)
+      inProgressPollTimer = null
+    }
+    inProgressPollChatId = null
+  }
+
+  function scheduleInProgressPoll(chatId: number) {
+    if (inProgressPollTimer !== null && inProgressPollChatId === chatId) return
+
+    stopInProgressPolling()
+    inProgressPollChatId = chatId
+    inProgressPollTimer = setTimeout(() => {
+      inProgressPollTimer = null
+      if (inProgressPollChatId !== chatId) return
+
+      // A foreground page load owns the message list until it settles. Defer
+      // the poll so it cannot replace or invalidate a concurrent load-more.
+      if (isLoadingMessages.value) {
+        scheduleInProgressPoll(chatId)
+        return
+      }
+
+      const loadedMessageCount = messages.value.filter(
+        (message) => message.id !== IN_PROGRESS_TURN_ID
+      ).length
+      void loadMessages(chatId, 0, Math.max(50, loadedMessageCount), true)
+    }, inProgressPollIntervalMs)
+  }
 
   const addMessage = (
     role: 'user' | 'assistant',
@@ -416,22 +451,31 @@ export const useHistoryStore = defineStore('history', () => {
   }
 
   const clear = () => {
+    stopInProgressPolling()
     messages.value = []
     currentOffset.value = 0
     hasMoreMessages.value = false
   }
 
-  const loadMessages = async (chatId: number, offset = 0, limit = 50) => {
+  const loadMessages = async (chatId: number, offset = 0, limit = 50, silent = false) => {
     if (!checkAuthOrRedirect()) return
 
-    // Fresh load (offset 0) bumps the generation so any in-flight response
-    // for a *previous* chat is silently discarded when it lands.
-    const myGeneration = offset === 0 ? ++loadGeneration : loadGeneration
+    if (offset === 0 && !silent) {
+      stopInProgressPolling()
+    }
 
-    isLoadingMessages.value = true
+    // Only a foreground load from the beginning starts a new generation.
+    // Silent same-chat polls share the current generation so they cannot
+    // invalidate a concurrent load-more request.
+    const startsNewGeneration = offset === 0 && !silent
+    const myGeneration = startsNewGeneration ? ++loadGeneration : loadGeneration
+
+    if (!silent) {
+      isLoadingMessages.value = true
+    }
 
     // Reset pagination state when loading from start (prevents stale state on error)
-    if (offset === 0) {
+    if (offset === 0 && !silent) {
       currentOffset.value = 0
       hasMoreMessages.value = false
     }
@@ -455,6 +499,9 @@ export const useHistoryStore = defineStore('history', () => {
         // shows the running/completed task cards, not just the user prompt.
         if (offset === 0 && response.inProgressTurn) {
           loadedMessages.push(mapInProgressTurn(response.inProgressTurn))
+          scheduleInProgressPoll(chatId)
+        } else if (offset === 0 && inProgressPollChatId === chatId) {
+          stopInProgressPolling()
         }
 
         // If offset is 0, replace messages; otherwise, prepend (for infinite scroll)
@@ -464,14 +511,21 @@ export const useHistoryStore = defineStore('history', () => {
           messages.value = [...loadedMessages, ...messages.value]
         }
 
-        currentOffset.value = offset + loadedMessages.length
+        currentOffset.value = offset + response.messages.length
         hasMoreMessages.value = response.pagination?.hasMore || false
       }
     } catch (error) {
       if (myGeneration !== loadGeneration) return
       console.error('Failed to load messages:', error)
+      if (
+        silent &&
+        inProgressPollChatId === chatId &&
+        messages.value.some((message) => message.id === IN_PROGRESS_TURN_ID)
+      ) {
+        scheduleInProgressPoll(chatId)
+      }
     } finally {
-      if (myGeneration === loadGeneration) {
+      if (!silent && myGeneration === loadGeneration) {
         isLoadingMessages.value = false
       }
     }

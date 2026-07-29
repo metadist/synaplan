@@ -8,6 +8,8 @@ use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\FeedbackConfigService;
 use App\Service\File\DocumentGeneratorService;
+use App\Service\File\DocumentImageCatalog;
+use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\Handler\ChatHandler;
@@ -59,6 +61,8 @@ class ChatHandlerVisionImageTest extends TestCase
             $this->createMock(MemoryExtractionDispatcher::class),
             $this->createMock(PerfPipelineFlag::class),
             $this->createMock(DocumentGeneratorService::class),
+            $this->createMock(DocumentImageReferenceResolver::class),
+            $this->createMock(DocumentImageCatalog::class),
             new TimeContextBuilder(),
         );
     }

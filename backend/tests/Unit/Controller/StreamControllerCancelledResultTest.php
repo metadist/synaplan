@@ -30,22 +30,13 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
- * Unit coverage for {@see StreamController::applyRagGroupKey()}.
- *
- * PR #1036 reintroduces a knowledge-base folder picker in the chat
- * composer that forwards `ragGroupKey` into the SSE stream so RAG
- * retrieval can be scoped to a single file group. Copilot's review
- * flagged that this new API contract had no automated coverage.
- *
- * The contract pinned here:
- *   - A non-empty key from a normal (non-widget) chat is forwarded into
- *     `processingOptions['rag_group_key']`.
- *   - Widget mode must NEVER honour a caller-supplied key — an embedded
- *     widget is locked to its own configuration and cannot widen or
- *     redirect retrieval.
- *   - An empty/null key is a no-op (default, unscoped retrieval).
+ * Cancelling a multitask/media turn wrote TWO outgoing messages for one Stop
+ * click: the CHAT row from /save-cancelled plus an ERROR row, because the
+ * cancellation came back as a failed processing result instead of an
+ * exception. The controller now recognises a cancelled result and ends the
+ * turn silently.
  */
-final class StreamControllerRagGroupKeyTest extends TestCase
+class StreamControllerCancelledResultTest extends TestCase
 {
     private StreamController $controller;
 
@@ -77,39 +68,35 @@ final class StreamControllerRagGroupKeyTest extends TestCase
         );
     }
 
-    public function testForwardsKeyForNormalChat(): void
+    public function testUserCancellationIsNotTreatedAsError(): void
     {
-        $options = $this->invoke(['existing' => true], false, 'kb-research');
-
-        $this->assertSame('kb-research', $options['rag_group_key']);
-        $this->assertTrue($options['existing'], 'existing options must be preserved');
+        $this->assertTrue($this->isCancelledResult([
+            'success' => false,
+            'cancelled' => true,
+            'error' => 'Stream cancelled by user',
+        ]));
     }
 
-    public function testWidgetModeCannotOverrideRagGroup(): void
+    public function testProviderFailureStillProducesAnErrorMessage(): void
     {
-        $options = $this->invoke([], true, 'kb-research');
-
-        $this->assertArrayNotHasKey('rag_group_key', $options);
+        $this->assertFalse($this->isCancelledResult([
+            'success' => false,
+            'error' => 'AI provider failed for streaming',
+        ]));
     }
 
-    public function testEmptyKeyIsNoOp(): void
+    public function testSuccessfulTurnIsNeverACancellation(): void
     {
-        $this->assertArrayNotHasKey('rag_group_key', $this->invoke([], false, ''));
-        $this->assertArrayNotHasKey('rag_group_key', $this->invoke([], false, null));
+        $this->assertFalse($this->isCancelledResult(['success' => true, 'cancelled' => true]));
     }
 
     /**
-     * @param array<string, mixed> $processingOptions
-     *
-     * @return array<string, mixed>
+     * @param array<string, mixed> $result
      */
-    private function invoke(array $processingOptions, bool $isWidgetMode, ?string $ragGroupKey): array
+    private function isCancelledResult(array $result): bool
     {
-        $reflection = new \ReflectionMethod(StreamController::class, 'applyRagGroupKey');
+        $reflection = new \ReflectionMethod(StreamController::class, 'isCancelledResult');
 
-        /** @var array<string, mixed> $result */
-        $result = $reflection->invoke($this->controller, $processingOptions, $isWidgetMode, $ragGroupKey);
-
-        return $result;
+        return (bool) $reflection->invoke($this->controller, $result);
     }
 }
