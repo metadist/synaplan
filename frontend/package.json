@@ -72,8 +72,8 @@
     "@types/dompurify": "3.2.0",
     "@types/katex": "0.16.8",
     "@types/node": "22.20.1",
-    "@typescript-eslint/eslint-plugin": "8.64.0",
-    "@typescript-eslint/parser": "8.64.0",
+    "@typescript-eslint/eslint-plugin": "8.65.0",
+    "@typescript-eslint/parser": "8.65.0",
     "@vitejs/plugin-vue": "6.0.8",
     "@vitest/ui": "4.1.10",
     "@vue/eslint-config-prettier": "10.2.0",
@@ -94,6 +94,6 @@
     "typescript": "6.0.3",
     "vite": "8.1.5",
     "vitest": "4.1.10",
-    "vue-tsc": "3.3.7"
+    "vue-tsc": "3.3.8"
   }
 }
