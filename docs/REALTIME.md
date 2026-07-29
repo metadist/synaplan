@@ -208,6 +208,15 @@ running Centrifugo to be testable.
 infrastructure (cache, lock, rate-limiter). Treat Redis as mandatory
 shared infrastructure.
 
+`REALTIME_API_KEY` and `REALTIME_TOKEN_SECRET` must be set on the **worker**
+as well, not just the backend. The worker owns every async media job, so it
+publishes all `media_job.update` progress events. If its key diverges from
+Centrifugo's — e.g. because it inherited a different value from
+`backend/.env` — Centrifugo answers each publish with `401`, the job still
+completes server-side, and the chat bubble stays "Working…" until the user
+reloads. Both compose files therefore declare these variables explicitly in
+the worker service.
+
 ### Composer dependencies introduced by this layer
 
 | Package | Why |

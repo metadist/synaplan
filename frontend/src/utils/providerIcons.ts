@@ -36,6 +36,10 @@ export const getProviderIcon = (provider: string): string => {
     return 'simple-icons:mistral'
   } else if (providerLower.includes('huggingface') || providerLower.includes('hugging face')) {
     return 'simple-icons:huggingface'
+  } else if (providerLower.includes('xai')) {
+    // simple-icons has no `xai` slug; `bxl:xai` is the official slash glyph and
+    // is drawn with currentColor, so it themes like the other brand icons.
+    return 'bxl:xai'
   } else if (
     providerCompact.includes('trustedtokens') ||
     providerLower.includes('trusted tokens')
@@ -77,6 +81,7 @@ export const getProviderFlag = (provider: string): string => {
     p.includes('anthropic') ||
     p.includes('google') ||
     p.includes('groq') ||
+    p.includes('xai') ||
     p.includes('thehive') ||
     p.includes('the hive')
   ) {

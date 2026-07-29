@@ -6,6 +6,7 @@ namespace App\Tests\Unit\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Provider\GoogleProvider;
+use App\AI\Provider\XaiProvider;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderRegistry;
 use App\Service\CircuitBreaker;
@@ -116,5 +117,34 @@ class AiFacadeAsyncVideoTest extends TestCase
         $result = $this->facade->downloadVideoContent('https://example.com/video.mp4', 'google');
 
         $this->assertSame('data:video/mp4;base64,dGVzdA==', $result);
+    }
+
+    /**
+     * Only providers that inline the reference frame themselves may skip the
+     * republish-to-a-public-URL step in MediaGenerationHandler.
+     */
+    public function testSupportsInlineReferenceImageDetectsTheCapability(): void
+    {
+        $inlineCapable = $this->createMock(XaiProvider::class);
+        $fetchOnly = $this->createMock(GoogleProvider::class);
+
+        $this->registry->expects(self::any())->method('getVideoGenerationProvider')
+            ->willReturnMap([
+                ['xai', $inlineCapable],
+                ['google', $fetchOnly],
+            ]);
+
+        $this->assertTrue($this->facade->supportsInlineReferenceImage('xai'));
+        $this->assertFalse($this->facade->supportsInlineReferenceImage('google'));
+    }
+
+    public function testSupportsInlineReferenceImageIsFalseForAnUnknownProvider(): void
+    {
+        $this->registry->expects(self::any())->method('getVideoGenerationProvider')
+            ->willThrowException(new \RuntimeException('no such provider'));
+
+        $this->assertFalse($this->facade->supportsInlineReferenceImage('nope'));
+        $this->assertFalse($this->facade->supportsInlineReferenceImage(null));
+        $this->assertFalse($this->facade->supportsInlineReferenceImage(''));
     }
 }

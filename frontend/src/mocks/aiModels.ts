@@ -212,6 +212,9 @@ export const serviceColors: Record<string, string> = {
   Stability: 'bg-pink-500',
   ElevenLabs: 'bg-indigo-500',
   RunwayML: 'bg-yellow-500',
+  // Slate keeps xAI's near-black brand feel while staying light enough to read
+  // as a distinct pill on dark cards; white text sits at ~8.9:1 in every theme.
+  xAI: 'bg-slate-600',
 }
 
 export const mockModelOptions: ModelOption[] = [

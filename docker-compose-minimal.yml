@@ -274,6 +274,13 @@ services:
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
       LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
       REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
+      # Must resolve to the same values as the backend and centrifugo services;
+      # otherwise the worker inherits a diverging REALTIME_API_KEY from
+      # `env_file: backend/.env` and every publish is rejected with 401.
+      REALTIME_ENABLED: ${REALTIME_ENABLED:-true}
+      REALTIME_API_URL: ${REALTIME_API_URL:-http://centrifugo:8000/api}
+      REALTIME_API_KEY: ${REALTIME_API_KEY:-changeme_centrifugo_api_key}
+      REALTIME_TOKEN_SECRET: ${REALTIME_TOKEN_SECRET:-changeme_centrifugo_token_secret}
       MAILER_DSN: smtp://mailhog:1025
       AUTO_DOWNLOAD_MODELS: "false"
       ENABLE_LOCAL_GPT_OSS: "false"

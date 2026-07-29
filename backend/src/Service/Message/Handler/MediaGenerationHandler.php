@@ -390,6 +390,12 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             }
         }
 
+        // Providers implementing SupportsInlineReferenceImage take the reference
+        // frame as inline bytes, so they need neither a republished file nor a
+        // publicly reachable APP_URL.
+        $inlineReferenceImage = 'video' === $mediaType
+            && $this->aiFacade->supportsInlineReferenceImage($provider);
+
         // Guard: image-to-video requires the remote provider to FETCH the
         // attached source frame from a public http(s) URL (we republish it at
         // APP_URL/api/v1/files/uploads/...). When APP_URL points at a
@@ -398,7 +404,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // is rejected with a confusing raw "invalid_image_url" 400. Detect this
         // up front and return an actionable message instead of burning a
         // provider call (and credits) on a request that cannot succeed.
-        if ('video' === $mediaType && [] !== $attachedImagePaths && [] === $imageUrlsInText && !$this->isPublicBaseUrlReachable()) {
+        if ('video' === $mediaType && !$inlineReferenceImage && [] !== $attachedImagePaths && [] === $imageUrlsInText && !$this->isPublicBaseUrlReachable()) {
             $base = rtrim($this->publicBaseUrl, '/');
             $this->logger->warning('MediaGenerationHandler: image-to-video blocked — APP_URL is not internet-reachable so the provider cannot fetch the source image', [
                 'app_url' => $base,
@@ -559,17 +565,25 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 }
 
                 // Image-to-video: hand the provider (Higgsfield etc.) a real
-                // http(s) image_url to animate. i2v providers require a fetchable
-                // URL — a local path or base64 data-URI will not work. Two source
-                // types are supported, in priority order:
+                // http(s) image_url to animate. Most i2v providers require a
+                // fetchable URL — a local path or base64 data-URI will not work.
+                // Three source types are supported, in priority order:
                 //   1. A public image URL the user pasted in their text — already
                 //      provider-fetchable, so it is forwarded as-is (no republish,
                 //      no internet-reachable APP_URL needed).
-                //   2. An attached local file — copied to a public `ai_`-prefixed
-                //      URL so the provider can fetch it.
+                //   2. An attached local file on a SupportsInlineReferenceImage
+                //      provider (xAI) — forwarded as the local path, which the
+                //      provider inlines as a data URI. No public URL needed.
+                //   3. An attached local file otherwise — copied to a public
+                //      `ai_`-prefixed URL so the provider can fetch it.
                 $referenceImageUrls = $imageUrlsInText;
 
                 foreach ($attachedImagePaths as $attachedImagePath) {
+                    if ($inlineReferenceImage) {
+                        $referenceImageUrls[] = $attachedImagePath;
+                        continue;
+                    }
+
                     $publicImageUrl = $this->publishInputImageForRemoteFetch($attachedImagePath, $message->getUserId());
                     if (null !== $publicImageUrl) {
                         $referenceImageUrls[] = $publicImageUrl;
@@ -590,6 +604,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'model' => $modelName,
                         'reference_count' => count($referenceImageUrls),
                         'from_text_url' => [] !== $imageUrlsInText,
+                        'inline' => $inlineReferenceImage,
                     ]);
                 }
 

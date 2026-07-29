@@ -55,7 +55,7 @@ docker compose up -d
 - Background worker (Symfony Messenger consumer for async AI/indexing jobs)
 - Local Ollama AI models
 - Whisper audio transcription
-- Cloud AI support (Groq, OpenAI, Anthropic, Gemini)
+- Cloud AI support (Groq, OpenAI, Anthropic, Gemini, xAI)
 - Qdrant vector database (AI memories, RAG, feedback)
 - Dev tools (phpMyAdmin, MailHog)
 
