@@ -411,6 +411,30 @@ class XaiProviderTest extends TestCase
         $this->makeProvider(httpClient: $client)->generateImage('a red cube');
     }
 
+    /**
+     * A moderated render answers 200 with `respect_moderation: false`, so the
+     * user must read "blocked by the safety filter", not "broken payload".
+     */
+    public function testGenerateImageReportsAModerationBlock(): void
+    {
+        $topLevel = new MockHttpClient(fn () => $this->jsonResponse([
+            'respect_moderation' => false,
+            'data' => [],
+        ]));
+        $perItem = new MockHttpClient(fn () => $this->jsonResponse([
+            'data' => [['respect_moderation' => false]],
+        ]));
+
+        foreach ([$topLevel, $perItem] as $client) {
+            try {
+                $this->makeProvider(httpClient: $client)->generateImage('a red cube');
+                $this->fail('Expected ProviderException');
+            } catch (ProviderException $e) {
+                $this->assertStringContainsString('safety filter', $e->getMessage());
+            }
+        }
+    }
+
     public function testGenerateImageSurfacesOutOfCreditsClearly(): void
     {
         $client = new MockHttpClient(fn () => $this->jsonResponse(['error' => ['message' => 'no funds']], 402));
@@ -744,6 +768,49 @@ class XaiProviderTest extends TestCase
         $this->assertStringContainsString('safety filter', $result['error']);
     }
 
+    /**
+     * The blocking path must hand the progress callback the SAME array payload
+     * GoogleProvider and HiggsfieldProvider emit. MediaGenerationHandler types
+     * its callback `array`, so a bare percentage would be a TypeError mid-render.
+     */
+    public function testGenerateVideoReportsProgressAsTheSharedArrayPayload(): void
+    {
+        $responses = [
+            $this->jsonResponse(['request_id' => 'req-123']),
+            $this->jsonResponse(['status' => 'pending']),
+            $this->jsonResponse([
+                'status' => 'done',
+                'video' => ['url' => 'https://bucket.x.ai/req-123.mp4', 'respect_moderation' => true],
+            ]),
+        ];
+        $client = new MockHttpClient($responses);
+
+        $updates = [];
+        $videos = $this->makeProvider(httpClient: $client)->generateVideo('a red cube spinning', [
+            'model' => 'grok-imagine-video',
+            'duration' => 4,
+            'resolution' => '480p',
+            'progress_callback' => function (array $progress) use (&$updates): void {
+                $updates[] = $progress;
+            },
+        ]);
+
+        $this->assertSame('https://bucket.x.ai/req-123.mp4', $videos[0]['url']);
+        $this->assertSame(4, $videos[0]['duration']);
+        $this->assertCount(2, $updates);
+
+        $this->assertSame('pending', $updates[0]['status']);
+        $this->assertSame(1, $updates[0]['attempt']);
+        $this->assertSame('req-123', $updates[0]['request_id']);
+        $this->assertIsInt($updates[0]['elapsed_seconds']);
+        // No `progress` field in xAI's poll response, so the elapsed-time
+        // estimate keeps the bar moving instead of freezing at 0%.
+        $this->assertGreaterThan(0, $updates[0]['percent']);
+
+        $this->assertSame('done', $updates[1]['status']);
+        $this->assertSame(100, $updates[1]['percent']);
+    }
+
     public function testPollRejectsAnUnparseableHandle(): void
     {
         $this->expectExceptionMessageContains('Invalid xAI video operation handle');
@@ -873,6 +940,42 @@ class XaiProviderTest extends TestCase
         $this->assertSame('audio/mpeg', $provider->getStreamContentType());
         // An unsupported codec must fall back rather than reach xAI.
         $this->assertSame('audio/mpeg', $provider->getStreamContentType(['format' => 'flac']));
+    }
+
+    /**
+     * The headerless codecs must not claim to be WAV — a raw stream in a .wav
+     * file served as audio/wav is undecodable for every player.
+     */
+    public function testHeaderlessCodecsKeepTheirOwnExtensionAndMimeType(): void
+    {
+        $client = new MockHttpClient(fn () => new MockResponse('RAWPCM'));
+        $provider = $this->makeProvider(httpClient: $client);
+
+        $this->assertStringEndsWith('.pcm', $provider->synthesize('hello', ['format' => 'pcm']));
+        $this->assertSame('audio/pcm', $provider->getStreamContentType(['format' => 'pcm']));
+        $this->assertSame('audio/basic', $provider->getStreamContentType(['format' => 'mulaw']));
+        $this->assertSame('audio/alaw', $provider->getStreamContentType(['format' => 'alaw']));
+    }
+
+    /**
+     * TtsController clamps to OpenAI's 0.25-4.0 range; xAI rejects anything
+     * outside 0.7-1.5, so the provider clamps instead of burning the request.
+     */
+    public function testSynthesizeClampsSpeedToTheRangeXaiAccepts(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured[] = json_decode($opts['body'], true)['speed'];
+
+            return new MockResponse('AUDIO');
+        });
+        $provider = $this->makeProvider(httpClient: $client);
+
+        $provider->synthesize('hello', ['speed' => 4.0]);
+        $provider->synthesize('hello', ['speed' => 0.25]);
+        $provider->synthesize('hello', ['speed' => 1.25]);
+
+        $this->assertSame([1.5, 0.7, 1.25], $captured);
     }
 
     /**

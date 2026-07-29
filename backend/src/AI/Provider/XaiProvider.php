@@ -129,7 +129,11 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
      */
     private const DEFAULT_TTS_LANGUAGE = 'auto';
 
-    /** Built-in voices, used as a fallback when the live roster is unreachable. */
+    /**
+     * Minimal offline fallback roster, used only when `/v1/tts/voices` is
+     * unreachable or no key is configured. xAI ships many more voices (plus
+     * custom ones), so getVoices() always prefers the live list.
+     */
     private const TTS_BUILTIN_VOICES = [
         'eve' => 'energetic',
         'ara' => 'warm',
@@ -138,14 +142,25 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         'leo' => 'authoritative',
     ];
 
-    /** Codec → [file extension, MIME type]. */
+    /**
+     * Codec → [file extension, MIME type], mirroring xAI's own codec table.
+     * `pcm`, `mulaw` and `alaw` are HEADERLESS streams — they must not be
+     * labelled as WAV, or the file claims a container it does not have and no
+     * player can decode it.
+     *
+     * @see https://docs.x.ai/developers/model-capabilities/audio/text-to-speech
+     */
     private const TTS_CODECS = [
         'mp3' => ['mp3', 'audio/mpeg'],
         'wav' => ['wav', 'audio/wav'],
-        'pcm' => ['wav', 'audio/wav'],
+        'pcm' => ['pcm', 'audio/pcm'],
         'mulaw' => ['ulaw', 'audio/basic'],
-        'alaw' => ['alaw', 'audio/x-alaw-basic'],
+        'alaw' => ['alaw', 'audio/alaw'],
     ];
+
+    /** xAI's accepted `speed` range. Out-of-range values are rejected with a 400. */
+    private const TTS_MIN_SPEED = 0.7;
+    private const TTS_MAX_SPEED = 1.5;
 
     private const TIMEOUT_AUDIO_SECONDS = 120;
 
@@ -503,8 +518,18 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
 
             $result = $this->pollVideoOperationOnce($handle, $options);
 
-            if (null !== $progressCallback && null !== $result['percent']) {
-                $progressCallback($result['percent']);
+            if (null !== $progressCallback) {
+                // Same payload shape GoogleProvider and HiggsfieldProvider emit;
+                // MediaGenerationHandler's callback is typed `array` and reads
+                // these keys to render the live progress bar.
+                $progressCallback([
+                    'status' => $result['status'],
+                    'attempt' => $attempt,
+                    'max_attempts' => self::POLL_MAX_ATTEMPTS,
+                    'elapsed_seconds' => time() - $startedAt,
+                    'percent' => $result['percent'],
+                    'request_id' => $requestId,
+                ]);
             }
 
             if (!$result['done']) {
@@ -949,8 +974,11 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             'output_format' => ['codec' => $codec],
         ];
 
+        // TtsController clamps to OpenAI's 0.25-4.0 range, which xAI rejects
+        // above 1.5. Clamp instead of failing: the speed is a preference, and a
+        // 400 would cost the user the whole synthesis.
         if (is_numeric($options['speed'] ?? null)) {
-            $body['speed'] = (float) $options['speed'];
+            $body['speed'] = max(self::TTS_MIN_SPEED, min(self::TTS_MAX_SPEED, (float) $options['speed']));
         }
 
         $this->logger->info('xAI: synthesize', [
@@ -1548,6 +1576,13 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
      */
     private function parseImagePayload(array $data): array
     {
+        // A moderated-away render answers 200 with `respect_moderation: false`
+        // and no usable bytes, so say why instead of reporting a broken payload.
+        // xAI exposes the flag on the response; tolerate a per-item one too.
+        if (false === ($data['respect_moderation'] ?? true)) {
+            throw new ProviderException('Content blocked by xAI safety filter', self::PROVIDER_NAME);
+        }
+
         $items = $data['data'] ?? null;
         if (!is_array($items) || [] === $items) {
             $this->logger->error('xAI: image response missing data array', ['keys' => array_keys($data)]);
@@ -1556,8 +1591,14 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         }
 
         $images = [];
+        $moderated = false;
         foreach ($items as $item) {
             if (!is_array($item)) {
+                continue;
+            }
+
+            if (false === ($item['respect_moderation'] ?? true)) {
+                $moderated = true;
                 continue;
             }
 
@@ -1578,7 +1619,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         }
 
         if ([] === $images) {
-            throw new ProviderException('xAI returned no usable image payload', self::PROVIDER_NAME);
+            throw new ProviderException($moderated ? 'Content blocked by xAI safety filter' : 'xAI returned no usable image payload', self::PROVIDER_NAME);
         }
 
         return $images;
