@@ -87,7 +87,6 @@ class ModelCatalog
         'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0],
         'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
         'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0],
-        'grok-4.3' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 5.0],
     ];
 
     /**
@@ -2982,34 +2981,6 @@ class ModelCatalog
                     'context_window' => '500000',
                     'max_output' => '32768',
                     'regions' => 'us-east-1, us-west-2',
-                ],
-            ],
-        ],
-        [
-            'id' => 314,
-            'service' => 'xAI',
-            'name' => 'Grok 4.3',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'grok-4.3',
-            'priceIn' => 1.25,
-            'inUnit' => 'per1M',
-            'priceOut' => 2.50,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'xAI Grok 4.3 - fast, cost-efficient model with strong tool calling and a 1M context window. Reasoning can be turned off entirely. Also served from eu-west-1.',
-                'max_tokens' => 32768,
-                'params' => ['model' => 'grok-4.3'],
-                'features' => ['vision', 'reasoning', 'tool_use', 'multilingual'],
-                'cache_read_price_per_1M' => 0.20,
-                'reasoning_effort_default' => 'high',
-                'meta' => [
-                    'context_window' => '1000000',
-                    'max_output' => '32768',
-                    'regions' => 'us-east-1, eu-west-1, us-west-2',
                 ],
             ],
         ],

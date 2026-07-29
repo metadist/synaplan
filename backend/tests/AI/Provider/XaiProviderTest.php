@@ -97,7 +97,7 @@ class XaiProviderTest extends TestCase
     public function testChatThrowsWithoutApiKey(): void
     {
         $this->expectExceptionMessageContains('XAI_API_KEY');
-        $this->makeProvider(apiKey: null)->chat([['role' => 'user', 'content' => 'hi']], ['model' => 'grok-4.3']);
+        $this->makeProvider(apiKey: null)->chat([['role' => 'user', 'content' => 'hi']], ['model' => 'grok-4.5']);
     }
 
     public function testExplainImageThrowsWithoutApiKey(): void
@@ -140,13 +140,13 @@ class XaiProviderTest extends TestCase
     {
         $request = $this->buildChatOptions(
             [['role' => 'user', 'content' => 'hi']],
-            ['model' => 'grok-4.3', 'max_tokens' => 1234],
+            ['model' => 'grok-4.5', 'max_tokens' => 1234],
             false,
         );
 
         $this->assertSame(1234, $request['max_completion_tokens']);
         $this->assertArrayNotHasKey('max_tokens', $request);
-        $this->assertSame('grok-4.3', $request['model']);
+        $this->assertSame('grok-4.5', $request['model']);
         $this->assertArrayNotHasKey('stream', $request);
     }
 
@@ -160,7 +160,7 @@ class XaiProviderTest extends TestCase
 
     public function testChatRequestForwardsPromptCacheKey(): void
     {
-        $request = $this->buildChatOptions([], ['model' => 'grok-4.3', 'cache_key' => 'thread-42'], false);
+        $request = $this->buildChatOptions([], ['model' => 'grok-4.5', 'cache_key' => 'thread-42'], false);
 
         $this->assertSame('thread-42', $request['prompt_cache_key']);
     }

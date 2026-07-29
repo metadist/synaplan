@@ -139,7 +139,6 @@ OpenAI-compatible chat/vision at `https://api.x.ai/v1` plus the Grok Imagine med
 | BID | Model | Catalog in/out | Official (cache) | Long context (> 200k) | Context |
 | --- | ----- | -------------- | ---------------- | --------------------- | ------- |
 | 313 / 315 | `grok-4.5` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.30) | $4.00 / $12.00 | 500k |
-| 314 | `grok-4.3` | $1.25 / $2.50 | $1.25 / $2.50 (cache $0.20) | $2.50 / $5.00 | 1M |
 | 316 | `grok-imagine-image` | — / $0.02 per image | $0.02 (1K and 2K identical) | n/a | n/a |
 | 317 | `grok-imagine-video` | — / $0.07 per second | 480p $0.05 · 720p $0.07 | n/a | 1–15 s |
 
@@ -155,7 +154,7 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 - **Read the Imagine table in the rendered page, never the "View as Markdown" export.** The markdown/plain-text view flattens the multi-row Imagine table and keeps only the FIRST resolution row, so `grok-imagine-video` looks like a flat `$0.050 / sec` and the 720p rate silently disappears. The `.../models/grok-imagine-video` page shows the same collapsed number. Trusting that export once already produced a 40% undercharge on the default 720p render. The rendered [pricing page](https://docs.x.ai/developers/pricing) is the only reliable source for media rows.
 - **1080p is not a `grok-imagine-video` resolution.** Only `grok-imagine-video-1.5` offers it (480p $0.08 · 720p $0.14 · 1080p $0.25 per second), which is why BID 317 caps `allowed_resolutions` at 480p/720p.
 - **No refund on cancel.** xAI has no cancel endpoint for deferred video renders, so `cancelVideoOperation()` only stops our polling; the render completes upstream and stays billable.
-- **`reasoning_effort` is a grok-4.3-only parameter.** xAI documents it for that model alone (`none` / `low` (default) / `medium` / `high`), so `XaiProvider::REASONING_EFFORT_MODELS` gates it and grok-4.5 never receives it. Its reasoning depth — and thus its output token volume — is not controllable.
+- **`reasoning_effort` is a grok-4.3-only parameter**, and grok-4.3 is not in the catalog. xAI documents the knob for that model alone (`none` / `low` (default) / `medium` / `high`), so `XaiProvider::REASONING_EFFORT_MODELS` gates it. `grok-4.5`'s reasoning depth — and therefore its output token volume — is not controllable, so a Thinking toggle cannot reduce its cost.
 - **Embeddings, voice, and the server-side tools** (web search, X search, code execution) are intentionally not wired up: xAI publishes no price for `/v1/embeddings`, and without a price there can be no correct usage accounting.
 
 ### TrustedTokens (verified 2026-07-27)

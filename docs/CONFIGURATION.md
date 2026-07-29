@@ -62,10 +62,9 @@ Chat and vision (Mistral Medium 3.5, Large 3) plus the Voxtral audio pair (trans
 XAI_API_KEY=your_key_here
 ```
 
-Long-context chat and image understanding (Grok 4.5 with a 500K window, Grok 4.3 with 1M) plus
-Grok Imagine for image and video generation. Reasoning depth follows the Thinking toggle: off uses
-the cheapest tier the model allows, on uses deep reasoning. Get a key at
-[console.x.ai](https://console.x.ai/) under **Team → API Keys**.
+Long-context chat and image understanding (Grok 4.5 with a 500K window) plus Grok Imagine for image
+and video generation. Grok 4.5 always reasons at a fixed depth, so the Thinking toggle has no effect
+on it. Get a key at [console.x.ai](https://console.x.ai/) under **Team → API Keys**.
 
 ### TrustedTokens (sovereign, Germany)
 

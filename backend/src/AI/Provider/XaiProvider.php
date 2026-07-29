@@ -37,7 +37,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
 
     private const BASE_URI = 'https://api.x.ai/v1';
 
-    private const DEFAULT_CHAT_MODEL = 'grok-4.3';
+    private const DEFAULT_CHAT_MODEL = 'grok-4.5';
     private const DEFAULT_VISION_MODEL = 'grok-4.5';
     private const DEFAULT_IMAGE_MODEL = 'grok-imagine-image';
     private const DEFAULT_VIDEO_MODEL = 'grok-imagine-video';
@@ -58,7 +58,9 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     /**
      * Model families that accept `reasoning_effort`. xAI documents the parameter
      * for grok-4.3 only — every other Grok model reasons at a fixed depth, so
-     * sending it there would be an unsupported field.
+     * sending it there would be an unsupported field. No shipped catalog row
+     * uses grok-4.3 today; the gate exists so an operator who points a model row
+     * at it gets the correct request shape.
      *
      * @see https://docs.x.ai/developers/rest-api-reference/inference/chat
      */
