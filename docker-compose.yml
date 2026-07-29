@@ -301,6 +301,17 @@ services:
       # transport). The worker consumes async_ai_high/async_extract/async_index,
       # all of which use the Redis transport, so REDIS_DSN is mandatory here.
       REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
+      # Realtime gateway (Centrifugo) — MUST resolve to the same values as the
+      # backend and centrifugo services, which read them from the same compose
+      # interpolation. Without these entries the worker falls through to
+      # `env_file: backend/.env`; any REALTIME_API_KEY set there diverges from
+      # centrifugo's, every publish is rejected with 401, and async media jobs
+      # complete on the server while the browser bubble stays "Working…"
+      # forever because no progress event ever arrives.
+      REALTIME_ENABLED: ${REALTIME_ENABLED:-true}
+      REALTIME_API_URL: ${REALTIME_API_URL:-http://centrifugo:8000/api}
+      REALTIME_API_KEY: ${REALTIME_API_KEY:-changeme_centrifugo_api_key}
+      REALTIME_TOKEN_SECRET: ${REALTIME_TOKEN_SECRET:-changeme_centrifugo_token_secret}
       MAILER_DSN: smtp://mailhog:1025
       AUTO_DOWNLOAD_MODELS: "false"
       ENABLE_LOCAL_GPT_OSS: ${ENABLE_LOCAL_GPT_OSS:-false}
