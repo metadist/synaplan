@@ -67,7 +67,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",
     "@eslint/js": "10.0.1",
-    "@playwright/test": "1.61.1",
+    "@playwright/test": "1.62.0",
     "@tailwindcss/postcss": "4.3.3",
     "@types/dompurify": "3.2.0",
     "@types/katex": "0.16.8",
@@ -85,7 +85,7 @@
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-vue": "10.9.2",
     "globals": "17.7.0",
-    "happy-dom": "20.10.6",
+    "happy-dom": "20.11.1",
     "openapi-zod-client": "1.18.3",
     "postcss": "8.5.18",
     "prettier": "3.9.5",
