@@ -2971,18 +2971,16 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'xAI Grok 4.5 - flagship model for code and agentic tool calling with a 500K context window. Reasoning is always on and cannot be disabled; the cheapest tier is "low".',
+                'description' => 'xAI Grok 4.5 - flagship model for code and agentic tool calling with a 500K context window. Reasoning is always on and its depth is not configurable.',
                 'max_tokens' => 32768,
                 'params' => ['model' => 'grok-4.5'],
                 'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
                 'cache_read_price_per_1M' => 0.30,
-                // Consumed by XaiProvider::resolveReasoningEffort() when the user
-                // enables the Thinking toggle.
-                'reasoning_effort_default' => 'high',
+                // No reasoning_effort_default: xAI accepts that parameter for
+                // grok-4.3 only, so XaiProvider never sends it for this model.
                 'meta' => [
                     'context_window' => '500000',
                     'max_output' => '32768',
-                    'knowledge_cutoff' => '2026-02-01',
                     'regions' => 'us-east-1, us-west-2',
                 ],
             ],
@@ -3051,15 +3049,14 @@ class ModelCatalog
             'providerId' => 'grok-imagine-image',
             'priceIn' => 0,
             'inUnit' => '-',
-            // Flat per-image price: xAI charges $0.02 at both 1K and 2K for this
-            // model, so no quality_prices tier table is needed and the billed
-            // amount can never drift from the requested resolution.
+            // Flat per-image price regardless of prompt length, so no
+            // quality_prices tier table is needed.
             'priceOut' => 0.02,
             'outUnit' => 'perpic',
             'quality' => 8,
             'rating' => 1,
             'json' => [
-                'description' => 'xAI Grok Imagine (Aurora) - fast text-to-image generation at $0.02 per image, 1K or 2K output.',
+                'description' => 'xAI Grok Imagine (Aurora) - fast text-to-image generation at $0.02 per image.',
                 'pricing_mode' => 'per_image',
                 'mode_prices' => ['output_cost_per_image' => 0.02],
                 'params' => ['model' => 'grok-imagine-image'],
@@ -3076,24 +3073,21 @@ class ModelCatalog
             'providerId' => 'grok-imagine-video',
             'priceIn' => 0,
             'inUnit' => '-',
-            // priceOut = fallback per-second rate; json.resolution_prices
-            // overrides it at billing time (CostCalculationService::
-            // lookupResolutionPrice). Set to the 720p default so the headline
-            // matches what a default render actually costs.
-            'priceOut' => 0.07,
+            // Flat per-second rate for every resolution. xAI's Imagine overview
+            // claims resolution influences the price but publishes only this
+            // single rate, so no resolution_prices table is set — see
+            // docs/PRICING_MAINTENANCE.md for the invoice check that would
+            // confirm a surcharge.
+            'priceOut' => 0.05,
             'outUnit' => 'persec',
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'xAI Grok Imagine Video - text-to-video and image-to-video, 1-15 seconds. 480p: $0.05/sec, 720p: $0.07/sec.',
+                'description' => 'xAI Grok Imagine Video - text-to-video and image-to-video, 1-15 seconds at $0.05 per second.',
                 'params' => ['model' => 'grok-imagine-video'],
                 'pricing_mode' => 'per_second',
                 'allowed_resolutions' => ['480p', '720p'],
                 'default_resolution' => '720p',
-                'resolution_prices' => [
-                    '480p' => 0.05,
-                    '720p' => 0.07,
-                ],
                 'default_duration' => 8,
                 'max_duration' => 15,
             ],

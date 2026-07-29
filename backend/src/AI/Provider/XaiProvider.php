@@ -56,11 +56,13 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     private const REASONING_EFFORTS = ['none', 'low', 'medium', 'high'];
 
     /**
-     * Model families that accept `reasoning_effort: none`. grok-4.5 cannot
-     * disable reasoning at all, so its cheapest tier is `low`; sending `none`
-     * there is rejected by the API.
+     * Model families that accept `reasoning_effort`. xAI documents the parameter
+     * for grok-4.3 only — every other Grok model reasons at a fixed depth, so
+     * sending it there would be an unsupported field.
+     *
+     * @see https://docs.x.ai/developers/rest-api-reference/inference/chat
      */
-    private const EFFORT_NONE_MODELS = ['grok-4.3'];
+    private const REASONING_EFFORT_MODELS = ['grok-4.3'];
 
     private const IMAGE_MIME_FALLBACK = 'image/png';
     private const MAX_IMAGES_PER_REQUEST = 10;
@@ -676,26 +678,28 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
      * Resolve xAI's `reasoning_effort`.
      *
      * Mirrors {@see OpenAIProvider::resolveReasoningConfig()} so "default chat =
-     * fast, Thinking toggle = deep" behaves the same across providers. This
-     * matters more on xAI than elsewhere: grok-4.5 defaults to `high` server
-     * side, so omitting the parameter would burn deep-reasoning tokens on every
-     * classification call.
+     * fast, Thinking toggle = deep" behaves the same across providers.
      *
      * Resolution order:
-     *   1. Explicit `reasoning_effort` string wins.
-     *   2. The Thinking toggle (`reasoning` bool): true → the catalog's
-     *      `reasoning_effort_default` (or `high`), false → the cheapest tier the
-     *      model accepts.
-     *   3. No signal, or a model that does not advertise reasoning → null, so
-     *      nothing is sent.
+     *   1. A model that does not accept the parameter → null.
+     *   2. Explicit `reasoning_effort` string wins.
+     *   3. The Thinking toggle (`reasoning` bool): true → the catalog's
+     *      `reasoning_effort_default` (or `high`), false → `none`, which is
+     *      cheaper than xAI's server-side default of `low`.
+     *   4. No signal, or a model row that does not advertise reasoning → null,
+     *      so nothing is sent.
      *
      * @param array<string, mixed> $options
      */
     private function resolveReasoningEffort(string $model, array $options): ?string
     {
+        if (!$this->supportsReasoningEffort($model)) {
+            return null;
+        }
+
         $explicit = $options['reasoning_effort'] ?? null;
         if (is_string($explicit) && in_array(strtolower($explicit), self::REASONING_EFFORTS, true)) {
-            return $this->clampEffort($model, strtolower($explicit));
+            return strtolower($explicit);
         }
 
         if (!array_key_exists('reasoning', $options)) {
@@ -710,35 +714,26 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         }
 
         if (!$options['reasoning']) {
-            return $this->lowestEffortTier($model);
+            return 'none';
         }
 
         $default = $this->modelConfigFromOptions($options)['reasoning_effort_default'] ?? null;
         if (is_string($default) && in_array($default, self::REASONING_EFFORTS, true)) {
-            return $this->clampEffort($model, $default);
+            return $default;
         }
 
         return 'high';
     }
 
-    private function clampEffort(string $model, string $effort): string
+    private function supportsReasoningEffort(string $model): bool
     {
-        if ('none' === $effort) {
-            return $this->lowestEffortTier($model);
-        }
-
-        return $effort;
-    }
-
-    private function lowestEffortTier(string $model): string
-    {
-        foreach (self::EFFORT_NONE_MODELS as $family) {
+        foreach (self::REASONING_EFFORT_MODELS as $family) {
             if (str_starts_with($model, $family)) {
-                return 'none';
+                return true;
             }
         }
 
-        return 'low';
+        return false;
     }
 
     /**
@@ -934,11 +929,9 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     }
 
     /**
-     * Clamp the resolution to what the catalog row can price.
-     *
-     * `resolution_prices` is keyed by the values in `allowed_resolutions`; asking
-     * xAI for anything outside that list would render fine but get billed at the
-     * row's fallback rate, so we never forward an unpriceable value.
+     * Clamp the resolution to the catalog row's `allowed_resolutions`, so an
+     * operator can cap what users may request without the provider having to
+     * know the model's capabilities.
      *
      * @param array<string, mixed> $options
      * @param array<string, mixed> $modelConfig

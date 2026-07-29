@@ -169,16 +169,29 @@ class XaiProviderTest extends TestCase
 
     public function testReasoningEffortIsOmittedWithoutAnySignal(): void
     {
-        $request = $this->buildChatOptions([], ['model' => 'grok-4.5'], false);
+        $request = $this->buildChatOptions([], ['model' => 'grok-4.3'], false);
 
         $this->assertArrayNotHasKey('reasoning_effort', $request);
     }
 
     public function testExplicitReasoningEffortWins(): void
     {
-        $request = $this->buildChatOptions([], ['model' => 'grok-4.5', 'reasoning_effort' => 'medium'], false);
+        $request = $this->buildChatOptions([], ['model' => 'grok-4.3', 'reasoning_effort' => 'medium'], false);
 
         $this->assertSame('medium', $request['reasoning_effort']);
+    }
+
+    /**
+     * xAI documents `reasoning_effort` for grok-4.3 only, so no signal — not
+     * even an explicit one — may leak the parameter onto another model.
+     */
+    public function testReasoningEffortIsNeverSentForModelsThatDoNotSupportIt(): void
+    {
+        foreach ([['reasoning' => true], ['reasoning' => false], ['reasoning_effort' => 'high']] as $options) {
+            $request = $this->buildChatOptions([], ['model' => 'grok-4.5', ...$options], false);
+
+            $this->assertArrayNotHasKey('reasoning_effort', $request);
+        }
     }
 
     public function testThinkingToggleUsesCatalogDefault(): void
@@ -199,21 +212,21 @@ class XaiProviderTest extends TestCase
         $this->assertSame('high', $request['reasoning_effort']);
     }
 
-    public function testDisabledThinkingUsesTheCheapestTierPerModel(): void
+    /**
+     * Thinking off must beat xAI's server-side default of `low` on cost, which
+     * means switching reasoning off entirely.
+     */
+    public function testDisabledThinkingTurnsReasoningOff(): void
     {
-        // grok-4.3 can switch reasoning off entirely...
-        $cheap = $this->buildChatOptions([], ['model' => 'grok-4.3', 'reasoning' => false], false);
-        $this->assertSame('none', $cheap['reasoning_effort']);
+        $request = $this->buildChatOptions([], ['model' => 'grok-4.3', 'reasoning' => false], false);
 
-        // ...while grok-4.5 always reasons, so `low` is as cheap as it gets.
-        $flagship = $this->buildChatOptions([], ['model' => 'grok-4.5', 'reasoning' => false], false);
-        $this->assertSame('low', $flagship['reasoning_effort']);
+        $this->assertSame('none', $request['reasoning_effort']);
     }
 
     public function testReasoningEffortIsSkippedForModelsWithoutTheFeature(): void
     {
         $request = $this->buildChatOptions([], [
-            'model' => 'grok-4.5',
+            'model' => 'grok-4.3',
             'reasoning' => true,
             'modelFeatures' => ['vision', 'ocr'],
         ], false);

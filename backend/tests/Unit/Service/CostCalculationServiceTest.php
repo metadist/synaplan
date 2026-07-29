@@ -567,31 +567,33 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.000000', $result->inputCost);
     }
 
-    public function testGrokImagineVideoBillsPerSecondAtTheRequestedResolution(): void
+    /**
+     * xAI publishes one flat per-second rate for grok-imagine-video, so the
+     * resolution changes the output but never the price.
+     */
+    public function testGrokImagineVideoBillsAFlatRatePerSecond(): void
     {
         $json = [
             'pricing_mode' => 'per_second',
             'allowed_resolutions' => ['480p', '720p'],
             'default_resolution' => '720p',
-            'resolution_prices' => ['480p' => 0.05, '720p' => 0.07],
         ];
 
         // @phpstan-ignore-next-line
         $this->modelRepository->method('find')->willReturn(
-            $this->createModelMock('xAI', 0.0, 0.07, '-', 'persec', $json, 'grok-imagine-video'),
+            $this->createModelMock('xAI', 0.0, 0.05, '-', 'persec', $json, 'grok-imagine-video'),
         );
         // @phpstan-ignore-next-line
         $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
 
-        // Default 720p render: 8s * $0.07 = $0.56
-        $default = $this->service->calculateMediaCost(317, 0, 8.0, null, '720p');
-        $this->assertSame('0.560000', $default->totalCost);
-        $this->assertSame('720p', $default->priceSnapshot['resolution']);
+        // Default 8s render: 8s * $0.05 = $0.40
+        $this->assertSame('0.400000', $this->service->calculateMediaCost(317, 0, 8.0, null, '720p')->totalCost);
 
-        // The cheap test render: 4s at 480p * $0.05 = $0.20
-        $cheap = $this->service->calculateMediaCost(317, 0, 4.0, null, '480p');
-        $this->assertSame('0.200000', $cheap->totalCost);
-        $this->assertSame('0.05000000', $cheap->priceSnapshot['price_out_resolution']);
+        // Same duration at the lower resolution costs exactly the same.
+        $this->assertSame('0.400000', $this->service->calculateMediaCost(317, 0, 8.0, null, '480p')->totalCost);
+
+        // The cheap test render: 4s * $0.05 = $0.20
+        $this->assertSame('0.200000', $this->service->calculateMediaCost(317, 0, 4.0, null, '480p')->totalCost);
     }
 
     public function testCostResultDtoStructure(): void
