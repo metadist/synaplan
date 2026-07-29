@@ -449,6 +449,48 @@ class XaiProviderTest extends TestCase
         $this->assertSame('480p', $handle['resolution']);
     }
 
+    /**
+     * xAI takes the reference frame as a data URI, which is what lets
+     * MediaGenerationHandler hand over the local upload path instead of
+     * republishing it at an internet-reachable APP_URL.
+     */
+    public function testStartVideoOperationInlinesALocalReferenceImage(): void
+    {
+        $file = $this->tempDir.'/frame.png';
+        // Minimal 1x1 PNG so mime_content_type() reports image/png.
+        file_put_contents($file, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=='));
+
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return $this->jsonResponse(['request_id' => 'req-inline']);
+        });
+
+        $this->makeProvider(httpClient: $client)->startVideoOperation('animate it', [
+            'model' => 'grok-imagine-video-1.5',
+            'image_url' => $file,
+        ]);
+
+        $this->assertStringStartsWith('data:image/png;base64,', $captured['image']['url']);
+    }
+
+    public function testStartVideoOperationForwardsAPublicReferenceUrlUntouched(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return $this->jsonResponse(['request_id' => 'req-url']);
+        });
+
+        $this->makeProvider(httpClient: $client)->startVideoOperation('animate it', [
+            'image_url' => 'https://cdn.example.test/frame.png',
+        ]);
+
+        $this->assertSame('https://cdn.example.test/frame.png', $captured['image']['url']);
+    }
+
     public function testVideoResolutionFallsBackToAPriceableValue(): void
     {
         $captured = [];

@@ -7,6 +7,7 @@ use App\AI\Exception\ProviderException;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Interface\SupportsAsyncVideo;
+use App\AI\Interface\SupportsInlineReferenceImage;
 use App\AI\Provider\GoogleProvider;
 use App\Service\CircuitBreaker;
 use App\Service\DiscordNotificationService;
@@ -974,6 +975,27 @@ class AiFacade
         }
 
         return $provider instanceof SupportsAsyncVideo;
+    }
+
+    /**
+     * Whether the named video provider can take an image-to-video reference
+     * frame as inline bytes ({@see SupportsInlineReferenceImage}). Lets the chat
+     * path hand over the local upload path instead of republishing the file at a
+     * public URL the provider would have to fetch.
+     */
+    public function supportsInlineReferenceImage(?string $providerName): bool
+    {
+        if (null === $providerName || '' === $providerName) {
+            return false;
+        }
+
+        try {
+            $provider = $this->registry->getVideoGenerationProvider($providerName);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $provider instanceof SupportsInlineReferenceImage;
     }
 
     /**

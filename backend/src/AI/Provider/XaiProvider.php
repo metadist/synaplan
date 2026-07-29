@@ -9,6 +9,7 @@ use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SupportsAsyncVideo;
+use App\AI\Interface\SupportsInlineReferenceImage;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use Psr\Log\LoggerInterface;
@@ -29,7 +30,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * @see https://docs.x.ai/developers/rest-api-reference/inference/chat
  * @see https://docs.x.ai/developers/model-capabilities/imagine
  */
-final class XaiProvider implements ChatProviderInterface, ImageGenerationProviderInterface, SupportsAsyncVideo, VideoGenerationProviderInterface, VisionProviderInterface
+final class XaiProvider implements ChatProviderInterface, ImageGenerationProviderInterface, SupportsAsyncVideo, SupportsInlineReferenceImage, VideoGenerationProviderInterface, VisionProviderInterface
 {
     private const PROVIDER_NAME = 'xai';
     private const DISPLAY_NAME = 'xAI';
