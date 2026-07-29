@@ -3162,12 +3162,14 @@ class ModelCatalog
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'xAI Grok TTS - expressive speech synthesis with 5 built-in voices (eve, ara, rex, sal, leo), 20+ languages and inline speech tags. Max 15,000 characters per request.',
+                'description' => 'xAI Grok TTS - expressive speech synthesis with a built-in voice roster (default eve), custom voices, 20+ languages and inline speech tags. Max 15,000 characters per request.',
                 // Mandatory: without it the cost path falls through to
                 // per-token and every synthesis records $0.00 (issue #886b).
                 'pricing_mode' => 'per_character',
                 'params' => ['model' => 'grok-tts'],
                 'default_voice' => 'eve',
+                // Offline fallback only — XaiProvider::getVoices() reads the
+                // full roster from /v1/tts/voices when a key is configured.
                 'voices' => ['eve', 'ara', 'rex', 'sal', 'leo'],
                 'max_characters' => 15000,
                 // Synthesis streams over a WebSocket only, which the PHP client

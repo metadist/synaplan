@@ -71,7 +71,7 @@ parameters:
     env(HUGGINGFACE_API_KEY): ''
     # TrustedTokens (TNG) — German sovereign OpenAI-compatible inference.
     env(TRUSTEDTOKENS_API_KEY): ''
-    # xAI (Grok chat/vision + Grok Imagine image/video).
+    # xAI (Grok chat/vision, Grok Imagine image/video, Grok voice TTS/STT).
     env(XAI_API_KEY): ''
     env(BRAVE_SEARCH_API_KEY): ''
     env(DISCORD_WEBHOOK_URL): ''

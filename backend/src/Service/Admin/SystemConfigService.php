@@ -1023,7 +1023,7 @@ final readonly class SystemConfigService
             'XAI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true,
-                'description' => 'xAI (Grok) API key — chat, image understanding, and Grok Imagine media',
+                'description' => 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
                 'default' => '',
             ],
             'TRITON_SERVER_URL' => [
