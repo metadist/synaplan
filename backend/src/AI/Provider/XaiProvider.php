@@ -87,6 +87,10 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
      * explicitly: xAI's default is undocumented, and on the quality model the
      * resolution decides the per-image price.
      *
+     * These are API-level lists — the union of what any Grok model accepts, used
+     * only when a catalog row declares no `allowed_resolutions`. What is billable
+     * per row is a narrower question, see resolutionFromOptions().
+     *
      * @see https://docs.x.ai/developers/model-capabilities/images/generation
      */
     private const IMAGE_RESOLUTIONS = ['1k', '2k'];
@@ -94,6 +98,8 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     private const VIDEO_MIN_DURATION = 1;
     private const VIDEO_MAX_DURATION = 15;
     private const VIDEO_DEFAULT_DURATION = 8;
+
+    /** 1080p is Grok Imagine Video 1.5 only; see IMAGE_RESOLUTIONS on the scope. */
     private const VIDEO_RESOLUTIONS = ['480p', '720p', '1080p'];
 
     /**
@@ -1010,6 +1016,10 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
      * without __get, so xAI's `reasoning_content` would silently never be seen
      * through the object graph.
      *
+     * Chunks without a delta are normal and must stay silent: `include_usage`
+     * makes xAI close every stream with a `choices: []` usage-only chunk. The
+     * `??` chains absorb those, so nothing here may dereference blindly.
+     *
      * @param array<string, mixed> $responseArray
      */
     private function dispatchStreamDelta(array $responseArray, callable $callback): void
@@ -1335,9 +1345,19 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     /**
      * Clamp the resolution to what the catalog row can price.
      *
-     * `resolution_prices` is keyed by the values in `allowed_resolutions`; asking
-     * xAI for anything outside that list would render fine but get billed at the
-     * row's fallback rate, so we never forward an unpriceable value.
+     * Asking xAI for a resolution the row does not price would render fine but
+     * get billed at the row's flat fallback rate, so we never forward an
+     * unpriceable value. Two independent constraints decide what is safe:
+     *
+     * - `allowed_resolutions` (or the API-level fallback list) — what may be
+     *   requested at all.
+     * - the keys of `resolution_prices` — what has a per-resolution price. A row
+     *   without that key bills every resolution at `priceOut`, so nothing needs
+     *   restricting there.
+     *
+     * Both are applied, because either one alone leaves a gap: a row that prices
+     * only 480p/720p while omitting `allowed_resolutions` would otherwise fall
+     * back to the API list and be allowed to render an unpriced 1080p.
      *
      * @param array<string, mixed> $options
      * @param array<string, mixed> $modelConfig
@@ -1349,6 +1369,13 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             ? array_values(array_filter($modelConfig['allowed_resolutions'], 'is_string'))
             : [];
         $effectiveAllowed = [] !== $allowed ? $allowed : $fallbackAllowed;
+
+        $priced = is_array($modelConfig['resolution_prices'] ?? null)
+            ? array_keys($modelConfig['resolution_prices'])
+            : [];
+        if ([] !== $priced) {
+            $effectiveAllowed = array_values(array_intersect($effectiveAllowed, $priced));
+        }
 
         $requested = $options['resolution'] ?? null;
         if (is_string($requested) && in_array($requested, $effectiveAllowed, true)) {
@@ -1393,7 +1420,14 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             'started_at' => time(),
         ]);
 
-        return false === $handle ? '' : $handle;
+        if (false === $handle) {
+            // The render is already submitted and billable, but without a handle
+            // nobody can poll it. Say so here instead of handing out an empty
+            // string that only fails later as "invalid operation handle".
+            throw new ProviderException(sprintf('Cannot build xAI video operation handle for request %s: %s', $requestId, json_last_error_msg()), self::PROVIDER_NAME);
+        }
+
+        return $handle;
     }
 
     /**

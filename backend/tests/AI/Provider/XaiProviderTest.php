@@ -300,6 +300,29 @@ class XaiProviderTest extends TestCase
         $this->assertSame([], $events);
     }
 
+    /**
+     * `stream_options.include_usage` makes xAI end every stream with a chunk that
+     * carries usage and an empty `choices` array. Dereferencing it must stay a
+     * no-op rather than emitting a bogus token or tripping a PHP warning.
+     */
+    public function testStreamDeltaIgnoresChunksWithoutADelta(): void
+    {
+        $events = [];
+        $callback = static function ($chunk) use (&$events): void {
+            $events[] = $chunk;
+        };
+
+        $this->invokePrivate('dispatchStreamDelta', [
+            ['choices' => [], 'usage' => ['prompt_tokens' => 12, 'completion_tokens' => 3]],
+            $callback,
+        ]);
+        $this->invokePrivate('dispatchStreamDelta', [['usage' => ['prompt_tokens' => 12]], $callback]);
+        $this->invokePrivate('dispatchStreamDelta', [['choices' => [['finish_reason' => 'stop']]], $callback]);
+        $this->invokePrivate('dispatchStreamDelta', [['choices' => 'unexpected'], $callback]);
+
+        $this->assertSame([], $events);
+    }
+
     // ==================== IMAGE GENERATION ====================
 
     public function testGenerateImagePostsB64PayloadAndReturnsDataUrl(): void
@@ -557,6 +580,87 @@ class XaiProviderTest extends TestCase
 
         $this->assertSame('720p', $captured['resolution']);
         $this->assertSame(15, $captured['duration']);
+    }
+
+    /**
+     * A row that prices only 480p/720p but forgets `allowed_resolutions` must not
+     * fall through to the API-level list and render an unpriced 1080p.
+     */
+    public function testVideoResolutionStaysWithinThePricedTiersWithoutAnAllowedList(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return $this->jsonResponse(['request_id' => 'req-123']);
+        });
+
+        $this->makeProvider(httpClient: $client)->startVideoOperation('a red cube', [
+            'resolution' => '1080p',
+            'modelConfig' => [
+                'default_resolution' => '720p',
+                'resolution_prices' => ['480p' => 0.05, '720p' => 0.07],
+            ],
+        ]);
+
+        $this->assertSame('720p', $captured['resolution']);
+    }
+
+    /**
+     * The 1.5 row prices 1080p, so the same request must go through there — the
+     * clamp exists for billing safety, not to cap quality.
+     */
+    public function testVideoResolutionAllowsAPricedHighTier(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return $this->jsonResponse(['request_id' => 'req-123']);
+        });
+
+        $this->makeProvider(httpClient: $client)->startVideoOperation('a red cube', [
+            'resolution' => '1080p',
+            'modelConfig' => [
+                'allowed_resolutions' => ['480p', '720p', '1080p'],
+                'default_resolution' => '720p',
+                'resolution_prices' => ['480p' => 0.08, '720p' => 0.14, '1080p' => 0.25],
+            ],
+        ]);
+
+        $this->assertSame('1080p', $captured['resolution']);
+    }
+
+    /**
+     * Without per-resolution prices every tier bills at the row's flat rate, so
+     * the user's choice is honoured instead of being clamped away.
+     */
+    public function testVideoResolutionKeepsTheRequestedTierOnAFlatRateRow(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return $this->jsonResponse(['request_id' => 'req-123']);
+        });
+
+        $this->makeProvider(httpClient: $client)->startVideoOperation('a red cube', [
+            'resolution' => '1080p',
+            'modelConfig' => ['default_resolution' => '720p'],
+        ]);
+
+        $this->assertSame('1080p', $captured['resolution']);
+    }
+
+    /**
+     * The render is already submitted and billable at this point, so an
+     * unencodable handle must name itself instead of yielding an empty string
+     * that only fails later as "invalid operation handle".
+     */
+    public function testEncodeOperationFailsLoudlyOnUnencodableInput(): void
+    {
+        $this->expectExceptionMessageContains('Cannot build xAI video operation handle for request req-123');
+        $this->invokePrivate('encodeOperation', ['req-123', ['model' => "grok\xB1\x31"]]);
     }
 
     public function testStartVideoOperationFailsWhenRequestIdIsMissing(): void
