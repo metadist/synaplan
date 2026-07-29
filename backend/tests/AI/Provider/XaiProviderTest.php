@@ -795,7 +795,7 @@ class XaiProviderTest extends TestCase
             return new MockResponse('ID3RAWMP3BYTES', ['response_headers' => ['content-type' => 'audio/mpeg']]);
         });
 
-        $filename = $this->makeProvider(httpClient: $client)->synthesize('  Hallo Welt  ', [
+        $filename = $this->makeProvider(httpClient: $client)->synthesize('  Synaplan speaking  ', [
             'voice' => 'ara',
             'language' => 'de',
             'speed' => 1.25,
@@ -804,7 +804,8 @@ class XaiProviderTest extends TestCase
         $this->assertSame('POST', $captured['method']);
         $this->assertSame('https://api.x.ai/v1/tts', $captured['url']);
         // The text is trimmed and `language` is always sent — /v1/tts requires it.
-        $this->assertSame('Hallo Welt', $captured['body']['text']);
+        // A non-default code proves the caller's hint wins over the `auto` default.
+        $this->assertSame('Synaplan speaking', $captured['body']['text']);
         $this->assertSame('ara', $captured['body']['voice_id']);
         $this->assertSame('de', $captured['body']['language']);
         $this->assertSame(['codec' => 'mp3'], $captured['body']['output_format']);
@@ -967,6 +968,85 @@ class XaiProviderTest extends TestCase
         $this->assertCount(1, $result['words']);
     }
 
+    /**
+     * xAI reads key terms from REPEATED `keyterm` fields. A plain field map would
+     * serialise them as `keyterm[0]`/`keyterm[1]`, which the API ignores — the
+     * caller would be billed for a request that silently lost its biasing.
+     */
+    public function testTranscribeSendsKeyTermsAsRepeatedFields(): void
+    {
+        file_put_contents($this->tempDir.'/clip.mp3', 'AUDIO');
+
+        $body = '';
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$body): MockResponse {
+            $body = $this->readMultipartBody($opts);
+
+            return $this->jsonResponse(['text' => 'Synaplan runs on Grok.', 'duration' => 3.0]);
+        });
+
+        $this->makeProvider(httpClient: $client)->transcribe('clip.mp3', [
+            'language' => 'en',
+            'diarize' => true,
+            'keyterm' => ['Synaplan', 'Grok Imagine'],
+        ]);
+
+        $this->assertSame(2, substr_count($body, 'name="keyterm"'));
+        $this->assertStringNotContainsString('name="keyterm[', $body);
+        $this->assertStringContainsString('Synaplan', $body);
+        $this->assertStringContainsString('Grok Imagine', $body);
+        // xAI requires the file part last, so the terms must precede it.
+        $this->assertLessThan(strpos($body, 'name="file"'), strrpos($body, 'name="keyterm"'));
+    }
+
+    /**
+     * Terms are hints, not content: an unusable one is dropped so the paid
+     * transcription still happens, instead of failing the whole request.
+     */
+    public function testTranscribeDropsUnusableKeyTermsInsteadOfFailing(): void
+    {
+        file_put_contents($this->tempDir.'/clip.mp3', 'AUDIO');
+
+        $body = '';
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$body): MockResponse {
+            $body = $this->readMultipartBody($opts);
+
+            return $this->jsonResponse(['text' => 'ok', 'duration' => 1.0]);
+        });
+
+        $result = $this->makeProvider(httpClient: $client)->transcribe('clip.mp3', [
+            'keyterm' => [
+                '  Synaplan  ',
+                'Synaplan',
+                '',
+                '   ',
+                str_repeat('a', 51),
+            ],
+        ]);
+
+        $this->assertSame('ok', $result['text']);
+        $this->assertSame(1, substr_count($body, 'name="keyterm"'));
+        $this->assertStringContainsString('Synaplan', $body);
+        $this->assertStringNotContainsString(str_repeat('a', 51), $body);
+    }
+
+    public function testTranscribeCapsKeyTermsAtTheDocumentedMaximum(): void
+    {
+        file_put_contents($this->tempDir.'/clip.mp3', 'AUDIO');
+
+        $body = '';
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$body): MockResponse {
+            $body = $this->readMultipartBody($opts);
+
+            return $this->jsonResponse(['text' => 'ok', 'duration' => 1.0]);
+        });
+
+        $this->makeProvider(httpClient: $client)->transcribe('clip.mp3', [
+            'keyterm' => array_map(static fn (int $i): string => 'term'.$i, range(1, 120)),
+        ]);
+
+        $this->assertSame(100, substr_count($body, 'name="keyterm"'));
+    }
+
     public function testTranscribeSurfacesProviderErrors(): void
     {
         file_put_contents($this->tempDir.'/clip.mp3', 'AUDIO');
@@ -1029,6 +1109,27 @@ class XaiProviderTest extends TestCase
     private function buildChatOptions(array $messages, array $options, bool $stream): array
     {
         return $this->invokePrivate('buildChatOptions', [$messages, $options, $stream]);
+    }
+
+    /**
+     * Multipart bodies reach the client as a chunk-producing closure, so they
+     * have to be drained before the field names can be inspected.
+     *
+     * @param array<string, mixed> $requestOptions
+     */
+    private function readMultipartBody(array $requestOptions): string
+    {
+        $body = $requestOptions['body'] ?? '';
+        if (!$body instanceof \Closure) {
+            return is_string($body) ? $body : '';
+        }
+
+        $raw = '';
+        while ('' !== ($chunk = $body(8192))) {
+            $raw .= $chunk;
+        }
+
+        return $raw;
     }
 
     /**

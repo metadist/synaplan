@@ -115,6 +115,11 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     private const STT_ENDPOINT = self::BASE_URI.'/stt';
 
     private const TTS_MAX_CHARS = 15000;
+
+    /** xAI's documented ceiling for `keyterm` biasing on /v1/stt. */
+    private const STT_MAX_KEYTERMS = 100;
+    private const STT_MAX_KEYTERM_LENGTH = 50;
+
     private const DEFAULT_TTS_VOICE = 'eve';
     private const DEFAULT_TTS_CODEC = 'mp3';
 
@@ -778,6 +783,9 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     // ==================== SPEECH TO TEXT (Grok voice) ====================
 
     /**
+     * `keyterm` biases the transcription toward names the model would otherwise
+     * mishear (product names, people, jargon).
+     *
      * @param array{language?: string, diarize?: bool, keyterm?: array<int, string>} $options
      *
      * @return array{text: string, language: string, duration: float, words: array<int, array<string, mixed>>}
@@ -790,20 +798,28 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         $language = is_string($options['language'] ?? null) && '' !== $options['language']
             ? $options['language']
             : null;
+        $keyTerms = $this->keyTermsFromOptions($options);
 
+        // Each entry is a single-pair array, the one FormDataPart shape that can
+        // emit the same field name twice: xAI expects key terms as a REPEATED
+        // `keyterm` field, and the plain map shape would send `keyterm[0]`.
         $fields = [];
         if (null !== $language) {
-            $fields['language'] = $language;
+            $fields[] = ['language' => $language];
         }
         if (true === ($options['diarize'] ?? null)) {
-            $fields['diarize'] = 'true';
+            $fields[] = ['diarize' => 'true'];
+        }
+        foreach ($keyTerms as $term) {
+            $fields[] = ['keyterm' => $term];
         }
         // xAI requires `file` to be the LAST field of the multipart body.
-        $fields['file'] = DataPart::fromPath($fullPath);
+        $fields[] = ['file' => DataPart::fromPath($fullPath)];
 
         $this->logger->info('xAI: transcribe', [
             'file' => basename($fullPath),
             'language' => $language,
+            'keyterms' => count($keyTerms),
         ]);
 
         try {
@@ -844,6 +860,60 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     public function translateAudio(string $audioPath, string $targetLang): string
     {
         throw new ProviderException('xAI has no audio translation endpoint. Transcribe with transcribe() and translate the text with a chat model instead.', self::PROVIDER_NAME);
+    }
+
+    /**
+     * Normalise `keyterm` to what xAI accepts: at most 100 terms of at most 50
+     * characters each.
+     *
+     * Unusable terms are dropped rather than raised as an error. They are hints,
+     * not content — losing one costs a few misspelled names, while rejecting the
+     * request would throw away a transcription the caller already paid for. The
+     * warning names the offenders so the caller can fix them.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return list<string>
+     */
+    private function keyTermsFromOptions(array $options): array
+    {
+        if (!is_array($options['keyterm'] ?? null) || [] === $options['keyterm']) {
+            return [];
+        }
+
+        $terms = [];
+        $dropped = [];
+        foreach ($options['keyterm'] as $term) {
+            $term = is_string($term) ? trim($term) : '';
+            if ('' === $term) {
+                continue;
+            }
+
+            if (mb_strlen($term) > self::STT_MAX_KEYTERM_LENGTH) {
+                $dropped[] = $term;
+                continue;
+            }
+
+            $terms[] = $term;
+        }
+
+        $terms = array_values(array_unique($terms));
+
+        if (count($terms) > self::STT_MAX_KEYTERMS) {
+            $dropped = array_merge($dropped, array_slice($terms, self::STT_MAX_KEYTERMS));
+            $terms = array_slice($terms, 0, self::STT_MAX_KEYTERMS);
+        }
+
+        if ([] !== $dropped) {
+            $this->logger->warning('xAI: dropped unusable transcription key terms', [
+                'kept' => count($terms),
+                'dropped' => $dropped,
+                'max_terms' => self::STT_MAX_KEYTERMS,
+                'max_length' => self::STT_MAX_KEYTERM_LENGTH,
+            ]);
+        }
+
+        return $terms;
     }
 
     // ==================== HELPERS: VOICE ====================
