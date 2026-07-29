@@ -139,8 +139,10 @@ OpenAI-compatible chat/vision at `https://api.x.ai/v1` plus the Grok Imagine med
 | BID | Model | Catalog in/out | Official (cache) | Long context (> 200k) | Context |
 | --- | ----- | -------------- | ---------------- | --------------------- | ------- |
 | 313 / 315 | `grok-4.5` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.30) | $4.00 / $12.00 | 500k |
-| 316 | `grok-imagine-image` | — / $0.02 per image | $0.02 (1K and 2K identical) | n/a | n/a |
+| 316 | `grok-imagine-image` | — / $0.02 per image | $0.02 (1k and 2k identical) | n/a | n/a |
 | 317 | `grok-imagine-video` | — / $0.07 per second | 480p $0.05 · 720p $0.07 | n/a | 1–15 s |
+| 318 | `grok-imagine-image-quality` | — / $0.05 per image | 1k $0.05 · 2k $0.07 | n/a | n/a |
+| 319 | `grok-imagine-video-1.5` | — / $0.14 per second | 480p $0.08 · 720p $0.14 · 1080p $0.25 | n/a | 1–15 s |
 
 The **> 200k long-context tier doubles the whole request**, so it lives in `ModelCatalog::CONTEXT_PRICING` (keyed by `providerId`, which covers the chat and the vision row at once) rather than in the model rows.
 
@@ -152,7 +154,9 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 - **Cached tokens are not doubled in the long-context tier.** `CONTEXT_PRICING` overrides only `price_in`/`price_out`, so above 200k prompt tokens cache reads are billed at $0.30 instead of xAI's $0.60 — a small undercharge. Extending `CONTEXT_PRICING` with a `cache_price_above` key would be a small follow-up.
 - **No pic2pic / image editing and no video editing or extension.** xAI bills input media separately ($0.002 per input image, $0.01 per input video second) and the `per_image` cost path pins `inputQuantity` to 0, so those inputs could not be attributed. `XaiProvider::editImage()` and `createVariations()` therefore throw. As long as only `text2pic` and `text2vid` are offered, billing is exact.
 - **Read the Imagine table in the rendered page, never the "View as Markdown" export.** The markdown/plain-text view flattens the multi-row Imagine table and keeps only the FIRST resolution row, so `grok-imagine-video` looks like a flat `$0.050 / sec` and the 720p rate silently disappears. The `.../models/grok-imagine-video` page shows the same collapsed number. Trusting that export once already produced a 40% undercharge on the default 720p render. The rendered [pricing page](https://docs.x.ai/developers/pricing) is the only reliable source for media rows.
-- **1080p is not a `grok-imagine-video` resolution.** Only `grok-imagine-video-1.5` offers it (480p $0.08 · 720p $0.14 · 1080p $0.25 per second), which is why BID 317 caps `allowed_resolutions` at 480p/720p.
+- **1080p is not a `grok-imagine-video` resolution.** Only `grok-imagine-video-1.5` (BID 319) offers it, which is why BID 317 caps `allowed_resolutions` at 480p/720p.
+- **Images are billed from `default_resolution`, not from the request.** The image path never passes a resolution into `calculateMediaCost()`, so `resolveResolution()` falls back to the catalog's `default_resolution` — and `XaiProvider::generateImage()` sends that same value to xAI. Changing `default_resolution` on BID 318 therefore moves the request AND the price together; changing only `priceOut` would desync them.
+- **`grok-imagine-video-1.5` is image-to-video only.** It carries `features: ['image2video']` + `requires_reference_image`, so `MediaGenerationHandler` explains the missing reference image instead of leaking a provider 400. It is reachable through the IMG2VID default-model slot, which shares the `text2vid` BTAG.
 - **No refund on cancel.** xAI has no cancel endpoint for deferred video renders, so `cancelVideoOperation()` only stops our polling; the render completes upstream and stays billable.
 - **`reasoning_effort` is a grok-4.3-only parameter**, and grok-4.3 is not in the catalog. xAI documents the knob for that model alone (`none` / `low` (default) / `medium` / `high`), so `XaiProvider::REASONING_EFFORT_MODELS` gates it. `grok-4.5`'s reasoning depth — and therefore its output token volume — is not controllable, so a Thinking toggle cannot reduce its cost.
 - **Embeddings, voice, and the server-side tools** (web search, X search, code execution) are intentionally not wired up: xAI publishes no price for `/v1/embeddings`, and without a price there can be no correct usage accounting.

@@ -567,6 +567,59 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.000000', $result->inputCost);
     }
 
+    /**
+     * The image path never passes a resolution, so the price has to come from
+     * the catalog's `default_resolution` — the same value XaiProvider sends.
+     */
+    public function testGrokImagineImageProBillsTheCatalogDefaultResolution(): void
+    {
+        $json = [
+            'pricing_mode' => 'per_image',
+            'mode_prices' => ['output_cost_per_image' => 0.05],
+            'allowed_resolutions' => ['1k', '2k'],
+            'default_resolution' => '1k',
+            'resolution_prices' => ['1k' => 0.05, '2k' => 0.07],
+        ];
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn(
+            $this->createModelMock('xAI', 0.0, 0.05, '-', 'perpic', $json, 'grok-imagine-image-quality'),
+        );
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $default = $this->service->calculateMediaCost(318, 0, 1);
+        $this->assertSame('0.050000', $default->totalCost);
+        $this->assertSame('1k', $default->priceSnapshot['resolution']);
+
+        // An operator switching the row to 2k bills the 2k rate.
+        $this->assertSame('0.070000', $this->service->calculateMediaCost(318, 0, 1, null, '2k')->totalCost);
+    }
+
+    public function testGrokImagineVideo15BillsTheHigherResolutionTiers(): void
+    {
+        $json = [
+            'pricing_mode' => 'per_second',
+            'allowed_resolutions' => ['480p', '720p', '1080p'],
+            'default_resolution' => '720p',
+            'resolution_prices' => ['480p' => 0.08, '720p' => 0.14, '1080p' => 0.25],
+        ];
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn(
+            $this->createModelMock('xAI', 0.0, 0.14, '-', 'persec', $json, 'grok-imagine-video-1.5'),
+        );
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // Default 720p render: 8s * $0.14 = $1.12
+        $this->assertSame('1.120000', $this->service->calculateMediaCost(319, 0, 8.0, null, '720p')->totalCost);
+        // 1080p is the expensive tier: 8s * $0.25 = $2.00
+        $this->assertSame('2.000000', $this->service->calculateMediaCost(319, 0, 8.0, null, '1080p')->totalCost);
+        // 480p: 4s * $0.08 = $0.32
+        $this->assertSame('0.320000', $this->service->calculateMediaCost(319, 0, 4.0, null, '480p')->totalCost);
+    }
+
     public function testGrokImagineVideoBillsPerSecondAtTheRequestedResolution(): void
     {
         $json = [

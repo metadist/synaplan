@@ -3033,6 +3033,11 @@ class ModelCatalog
                 'mode_prices' => ['output_cost_per_image' => 0.02],
                 'params' => ['model' => 'grok-imagine-image'],
                 'default_aspect_ratio' => '1:1',
+                // Both tiers cost the same here, so 2k is a free quality win.
+                // XaiProvider sends this value explicitly because xAI's own
+                // default is undocumented.
+                'allowed_resolutions' => ['1k', '2k'],
+                'default_resolution' => '2k',
             ],
         ],
         [
@@ -3066,6 +3071,75 @@ class ModelCatalog
                 ],
                 'default_duration' => 8,
                 'max_duration' => 15,
+            ],
+        ],
+        [
+            'id' => 318,
+            'service' => 'xAI',
+            'name' => 'Grok Imagine Image Pro',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-imagine-image-quality',
+            'priceIn' => 0,
+            'inUnit' => '-',
+            // priceOut = the default_resolution's rate; json.resolution_prices
+            // overrides it at billing time. Both the billed price and the
+            // resolution XaiProvider requests come from `default_resolution`,
+            // so they cannot drift apart.
+            'priceOut' => 0.05,
+            'outUnit' => 'perpic',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok Imagine Image Pro - higher-fidelity text-to-image. 1K: $0.05, 2K: $0.07 per image.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.05],
+                'params' => ['model' => 'grok-imagine-image-quality'],
+                'default_aspect_ratio' => '1:1',
+                'allowed_resolutions' => ['1k', '2k'],
+                'default_resolution' => '1k',
+                'resolution_prices' => [
+                    '1k' => 0.05,
+                    '2k' => 0.07,
+                ],
+            ],
+        ],
+        [
+            'id' => 319,
+            'service' => 'xAI',
+            'name' => 'Grok Imagine Video 1.5',
+            // Image-to-video shares the `text2vid` BTAG and is surfaced through
+            // the IMG2VID default-model slot — see CAPABILITY_TAGS.
+            'tag' => 'text2vid',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-imagine-video-1.5',
+            'priceIn' => 0,
+            'inUnit' => '-',
+            // 720p default keeps a default render at $1.12 for 8s; 1080p would
+            // be $2.00. resolution_prices overrides this at billing time.
+            'priceOut' => 0.14,
+            'outUnit' => 'persec',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok Imagine Video 1.5 - higher-fidelity image-to-video with 1080p support. Requires a reference image. 480p: $0.08/sec, 720p: $0.14/sec, 1080p: $0.25/sec.',
+                'params' => ['model' => 'grok-imagine-video-1.5'],
+                'pricing_mode' => 'per_second',
+                'allowed_resolutions' => ['480p', '720p', '1080p'],
+                'default_resolution' => '720p',
+                'resolution_prices' => [
+                    '480p' => 0.08,
+                    '720p' => 0.14,
+                    '1080p' => 0.25,
+                ],
+                'default_duration' => 8,
+                'max_duration' => 15,
+                // This model has no text-to-video mode; MediaGenerationHandler
+                // uses both flags to explain that a reference image is needed.
+                'features' => ['image2video'],
+                'requires_reference_image' => true,
             ],
         ],
     ];

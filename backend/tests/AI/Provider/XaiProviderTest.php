@@ -332,6 +332,52 @@ class XaiProviderTest extends TestCase
         $this->assertNull($images[0]['revised_prompt']);
     }
 
+    /**
+     * The billed price comes from the catalog's `default_resolution`, so the
+     * request must carry that exact value instead of relying on xAI's
+     * undocumented default.
+     */
+    public function testGenerateImageSendsTheCatalogResolution(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return $this->jsonResponse(['data' => [['b64_json' => base64_encode('X'), 'mime_type' => 'image/png']]]);
+        });
+
+        $this->makeProvider(httpClient: $client)->generateImage('a red cube', [
+            'model' => 'grok-imagine-image-quality',
+            'modelConfig' => [
+                'allowed_resolutions' => ['1k', '2k'],
+                'default_resolution' => '1k',
+            ],
+        ]);
+
+        $this->assertSame('1k', $captured['resolution']);
+    }
+
+    public function testGenerateImageClampsAnUnpriceableResolution(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return $this->jsonResponse(['data' => [['b64_json' => base64_encode('X'), 'mime_type' => 'image/png']]]);
+        });
+
+        $this->makeProvider(httpClient: $client)->generateImage('a red cube', [
+            'model' => 'grok-imagine-image-quality',
+            'resolution' => '4k',
+            'modelConfig' => [
+                'allowed_resolutions' => ['1k', '2k'],
+                'default_resolution' => '1k',
+            ],
+        ]);
+
+        $this->assertSame('1k', $captured['resolution']);
+    }
+
     public function testGenerateImageFailsLoudlyOnEmptyPayload(): void
     {
         $client = new MockHttpClient(fn () => $this->jsonResponse(['data' => []]));

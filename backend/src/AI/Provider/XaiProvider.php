@@ -69,6 +69,15 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     private const IMAGE_MIME_FALLBACK = 'image/png';
     private const MAX_IMAGES_PER_REQUEST = 10;
 
+    /**
+     * Output resolutions the Imagine image endpoint accepts. We always send one
+     * explicitly: xAI's default is undocumented, and on the quality model the
+     * resolution decides the per-image price.
+     *
+     * @see https://docs.x.ai/developers/model-capabilities/images/generation
+     */
+    private const IMAGE_RESOLUTIONS = ['1k', '2k'];
+
     private const VIDEO_MIN_DURATION = 1;
     private const VIDEO_MAX_DURATION = 15;
     private const VIDEO_DEFAULT_DURATION = 8;
@@ -340,11 +349,19 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             $body['aspect_ratio'] = $aspectRatio;
         }
 
+        // Must match the catalog row's `default_resolution`, because
+        // CostCalculationService prices the image from that same value.
+        $resolution = $this->resolutionFromOptions($options, $modelConfig, self::IMAGE_RESOLUTIONS);
+        if (null !== $resolution) {
+            $body['resolution'] = $resolution;
+        }
+
         $this->logger->info('xAI: generateImage', [
             'model' => $model,
             'prompt_length' => strlen($prompt),
             'n' => $body['n'],
             'aspect_ratio' => $aspectRatio,
+            'resolution' => $resolution,
         ]);
 
         $data = $this->requestJson('POST', self::BASE_URI.'/images/generations', $body, self::TIMEOUT_SUBMIT_SECONDS);
@@ -870,7 +887,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             $body['prompt'] = $prompt;
         }
 
-        $resolution = $this->videoResolutionFromOptions($options, $modelConfig);
+        $resolution = $this->resolutionFromOptions($options, $modelConfig, self::VIDEO_RESOLUTIONS);
         if (null !== $resolution) {
             $body['resolution'] = $resolution;
         }
@@ -939,13 +956,14 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
      *
      * @param array<string, mixed> $options
      * @param array<string, mixed> $modelConfig
+     * @param array<int, string>   $fallbackAllowed used when the row lists none
      */
-    private function videoResolutionFromOptions(array $options, array $modelConfig): ?string
+    private function resolutionFromOptions(array $options, array $modelConfig, array $fallbackAllowed): ?string
     {
         $allowed = is_array($modelConfig['allowed_resolutions'] ?? null)
             ? array_values(array_filter($modelConfig['allowed_resolutions'], 'is_string'))
             : [];
-        $effectiveAllowed = [] !== $allowed ? $allowed : self::VIDEO_RESOLUTIONS;
+        $effectiveAllowed = [] !== $allowed ? $allowed : $fallbackAllowed;
 
         $requested = $options['resolution'] ?? null;
         if (is_string($requested) && in_array($requested, $effectiveAllowed, true)) {
