@@ -564,12 +564,17 @@
             <Icon icon="mdi:share-variant-outline" class="w-4 h-4" />
             {{ $t('common.share') }}
           </button>
-          <button class="dropdown-item" @click="handleChatRename(chatMenuOpenId!)">
+          <button
+            class="dropdown-item"
+            data-testid="btn-chat-v2-rename"
+            @click="handleChatRename(chatMenuOpenId!)"
+          >
             <Icon icon="mdi:pencil-outline" class="w-4 h-4" />
             {{ $t('common.rename') }}
           </button>
           <button
             class="dropdown-item dropdown-item--danger"
+            data-testid="btn-chat-v2-delete"
             @click="handleChatDelete(chatMenuOpenId!)"
           >
             <Icon icon="mdi:delete-outline" class="w-4 h-4" />

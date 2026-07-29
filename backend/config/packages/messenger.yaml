@@ -121,3 +121,11 @@ when@test:
                 legacy_async_extract: 'in-memory://'
                 legacy_async_index: 'in-memory://'
                 legacy_failed: 'in-memory://'
+                # Synchronous execution for memory extraction: the test env
+                # runs no messenger worker, so an in-memory queue would mean
+                # extraction never happens and the feature is untestable E2E.
+                sync: 'sync://'
+            routing:
+                # Only this key is overridden — the rest of the routing map
+                # from the base config is merged in unchanged.
+                'App\Message\ExtractMemoriesCommand': sync
