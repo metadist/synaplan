@@ -86,6 +86,8 @@ class ModelCatalog
         'gpt-5.6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 2.0, 'price_out_above' => 9.0],
         'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0],
         'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
+        'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0],
+        'grok-4.3' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 5.0],
     ];
 
     /**
@@ -2946,6 +2948,154 @@ class ModelCatalog
                     'host' => 'trustedtokens.eu',
                     'jurisdiction' => 'DE',
                 ],
+            ],
+        ],
+        // ==================== xAI (GROK) ====================
+        // Snapshot 2026-07-29 from https://docs.x.ai/developers/pricing.
+        // Chat rows are covered by the LiteLLM sync (keys `xai/<providerId>`);
+        // the Grok Imagine rows are not and must be verified manually.
+        // Above 200K prompt tokens xAI bills the whole request at 2x — encoded
+        // in self::CONTEXT_PRICING, not here.
+        [
+            'id' => 313,
+            'service' => 'xAI',
+            'name' => 'Grok 4.5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.5',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 6.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.5 - flagship model for code and agentic tool calling with a 500K context window. Reasoning is always on and cannot be disabled; the cheapest tier is "low".',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'grok-4.5'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 0.30,
+                // Consumed by XaiProvider::resolveReasoningEffort() when the user
+                // enables the Thinking toggle.
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '500000',
+                    'max_output' => '32768',
+                    'knowledge_cutoff' => '2026-02-01',
+                    'regions' => 'us-east-1, us-west-2',
+                ],
+            ],
+        ],
+        [
+            'id' => 314,
+            'service' => 'xAI',
+            'name' => 'Grok 4.3',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.3',
+            'priceIn' => 1.25,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.3 - fast, cost-efficient model with strong tool calling and a 1M context window. Reasoning can be turned off entirely. Also served from eu-west-1.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'grok-4.3'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'multilingual'],
+                'cache_read_price_per_1M' => 0.20,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '1000000',
+                    'max_output' => '32768',
+                    'regions' => 'us-east-1, eu-west-1, us-west-2',
+                ],
+            ],
+        ],
+        [
+            'id' => 315,
+            'service' => 'xAI',
+            'name' => 'Grok 4.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.5',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 6.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.5 image understanding - describe images and extract text (OCR-style) via the chat endpoint. Max 20 MiB per image, JPEG/PNG only.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'grok-4.5'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 0.30,
+                'meta' => [
+                    'supports_images' => true,
+                    'max_image_bytes' => '20971520',
+                ],
+            ],
+        ],
+        [
+            'id' => 316,
+            'service' => 'xAI',
+            'name' => 'Grok Imagine Image',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-imagine-image',
+            'priceIn' => 0,
+            'inUnit' => '-',
+            // Flat per-image price: xAI charges $0.02 at both 1K and 2K for this
+            // model, so no quality_prices tier table is needed and the billed
+            // amount can never drift from the requested resolution.
+            'priceOut' => 0.02,
+            'outUnit' => 'perpic',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok Imagine (Aurora) - fast text-to-image generation at $0.02 per image, 1K or 2K output.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.02],
+                'params' => ['model' => 'grok-imagine-image'],
+                'default_aspect_ratio' => '1:1',
+            ],
+        ],
+        [
+            'id' => 317,
+            'service' => 'xAI',
+            'name' => 'Grok Imagine Video',
+            'tag' => 'text2vid',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-imagine-video',
+            'priceIn' => 0,
+            'inUnit' => '-',
+            // priceOut = fallback per-second rate; json.resolution_prices
+            // overrides it at billing time (CostCalculationService::
+            // lookupResolutionPrice). Set to the 720p default so the headline
+            // matches what a default render actually costs.
+            'priceOut' => 0.07,
+            'outUnit' => 'persec',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok Imagine Video - text-to-video and image-to-video, 1-15 seconds. 480p: $0.05/sec, 720p: $0.07/sec.',
+                'params' => ['model' => 'grok-imagine-video'],
+                'pricing_mode' => 'per_second',
+                'allowed_resolutions' => ['480p', '720p'],
+                'default_resolution' => '720p',
+                'resolution_prices' => [
+                    '480p' => 0.05,
+                    '720p' => 0.07,
+                ],
+                'default_duration' => 8,
+                'max_duration' => 15,
             ],
         ],
     ];

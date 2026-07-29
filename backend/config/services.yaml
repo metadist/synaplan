@@ -71,6 +71,8 @@ parameters:
     env(HUGGINGFACE_API_KEY): ''
     # TrustedTokens (TNG) — German sovereign OpenAI-compatible inference.
     env(TRUSTEDTOKENS_API_KEY): ''
+    # xAI (Grok chat/vision + Grok Imagine image/video).
+    env(XAI_API_KEY): ''
     env(BRAVE_SEARCH_API_KEY): ''
     env(DISCORD_WEBHOOK_URL): ''
     env(GMAIL_USERNAME): ''
@@ -269,6 +271,16 @@ services:
         tags:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.vision' }
+
+    App\AI\Provider\XaiProvider:
+        arguments:
+            $apiKey: '%env(XAI_API_KEY)%'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.image_generation' }
+            - { name: 'app.ai.video_generation' }
 
     App\AI\Provider\GoogleProvider:
         arguments:

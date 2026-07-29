@@ -30,8 +30,8 @@ For each provider block in `ModelCatalog.php`, work through all seven steps. Ste
 
 **Scope — which blocks to touch:**
 
-- **LiteLLM-synced (do NOT hand-edit numbers):** Anthropic, OpenAI, Google, Groq. Their prices come from `app:sync-model-prices`. To verify, run `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run` and eyeball the diff against the official pages; only touch the catalog for something LiteLLM gets wrong (record why).
-- **Manual (the full 7-step playbook applies):** Kimi/HuggingFace, TheHive, Higgsfield, Mistral, Cloudflare Workers AI. These are the rows in the status table (§"NOT covered by LiteLLM sync").
+- **LiteLLM-synced (do NOT hand-edit numbers):** Anthropic, OpenAI, Google, Groq, plus the xAI **chat/vision** rows. Their prices come from `app:sync-model-prices`. To verify, run `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run` and eyeball the diff against the official pages; only touch the catalog for something LiteLLM gets wrong (record why).
+- **Manual (the full 7-step playbook applies):** Kimi/HuggingFace, TheHive, Higgsfield, Mistral, Cloudflare Workers AI, and the xAI **Grok Imagine** rows. These are the rows in the status table (§"NOT covered by LiteLLM sync").
 - **Skip:** Piper / Triton (free/local, `pricing_mode` effectively free).
 
 **When to re-verify (don't just trust a ✅):** treat any status row whose "verified" date is **older than 30 days** as unverified and redo the 7 steps. A price you didn't check this run is *not* verified, regardless of the table.
@@ -69,6 +69,8 @@ Provider billing-mechanics cheat-sheet (verified 2026-07-13):
 | Mistral | per-token; Voxtral per-min (STT) / per-char (TTS) | — | n/a | no |
 | Cloudflare WAI | neurons → per-token equiv | — | n/a | no |
 | Higgsfield | **per-clip credits** (not per-second!) | resolution, clip length | **yes** (failed/NSFW/cancelled auto-refunded) | resolution + duration (see #1317) |
+| xAI (chat/vision) | per-token, cache-read discount | **prompt length** (2× above 200k) | n/a | `reasoning_effort` (changes output token volume, not the rate) |
+| xAI (Grok Imagine) | image: per-image · video: **per-second** | video: resolution | **no** (no cancel endpoint) | resolution + duration |
 
 ## HuggingFace routing — DECIDED: pin DeepInfra
 
@@ -105,6 +107,7 @@ Catalog now set to DeepInfra rates. Note K2.7 was previously $0.95/$4.00 (ABOVE 
 - DeepInfra (Kimi partner we pin): https://deepinfra.com/pricing
 - Kimi direct: https://platform.kimi.ai/docs/pricing/chat
 - TrustedTokens (JSON catalog, not the JS marketing page): https://trustedtokens.eu/api/billing/models · docs https://trustedtokens.eu/docs/
+- xAI: https://docs.x.ai/developers/pricing · models https://docs.x.ai/developers/models
 
 **Tooling / cross-checks:**
 
@@ -126,7 +129,31 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | **Mistral** | ✅ verified 2026-07-13 — all correct | https://mistral.ai/pricing/api/ |
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
 | **TrustedTokens** | ✅ verified 2026-07-27 | https://trustedtokens.eu/api/billing/models |
+| **xAI Grok Imagine** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
+
+### xAI / Grok (verified 2026-07-29)
+
+OpenAI-compatible chat/vision at `https://api.x.ai/v1` plus the Grok Imagine media endpoints. Catalog stores **USD per 1M tokens**; cache-read rates live in `json.cache_read_price_per_1M`.
+
+| BID | Model | Catalog in/out | Official (cache) | Long context (> 200k) | Context |
+| --- | ----- | -------------- | ---------------- | --------------------- | ------- |
+| 313 / 315 | `grok-4.5` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.30) | $4.00 / $12.00 | 500k |
+| 314 | `grok-4.3` | $1.25 / $2.50 | $1.25 / $2.50 (cache $0.20) | $2.50 / $5.00 | 1M |
+| 316 | `grok-imagine-image` | — / $0.02 per image | $0.02 (1K and 2K identical) | n/a | n/a |
+| 317 | `grok-imagine-video` | — / $0.07 per second | 480p $0.05 · 720p $0.07 | n/a | 1–15 s |
+
+The **> 200k long-context tier doubles the whole request**, so it lives in `ModelCatalog::CONTEXT_PRICING` (keyed by `providerId`, which covers the chat and the vision row at once) rather than in the model rows.
+
+`priceIn` is deliberately **0** on both Imagine rows. `RateLimitService` sets `inputQuantity` to the clip length in the `per_second` path and to 0 in the `per_image` path, so any non-zero input price would be billed a second time per second of video.
+
+**Known deviations and limits — read before "fixing" a number:**
+
+- **LiteLLM reports a $0.50/1M cache-read price for `xai/grok-4.5`; the official xAI docs say $0.30.** We follow the official value. The sync only rewrites `cache_read_price_per_1M` when the input/output price itself drifts, so our value stays put — do not "correct" it toward LiteLLM.
+- **Cached tokens are not doubled in the long-context tier.** `CONTEXT_PRICING` overrides only `price_in`/`price_out`, so above 200k prompt tokens cache reads are billed at $0.30 instead of xAI's $0.60 — a small undercharge. Extending `CONTEXT_PRICING` with a `cache_price_above` key would be a small follow-up.
+- **No pic2pic / image editing and no video editing or extension.** xAI bills input media separately ($0.002 per input image, $0.01 per input video second) and the `per_image` cost path pins `inputQuantity` to 0, so those inputs could not be attributed. `XaiProvider::editImage()` and `createVariations()` therefore throw. As long as only `text2pic` and `text2vid` are offered, billing is exact.
+- **No refund on cancel.** xAI has no cancel endpoint for deferred video renders, so `cancelVideoOperation()` only stops our polling; the render completes upstream and stays billable.
+- **Embeddings, voice, and the server-side tools** (web search, X search, code execution) are intentionally not wired up: xAI publishes no price for `/v1/embeddings`, and without a price there can be no correct usage accounting.
 
 ### TrustedTokens (verified 2026-07-27)
 

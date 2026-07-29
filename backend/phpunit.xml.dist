@@ -27,6 +27,7 @@
         <env name="OPENAI_API_KEY" value="" />
         <env name="GROQ_API_KEY" value="" />
         <env name="GOOGLE_GEMINI_API_KEY" value="" />
+        <env name="XAI_API_KEY" value="" />
         <!-- Brave Search API (defaults for testing) -->
         <env name="BRAVE_SEARCH_API_KEY" value="" />
         <env name="BRAVE_SEARCH_API_URL" value="https://api.search.brave.com/res/v1" />

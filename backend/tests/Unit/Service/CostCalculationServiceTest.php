@@ -489,6 +489,111 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.180000', $result->totalCost);
     }
 
+    // ==================== xAI (GROK) PRICING ====================
+
+    public function testGrokChargesTheStandardTierBelowTheLongContextThreshold(): void
+    {
+        $model = $this->createModelMock('xAI', 2.0, 6.0, 'per1M', 'per1M', [], 'grok-4.5');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // Exactly at the threshold the standard rate still applies.
+        // 200000 * 2/1M = 0.400000, 1000 * 6/1M = 0.006000
+        $result = $this->service->calculateCost(200000, 1000, 0, 0, 313);
+
+        $this->assertSame('0.406000', $result->totalCost);
+        $this->assertSame('2.00000000', $result->priceSnapshot['price_in']);
+    }
+
+    public function testGrokSwitchesToTheLongContextTierAboveTwoHundredThousandTokens(): void
+    {
+        $model = $this->createModelMock('xAI', 2.0, 6.0, 'per1M', 'per1M', [], 'grok-4.5');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // One token past the threshold doubles both rates.
+        // 200001 * 4/1M = 0.800004, 1000 * 12/1M = 0.012000
+        $result = $this->service->calculateCost(200001, 1000, 0, 0, 313);
+
+        $this->assertSame('0.812004', $result->totalCost);
+        $this->assertSame('4.00000000', $result->priceSnapshot['price_in']);
+        $this->assertSame('12.00000000', $result->priceSnapshot['price_out']);
+    }
+
+    public function testGrokBillsCachedPromptTokensAtTheCatalogCacheRate(): void
+    {
+        $model = $this->createModelMock('xAI', 2.0, 6.0, 'per1M', 'per1M', [
+            'cache_read_price_per_1M' => 0.30,
+        ], 'grok-4.5');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 100000 prompt tokens, 80000 of them cached:
+        //   regular 20000 * 2/1M    = 0.040000
+        //   cached  80000 * 0.30/1M = 0.024000
+        //   output   1000 * 6/1M    = 0.006000
+        $result = $this->service->calculateCost(100000, 1000, 80000, 0, 313);
+
+        $this->assertSame('0.070000', $result->totalCost);
+        $this->assertSame('0.064000', $result->inputCost);
+        // Full price would have been 0.200000 + 0.006000 → 0.136000 saved.
+        $this->assertSame('0.136000', $result->cacheSavings);
+    }
+
+    public function testGrokImagineImageCostsTwoCentsPerImage(): void
+    {
+        $model = $this->createModelMock('xAI', 0.0, 0.02, '-', 'perpic', [
+            'pricing_mode' => 'per_image',
+            'mode_prices' => ['output_cost_per_image' => 0.02],
+        ], 'grok-imagine-image');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(316, 0, 1);
+
+        $this->assertSame('0.020000', $result->totalCost);
+        $this->assertSame('0.000000', $result->inputCost);
+    }
+
+    public function testGrokImagineVideoBillsPerSecondAtTheRequestedResolution(): void
+    {
+        $json = [
+            'pricing_mode' => 'per_second',
+            'allowed_resolutions' => ['480p', '720p'],
+            'default_resolution' => '720p',
+            'resolution_prices' => ['480p' => 0.05, '720p' => 0.07],
+        ];
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn(
+            $this->createModelMock('xAI', 0.0, 0.07, '-', 'persec', $json, 'grok-imagine-video'),
+        );
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // Default 720p render: 8s * $0.07 = $0.56
+        $default = $this->service->calculateMediaCost(317, 0, 8.0, null, '720p');
+        $this->assertSame('0.560000', $default->totalCost);
+        $this->assertSame('720p', $default->priceSnapshot['resolution']);
+
+        // The cheap test render: 4s at 480p * $0.05 = $0.20
+        $cheap = $this->service->calculateMediaCost(317, 0, 4.0, null, '480p');
+        $this->assertSame('0.200000', $cheap->totalCost);
+        $this->assertSame('0.05000000', $cheap->priceSnapshot['price_out_resolution']);
+    }
+
     public function testCostResultDtoStructure(): void
     {
         $result = new CostResult(
@@ -515,6 +620,7 @@ class CostCalculationServiceTest extends TestCase
         string $inUnit,
         string $outUnit,
         array $json = [],
+        string $providerId = '',
     ): Model {
         $model = $this->createMock(Model::class);
         $model->method('getService')->willReturn($service);
@@ -523,6 +629,7 @@ class CostCalculationServiceTest extends TestCase
         $model->method('getInUnit')->willReturn($inUnit);
         $model->method('getOutUnit')->willReturn($outUnit);
         $model->method('getJson')->willReturn($json);
+        $model->method('getProviderId')->willReturn($providerId);
 
         return $model;
     }
