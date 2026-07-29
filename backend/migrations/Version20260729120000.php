@@ -8,7 +8,12 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Widen BCONFIG.BVALUE from VARCHAR(250) to TEXT.
+ * Widen BCONFIG.BVALUE from VARCHAR(250) to LONGTEXT.
+ *
+ * LONGTEXT (not TEXT) because Doctrine maps `Types::TEXT` to LONGTEXT on
+ * MariaDB — anything narrower fails CI's `doctrine:schema:validate` — and it
+ * is the house convention for every other text column (BFILETEXT, BMETAVALUE,
+ * plugin_data.BVALUE, ...).
  *
  * BCONFIG stores encrypted secrets (AES-256-CBC ciphertext, base64, IV
  * prepended) for the OpenAI-compatible endpoint registry, per-user Higgsfield
@@ -32,7 +37,7 @@ final class Version20260729120000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Widen BCONFIG.BVALUE to TEXT so encrypted secrets (provider keys, endpoint configs) fit';
+        return 'Widen BCONFIG.BVALUE to LONGTEXT so encrypted secrets (provider keys, endpoint configs) fit';
     }
 
     public function isTransactional(): bool
@@ -47,8 +52,8 @@ final class Version20260729120000 extends AbstractMigration
             "SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'BCONFIG' AND COLUMN_NAME = 'BVALUE'",
         );
 
-        if ('varchar' === strtolower($dataType)) {
-            $this->addSql('ALTER TABLE BCONFIG MODIFY BVALUE TEXT NOT NULL');
+        if ('longtext' !== strtolower($dataType)) {
+            $this->addSql('ALTER TABLE BCONFIG MODIFY BVALUE LONGTEXT NOT NULL');
         }
     }
 
