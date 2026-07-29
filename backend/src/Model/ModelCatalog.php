@@ -3049,14 +3049,15 @@ class ModelCatalog
             'providerId' => 'grok-imagine-image',
             'priceIn' => 0,
             'inUnit' => '-',
-            // Flat per-image price regardless of prompt length, so no
-            // quality_prices tier table is needed.
+            // Flat per-image price: xAI charges $0.02 at both 1K and 2K for this
+            // model, so no quality_prices tier table is needed and the billed
+            // amount can never drift from the requested resolution.
             'priceOut' => 0.02,
             'outUnit' => 'perpic',
             'quality' => 8,
             'rating' => 1,
             'json' => [
-                'description' => 'xAI Grok Imagine (Aurora) - fast text-to-image generation at $0.02 per image.',
+                'description' => 'xAI Grok Imagine (Aurora) - fast text-to-image generation at $0.02 per image, 1K or 2K output.',
                 'pricing_mode' => 'per_image',
                 'mode_prices' => ['output_cost_per_image' => 0.02],
                 'params' => ['model' => 'grok-imagine-image'],
@@ -3073,21 +3074,25 @@ class ModelCatalog
             'providerId' => 'grok-imagine-video',
             'priceIn' => 0,
             'inUnit' => '-',
-            // Flat per-second rate for every resolution. xAI's Imagine overview
-            // claims resolution influences the price but publishes only this
-            // single rate, so no resolution_prices table is set — see
-            // docs/PRICING_MAINTENANCE.md for the invoice check that would
-            // confirm a surcharge.
-            'priceOut' => 0.05,
+            // priceOut = fallback per-second rate; json.resolution_prices
+            // overrides it at billing time (CostCalculationService::
+            // lookupResolutionPrice). Set to the 720p default so the headline
+            // matches what a default render actually costs.
+            'priceOut' => 0.07,
             'outUnit' => 'persec',
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'xAI Grok Imagine Video - text-to-video and image-to-video, 1-15 seconds at $0.05 per second.',
+                'description' => 'xAI Grok Imagine Video - text-to-video and image-to-video, 1-15 seconds. 480p: $0.05/sec, 720p: $0.07/sec.',
                 'params' => ['model' => 'grok-imagine-video'],
                 'pricing_mode' => 'per_second',
+                // 1080p belongs to grok-imagine-video-1.5, not this model.
                 'allowed_resolutions' => ['480p', '720p'],
                 'default_resolution' => '720p',
+                'resolution_prices' => [
+                    '480p' => 0.05,
+                    '720p' => 0.07,
+                ],
                 'default_duration' => 8,
                 'max_duration' => 15,
             ],

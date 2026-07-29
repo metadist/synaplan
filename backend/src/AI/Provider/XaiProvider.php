@@ -929,9 +929,11 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     }
 
     /**
-     * Clamp the resolution to the catalog row's `allowed_resolutions`, so an
-     * operator can cap what users may request without the provider having to
-     * know the model's capabilities.
+     * Clamp the resolution to what the catalog row can price.
+     *
+     * `resolution_prices` is keyed by the values in `allowed_resolutions`; asking
+     * xAI for anything outside that list would render fine but get billed at the
+     * row's fallback rate, so we never forward an unpriceable value.
      *
      * @param array<string, mixed> $options
      * @param array<string, mixed> $modelConfig
