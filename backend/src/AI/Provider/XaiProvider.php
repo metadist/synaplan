@@ -8,16 +8,21 @@ use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\SupportsInlineReferenceImage;
+use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Mime\Part\DataPart;
+use Symfony\Component\Mime\Part\Multipart\FormDataPart;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * xAI (Grok) provider — chat, image understanding, and Grok Imagine media.
+ * xAI (Grok) provider — chat, image understanding, Grok Imagine media, and voice.
  *
  * Chat and vision run against the OpenAI-compatible `/v1/chat/completions`
  * endpoint, so they reuse the openai-php client with a custom base URI (SSE
@@ -25,12 +30,19 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * `/v1/videos/*`) is NOT OpenAI-shaped — it uses xAI-specific fields
  * (`aspect_ratio`, `resolution`, `duration`) and an async submit → poll →
  * download lifecycle for video — so those calls go through the plain HTTP
- * client.
+ * client. The same is true for voice: xAI serves `/v1/tts` and `/v1/stt`
+ * instead of OpenAI's `/v1/audio/speech` and `/v1/audio/transcriptions`.
+ *
+ * The realtime Speech-to-Speech API (`wss://api.x.ai/v1/realtime`) is
+ * deliberately not implemented — this application has no realtime-voice
+ * capability to plug it into, and its per-minute session billing has no
+ * counterpart in the usage model.
  *
  * @see https://docs.x.ai/developers/rest-api-reference/inference/chat
  * @see https://docs.x.ai/developers/model-capabilities/imagine
+ * @see https://docs.x.ai/developers/model-capabilities/audio/voice
  */
-final class XaiProvider implements ChatProviderInterface, ImageGenerationProviderInterface, SupportsAsyncVideo, SupportsInlineReferenceImage, VideoGenerationProviderInterface, VisionProviderInterface
+final class XaiProvider implements ChatProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, SupportsAsyncVideo, SupportsInlineReferenceImage, TextToSpeechProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface
 {
     private const PROVIDER_NAME = 'xai';
     private const DISPLAY_NAME = 'xAI';
@@ -84,6 +96,48 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     private const VIDEO_DEFAULT_DURATION = 8;
     private const VIDEO_RESOLUTIONS = ['480p', '720p', '1080p'];
 
+    /**
+     * Voice endpoints. Both are xAI-specific paths, NOT the OpenAI-compatible
+     * `/v1/audio/*` ones, and neither takes a `model` field — the endpoint
+     * itself selects the model, so the catalog rows carry the documentation
+     * names `grok-tts` / `grok-stt` purely as identifiers.
+     *
+     * @see https://docs.x.ai/developers/rest-api-reference/inference/voice
+     */
+    private const TTS_ENDPOINT = self::BASE_URI.'/tts';
+    private const TTS_VOICES_ENDPOINT = self::BASE_URI.'/tts/voices';
+    private const STT_ENDPOINT = self::BASE_URI.'/stt';
+
+    private const TTS_MAX_CHARS = 15000;
+    private const DEFAULT_TTS_VOICE = 'eve';
+    private const DEFAULT_TTS_CODEC = 'mp3';
+
+    /**
+     * `/v1/tts` requires `language`; `auto` makes xAI detect it, which is what
+     * we want because the caller's language hint is often absent.
+     */
+    private const DEFAULT_TTS_LANGUAGE = 'auto';
+
+    /** Built-in voices, used as a fallback when the live roster is unreachable. */
+    private const TTS_BUILTIN_VOICES = [
+        'eve' => 'energetic',
+        'ara' => 'warm',
+        'rex' => 'confident',
+        'sal' => 'balanced',
+        'leo' => 'authoritative',
+    ];
+
+    /** Codec → [file extension, MIME type]. */
+    private const TTS_CODECS = [
+        'mp3' => ['mp3', 'audio/mpeg'],
+        'wav' => ['wav', 'audio/wav'],
+        'pcm' => ['wav', 'audio/wav'],
+        'mulaw' => ['ulaw', 'audio/basic'],
+        'alaw' => ['alaw', 'audio/x-alaw-basic'],
+    ];
+
+    private const TIMEOUT_AUDIO_SECONDS = 120;
+
     private const TIMEOUT_SUBMIT_SECONDS = 60;
     private const TIMEOUT_POLL_SECONDS = 15;
     private const TIMEOUT_DOWNLOAD_SECONDS = 300;
@@ -131,12 +185,12 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
 
     public function getDescription(): string
     {
-        return 'xAI Grok — long-context chat with configurable reasoning and tool calling, image understanding, plus Grok Imagine image and video generation.';
+        return 'xAI Grok — long-context chat with configurable reasoning and tool calling, image understanding, Grok Imagine image and video generation, plus Grok voice synthesis and transcription.';
     }
 
     public function getCapabilities(): array
     {
-        return ['chat', 'vision', 'image_generation', 'video_generation'];
+        return ['chat', 'vision', 'image_generation', 'video_generation', 'text_to_speech', 'speech_to_text'];
     }
 
     public function getDefaultModels(): array
@@ -600,6 +654,330 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         $this->logger->info('xAI: cancel requested but not supported upstream; the render keeps running and stays billable', [
             'request_id' => $requestId,
         ]);
+    }
+
+    // ==================== TEXT TO SPEECH (Grok voice) ====================
+
+    /**
+     * Synthesize `$text` and store the audio under the upload dir.
+     *
+     * @param array{voice?: string, format?: string, language?: string, speed?: float|string} $options
+     *
+     * @return string Filename relative to the upload dir
+     */
+    public function synthesize(string $text, array $options = []): string
+    {
+        $audio = $this->requestSpeech($text, $options);
+        $codec = $this->ttsCodecFromOptions($options);
+
+        $filename = 'tts_'.uniqid().'.'.self::TTS_CODECS[$codec][0];
+        $outputPath = $this->uploadDir.'/'.$filename;
+
+        if (!FileHelper::createDirectory($this->uploadDir)) {
+            throw new ProviderException('Unable to create upload directory: '.$this->uploadDir, self::PROVIDER_NAME);
+        }
+
+        FileHelper::writeFile($outputPath, $audio);
+
+        return $filename;
+    }
+
+    /**
+     * xAI streams synthesis over a WebSocket only (`wss://api.x.ai/v1/tts`),
+     * which Symfony's HTTP client cannot speak. Synthesize unary and replay the
+     * result from disk, the same shape GoogleProvider uses, so the TTS endpoint
+     * keeps working while `supportsStreaming()` tells callers the audio is not
+     * actually incremental.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return \Generator<int, string, void, void>
+     */
+    public function synthesizeStream(string $text, array $options = []): \Generator
+    {
+        $filename = $this->synthesize($text, $options);
+        $fullPath = $this->uploadDir.'/'.$filename;
+
+        $handle = @fopen($fullPath, 'rb');
+        if (false === $handle) {
+            throw new ProviderException('xAI TTS: cannot read synthesized file '.$fullPath, self::PROVIDER_NAME);
+        }
+
+        try {
+            while (!feof($handle)) {
+                $chunk = fread($handle, 8192);
+                if (false !== $chunk && '' !== $chunk) {
+                    yield $chunk;
+                }
+            }
+        } finally {
+            fclose($handle);
+            @unlink($fullPath);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function getStreamContentType(array $options = []): string
+    {
+        return self::TTS_CODECS[$this->ttsCodecFromOptions($options)][1];
+    }
+
+    public function supportsStreaming(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return array<int, array{id: string, name: string, description: string}>
+     */
+    public function getVoices(): array
+    {
+        if (null === $this->apiKey || '' === $this->apiKey) {
+            return $this->builtinVoices();
+        }
+
+        try {
+            $data = $this->requestJson('GET', self::TTS_VOICES_ENDPOINT, null, self::TIMEOUT_POLL_SECONDS);
+        } catch (\Throwable $e) {
+            $this->logger->warning('xAI: could not fetch the voice roster, falling back to the built-in voices', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->builtinVoices();
+        }
+
+        $voices = [];
+        foreach (is_array($data['voices'] ?? null) ? $data['voices'] : [] as $voice) {
+            if (!is_array($voice)) {
+                continue;
+            }
+
+            $id = $voice['voice_id'] ?? ($voice['id'] ?? ($voice['name'] ?? null));
+            if (!is_string($id) || '' === $id) {
+                continue;
+            }
+
+            $voices[] = [
+                'id' => $id,
+                'name' => is_string($voice['name'] ?? null) ? $voice['name'] : $id,
+                'description' => is_string($voice['description'] ?? null) ? $voice['description'] : '',
+            ];
+        }
+
+        return [] !== $voices ? $voices : $this->builtinVoices();
+    }
+
+    // ==================== SPEECH TO TEXT (Grok voice) ====================
+
+    /**
+     * @param array{language?: string, diarize?: bool, keyterm?: array<int, string>} $options
+     *
+     * @return array{text: string, language: string, duration: float, words: array<int, array<string, mixed>>}
+     */
+    public function transcribe(string $audioPath, array $options = []): array
+    {
+        $this->assertApiKey();
+
+        $fullPath = $this->resolveExistingAudioPath($audioPath);
+        $language = is_string($options['language'] ?? null) && '' !== $options['language']
+            ? $options['language']
+            : null;
+
+        $fields = [];
+        if (null !== $language) {
+            $fields['language'] = $language;
+        }
+        if (true === ($options['diarize'] ?? null)) {
+            $fields['diarize'] = 'true';
+        }
+        // xAI requires `file` to be the LAST field of the multipart body.
+        $fields['file'] = DataPart::fromPath($fullPath);
+
+        $this->logger->info('xAI: transcribe', [
+            'file' => basename($fullPath),
+            'language' => $language,
+        ]);
+
+        try {
+            $formData = new FormDataPart($fields);
+
+            $response = $this->httpClient->request('POST', self::STT_ENDPOINT, [
+                'auth_bearer' => $this->apiKey,
+                'headers' => $formData->getPreparedHeaders()->toArray(),
+                'body' => $formData->bodyToIterable(),
+                'timeout' => self::TIMEOUT_AUDIO_SECONDS,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $data = $response->toArray(false);
+        } catch (HttpExceptionInterface $e) {
+            throw new ProviderException('xAI transcription failed: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
+        }
+
+        if ($statusCode >= 400) {
+            $this->handleErrorResponse($statusCode, $data);
+        }
+
+        return [
+            'text' => is_string($data['text'] ?? null) ? $data['text'] : '',
+            // xAI documents `language` as "currently empty — detection is not yet
+            // enabled" even though live responses do carry it, so prefer the
+            // reported value and fall back to what the caller asked for.
+            'language' => is_string($data['language'] ?? null) && '' !== $data['language']
+                ? $data['language']
+                : ($language ?? 'unknown'),
+            // Drives per-second billing in AiFacade, so it must be the provider's
+            // own measurement rather than anything we estimate locally.
+            'duration' => (float) ($data['duration'] ?? 0),
+            'words' => is_array($data['words'] ?? null) ? $data['words'] : [],
+        ];
+    }
+
+    public function translateAudio(string $audioPath, string $targetLang): string
+    {
+        throw new ProviderException('xAI has no audio translation endpoint. Transcribe with transcribe() and translate the text with a chat model instead.', self::PROVIDER_NAME);
+    }
+
+    // ==================== HELPERS: VOICE ====================
+
+    /**
+     * POST the synthesis request and return the raw audio bytes.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function requestSpeech(string $text, array $options): string
+    {
+        $this->assertApiKey();
+
+        $trimmed = trim($text);
+        if ('' === $trimmed) {
+            throw new ProviderException('xAI TTS needs a non-empty text.', self::PROVIDER_NAME);
+        }
+
+        $length = mb_strlen($trimmed);
+        if ($length > self::TTS_MAX_CHARS) {
+            throw new ProviderException(sprintf('xAI TTS accepts at most %d characters, got %d. Split the text into smaller chunks.', self::TTS_MAX_CHARS, $length), self::PROVIDER_NAME);
+        }
+
+        $codec = $this->ttsCodecFromOptions($options);
+        $body = [
+            'text' => $trimmed,
+            'voice_id' => is_string($options['voice'] ?? null) && '' !== $options['voice']
+                ? $options['voice']
+                : self::DEFAULT_TTS_VOICE,
+            'language' => is_string($options['language'] ?? null) && '' !== $options['language']
+                ? $options['language']
+                : self::DEFAULT_TTS_LANGUAGE,
+            'output_format' => ['codec' => $codec],
+        ];
+
+        if (is_numeric($options['speed'] ?? null)) {
+            $body['speed'] = (float) $options['speed'];
+        }
+
+        $this->logger->info('xAI: synthesize', [
+            'voice' => $body['voice_id'],
+            'language' => $body['language'],
+            'codec' => $codec,
+            'characters' => $length,
+        ]);
+
+        try {
+            $response = $this->httpClient->request('POST', self::TTS_ENDPOINT, [
+                'headers' => [
+                    'Authorization' => 'Bearer '.$this->apiKey,
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => $body,
+                'timeout' => self::TIMEOUT_AUDIO_SECONDS,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            $contentType = $response->getHeaders(false)['content-type'][0] ?? '';
+            // Never toArray() here: the success body is binary audio.
+            $content = $response->getContent(false);
+        } catch (HttpExceptionInterface $e) {
+            throw new ProviderException('xAI TTS failed: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
+        }
+
+        if ($statusCode >= 400) {
+            $decoded = json_decode($content, true);
+            $this->handleErrorResponse($statusCode, is_array($decoded) ? $decoded : ['message' => substr($content, 0, 500)]);
+        }
+
+        // `/v1/tts` answers with raw audio bytes. It only switches to a JSON
+        // envelope carrying base64 audio when `with_timestamps` is requested,
+        // which we never do — decode it anyway so a future default flip cannot
+        // silently write base64 text into an .mp3 file.
+        if (str_contains($contentType, 'application/json')) {
+            $content = $this->decodeSpeechEnvelope($content);
+        }
+
+        if ('' === $content) {
+            throw new ProviderException('xAI TTS returned no audio.', self::PROVIDER_NAME);
+        }
+
+        return $content;
+    }
+
+    private function decodeSpeechEnvelope(string $content): string
+    {
+        $payload = json_decode($content, true);
+        $base64 = is_array($payload) && is_string($payload['audio'] ?? null) ? $payload['audio'] : '';
+        if ('' === $base64) {
+            throw new ProviderException('xAI TTS returned a JSON response without audio.', self::PROVIDER_NAME);
+        }
+
+        $decoded = base64_decode($base64, true);
+        if (false === $decoded) {
+            throw new ProviderException('xAI TTS returned invalid base64 audio.', self::PROVIDER_NAME);
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function ttsCodecFromOptions(array $options): string
+    {
+        $requested = $options['format'] ?? null;
+        if (is_string($requested)) {
+            $normalized = 'ulaw' === $requested ? 'mulaw' : $requested;
+            if (isset(self::TTS_CODECS[$normalized])) {
+                return $normalized;
+            }
+        }
+
+        return self::DEFAULT_TTS_CODEC;
+    }
+
+    /**
+     * @return array<int, array{id: string, name: string, description: string}>
+     */
+    private function builtinVoices(): array
+    {
+        $voices = [];
+        foreach (self::TTS_BUILTIN_VOICES as $id => $description) {
+            $voices[] = ['id' => $id, 'name' => ucfirst($id), 'description' => $description];
+        }
+
+        return $voices;
+    }
+
+    private function resolveExistingAudioPath(string $audioPath): string
+    {
+        $fullPath = str_starts_with($audioPath, '/')
+            ? $audioPath
+            : $this->uploadDir.'/'.ltrim($audioPath, '/');
+
+        if (!file_exists($fullPath)) {
+            throw new ProviderException("Audio file not found: {$fullPath}", self::PROVIDER_NAME);
+        }
+
+        return $fullPath;
     }
 
     // ==================== HELPERS: CHAT ====================

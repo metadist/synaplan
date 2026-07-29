@@ -62,9 +62,12 @@ Chat and vision (Mistral Medium 3.5, Large 3) plus the Voxtral audio pair (trans
 XAI_API_KEY=your_key_here
 ```
 
-Long-context chat and image understanding (Grok 4.5 with a 500K window) plus Grok Imagine for image
-and video generation. Grok 4.5 always reasons at a fixed depth, so the Thinking toggle has no effect
-on it. Get a key at [console.x.ai](https://console.x.ai/) under **Team → API Keys**.
+Long-context chat and image understanding (Grok 4.5 with a 500K window), Grok Imagine for image and
+video generation, and Grok voice for speech synthesis and transcription. Grok 4.5 always reasons at a
+fixed depth, so the Thinking toggle has no effect on it. Grok TTS offers five built-in voices (eve,
+ara, rex, sal, leo) and delivers the audio in one piece — xAI streams synthesis over a WebSocket
+only, which this backend does not speak. The realtime Speech-to-Speech API is not supported. Get a
+key at [console.x.ai](https://console.x.ai/) under **Team → API Keys**.
 
 ### TrustedTokens (sovereign, Germany)
 

@@ -647,6 +647,47 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.05000000', $cheap->priceSnapshot['price_out_resolution']);
     }
 
+    public function testGrokTtsBillsPerCharacterOfInputText(): void
+    {
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn(
+            $this->createModelMock('xAI', 0.000015, 0.0, 'perChar', 'perChar', [
+                'pricing_mode' => 'per_character',
+            ], 'grok-tts'),
+        );
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // $15/1M chars → 2 000 characters * 0.000015 = $0.03. Output is ignored.
+        $result = $this->service->calculateMediaCost(320, 2000.0, 0.0);
+
+        $this->assertSame('0.030000', $result->totalCost);
+        $this->assertSame('0.030000', $result->inputCost);
+        $this->assertSame('0.000000', $result->outputCost);
+    }
+
+    /**
+     * The row is authored in $/hour, so the calculator must normalise to
+     * per-second before multiplying the clip length — otherwise a 90-second
+     * transcription would bill 3 600× too much.
+     */
+    public function testGrokSttBillsPerSecondFromAnHourlyRate(): void
+    {
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn(
+            $this->createModelMock('xAI', 0.10, 0.0, 'perhour', '-', [
+                'pricing_mode' => 'per_second',
+            ], 'grok-stt'),
+        );
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 1 hour of audio costs exactly the hourly rate.
+        $this->assertSame('0.100000', $this->service->calculateMediaCost(321, 3600.0, 0.0)->totalCost);
+        // 90 s * ($0.10 / 3600) = $0.0025
+        $this->assertSame('0.002500', $this->service->calculateMediaCost(321, 90.0, 0.0)->totalCost);
+    }
+
     public function testCostResultDtoStructure(): void
     {
         $result = new CostResult(

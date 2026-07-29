@@ -281,6 +281,8 @@ services:
             - { name: 'app.ai.vision' }
             - { name: 'app.ai.image_generation' }
             - { name: 'app.ai.video_generation' }
+            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.speech_to_text' }
 
     App\AI\Provider\GoogleProvider:
         arguments:

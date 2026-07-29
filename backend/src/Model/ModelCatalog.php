@@ -3142,5 +3142,65 @@ class ModelCatalog
                 'requires_reference_image' => true,
             ],
         ],
+        [
+            'id' => 320,
+            'service' => 'xAI',
+            'name' => 'Grok TTS',
+            'tag' => 'text2sound',
+            'selectable' => 1,
+            'active' => 1,
+            // POST /v1/tts takes no `model` field — the endpoint selects the
+            // model. This is xAI's documentation name, kept so the row has a
+            // stable provider key.
+            'providerId' => 'grok-tts',
+            // $15.00 per 1M characters → $0.000015 per character, billed on the
+            // input text (media_usage.characters). Mirrors the OpenAI tts-1 rows.
+            'priceIn' => 0.000015,
+            'inUnit' => 'perChar',
+            'priceOut' => 0,
+            'outUnit' => 'perChar',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok TTS - expressive speech synthesis with 5 built-in voices (eve, ara, rex, sal, leo), 20+ languages and inline speech tags. Max 15,000 characters per request.',
+                // Mandatory: without it the cost path falls through to
+                // per-token and every synthesis records $0.00 (issue #886b).
+                'pricing_mode' => 'per_character',
+                'params' => ['model' => 'grok-tts'],
+                'default_voice' => 'eve',
+                'voices' => ['eve', 'ara', 'rex', 'sal', 'leo'],
+                'max_characters' => 15000,
+                // Synthesis streams over a WebSocket only, which the PHP client
+                // cannot speak, so the provider delivers the audio unary.
+                'supportsStreaming' => false,
+                'features' => ['multilingual', 'speech_tags', 'custom_voices'],
+            ],
+        ],
+        [
+            'id' => 321,
+            'service' => 'xAI',
+            'name' => 'Grok STT',
+            'tag' => 'sound2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-stt',
+            // REST transcription is $0.10 per hour of audio. (The streaming
+            // WebSocket variant costs $0.20/hour and is not implemented, so no
+            // request can be billed at that rate.)
+            'priceIn' => 0.10,
+            'inUnit' => 'perhour',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok STT - speech-to-text via POST /v1/stt with word-level timestamps, speaker diarization and key-term biasing. Up to 500 MB per file.',
+                // Billed on the audio duration the provider reports (perhour →
+                // per-second at bill time, #1314).
+                'pricing_mode' => 'per_second',
+                'params' => ['model' => 'grok-stt'],
+                'features' => ['timestamps', 'diarization', 'multilingual'],
+            ],
+        ],
     ];
 }

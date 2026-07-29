@@ -31,7 +31,7 @@ For each provider block in `ModelCatalog.php`, work through all seven steps. Ste
 **Scope — which blocks to touch:**
 
 - **LiteLLM-synced (do NOT hand-edit numbers):** Anthropic, OpenAI, Google, Groq, plus the xAI **chat/vision** rows. Their prices come from `app:sync-model-prices`. To verify, run `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run` and eyeball the diff against the official pages; only touch the catalog for something LiteLLM gets wrong (record why).
-- **Manual (the full 7-step playbook applies):** Kimi/HuggingFace, TheHive, Higgsfield, Mistral, Cloudflare Workers AI, and the xAI **Grok Imagine** rows. These are the rows in the status table (§"NOT covered by LiteLLM sync").
+- **Manual (the full 7-step playbook applies):** Kimi/HuggingFace, TheHive, Higgsfield, Mistral, Cloudflare Workers AI, and the xAI **Grok Imagine + voice** rows. These are the rows in the status table (§"NOT covered by LiteLLM sync").
 - **Skip:** Piper / Triton (free/local, `pricing_mode` effectively free).
 
 **When to re-verify (don't just trust a ✅):** treat any status row whose "verified" date is **older than 30 days** as unverified and redo the 7 steps. A price you didn't check this run is *not* verified, regardless of the table.
@@ -71,6 +71,7 @@ Provider billing-mechanics cheat-sheet (verified 2026-07-13):
 | Higgsfield | **per-clip credits** (not per-second!) | resolution, clip length | **yes** (failed/NSFW/cancelled auto-refunded) | resolution + duration (see #1317) |
 | xAI (chat/vision) | per-token, cache-read discount | **prompt length** (2× above 200k) | n/a | `reasoning_effort` (changes output token volume, not the rate) |
 | xAI (Grok Imagine) | image: per-image · video: **per-second** | video: resolution | **no** (no cancel endpoint) | resolution + duration |
+| xAI (voice) | TTS: **per character** · STT: **per second** (authored $/hour) | — | n/a | text length · audio duration |
 
 ## HuggingFace routing — DECIDED: pin DeepInfra
 
@@ -129,12 +130,12 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | **Mistral** | ✅ verified 2026-07-13 — all correct | https://mistral.ai/pricing/api/ |
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
 | **TrustedTokens** | ✅ verified 2026-07-27 | https://trustedtokens.eu/api/billing/models |
-| **xAI Grok Imagine** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
+| **xAI Grok Imagine + voice** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
 
 ### xAI / Grok (verified 2026-07-29)
 
-OpenAI-compatible chat/vision at `https://api.x.ai/v1` plus the Grok Imagine media endpoints. Catalog stores **USD per 1M tokens**; cache-read rates live in `json.cache_read_price_per_1M`.
+OpenAI-compatible chat/vision at `https://api.x.ai/v1`, plus the Grok Imagine media endpoints and the voice endpoints (`/v1/tts`, `/v1/stt` — note: NOT OpenAI's `/v1/audio/*`). Catalog stores **USD per 1M tokens** for the token rows; cache-read rates live in `json.cache_read_price_per_1M`.
 
 | BID | Model | Catalog in/out | Official (cache) | Long context (> 200k) | Context |
 | --- | ----- | -------------- | ---------------- | --------------------- | ------- |
@@ -143,6 +144,8 @@ OpenAI-compatible chat/vision at `https://api.x.ai/v1` plus the Grok Imagine med
 | 317 | `grok-imagine-video` | — / $0.07 per second | 480p $0.05 · 720p $0.07 | n/a | 1–15 s |
 | 318 | `grok-imagine-image-quality` | — / $0.05 per image | 1k $0.05 · 2k $0.07 | n/a | n/a |
 | 319 | `grok-imagine-video-1.5` | — / $0.14 per second | 480p $0.08 · 720p $0.14 · 1080p $0.25 | n/a | 1–15 s |
+| 320 | `grok-tts` | $0.000015 per character | $15.00 / 1M characters | n/a | max 15,000 chars |
+| 321 | `grok-stt` | $0.10 per hour | $0.10/hr (REST) · $0.20/hr (streaming) | n/a | max 500 MB |
 
 The **> 200k long-context tier doubles the whole request**, so it lives in `ModelCatalog::CONTEXT_PRICING` (keyed by `providerId`, which covers the chat and the vision row at once) rather than in the model rows.
 
@@ -159,7 +162,11 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 - **`grok-imagine-video-1.5` is image-to-video only.** It carries `features: ['image2video']` + `requires_reference_image`, so `MediaGenerationHandler` explains the missing reference image instead of leaking a provider 400. It is reachable through the IMG2VID default-model slot, which shares the `text2vid` BTAG. Because `XaiProvider` implements `SupportsInlineReferenceImage`, the handler passes the local upload path and the provider inlines it as a data URI — so image-to-video works on xAI without an internet-reachable `APP_URL`, unlike Higgsfield and Veo.
 - **No refund on cancel.** xAI has no cancel endpoint for deferred video renders, so `cancelVideoOperation()` only stops our polling; the render completes upstream and stays billable.
 - **`reasoning_effort` is a grok-4.3-only parameter**, and grok-4.3 is not in the catalog. xAI documents the knob for that model alone (`none` / `low` (default) / `medium` / `high`), so `XaiProvider::REASONING_EFFORT_MODELS` gates it. `grok-4.5`'s reasoning depth — and therefore its output token volume — is not controllable, so a Thinking toggle cannot reduce its cost.
-- **Embeddings, voice, and the server-side tools** (web search, X search, code execution) are intentionally not wired up: xAI publishes no price for `/v1/embeddings`, and without a price there can be no correct usage accounting.
+- **The voice rows MUST keep their `pricing_mode`.** BID 320 needs `pricing_mode: per_character` and BID 321 needs `per_second`; without it the cost path falls through to per-token and records $0.00 for every call (issue #886b). BID 321 is authored in `$/hour`, which `CostCalculationService` normalises to per-second, so the clip length must never be pre-divided.
+- **Only the REST transcription rate is reachable.** xAI charges $0.20/hour for the streaming STT WebSocket, but `XaiProvider` implements the `POST /v1/stt` REST path only, so no request can be billed at the higher rate. If streaming STT is ever added it needs its own catalog row.
+- **TTS has no per-request cap beyond the character limit.** `/v1/tts` rejects text over 15,000 characters, and the provider checks that locally so the user gets a readable message instead of a 400. Longer texts must be split by the caller — each chunk is billed separately.
+- **The realtime Speech-to-Speech API is deliberately not wired up.** It bills per session minute ($0.05/min, plus $0.004 per text input message) over a WebSocket, and this application has no realtime-voice capability to attach it to. Adding it would need a new capability, a new pricing mode, and session-duration metering.
+- **Embeddings and the server-side tools** (web search, X search, code execution) are intentionally not wired up: xAI publishes no price for `/v1/embeddings`, and without a price there can be no correct usage accounting.
 
 ### TrustedTokens (verified 2026-07-27)
 

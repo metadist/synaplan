@@ -60,6 +60,8 @@ class XaiProviderTest extends TestCase
         $this->assertContains('vision', $capabilities);
         $this->assertContains('image_generation', $capabilities);
         $this->assertContains('video_generation', $capabilities);
+        $this->assertContains('text_to_speech', $capabilities);
+        $this->assertContains('speech_to_text', $capabilities);
     }
 
     public function testStatusHealthyWhenConfigured(): void
@@ -670,6 +672,211 @@ class XaiProviderTest extends TestCase
         $this->makeProvider(httpClient: $client)->cancelVideoOperation('not-json');
 
         $this->expectNotToPerformAssertions();
+    }
+
+    // ==================== TEXT TO SPEECH ====================
+
+    public function testSynthesizeThrowsWithoutApiKey(): void
+    {
+        $this->expectExceptionMessageContains('XAI_API_KEY');
+        $this->makeProvider(apiKey: null)->synthesize('hello');
+    }
+
+    public function testSynthesizeWritesTheRawAudioResponseToAFile(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = ['method' => $method, 'url' => $url, 'body' => json_decode($opts['body'], true)];
+
+            return new MockResponse('ID3RAWMP3BYTES', ['response_headers' => ['content-type' => 'audio/mpeg']]);
+        });
+
+        $filename = $this->makeProvider(httpClient: $client)->synthesize('  Hallo Welt  ', [
+            'voice' => 'ara',
+            'language' => 'de',
+            'speed' => 1.25,
+        ]);
+
+        $this->assertSame('POST', $captured['method']);
+        $this->assertSame('https://api.x.ai/v1/tts', $captured['url']);
+        // The text is trimmed and `language` is always sent — /v1/tts requires it.
+        $this->assertSame('Hallo Welt', $captured['body']['text']);
+        $this->assertSame('ara', $captured['body']['voice_id']);
+        $this->assertSame('de', $captured['body']['language']);
+        $this->assertSame(['codec' => 'mp3'], $captured['body']['output_format']);
+        $this->assertSame(1.25, $captured['body']['speed']);
+
+        $this->assertStringEndsWith('.mp3', $filename);
+        $this->assertSame('ID3RAWMP3BYTES', file_get_contents($this->tempDir.'/'.$filename));
+    }
+
+    public function testSynthesizeDefaultsToEveAndAutoLanguage(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return new MockResponse('AUDIO');
+        });
+
+        $this->makeProvider(httpClient: $client)->synthesize('hello');
+
+        $this->assertSame('eve', $captured['voice_id']);
+        $this->assertSame('auto', $captured['language']);
+        $this->assertArrayNotHasKey('speed', $captured);
+    }
+
+    /**
+     * `/v1/tts` returns raw bytes unless timestamps are requested. Decoding the
+     * JSON envelope anyway keeps a future default flip from writing base64 text
+     * into an audio file.
+     */
+    public function testSynthesizeDecodesABase64JsonEnvelope(): void
+    {
+        $client = new MockHttpClient(fn () => $this->jsonResponse([
+            'audio' => base64_encode('DECODEDAUDIO'),
+            'content_type' => 'audio/mpeg',
+            'duration' => 1.5,
+        ]));
+
+        $filename = $this->makeProvider(httpClient: $client)->synthesize('hello');
+
+        $this->assertSame('DECODEDAUDIO', file_get_contents($this->tempDir.'/'.$filename));
+    }
+
+    public function testSynthesizeRejectsTextBeyondTheProviderLimit(): void
+    {
+        $this->expectExceptionMessageContains('at most 15000 characters');
+        $this->makeProvider()->synthesize(str_repeat('a', 15001));
+    }
+
+    public function testSynthesizeRejectsEmptyText(): void
+    {
+        $this->expectExceptionMessageContains('non-empty text');
+        $this->makeProvider()->synthesize("  \n ");
+    }
+
+    public function testCodecDrivesFileExtensionAndStreamContentType(): void
+    {
+        $client = new MockHttpClient(fn () => new MockResponse('WAVBYTES'));
+        $provider = $this->makeProvider(httpClient: $client);
+
+        $filename = $provider->synthesize('hello', ['format' => 'wav']);
+
+        $this->assertStringEndsWith('.wav', $filename);
+        $this->assertSame('audio/wav', $provider->getStreamContentType(['format' => 'wav']));
+        $this->assertSame('audio/mpeg', $provider->getStreamContentType());
+        // An unsupported codec must fall back rather than reach xAI.
+        $this->assertSame('audio/mpeg', $provider->getStreamContentType(['format' => 'flac']));
+    }
+
+    /**
+     * xAI streams synthesis over a WebSocket only, so the provider reports no
+     * streaming support and replays the unary result from disk instead.
+     */
+    public function testSynthesizeStreamReplaysTheUnaryResultAndCleansUp(): void
+    {
+        $client = new MockHttpClient(fn () => new MockResponse('STREAMED'));
+        $provider = $this->makeProvider(httpClient: $client);
+
+        $this->assertFalse($provider->supportsStreaming());
+
+        $chunks = iterator_to_array($provider->synthesizeStream('hello'));
+
+        $this->assertSame('STREAMED', implode('', $chunks));
+        $this->assertSame([], glob($this->tempDir.'/tts_*') ?: []);
+    }
+
+    public function testGetVoicesMapsTheLiveRoster(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$captured): MockResponse {
+            $captured = ['method' => $method, 'url' => $url];
+
+            return $this->jsonResponse(['voices' => [
+                ['voice_id' => 'eve', 'name' => 'Eve', 'description' => 'energetic'],
+                ['voice_id' => 'custom01'],
+                ['not' => 'a voice'],
+            ]]);
+        });
+
+        $voices = $this->makeProvider(httpClient: $client)->getVoices();
+
+        $this->assertSame('GET', $captured['method']);
+        $this->assertSame('https://api.x.ai/v1/tts/voices', $captured['url']);
+        $this->assertSame(['eve', 'custom01'], array_column($voices, 'id'));
+        $this->assertSame('custom01', $voices[1]['name']);
+    }
+
+    public function testGetVoicesFallsBackToTheBuiltInRoster(): void
+    {
+        $client = new MockHttpClient(fn () => $this->jsonResponse(['error' => ['message' => 'boom']], 500));
+
+        $voices = $this->makeProvider(httpClient: $client)->getVoices();
+
+        $this->assertSame(['eve', 'ara', 'rex', 'sal', 'leo'], array_column($voices, 'id'));
+        // Without a key we must not even attempt the request.
+        $this->assertSame($voices, $this->makeProvider(apiKey: null)->getVoices());
+    }
+
+    // ==================== SPEECH TO TEXT ====================
+
+    public function testTranscribeThrowsWithoutApiKey(): void
+    {
+        $this->expectExceptionMessageContains('XAI_API_KEY');
+        $this->makeProvider(apiKey: null)->transcribe('clip.mp3');
+    }
+
+    public function testTranscribeThrowsWhenFileMissing(): void
+    {
+        $this->expectExceptionMessageContains('Audio file not found');
+        $this->makeProvider()->transcribe('does-not-exist.mp3');
+    }
+
+    public function testTranscribeReturnsTextAndTheBillableDuration(): void
+    {
+        $file = $this->tempDir.'/clip.mp3';
+        file_put_contents($file, 'AUDIO');
+
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$captured): MockResponse {
+            $captured = ['method' => $method, 'url' => $url];
+
+            return $this->jsonResponse([
+                'text' => 'The balance is $167,983.15.',
+                // xAI currently always answers with an empty language.
+                'language' => '',
+                'duration' => 8.4,
+                'words' => [['text' => 'The', 'start' => 0, 'end' => 0.24]],
+            ]);
+        });
+
+        $result = $this->makeProvider(httpClient: $client)->transcribe('clip.mp3', ['language' => 'en']);
+
+        $this->assertSame('POST', $captured['method']);
+        $this->assertSame('https://api.x.ai/v1/stt', $captured['url']);
+        $this->assertSame('The balance is $167,983.15.', $result['text']);
+        // Falls back to the requested language while detection is disabled.
+        $this->assertSame('en', $result['language']);
+        // Drives per-second billing, so it must survive as a float.
+        $this->assertSame(8.4, $result['duration']);
+        $this->assertCount(1, $result['words']);
+    }
+
+    public function testTranscribeSurfacesProviderErrors(): void
+    {
+        file_put_contents($this->tempDir.'/clip.mp3', 'AUDIO');
+
+        $client = new MockHttpClient(fn () => $this->jsonResponse(['error' => ['message' => 'unsupported codec']], 400));
+
+        $this->expectExceptionMessageContains('unsupported codec');
+        $this->makeProvider(httpClient: $client)->transcribe('clip.mp3');
+    }
+
+    public function testTranslateAudioIsRejectedWithAnActionableMessage(): void
+    {
+        $this->expectExceptionMessageContains('no audio translation endpoint');
+        $this->makeProvider()->translateAudio('clip.mp3', 'de');
     }
 
     // ==================== HELPERS ====================
