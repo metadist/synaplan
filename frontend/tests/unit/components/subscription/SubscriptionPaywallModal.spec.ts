@@ -164,6 +164,30 @@ describe('SubscriptionPaywallModal', () => {
     expect(offered).toEqual(['TEAM', 'BUSINESS'])
   })
 
+  it('keeps offering a tier the hierarchy does not know', async () => {
+    mockAuth.isAuthenticated = true
+    mockAuth.user = { level: 'PRO' }
+    mockGetPlans.mockResolvedValue({
+      plans: [plan('PRO', 19.95), plan('STUDIO', 29.95)],
+      stripeConfigured: true,
+    })
+
+    const wrapper = await mountPaywall()
+
+    const offered = wrapper
+      .findAll('[data-testid="paywall-plan-card"]')
+      .map((card) => card.attributes('data-plan-id'))
+    expect(offered).toEqual(['STUDIO'])
+  })
+
+  it('announces the reason it was opened for', async () => {
+    const wrapper = await mountPaywall()
+
+    const dialog = wrapper.find('[data-testid="subscription-paywall"]')
+    expect(dialog.attributes('aria-labelledby')).toBe('paywall-title')
+    expect(wrapper.find('#paywall-title').text()).toBe('Your free messages are used up')
+  })
+
   it('offers Restore Purchases and drops the backdrop in the native shell', async () => {
     nativeShell = true
 

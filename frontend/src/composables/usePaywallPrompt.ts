@@ -70,8 +70,9 @@ export function usePaywallPrompt() {
   }
 
   /**
-   * `hasQuotaLeft` lets the caller pass what it knows about the current block:
-   * a paying user is only eligible while their monthly allowance is gone.
+   * A hard trigger passes for anyone who can still buy something — the caller
+   * only raises it once the allowance is actually gone. The `reminder` trigger
+   * is narrower: guests and free accounts see it, paying tiers never do.
    */
   function isEligible(reason: PaywallReason): boolean {
     if (!canSell() || !hasUpgradePath()) return false

@@ -8,7 +8,8 @@
         :class="isNative ? 'items-stretch' : 'items-center p-4'"
         role="dialog"
         aria-modal="true"
-        :aria-label="$t('paywall.title.reminder')"
+        aria-labelledby="paywall-title"
+        aria-describedby="paywall-subtitle"
       >
         <div
           v-if="!isNative"
@@ -46,10 +47,10 @@
               >
                 <Icon icon="mdi:rocket-launch-outline" class="w-7 h-7 text-[var(--brand)]" />
               </div>
-              <h2 class="text-2xl md:text-3xl font-bold txt-primary mb-2">
+              <h2 id="paywall-title" class="text-2xl md:text-3xl font-bold txt-primary mb-2">
                 {{ $t(`paywall.title.${reason}`) }}
               </h2>
-              <p class="txt-secondary text-sm md:text-base">
+              <p id="paywall-subtitle" class="txt-secondary text-sm md:text-base">
                 {{ $t(`paywall.subtitle.${reason}`) }}
               </p>
             </div>

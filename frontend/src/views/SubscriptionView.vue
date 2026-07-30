@@ -317,11 +317,15 @@ const {
 /**
  * Tier pre-selected by the paywall modal via `?plan=<tier>`; the matching card
  * is highlighted and scrolled into view so the user lands on the plan they
- * picked before signing up.
+ * picked before signing up. Only a tier the server actually offers counts — a
+ * stale or hand-edited link then simply shows the normal page instead of
+ * promising a plan that does not exist.
  */
 const preselectedPlan = computed(() => {
   const raw = route.query.plan
-  return 'string' === typeof raw ? raw.toUpperCase() : null
+  if ('string' !== typeof raw) return null
+  const wanted = raw.toUpperCase()
+  return plans.value.some((plan) => plan.id === wanted) ? wanted : null
 })
 
 const isHighestPlan = computed(() => {
@@ -464,9 +468,14 @@ onMounted(async () => {
 })
 
 async function scrollToPreselectedPlan(): Promise<void> {
-  if (!preselectedPlan.value) return
+  const wanted = preselectedPlan.value
+  if (!wanted) return
   await nextTick()
-  const card = document.querySelector(`[data-plan-id="${preselectedPlan.value}"]`)
+  // Match on the attribute value instead of interpolating it into a selector,
+  // which would throw a DOMException on quotes or brackets.
+  const card = Array.from(document.querySelectorAll('[data-plan-id]')).find(
+    (el) => el.getAttribute('data-plan-id') === wanted
+  )
   card?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 </script>

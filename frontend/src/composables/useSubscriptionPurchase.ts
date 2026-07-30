@@ -105,12 +105,19 @@ export function useSubscriptionPurchase(options: UseSubscriptionPurchaseOptions 
     return currentLevel.value === planId
   }
 
+  /**
+   * Whether `planId` ranks below the tier the user already has, which the
+   * surfaces dim. A tier missing from {@link PLAN_HIERARCHY} — a new or custom
+   * one from the backend — is deliberately not ranked: it stays fully offered
+   * rather than being dimmed away as if it were a downgrade.
+   */
   function isLowerPlan(planId: string): boolean {
     if (!currentLevel.value) return false
     const currentIndex = PLAN_HIERARCHY.indexOf(
       currentLevel.value as (typeof PLAN_HIERARCHY)[number]
     )
     const planIndex = PLAN_HIERARCHY.indexOf(planId as (typeof PLAN_HIERARCHY)[number])
+    if (0 > currentIndex || 0 > planIndex) return false
     return planIndex < currentIndex
   }
 
