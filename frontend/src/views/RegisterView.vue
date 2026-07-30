@@ -440,7 +440,6 @@ import { useBrandLogo } from '@/composables/useBrandLogo'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { useSocialAuth } from '@/composables/useSocialAuth'
 import { consumePendingRedirect, isSafeRedirectPath } from '@/utils/pendingAuthRedirect'
-import { postAuthTargetPath } from '@/services/iapPurchaseIntent'
 
 const router = useRouter()
 const route = useRoute()
@@ -547,8 +546,7 @@ const handleSocialLogin = async (provider: string) => {
   const redirect = route.query.redirect as string | undefined
   if (await signInWith(provider, redirect)) {
     const queryPath = isSafeRedirectPath(redirect) ? redirect : null
-    // A pending purchase intent wins over redirect hints — see postAuthTargetPath.
-    router.push(postAuthTargetPath(queryPath ?? consumePendingRedirect()))
+    router.push(queryPath ?? consumePendingRedirect() ?? '/')
   }
 }
 </script>

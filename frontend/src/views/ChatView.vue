@@ -339,8 +339,16 @@
       @verify-phone="closeLimitModal"
     />
 
-    <!-- Guest Signup Modal (shown when guest message limit is reached) -->
+    <!-- Guest Signup Modal (fallback when there is no purchase channel) -->
     <GuestSignupModal :is-open="showGuestSignupModal" @close="showGuestSignupModal = false" />
+
+    <!-- Upgrade paywall (trial spent, monthly allowance spent, daily reminder) -->
+    <SubscriptionPaywallModal
+      :is-open="isPaywallOpen"
+      :reason="paywallReason"
+      @close="closePaywall"
+      @unavailable="fallBackFromPaywall"
+    />
 
     <!-- Guest hint popover (shown when a guest taps a restricted feature) -->
     <GuestHintPopover
@@ -455,7 +463,7 @@ import { useFeedbackStore } from '@/stores/userFeedback'
 import { useIncognitoStore } from '@/stores/incognito'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
-import { useLimitCheck } from '@/composables/useLimitCheck'
+import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
 import { prefetchSseToken } from '@/services/api/chatApi'
@@ -498,6 +506,8 @@ import GuestBanner from '@/components/guest/GuestBanner.vue'
 import PendingPurchaseBanner from '@/components/guest/PendingPurchaseBanner.vue'
 import GuestSignupModal from '@/components/guest/GuestSignupModal.vue'
 import GuestHintPopover from '@/components/guest/GuestHintPopover.vue'
+import SubscriptionPaywallModal from '@/components/subscription/SubscriptionPaywallModal.vue'
+import { paywallReasonForLimit, usePaywallPrompt } from '@/composables/usePaywallPrompt'
 import { hasPendingIapRedemption } from '@/services/nativeIap'
 import { usePromoTips } from '@/composables/usePromoTips'
 import { useDateFormat } from '@/composables/useDateFormat'
@@ -515,6 +525,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
+const { isPaywallOpen, paywallReason, shouldRemind, openPaywall, closePaywall } = usePaywallPrompt()
 const { error: showErrorToast, success: showSuccessToast } = useNotification()
 
 const chatContainer = ref<HTMLElement | null>(null)
@@ -572,6 +583,53 @@ const welcomeGreeting = computed(() => {
 const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
+
+/** The block that opened the paywall, kept so the fallback modal can show it. */
+const blockedLimit = ref<LimitCheckResult | null>(null)
+
+/**
+ * A blocked message either opens the upgrade paywall or the plain informational
+ * limit modal — `paywallReasonForLimit` owns which block deserves which.
+ */
+function showLimitOrPaywall(result: LimitCheckResult): void {
+  blockedLimit.value = result
+  const reason = paywallReasonForLimit(result)
+
+  if (reason && openPaywall(reason)) {
+    return
+  }
+  checkAndShowLimit(result)
+}
+
+/**
+ * The paywall has nothing to sell (catalogue unreachable, or every tier above
+ * this user deactivated). Hand the user back to the modal the paywall replaced
+ * so a blocked message still explains itself; a mere reminder just goes away.
+ */
+function fallBackFromPaywall(): void {
+  const reason = paywallReason.value
+  closePaywall()
+
+  if ('guest_limit' === reason) {
+    showGuestSignupModal.value = true
+    return
+  }
+  if ('reminder' === reason) return
+  if (blockedLimit.value) checkAndShowLimit(blockedLimit.value)
+}
+
+/**
+ * Opportunistic upgrade reminder, throttled to once a day by
+ * `usePaywallPrompt`. Skipped in a brand-new session so nothing pops up right
+ * after onboarding — the user has to have sent something first.
+ */
+function maybeRemindAboutUpgrade(): void {
+  const hasUsedTheApp = authStore.isAuthenticated
+    ? historyStore.messages.length > 0
+    : guestStore.messageCount > 0
+  if (!hasUsedTheApp || !shouldRemind()) return
+  openPaywall('reminder')
+}
 
 // Empty landing: no messages, not loading, and not the guest-error state.
 // Keeps the welcome content vertically centered while the composer remains
@@ -730,6 +788,7 @@ onMounted(async () => {
 
     window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
     window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+    maybeRemindAboutUpgrade()
     return
   }
 
@@ -791,6 +850,8 @@ onMounted(async () => {
   prefetchSseToken()
   window.addEventListener('focus', prefetchSseToken)
   document.addEventListener('visibilitychange', handleVisibilityChangeForToken)
+
+  maybeRemindAboutUpgrade()
 })
 
 const handleVisibilityChangeForToken = () => {
@@ -1970,7 +2031,12 @@ const streamAIResponse = async (
             // authenticated rate-limit path (removeMessage), otherwise the
             // guest sees a blank bubble above the signup modal.
             historyStore.removeMessage(messageId)
-            showGuestSignupModal.value = true
+            // The trial is over, so the upgrade sheet is the useful next step.
+            // Without a purchase channel (billing off / custom server) it is not
+            // eligible and the plain signup modal takes over.
+            if (!openPaywall('guest_limit')) {
+              showGuestSignupModal.value = true
+            }
             processingStatus.value = ''
             processingMetadata.value = {}
             streamingAbortController = null
@@ -3342,7 +3408,7 @@ const streamAIResponse = async (
                 })
               }
 
-              checkAndShowLimit({
+              showLimitOrPaywall({
                 allowed: false,
                 limitType:
                   data.limit_type === 'hourly' ||
@@ -3377,7 +3443,7 @@ const streamAIResponse = async (
             ) {
               historyStore.removeMessage(messageId)
 
-              checkAndShowLimit({
+              showLimitOrPaywall({
                 allowed: false,
                 limitType: 'monthly',
                 actionType: data.action_type || 'MESSAGES',

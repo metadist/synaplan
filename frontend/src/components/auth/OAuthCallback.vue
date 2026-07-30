@@ -80,7 +80,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
 import { clearPendingRedirect, consumePendingRedirect } from '@/utils/pendingAuthRedirect'
-import { postAuthTargetPath } from '@/services/iapPurchaseIntent'
 import Button from '../Button.vue'
 
 const router = useRouter()
@@ -136,8 +135,7 @@ onMounted(async () => {
         const result = await authStore.handleOAuthCallback()
 
         if (result) {
-          // A pending purchase intent wins over redirect hints — see postAuthTargetPath.
-          const target = postAuthTargetPath(consumePendingRedirect())
+          const target = consumePendingRedirect() ?? '/'
           // Clear URL params for clean history
           window.history.replaceState({}, document.title, '/auth/callback')
 

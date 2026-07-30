@@ -115,9 +115,9 @@ const router = createRouter({
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.loggedOut' },
     },
     {
-      // MOBILE-APP SEAM (first-run onboarding): native-only first-run flow
-      // (welcome → plans). Web builds never navigate here — the beforeEach
-      // guard redirects the route away unless the flow applies.
+      // MOBILE-APP SEAM (first-run onboarding): native-only first-run welcome
+      // page. Web builds never navigate here — the beforeEach guard redirects
+      // the route away unless the flow applies.
       path: '/onboarding',
       name: 'onboarding',
       component: () => import('@/views/OnboardingView.vue'),
@@ -667,10 +667,10 @@ router.beforeEach(async (to, from, next) => {
     next(resolveDefaultRoute())
   } else if (to.name === 'chat' && !authenticated && !useGuestStore().isGuestMode) {
     // MOBILE-APP SEAM (first-run onboarding): the very first entry navigation
-    // of a signed-out native user goes to the one-time onboarding flow
-    // (welcome → plans). `shouldShowOnboarding` is false on web, for
-    // signed-in users, after completion/skip, and for existing guest sessions
-    // — so this branch is a no-op everywhere except the app's true first run.
+    // of a signed-out native user goes to the one-time welcome page.
+    // `shouldShowOnboarding` is false on web, for signed-in users, after
+    // completion, and for existing guest sessions — so this branch is a no-op
+    // everywhere except the app's true first run.
     if (shouldShowOnboarding(authenticated)) {
       next({ name: 'onboarding' })
       return
@@ -687,7 +687,7 @@ router.beforeEach(async (to, from, next) => {
       next()
     }
   } else if (to.name === 'onboarding' && (!isNativeApp() || authenticated)) {
-    // MOBILE-APP SEAM (first-run onboarding): the flow is native-only and for
+    // MOBILE-APP SEAM (first-run onboarding): the page is native-only and for
     // signed-out users. Web or signed-in navigations bounce to their normal
     // entry. No loop is possible: the chat branch above only redirects here
     // while `shouldShowOnboarding` is true, which requires native + signed-out.

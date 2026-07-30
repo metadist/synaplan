@@ -6,25 +6,18 @@ import { mount, flushPromises } from '@vue/test-utils'
  * logic (probe, persist) behind the `nativeServer.ts` seam. `saveNativeServerUrl`
  * only persists — the modal is responsible for calling `reloadNativeApp()`
  * itself once the save succeeds. This spec pins the two paths the SPA
- * controls: a rejected probe surfaces an error and rolls the resume step back,
- * and a successful save emits `saved` and reloads.
+ * controls: a rejected probe surfaces an error and does not reload, and a
+ * successful save emits `saved` and reloads.
  */
 
 const mockSave = vi.fn()
 const mockReload = vi.fn()
-const mockSetResume = vi.fn()
-const mockClearResume = vi.fn()
 
 vi.mock('@/services/api/nativeServer', () => ({
   getNativeServerUrl: () => 'https://web.synaplan.com',
   getNativeDefaultServerUrl: () => 'https://web.synaplan.com',
   saveNativeServerUrl: (...args: unknown[]) => mockSave(...args),
   reloadNativeApp: (...args: unknown[]) => mockReload(...args),
-}))
-
-vi.mock('@/composables/useOnboarding', () => ({
-  setOnboardingResumeStep: (...args: unknown[]) => mockSetResume(...args),
-  clearOnboardingResumeStep: (...args: unknown[]) => mockClearResume(...args),
 }))
 
 vi.mock('@iconify/vue', () => ({
@@ -57,7 +50,7 @@ describe('OnboardingServerModal', () => {
     expect(mockSave).not.toHaveBeenCalled()
   })
 
-  it('surfaces an error and rolls back the resume step when the probe rejects', async () => {
+  it('surfaces an error when the probe rejects', async () => {
     mockSave.mockResolvedValue({ ok: false, error: 'Server unreachable.' })
     const wrapper = mountModal()
 
@@ -65,8 +58,6 @@ describe('OnboardingServerModal', () => {
     await wrapper.find('[data-testid="btn-server-connect"]').trigger('click')
     await flushPromises()
 
-    expect(mockSetResume).toHaveBeenCalledWith(1)
-    expect(mockClearResume).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[data-testid="text-server-error"]').text()).toBe('Server unreachable.')
     expect(wrapper.emitted('saved')).toBeUndefined()
     expect(mockReload).not.toHaveBeenCalled()
@@ -80,9 +71,7 @@ describe('OnboardingServerModal', () => {
     await wrapper.find('[data-testid="btn-server-connect"]').trigger('click')
     await flushPromises()
 
-    expect(mockSetResume).toHaveBeenCalledWith(1)
     expect(mockSave).toHaveBeenCalledWith('https://good.example.com')
-    expect(mockClearResume).not.toHaveBeenCalled()
     expect(wrapper.emitted('saved')).toHaveLength(1)
     expect(mockReload).toHaveBeenCalledTimes(1)
   })

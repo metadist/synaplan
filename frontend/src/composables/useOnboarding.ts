@@ -16,15 +16,7 @@ import { GUEST_STORAGE_KEY } from '@/stores/guest'
 
 const COMPLETED_KEY = 'synaplan.onboardingCompleted'
 
-/**
- * Switching the server from the own-server modal (page 1) reloads the WebView
- * (app-owned behavior of `SynaplanServer.save`). The step to resume at survives
- * that reload in sessionStorage — and evaporates with the session, so a later
- * cold start never jumps into the middle of the flow.
- */
-const RESUME_STEP_KEY = 'synaplan.onboardingResumeStep'
-
-/** True once the user finished or skipped the first-run onboarding. */
+/** True once the user finished the first-run onboarding. */
 export function isOnboardingCompleted(): boolean {
   try {
     return '1' === localStorage.getItem(COMPLETED_KEY)
@@ -34,7 +26,7 @@ export function isOnboardingCompleted(): boolean {
   }
 }
 
-/** Persist that the first-run onboarding is done (finish or skip). */
+/** Persist that the first-run onboarding is done. */
 export function markOnboardingCompleted(): void {
   try {
     localStorage.setItem(COMPLETED_KEY, '1')
@@ -67,37 +59,4 @@ export function shouldShowOnboarding(isAuthenticated: boolean): boolean {
     return false
   }
   return true
-}
-
-/** Remember the step to resume at across the server-switch WebView reload. */
-export function setOnboardingResumeStep(step: number): void {
-  try {
-    sessionStorage.setItem(RESUME_STEP_KEY, String(step))
-  } catch {
-    /* no-op */
-  }
-}
-
-/** Drop a remembered resume step (e.g. the server probe failed → no reload). */
-export function clearOnboardingResumeStep(): void {
-  try {
-    sessionStorage.removeItem(RESUME_STEP_KEY)
-  } catch {
-    /* no-op */
-  }
-}
-
-/** Read + clear the resume step in one shot; null when there is none. */
-export function consumeOnboardingResumeStep(): number | null {
-  try {
-    const raw = sessionStorage.getItem(RESUME_STEP_KEY)
-    sessionStorage.removeItem(RESUME_STEP_KEY)
-    if (null === raw) {
-      return null
-    }
-    const step = Number.parseInt(raw, 10)
-    return Number.isInteger(step) && step >= 1 && step <= 2 ? step : null
-  } catch {
-    return null
-  }
 }
