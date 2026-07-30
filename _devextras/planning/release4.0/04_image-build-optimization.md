@@ -1,6 +1,6 @@
 # Feature 3 — Image & first-boot optimization ("fast first boot")
 
-**Release:** 4.0 · **Priority:** P1 (developer-experience / OSS adoption) · **Status:** Planned (2026-06-23)
+**Release:** 4.0 · **Priority:** P1 (developer-experience / OSS adoption) · **Status:** Workstream A in progress (`synaplan-base-php` branch `feat/multi-arch-base`, 2026-07-30)
 **Type:** Infra / DevEx (not user-facing) — spans `synaplan`, `synaplan-base-php`, and a new `synaplan-ollama` repo.
 
 > Goal: a first-time user who clones `synaplan` and runs `docker compose up`
@@ -141,25 +141,20 @@ order: **A → B → C → D** (A unblocks the biggest Mac win; B/C are parallel
 
 ### A — Multi-arch base image (`linux/amd64` + `linux/arm64`)  · biggest Mac win
 
+**Status (2026-07-30):** code ready on `synaplan-base-php` branch
+`feat/multi-arch-base` (arch-aware protoc + single-job multi-arch build/push).
+Next: open PR → merge/publish → record index digest → bump synaplan pin.
+
 **Repo: `synaplan-base-php`**
-- `Dockerfile`: make `protoc` arch-aware. Add `ARG TARGETARCH` and map to the
-  protobuf asset name (`amd64 → x86_64`, `arm64 → aarch_64` — note protobuf's
-  underscore spelling). Verify the whisper `COPY --from=whisper-builder` library
-  paths are arch-neutral (they are: `build/.../libggml*.so`).
-- `.github/workflows/build.yml`: rework for multi-arch.
-  - Add `platforms: linux/amd64,linux/arm64` and QEMU setup
-    (`docker/setup-qemu-action`).
-  - A `type=docker` tar can't carry a manifest list, so **drop the tar
-    build→artifact→load→push split** and build+push in one job with
-    `push: ${{ github.event_name != 'pull_request' }}`. For PRs, keep
-    `push: false` (build both arches to validate, output discarded) so PR CI
-    still proves the arm64 build compiles.
-  - Keep the existing `metadata-action` tag set and the `concurrency` group.
-- Record the new **multi-arch index digest** from the push step.
+- ✅ `Dockerfile`: `protoc` arch-aware via `ARG TARGETARCH`
+  (`amd64 → x86_64`, `arm64 → aarch_64`).
+- ✅ `.github/workflows/build.yml`: QEMU + `platforms: linux/amd64,linux/arm64`;
+  tar→load→push dropped; `push: ${{ github.event_name != 'pull_request' }}`.
+- ⬜ Record the new **multi-arch index digest** from the push step (after merge).
 
 **Repo: `synaplan`**
-- `_docker/backend/Dockerfile`: bump the `FROM …@sha256:` pin to the **new
-  multi-arch index digest** (this is mandatory — the old digest is amd64-only).
+- ⬜ `_docker/backend/Dockerfile`: bump the `FROM …@sha256:` pin to the **new
+  multi-arch index digest** (mandatory — the old digest is amd64-only).
   Update the surrounding "to bump" comment.
 - Validate: on a Mac, `docker compose build backend` resolves the arm64 base and
   `docker compose exec backend php -i | grep -i architecture` (or `uname -m`)

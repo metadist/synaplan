@@ -928,6 +928,13 @@
     "userText": "Sohbet henüz hazır değil. Lütfen yöneticinizden bir AI sağlayıcısı bağlamasını isteyin.",
     "cta": "AI sağlayıcısını kur"
   },
+  "localAiDownload": {
+    "waitingTitle": "Yerel AI başlatılıyor",
+    "downloadingTitle": "Yerel AI indiriliyor, {percent}%",
+    "cloudWorksText": "Bulut sohbeti şimdi çalışıyor — indirme bitince yerel modeller hazır olacak.",
+    "errorTitle": "Yerel AI indirmesi başarısız",
+    "errorText": "Bulut sohbeti çalışmaya devam eder. Ollama günlüklerini kontrol edin veya AUTO_DOWNLOAD_MODELS=true ile yeniden deneyin."
+  },
   "common": {
     "ok": "Tamam",
     "cancel": "İptal",
@@ -1751,8 +1758,8 @@
       "healthSummary": "{total} servisten {healthy} tanesi sağlıklı",
       "model": "model",
       "models": "model",
-      "devOnlyTitle": "Yalnızca Geliştirme Modu",
-      "devOnlyMessage": "Bu sayfa yalnızca geliştirme ortamlarında kullanılabilir. Sistem durumu izleme üretimde kısıtlanmıştır."
+      "devOnlyTitle": "Yönetici erişimi gerekli",
+      "devOnlyMessage": "Özellik durumu yalnızca yöneticiler için kullanılabilir."
     }
   },
   "storage": {

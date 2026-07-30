@@ -161,6 +161,15 @@ final class AdminProviderKeysController extends AbstractController
         if ($applyDefaults && ProviderDefaultsService::supports($provider)) {
             $this->defaults->applyGlobalDefaults($provider);
             $defaultsApplied = true;
+        } elseif (!$applyDefaults && ProviderDefaultsService::supports($provider)) {
+            // Key saved without the checkbox — still auto-flip when the current
+            // default chat provider has no usable key (fresh Anthropic seed).
+            $current = strtolower((string) ($this->configRepository->getValue(0, 'ai', 'default_chat_provider') ?? ''));
+            $currentReady = '' !== $current && null !== $this->keyStore->getKey($current);
+            if (!$currentReady) {
+                $this->defaults->applyGlobalDefaults($provider);
+                $defaultsApplied = true;
+            }
         }
 
         return $this->json([

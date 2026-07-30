@@ -2,7 +2,9 @@
 
 namespace App\Controller;
 
+use App\AI\Credential\ProviderDefaultsService;
 use App\AI\Interface\ProviderMetadataInterface;
+use App\AI\Provider\OllamaProvider;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\User;
@@ -16,6 +18,7 @@ use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Infrastructure\RedisService;
+use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
@@ -56,6 +59,8 @@ class ConfigController extends AbstractController
         private MobileVersionService $mobileVersionService,
         private MarketingNewsConfig $marketingNewsConfig,
         private UsageTaximeterConfig $usageTaximeterConfig,
+        private ProviderDefaultsService $providerDefaultsService,
+        private LocalAiDownloadStatusService $localAiDownloadStatus,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -459,6 +464,25 @@ class ConfigController extends AbstractController
                 }
             }
 
+            // Ollama answers as soon as the server is up, even with zero models
+            // pulled — treating that as "available" would route chat at a local
+            // model nobody downloaded (and falsely hide the setup banner).
+            if (array_key_exists('ollama', $availabilityByName)) {
+                $availabilityByName['ollama'] = $availabilityByName['ollama']
+                    && $this->isRecommendedOllamaChatModelPulled();
+            }
+
+            // Auto-flip virgin / broken defaults to the first available provider
+            // (Groq → … → Ollama) so chatReady becomes true without an explicit
+            // "Use as default" click. No-op when the current default already works.
+            if (!$this->isDefaultChatModelReady($availabilityByName)) {
+                $applied = $this->providerDefaultsService->autoApplyBestAvailable($availabilityByName);
+                if (null !== $applied) {
+                    // Re-evaluate after the write (model_config cache was cleared).
+                    $availabilityByName[$applied] = true;
+                }
+            }
+
             // First-run signal: can a plain chat message work right now? The
             // frontend shows a "connect an AI provider" banner (admins get a
             // wizard CTA) while this is false — e.g. a fresh install whose
@@ -560,7 +584,50 @@ class ConfigController extends AbstractController
             }
         }
 
-        return [] !== $this->providerRegistry->getAvailableProviders('chat', false);
+        // Fallback: any chat-capable provider that is available. Uses the
+        // caller's map so the Ollama model-presence correction applies here too
+        // (a bare Ollama must not report the install as chat-ready).
+        foreach ($this->providerRegistry->getAvailableProviders('chat', false) as $name) {
+            if ($availabilityByName[strtolower($name)] ?? false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the local Ollama server actually has the model that the
+     * recommended Ollama defaults would bind CHAT to. Guards the auto-apply
+     * fallback: the compose stack only pulls gpt-oss:20b when
+     * ENABLE_LOCAL_GPT_OSS=true (default off), so on a stock install there is
+     * usually no local chat model at all.
+     */
+    private function isRecommendedOllamaChatModelPulled(): bool
+    {
+        $provider = null;
+        foreach ($this->providerRegistry->getUniqueProviders() as $name => $candidate) {
+            if ('ollama' === strtolower((string) $name) && $candidate instanceof OllamaProvider) {
+                $provider = $candidate;
+                break;
+            }
+        }
+        if (null === $provider) {
+            return false;
+        }
+
+        try {
+            $bid = $this->providerDefaultsService->getRecommendedDefaults('ollama')['CHAT'] ?? null;
+        } catch (\Throwable) {
+            return false;
+        }
+        if (null === $bid) {
+            return false;
+        }
+
+        $model = $this->modelRepository->find($bid);
+
+        return null !== $model && $provider->hasModel($model->getProviderId());
     }
 
     /**
@@ -1509,14 +1576,61 @@ class ConfigController extends AbstractController
     }
 
     /**
+     * Local AI (Ollama) model-download progress written by the backend entrypoint.
+     * Authenticated users can poll this while AUTO_DOWNLOAD_MODELS pulls models.
+     */
+    #[Route('/local-ai/status', name: 'local_ai_download_status', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/local-ai/status',
+        summary: 'Get local AI model download status',
+        description: 'Returns progress of background Ollama model pulls started by the container entrypoint. When no download is running the status is idle/ready.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Local AI download status',
+        content: new OA\JsonContent(
+            required: ['status', 'currentModel', 'percent', 'message', 'models', 'updatedAt'],
+            properties: [
+                new OA\Property(property: 'status', type: 'string', enum: ['idle', 'waiting', 'downloading', 'ready', 'error'], example: 'downloading'),
+                new OA\Property(property: 'currentModel', type: 'string', nullable: true, example: 'bge-m3'),
+                new OA\Property(property: 'percent', type: 'integer', nullable: true, example: 43),
+                new OA\Property(property: 'message', type: 'string', nullable: true, example: 'Downloading bge-m3'),
+                new OA\Property(
+                    property: 'models',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'name', type: 'string', example: 'bge-m3'),
+                            new OA\Property(property: 'state', type: 'string', example: 'downloading'),
+                            new OA\Property(property: 'percent', type: 'integer', nullable: true, example: 43),
+                        ]
+                    )
+                ),
+                new OA\Property(property: 'updatedAt', type: 'string', nullable: true, example: '2026-07-30T10:00:00Z'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function getLocalAiDownloadStatus(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        return $this->json($this->localAiDownloadStatus->getStatus());
+    }
+
+    /**
      * Get status of all features and services (Web Search, AI Providers, Processing Services, etc.)
-     * Only available in development mode (APP_ENV=dev). Returns 403 Forbidden in production.
+     * Admin only (available in production builds).
      */
     #[Route('/features', name: 'features_status', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/config/features',
-        summary: 'Get feature and service status (dev only)',
-        description: 'Returns the live status of all configured features, AI providers, and infrastructure services. **Only available in `APP_ENV=dev`** – returns 403 Forbidden in production. Useful during local development to verify that all required services are reachable and correctly configured.',
+        summary: 'Get feature and service status (admin)',
+        description: 'Returns the live status of all configured features, AI providers, and infrastructure services. **Admin only** (available in production).',
         security: [['Bearer' => []]],
         tags: ['Configuration']
     )]
@@ -1555,17 +1669,15 @@ class ConfigController extends AbstractController
         )
     )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
-    #[OA\Response(response: 403, description: 'Only available in development mode (APP_ENV=dev)')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
     public function getFeaturesStatus(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Only allow in development mode
-        $env = $_ENV['APP_ENV'] ?? 'prod';
-        if ('dev' !== $env) {
-            return $this->json(['error' => 'Feature only available in development mode'], Response::HTTP_FORBIDDEN);
+        if (!$user->isAdmin()) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
         $features = [];
@@ -1619,9 +1731,9 @@ class ConfigController extends AbstractController
         $providersMetadata = $this->providerRegistry->getProvidersMetadata();
 
         foreach ($providersMetadata as $providerName => $providerData) {
-            // Skip test provider in production (only show in dev mode)
-            if ('test' === $providerName && 'dev' !== $env) {
-                continue; // @phpstan-ignore-line (env is dynamic at runtime)
+            // Skip the synthetic test provider outside local APP_ENV=dev.
+            if ('test' === $providerName && 'dev' !== ($_ENV['APP_ENV'] ?? 'prod')) {
+                continue;
             }
 
             // Get model count from database for this provider

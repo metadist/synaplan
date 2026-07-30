@@ -230,6 +230,11 @@ services:
                 huggingface: '%env(HUGGINGFACE_API_KEY)%'
                 xai: '%env(XAI_API_KEY)%'
 
+    # Written by _docker/backend/docker-entrypoint.sh during AUTO_DOWNLOAD_MODELS pulls.
+    App\Service\LocalAi\LocalAiDownloadStatusService:
+        arguments:
+            $statusFilePath: '%kernel.project_dir%/var/ollama-download.json'
+
     App\AI\Provider\AnthropicProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'

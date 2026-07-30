@@ -928,6 +928,13 @@
     "userText": "El chat aún no está listo. Pide a tu administrador que conecte un proveedor de IA.",
     "cta": "Configurar proveedor de IA"
   },
+  "localAiDownload": {
+    "waitingTitle": "La IA local se está iniciando",
+    "downloadingTitle": "La IA local se está descargando, {percent} %",
+    "cloudWorksText": "El chat en la nube ya funciona — los modelos locales estarán listos al terminar la descarga.",
+    "errorTitle": "Error al descargar la IA local",
+    "errorText": "El chat en la nube sigue funcionando. Revisa los logs de Ollama o reinténtalo con AUTO_DOWNLOAD_MODELS=true."
+  },
   "common": {
     "ok": "OK",
     "cancel": "Cancelar",
@@ -1750,8 +1757,8 @@
       "healthSummary": "{healthy} de {total} servicios saludables",
       "model": "modelo",
       "models": "modelos",
-      "devOnlyTitle": "Solo Modo de Desarrollo",
-      "devOnlyMessage": "Esta página solo está disponible en entornos de desarrollo. El monitoreo del estado del sistema está restringido en producción."
+      "devOnlyTitle": "Se requiere acceso de administrador",
+      "devOnlyMessage": "El estado de las funciones solo está disponible para administradores."
     }
   },
   "storage": {

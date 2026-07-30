@@ -47,7 +47,8 @@ final class ProviderDefaultsServiceTest extends TestCase
      */
     public function testEveryRecommendedDefaultResolvesInTheModelCatalog(): void
     {
-        foreach (ProviderKeyStore::SUPPORTED_PROVIDERS as $provider) {
+        $providers = [...ProviderKeyStore::SUPPORTED_PROVIDERS, 'ollama'];
+        foreach ($providers as $provider) {
             self::assertTrue(ProviderDefaultsService::supports($provider), sprintf('No recommended defaults defined for supported provider "%s"', $provider));
 
             $defaults = $this->service->getRecommendedDefaults($provider);
@@ -58,6 +59,63 @@ final class ProviderDefaultsServiceTest extends TestCase
                 self::assertGreaterThan(0, $bid, sprintf('%s/%s resolved to an invalid BID', $provider, $capability));
             }
         }
+    }
+
+    public function testAutoApplyNoopsWhenCurrentDefaultIsAvailable(): void
+    {
+        $this->configRepository->method('getValue')->willReturn('anthropic');
+
+        $applied = $this->service->autoApplyBestAvailable([
+            'anthropic' => true,
+            'groq' => true,
+        ]);
+
+        self::assertNull($applied);
+        self::assertSame([], $this->written);
+    }
+
+    public function testAutoApplyPicksFirstAvailableInPreferenceOrder(): void
+    {
+        $this->configRepository->method('getValue')->willReturn('anthropic');
+
+        $applied = $this->service->autoApplyBestAvailable([
+            'anthropic' => false,
+            'openai' => false,
+            'groq' => true,
+            'google' => true,
+        ]);
+
+        self::assertSame('groq', $applied);
+        self::assertSame('groq', $this->written['0|ai|default_chat_provider'] ?? null);
+    }
+
+    public function testAutoApplyDoesNothingWhenNoProviderIsAvailable(): void
+    {
+        $this->configRepository->method('getValue')->willReturn('anthropic');
+
+        // A reachable-but-empty Ollama must arrive here as false — otherwise the
+        // install would silently bind CHAT to a model that was never pulled.
+        $applied = $this->service->autoApplyBestAvailable([
+            'anthropic' => false,
+            'groq' => false,
+            'ollama' => false,
+        ]);
+
+        self::assertNull($applied);
+        self::assertSame([], $this->written, 'nothing may be written when no provider can serve chat');
+    }
+
+    public function testAutoApplyFallsThroughToOllama(): void
+    {
+        $this->configRepository->method('getValue')->willReturn('anthropic');
+
+        $applied = $this->service->autoApplyBestAvailable([
+            'anthropic' => false,
+            'ollama' => true,
+        ]);
+
+        self::assertSame('ollama', $applied);
+        self::assertSame('ollama', $this->written['0|ai|default_chat_provider'] ?? null);
     }
 
     public function testUnknownProviderIsRejected(): void

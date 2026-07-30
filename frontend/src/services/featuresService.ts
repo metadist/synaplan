@@ -38,9 +38,10 @@ export type FeatureEnvVar = z.infer<typeof FeatureEnvVarSchema>
 export type Feature = z.infer<typeof FeatureSchema>
 export type FeaturesStatus = z.infer<typeof FeaturesStatusSchema>
 
+/** Thrown when `/api/v1/config/features` returns 403 (non-admin caller). */
 export class DevOnlyFeatureError extends Error {
   constructor() {
-    super('Feature only available in development mode')
+    super('Feature status requires admin access')
     this.name = 'DevOnlyFeatureError'
   }
 }

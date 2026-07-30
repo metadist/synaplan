@@ -10,6 +10,8 @@
         <p class="txt-secondary">{{ $t('adminSetup.description') }}</p>
       </div>
 
+      <LocalAiDownloadCard class="mb-6" />
+
       <!-- Readiness status -->
       <div
         class="rounded-lg p-4 mb-6 flex items-start gap-3 border"
@@ -87,6 +89,7 @@ import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import ProviderKeyCard from '@/components/admin/ProviderKeyCard.vue'
+import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useNotification } from '@/composables/useNotification'
 import { useConfigStore } from '@/stores/config'
 import { listProviderKeys, type ProviderKeyStatus } from '@/services/api/providerKeysApi'

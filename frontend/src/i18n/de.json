@@ -2241,6 +2241,13 @@
     "userText": "Der Chat ist noch nicht bereit. Bitte deinen Administrator, einen KI-Anbieter zu verbinden.",
     "cta": "KI-Anbieter einrichten"
   },
+  "localAiDownload": {
+    "waitingTitle": "Lokale KI startet",
+    "downloadingTitle": "Lokale KI wird heruntergeladen, {percent} %",
+    "cloudWorksText": "Cloud-Chat funktioniert jetzt — lokale Modelle sind bereit, sobald der Download fertig ist.",
+    "errorTitle": "Download der lokalen KI fehlgeschlagen",
+    "errorText": "Cloud-Chat funktioniert weiter. Prüfe die Ollama-Logs oder starte mit AUTO_DOWNLOAD_MODELS=true neu."
+  },
   "common": {
     "ok": "OK",
     "cancel": "Abbrechen",
@@ -2733,8 +2740,8 @@
       "healthSummary": "{healthy} von {total} Services gesund",
       "model": "Modell",
       "models": "Modelle",
-      "devOnlyTitle": "Nur Entwicklungsmodus",
-      "devOnlyMessage": "Diese Seite ist nur in Entwicklungsumgebungen verfügbar. Die Systemstatusüberwachung ist in der Produktion eingeschränkt."
+      "devOnlyTitle": "Admin-Zugriff erforderlich",
+      "devOnlyMessage": "Der Feature-Status ist nur für Administratoren verfügbar."
     }
   },
   "mail": {

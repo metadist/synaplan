@@ -115,6 +115,35 @@ final readonly class ProviderDefaultsService
             'PIC2TEXT' => 'xai:grok-4.5:pic2text',
             'SOUND2TEXT' => 'xai:grok-stt:sound2text',
         ],
+        // Local Ollama — last resort when a chat-capable model is already present.
+        // providerId "gpt-oss:120b" normalises to "gpt-oss-120b" in ModelCatalog keys.
+        'ollama' => [
+            'CHAT' => 'ollama:gpt-oss-120b:chat',
+            'TOOLS' => 'ollama:gpt-oss-120b:chat',
+            'ANALYZE' => 'ollama:gpt-oss-120b:chat',
+            'SORT' => 'ollama:gpt-oss-120b:chat',
+            'PLAN' => 'ollama:gpt-oss-120b:chat',
+            'SUMMARIZE' => 'ollama:gpt-oss-120b:chat',
+            'MEM' => 'ollama:gpt-oss-120b:mem',
+        ],
+    ];
+
+    /**
+     * Preference order for automatic first-run default selection.
+     * Cloud free-tier / fast providers first; local Ollama last.
+     *
+     * @var list<string>
+     */
+    public const PREFERENCE_ORDER = [
+        'groq',
+        'openai',
+        'google',
+        'mistral',
+        'anthropic',
+        'trustedtokens',
+        'huggingface',
+        'xai',
+        'ollama',
     ];
 
     public function __construct(
@@ -127,6 +156,42 @@ final readonly class ProviderDefaultsService
     public static function supports(string $provider): bool
     {
         return isset(self::PROVIDER_DEFAULTS[strtolower($provider)]);
+    }
+
+    /**
+     * If the current global default chat provider is unavailable, pick the
+     * first available provider in {@see self::PREFERENCE_ORDER} and apply its
+     * recommended defaults. No-op when chat is already ready.
+     *
+     * @param array<string, bool> $availabilityByName lowercase provider name => available
+     *
+     * @return string|null the provider that was applied, or null when unchanged
+     */
+    public function autoApplyBestAvailable(array $availabilityByName): ?string
+    {
+        $current = strtolower((string) ($this->configRepository->getValue(0, 'ai', 'default_chat_provider') ?? ''));
+        if ('' !== $current && ($availabilityByName[$current] ?? false)) {
+            return null;
+        }
+
+        foreach (self::PREFERENCE_ORDER as $provider) {
+            if (!($availabilityByName[$provider] ?? false)) {
+                continue;
+            }
+            if (!self::supports($provider)) {
+                continue;
+            }
+
+            $this->applyGlobalDefaults($provider);
+            $this->logger->info('Auto-applied provider defaults because chat was not ready', [
+                'provider' => $provider,
+                'previous' => $current,
+            ]);
+
+            return $provider;
+        }
+
+        return null;
     }
 
     /**

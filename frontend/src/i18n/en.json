@@ -2226,6 +2226,13 @@
     "userText": "Chat is not ready yet. Please ask your administrator to connect an AI provider.",
     "cta": "Set up AI provider"
   },
+  "localAiDownload": {
+    "waitingTitle": "Local AI is starting",
+    "downloadingTitle": "Local AI is downloading, {percent}%",
+    "cloudWorksText": "Cloud chat works now — local models will be ready when the download finishes.",
+    "errorTitle": "Local AI download failed",
+    "errorText": "Cloud chat still works. Check Ollama logs or retry with AUTO_DOWNLOAD_MODELS=true."
+  },
   "common": {
     "ok": "OK",
     "cancel": "Cancel",
@@ -3706,8 +3713,8 @@
       "healthSummary": "{healthy} of {total} services healthy",
       "model": "model",
       "models": "models",
-      "devOnlyTitle": "Development Mode Only",
-      "devOnlyMessage": "This page is only available in development environments. System status monitoring is restricted in production."
+      "devOnlyTitle": "Admin access required",
+      "devOnlyMessage": "Feature status is available to administrators only."
     }
   },
   "cookies": {

@@ -1,6 +1,6 @@
 # First-Run Onboarding — Provider Wizard & DB-Backed API Keys
 
-**Release:** 4.1 · **Priority:** P1 (adoption) · **Status:** Tier 1 + 2 shipped (PR #1392, branch `feat/provider-key-wizard`); Tiers 3–6 open
+**Release:** 4.1 · **Priority:** P1 (adoption) · **Status:** Tier 1 + 2 shipped (PR #1392); Tiers 3–4 implemented on `feat/provider-key-wizard`; Tier 5 (arm64 base) started in `synaplan-base-php` `feat/multi-arch-base`; Tier 6 open
 **Trigger:** "Is our setup easy enough for a large number of people? Groq keys and model downloads feel complicated."
 **Scope of the audit:** README, `_1st_install_linux.sh`, both compose files, `docs/`, seeders + entrypoint, frontend first-run behaviour — benchmarked against Open WebUI, LibreChat and AnythingLLM (2026).
 
@@ -45,9 +45,9 @@
 |------|------|--------|
 | **1** | **First-run provider wizard** — on first admin login, if no provider has a working key, show a guided screen: pick a provider (Groq recommended + deep link), paste key, live "Test connection", set sane defaults via **catalog keys**. Lets us delete the raw-SQL half of the install script. | ✅ **Shipped** (PR #1392) |
 | **2** | **DB-backed, hot-reloadable keys** — store keys encrypted in `BCONFIG`; env stays available as a bootstrap/override for ops/K8s. The architectural enabler for Tier 1. | ✅ **Shipped** (PR #1392) |
-| **3** | **Provider-aware defaults instead of hardcoded Anthropic** — resolve the default chat model to the first provider that actually has a key (Groq → OpenAI → … → Ollama-if-present); persistent "Connect an AI provider" banner replacing the console-only warning; open the Feature Status page to admins in prod. | 🟡 **Partial** — banner + one-click/CLI `apply-defaults` shipped; **automatic** resolution at seed/first-request and the Feature Status page are still open |
-| **4** | **Surface the model download** — the entrypoint already logs pull progress at 10% milestones; expose it via a status endpoint and show a progress card ("Local AI is downloading, 43% — cloud chat works now"). | ⬜ Open |
-| **5** | **Lower the hardware bar** — ship a small-model tier (`llama3.2:3b` / `qwen3:4b`, ~2–4 GB) as the local default so chat works on an 8–16 GB laptop with no GPU, `gpt-oss:20b` as opt-in "quality"; **publish multi-arch (arm64) images**. | ⬜ Open |
+| **3** | **Provider-aware defaults instead of hardcoded Anthropic** — resolve the default chat model to the first provider that actually has a key (Groq → OpenAI → … → Ollama-if-present); persistent "Connect an AI provider" banner replacing the console-only warning; open the Feature Status page to admins in prod. | ✅ **Done** on branch — runtime `autoApplyBestAvailable` on `/config/runtime`; Feature Status admin-only in prod (nav + route + API) |
+| **4** | **Surface the model download** — the entrypoint already logs pull progress at 10% milestones; expose it via a status endpoint and show a progress card ("Local AI is downloading, 43% — cloud chat works now"). | ✅ **Done** on branch — `var/ollama-download.json` + `GET /api/v1/config/local-ai/status` + `LocalAiDownloadCard` |
+| **5** | **Lower the hardware bar** — ship a small-model tier (`llama3.2:3b` / `qwen3:4b`, ~2–4 GB) as the local default so chat works on an 8–16 GB laptop with no GPU, `gpt-oss:20b` as opt-in "quality"; **publish multi-arch (arm64) images**. | 🟡 **Partial** — arm64 base image work started in `synaplan-base-php` (`feat/multi-arch-base`: arch-aware protoc + multi-arch CI). Still open: publish index digest, bump `_docker/backend/Dockerfile` pin, small-model tier (see §8.2) |
 | **6** | **Distribution channels** — "the masses" rarely `git clone`. One-click templates for Coolify, CapRover, Elestio, PikaPods, Railway; app-store listings for Umbrel and CasaOS. Mostly a compose/template file + metadata per channel; an all-in-one evaluation image would make several listings trivial. | ⬜ Open |
 | **H** | **Hygiene** — auto-generate `APP_SECRET`/`TOKEN_SECRET` on first boot when still placeholders; reconcile the disk-size numbers; ~~make the install script POSIX/Windows-friendly or retire it~~ **install script retired** to `_devextras/_1st_install_linux.sh` (docs now point at compose + Admin → AI Providers). Remaining: secret autogen + disk-size reconciliation. | 🟡 **Partial** |
 
@@ -275,3 +275,78 @@ correctly reported unconfigured, and an authenticated runtime config returned
 (small-model default + arm64 images) → Tier 6 (Coolify/CapRover/Elestio/PikaPods/
 Railway templates, Umbrel/CasaOS listings) → remaining hygiene (`APP_SECRET`
 autogeneration, disk-size reconciliation).
+
+---
+
+## 8. Tier 3/4 review findings (2026-07-30)
+
+Audit of the Tier 3 + 4 implementation against this plan. Two bugs were found and
+fixed on the branch; one gap is deliberately deferred to Tier 5.
+
+### 8.1 Fixed: auto-apply trusted a bare Ollama (would have re-created the
+### default-provider trap)
+
+`autoApplyBestAvailable()` was fed `$provider->isAvailable()`, and
+`OllamaProvider::isAvailable()` only proves **the server answers** — it does not
+check that any model is pulled. Verified on the dev stack: `/api/tags` holds
+**`bge-m3:latest` only**, because `docker-compose.yml` defaults
+`ENABLE_LOCAL_GPT_OSS=false`, so the stock install has *no local chat model at
+all*. A keyless fresh install would therefore have:
+
+1. auto-bound global `CHAT` to `ollama:gpt-oss-120b` (never downloaded),
+2. reported `setup.chatReady = true`, **hiding the setup banner**, and
+3. failed on the first message — exactly the friction §1.2 #1 set out to kill,
+   in a new disguise.
+
+Fixes: new `OllamaProvider::hasModel()` (tag-aware, handles the implicit
+`:latest`); `ConfigController` corrects the Ollama entry in the availability map
+with it before both the auto-apply and the `chatReady` evaluation; the
+`isDefaultChatModelReady()` fallback now consults that corrected map instead of
+`getAvailableProviders('chat')`, so a bare Ollama can no longer report an install
+as chat-ready. The plan's own wording — "Ollama-**if-model-present**" and
+"checking 'any provider reachable' would false-positive on a bare Ollama" —
+was the specification; the first implementation violated it.
+
+### 8.2 Deferred to Tier 5: the Ollama defaults point at a model we never pull
+
+`PROVIDER_DEFAULTS['ollama']` binds `gpt-oss:120b`, but the entrypoint pulls
+`gpt-oss:20b` (and only when `ENABLE_LOCAL_GPT_OSS=true`). There is no catalog
+entry for a small local model, so **local-only chat is currently unreachable by
+design** — the guard in §8.1 makes that honest (banner stays up, user is guided
+to a free cloud key) instead of silently broken. Tier 5's small-model tier must
+add the catalog entry AND repoint these defaults at the model the stack actually
+downloads; catalog/seed changes need sign-off first.
+
+### 8.3 Fixed: phantom "downloading forever" card
+
+A container killed mid-pull, or a later boot with `AUTO_DOWNLOAD_MODELS=false`,
+left `status: downloading` on disk and the card would poll it forever. The
+entrypoint now writes `idle` when it skips downloads, and
+`LocalAiDownloadStatusService` treats an in-progress status older than 30 min as
+idle (finished states are kept regardless of age).
+
+Also fixed while verifying: the "model already available" short-circuit compared
+`"name":"bge-m3"` against Ollama's `"name":"bge-m3:latest"`, so it never matched
+and **every backend restart re-issued a pull** (cheap because cached, but it
+flashed a download card on each restart).
+
+### 8.4 Verified live (not just unit-tested)
+
+- Entrypoint → file → API: restarting `backend` produced valid JSON and the
+  `ready` transition; `GET /api/v1/config/local-ai/status` returned it.
+- Access control: `/config/features` → 200 admin / **403 non-admin**;
+  `/config/local-ai/status` → 200 authenticated / **401 anonymous**.
+- `ToolsDropdown` no longer strands every tool in its "checking" state for
+  non-admins (the admin-only early return skipped the loading-flag reset).
+- Frontend Zod schema for the new endpoint is **generated** from the OpenAPI
+  annotations (`GetApiConfigLocalAiDownloadStatusResponseSchema`), per house rule
+  — the first version was hand-written.
+
+**New tests:** `OllamaProviderHasModelTest` (4), `LocalAiDownloadStatusServiceTest`
+(5, incl. staleness), `ProviderDefaultsServiceTest` auto-apply cases (4, incl.
+"no provider available ⇒ write nothing"), `localAiDownloadCard.spec.ts` (5,
+asserting the real shipped `en.json` copy).
+
+**Still thin:** no functional test boots `ConfigController::getRuntimeConfig()`
+with a keyless DB (the Ollama guard is covered at unit level only), and the
+entrypoint shell logic itself has no automated coverage.

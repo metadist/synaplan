@@ -107,7 +107,7 @@ describe('getFeaturesStatus', () => {
     mockedApi.get.mockRejectedValue(new Error('API Error: 403 Forbidden'))
 
     await expect(getFeaturesStatus()).rejects.toThrow(DevOnlyFeatureError)
-    await expect(getFeaturesStatus()).rejects.toThrow('Feature only available in development mode')
+    await expect(getFeaturesStatus()).rejects.toThrow('Feature status requires admin access')
   })
 
   it('should not match non-403 errors containing "403"', async () => {
@@ -130,7 +130,7 @@ describe('DevOnlyFeatureError', () => {
     const error = new DevOnlyFeatureError()
 
     expect(error.name).toBe('DevOnlyFeatureError')
-    expect(error.message).toBe('Feature only available in development mode')
+    expect(error.message).toBe('Feature status requires admin access')
     expect(error).toBeInstanceOf(Error)
   })
 })
