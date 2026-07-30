@@ -43,15 +43,14 @@
 }
 
 /* Dark + V2
- * Secondary text leans toward the pre-overhaul grey (#b8bdc7) rather than
- * the high-contrast pass (#d6dae2) — readable, without near-white glare. */
+ * Secondary text is a calm mid-grey — readable on near-black surfaces
+ * without the glare of near-white ink. */
 .design-v2.dark {
   --bg-app: #050a16;
   --bg-sidebar: rgba(10, 16, 30, 0.7);
   --bg-chat: #050a16;
   --bg-card: rgba(16, 24, 42, 0.9);
   --bg-chip: rgba(255, 255, 255, 0.04);
-  /* Closer to pre-overhaul #b8bdc7 than to #d6dae2. */
   --txt-secondary: #bdc2cc;
   --border-light: rgba(107, 143, 214, 0.16);
   --brand-alpha-light: rgba(107, 143, 214, 0.1);
@@ -252,11 +251,14 @@
     border-color 0.3s ease;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell'] {
-  background: rgba(255, 255, 255, 0.05) !important;
+  /* Elevated dark glass — slightly brighter than the page so the field
+     still reads as an input, without a glaring light box in dark mode.
+     Home chat + active chat share this shell. */
+  background: rgba(255, 255, 255, 0.08) !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   box-shadow:
-    0 2px 12px rgba(0, 0, 0, 0.15),
-    0 0 8px var(--v2-glow) !important;
+    0 4px 20px rgba(0, 0, 0, 0.35),
+    0 0 10px var(--v2-glow) !important;
 }
 
 /* Focus glow when typing */
@@ -269,8 +271,8 @@
 .design-v2.dark [data-testid='comp-chat-input-shell']:focus-within {
   border-color: var(--v2-border-hover) !important;
   box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.25),
-    0 0 20px var(--v2-glow-strong) !important;
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 18px var(--v2-glow-strong) !important;
 }
 
 /* Chat input area — same background as the messages area above,
@@ -1130,15 +1132,14 @@
 /* ----------------------------------------------------------
    19. Dark-mode contrast (softened readability pass)
 
-   Walks back the #1270 white-composer / near-white ink overhaul toward
-   the calmer pre-overhaul dark glass look. Rail + heading stay a touch
-   clearer than before; the composer is an elevated dark panel (not a
-   bright white box) so home chat and active chats match. Light mode
-   untouched. Appended last so these win at equal specificity.
+   Softens rail icons, empty-state heading, and composer ink after an
+   earlier high-contrast pass that used near-white text and a bright
+   composer box. Composer shell chrome (background / border / focus)
+   lives in section 6 — do not redeclare it here. Light mode untouched.
+   Appended last so these win at equal specificity.
    ---------------------------------------------------------- */
 
-/* Sidebar rail icons + labels — soft grey, closer to old secondary than
-   the overhaul near-white #eceef3 */
+/* Sidebar rail icons + labels — soft mid-grey, not near-white */
 .design-v2.dark .v2-rail-icon {
   color: #c0c5d0;
 }
@@ -1162,26 +1163,8 @@
   letter-spacing: -0.01em;
 }
 
-/* Composer shell — elevated dark panel (home + active chat share this
-   selector). Between pre-overhaul glass (rgba white 0.05) and the
-   overhaul pure-white box: slightly brighter so the field still reads
-   as an input, without the glare of a light box in dark mode. */
-.design-v2.dark [data-testid='comp-chat-input-shell'] {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.35),
-    0 0 10px var(--v2-glow) !important;
-}
-.design-v2.dark [data-testid='comp-chat-input-shell']:focus-within {
-  border-color: var(--v2-border-hover) !important;
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.4),
-    0 0 18px var(--v2-glow-strong) !important;
-}
-
-/* Soft light ink on the dark composer (theme tokens — no dark-on-light
-   overrides from the white-box era). */
+/* Soft light ink on the dark composer (section 6). Keeps text/icons
+   readable without forcing dark-on-light styles. */
 .design-v2.dark [data-testid='comp-chat-input-shell'] textarea,
 .design-v2.dark [data-testid='comp-chat-input-shell'] .txt-primary {
   color: #e2e4ea !important;

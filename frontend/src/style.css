@@ -967,8 +967,8 @@
     outline: none;
   }
   .dark .icon-ghost {
-    /* Closer to pre-#1233 (#c6c6c9 / 0.7) than the contrast pass
-       (#d6d7db / 0.85) — readable without glare in dark mode. */
+    /* Soft mid-grey: readable on dark surfaces without the glare of
+       near-white icons at high opacity. */
     color: #c8c8cc;
     opacity: 0.74;
   }
