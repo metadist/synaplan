@@ -967,8 +967,10 @@
     outline: none;
   }
   .dark .icon-ghost {
-    color: #d6d7db;
-    opacity: 0.85;
+    /* Closer to pre-#1233 (#c6c6c9 / 0.7) than the contrast pass
+       (#d6d7db / 0.85) — readable without glare in dark mode. */
+    color: #c8c8cc;
+    opacity: 0.74;
   }
   .dark .icon-ghost:hover,
   .dark .icon-ghost:focus-visible {

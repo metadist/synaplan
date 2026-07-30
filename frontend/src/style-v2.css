@@ -43,18 +43,16 @@
 }
 
 /* Dark + V2
- * Contrast-tuned: secondary text (placeholders, hints, labels) and borders
- * were too faint against the near-black surfaces — lifted for readability. */
+ * Secondary text leans toward the pre-overhaul grey (#b8bdc7) rather than
+ * the high-contrast pass (#d6dae2) — readable, without near-white glare. */
 .design-v2.dark {
   --bg-app: #050a16;
   --bg-sidebar: rgba(10, 16, 30, 0.7);
   --bg-chat: #050a16;
   --bg-card: rgba(16, 24, 42, 0.9);
   --bg-chip: rgba(255, 255, 255, 0.04);
-  /* Contrast overhaul: secondary text is a very bright grey so hints,
-     labels, timestamps and placeholders stay clearly legible on the
-     near-black surfaces (was #b8bdc7 — too dim). */
-  --txt-secondary: #d6dae2;
+  /* Closer to pre-overhaul #b8bdc7 than to #d6dae2. */
+  --txt-secondary: #bdc2cc;
   --border-light: rgba(107, 143, 214, 0.16);
   --brand-alpha-light: rgba(107, 143, 214, 0.1);
 
@@ -1130,153 +1128,100 @@
 }
 
 /* ----------------------------------------------------------
-   19. Dark-mode contrast overhaul (readability pass)
+   19. Dark-mode contrast (softened readability pass)
 
-   Brighter rail icons/labels, a solid-white empty-state heading,
-   and a light high-contrast composer with dark text. Only the dark
-   V2 surfaces are touched — light mode is left as-is. Appended last
-   so these win over earlier rules at equal specificity.
+   Walks back the #1270 white-composer / near-white ink overhaul toward
+   the calmer pre-overhaul dark glass look. Rail + heading stay a touch
+   clearer than before; the composer is an elevated dark panel (not a
+   bright white box) so home chat and active chats match. Light mode
+   untouched. Appended last so these win at equal specificity.
    ---------------------------------------------------------- */
 
-/* Sidebar rail icons + labels — near-white for clear contrast */
+/* Sidebar rail icons + labels — soft grey, closer to old secondary than
+   the overhaul near-white #eceef3 */
 .design-v2.dark .v2-rail-icon {
-  color: #eceef3;
+  color: #c0c5d0;
 }
 .design-v2.dark .v2-rail-icon:hover {
-  color: #ffffff;
-  background: rgba(107, 143, 214, 0.16);
+  color: #d8dce6;
+  background: rgba(107, 143, 214, 0.12);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2.dark .v2-rail-icon--active {
   color: var(--brand-light);
-  background: rgba(107, 143, 214, 0.12);
+  background: rgba(107, 143, 214, 0.1);
   box-shadow: 0 0 14px var(--v2-glow);
 }
 
-/* Empty-state welcome heading — solid white, bolder for a crisper, higher
-   contrast title against the near-black background (was a soft blue gradient) */
+/* Empty-state welcome heading — soft off-white, not pure #fff */
 .design-v2.dark [data-testid='state-empty'] h2 {
   background: none;
-  -webkit-text-fill-color: #ffffff;
-  color: #ffffff;
-  font-weight: 700;
+  -webkit-text-fill-color: #d4d8e2;
+  color: #d4d8e2;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
-/* Composer shell — a light, high-contrast box (user request: white box,
-   black font). The inner textarea keeps its transparent background from
-   section 18's override, so we only recolor the shell + inner text/icons. */
+/* Composer shell — elevated dark panel (home + active chat share this
+   selector). Between pre-overhaul glass (rgba white 0.05) and the
+   overhaul pure-white box: slightly brighter so the field still reads
+   as an input, without the glare of a light box in dark mode. */
 .design-v2.dark [data-testid='comp-chat-input-shell'] {
-  /* Pure white (not grey) so the composer clearly stands out from the
-     near-black background; a crisp ring + drop shadow define its edge. */
-  background: #ffffff !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
   box-shadow:
-    0 6px 26px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+    0 4px 20px rgba(0, 0, 0, 0.35),
+    0 0 10px var(--v2-glow) !important;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell']:focus-within {
-  border-color: #ffffff !important;
+  border-color: var(--v2-border-hover) !important;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.6),
-    0 0 0 3px var(--brand-alpha-light) !important;
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 18px var(--v2-glow-strong) !important;
 }
 
-/* Text + placeholder inside the light composer → near-black */
+/* Soft light ink on the dark composer (theme tokens — no dark-on-light
+   overrides from the white-box era). */
 .design-v2.dark [data-testid='comp-chat-input-shell'] textarea,
 .design-v2.dark [data-testid='comp-chat-input-shell'] .txt-primary {
-  color: #0f1522 !important;
+  color: #e2e4ea !important;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell'] textarea::placeholder {
-  color: #4a5261 !important;
+  color: var(--txt-secondary) !important;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell'] .txt-secondary,
 .design-v2.dark [data-testid='comp-chat-input-shell'] .txt-muted {
-  color: #5c6575 !important;
+  color: var(--txt-secondary) !important;
 }
 
-/* Control icons inside the light composer (plus / enhance / mic) → dark grey
-   so they stay visible on the bright box; brand accent on hover. */
 .design-v2.dark [data-testid='comp-chat-input-shell'] .icon-ghost {
-  color: #3b4353;
-  opacity: 1;
+  color: #c8c8cc;
+  opacity: 0.74;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell'] .icon-ghost:hover,
 .design-v2.dark [data-testid='comp-chat-input-shell'] .icon-ghost:focus-visible {
-  color: var(--brand);
-  background: rgba(0, 63, 199, 0.08);
+  color: var(--brand-light);
+  background: rgba(107, 143, 214, 0.1);
+  opacity: 1;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell'] .surface-chip {
-  background: rgba(0, 0, 0, 0.04) !important;
-  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
 }
 
-/* Pills inside the light composer (active command / enhance-on) stay readable */
 .design-v2.dark [data-testid='comp-chat-input-shell'] .pill {
-  background: rgba(0, 0, 0, 0.05) !important;
-  border-color: rgba(0, 0, 0, 0.12) !important;
-  color: #3b4353 !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #d0d3db !important;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell'] .pill--active {
-  background: rgba(0, 63, 199, 0.1) !important;
-  border-color: rgba(0, 63, 199, 0.3) !important;
-  color: var(--brand) !important;
+  background: rgba(107, 143, 214, 0.12) !important;
+  border-color: rgba(107, 143, 214, 0.28) !important;
+  color: var(--brand-light) !important;
 }
 
-/* Send button keeps its vivid brand fill with a crisp white glyph */
 .design-v2.dark [data-testid='comp-chat-input-shell'] .btn-primary {
   color: #ffffff;
-}
-
-/* ----------------------------------------------------------
-   19b. Dark overlays INSIDE the light composer
-
-   Section 19 recolors .pill / .txt-secondary / .txt-muted to dark ink
-   because the composer shell itself is a white box in dark V2. But three
-   overlay surfaces render inside the shell's DOM subtree with their own
-   DARK panels: the "+" menu and its nested Model/Tools/Knowledge
-   drop-ups (.dropdown-up), the command palette, and the @file-mention
-   palette. Without these restores, the white-composer ink lands on the
-   near-black panels (~1.6:1 contrast — unreadable). Anything on a dark
-   overlay must use the dark-theme colors again; appended after 19 so it
-   wins at equal importance.
-   ---------------------------------------------------------- */
-
-.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .pill {
-  background: rgba(255, 255, 255, 0.09) !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
-  color: #e4e5e9 !important;
-}
-.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .pill:hover {
-  background: rgba(107, 143, 214, 0.12) !important;
-  border-color: rgba(107, 143, 214, 0.3) !important;
-  color: var(--brand-light) !important;
-}
-.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .pill--active {
-  background: rgba(107, 143, 214, 0.1) !important;
-  border-color: rgba(107, 143, 214, 0.3) !important;
-  color: var(--brand-light) !important;
-}
-
-.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .txt-secondary,
-.design-v2.dark [data-testid='comp-chat-input-shell'] .dropdown-up .txt-muted,
-.design-v2.dark
-  [data-testid='comp-chat-input-shell']
-  [data-testid='comp-command-palette']
-  .txt-secondary,
-.design-v2.dark
-  [data-testid='comp-chat-input-shell']
-  [data-testid='comp-command-palette']
-  .txt-muted,
-.design-v2.dark
-  [data-testid='comp-chat-input-shell']
-  [data-testid='comp-file-mention-palette']
-  .txt-secondary,
-.design-v2.dark
-  [data-testid='comp-chat-input-shell']
-  [data-testid='comp-file-mention-palette']
-  .txt-muted {
-  color: var(--txt-secondary) !important;
 }
 
 /* ----------------------------------------------------------
