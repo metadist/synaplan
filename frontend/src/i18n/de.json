@@ -2194,6 +2194,47 @@
       "description": "Die Standard-Installation enthält lokale KI-Modelle, die vollständig auf deiner Hardware laufen. Der Modell-Download kann beim ersten Start etwas dauern; die Cloud-Anbieter oben sind sofort verfügbar."
     }
   },
+  "providerHelp": {
+    "openAria": "So richtest du das ein",
+    "createKeyLink": "API-Schlüssel erstellen",
+    "downloadLink": "Ollama herunterladen",
+    "groq": {
+      "title": "Groq-API-Schlüssel",
+      "message": "Erstelle einen kostenlosen Groq-API-Schlüssel in der Groq-Konsole und füge ihn hier ein. Die kostenlose Stufe reicht meist, um in unter einer Minute zu chatten."
+    },
+    "openai": {
+      "title": "OpenAI-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in deinem OpenAI-Konto (API-Keys-Seite) und füge ihn hier ein. Die Nutzung wird von OpenAI abgerechnet."
+    },
+    "anthropic": {
+      "title": "Anthropic-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in der Anthropic-Konsole (Einstellungen → Keys) und füge ihn hier ein, um Claude-Modelle zu nutzen."
+    },
+    "google": {
+      "title": "Google-Gemini-API-Schlüssel",
+      "message": "Erstelle einen Gemini-API-Schlüssel in Google AI Studio und füge ihn hier ein. Für viele Modelle gibt es eine kostenlose Stufe."
+    },
+    "mistral": {
+      "title": "Mistral-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in der Mistral-Konsole und füge ihn hier ein. Zum Einstieg bietet Mistral eine kostenlose Stufe."
+    },
+    "trustedtokens": {
+      "title": "TrustedTokens-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel bei TrustedTokens (Konto → API-Zugang) und füge ihn hier ein. Die Inferenz läuft auf deutschen GPUs mit EU-Datenresidenz."
+    },
+    "huggingface": {
+      "title": "HuggingFace-API-Token",
+      "message": "Erstelle ein Access-Token in den HuggingFace-Einstellungen und füge es hier ein, um HuggingFace-Inference-Modelle zu nutzen."
+    },
+    "xai": {
+      "title": "xAI-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in der xAI-Konsole und füge ihn hier ein, um Grok-Modelle zu nutzen."
+    },
+    "ollama": {
+      "title": "Lokale KI mit Ollama",
+      "message": "Lade Ollama herunter und ziehe ein leistungsfähiges Modell wie gpt-oss:120b (oder ein kleineres wie llama3.2 bei weniger RAM). Kein API-Schlüssel nötig — Synaplan spricht mit Ollama unter der konfigurierten URL."
+    }
+  },
   "setupBanner": {
     "title": "Kein KI-Anbieter verbunden",
     "adminText": "Der Chat braucht einen KI-Anbieter. Verbinde einen in einer Minute — kostenlose Optionen verfügbar.",

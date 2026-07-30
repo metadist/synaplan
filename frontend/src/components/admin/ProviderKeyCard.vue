@@ -7,6 +7,12 @@
     <div class="flex items-start justify-between gap-2">
       <div class="flex items-center gap-2 min-w-0">
         <h3 class="text-lg font-semibold txt-primary truncate">{{ provider.displayName }}</h3>
+        <ProviderHelpHint
+          v-if="helpMeta"
+          :help-id="helpMeta.id"
+          :url="provider.consoleUrl || helpMeta.url"
+          :is-download="helpMeta.isDownload"
+        />
         <span
           v-if="provider.recommended"
           class="text-xs font-medium px-2 py-0.5 rounded-full bg-[var(--brand)] text-white whitespace-nowrap"
@@ -142,9 +148,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import {
@@ -154,6 +161,7 @@ import {
   testProviderKey,
   type ProviderKeyStatus,
 } from '@/services/api/providerKeysApi'
+import { providerHelpByName } from '@/utils/providerHelp'
 
 const props = defineProps<{
   provider: ProviderKeyStatus
@@ -173,6 +181,7 @@ const applyDefaultsChecked = ref(!props.isDefaultChat)
 const saving = ref(false)
 const testing = ref(false)
 const applying = ref(false)
+const helpMeta = computed(() => providerHelpByName(props.provider.name))
 
 const save = async () => {
   const key = keyInput.value.trim()

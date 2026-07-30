@@ -1,12 +1,25 @@
 #!/bin/bash
+# =============================================================================
+# LEGACY / optional helper — kept under _devextras for operators who still want
+# an interactive prompt. Prefer the supported path for new installs:
+#
+#   docker compose up -d
+#   → http://localhost:5173  (admin@synaplan.com / admin123)
+#   → Admin → AI Providers   (/admin/setup)
+#
+# Keys entered in the UI are tested live, stored encrypted in the database, and
+# apply without a restart. Env keys in backend/.env still bootstrap on first use.
+# =============================================================================
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 echo ""
 echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║           🚀 Synaplan First Installation                      ║"
+echo "║           Synaplan First Installation (legacy helper)         ║"
+echo "╠═══════════════════════════════════════════════════════════════╣"
+echo "║  Prefer: docker compose up -d → Admin → AI Providers          ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo ""
 

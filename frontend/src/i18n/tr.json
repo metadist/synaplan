@@ -881,6 +881,47 @@
       "description": "Standart kurulum, tamamen kendi donanımınızda çalışan yerel AI modelleri içerir. İlk başlatmada model indirme biraz sürebilir; yukarıdaki bulut sağlayıcıları anında kullanılabilir."
     }
   },
+  "providerHelp": {
+    "openAria": "Bunu nasıl kurarsınız",
+    "createKeyLink": "API anahtarı oluştur",
+    "downloadLink": "Ollama'yı indir",
+    "groq": {
+      "title": "Groq API anahtarı",
+      "message": "Groq konsolunda ücretsiz bir Groq API anahtarı oluşturun ve buraya yapıştırın. Ücretsiz katman genellikle bir dakikadan kısa sürede sohbete başlamak için yeterlidir."
+    },
+    "openai": {
+      "title": "OpenAI API anahtarı",
+      "message": "OpenAI hesabınızda (API keys sayfası) bir API anahtarı oluşturun ve buraya yapıştırın. Kullanım OpenAI tarafından faturalandırılır."
+    },
+    "anthropic": {
+      "title": "Anthropic API anahtarı",
+      "message": "Anthropic konsolunda (Ayarlar → Keys) bir API anahtarı oluşturun ve Claude modellerini kullanmak için buraya yapıştırın."
+    },
+    "google": {
+      "title": "Google Gemini API anahtarı",
+      "message": "Google AI Studio'da bir Gemini API anahtarı oluşturun ve buraya yapıştırın. Birçok model için ücretsiz katman vardır."
+    },
+    "mistral": {
+      "title": "Mistral API anahtarı",
+      "message": "Mistral konsolunda bir API anahtarı oluşturun ve buraya yapıştırın. Mistral başlangıç için ücretsiz katman sunar."
+    },
+    "trustedtokens": {
+      "title": "TrustedTokens API anahtarı",
+      "message": "TrustedTokens'ta (Hesap → API Erişimi) bir API anahtarı oluşturun ve buraya yapıştırın. Çıkarım, AB veri yerleşimli Alman GPU'larda çalışır."
+    },
+    "huggingface": {
+      "title": "HuggingFace API jetonu",
+      "message": "HuggingFace ayarlarında bir erişim jetonu oluşturun ve HuggingFace Inference modellerini kullanmak için buraya yapıştırın."
+    },
+    "xai": {
+      "title": "xAI API anahtarı",
+      "message": "xAI konsolunda bir API anahtarı oluşturun ve Grok modellerini kullanmak için buraya yapıştırın."
+    },
+    "ollama": {
+      "title": "Ollama ile yerel AI",
+      "message": "Ollama'yı indirin ve gpt-oss:120b gibi güçlü bir model çekin (daha az RAM varsa llama3.2 gibi daha küçük bir model). API anahtarı gerekmez — Synaplan yapılandırılan URL'deki Ollama ile konuşur."
+    }
+  },
   "setupBanner": {
     "title": "Bağlı AI sağlayıcısı yok",
     "adminText": "Sohbet için bir AI sağlayıcısı gerekiyor. Bir dakikada bağlayın — ücretsiz seçenekler mevcut.",

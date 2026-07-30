@@ -22,7 +22,9 @@ cd synaplan
 docker compose up -d
 ```
 
-That's it! Visit http://localhost:5173 after ~2 minutes.
+That's it! Visit http://localhost:5173 after ~2 minutes, log in as
+`admin@synaplan.com` / `admin123`, and connect a provider under
+**Admin → AI Providers** (see [Connect an AI Provider](#connect-an-ai-provider)).
 
 ---
 
@@ -39,11 +41,7 @@ Full-featured installation with local AI models and audio transcription.
 | **Total** | **~9 GB** | Everything included |
 
 ```bash
-# Option 1: Docker Compose directly
 docker compose up -d
-
-# Option 2: Guided install script (Linux/macOS/WSL2)
-./_1st_install_linux.sh
 ```
 
 **What's included:**
@@ -55,7 +53,7 @@ docker compose up -d
 - Background worker (Symfony Messenger consumer for async AI/indexing jobs)
 - Local Ollama AI models
 - Whisper audio transcription
-- Cloud AI support (Groq, OpenAI, Anthropic, Gemini, xAI)
+- Cloud AI support (Groq, OpenAI, Anthropic, Gemini, xAI, …)
 - Qdrant vector database (AI memories, RAG, feedback)
 - Dev tools (phpMyAdmin, MailHog)
 
@@ -73,17 +71,6 @@ Fastest way to start—uses cloud AI providers, skips large local models.
 docker compose -f docker-compose-minimal.yml up -d
 ```
 
-Then connect a cloud provider: log in as admin, open **Admin → AI Providers**
-(`http://localhost:5173/admin/setup`), and paste your key (get a free one at
-[console.groq.com](https://console.groq.com)). The key is tested live, stored
-encrypted in the database, and works immediately — no restart.
-
-Alternatively via the shell (imported into the encrypted store on first use):
-
-```bash
-echo "GROQ_API_KEY=your_key_here" >> backend/.env
-```
-
 **Excluded (saves ~4 GB):**
 - Ollama (local AI models)
 - Whisper models (audio transcription)
@@ -97,23 +84,24 @@ docker compose up -d
 
 ---
 
-## Install Script Options
+## Connect an AI Provider
 
-The `_1st_install_linux.sh` script offers two AI configurations:
+After `docker compose up -d`, log in as `admin@synaplan.com` / `admin123` and open
+**Admin → AI Providers** (`http://localhost:5173/admin/setup`).
 
-### Option 1: Local Ollama (Offline Capable)
+- Paste a cloud key (free tier: [console.groq.com](https://console.groq.com)) — it is
+  tested live, stored encrypted in the database, and works immediately (no restart).
+- Or use local Ollama from the standard install (models download in the background).
+- Optional: put keys in `backend/.env` for scripted deploys; they are imported into
+  the encrypted store on first use.
 
-- Downloads `gpt-oss:20b` (~12GB) for chat
-- Downloads `bge-m3` (~1.5GB) for embeddings
-- Requires ~24GB VRAM for full performance
-- Works completely offline after setup
+```bash
+# Optional env bootstrap (UI is preferred)
+echo "GROQ_API_KEY=your_key_here" >> backend/.env
+```
 
-### Option 2: Groq Cloud (Recommended)
-
-- Prompts for free `GROQ_API_KEY`
-- Uses `llama-3.3-70b-versatile` for chat
-- Only downloads `bge-m3` for local embeddings
-- Fastest setup, excellent performance
+> A legacy interactive helper still lives at `_devextras/_1st_install_linux.sh` for
+> operators who want a shell prompt. It is **not** the supported install path.
 
 ---
 

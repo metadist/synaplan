@@ -49,7 +49,7 @@
 | **4** | **Surface the model download** — the entrypoint already logs pull progress at 10% milestones; expose it via a status endpoint and show a progress card ("Local AI is downloading, 43% — cloud chat works now"). | ⬜ Open |
 | **5** | **Lower the hardware bar** — ship a small-model tier (`llama3.2:3b` / `qwen3:4b`, ~2–4 GB) as the local default so chat works on an 8–16 GB laptop with no GPU, `gpt-oss:20b` as opt-in "quality"; **publish multi-arch (arm64) images**. | ⬜ Open |
 | **6** | **Distribution channels** — "the masses" rarely `git clone`. One-click templates for Coolify, CapRover, Elestio, PikaPods, Railway; app-store listings for Umbrel and CasaOS. Mostly a compose/template file + metadata per channel; an all-in-one evaluation image would make several listings trivial. | ⬜ Open |
-| **H** | **Hygiene** — auto-generate `APP_SECRET`/`TOKEN_SECRET` on first boot when still placeholders; reconcile the disk-size numbers; make the install script POSIX/Windows-friendly or retire it now that the wizard exists. | ⬜ Open |
+| **H** | **Hygiene** — auto-generate `APP_SECRET`/`TOKEN_SECRET` on first boot when still placeholders; reconcile the disk-size numbers; ~~make the install script POSIX/Windows-friendly or retire it~~ **install script retired** to `_devextras/_1st_install_linux.sh` (docs now point at compose + Admin → AI Providers). Remaining: secret autogen + disk-size reconciliation. | 🟡 **Partial** |
 
 ---
 
@@ -143,11 +143,10 @@ POST   /api/v1/admin/provider-keys/{provider}/apply-defaults
 
 ### 3.3 Install script & docs
 
-- `_1st_install_linux.sh`: the whole raw-SQL block (hardcoded `BVALUE='9'`, the
-  deadlock-retry helper) is replaced by
-  `php bin/console app:provider:apply-defaults groq`; the closing banner points at
-  the setup page. The `GROQ_API_KEY` it writes to `backend/.env` is now imported
-  into the encrypted store automatically.
+- Install script: the raw-SQL block was replaced by
+  `php bin/console app:provider:apply-defaults groq`, then the script was **moved
+  out of the repo root** to `_devextras/_1st_install_linux.sh` (legacy/optional).
+  Supported install path is `docker compose up -d` + **Admin → AI Providers**.
 - **This repo:** `README.md` (Quick Start, Install Options, provider table),
   `docs/INSTALLATION.md`, `docs/CONFIGURATION.md`, `backend/.env.example`.
 - **`synaplan-docs`:** `docs/quickstart.md` (TL;DR path no longer edits `.env`;
@@ -274,5 +273,5 @@ correctly reported unconfigured, and an authenticated runtime config returned
 
 **Then, in adoption order:** Tier 4 (download progress endpoint + card) → Tier 5
 (small-model default + arm64 images) → Tier 6 (Coolify/CapRover/Elestio/PikaPods/
-Railway templates, Umbrel/CasaOS listings) → hygiene batch (`APP_SECRET`
-autogeneration, disk-size reconciliation, retire or port the install script).
+Railway templates, Umbrel/CasaOS listings) → remaining hygiene (`APP_SECRET`
+autogeneration, disk-size reconciliation).

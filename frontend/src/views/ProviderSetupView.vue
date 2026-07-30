@@ -61,8 +61,17 @@
         <!-- Local AI note -->
         <div class="surface-card rounded-lg p-5 flex items-start gap-3">
           <Icon icon="mdi:server-outline" class="w-6 h-6 shrink-0 txt-brand mt-0.5" />
-          <div>
-            <h3 class="text-lg font-semibold txt-primary">{{ $t('adminSetup.localAi.title') }}</h3>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <h3 class="text-lg font-semibold txt-primary">
+                {{ $t('adminSetup.localAi.title') }}
+              </h3>
+              <ProviderHelpHint
+                help-id="ollama"
+                url="https://ollama.com/download"
+                :is-download="true"
+              />
+            </div>
             <p class="text-sm txt-secondary mt-1">{{ $t('adminSetup.localAi.description') }}</p>
           </div>
         </div>
@@ -76,6 +85,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
+import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import ProviderKeyCard from '@/components/admin/ProviderKeyCard.vue'
 import { useNotification } from '@/composables/useNotification'
 import { useConfigStore } from '@/stores/config'

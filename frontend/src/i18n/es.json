@@ -881,6 +881,47 @@
       "description": "La instalación estándar incluye modelos de IA locales que se ejecutan completamente en tu hardware. La descarga de modelos puede tardar en el primer arranque; los proveedores en la nube de arriba están disponibles al instante."
     }
   },
+  "providerHelp": {
+    "openAria": "Cómo configurar esto",
+    "createKeyLink": "Crear clave API",
+    "downloadLink": "Descargar Ollama",
+    "groq": {
+      "title": "Clave API de Groq",
+      "message": "Crea una clave API gratuita de Groq en la consola de Groq y pégala aquí. El nivel gratuito suele bastar para empezar a chatear en menos de un minuto."
+    },
+    "openai": {
+      "title": "Clave API de OpenAI",
+      "message": "Crea una clave API en tu cuenta de OpenAI (página de API keys) y pégala aquí. El uso lo factura OpenAI."
+    },
+    "anthropic": {
+      "title": "Clave API de Anthropic",
+      "message": "Crea una clave API en la consola de Anthropic (Ajustes → Keys) y pégala aquí para usar los modelos Claude."
+    },
+    "google": {
+      "title": "Clave API de Google Gemini",
+      "message": "Crea una clave API de Gemini en Google AI Studio y pégala aquí. Hay un nivel gratuito para muchos modelos."
+    },
+    "mistral": {
+      "title": "Clave API de Mistral",
+      "message": "Crea una clave API en la consola de Mistral y pégala aquí. Mistral ofrece un nivel gratuito para empezar."
+    },
+    "trustedtokens": {
+      "title": "Clave API de TrustedTokens",
+      "message": "Crea una clave API en TrustedTokens (Cuenta → Acceso API) y pégala aquí. La inferencia se ejecuta en GPUs alemanas con residencia de datos en la UE."
+    },
+    "huggingface": {
+      "title": "Token API de HuggingFace",
+      "message": "Crea un token de acceso en la configuración de HuggingFace y pégalo aquí para usar los modelos de HuggingFace Inference."
+    },
+    "xai": {
+      "title": "Clave API de xAI",
+      "message": "Crea una clave API en la consola de xAI y pégala aquí para usar los modelos Grok."
+    },
+    "ollama": {
+      "title": "IA local con Ollama",
+      "message": "Descarga Ollama e instala un modelo potente como gpt-oss:120b (o uno más pequeño como llama3.2 si tienes menos RAM). No hace falta clave API: Synaplan habla con Ollama en la URL configurada."
+    }
+  },
   "setupBanner": {
     "title": "Ningún proveedor de IA conectado",
     "adminText": "El chat necesita un proveedor de IA. Conecta uno en un minuto — hay opciones gratuitas.",
