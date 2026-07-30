@@ -2,9 +2,16 @@ import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import type { LimitCheckResult } from '@/composables/useLimitCheck'
 
-/** Why the paywall is being shown — drives the headline and subline. */
-export type PaywallReason = 'guest_limit' | 'quota_exhausted' | 'reminder'
+/**
+ * Why the paywall is being shown — drives the headline and subline.
+ *
+ * `free_limit` and `quota_exhausted` are deliberately separate: a free
+ * allowance never resets, so promising a reset next month would be wrong.
+ */
+export type PaywallReason = 'guest_limit' | 'free_limit' | 'quota_exhausted' | 'reminder'
 
 export const PAYWALL_LAST_SHOWN_KEY = 'synaplan.paywallLastShownAt'
 
@@ -22,6 +29,27 @@ const REMINDER_LEVELS = ['NEW']
  * unlimited — neither must ever be shown an upgrade sheet.
  */
 const TOP_LEVELS = ['BUSINESS', 'ADMIN']
+
+/**
+ * Which paywall a blocked message should raise, or `null` when the plain limit
+ * modal is the better answer:
+ *
+ * - An `hourly` throttle resets within the hour, so the modal with its reset
+ *   countdown says more than a plan sheet.
+ * - A monthly cost-budget block offers a one-time top-up, which is cheaper and
+ *   more precise than a plan upgrade — MOBILE-APP SEAM: that top-up is a Stripe
+ *   web checkout and hidden in the app (Apple 3.1.1), so the native shell gets
+ *   the paywall instead.
+ * - An anonymous user without a verified phone number can lift the limit for
+ *   FREE by verifying it, and that offer only exists in the limit modal. Selling
+ *   a plan instead would hide the cheaper remedy.
+ */
+export function paywallReasonForLimit(result: LimitCheckResult): PaywallReason | null {
+  if ('lifetime' !== result.limitType && 'monthly' !== result.limitType) return null
+  if (true === result.topupAvailable && !isNativeApp()) return null
+  if ('ANONYMOUS' === result.userLevel && !result.phoneVerified) return null
+  return 'lifetime' === result.limitType ? 'free_limit' : 'quota_exhausted'
+}
 
 function readLastShownAt(): number {
   try {

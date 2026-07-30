@@ -343,6 +343,7 @@
       :is-open="isPaywallOpen"
       :reason="paywallReason"
       @close="closePaywall"
+      @unavailable="fallBackFromPaywall"
     />
 
     <!-- Guest hint popover (shown when a guest taps a restricted feature) -->
@@ -500,8 +501,7 @@ import PendingPurchaseBanner from '@/components/guest/PendingPurchaseBanner.vue'
 import GuestSignupModal from '@/components/guest/GuestSignupModal.vue'
 import GuestHintPopover from '@/components/guest/GuestHintPopover.vue'
 import SubscriptionPaywallModal from '@/components/subscription/SubscriptionPaywallModal.vue'
-import { usePaywallPrompt } from '@/composables/usePaywallPrompt'
-import { isNativeApp } from '@/services/api/nativeRuntime'
+import { paywallReasonForLimit, usePaywallPrompt } from '@/composables/usePaywallPrompt'
 import { hasPendingIapRedemption } from '@/services/nativeIap'
 import { usePromoTips } from '@/composables/usePromoTips'
 import { useDateFormat } from '@/composables/useDateFormat'
@@ -578,26 +578,38 @@ const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
 
+/** The block that opened the paywall, kept so the fallback modal can show it. */
+const blockedLimit = ref<LimitCheckResult | null>(null)
+
 /**
  * A blocked message either opens the upgrade paywall or the plain informational
- * limit modal.
- *
- * The paywall only makes sense when the allowance is actually spent
- * (`lifetime`/`monthly`); an `hourly` throttle resets within the hour, so the
- * existing modal with its reset countdown stays the better answer. A monthly
- * cost-budget block keeps the old modal on the web too, because its one-time
- * top-up is the cheaper, more precise remedy — MOBILE-APP SEAM: that top-up is
- * a Stripe web checkout and is hidden in the app (Apple 3.1.1), so the native
- * shell gets the paywall instead.
+ * limit modal — `paywallReasonForLimit` owns which block deserves which.
  */
 function showLimitOrPaywall(result: LimitCheckResult): void {
-  const allowanceSpent = 'lifetime' === result.limitType || 'monthly' === result.limitType
-  const topupIsBetter = true === result.topupAvailable && !isNativeApp()
+  blockedLimit.value = result
+  const reason = paywallReasonForLimit(result)
 
-  if (allowanceSpent && !topupIsBetter && openPaywall('quota_exhausted')) {
+  if (reason && openPaywall(reason)) {
     return
   }
   checkAndShowLimit(result)
+}
+
+/**
+ * The paywall has nothing to sell (catalogue unreachable, or every tier above
+ * this user deactivated). Hand the user back to the modal the paywall replaced
+ * so a blocked message still explains itself; a mere reminder just goes away.
+ */
+function fallBackFromPaywall(): void {
+  const reason = paywallReason.value
+  closePaywall()
+
+  if ('guest_limit' === reason) {
+    showGuestSignupModal.value = true
+    return
+  }
+  if ('reminder' === reason) return
+  if (blockedLimit.value) checkAndShowLimit(blockedLimit.value)
 }
 
 /**

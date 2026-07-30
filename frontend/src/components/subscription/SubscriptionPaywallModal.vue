@@ -29,6 +29,7 @@
           <!-- Absolute so it stays put while plans scroll, without a full-width
                header bar that would paint over the scroll content (Apple 3.1.2). -->
           <button
+            ref="closeButtonRef"
             class="paywall-close absolute top-3 right-3 z-10 w-9 h-9 rounded-xl txt-primary flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
             data-testid="paywall-close"
             :aria-label="$t('common.close')"
@@ -55,8 +56,13 @@
               </p>
             </div>
 
-            <!-- Loading -->
-            <div v-if="loadingPlans" class="py-12 text-center" data-testid="paywall-loading">
+            <!-- Loading (also before the request starts, so the empty state
+                 below can never flash while the catalogue is still on its way) -->
+            <div
+              v-if="loadingPlans || !catalogueSettled"
+              class="py-12 text-center"
+              data-testid="paywall-loading"
+            >
               <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
             </div>
 
@@ -82,10 +88,10 @@
 
                 <div class="p-6 flex flex-col flex-1">
                   <h3 class="text-xl font-bold mb-1" :style="{ color: planInk(plan.id) }">
-                    {{ $t(`subscription.plans.${plan.id.toLowerCase()}`) }}
+                    {{ planName(plan) }}
                   </h3>
-                  <p class="text-xs txt-secondary mb-4">
-                    {{ $t(`paywall.plans.${plan.id.toLowerCase()}.tagline`) }}
+                  <p v-if="taglineFor(plan)" class="text-xs txt-secondary mb-4">
+                    {{ taglineFor(plan) }}
                   </p>
 
                   <div class="flex items-baseline gap-1 mb-5">
@@ -120,14 +126,23 @@
                     {{
                       isProcessing
                         ? $t('subscription.processing')
-                        : $t('paywall.choosePlan', {
-                            plan: $t(`subscription.plans.${plan.id.toLowerCase()}`),
-                          })
+                        : $t('paywall.choosePlan', { plan: planName(plan) })
                     }}
                   </button>
                 </div>
               </article>
             </div>
+
+            <!-- Nothing purchasable: the parent is told via `unavailable` and
+                 normally swaps in its own modal, so this is only the safety net
+                 for a surface that ignores the event. -->
+            <p
+              v-else
+              class="py-10 text-center text-sm txt-secondary"
+              data-testid="paywall-unavailable"
+            >
+              {{ $t('paywall.unavailable') }}
+            </p>
 
             <!-- Footer -->
             <div class="max-w-2xl mx-auto mt-8 space-y-4 text-center">
@@ -194,7 +209,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
@@ -222,9 +237,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  /**
+   * The catalogue settled with nothing this user can buy here (request failed,
+   * every tier above them deactivated). The caller — which opened the paywall
+   * instead of an informational modal — can fall back to that modal rather than
+   * leaving a blocked user in front of an empty sheet.
+   */
+  unavailable: []
 }>()
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 const config = useConfigStore()
@@ -234,6 +256,7 @@ const {
   plans,
   loadingPlans,
   isProcessing,
+  currentLevel,
   loadPlans,
   displayPrice,
   isCurrentPlan,
@@ -241,6 +264,12 @@ const {
   selectPlan,
   restorePurchases,
 } = useSubscriptionPurchase()
+
+const closeButtonRef = ref<HTMLButtonElement | null>(null)
+let previouslyFocused: HTMLElement | null = null
+
+/** False until the plan request has come back once — see the loading branch. */
+const catalogueSettled = ref(false)
 
 const isGuest = computed(() => !authStore.isAuthenticated)
 
@@ -298,6 +327,21 @@ function benefitsFor(plan: SubscriptionPlan): string[] {
   const mapped = PLAN_BENEFITS[plan.id]
   if (!mapped) return plan.features
   return mapped.map((benefit) => t(`subscription.features.${benefit.key}`, benefit.params ?? {}))
+}
+
+/**
+ * Tier name and tagline fall back to what the server sent (and to nothing) for
+ * a tier this build has no copy for — `t()` would otherwise print the raw key
+ * path, e.g. `paywall.plans.studio.tagline`, right into the card.
+ */
+function planName(plan: SubscriptionPlan): string {
+  const key = `subscription.plans.${plan.id.toLowerCase()}`
+  return te(key) ? t(key) : plan.name
+}
+
+function taglineFor(plan: SubscriptionPlan): string {
+  const key = `paywall.plans.${plan.id.toLowerCase()}.tagline`
+  return te(key) ? t(key) : ''
 }
 
 function planToken(planId: string, suffix: string): string {
@@ -362,13 +406,42 @@ function handleKeydown(event: KeyboardEvent): void {
 onMounted(() => document.addEventListener('keydown', handleKeydown))
 onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
 
+/**
+ * Load the catalogue on open and move focus into the sheet, so a keyboard or
+ * screen-reader user starts at the dismiss control instead of somewhere on the
+ * chat behind the overlay. Focus goes back where it came from on close.
+ */
+async function onOpen(): Promise<void> {
+  previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  await nextTick()
+  closeButtonRef.value?.focus()
+
+  if (0 === plans.value.length) await loadPlans()
+  catalogueSettled.value = true
+  if (props.isOpen && 0 === offeredPlans.value.length) emit('unavailable')
+}
+
 watch(
   () => props.isOpen,
   (open) => {
-    if (open && 0 === plans.value.length) void loadPlans()
+    if (open) {
+      void onOpen()
+      return
+    }
+    previouslyFocused?.focus()
+    previouslyFocused = null
   },
   { immediate: true }
 )
+
+/**
+ * A completed purchase (or a restore that recovered one) changes the tier, and
+ * the user came here from a blocked chat — so the sheet gets out of the way
+ * instead of advertising the next tier up on top of it.
+ */
+watch(currentLevel, (level, previous) => {
+  if (props.isOpen && level !== previous) close()
+})
 </script>
 
 <style scoped>
@@ -407,5 +480,16 @@ watch(
 }
 .animate-paywall-enter {
   animation: paywall-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Accessibility: neutralize all motion under the OS setting. */
+@media (prefers-reduced-motion: reduce) {
+  .paywall-fade-enter-active,
+  .paywall-fade-leave-active {
+    transition: none;
+  }
+  .animate-paywall-enter {
+    animation: none;
+  }
 }
 </style>

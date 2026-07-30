@@ -25,9 +25,25 @@ vi.mock('@/services/api/nativeServer', () => ({
 
 import {
   usePaywallPrompt,
+  paywallReasonForLimit,
   PAYWALL_LAST_SHOWN_KEY,
   PAYWALL_REMINDER_INTERVAL_MS,
 } from '@/composables/usePaywallPrompt'
+import type { LimitCheckResult } from '@/composables/useLimitCheck'
+
+function block(overrides: Partial<LimitCheckResult> = {}): LimitCheckResult {
+  return {
+    allowed: false,
+    limitType: 'monthly',
+    actionType: 'MESSAGES',
+    used: 100,
+    limit: 100,
+    remaining: 0,
+    userLevel: 'PRO',
+    phoneVerified: true,
+    ...overrides,
+  }
+}
 
 describe('usePaywallPrompt', () => {
   beforeEach(() => {
@@ -88,15 +104,24 @@ describe('usePaywallPrompt', () => {
   })
 
   it('throttles the reminder to once per interval', () => {
-    const paywall = usePaywallPrompt()
-    const now = Date.now()
+    // Pin the clock: `openPaywall` stamps `Date.now()`, so a real clock ticking
+    // a millisecond into the call would push the cool-down past the assertions.
+    const now = Date.UTC(2026, 0, 15, 9, 0, 0)
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
 
-    expect(paywall.shouldRemind(now)).toBe(true)
-    paywall.openPaywall('reminder')
+    try {
+      const paywall = usePaywallPrompt()
 
-    expect(paywall.shouldRemind(now)).toBe(false)
-    expect(paywall.shouldRemind(now + PAYWALL_REMINDER_INTERVAL_MS - 1000)).toBe(false)
-    expect(paywall.shouldRemind(now + PAYWALL_REMINDER_INTERVAL_MS)).toBe(true)
+      expect(paywall.shouldRemind(now)).toBe(true)
+      paywall.openPaywall('reminder')
+
+      expect(paywall.shouldRemind(now)).toBe(false)
+      expect(paywall.shouldRemind(now + PAYWALL_REMINDER_INTERVAL_MS - 1000)).toBe(false)
+      expect(paywall.shouldRemind(now + PAYWALL_REMINDER_INTERVAL_MS)).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('lets a hard trigger through even inside the reminder cool-down', () => {
@@ -114,5 +139,35 @@ describe('usePaywallPrompt', () => {
     paywall.closePaywall()
 
     expect(paywall.isPaywallOpen.value).toBe(false)
+  })
+})
+
+describe('paywallReasonForLimit', () => {
+  it('sells an upgrade once the allowance is spent', () => {
+    expect(paywallReasonForLimit(block({ limitType: 'monthly' }))).toBe('quota_exhausted')
+    expect(paywallReasonForLimit(block({ limitType: 'lifetime', userLevel: 'NEW' }))).toBe(
+      'free_limit'
+    )
+  })
+
+  it('leaves an hourly throttle to the modal with its reset countdown', () => {
+    expect(paywallReasonForLimit(block({ limitType: 'hourly' }))).toBeNull()
+  })
+
+  it('keeps the cheaper top-up on the web', () => {
+    expect(paywallReasonForLimit(block({ topupAvailable: true }))).toBeNull()
+  })
+
+  it('keeps the free phone-verification remedy for anonymous users', () => {
+    expect(
+      paywallReasonForLimit(
+        block({ limitType: 'lifetime', userLevel: 'ANONYMOUS', phoneVerified: false })
+      )
+    ).toBeNull()
+    expect(
+      paywallReasonForLimit(
+        block({ limitType: 'lifetime', userLevel: 'ANONYMOUS', phoneVerified: true })
+      )
+    ).toBe('free_limit')
   })
 })

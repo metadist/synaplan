@@ -180,6 +180,43 @@ describe('SubscriptionPaywallModal', () => {
     expect(offered).toEqual(['STUDIO'])
   })
 
+  it('names an unknown tier from the server instead of printing i18n keys', async () => {
+    mockGetPlans.mockResolvedValue({
+      plans: [{ ...plan('STUDIO', 29.95), name: 'Studio' }],
+      stripeConfigured: true,
+    })
+
+    const wrapper = await mountPaywall()
+
+    const card = wrapper.find('[data-plan-id="STUDIO"]')
+    expect(card.text()).toContain('Studio')
+    expect(card.text()).not.toContain('subscription.plans.studio')
+    expect(card.text()).not.toContain('paywall.plans.studio.tagline')
+  })
+
+  it('reports that there is nothing to sell when the catalogue is empty', async () => {
+    mockGetPlans.mockResolvedValue({ plans: [], stripeConfigured: true })
+
+    const wrapper = await mountPaywall()
+
+    expect(wrapper.emitted('unavailable')).toHaveLength(1)
+    expect(wrapper.find('[data-testid="paywall-unavailable"]').exists()).toBe(true)
+  })
+
+  it('reports the same when the plan request fails', async () => {
+    mockGetPlans.mockRejectedValue(new Error('offline'))
+
+    const wrapper = await mountPaywall()
+
+    expect(wrapper.emitted('unavailable')).toHaveLength(1)
+  })
+
+  it('stays quiet while it has something to offer', async () => {
+    const wrapper = await mountPaywall()
+
+    expect(wrapper.emitted('unavailable')).toBeUndefined()
+  })
+
   it('announces the reason it was opened for', async () => {
     const wrapper = await mountPaywall()
 

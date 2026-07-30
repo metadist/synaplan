@@ -2045,14 +2045,17 @@
   "paywall": {
     "title": {
       "guest_limit": "Deine Gratis-Nachrichten sind aufgebraucht",
+      "free_limit": "Deine Gratis-Nachrichten sind aufgebraucht",
       "quota_exhausted": "Dein Kontingent für diesen Monat ist aufgebraucht",
       "reminder": "Hol mehr aus Synaplan heraus"
     },
     "subtitle": {
       "guest_limit": "Wähle einen Tarif und chatte weiter – mit eigenem Verlauf, Erinnerungen und Dateien.",
+      "free_limit": "Dein Gratis-Kontingent ist verbraucht. Wähle einen Tarif und chatte ohne Limit weiter.",
       "quota_exhausted": "Wechsle in einen größeren Tarif und mach sofort weiter, oder warte bis dein Kontingent nächsten Monat zurückgesetzt wird.",
       "reminder": "Mit einem Tarif bekommst du mehr Nachrichten, stärkere KI-Modelle und mehr Speicher."
     },
+    "unavailable": "Hier kann gerade kein Tarif gekauft werden. Bitte versuche es später noch einmal.",
     "recommended": "Empfohlen",
     "choosePlan": "{plan} wählen",
     "guestNote": "Erstelle zuerst ein kostenloses Konto – dein Tarif wird damit verknüpft.",

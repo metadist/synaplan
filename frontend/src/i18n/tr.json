@@ -1475,14 +1475,17 @@
   "paywall": {
     "title": {
       "guest_limit": "Ücretsiz mesajların bitti",
+      "free_limit": "Ücretsiz mesajların bitti",
       "quota_exhausted": "Bu ayki kotan doldu",
       "reminder": "Synaplan'dan daha fazlasını al"
     },
     "subtitle": {
       "guest_limit": "Kendi geçmişin, hafızaların ve dosyalarınla sohbete devam etmek için bir plan seç.",
+      "free_limit": "Ücretsiz kotan tükendi. Sınır olmadan sohbete devam etmek için bir plan seç.",
       "quota_exhausted": "Hemen devam etmek için üst bir plana geç ya da kotanın gelecek ay sıfırlanmasını bekle.",
       "reminder": "Bir plan sana daha fazla mesaj, daha güçlü AI modelleri ve daha fazla depolama verir."
     },
+    "unavailable": "Şu anda burada bir plan satın alınamıyor. Lütfen daha sonra tekrar dene.",
     "recommended": "Önerilen",
     "choosePlan": "{plan} planını seç",
     "guestNote": "Önce ücretsiz bir hesap oluştur; planın bu hesaba bağlanır.",

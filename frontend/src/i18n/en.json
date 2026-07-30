@@ -2030,14 +2030,17 @@
   "paywall": {
     "title": {
       "guest_limit": "Your free messages are used up",
+      "free_limit": "Your free messages are used up",
       "quota_exhausted": "You've used up this month's allowance",
       "reminder": "Get more out of Synaplan"
     },
     "subtitle": {
       "guest_limit": "Pick a plan to keep chatting — with your own history, memories and files.",
+      "free_limit": "Your free allowance is spent. Pick a plan to keep chatting without limits.",
       "quota_exhausted": "Move up a plan to keep going right away, or wait for your allowance to reset next month.",
       "reminder": "A plan gives you more messages, stronger AI models and more storage."
     },
+    "unavailable": "No plans can be bought here right now. Please try again later.",
     "recommended": "Recommended",
     "choosePlan": "Choose {plan}",
     "guestNote": "Create a free account first — your plan is linked to it.",
