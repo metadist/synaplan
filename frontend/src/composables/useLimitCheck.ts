@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-interface LimitCheckResult {
+export interface LimitCheckResult {
   allowed: boolean
   limitType: 'lifetime' | 'hourly' | 'monthly'
   actionType: string
