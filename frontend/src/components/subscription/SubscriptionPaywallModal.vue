@@ -21,10 +21,9 @@
           class="relative w-full flex flex-col animate-paywall-enter"
           :class="
             isNative
-              ? 'bg-app h-full'
+              ? 'bg-app h-full paywall-native-insets'
               : 'surface-card rounded-2xl shadow-2xl max-w-5xl max-h-[90vh] overflow-hidden'
           "
-          :style="isNative ? nativeInsetStyle : undefined"
         >
           <!-- Its own row rather than an overlay, so the dismiss affordance stays
                put while the plans scroll (Apple 3.1.2). -->
@@ -262,11 +261,6 @@ const planGridClass = computed(() => {
   return 'max-w-md mx-auto'
 })
 
-const nativeInsetStyle = {
-  paddingTop: 'env(safe-area-inset-top, 0px)',
-  paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-}
-
 /**
  * Localized benefits per tier, mirroring the server-side plan catalogue. The
  * API returns English-only `features`, which we only fall back to for a tier
@@ -377,6 +371,14 @@ watch(
 </script>
 
 <style scoped>
+/* Keeps the close row clear of the notch and the home indicator. Declared as a
+   class rather than an inline style because Safari drops `env()` when it is
+   assigned through the CSSOM. */
+.paywall-native-insets {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 .paywall-fade-enter-active,
 .paywall-fade-leave-active {
   transition: opacity 0.25s ease;
