@@ -116,6 +116,21 @@
     --usage-track: rgba(0, 63, 199, 0.1);
     --usage-epoch-a: #003fc7;
     --usage-epoch-b: #4f9cf9;
+
+    /* Subscription tiers. One hue per plan (matching the badge-pro/team/business
+       family) so the paywall cards stay distinguishable at a glance. `accent` is
+       a solid surface that carries `--plan-on-accent` text, `soft` is a tint for
+       card headers, `ink` is the readable heading color on a card background. */
+    --plan-on-accent: #fff;
+    --plan-pro-accent: #2563eb;
+    --plan-pro-soft: rgba(37, 99, 235, 0.08);
+    --plan-pro-ink: #1e3a8a;
+    --plan-team-accent: #7c3aed;
+    --plan-team-soft: rgba(124, 58, 237, 0.08);
+    --plan-team-ink: #5b21b6;
+    --plan-business-accent: #15803d;
+    --plan-business-soft: rgba(21, 128, 61, 0.08);
+    --plan-business-ink: #14532d;
   }
 
   .dark {
@@ -155,6 +170,19 @@
     --usage-track: rgba(109, 154, 224, 0.18);
     --usage-epoch-a: #6d9ae0;
     --usage-epoch-b: #93c5fd;
+
+    /* Subscription tiers — dark theme. The accents lighten so they stay visible
+       on the dark card, which flips `--plan-on-accent` to a dark ink. */
+    --plan-on-accent: #0a0e1a;
+    --plan-pro-accent: #60a5fa;
+    --plan-pro-soft: rgba(96, 165, 250, 0.14);
+    --plan-pro-ink: #bfdbfe;
+    --plan-team-accent: #a78bfa;
+    --plan-team-soft: rgba(167, 139, 250, 0.14);
+    --plan-team-ink: #ddd6fe;
+    --plan-business-accent: #4ade80;
+    --plan-business-soft: rgba(74, 222, 128, 0.14);
+    --plan-business-ink: #bbf7d0;
   }
 
   select {

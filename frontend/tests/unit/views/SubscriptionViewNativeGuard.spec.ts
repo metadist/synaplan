@@ -60,6 +60,7 @@ vi.mock('@/composables/useDateFormat', () => ({
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockRouterPush }),
+  useRoute: () => ({ query: {} }),
 }))
 
 vi.mock('@iconify/vue', () => ({

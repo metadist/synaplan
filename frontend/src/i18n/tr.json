@@ -1472,6 +1472,36 @@
     "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",
     "continueButton": "Yanıtı sürdür"
   },
+  "paywall": {
+    "title": {
+      "guest_limit": "Ücretsiz mesajların bitti",
+      "quota_exhausted": "Bu ayki kotan doldu",
+      "reminder": "Synaplan'dan daha fazlasını al"
+    },
+    "subtitle": {
+      "guest_limit": "Kendi geçmişin, hafızaların ve dosyalarınla sohbete devam etmek için bir plan seç.",
+      "quota_exhausted": "Hemen devam etmek için üst bir plana geç ya da kotanın gelecek ay sıfırlanmasını bekle.",
+      "reminder": "Bir plan sana daha fazla mesaj, daha güçlü AI modelleri ve daha fazla depolama verir."
+    },
+    "recommended": "Önerilen",
+    "choosePlan": "{plan} planını seç",
+    "guestNote": "Önce ücretsiz bir hesap oluştur; planın bu hesaba bağlanır.",
+    "login": "Zaten hesabım var",
+    "maybeLater": "Belki sonra",
+    "renewalNoteStore": "Abonelikler sen iptal edene kadar otomatik yenilenir. Mağaza hesabının ayarlarından istediğin zaman yönetebilir veya iptal edebilirsin.",
+    "renewalNoteWeb": "Abonelikler sen iptal edene kadar otomatik yenilenir. İstediğin zaman iptal edebilirsin.",
+    "plans": {
+      "pro": {
+        "tagline": "Yapay zekâyla günlük çalışma için"
+      },
+      "team": {
+        "tagline": "Birlikte çalışan küçük ekipler için"
+      },
+      "business": {
+        "tagline": "En yüksek beklentileri olan şirketler için"
+      }
+    }
+  },
   "subscription": {
     "serviceNotAvailable": "Hizmet Kullanılamıyor",
     "title": "Abonelik Planları",

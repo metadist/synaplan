@@ -2042,6 +2042,36 @@
     "messageBlockedDesc": "Du hast dein {action}-Limit erreicht. Upgrade deinen Plan oder warte bis das Limit zurückgesetzt wird.",
     "retryLater": "Erneut versuchen"
   },
+  "paywall": {
+    "title": {
+      "guest_limit": "Deine Gratis-Nachrichten sind aufgebraucht",
+      "quota_exhausted": "Dein Kontingent für diesen Monat ist aufgebraucht",
+      "reminder": "Hol mehr aus Synaplan heraus"
+    },
+    "subtitle": {
+      "guest_limit": "Wähle einen Tarif und chatte weiter – mit eigenem Verlauf, Erinnerungen und Dateien.",
+      "quota_exhausted": "Wechsle in einen größeren Tarif und mach sofort weiter, oder warte bis dein Kontingent nächsten Monat zurückgesetzt wird.",
+      "reminder": "Mit einem Tarif bekommst du mehr Nachrichten, stärkere KI-Modelle und mehr Speicher."
+    },
+    "recommended": "Empfohlen",
+    "choosePlan": "{plan} wählen",
+    "guestNote": "Erstelle zuerst ein kostenloses Konto – dein Tarif wird damit verknüpft.",
+    "login": "Ich habe schon ein Konto",
+    "maybeLater": "Vielleicht später",
+    "renewalNoteStore": "Abonnements verlängern sich automatisch, bis du sie kündigst. Verwalten und kündigen kannst du sie jederzeit in den Einstellungen deines Store-Kontos.",
+    "renewalNoteWeb": "Abonnements verlängern sich automatisch, bis du sie kündigst. Du kannst jederzeit kündigen.",
+    "plans": {
+      "pro": {
+        "tagline": "Für die tägliche Arbeit mit KI"
+      },
+      "team": {
+        "tagline": "Für kleine Teams, die zusammenarbeiten"
+      },
+      "business": {
+        "tagline": "Für Unternehmen mit höchsten Ansprüchen"
+      }
+    }
+  },
   "subscription": {
     "serviceNotAvailable": "Dienst nicht verfügbar",
     "title": "Abonnements",

@@ -1472,6 +1472,36 @@
     "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
     "continueButton": "Continuar respuesta"
   },
+  "paywall": {
+    "title": {
+      "guest_limit": "Has agotado tus mensajes gratuitos",
+      "quota_exhausted": "Has agotado tu cuota de este mes",
+      "reminder": "Saca más partido a Synaplan"
+    },
+    "subtitle": {
+      "guest_limit": "Elige un plan para seguir chateando, con tu propio historial, memorias y archivos.",
+      "quota_exhausted": "Cambia a un plan superior para continuar ahora mismo, o espera a que tu cuota se reinicie el mes que viene.",
+      "reminder": "Un plan te da más mensajes, modelos de IA más potentes y más almacenamiento."
+    },
+    "recommended": "Recomendado",
+    "choosePlan": "Elegir {plan}",
+    "guestNote": "Crea primero una cuenta gratuita: tu plan queda vinculado a ella.",
+    "login": "Ya tengo una cuenta",
+    "maybeLater": "Quizás más tarde",
+    "renewalNoteStore": "Las suscripciones se renuevan automáticamente hasta que las canceles. Puedes gestionarlas o cancelarlas cuando quieras en los ajustes de tu cuenta de la tienda.",
+    "renewalNoteWeb": "Las suscripciones se renuevan automáticamente hasta que las canceles. Puedes cancelar cuando quieras.",
+    "plans": {
+      "pro": {
+        "tagline": "Para el trabajo diario con IA"
+      },
+      "team": {
+        "tagline": "Para equipos pequeños que colaboran"
+      },
+      "business": {
+        "tagline": "Para empresas con las máximas exigencias"
+      }
+    }
+  },
   "subscription": {
     "serviceNotAvailable": "Servicio No Disponible",
     "title": "Planes de Suscripción",

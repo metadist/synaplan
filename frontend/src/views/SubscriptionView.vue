@@ -154,7 +154,11 @@
                   : '',
                 isCurrentPlan(plan.id) ? 'ring-2 ring-green-500 relative' : 'hover:shadow-xl',
                 isLowerPlan(plan.id) ? 'opacity-60' : '',
+                plan.id === preselectedPlan && !isCurrentPlan(plan.id)
+                  ? 'ring-2 ring-[var(--brand)] relative'
+                  : '',
               ]"
+              :data-plan-id="plan.id"
               data-testid="card-plan"
             >
               <!-- Current Plan Badge -->
@@ -267,64 +271,58 @@
 </template>
 
 <script setup lang="ts">
-import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, nextTick, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
-import {
-  subscriptionApi,
-  type SubscriptionPlan,
-  type SubscriptionStatus,
-} from '@/services/api/subscriptionApi'
-import { useAuthStore } from '@/stores/auth'
+import { subscriptionApi, type SubscriptionStatus } from '@/services/api/subscriptionApi'
 import { useConfigStore } from '@/stores/config'
 import { useDialog } from '@/composables/useDialog'
-import { isNativeApp } from '@/services/api/nativeRuntime'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
-import {
-  getStorePrice,
-  initNativeIap,
-  isNativeIapAvailable,
-  purchaseProduct,
-  restoreNativePurchases,
-} from '@/services/nativeIap'
-import { useNotification } from '@/composables/useNotification'
-import { formatPlanPrice } from '@/utils/formatPrice'
+import { useSubscriptionPurchase } from '@/composables/useSubscriptionPurchase'
 import MainLayout from '@/components/MainLayout.vue'
 
 const { t, te } = useI18n()
 const { formatDateTime } = useDateFormat()
+const route = useRoute()
 const router = useRouter()
-const authStore = useAuthStore()
 const config = useConfigStore()
 const dialog = useDialog()
-const { success } = useNotification()
-const plans = ref<SubscriptionPlan[]>([])
-/** Set once the native store catalogue is loaded (native shell only). */
-const storePricesReady = ref(false)
-const loading = ref(false)
-const isProcessing = ref(false)
-const stripeConfigured = ref(true)
 const subscriptionStatus = ref<SubscriptionStatus | null>(null)
 
 /**
- * MOBILE-APP SEAM (Epic 5.2): inside the native shell the Stripe web checkout
- * and billing portal are forbidden (Apple 3.1.1 / Google Play). The app must
- * purchase via native IAP (wired in Epic 5.3) and manage via the store. This
- * flag flips the purchase/manage paths to the native ones and guarantees the
- * web `window.location.href` redirects can never fire in the app.
+ * The purchase channel (native IAP vs. Stripe), the plan catalogue and the
+ * price formatting are shared with the paywall modal — see
+ * `useSubscriptionPurchase`. `isNative` also guards the billing-portal path
+ * below: inside the app the Stripe portal is forbidden (Apple 3.1.1 / Google
+ * Play), so "manage" points at the store's own subscription settings.
  */
-const isNative = isNativeApp()
+const {
+  isNative,
+  plans,
+  stripeConfigured,
+  loadingPlans: loading,
+  isProcessing,
+  currentLevel,
+  hasActivePlan,
+  loadPlans,
+  displayPrice,
+  isCurrentPlan,
+  isLowerPlan,
+  selectPlan,
+  restorePurchases,
+} = useSubscriptionPurchase({ onEntitlementChange: loadSubscriptionStatus })
 
-const currentLevel = computed(() => authStore.user?.level)
-const hasActivePlan = computed(() => {
-  return currentLevel.value && ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'].includes(currentLevel.value)
+/**
+ * Tier pre-selected by the paywall modal via `?plan=<tier>`; the matching card
+ * is highlighted and scrolled into view so the user lands on the plan they
+ * picked before signing up.
+ */
+const preselectedPlan = computed(() => {
+  const raw = route.query.plan
+  return 'string' === typeof raw ? raw.toUpperCase() : null
 })
-
-// Plan hierarchy for upgrade logic (ADMIN is special - unlimited, not a purchasable plan)
-const planHierarchy = ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN']
 
 const isHighestPlan = computed(() => {
   return currentLevel.value === 'BUSINESS' || currentLevel.value === 'ADMIN'
@@ -351,195 +349,11 @@ const showPaymentFailedWarning = computed(() => {
   return subscriptionStatus.value.status === 'past_due'
 })
 
-/**
- * Price shown to the user, channel-aware:
- * - Native app: the store's own localized price wins (that is what Apple/Google
- *   actually charge); until the catalogue is loaded, `appPrice` (web price plus
- *   the store-commission markup) is the fallback so the app never advertises
- *   the cheaper web price (anti-steering).
- * - Web: always the plain server-configured `price`.
- */
-function displayPrice(plan: SubscriptionPlan): string {
-  if (isNative) {
-    if (storePricesReady.value) {
-      const storePrice = getStorePrice(plan.iapProductId)
-      if (storePrice) return storePrice
-    }
-    return formatPlanPrice(plan.appPrice, plan.currency)
-  }
-  return formatPlanPrice(plan.price, plan.currency)
-}
-
-function isCurrentPlan(planId: string): boolean {
-  return currentLevel.value === planId
-}
-
-function isLowerPlan(planId: string): boolean {
-  if (!currentLevel.value) return false
-  const currentIndex = planHierarchy.indexOf(currentLevel.value)
-  const planIndex = planHierarchy.indexOf(planId)
-  return planIndex < currentIndex
-}
-
-async function loadPlans() {
-  loading.value = true
-  try {
-    const response = await subscriptionApi.getPlans()
-    plans.value = response.plans
-    stripeConfigured.value = response.stripeConfigured
-    void loadStorePrices(response.plans)
-  } catch (error) {
-    console.error('Failed to load plans:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-/** Fetch the store's localized prices (native shell only, non-blocking). */
-async function loadStorePrices(loadedPlans: SubscriptionPlan[]): Promise<void> {
-  if (!isNativeIapAvailable()) return
-  const productIds = loadedPlans
-    .map((plan) => plan.iapProductId)
-    .filter((id): id is string => 'string' === typeof id && '' !== id)
-  storePricesReady.value = await initNativeIap(productIds)
-}
-
 async function loadSubscriptionStatus() {
   try {
     subscriptionStatus.value = await subscriptionApi.getSubscriptionStatus()
   } catch (error) {
     console.error('Failed to load subscription status:', error)
-  }
-}
-
-async function selectPlan(planId: string) {
-  // MOBILE-APP SEAM (Epic 5.2): never open the Stripe web checkout in the app.
-  // Native purchases go through IAP (Epic 5.3 wires the store billing plugin here).
-  if (isNative) {
-    await startNativePurchase(planId)
-    return
-  }
-
-  if (!stripeConfigured.value) {
-    await dialog.alert({
-      title: t('subscription.serviceNotAvailable'),
-      message: t('subscription.serviceNotConfigured'),
-    })
-    return
-  }
-
-  isProcessing.value = true
-  try {
-    const response = await subscriptionApi.createCheckoutSession(planId)
-    // Redirect to Stripe Checkout
-    window.location.href = response.url
-  } catch (error: unknown) {
-    console.error('Failed to create checkout session:', error)
-
-    // Show user-friendly error
-    if (
-      getErrorMessage(error)?.includes('unavailable') ||
-      getErrorMessage(error)?.includes('STRIPE_NOT_CONFIGURED')
-    ) {
-      await dialog.alert({
-        title: t('subscription.serviceNotAvailable'),
-        message: t('subscription.serviceNotConfigured'),
-      })
-    } else {
-      await dialog.alert({
-        title: t('common.error'),
-        message: t('subscription.checkoutFailed'),
-      })
-    }
-
-    isProcessing.value = false
-  }
-}
-
-/**
- * MOBILE-APP SEAM (Epic 5.3): start a native in-app purchase for the selected
- * tier via the store billing plugin (StoreKit 2 / Play Billing). The purchase
- * is verified server-side (`/api/v1/iap/verify`) before any tier is granted;
- * this never falls back to the web checkout (Apple 3.1.1 / Google Play).
- */
-async function startNativePurchase(planId: string) {
-  const plan = plans.value.find((p) => p.id === planId)
-  const productId = plan?.iapProductId
-
-  if (!productId || !isNativeIapAvailable()) {
-    await dialog.alert({
-      title: t('subscription.native.purchaseTitle'),
-      message: t('subscription.native.purchaseUnavailable'),
-    })
-    return
-  }
-
-  isProcessing.value = true
-  try {
-    const outcome = await purchaseProduct(productId)
-
-    switch (outcome.status) {
-      case 'granted':
-        await Promise.all([authStore.refreshUser(), loadSubscriptionStatus()])
-        success(t('subscription.native.purchaseSuccess'))
-        break
-      case 'pending':
-        await dialog.alert({
-          title: t('subscription.native.purchaseTitle'),
-          message: t('subscription.native.purchasePending'),
-        })
-        break
-      case 'cancelled':
-        // The user closed the store sheet — no message needed.
-        break
-      case 'error': {
-        const messageKey =
-          'ownership_conflict' === outcome.code
-            ? 'subscription.native.purchaseConflict'
-            : 'not_available' === outcome.code
-              ? 'subscription.native.purchaseUnavailable'
-              : 'subscription.native.purchaseFailed'
-        await dialog.alert({
-          title: t('subscription.native.purchaseTitle'),
-          message: t(messageKey),
-        })
-        break
-      }
-    }
-  } finally {
-    isProcessing.value = false
-  }
-}
-
-/**
- * MOBILE-APP SEAM (Epic 9.4): Apple requires a "Restore Purchases" path so a
- * user who reinstalls or switches devices can recover an active subscription.
- * Restored transactions run through the same server-side verification as a
- * fresh purchase; the refreshed server status is the source of truth.
- */
-async function restorePurchases() {
-  isProcessing.value = true
-  try {
-    const ran = await restoreNativePurchases()
-    if (!ran) {
-      await dialog.alert({
-        title: t('subscription.native.restoreTitle'),
-        message: t('subscription.native.purchaseUnavailable'),
-      })
-      return
-    }
-
-    await Promise.all([authStore.refreshUser(), loadSubscriptionStatus()])
-    if (hasActivePlan.value) {
-      success(t('subscription.native.restoreDone'))
-    } else {
-      await dialog.alert({
-        title: t('subscription.native.restoreTitle'),
-        message: t('subscription.native.restoreNone'),
-      })
-    }
-  } finally {
-    isProcessing.value = false
   }
 }
 
@@ -646,5 +460,13 @@ onMounted(async () => {
   }
   await loadPlans()
   await loadSubscriptionStatus()
+  await scrollToPreselectedPlan()
 })
+
+async function scrollToPreselectedPlan(): Promise<void> {
+  if (!preselectedPlan.value) return
+  await nextTick()
+  const card = document.querySelector(`[data-plan-id="${preselectedPlan.value}"]`)
+  card?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
 </script>

@@ -2027,6 +2027,36 @@
     "messageBlockedDesc": "You've reached your {action} limit. Upgrade your plan or wait for the limit to reset.",
     "retryLater": "Retry"
   },
+  "paywall": {
+    "title": {
+      "guest_limit": "Your free messages are used up",
+      "quota_exhausted": "You've used up this month's allowance",
+      "reminder": "Get more out of Synaplan"
+    },
+    "subtitle": {
+      "guest_limit": "Pick a plan to keep chatting — with your own history, memories and files.",
+      "quota_exhausted": "Move up a plan to keep going right away, or wait for your allowance to reset next month.",
+      "reminder": "A plan gives you more messages, stronger AI models and more storage."
+    },
+    "recommended": "Recommended",
+    "choosePlan": "Choose {plan}",
+    "guestNote": "Create a free account first — your plan is linked to it.",
+    "login": "I already have an account",
+    "maybeLater": "Maybe later",
+    "renewalNoteStore": "Subscriptions renew automatically until you cancel them. Manage or cancel any time in your store account settings.",
+    "renewalNoteWeb": "Subscriptions renew automatically until you cancel them. You can cancel any time.",
+    "plans": {
+      "pro": {
+        "tagline": "For everyday work with AI"
+      },
+      "team": {
+        "tagline": "For small teams working together"
+      },
+      "business": {
+        "tagline": "For companies with the highest demands"
+      }
+    }
+  },
   "subscription": {
     "serviceNotAvailable": "Service Not Available",
     "title": "Subscription Plans",
