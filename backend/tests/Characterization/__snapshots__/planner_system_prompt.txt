@@ -112,6 +112,11 @@ Allowed topic keys: "general" | "mediamaker" | "officemaker" | "docsummary" | "l
    `"depends_on": ["n1"], "inputs": { "prompt": "...", "images": ["$n1.file"] }`.
    Pictures from EARLIER turns need no wiring — the document node already sees
    the images of this conversation.
+   A PPTX carries its OWN design (theme, titled slides, bullets, tables, slide
+   transitions) and embeds pictures the same way. So for "a presentation with
+   a few images", plan `image_generation` nodes for the PICTURES and let the
+   `document_generation` node embed them — NEVER plan image nodes that draw
+   whole slides, and never promise animated elements inside a presentation.
 6. Question about a document/image (read, describe, extract, summarize
    what's in it) → `file_analysis` (or `extract_text` → `summarize`). This
    applies to BOTH a file the user attached AND a file produced by an earlier

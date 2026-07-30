@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\File;
 
+use App\Service\File\Presentation\PptxRenderer;
+use App\Service\File\Presentation\SlideMarkdownParser;
 use PhpOffice\PhpPresentation\IOFactory as PresentationIOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -29,8 +31,12 @@ final readonly class DocumentGeneratorService
     /** Office formats that must be produced as real OOXML binaries. */
     private const BINARY_FORMATS = ['docx', 'xlsx', 'pptx'];
 
+    private const IMAGE_MARKER_PATTERN = '/\{\{IMAGE:[a-z]+:\d+}}/';
+
     public function __construct(
         private LoggerInterface $logger,
+        private SlideMarkdownParser $slideParser,
+        private PptxRenderer $pptxRenderer,
     ) {
     }
 
@@ -56,18 +62,18 @@ final readonly class DocumentGeneratorService
     {
         switch (strtolower($extension)) {
             case 'docx':
-                $this->writeDocx($content, $absolutePath, $images);
+                $this->writeDocx($this->stripPresentationDirective($content), $absolutePath, $images);
                 break;
             case 'xlsx':
-                $this->writeXlsx($this->stripImageMarkers($content), $absolutePath);
+                $this->writeXlsx($this->stripMarkers($content), $absolutePath);
                 break;
             case 'pptx':
-                $this->writePptx($this->stripImageMarkers($content), $absolutePath);
+                $this->writePptx($content, $absolutePath, $images);
                 break;
             default:
-                // Only DOCX can embed images — every other format would show
-                // the raw marker to the user, so drop it.
-                if (false === file_put_contents($absolutePath, $this->stripImageMarkers($content))) {
+                // Only DOCX and PPTX can embed images — every other format would
+                // show the raw marker to the user, so drop it.
+                if (false === file_put_contents($absolutePath, $this->stripMarkers($content))) {
                     throw new \RuntimeException('Failed to write file: '.$absolutePath);
                 }
         }
@@ -90,29 +96,11 @@ final readonly class DocumentGeneratorService
             throw new \RuntimeException('Cannot generate DOCX from empty content');
         }
 
-        $temporaryImages = [];
+        $normalized = $this->normalizeImagesForOoxml($images);
+        $images = $normalized['images'];
+        $temporaryImages = $normalized['temporary'];
+
         try {
-            foreach ($images as $reference => $imagePath) {
-                if ('webp' !== strtolower(pathinfo($imagePath, PATHINFO_EXTENSION))) {
-                    continue;
-                }
-
-                try {
-                    $convertedPath = $this->convertWebpForWord($imagePath);
-                } catch (\RuntimeException $e) {
-                    $this->logger->warning('DocumentGeneratorService: skipping WebP image that could not be converted', [
-                        'reference' => $reference,
-                        'error' => $e->getMessage(),
-                    ]);
-
-                    unset($images[$reference]);
-                    continue;
-                }
-
-                $images[$reference] = $convertedPath;
-                $temporaryImages[] = $convertedPath;
-            }
-
             // Ensure special characters (like '&', '<', '>') are escaped in the XML to prevent document corruption.
             WordSettings::setOutputEscapingEnabled(true);
 
@@ -150,9 +138,48 @@ final readonly class DocumentGeneratorService
         }
     }
 
-    private function convertWebpForWord(string $sourcePath): string
+    /**
+     * Replace WebP images with PNG copies, because neither Word nor PowerPoint
+     * renders WebP reliably. An image that cannot be converted is dropped from
+     * the list so the document is produced without it.
+     *
+     * The caller owns the returned temporary files and must unlink them.
+     *
+     * @param array<string, string> $images
+     *
+     * @return array{images: array<string, string>, temporary: list<string>}
+     */
+    private function normalizeImagesForOoxml(array $images): array
     {
-        $temporaryPath = tempnam(sys_get_temp_dir(), 'docx_image_');
+        $temporary = [];
+
+        foreach ($images as $reference => $imagePath) {
+            if ('webp' !== strtolower(pathinfo($imagePath, PATHINFO_EXTENSION))) {
+                continue;
+            }
+
+            try {
+                $convertedPath = $this->convertWebpToPng($imagePath);
+            } catch (\RuntimeException $e) {
+                $this->logger->warning('DocumentGeneratorService: skipping WebP image that could not be converted', [
+                    'reference' => $reference,
+                    'error' => $e->getMessage(),
+                ]);
+
+                unset($images[$reference]);
+                continue;
+            }
+
+            $images[$reference] = $convertedPath;
+            $temporary[] = $convertedPath;
+        }
+
+        return ['images' => $images, 'temporary' => $temporary];
+    }
+
+    private function convertWebpToPng(string $sourcePath): string
+    {
+        $temporaryPath = tempnam(sys_get_temp_dir(), 'ooxml_image_');
         if (false === $temporaryPath) {
             throw new \RuntimeException('Failed to create a temporary file for a WebP document image');
         }
@@ -265,17 +292,45 @@ final readonly class DocumentGeneratorService
     }
 
     /**
-     * Remove image markers from content that is written as text.
+     * Remove every generator marker from content that is written as text: image
+     * markers and the presentation directive would otherwise be shown verbatim.
      */
-    private function stripImageMarkers(string $content): string
+    private function stripMarkers(string $content): string
     {
-        if (!str_contains($content, '{{IMAGE:')) {
+        if (!str_contains($content, '{{')) {
             return $content;
         }
 
-        $stripped = preg_replace('/\{\{IMAGE:[a-z]+:\d+}}/', '', $content) ?? $content;
+        return $this->closeMarkerGaps(preg_replace(
+            [SlideMarkdownParser::DIRECTIVE_PATTERN, self::IMAGE_MARKER_PATTERN],
+            '',
+            $content,
+        ) ?? $content);
+    }
 
-        return preg_replace('/\R{3,}/', "\n\n", $stripped) ?? $stripped;
+    /**
+     * The presentation directive only configures the PPTX renderer. Any other
+     * format has to drop it, or the user reads `{{PPTX:theme=ocean}}` in their
+     * Word document.
+     */
+    private function stripPresentationDirective(string $content): string
+    {
+        if (!str_contains($content, '{{')) {
+            return $content;
+        }
+
+        return $this->closeMarkerGaps(
+            preg_replace(SlideMarkdownParser::DIRECTIVE_PATTERN, '', $content) ?? $content,
+        );
+    }
+
+    /**
+     * A removed marker leaves a hole behind: an empty paragraph in the middle of
+     * the text, or a blank first line when the directive occupied it.
+     */
+    private function closeMarkerGaps(string $content): string
+    {
+        return ltrim(preg_replace('/\R{3,}/', "\n\n", $content) ?? $content, "\r\n");
     }
 
     /**
@@ -383,11 +438,45 @@ final readonly class DocumentGeneratorService
     }
 
     /**
-     * Build a PowerPoint presentation. The content is split into slides on
-     * markdown headings; each slide gets a single text box with the (lightly
-     * de-marked) lines of that section.
+     * Build a PowerPoint presentation: the markdown is parsed into slides and
+     * drawn with a real layout — title, bullets, tables and embedded images
+     * (#1397).
+     *
+     * If anything about the structured path fails, the deck falls back to the
+     * flat text rendering so the user still receives an openable file.
+     *
+     * @param array<string, string> $images
      */
-    private function writePptx(string $content, string $absolutePath): void
+    private function writePptx(string $content, string $absolutePath, array $images): void
+    {
+        $normalized = $this->normalizeImagesForOoxml($images);
+
+        try {
+            try {
+                $this->pptxRenderer->render(
+                    $this->slideParser->parse($content),
+                    $absolutePath,
+                    $normalized['images'],
+                );
+            } catch (\Throwable $e) {
+                $this->logger->warning('DocumentGeneratorService: PPTX rendering failed, using plain text fallback', [
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->writePlainTextPptx($this->stripMarkers($content), $absolutePath);
+            }
+        } finally {
+            foreach ($normalized['temporary'] as $temporaryImage) {
+                @unlink($temporaryImage);
+            }
+        }
+    }
+
+    /**
+     * Always-valid fallback: one text box per markdown section, markdown markers
+     * removed. No design, but an openable presentation.
+     */
+    private function writePlainTextPptx(string $content, string $absolutePath): void
     {
         $presentation = new PhpPresentation();
         $slides = $this->splitIntoSlides($content);
