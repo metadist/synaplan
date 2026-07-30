@@ -8,6 +8,7 @@
       >
         <div
           class="modal-panel surface-card rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto scroll-thin"
+          data-testid="modal-memory-form"
           @click.stop
         >
           <!-- Header -->
@@ -49,6 +50,7 @@
                     ? 'mode-toggle-active'
                     : 'txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10'
                 "
+                data-testid="btn-memory-mode-advanced"
                 @click="mode = 'advanced'"
               >
                 <Icon icon="mdi:form-textbox" class="w-4 h-4" />
@@ -333,6 +335,7 @@
                 :placeholder="$t('memories.create.categoryPlaceholder')"
                 required
                 list="category-suggestions"
+                data-testid="input-memory-category"
                 class="w-full px-4 py-2.5 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all"
               />
               <datalist id="category-suggestions">
@@ -352,6 +355,7 @@
                 type="text"
                 required
                 :placeholder="$t('memories.create.keyPlaceholder')"
+                data-testid="input-memory-key"
                 class="w-full px-4 py-2.5 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all"
               />
             </div>
@@ -365,6 +369,7 @@
                 required
                 :placeholder="$t('memories.create.valuePlaceholder')"
                 rows="4"
+                data-testid="input-memory-value"
                 class="w-full px-4 py-2.5 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50 resize-none transition-all"
               ></textarea>
             </div>
@@ -378,7 +383,11 @@
               >
                 {{ $t('common.cancel') }}
               </button>
-              <button type="submit" class="flex-1 btn-primary px-4 py-2.5 rounded-xl font-medium">
+              <button
+                type="submit"
+                class="flex-1 btn-primary px-4 py-2.5 rounded-xl font-medium"
+                data-testid="btn-memory-save"
+              >
                 {{ $t('common.save') }}
               </button>
             </div>

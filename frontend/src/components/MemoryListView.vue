@@ -83,7 +83,11 @@
           <Icon icon="mdi:checkbox-multiple-marked" class="w-4 h-4 inline mr-1" />
           {{ $t('memories.selectAll') }}
         </button>
-        <button class="btn-primary px-4 py-2.5 rounded-lg" @click="$emit('create')">
+        <button
+          class="btn-primary px-4 py-2.5 rounded-lg"
+          data-testid="btn-memory-create"
+          @click="$emit('create')"
+        >
           <Icon icon="mdi:plus" class="w-4 h-4 inline mr-1" />
           {{ $t('memories.createButton') }}
         </button>
@@ -128,6 +132,7 @@
             v-for="memory in filteredMemories"
             :key="memory.id"
             :data-memory-id="memory.id"
+            data-testid="item-memory"
             class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-surface-soft transition-colors cursor-pointer"
             :class="{ 'bg-brand-500/10': isSelected(memory.id) }"
             @click="toggleSelect(memory.id)"
@@ -167,6 +172,7 @@
                 <button
                   class="p-2 rounded-lg hover:bg-brand-500/10 txt-brand transition-colors"
                   :title="$t('common.edit')"
+                  data-testid="btn-memory-edit"
                   @click="$emit('edit', memory)"
                 >
                   <Icon icon="mdi:pencil" class="w-4 h-4" />
@@ -174,6 +180,7 @@
                 <button
                   class="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors"
                   :title="$t('common.delete')"
+                  data-testid="btn-memory-delete"
                   @click="$emit('delete', memory)"
                 >
                   <Icon icon="mdi:delete" class="w-4 h-4" />
@@ -190,6 +197,7 @@
           v-for="memory in filteredMemories"
           :key="memory.id"
           :data-memory-id="memory.id"
+          data-testid="item-memory"
           class="surface-card rounded-xl p-4 cursor-pointer"
           :class="isSelected(memory.id) ? 'ring-2 ring-brand' : ''"
           @click="toggleSelect(memory.id)"
@@ -228,6 +236,7 @@
                   <button
                     class="p-2 rounded-lg hover:bg-brand-500/10 txt-brand transition-colors"
                     :title="$t('common.edit')"
+                    data-testid="btn-memory-edit"
                     @click="$emit('edit', memory)"
                   >
                     <Icon icon="mdi:pencil" class="w-4 h-4" />
@@ -235,6 +244,7 @@
                   <button
                     class="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors"
                     :title="$t('common.delete')"
+                    data-testid="btn-memory-delete"
                     @click="$emit('delete', memory)"
                   >
                     <Icon icon="mdi:delete" class="w-4 h-4" />
@@ -247,7 +257,11 @@
       </div>
 
       <!-- Empty State -->
-      <div v-if="filteredMemories.length === 0" class="text-center py-12">
+      <div
+        v-if="filteredMemories.length === 0"
+        class="text-center py-12"
+        data-testid="state-memories-empty"
+      >
         <Icon icon="mdi:brain-off" class="w-16 h-16 mx-auto txt-secondary mb-4" />
         <p class="txt-secondary text-lg">{{ $t('memories.noResults') }}</p>
       </div>

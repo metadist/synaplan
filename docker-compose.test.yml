@@ -39,6 +39,9 @@ services:
       DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama-stub:11434
       TIKA_BASE_URL: http://tika_test:9998
+      # Real Qdrant for memory/vector E2E flows (overrides the empty
+      # QDRANT_URL in backend/.env.test, which keeps PHPUnit Qdrant-free).
+      QDRANT_URL: http://qdrant_test:6333
       AI_DEFAULT_PROVIDER: test
       MAILER_DSN: smtp://mailhog_test:1025
       AUTO_DOWNLOAD_MODELS: "false"
@@ -63,6 +66,8 @@ services:
       mailhog_test:
         condition: service_started
       ollama-stub:
+        condition: service_started
+      qdrant_test:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
@@ -100,9 +105,20 @@ services:
     networks:
       - synaplan-test-network
 
+  # Qdrant vector store — required by the memory service (user memories).
+  # Ephemeral by design: no volume, every stack start begins with empty
+  # collections (the backend auto-creates them on first use). Not published
+  # to a host port; only app_test talks to it.
+  qdrant_test:
+    image: qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c
+    container_name: synaplan-qdrant-test
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
   # Ollama Test (Optional - Integration Profile)
   ollama_test:
-    image: ollama/ollama:latest@sha256:6345fbc18bd73a1e16404be681dbc6fd291a027cab43ed541abe78c4c81051b0
+    image: ollama/ollama:latest@sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131
     container_name: synaplan-ollama-test
     ports:
       - "11436:11434"
@@ -196,7 +212,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak_test:
-    image: quay.io/keycloak/keycloak:26.7@sha256:2eb3cd316835c990e69e26ade292ffa78f6fb0db7d5fc6377463c162e1979ac0
+    image: quay.io/keycloak/keycloak:26.7@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
     container_name: synaplan-keycloak-test
     depends_on:
       keycloak_certs:
@@ -229,7 +245,7 @@ services:
       - synaplan-test-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.7@sha256:2eb3cd316835c990e69e26ade292ffa78f6fb0db7d5fc6377463c162e1979ac0
+    image: quay.io/keycloak/keycloak:26.7@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
     container_name: synaplan-keycloak-setup-test
     depends_on:
       keycloak_test:

@@ -967,8 +967,10 @@
     outline: none;
   }
   .dark .icon-ghost {
-    color: #d6d7db;
-    opacity: 0.85;
+    /* Soft mid-grey: readable on dark surfaces without the glare of
+       near-white icons at high opacity. */
+    color: #c8c8cc;
+    opacity: 0.74;
   }
   .dark .icon-ghost:hover,
   .dark .icon-ghost:focus-visible {

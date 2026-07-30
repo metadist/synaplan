@@ -103,6 +103,13 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
             return $this->mockTaskPlan($userContent);
         }
 
+        // Memory extraction (tools:memory_extraction): the user prompt built by
+        // MemoryExtractionService carries these two stable markers.
+        if (str_contains($userContent, 'Current Message (from the user):')
+            && str_contains($userContent, '"action": "create"')) {
+            return $this->mockMemoryExtraction($userContent);
+        }
+
         // Search-query-style request (e.g. SearchQueryGenerator with tools:search prompt): return cleaned query like fallbackExtraction
         if (str_contains($systemContent, 'search') && str_contains($systemContent, 'query')) {
             return $this->mockSearchQueryExtraction($userContent);
@@ -232,6 +239,35 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
                 ['id' => 'n1', 'capability' => 'chat', 'inputs' => ['text' => '$message.text']],
             ],
         ], JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Mock memory extraction: deterministic contract for E2E tests.
+     *
+     * The current user message may contain an explicit instruction of the
+     * form `memorize: some_key = some value` — exactly that becomes a
+     * `create` action (category `preferences`). Everything else returns `[]`
+     * so ordinary E2E chat turns never pollute the user's memory list.
+     */
+    private function mockMemoryExtraction(string $userContent): string
+    {
+        $currentMessage = '';
+        if (preg_match('/Current Message \(from the user\):\n(.*?)(?:\n\n|$)/s', $userContent, $m)) {
+            $currentMessage = $m[1];
+        }
+
+        if (preg_match('/memorize:\s*([a-z0-9_]+)\s*=\s*([^\n]+)/i', $currentMessage, $m)) {
+            return json_encode([
+                [
+                    'action' => 'create',
+                    'category' => 'preferences',
+                    'key' => strtolower($m[1]),
+                    'value' => trim($m[2]),
+                ],
+            ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        }
+
+        return '[]';
     }
 
     private function detectLanguage(string $text, string $fallback = 'en'): string

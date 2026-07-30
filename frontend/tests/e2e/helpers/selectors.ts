@@ -101,6 +101,8 @@ export const selectors = {
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
     /** V2 chat list modal */
     modalChatManager: '[data-testid="modal-chat-manager"]',
+    /** V2 chat list modal: backdrop — click outside the panel to close */
+    modalChatManagerBackdrop: '[data-testid="modal-chat-manager-backdrop"]',
     /** V2 chat list: container visible when at least one chat exists; use to wait before targeting rows */
     chatManagerListRows: '[data-testid="list-chat-manager-rows"]',
     /** V2 chat list: one row per chat; scope menu to this */
@@ -109,6 +111,10 @@ export const selectors = {
     chatV2RowMenu: '[data-testid="btn-chat-v2-row-menu"]',
     /** V2 chat context menu: Share button */
     chatV2Share: '[data-testid="btn-chat-v2-share"]',
+    /** V2 chat context menu: Rename button (opens dialog prompt) */
+    chatV2Rename: '[data-testid="btn-chat-v2-rename"]',
+    /** V2 chat context menu: Delete button (opens danger confirm) */
+    chatV2Delete: '[data-testid="btn-chat-v2-delete"]',
   },
   models: {
     page: '[data-testid="page-config-ai-models"]',
@@ -188,6 +194,14 @@ export const selectors = {
     legacyVoiceReplyPill: '[data-testid="btn-chat-voice-reply"]',
     legacyManageKnowledgeGroupsBtn: '[data-testid="btn-manage-knowledge-groups"]',
   },
+  incognito: {
+    /** Session toggle button — rendered twice (mobile + desktop), scope via desktopSection */
+    toggle: '[data-testid="btn-incognito-toggle"]',
+    /** Desktop wrapper of the toggle (floats over the message area) */
+    desktopSection: '[data-testid="section-incognito-toggle-desktop"]',
+    /** Banner above the composer while an incognito session is active */
+    banner: '[data-testid="banner-incognito"]',
+  },
   multitask: {
     /** Task-plan block inside the assistant bubble (multi-node DAG turns) */
     plan: '[data-testid="task-plan"]',
@@ -249,6 +263,20 @@ export const selectors = {
     table: '[data-testid="section-table"]',
     fileRow: '[data-testid="item-file"]',
     emptyState: '[data-testid="state-empty"]',
+    /** Toolbar: opens the inline "New folder" input row */
+    btnNewFolder: '[data-testid="btn-new-folder"]',
+    inputNewFolderToolbar: '[data-testid="input-new-folder-toolbar"]',
+    btnNewFolderCreate: '[data-testid="btn-new-folder-create"]',
+    /** Root view: one card per knowledge folder */
+    folderCard: (name: string) => `[data-testid="folder-card-${name}"]`,
+    /** Folder card hover action: open a chat scoped to this folder */
+    btnUseInChat: (name: string) => `[data-testid="btn-use-in-chat-${name}"]`,
+    /** Folder view: back to the root file list */
+    btnBackToRoot: '[data-testid="btn-back-to-root"]',
+    /** Folder view: shown when the open folder has no files left */
+    stateEmptyFolder: '[data-testid="state-empty-folder"]',
+    /** File row action: delete this file (opens ConfirmDialog) */
+    btnDeleteFile: '[data-testid="btn-delete"]',
     /** §4.8: knowledge-base tabs shared by /files and /files/search */
     tabsBar: '[data-testid="tabs-files"]',
     tabBrowse: '[data-testid="tab-files-browse"]',
@@ -434,6 +462,12 @@ export const selectors = {
     btnCreate: '[data-testid="btn-create-prompt"]',
     btnDelete: '[data-testid="btn-delete"]',
     cardForTopic: (topic: string) => `[data-testid="card-prompt-${topic}"]`,
+    sectionDanger: '[data-testid="section-danger"]',
+    createModal: '[data-testid="modal-task-prompt-create"]',
+    inputNewTopic: '[data-testid="input-new-topic"]',
+    inputNewName: '[data-testid="input-new-name"]',
+    inputNewContent: '[data-testid="input-new-content"]',
+    btnConfirmCreate: '[data-testid="btn-confirm-create"]',
   },
   pages: {
     chat: '[data-testid="page-chat"]',
@@ -445,6 +479,37 @@ export const selectors = {
   dialog: {
     confirmBtn: '[data-testid="btn-dialog-confirm"]',
     cancelBtn: '[data-testid="btn-dialog-cancel"]',
+    /** Text input rendered by useDialog().prompt() */
+    promptInput: '[data-testid="input-dialog-prompt"]',
+  },
+  /** ConfirmDialog.vue component (used by FilesView etc. — NOT useDialog()) */
+  confirmDialog: {
+    accept: '[data-testid="btn-confirm-accept"]',
+    cancel: '[data-testid="btn-confirm-cancel"]',
+  },
+  profile: {
+    inputCurrentPassword: '[data-testid="input-current-password"]',
+    inputNewPassword: '[data-testid="input-new-password"]',
+    inputConfirmPassword: '[data-testid="input-confirm-password"]',
+  },
+  memories: {
+    btnCreate: '[data-testid="btn-memory-create"]',
+    /** Rendered twice per memory (desktop row + mobile card) — filter visible */
+    item: '[data-testid="item-memory"]',
+    btnEdit: '[data-testid="btn-memory-edit"]',
+    btnDelete: '[data-testid="btn-memory-delete"]',
+    stateEmpty: '[data-testid="state-memories-empty"]',
+    formModal: '[data-testid="modal-memory-form"]',
+    /** Form dialog: switch to the AI-free advanced form */
+    btnModeAdvanced: '[data-testid="btn-memory-mode-advanced"]',
+    inputCategory: '[data-testid="input-memory-category"]',
+    inputKey: '[data-testid="input-memory-key"]',
+    inputValue: '[data-testid="input-memory-value"]',
+    btnSave: '[data-testid="btn-memory-save"]',
+  },
+  /** UnsavedChangesBar.vue (profile & config pages) */
+  unsavedBar: {
+    save: '[data-testid="btn-unsaved-save"]',
   },
   guest: {
     banner: '[data-testid="guest-banner"]',
