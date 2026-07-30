@@ -1,0 +1,278 @@
+# First-Run Onboarding — Provider Wizard & DB-Backed API Keys
+
+**Release:** 4.1 · **Priority:** P1 (adoption) · **Status:** Tier 1 + 2 shipped (PR #1392, branch `feat/provider-key-wizard`); Tiers 3–6 open
+**Trigger:** "Is our setup easy enough for a large number of people? Groq keys and model downloads feel complicated."
+**Scope of the audit:** README, `_1st_install_linux.sh`, both compose files, `docs/`, seeders + entrypoint, frontend first-run behaviour — benchmarked against Open WebUI, LibreChat and AnythingLLM (2026).
+
+> **TL;DR** — The Docker plumbing is genuinely good; the **first five minutes inside
+> the app** are where we lost people. A plain `docker compose up -d` dropped users
+> into a chat whose default model (Anthropic) they had no key for, the failure was
+> reported only to the browser console, and the fix meant editing `backend/.env`
+> plus a container restart. PR #1392 fixes the two highest-leverage tiers: an
+> in-app **provider setup wizard** (`/admin/setup`) and **DB-backed, encrypted,
+> hot-reloadable provider keys** with a one-time env import. Keys never touch git.
+> Tiers 3–6 (auto-resolved defaults, download progress, small-model tier + arm64,
+> distribution channels) remain open.
+
+---
+
+## 1. Findings
+
+### 1.1 What was already good
+
+- One-command start, seeded admin/demo logins, minimal vs. standard compose split,
+  an admin System Config UI, a Helm chart repo, and a hosted instance to try first
+  — above average for a stack this size.
+- The compose files show real battle-hardening (healthchecks, self-healing
+  dependency ordering). **Reliability was never the problem.**
+
+### 1.2 Where the friction actually was
+
+| # | Friction | Impact |
+|---|----------|--------|
+| 1 | **Default-provider trap** — `DefaultModelConfigSeeder` seeded chat to Anthropic, so the README's own Quick Start produced a chat that errored on the first message. The Groq path only worked via the install script. | Fatal for a first impression |
+| 2 | **The install script did the app's job, badly** — `_1st_install_linux.sh` fired raw SQL at the DB after boot (`UPDATE BCONFIG SET BVALUE='9' …`) behind a hand-rolled deadlock-retry loop, hardcoding a model **BID**. Our own seeder docs forbid raw BIDs (catalog keys exist for this); a catalog reorder would silently repoint new installs. Interactive + Linux/macOS-only, so unpipeable. | Latent correctness bug + no automation |
+| 3 | **Keys required a restart and lived in a file** — System Config wrote `backend/.env` and returned `requiresRestart: true`. Open WebUI, LibreChat and AnythingLLM all store keys in the DB and apply them live; that is the 2026 baseline. | Below competitor baseline |
+| 4 | **Failure was invisible** — the backend computed `unavailableProviders` but the frontend only `console.warn`ed it. The Feature Status page that would show provider health is dev-only (403 in prod). Ollama's multi-GB pull logged progress to container stdout only. | "Is it broken?" support load |
+| 5 | **Hardware/platform barriers** — `linux/amd64` images only (every Apple Silicon dev runs under Rosetta); the local-AI path assumes `gpt-oss:20b` (~12 GB, ~24 GB GPU RAM) with no small-model tier; 12+ containers / 7 host ports vs. Open WebUI's single container. | Excludes the audience most likely to try us |
+| 6 | **Hygiene** — `APP_SECRET`, `TOKEN_SECRET` and the Centrifugo secrets ship as `changeme_*` with nothing generating them; README says ~9 GB disk while `INSTALLATION.md` says 20 GB. | Trust + prod-safety |
+
+---
+
+## 2. Tiered improvement plan
+
+| Tier | Work | Status |
+|------|------|--------|
+| **1** | **First-run provider wizard** — on first admin login, if no provider has a working key, show a guided screen: pick a provider (Groq recommended + deep link), paste key, live "Test connection", set sane defaults via **catalog keys**. Lets us delete the raw-SQL half of the install script. | ✅ **Shipped** (PR #1392) |
+| **2** | **DB-backed, hot-reloadable keys** — store keys encrypted in `BCONFIG`; env stays available as a bootstrap/override for ops/K8s. The architectural enabler for Tier 1. | ✅ **Shipped** (PR #1392) |
+| **3** | **Provider-aware defaults instead of hardcoded Anthropic** — resolve the default chat model to the first provider that actually has a key (Groq → OpenAI → … → Ollama-if-present); persistent "Connect an AI provider" banner replacing the console-only warning; open the Feature Status page to admins in prod. | 🟡 **Partial** — banner + one-click/CLI `apply-defaults` shipped; **automatic** resolution at seed/first-request and the Feature Status page are still open |
+| **4** | **Surface the model download** — the entrypoint already logs pull progress at 10% milestones; expose it via a status endpoint and show a progress card ("Local AI is downloading, 43% — cloud chat works now"). | ⬜ Open |
+| **5** | **Lower the hardware bar** — ship a small-model tier (`llama3.2:3b` / `qwen3:4b`, ~2–4 GB) as the local default so chat works on an 8–16 GB laptop with no GPU, `gpt-oss:20b` as opt-in "quality"; **publish multi-arch (arm64) images**. | ⬜ Open |
+| **6** | **Distribution channels** — "the masses" rarely `git clone`. One-click templates for Coolify, CapRover, Elestio, PikaPods, Railway; app-store listings for Umbrel and CasaOS. Mostly a compose/template file + metadata per channel; an all-in-one evaluation image would make several listings trivial. | ⬜ Open |
+| **H** | **Hygiene** — auto-generate `APP_SECRET`/`TOKEN_SECRET` on first boot when still placeholders; reconcile the disk-size numbers; make the install script POSIX/Windows-friendly or retire it now that the wizard exists. | ⬜ Open |
+
+---
+
+## 3. What shipped in this branch
+
+**Branch:** `feat/provider-key-wizard` → **PR [#1392](https://github.com/metadist/synaplan/pull/1392)** ·
+41 files, +2976 / −224 · all CI checks green.
+
+| Commit | Purpose |
+|--------|---------|
+| `64785ea` | Main implementation (store, catalog, validator, defaults service, admin API, wizard UI, docs, install script) |
+| `d98eb65` | `BCONFIG.BVALUE` → **LONGTEXT** (CI `doctrine:schema:validate` fix) |
+| `c9be11a` | Restore unlimited execution time after `HiggsfieldProviderTest` (suite time-bomb) |
+| `dfd109e` | Merge `main` |
+
+### 3.1 Backend — the key lifecycle
+
+New namespace `App\AI\Credential`:
+
+| Class | Role |
+|-------|------|
+| `ProviderKeyStore` | Install-wide store for the 8 keyed cloud providers (`anthropic`, `openai`, `groq`, `google`, `mistral`, `trustedtokens`, `huggingface`, `xai`). Resolution, encryption, env import, rotation, masked status. |
+| `ProviderKeyCatalog` | Static per-provider metadata: display name, env var, console URL, `freeTier`, `recommended`, and the live-validation probe (method/URL/headers with a `{key}` placeholder). Deliberately has **no** entry for providers without a platform key (Ollama, Piper, OpenAI-compatible endpoints). |
+| `ProviderKeyValidator` | One cheap authenticated request (list models / whoami) per provider. `429` counts as valid (the key authenticated far enough to be rate-limited). |
+| `ProviderDefaultsService` | Recommended capability → model bindings per provider, resolved through `ModelCatalog::findBidByKey()`. Writes global defaults (ownerId 0) + `ai.default_chat_provider`, then clears the `model_config` cache. |
+
+**Storage.** One `BCONFIG` row per provider: `ownerId = 0`, group `provider_keys`,
+setting = provider name, value = AES-256-CBC ciphertext (via `EncryptionService`,
+keyed off `APP_SECRET`) of `{"key": "…", "origin": "env"|"ui"}` — the same at-rest
+pattern already used by `OpenAiCompatibleEndpointRegistry` and the Higgsfield
+credentials.
+
+**Resolution order** (`ProviderKeyStore::getKey()`):
+
+1. **A stored DB row wins.** A row saved through the UI (`origin: ui`)
+   *permanently* beats the environment, so operators can delete the key from
+   `.env` after the transfer.
+2. **Env bootstrap ("transfer on first load").** No DB row + env var set ⇒ the env
+   key is imported (`origin: env`) and used. An existing `origin: env` row whose
+   env var **changed** to a different non-empty value is refreshed — key rotation
+   through `.env` / orchestrator secrets keeps working.
+3. Neither configured ⇒ `null`; the provider reports itself unavailable.
+
+The import checks **presence, not live validity** on purpose: a network blip at
+boot must never drop a valid key. Live validation happens only in the admin
+endpoints.
+
+**Hot reload without a restart.** All 8 providers were refactored to resolve the
+key *per call* and lazily (re)build their SDK client when the key changes
+(`resolveApiKey()` + `client()`), with the constructor `$apiKey` kept as an
+explicit override for tests/custom wiring. Reads are memoized ~15 s per process,
+so per-request calls don't hammer `BCONFIG` while long-lived processes (FrankenPHP
+worker mode, the messenger worker) still pick up UI changes quickly.
+
+**Admin API** — 5 routes, admin-only, masked keys only:
+
+```
+GET    /api/v1/admin/provider-keys                        # statuses + defaultChatProvider
+PUT    /api/v1/admin/provider-keys/{provider}             # save (optional validate + apply defaults)
+DELETE /api/v1/admin/provider-keys/{provider}
+POST   /api/v1/admin/provider-keys/{provider}/test
+POST   /api/v1/admin/provider-keys/{provider}/apply-defaults
+```
+
+**Also backend:**
+
+- `ApplyProviderDefaultsCommand` — `php bin/console app:provider:apply-defaults <provider>`,
+  the CLI twin of the wizard's one-click action (catalog-key based, no raw BIDs).
+- `ConfigController::getRuntimeConfig()` gained `setup.chatReady` — true only when
+  the provider serving the **global default chat model** is actually available.
+  (Checking "any provider reachable" would false-positive on a bare Ollama.)
+- `SystemConfigService` now reads/writes cloud provider keys **through the store**
+  instead of `.env`, so the existing admin config screen and the new wizard share
+  one source of truth. `XAI_API_KEY` was added to its schema.
+- Migration `Version20260729120000` widens `BCONFIG.BVALUE` to `LONGTEXT`
+  (see §5.1). Galera-safe by design: it never reads the injected `Schema` (the DBAL
+  comparator throws `TableDoesNotExist` on the prod cluster) and checks
+  `information_schema` through `$this->connection`, so it is idempotent and
+  re-runnable on any schema shape.
+
+### 3.2 Frontend
+
+| File | Role |
+|------|------|
+| `views/ProviderSetupView.vue` | The wizard at `/admin/setup` — readiness header, provider cards, local-AI (Ollama) section |
+| `components/admin/ProviderKeyCard.vue` | Per-provider card: status, masked key, console link, key input, **Test & Save**, **Use as default**, **Remove** |
+| `components/setup/ProviderSetupBanner.vue` | Dismissable banner in chat while `chatReady === false` — admins get the wizard CTA, regular users an info message |
+| `services/api/providerKeysApi.ts` | Typed client over generated Zod schemas |
+| `stores/config.ts`, `views/ChatView.vue`, `router/index.ts`, `composables/useNavItems.ts` | `setup.chatReady` getter, banner mount, route, **Admin → AI Providers** nav entry |
+| `i18n/{en,de,es,tr}.json` | `adminSetup` + `setupBanner` keys in all four locales |
+
+### 3.3 Install script & docs
+
+- `_1st_install_linux.sh`: the whole raw-SQL block (hardcoded `BVALUE='9'`, the
+  deadlock-retry helper) is replaced by
+  `php bin/console app:provider:apply-defaults groq`; the closing banner points at
+  the setup page. The `GROQ_API_KEY` it writes to `backend/.env` is now imported
+  into the encrypted store automatically.
+- **This repo:** `README.md` (Quick Start, Install Options, provider table),
+  `docs/INSTALLATION.md`, `docs/CONFIGURATION.md`, `backend/.env.example`.
+- **`synaplan-docs`:** `docs/quickstart.md` (TL;DR path no longer edits `.env`;
+  no more "restart the backend"), `docs/faq.md` (new leading "easiest way to add a
+  key" entry, all restart instructions removed, troubleshooting row updated).
+  While in there: **xAI/Grok was missing from the FAQ entirely** — added to the
+  provider table, the `.env` section list, and its own entry.
+
+---
+
+## 4. Open-source hygiene — how keys stay out of the public repo
+
+The explicit constraint was "we must never publish migrations with keys". The
+design satisfies it structurally, not by convention:
+
+1. **No secret ever enters a tracked file.** The migration is **structure-only**
+   (one `ALTER TABLE`); no seeder, fixture or migration reads or writes a key.
+   Keys enter the database **exclusively at runtime** — admin UI or the one-time
+   env import — inside the operator's own install.
+2. **Encrypted at rest** with the operator's own `APP_SECRET`. A dump of `BCONFIG`
+   from one install is useless in another. A decrypt failure (rotated
+   `APP_SECRET`) is logged and treated as *not configured* so the env fallback
+   still applies rather than breaking requests.
+3. **Never echoed back.** Every API response and log line carries a masked key
+   (`gsk_••••••••••••SPaz`) or nothing at all.
+4. **`clone` + `compose up` is the supported path.** No key is required to boot;
+   the app tells the admin what to do next (banner → wizard) instead of failing
+   silently.
+5. **Env vars remain first-class** for scripted/orchestrated deploys (K8s,
+   `synaplan-platform`), with documented precedence: env bootstraps and can
+   rotate an `origin: env` row, but a UI-saved key wins permanently.
+
+---
+
+## 5. Bugs found while building this
+
+All pre-existing except 5.3; each is worth remembering.
+
+### 5.1 `BCONFIG.BVALUE` was too narrow for its own existing payloads
+
+`VARCHAR(250)` could not hold AES-256-CBC ciphertext: a modern OpenAI project key
+(~160 chars) encrypts to ~300, and an encrypted OpenAI-compatible **endpoint** JSON
+payload already exceeded 250 for any realistic `base_url` + key. Under MariaDB's
+default `STRICT_TRANS_TABLES` those writes fail with *Data too long* — so this was
+a **latent bug affecting the existing endpoint registry**, not just the new keys.
+Confirmed live afterwards: the imported OpenAI row is 280 chars of ciphertext.
+
+**Follow-up trap:** the first version widened it to `TEXT`, which passed the local
+gate but failed CI's `doctrine:schema:validate` — Doctrine maps `Types::TEXT` to
+**LONGTEXT** on MariaDB, which is also the house convention for every other text
+column. Fixed in `d98eb65`, and the guard is now `!= longtext` (idempotent from any
+starting shape) rather than `== varchar`.
+
+> **Lesson for the local gate:** `make test` does not run `doctrine:schema:validate`.
+> Any migration touching a column type should be checked with
+> `php bin/console doctrine:schema:validate` before pushing.
+
+### 5.2 A catalog key that silently resolved to nothing
+
+`ProviderDefaultsService` mapped HuggingFace to
+`huggingface:moonshotai/Kimi-K2.6:deepinfra:chat`, but `ModelCatalog::modelKey()`
+normalises colons **inside** a `providerId` to dashes, so the key matched zero
+entries and would have thrown at apply time in an operator's install. Caught
+immediately by the new test that locks every mapping — exactly the catalog-drift
+protection it exists for. Correct key: `…Kimi-K2.6-deepinfra:chat`.
+
+### 5.3 Two PHPStan errors unmasked by typing the client
+
+Replacing the untyped `private $client` with `?OpenAI\Client` revealed that
+`GroqProvider` indexed a sealed SDK usage array shape (`prompt_tokens_details`) and
+`OpenAIProvider` read a nonexistent `->capabilities` property. Both now read the raw
+payload via `toArray()` with `is_array()` narrowing — fixed properly rather than
+suppressed.
+
+### 5.4 An OpenAPI enum that generated invalid Zod
+
+`enum: ['env', 'ui', null]` on a nullable property generated
+`z.enum(['env','ui',null])`, which `vue-tsc` rejects. Correct form is
+`enum: ['env','ui']` + `nullable: true`.
+
+### 5.5 A suite-wide time bomb in `HiggsfieldProviderTest`
+
+The full backend suite began dying with *Maximum execution time of 45 seconds
+exceeded* — in a **different random test each run**. Root cause: the Higgsfield
+render-poll loop calls `set_time_limit(45)` per iteration (correct and necessary
+under FrankenPHP, where the request budget is wall-clock). Exercised from the CLI
+runner, that call converts the phpunit process from *unlimited* to a 45 s CPU
+budget; once the remaining ~2400 tests cumulatively cross it, whichever test is
+running dies. It only surfaced now because the machine got slow enough to tip over.
+Fixed by restoring `set_time_limit(0)` in that class's `tearDown()` (`c9be11a`).
+
+---
+
+## 6. Tests & verification
+
+**New:** `backend/tests/AI/Credential/` — 25 tests / 157 assertions.
+
+| Suite | Covers |
+|-------|--------|
+| `ProviderKeyStoreTest` | env import, encryption at rest, UI-key precedence, env rotation, survival of env removal, delete → re-import, memoization + invalidation, corrupt-ciphertext fallback, masking, catalog completeness |
+| `ProviderDefaultsServiceTest` | **every** catalog key in `PROVIDER_DEFAULTS` resolves (drift guard), unknown provider rejected, global write + provider flag + cache clear, unrelated capabilities untouched |
+| `ProviderKeyValidatorTest` | 200 / 401 / 429 / transport failure, key goes into the auth header and **never** into the URL, invalid input fails fast without HTTP |
+
+**Gate:** `make lint` ✓ · `make -C backend phpstan` ✓ (0 errors) · 2887 backend
+tests ✓ · 975 frontend tests ✓ · `vue-tsc` ✓ · full PR CI green.
+
+**Live smoke test** on the dev stack: all 7 keys present in `backend/.env` were
+imported into `BCONFIG` as ciphertext with `origin: env`, returned masked, xAI
+correctly reported unconfigured, and an authenticated runtime config returned
+`setup: {chatReady: true}`.
+
+---
+
+## 7. Next steps
+
+**Finish Tier 3** (small, high value):
+
+1. Resolve the default chat model **automatically** to the first provider with a
+   working key (Groq → OpenAI → … → Ollama-if-model-present) at seed time or first
+   request, so `chatReady` is true without an explicit "Use as default" click.
+   Note the `BCONFIG` rule: seeder defaults are bootstrap-only, so rolling out a
+   changed default for existing installs needs a migration that UPDATEs the rows.
+2. Open the Feature Status page to admins in production (currently 403).
+
+**Then, in adoption order:** Tier 4 (download progress endpoint + card) → Tier 5
+(small-model default + arm64 images) → Tier 6 (Coolify/CapRover/Elestio/PikaPods/
+Railway templates, Umbrel/CasaOS listings) → hygiene batch (`APP_SECRET`
+autogeneration, disk-size reconciliation, retire or port the install script).

@@ -54,8 +54,10 @@ final readonly class SystemConfigService
                 'label' => 'AI Services',
                 'sections' => [
                     'ollama' => ['label' => 'Local AI (Ollama)', 'fields' => ['OLLAMA_BASE_URL']],
-                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN', 'XAI_API_KEY']],
+                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
                     'selfhosted' => ['label' => 'Self-Hosted AI', 'fields' => ['TRITON_SERVER_URL']],
+                    'media' => ['label' => 'Image & Video Generation', 'fields' => ['THEHIVE_API_KEY', 'HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET']],
+                    'embeddings' => ['label' => 'Embeddings (Cloudflare Workers AI)', 'fields' => ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'EMBEDDING_FALLBACK_PROVIDER']],
                     'tts' => ['label' => 'Text-to-Speech', 'fields' => ['SYNAPLAN_TTS_URL', 'ELEVENLABS_API_KEY']],
                 ],
             ],
@@ -1035,25 +1037,52 @@ final readonly class SystemConfigService
                 'sensitive' => false, 'description' => 'Ollama server URL',
                 'default' => 'http://ollama:11434',
             ],
+            // Every field below whose env var is known to ProviderKeyCatalog is
+            // stored encrypted in BCONFIG by ProviderKeyStore and applies without
+            // a restart — hence 'source' => 'database'. getValues()/setValue()
+            // route them through the store before the source check ever runs; the
+            // marker only tells the UI to label them "saved live".
             'OPENAI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true, 'description' => 'OpenAI API key',
-                'default' => '',
+                'default' => '', 'source' => 'database',
             ],
             'ANTHROPIC_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true, 'description' => 'Anthropic (Claude) API key',
-                'default' => '',
+                'default' => '', 'source' => 'database',
             ],
             'GROQ_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true, 'description' => 'Groq API key',
-                'default' => '',
+                'sensitive' => true, 'description' => 'Groq API key (free tier available)',
+                'default' => '', 'source' => 'database',
             ],
             'GOOGLE_GEMINI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true, 'description' => 'Google Gemini API key',
-                'default' => '',
+                'sensitive' => true, 'description' => 'Google Gemini API key — also unlocks Imagen, Nano Banana, Veo and Gemini TTS',
+                'default' => '', 'source' => 'database',
+            ],
+            'MISTRAL_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Mistral API key — chat, vision and the Voxtral audio pair',
+                'default' => '', 'source' => 'database',
+            ],
+            'XAI_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
+                'default' => '', 'source' => 'database',
+            ],
+            'TRUSTEDTOKENS_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'TrustedTokens API key — sovereign inference on German GPUs (GLM, Qwen, GPT OSS)',
+                'default' => '', 'source' => 'database',
+            ],
+            'HUGGINGFACE_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true, 'description' => 'HuggingFace API token — routes the Kimi K2 models through HF Inference',
+                'default' => '', 'source' => 'database',
             ],
             'GOOGLE_VERTEX_ACCESS_TOKEN' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
@@ -1061,15 +1090,40 @@ final readonly class SystemConfigService
                 'description' => 'Optional OAuth bearer for Vertex AI Imagen; leave empty to use Gemini API (Imagen 4) with the key above',
                 'default' => '',
             ],
-            'XAI_API_KEY' => [
-                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true,
-                'description' => 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
-                'default' => '',
-            ],
             'TRITON_SERVER_URL' => [
                 'tab' => 'ai', 'section' => 'selfhosted', 'type' => 'url',
                 'sensitive' => false, 'description' => 'NVIDIA Triton gRPC endpoint',
+                'default' => '',
+            ],
+            'THEHIVE_API_KEY' => [
+                'tab' => 'ai', 'section' => 'media', 'type' => 'password',
+                'sensitive' => true, 'description' => 'TheHive API key — Flux Schnell and SDXL image generation',
+                'default' => '',
+            ],
+            'HIGGSFIELD_API_KEY' => [
+                'tab' => 'ai', 'section' => 'media', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Higgsfield API key — Soul/Reve images, DoP and Kling video. Both halves are required',
+                'default' => '',
+            ],
+            'HIGGSFIELD_API_SECRET' => [
+                'tab' => 'ai', 'section' => 'media', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Higgsfield API secret — the key alone will not authenticate',
+                'default' => '',
+            ],
+            'CLOUDFLARE_ACCOUNT_ID' => [
+                'tab' => 'ai', 'section' => 'embeddings', 'type' => 'text',
+                'sensitive' => false, 'description' => 'Cloudflare account ID for Workers AI embeddings (bge-m3)',
+                'default' => '',
+            ],
+            'CLOUDFLARE_API_TOKEN' => [
+                'tab' => 'ai', 'section' => 'embeddings', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Cloudflare API token with Workers AI access',
+                'default' => '',
+            ],
+            'EMBEDDING_FALLBACK_PROVIDER' => [
+                'tab' => 'ai', 'section' => 'embeddings', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Provider to try when the primary embedding fails (e.g. "cloudflare"); empty disables fallback',
                 'default' => '',
             ],
             'SYNAPLAN_TTS_URL' => [
