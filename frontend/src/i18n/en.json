@@ -4169,11 +4169,7 @@
     }
   },
   "onboarding": {
-    "skip": "Skip",
-    "back": "Back",
-    "next": "Continue",
     "getStarted": "Get started",
-    "stepLabel": "Step {step} of {total}",
     "welcome": {
       "title": "Welcome to",
       "subtitle": "Every AI, every feature in one place",
@@ -4220,43 +4216,6 @@
       "connect": "Connect",
       "connecting": "Checking connection…",
       "connectError": "This server can't be reached. Check the address and try again."
-    },
-    "plans": {
-      "title": "How do you want to start?",
-      "subtitle": "Try it for free — you can upgrade anytime",
-      "guestCta": "Continue without an account",
-      "popular": "Popular",
-      "continueWith": "Continue with {plan}",
-      "restore": "Restore purchases",
-      "restoring": "Restoring…",
-      "restoreNone": "No previous purchase found. If you bought with an account, sign in instead.",
-      "registerCta": "Create a free account",
-      "loginHint": "Already have an account?",
-      "loginCta": "Sign in"
-    },
-    "account": {
-      "title": "Almost there",
-      "subtitle": "Sign in or create your account to activate your subscription.",
-      "providerCta": "Continue with {provider}",
-      "emailCta": "Continue with email",
-      "note": "Your subscription will be linked to this account.",
-      "redeemTitle": "Payment successful",
-      "redeemSubtitle": "Create your account now to activate your subscription — it takes less than a minute.",
-      "redeemNote": "Your purchase is linked to your new account automatically."
-    },
-    "purchase": {
-      "checking": "Checking your account…",
-      "purchasing": "Completing the purchase in the store…",
-      "alreadyTitle": "Already subscribed",
-      "alreadyBody": "This account already has an active subscription ({plan}). You will not be charged again.",
-      "alreadyManage": "Manage subscription",
-      "toChat": "Go to chat",
-      "pendingTitle": "Purchase pending",
-      "retryTitle": "Purchase not completed",
-      "cancelledBody": "The purchase was cancelled. You have not been charged.",
-      "checkFailed": "We could not check your subscription status. Please try again.",
-      "retryCta": "Try again",
-      "later": "Maybe later"
     }
   },
   "iap": {

@@ -3121,11 +3121,7 @@
     }
   },
   "onboarding": {
-    "skip": "Omitir",
-    "back": "Atrás",
-    "next": "Continuar",
     "getStarted": "Empezar",
-    "stepLabel": "Paso {step} de {total}",
     "welcome": {
       "title": "Bienvenido a",
       "subtitle": "Todas las IA, todas las funciones en un solo lugar",
@@ -3172,43 +3168,6 @@
       "connect": "Conectar",
       "connecting": "Comprobando la conexión…",
       "connectError": "No se puede acceder a este servidor. Comprueba la dirección e inténtalo de nuevo."
-    },
-    "plans": {
-      "title": "¿Cómo quieres empezar?",
-      "subtitle": "Pruébalo gratis — puedes mejorar tu plan en cualquier momento",
-      "guestCta": "Continuar sin cuenta",
-      "popular": "Popular",
-      "continueWith": "Continuar con {plan}",
-      "restore": "Restaurar compras",
-      "restoring": "Restaurando…",
-      "restoreNone": "No se encontró ninguna compra anterior. Si compraste con una cuenta, inicia sesión.",
-      "registerCta": "Crear una cuenta gratuita",
-      "loginHint": "¿Ya tienes una cuenta?",
-      "loginCta": "Iniciar sesión"
-    },
-    "account": {
-      "title": "Casi listo",
-      "subtitle": "Inicia sesión o crea tu cuenta para activar tu suscripción.",
-      "providerCta": "Continuar con {provider}",
-      "emailCta": "Continuar con correo electrónico",
-      "note": "Tu suscripción se vinculará a esta cuenta.",
-      "redeemTitle": "Pago completado",
-      "redeemSubtitle": "Crea tu cuenta ahora para activar tu suscripción — tarda menos de un minuto.",
-      "redeemNote": "Tu compra se vincula automáticamente a tu nueva cuenta."
-    },
-    "purchase": {
-      "checking": "Comprobando tu cuenta…",
-      "purchasing": "Completando la compra en la tienda…",
-      "alreadyTitle": "Ya tienes una suscripción",
-      "alreadyBody": "Esta cuenta ya tiene una suscripción activa ({plan}). No se te cobrará de nuevo.",
-      "alreadyManage": "Gestionar suscripción",
-      "toChat": "Ir al chat",
-      "pendingTitle": "Compra pendiente",
-      "retryTitle": "Compra no completada",
-      "cancelledBody": "La compra se canceló. No se te ha cobrado nada.",
-      "checkFailed": "No se pudo comprobar el estado de tu suscripción. Inténtalo de nuevo.",
-      "retryCta": "Intentar de nuevo",
-      "later": "Quizás más tarde"
     }
   },
   "iap": {

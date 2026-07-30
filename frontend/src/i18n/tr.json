@@ -3122,11 +3122,7 @@
     }
   },
   "onboarding": {
-    "skip": "Atla",
-    "back": "Geri",
-    "next": "Devam",
     "getStarted": "Başlayalım",
-    "stepLabel": "Adım {step} / {total}",
     "welcome": {
       "title": "Hoş geldin",
       "subtitle": "Tüm yapay zekâlar, tüm özellikler tek bir yerde",
@@ -3173,43 +3169,6 @@
       "connect": "Bağlan",
       "connecting": "Bağlantı kontrol ediliyor…",
       "connectError": "Bu sunucuya ulaşılamıyor. Adresi kontrol edip tekrar dene."
-    },
-    "plans": {
-      "title": "Nasıl başlamak istersin?",
-      "subtitle": "Ücretsiz dene — istediğin zaman yükseltebilirsin",
-      "guestCta": "Hesapsız devam et",
-      "popular": "Popüler",
-      "continueWith": "{plan} ile devam et",
-      "restore": "Satın alımları geri yükle",
-      "restoring": "Geri yükleniyor…",
-      "restoreNone": "Önceki bir satın alma bulunamadı. Bir hesapla satın aldıysan bunun yerine giriş yap.",
-      "registerCta": "Ücretsiz hesap oluştur",
-      "loginHint": "Zaten bir hesabın var mı?",
-      "loginCta": "Giriş yap"
-    },
-    "account": {
-      "title": "Neredeyse tamam",
-      "subtitle": "Aboneliğini etkinleştirmek için giriş yap veya bir hesap oluştur.",
-      "providerCta": "{provider} ile devam et",
-      "emailCta": "E-posta ile devam et",
-      "note": "Aboneliğin bu hesaba bağlanacak.",
-      "redeemTitle": "Ödeme başarılı",
-      "redeemSubtitle": "Aboneliğini etkinleştirmek için şimdi hesabını oluştur — bir dakikadan az sürer.",
-      "redeemNote": "Satın alman otomatik olarak yeni hesabına bağlanır."
-    },
-    "purchase": {
-      "checking": "Hesabın kontrol ediliyor…",
-      "purchasing": "Satın alma mağazada tamamlanıyor…",
-      "alreadyTitle": "Zaten abonesin",
-      "alreadyBody": "Bu hesabın zaten aktif bir aboneliği var ({plan}). Tekrar ücret alınmayacak.",
-      "alreadyManage": "Aboneliği yönet",
-      "toChat": "Sohbete git",
-      "pendingTitle": "Satın alma beklemede",
-      "retryTitle": "Satın alma tamamlanmadı",
-      "cancelledBody": "Satın alma iptal edildi. Ücret alınmadı.",
-      "checkFailed": "Abonelik durumun kontrol edilemedi. Lütfen tekrar dene.",
-      "retryCta": "Tekrar dene",
-      "later": "Belki daha sonra"
     }
   },
   "iap": {
