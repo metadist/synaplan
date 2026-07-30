@@ -18,24 +18,28 @@
         />
 
         <div
-          class="relative w-full overflow-y-auto scroll-thin animate-paywall-enter"
+          class="relative w-full flex flex-col animate-paywall-enter"
           :class="
             isNative
               ? 'bg-app h-full'
-              : 'surface-card rounded-2xl shadow-2xl max-w-5xl max-h-[90vh]'
+              : 'surface-card rounded-2xl shadow-2xl max-w-5xl max-h-[90vh] overflow-hidden'
           "
           :style="isNative ? nativeInsetStyle : undefined"
         >
-          <button
-            class="absolute top-3 right-3 z-10 w-9 h-9 rounded-xl surface-chip txt-primary flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-            data-testid="paywall-close"
-            :aria-label="$t('common.close')"
-            @click="close"
-          >
-            <Icon icon="mdi:close" class="w-5 h-5" />
-          </button>
+          <!-- Its own row rather than an overlay, so the dismiss affordance stays
+               put while the plans scroll (Apple 3.1.2). -->
+          <div class="flex justify-end flex-shrink-0 p-3 pb-0">
+            <button
+              class="w-9 h-9 rounded-xl surface-chip txt-primary flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              data-testid="paywall-close"
+              :aria-label="$t('common.close')"
+              @click="close"
+            >
+              <Icon icon="mdi:close" class="w-5 h-5" />
+            </button>
+          </div>
 
-          <div class="px-5 md:px-8 py-8 md:py-10">
+          <div class="flex-1 overflow-y-auto scroll-thin px-5 md:px-8 pt-4 pb-8 md:pb-10">
             <!-- Header -->
             <div class="text-center max-w-2xl mx-auto mb-8">
               <div
