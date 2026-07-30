@@ -33,7 +33,9 @@ final readonly class SlideMarkdownParser
     public function parse(string $content): SlideDeck
     {
         [$theme, $transition] = $this->extractDirective($content);
-        $content = (string) preg_replace(self::DIRECTIVE_PATTERN, '', $content);
+        // Falling back to the untouched content keeps the slides: casting a PCRE
+        // failure to string would silently render an empty deck.
+        $content = preg_replace(self::DIRECTIVE_PATTERN, '', $content) ?? $content;
 
         $slides = $this->parseSlides($content);
         if ([] === $slides) {
@@ -275,7 +277,7 @@ final readonly class SlideMarkdownParser
             return $text;
         }
 
-        return (string) preg_replace_callback(
+        return preg_replace_callback(
             self::IMAGE_MARKER_PATTERN,
             static function (array $matches) use ($builder): string {
                 $builder->addImage($matches[1]);
@@ -283,7 +285,7 @@ final readonly class SlideMarkdownParser
                 return '';
             },
             $text,
-        );
+        ) ?? $text;
     }
 
     /**
@@ -369,7 +371,7 @@ final readonly class SlideMarkdownParser
      */
     private function flattenLinks(string $text): string
     {
-        return (string) preg_replace('/!?\[([^\]]*)]\([^)]*\)/u', '$1', $text);
+        return preg_replace('/!?\[([^\]]*)]\([^)]*\)/u', '$1', $text) ?? $text;
     }
 
     /**

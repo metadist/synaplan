@@ -502,9 +502,16 @@ class DocumentGeneratorServiceTest extends TestCase
 
     private static function onePixelPng(): string
     {
-        return (string) base64_decode(
+        $png = base64_decode(
             'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+            true,
         );
+
+        // A truncated fixture would produce an empty file and turn the image
+        // assertions below into a false negative instead of a setup failure.
+        self::assertNotFalse($png, 'the one-pixel PNG fixture must be valid base64');
+
+        return $png;
     }
 
     private static function writeOnePixelWebp(string $path): bool
