@@ -163,9 +163,12 @@ final class AdminProviderKeysController extends AbstractController
             $defaultsApplied = true;
         } elseif (!$applyDefaults && ProviderDefaultsService::supports($provider)) {
             // Key saved without the checkbox — still auto-flip when the current
-            // default chat provider has no usable key (fresh Anthropic seed).
+            // default chat provider is a cloud provider with no usable key
+            // (fresh Anthropic seed). A keyless default (Ollama, test provider)
+            // is a deliberate choice and is never overridden.
             $current = strtolower((string) ($this->configRepository->getValue(0, 'ai', 'default_chat_provider') ?? ''));
-            $currentReady = '' !== $current && null !== $this->keyStore->getKey($current);
+            $currentReady = '' !== $current
+                && (!ProviderKeyCatalog::has($current) || null !== $this->keyStore->getKey($current));
             if (!$currentReady) {
                 $this->defaults->applyGlobalDefaults($provider);
                 $defaultsApplied = true;

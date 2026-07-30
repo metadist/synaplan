@@ -118,6 +118,66 @@ final class ProviderDefaultsServiceTest extends TestCase
         self::assertSame('ollama', $this->written['0|ai|default_chat_provider'] ?? null);
     }
 
+    /**
+     * The test/E2E environment routes chat at the TestProvider on purpose, and a
+     * dummy GROQ_API_KEY makes Groq look "available" (isAvailable() only checks
+     * that a key string exists). Auto-apply must not hijack that: it broke the
+     * Ollama and WhatsApp E2E suites by silently repointing chat at Groq, which
+     * then answered "invalid api key".
+     */
+    public function testAutoApplyNeverOverridesTheTestProviderDefault(): void
+    {
+        $this->configRepository->method('getValue')->willReturn('test');
+
+        $applied = $this->service->autoApplyBestAvailable(['test' => false, 'groq' => true], 'test');
+
+        self::assertNull($applied);
+        self::assertSame([], $this->written);
+    }
+
+    /**
+     * A deliberately chosen local default must survive a transient outage — one
+     * request while Ollama restarts may not permanently repoint the install at a
+     * cloud provider.
+     */
+    public function testAutoApplyNeverOverridesAKeylessDefaultThatIsMomentarilyUnavailable(): void
+    {
+        $this->configRepository->method('getValue')->willReturn('ollama');
+
+        $applied = $this->service->autoApplyBestAvailable(['ollama' => false, 'groq' => true], 'ollama');
+
+        self::assertNull($applied);
+        self::assertSame([], $this->written);
+    }
+
+    /**
+     * Guards the case where the provider flag and the CHAT binding disagree: an
+     * admin picked an Ollama chat model while the flag still says anthropic.
+     * The explicit binding wins — nothing is rewritten.
+     */
+    public function testAutoApplyRespectsAnExplicitKeylessChatBindingOverTheProviderFlag(): void
+    {
+        $this->configRepository->method('getValue')->willReturn('anthropic');
+
+        $applied = $this->service->autoApplyBestAvailable(['anthropic' => false, 'groq' => true], 'ollama');
+
+        self::assertNull($applied);
+        self::assertSame([], $this->written);
+    }
+
+    /**
+     * The Tier 3 target case: the seeded Anthropic default with no Anthropic key.
+     */
+    public function testAutoApplyRepairsAKeyedCloudDefaultWithoutAKey(): void
+    {
+        $this->configRepository->method('getValue')->willReturn('anthropic');
+
+        $applied = $this->service->autoApplyBestAvailable(['anthropic' => false, 'groq' => true], 'anthropic');
+
+        self::assertSame('groq', $applied);
+        self::assertSame('groq', $this->written['0|ai|default_chat_provider'] ?? null);
+    }
+
     public function testUnknownProviderIsRejected(): void
     {
         self::assertFalse(ProviderDefaultsService::supports('not-a-provider'));

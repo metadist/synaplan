@@ -454,12 +454,12 @@ class ConfigController extends AbstractController
         if ($user) {
             $availabilityByName = [];
             foreach ($this->providerRegistry->getUniqueProviders() as $name => $provider) {
-                if ('test' === $name) {
-                    continue;
-                }
                 $available = $provider->isAvailable();
+                // TestProvider stays out of the user-facing list but must be in
+                // the map: in the test/E2E env it serves the default chat model,
+                // and a missing entry reads as "the default is broken".
                 $availabilityByName[strtolower($name)] = $available;
-                if (!$available) {
+                if (!$available && 'test' !== strtolower($name)) {
                     $unavailableProviders[] = $provider->getDisplayName();
                 }
             }
@@ -472,14 +472,18 @@ class ConfigController extends AbstractController
                     && $this->isRecommendedOllamaChatModelPulled();
             }
 
-            // Auto-flip virgin / broken defaults to the first available provider
-            // (Groq → … → Ollama) so chatReady becomes true without an explicit
-            // "Use as default" click. No-op when the current default already works.
-            if (!$this->isDefaultChatModelReady($availabilityByName)) {
-                $applied = $this->providerDefaultsService->autoApplyBestAvailable($availabilityByName);
+            $defaultChatService = $this->defaultChatModelService();
+
+            // Repair a default that points at a cloud provider without a key so
+            // chatReady becomes true without an explicit "Use as default" click.
+            // Never touches a keyless (Ollama / test / self-hosted) default —
+            // see ProviderDefaultsService::autoApplyBestAvailable().
+            if (!$this->isDefaultChatModelReady($availabilityByName, $defaultChatService)) {
+                $applied = $this->providerDefaultsService->autoApplyBestAvailable($availabilityByName, $defaultChatService);
                 if (null !== $applied) {
                     // Re-evaluate after the write (model_config cache was cleared).
                     $availabilityByName[$applied] = true;
+                    $defaultChatService = $applied;
                 }
             }
 
@@ -487,7 +491,7 @@ class ConfigController extends AbstractController
             // frontend shows a "connect an AI provider" banner (admins get a
             // wizard CTA) while this is false — e.g. a fresh install whose
             // default chat model points at a provider without a key.
-            $setup = ['chatReady' => $this->isDefaultChatModelReady($availabilityByName)];
+            $setup = ['chatReady' => $this->isDefaultChatModelReady($availabilityByName, $defaultChatService)];
         }
 
         // Realtime / WebSocket gateway settings.
@@ -567,21 +571,32 @@ class ConfigController extends AbstractController
     }
 
     /**
+     * The provider serving the GLOBAL default chat model, or null when the
+     * binding does not resolve (fresh DB, retired model).
+     */
+    private function defaultChatModelService(): ?string
+    {
+        $bid = $this->modelConfigService->getDefaultModel('CHAT');
+        if (null === $bid) {
+            return null;
+        }
+
+        $model = $this->modelRepository->find($bid);
+
+        return null !== $model ? strtolower($model->getService()) : null;
+    }
+
+    /**
      * Whether the provider serving the GLOBAL default chat model is currently
      * available. Falls back to "any non-test chat provider available" when no
      * default binding resolves (fresh DB, retired model).
      *
      * @param array<string, bool> $availabilityByName lowercase provider name => isAvailable()
      */
-    private function isDefaultChatModelReady(array $availabilityByName): bool
+    private function isDefaultChatModelReady(array $availabilityByName, ?string $defaultChatService): bool
     {
-        $bid = $this->modelConfigService->getDefaultModel('CHAT');
-        if (null !== $bid) {
-            $model = $this->modelRepository->find($bid);
-            $service = null !== $model ? strtolower($model->getService()) : null;
-            if (null !== $service && isset($availabilityByName[$service])) {
-                return $availabilityByName[$service];
-            }
+        if (null !== $defaultChatService && isset($availabilityByName[$defaultChatService])) {
+            return $availabilityByName[$defaultChatService];
         }
 
         // Fallback: any chat-capable provider that is available. Uses the

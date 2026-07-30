@@ -159,19 +159,40 @@ final readonly class ProviderDefaultsService
     }
 
     /**
-     * If the current global default chat provider is unavailable, pick the
-     * first available provider in {@see self::PREFERENCE_ORDER} and apply its
-     * recommended defaults. No-op when chat is already ready.
+     * Repair a default that points at a cloud provider the operator never gave a
+     * key for: pick the first available provider in {@see self::PREFERENCE_ORDER}
+     * and apply its recommended defaults, so chat works without an explicit
+     * "Use as default" click on a fresh install.
+     *
+     * Deliberately narrow — it only ever overrides a **keyed cloud provider
+     * without a usable key**. A default served by Ollama, the test provider or
+     * any other keyless provider is a deliberate choice and is never rewritten,
+     * not even while that provider is briefly unreachable: a single request
+     * during an Ollama restart must not permanently repoint the install at a
+     * cloud provider.
      *
      * @param array<string, bool> $availabilityByName lowercase provider name => available
+     * @param string|null         $defaultChatService provider serving the current global default CHAT model, null when it does not resolve
      *
      * @return string|null the provider that was applied, or null when unchanged
      */
-    public function autoApplyBestAvailable(array $availabilityByName): ?string
+    public function autoApplyBestAvailable(array $availabilityByName, ?string $defaultChatService = null): ?string
     {
         $current = strtolower((string) ($this->configRepository->getValue(0, 'ai', 'default_chat_provider') ?? ''));
-        if ('' !== $current && ($availabilityByName[$current] ?? false)) {
-            return null;
+
+        foreach ([$defaultChatService, '' !== $current ? $current : null] as $incumbent) {
+            if (null === $incumbent) {
+                continue;
+            }
+            $incumbent = strtolower($incumbent);
+            // Keyless provider (ollama, test, self-hosted) => operator's choice.
+            if (!ProviderKeyCatalog::has($incumbent)) {
+                return null;
+            }
+            // Has a usable key => nothing to repair.
+            if ($availabilityByName[$incumbent] ?? false) {
+                return null;
+            }
         }
 
         foreach (self::PREFERENCE_ORDER as $provider) {
