@@ -6,6 +6,9 @@ import { WORKER_COUNT } from './playwright.config'
 
 const WORKER_PASSWORD = 'E2eTest1234!'
 
+/** Keep in sync with `PAYWALL_LAST_SHOWN_KEY` in `usePaywallPrompt.ts`. */
+const PAYWALL_LAST_SHOWN_KEY = 'synaplan.paywallLastShownAt'
+
 function workerEmail(workerIndex: number): string {
   if (workerIndex < 0 || workerIndex >= WORKER_COUNT) {
     throw new Error(
@@ -73,9 +76,17 @@ export const test = base.extend<
         state.origins = [
           {
             origin: new URL(URLS.BASE_URL).origin,
-            // Session hint: tells the app a session exists, so an expired
-            // access cookie triggers a token refresh instead of a logout.
-            localStorage: [{ name: 'sh', value: '1' }],
+            localStorage: [
+              // Session hint: tells the app a session exists, so an expired
+              // access cookie triggers a token refresh instead of a logout.
+              { name: 'sh', value: '1' },
+              // Mark the daily upgrade reminder (usePaywallPrompt) as just
+              // shown. Its throttle lives in localStorage and every test gets a
+              // fresh context, so it would otherwise be due on every mount and
+              // the full-screen paywall would cover the chat and swallow the
+              // clicks the specs are making.
+              { name: PAYWALL_LAST_SHOWN_KEY, value: String(Date.now()) },
+            ],
           },
         ]
         await use(state)
