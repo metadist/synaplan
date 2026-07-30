@@ -74,7 +74,7 @@ final class ProviderKeyStoreTest extends TestCase
     }
 
     /**
-     * @param array<string, string|list<string>> $envKeys
+     * @param array<string, string|list<string|null>|null> $envKeys
      */
     private function makeStore(array $envKeys = []): ProviderKeyStore
     {
@@ -177,6 +177,26 @@ final class ProviderKeyStoreTest extends TestCase
         $store = $this->makeStore(['google' => ['', 'gemini_alias_key', 'google_api_key']]);
 
         self::assertSame('gemini_alias_key', $store->getKey('google'));
+    }
+
+    /**
+     * The aliases are wired as `%env(default::GEMINI_API_KEY)%`, which the
+     * container resolves to NULL — not '' — while the variable is unset. Every
+     * provider lookup ran through this list, so a null alias took down the
+     * health endpoint, not just Google.
+     */
+    public function testUnsetAliasesArriveAsNullAndAreSkipped(): void
+    {
+        $store = $this->makeStore(['google' => [null, null, null], 'groq' => null]);
+
+        self::assertNull($store->getKey('google'));
+        self::assertNull($store->getKey('groq'));
+        self::assertFalse($store->getStatus('google')['configured']);
+        self::assertFalse($store->hasEnvKey('google'));
+        self::assertSame([], $this->store);
+
+        $withKey = $this->makeStore(['google' => [null, 'gemini_alias_key', null]]);
+        self::assertSame('gemini_alias_key', $withKey->getKey('google'));
     }
 
     public function testStoredValueIsEncryptedAtRest(): void

@@ -65,12 +65,14 @@ final class ProviderKeyStore
     private array $memo = [];
 
     /**
-     * @param array<string, string|list<string>> $envKeys provider name => key from the
-     *                                                    environment ('' when unset). A list
-     *                                                    holds accepted alternatives (Google
-     *                                                    reads GEMINI_API_KEY / GOOGLE_API_KEY
-     *                                                    too) and the first usable one wins;
-     *                                                    wired in services.yaml
+     * @param array<string, string|list<string|null>|null> $envKeys provider name => key from
+     *                                                              the environment ('' — or null
+     *                                                              for a `default::` alias — when
+     *                                                              unset). A list holds accepted
+     *                                                              alternatives (Google reads
+     *                                                              GEMINI_API_KEY / GOOGLE_API_KEY
+     *                                                              too) and the first usable one
+     *                                                              wins; wired in services.yaml
      */
     public function __construct(
         private readonly ConfigRepository $configRepository,
@@ -264,7 +266,10 @@ final class ProviderKeyStore
     {
         $candidates = $this->envKeys[$provider] ?? '';
         foreach (is_array($candidates) ? $candidates : [$candidates] as $candidate) {
-            $candidate = trim($candidate);
+            // An alias wired as `%env(default::GEMINI_API_KEY)%` resolves to null,
+            // not '', while the var is unset — the container passes that null
+            // straight through.
+            $candidate = trim((string) ($candidate ?? ''));
             if (SecretValueGuard::isUsable($candidate)) {
                 return $candidate;
             }
