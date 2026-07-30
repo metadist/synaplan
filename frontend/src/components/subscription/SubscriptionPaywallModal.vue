@@ -25,20 +25,20 @@
               : 'surface-card rounded-2xl shadow-2xl max-w-5xl max-h-[90vh] overflow-hidden'
           "
         >
-          <!-- Its own row rather than an overlay, so the dismiss affordance stays
-               put while the plans scroll (Apple 3.1.2). -->
-          <div class="flex justify-end flex-shrink-0 p-3 pb-0">
-            <button
-              class="w-9 h-9 rounded-xl surface-chip txt-primary flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-              data-testid="paywall-close"
-              :aria-label="$t('common.close')"
-              @click="close"
-            >
-              <Icon icon="mdi:close" class="w-5 h-5" />
-            </button>
-          </div>
+          <!-- Absolute so it stays put while plans scroll, without a full-width
+               header bar that would paint over the scroll content (Apple 3.1.2). -->
+          <button
+            class="paywall-close absolute top-3 right-3 z-10 w-9 h-9 rounded-xl txt-primary flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+            data-testid="paywall-close"
+            :aria-label="$t('common.close')"
+            @click="close"
+          >
+            <Icon icon="mdi:close" class="w-5 h-5" />
+          </button>
 
-          <div class="flex-1 overflow-y-auto scroll-thin px-5 md:px-8 pt-4 pb-8 md:pb-10">
+          <div
+            class="paywall-scroll flex-1 overflow-y-auto scroll-thin px-5 md:px-8 pt-8 pb-8 md:pb-10"
+          >
             <!-- Header -->
             <div class="text-center max-w-2xl mx-auto mb-8">
               <div
@@ -371,12 +371,18 @@ watch(
 </script>
 
 <style scoped>
-/* Keeps the close row clear of the notch and the home indicator. Declared as a
-   class rather than an inline style because Safari drops `env()` when it is
-   assigned through the CSSOM. */
+/* Safe-area lives on the floating close button and the scroll padding, not on
+   a full-width header strip — otherwise that strip paints a solid bar across
+   the top. Declared as a class rather than an inline style because Safari drops
+   `env()` when it is assigned through the CSSOM. */
 .paywall-native-insets {
-  padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.paywall-native-insets .paywall-close {
+  top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+}
+.paywall-native-insets .paywall-scroll {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 2.5rem);
 }
 
 .paywall-fade-enter-active,
