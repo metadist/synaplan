@@ -33,6 +33,9 @@
       <span v-if="provider.configured && provider.source === 'env'">
         ({{ $t('adminSetup.sourceEnv') }})
       </span>
+      <span v-if="provider.configured && provider.source === 'db' && provider.origin === 'env'">
+        ({{ $t('adminSetup.sourceDbFromEnv') }})
+      </span>
       <span v-if="isDefaultChat" class="inline-flex items-center gap-1 txt-brand font-medium">
         <Icon icon="mdi:star" class="w-3.5 h-3.5" />
         {{ $t('adminSetup.currentDefault') }}
@@ -65,6 +68,20 @@
           <span v-else>{{ $t('adminSetup.saveAndTest') }}</span>
         </button>
       </div>
+      <p
+        v-if="provider.source === 'db' && provider.origin === 'ui'"
+        class="text-xs txt-secondary"
+        data-testid="provider-key-db-override-hint"
+      >
+        {{ $t('adminSetup.sourceDbOverridesEnv') }}
+      </p>
+      <p
+        v-else-if="provider.source === 'db' && provider.origin === 'env'"
+        class="text-xs txt-secondary"
+        data-testid="provider-key-db-from-env-hint"
+      >
+        {{ $t('adminSetup.sourceDbFromEnvHint') }}
+      </p>
       <label
         v-if="keyInput.trim() !== ''"
         class="flex items-center gap-2 text-sm txt-secondary cursor-pointer"

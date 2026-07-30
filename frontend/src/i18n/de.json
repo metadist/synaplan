@@ -453,6 +453,7 @@
       "saveError": "Konfiguration konnte nicht gespeichert werden",
       "saved": "Konfiguration gespeichert",
       "savedLive": "Gespeichert — sofort wirksam",
+      "dbOverridesEnv": "Verschlüsselt in der Datenbank gespeichert — überschreibt jeden passenden Wert in .env.",
       "unsaved": "Nicht gespeicherte Änderungen",
       "testConnection": "Verbindung testen",
       "testFailed": "Verbindungstest fehlgeschlagen",
@@ -1308,7 +1309,7 @@
         "applyTooltip": "{model} als Standardmodell für „{purpose}“ festlegen"
       },
       "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
-      "modelNotConfigured": "{model} ist nicht bereit: Setze {envVar} in der Umgebung (z. B. .env.local).",
+      "modelNotConfigured": "{model} ist nicht bereit: Füge {envVar} unter Admin → KI-Anbieter hinzu (oder in der Umgebung).",
       "admin": {
         "catalogSubtitle": "System-Modellkatalog durchsuchen und bearbeiten.",
         "bulkImportSubtitle": "SQL aus Anbieter-Dokumentation erzeugen und anwenden (erweitert).",
@@ -2166,6 +2167,9 @@
     "freeTier": "Kostenlose Stufe verfügbar",
     "connected": "Verbunden",
     "sourceEnv": "aus .env importiert",
+    "sourceDbFromEnv": "in DB gespeichert (aus .env)",
+    "sourceDbOverridesEnv": "Verschlüsselt in der Datenbank gespeichert — überschreibt jeden passenden Wert in .env.",
+    "sourceDbFromEnvHint": "Verschlüsselt in der Datenbank gespeichert (aus .env importiert). Ein hier gespeicherter Schlüssel überschreibt .env dauerhaft.",
     "currentDefault": "Aktueller Standard",
     "keyPlaceholder": "API-Schlüssel einfügen…",
     "replaceKeyPlaceholder": "Neuen API-Schlüssel zum Ersetzen einfügen…",

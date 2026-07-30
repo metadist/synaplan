@@ -100,6 +100,15 @@ const statusColor = computed(() => {
   }
   return 'txt-secondary'
 })
+
+/** Cloud provider keys (source=database) — DB value overrides any matching .env entry. */
+const showDbOverrideHint = computed(
+  () =>
+    props.schema.source === 'database' &&
+    props.schema.type === 'password' &&
+    props.value.isSet &&
+    !isDirty.value
+)
 </script>
 
 <template>
@@ -212,6 +221,14 @@ const statusColor = computed(() => {
         {{ $t('common.save') }}
       </button>
     </div>
+
+    <p
+      v-if="showDbOverrideHint"
+      class="text-xs txt-secondary mt-1.5"
+      data-testid="config-field-db-override-hint"
+    >
+      {{ $t('admin.config.dbOverridesEnv') }}
+    </p>
   </div>
 </template>
 

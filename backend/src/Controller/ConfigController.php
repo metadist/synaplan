@@ -1327,7 +1327,7 @@ class ConfigController extends AbstractController
                     property: 'env_var',
                     type: 'string',
                     nullable: true,
-                    description: 'Environment variable that must be set for external providers',
+                    description: 'Provider credential identifier (env var name) when the key is missing from both the DB store and the environment',
                     example: 'OPENAI_API_KEY'
                 ),
                 new OA\Property(
@@ -1335,7 +1335,7 @@ class ConfigController extends AbstractController
                     type: 'string',
                     nullable: true,
                     description: 'Short setup hint when `env_var` is present',
-                    example: 'Set OPENAI_API_KEY in your environment (e.g. .env.local)'
+                    example: 'Configure OPENAI_API_KEY under Admin → AI Providers, or set it in the environment'
                 ),
             ]
         )
@@ -1401,7 +1401,9 @@ class ConfigController extends AbstractController
                 $message = 'Ollama not available: '.$e->getMessage();
             }
         } elseif (null !== ($registeredProvider = $this->findProviderForModelService($service))) {
-            // Same rules for every registered provider: use getRequiredEnvVars() (API keys, URLs, etc.)
+            // Prefer the provider's own availability (DB-backed ProviderKeyStore
+            // and/or env bootstrap) over raw getenv() — a UI-saved key must
+            // count as configured without requiring a matching .env entry.
             $providerType = 'external';
             $secretCheck = $this->evaluateProviderRequiredConfiguration($registeredProvider, $service);
             $available = $secretCheck['available'];
@@ -1429,7 +1431,7 @@ class ConfigController extends AbstractController
 
         if ($envVar) {
             $response['env_var'] = $envVar;
-            $response['setup_instructions'] = "Set {$envVar} in your environment (e.g. .env.local)";
+            $response['setup_instructions'] = "Configure {$envVar} under Admin → AI Providers, or set it in the environment";
         }
 
         return $this->json($response);
@@ -1468,62 +1470,42 @@ class ConfigController extends AbstractController
     }
 
     /**
-     * True if the env var is set to a non-placeholder non-empty string.
-     */
-    private function isMeaningfulEnvValueSet(string $envName): bool
-    {
-        $value = $_ENV[$envName] ?? getenv($envName);
-        if (!\is_string($value) || '' === $value) {
-            return false;
-        }
-
-        return 'your-api-key-here' !== $value;
-    }
-
-    /**
+     * Decide whether a registered provider has the credentials needed to run.
+     *
+     * Prefer {@see ProviderMetadataInterface::isAvailable()} so DB-backed keys
+     * from ProviderKeyStore (and env-bootstrap imports) count as configured.
+     * Setting a model must succeed whenever a key exists in either the DB or
+     * the environment. When unavailable, surface the first required credential
+     * name as a setup hint for the admin toast.
+     *
      * @return array{available: bool, message: ?string, env_var: ?string}
      */
     private function evaluateProviderRequiredConfiguration(ProviderMetadataInterface $provider, string $serviceLabel): array
     {
-        $requiredVars = $provider->getRequiredEnvVars();
-
-        if ([] === $requiredVars) {
+        if ($provider->isAvailable()) {
             return ['available' => true, 'message' => null, 'env_var' => null];
         }
 
-        foreach ($requiredVars as $envName => $meta) {
+        $envVarHint = null;
+        foreach ($provider->getRequiredEnvVars() as $envName => $meta) {
             if (false === ($meta['required'] ?? true)) {
                 continue;
             }
 
-            $candidates = (isset($meta['any_of']) && \is_array($meta['any_of']))
-                ? array_values(array_filter($meta['any_of'], 'is_string'))
-                : [$envName];
-
-            if ([] === $candidates) {
-                $candidates = [$envName];
+            if (isset($meta['any_of']) && \is_array($meta['any_of'])) {
+                $candidates = array_values(array_filter($meta['any_of'], 'is_string'));
+                $envVarHint = $candidates[0] ?? $envName;
+            } else {
+                $envVarHint = $envName;
             }
-
-            $satisfied = false;
-            foreach ($candidates as $candidate) {
-                if ('' !== $candidate && $this->isMeaningfulEnvValueSet($candidate)) {
-                    $satisfied = true;
-                    break;
-                }
-            }
-
-            if (!$satisfied) {
-                $first = $candidates[0];
-
-                return [
-                    'available' => false,
-                    'message' => "Configuration not complete for {$serviceLabel}",
-                    'env_var' => $first,
-                ];
-            }
+            break;
         }
 
-        return ['available' => true, 'message' => null, 'env_var' => null];
+        return [
+            'available' => false,
+            'message' => "Configuration not complete for {$serviceLabel}",
+            'env_var' => $envVarHint,
+        ];
     }
 
     /**
