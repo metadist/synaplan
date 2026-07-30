@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service\Admin;
 
+use App\AI\Credential\ProviderKeyCatalog;
+use App\AI\Credential\ProviderKeyStore;
+use App\AI\Credential\SecretValueGuard;
 use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
@@ -35,6 +38,7 @@ final readonly class SystemConfigService
         private readonly LoggerInterface $logger,
         private readonly ConfigRepository $configRepository,
         private readonly string $defaultTtsUrl,
+        private readonly ProviderKeyStore $providerKeyStore,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -51,8 +55,10 @@ final readonly class SystemConfigService
                 'label' => 'AI Services',
                 'sections' => [
                     'ollama' => ['label' => 'Local AI (Ollama)', 'fields' => ['OLLAMA_BASE_URL']],
-                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN', 'XAI_API_KEY']],
+                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
                     'selfhosted' => ['label' => 'Self-Hosted AI', 'fields' => ['TRITON_SERVER_URL']],
+                    'media' => ['label' => 'Image & Video Generation', 'fields' => ['THEHIVE_API_KEY', 'HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET']],
+                    'embeddings' => ['label' => 'Embeddings (Cloudflare Workers AI)', 'fields' => ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'EMBEDDING_FALLBACK_PROVIDER']],
                     'tts' => ['label' => 'Text-to-Speech', 'fields' => ['SYNAPLAN_TTS_URL', 'ELEVENLABS_API_KEY']],
                 ],
             ],
@@ -161,6 +167,20 @@ final readonly class SystemConfigService
         foreach ($this->schema as $key => $field) {
             $source = $field['source'] ?? 'env';
 
+            // Cloud provider API keys live in the encrypted ProviderKeyStore
+            // (BCONFIG), not in .env — report their status from there so this
+            // legacy surface and the provider-key wizard agree.
+            $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
+            if (null !== $storeProvider) {
+                $status = $this->providerKeyStore->getStatus($storeProvider);
+                $values[$key] = [
+                    'value' => $status['configured'] ? self::MASK : $field['default'],
+                    'isSet' => $status['configured'],
+                    'isMasked' => $status['configured'],
+                ];
+                continue;
+            }
+
             if ('database' === $source) {
                 $rawValue = $this->configRepository->getValue(
                     self::DB_OWNER_ID,
@@ -229,6 +249,48 @@ final readonly class SystemConfigService
 
         $field = $this->schema[$key];
         $source = $field['source'] ?? 'env';
+
+        // Reading a sensitive field returns self::MASK, so a client that submits
+        // the form unchanged (or retries it) sends the mask back. Storing that
+        // would silently destroy a working secret — refuse it server-side
+        // instead of relying on the frontend to filter it out.
+        if ($field['sensitive'] && SecretValueGuard::isMasked($value)) {
+            return [
+                'success' => false,
+                'requiresRestart' => false,
+                'message' => 'That is the masked placeholder, not a real value. Leave the field untouched to keep the current secret, or enter a new one.',
+            ];
+        }
+
+        // Cloud provider API keys are stored encrypted in the ProviderKeyStore
+        // and apply without a restart (providers resolve keys per call). An empty
+        // value removes the stored key (an env fallback, if set, then applies
+        // again) — the admin UI clears keys on the setup page instead, so this
+        // branch serves API clients that PUT an empty string.
+        $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
+        if (null !== $storeProvider) {
+            try {
+                if ('' === trim($value)) {
+                    $this->providerKeyStore->deleteKey($storeProvider);
+                } else {
+                    $this->providerKeyStore->saveKey($storeProvider, $value, ProviderKeyStore::ORIGIN_UI);
+                }
+                $this->logChange($key, $value);
+
+                return ['success' => true, 'requiresRestart' => false];
+            } catch (\InvalidArgumentException $e) {
+                // Rejected value (placeholder, mask) — the message names the
+                // problem and is safe to show: it never contains a real key.
+                return ['success' => false, 'requiresRestart' => false, 'message' => $e->getMessage()];
+            } catch (\Throwable $e) {
+                $this->logger->error('Failed to save provider key via system config', [
+                    'key' => $key,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to save the API key'];
+            }
+        }
 
         // Database-backed fields: write to BCONFIG, no restart needed
         if ('database' === $source) {
@@ -994,25 +1056,52 @@ final readonly class SystemConfigService
                 'sensitive' => false, 'description' => 'Ollama server URL',
                 'default' => 'http://ollama:11434',
             ],
+            // Every field below whose env var is known to ProviderKeyCatalog is
+            // stored encrypted in BCONFIG by ProviderKeyStore and applies without
+            // a restart — hence 'source' => 'database'. getValues()/setValue()
+            // route them through the store before the source check ever runs; the
+            // marker only tells the UI to label them "saved live".
             'OPENAI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true, 'description' => 'OpenAI API key',
-                'default' => '',
+                'default' => '', 'source' => 'database',
             ],
             'ANTHROPIC_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true, 'description' => 'Anthropic (Claude) API key',
-                'default' => '',
+                'default' => '', 'source' => 'database',
             ],
             'GROQ_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true, 'description' => 'Groq API key',
-                'default' => '',
+                'sensitive' => true, 'description' => 'Groq API key (free tier available)',
+                'default' => '', 'source' => 'database',
             ],
             'GOOGLE_GEMINI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true, 'description' => 'Google Gemini API key',
-                'default' => '',
+                'sensitive' => true, 'description' => 'Google Gemini API key — also unlocks Imagen, Nano Banana, Veo and Gemini TTS',
+                'default' => '', 'source' => 'database',
+            ],
+            'MISTRAL_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Mistral API key — chat, vision and the Voxtral audio pair',
+                'default' => '', 'source' => 'database',
+            ],
+            'XAI_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
+                'default' => '', 'source' => 'database',
+            ],
+            'TRUSTEDTOKENS_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'TrustedTokens API key — sovereign inference on German GPUs (GLM, Qwen, GPT OSS)',
+                'default' => '', 'source' => 'database',
+            ],
+            'HUGGINGFACE_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true, 'description' => 'HuggingFace API token — routes the Kimi K2 models through HF Inference',
+                'default' => '', 'source' => 'database',
             ],
             'GOOGLE_VERTEX_ACCESS_TOKEN' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
@@ -1020,15 +1109,40 @@ final readonly class SystemConfigService
                 'description' => 'Optional OAuth bearer for Vertex AI Imagen; leave empty to use Gemini API (Imagen 4) with the key above',
                 'default' => '',
             ],
-            'XAI_API_KEY' => [
-                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true,
-                'description' => 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
-                'default' => '',
-            ],
             'TRITON_SERVER_URL' => [
                 'tab' => 'ai', 'section' => 'selfhosted', 'type' => 'url',
                 'sensitive' => false, 'description' => 'NVIDIA Triton gRPC endpoint',
+                'default' => '',
+            ],
+            'THEHIVE_API_KEY' => [
+                'tab' => 'ai', 'section' => 'media', 'type' => 'password',
+                'sensitive' => true, 'description' => 'TheHive API key — Flux Schnell and SDXL image generation',
+                'default' => '',
+            ],
+            'HIGGSFIELD_API_KEY' => [
+                'tab' => 'ai', 'section' => 'media', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Higgsfield API key — Soul/Reve images, DoP and Kling video. Both halves are required',
+                'default' => '',
+            ],
+            'HIGGSFIELD_API_SECRET' => [
+                'tab' => 'ai', 'section' => 'media', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Higgsfield API secret — the key alone will not authenticate',
+                'default' => '',
+            ],
+            'CLOUDFLARE_ACCOUNT_ID' => [
+                'tab' => 'ai', 'section' => 'embeddings', 'type' => 'text',
+                'sensitive' => false, 'description' => 'Cloudflare account ID for Workers AI embeddings (bge-m3)',
+                'default' => '',
+            ],
+            'CLOUDFLARE_API_TOKEN' => [
+                'tab' => 'ai', 'section' => 'embeddings', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Cloudflare API token with Workers AI access',
+                'default' => '',
+            ],
+            'EMBEDDING_FALLBACK_PROVIDER' => [
+                'tab' => 'ai', 'section' => 'embeddings', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Provider to try when the primary embedding fails (e.g. "cloudflare"); empty disables fallback',
                 'default' => '',
             ],
             'SYNAPLAN_TTS_URL' => [

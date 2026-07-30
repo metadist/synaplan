@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Controller;
 
+use App\AI\Credential\ChatReadinessService;
 use App\AI\Service\ProviderRegistry;
 use App\Controller\ConfigController;
 use App\Entity\Config;
@@ -18,6 +19,7 @@ use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Infrastructure\RedisService;
+use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
@@ -71,6 +73,8 @@ final class ConfigControllerPlannerModelTest extends TestCase
             $this->createStub(MobileVersionService::class),
             $this->createStub(MarketingNewsConfig::class),
             $this->createStub(UsageTaximeterConfig::class),
+            $this->createStub(ChatReadinessService::class),
+            $this->createStub(LocalAiDownloadStatusService::class),
             'http://qdrant.example',
         );
 

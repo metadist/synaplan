@@ -32,9 +32,9 @@
         >
           <Icon icon="mdi:code-braces" class="w-12 h-12 mx-auto mb-4 txt-secondary" />
           <h2 class="text-xl font-semibold txt-primary mb-2">
-            {{ $t('settings.features.devOnlyTitle') }}
+            {{ $t('settings.features.adminOnlyTitle') }}
           </h2>
-          <p class="txt-secondary">{{ $t('settings.features.devOnlyMessage') }}</p>
+          <p class="txt-secondary">{{ $t('settings.features.adminOnlyMessage') }}</p>
         </div>
 
         <!-- Error State -->
@@ -223,7 +223,7 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import {
   getFeaturesStatus,
-  DevOnlyFeatureError,
+  FeatureStatusForbiddenError,
   type FeaturesStatus,
   type Feature,
 } from '@/services/featuresService'
@@ -295,7 +295,7 @@ const loadFeatures = async () => {
     const data = await getFeaturesStatus()
     featuresStatus.value = data
   } catch (error) {
-    if (error instanceof DevOnlyFeatureError) {
+    if (error instanceof FeatureStatusForbiddenError) {
       isDevOnly.value = true
     } else {
       console.error('Failed to load features:', error)

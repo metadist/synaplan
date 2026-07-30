@@ -37,6 +37,10 @@
         </div>
       </Transition>
 
+      <!-- First-run: no usable AI provider yet — admins get a wizard CTA -->
+      <ProviderSetupBanner />
+      <LocalAiDownloadCard class="mx-auto max-w-4xl w-full px-4 pt-4" />
+
       <div
         ref="chatContainer"
         class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
@@ -435,6 +439,8 @@ import ExamplePrompts from '@/components/ExamplePrompts.vue'
 import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
+import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
+import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {

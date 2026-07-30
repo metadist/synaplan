@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
@@ -100,12 +101,27 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
         'tool_choice',
     ];
 
+    /**
+     * $apiKey is an explicit override (tests, custom wiring) that wins over
+     * the ProviderKeyStore. Production wiring passes only the store, so keys
+     * saved in the admin UI (or imported from env) apply without a restart.
+     */
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
         private readonly ?string $apiKey = null,
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
+        private readonly ?ProviderKeyStore $keyStore = null,
     ) {
+    }
+
+    private function resolveApiKey(): ?string
+    {
+        if (null !== $this->apiKey && '' !== $this->apiKey) {
+            return $this->apiKey;
+        }
+
+        return $this->keyStore?->getKey($this->getName());
     }
 
     // ==================== METADATA ====================
@@ -137,7 +153,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
     public function getStatus(): array
     {
-        if (empty($this->apiKey)) {
+        if (null === $this->resolveApiKey()) {
             return [
                 'healthy' => false,
                 'error' => 'API key not configured',
@@ -153,7 +169,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
     public function isAvailable(): bool
     {
-        return !empty($this->apiKey);
+        return null !== $this->resolveApiKey();
     }
 
     public function getRequiredEnvVars(): array
@@ -646,7 +662,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
     private function assertApiKey(): void
     {
-        if (empty($this->apiKey)) {
+        if (null === $this->resolveApiKey()) {
             throw ProviderException::missingApiKey(self::PROVIDER_NAME, 'HUGGINGFACE_API_KEY');
         }
     }
@@ -1156,8 +1172,10 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
      */
     private function buildAuthHeaders(bool $sse = false): array
     {
+        $key = $this->resolveApiKey();
+
         $headers = [
-            'Authorization' => 'Bearer '.$this->apiKey,
+            'Authorization' => 'Bearer '.$key,
             'Content-Type' => 'application/json',
         ];
 

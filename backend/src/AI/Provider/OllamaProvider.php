@@ -399,9 +399,37 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     }
 
     /**
+     * Whether a specific model is actually pulled on the Ollama server.
+     *
+     * isAvailable() only proves the server answers — a fresh install has a
+     * reachable Ollama with zero (or embedding-only) models, so anything that
+     * wants to route CHAT here must check the concrete model first.
+     * Tags may carry an implicit ":latest" suffix.
+     */
+    public function hasModel(string $model): bool
+    {
+        $model = strtolower(trim($model));
+        if ('' === $model) {
+            return false;
+        }
+        $wanted = [$model];
+        if (!str_contains($model, ':')) {
+            $wanted[] = $model.':latest';
+        }
+
+        foreach ($this->getAvailableModels() as $name) {
+            if (in_array(strtolower($name), $wanted, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Get list of available models from Ollama.
      */
-    private function getAvailableModels(): array
+    protected function getAvailableModels(): array
     {
         try {
             $models = $this->client->models()->list();

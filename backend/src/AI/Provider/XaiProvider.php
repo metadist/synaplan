@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
@@ -179,8 +180,16 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
      */
     private const ESTIMATED_VIDEO_SECONDS = 120;
 
-    private mixed $client = null;
+    private ?\OpenAI\Client $client = null;
 
+    /** Key the cached client was built with (rebuild on key change). */
+    private ?string $clientKey = null;
+
+    /**
+     * $apiKey is an explicit override (tests, custom wiring) that wins over
+     * the ProviderKeyStore. Production wiring passes only the store, so keys
+     * saved in the admin UI (or imported from env) apply without a restart.
+     */
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
@@ -188,13 +197,42 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
         // Injectable so unit tests can poll without real sleeps.
         private readonly int $pollIntervalSeconds = self::POLL_INTERVAL_SECONDS,
+        private readonly ?ProviderKeyStore $keyStore = null,
     ) {
-        if (!empty($apiKey)) {
+    }
+
+    private function resolveApiKey(): ?string
+    {
+        if (null !== $this->apiKey && '' !== $this->apiKey) {
+            return $this->apiKey;
+        }
+
+        return $this->keyStore?->getKey($this->getName());
+    }
+
+    /**
+     * Lazily build the API client with the CURRENT key; rebuilt when the key
+     * changes at runtime (admin UI save / env import).
+     */
+    private function client(): ?\OpenAI\Client
+    {
+        $key = $this->resolveApiKey();
+        if (null === $key || '' === $key) {
+            $this->client = null;
+            $this->clientKey = null;
+
+            return null;
+        }
+
+        if (null === $this->client || $this->clientKey !== $key) {
             $this->client = \OpenAI::factory()
-                ->withApiKey($apiKey)
+                ->withApiKey($key)
                 ->withBaseUri(self::BASE_URI)
                 ->make();
+            $this->clientKey = $key;
         }
+
+        return $this->client;
     }
 
     // ==================== METADATA ====================
@@ -248,7 +286,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
 
     public function isAvailable(): bool
     {
-        return !empty($this->apiKey) && null !== $this->client;
+        return null !== $this->client();
     }
 
     public function getRequiredEnvVars(): array
@@ -269,7 +307,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
 
         try {
             $requestOptions = $this->buildChatOptions($messages, $options, false);
-            $response = $this->client->chat()->create($requestOptions);
+            $response = $this->client()->chat()->create($requestOptions);
             $responseArray = $response->toArray();
 
             return [
@@ -294,7 +332,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
 
         try {
             $requestOptions = $this->buildChatOptions($messages, $options, true);
-            $stream = $this->client->chat()->createStreamed($requestOptions);
+            $stream = $this->client()->chat()->createStreamed($requestOptions);
 
             $usage = $this->parseUsage([]);
             $finishReason = null;
@@ -339,7 +377,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         $prompt = '' !== $prompt ? $prompt : 'Please describe this image in detail.';
 
         try {
-            $response = $this->client->chat()->create([
+            $response = $this->client()->chat()->create([
                 'model' => $model,
                 'messages' => [[
                     'role' => 'user',
@@ -372,7 +410,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         $this->assertApiKey();
 
         try {
-            $response = $this->client->chat()->create([
+            $response = $this->client()->chat()->create([
                 'model' => self::DEFAULT_VISION_MODEL,
                 'messages' => [[
                     'role' => 'user',
@@ -770,7 +808,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
      */
     public function getVoices(): array
     {
-        if (null === $this->apiKey || '' === $this->apiKey) {
+        if (null === $this->resolveApiKey()) {
             return $this->builtinVoices();
         }
 
@@ -818,6 +856,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     public function transcribe(string $audioPath, array $options = []): array
     {
         $this->assertApiKey();
+        $key = $this->resolveApiKey();
 
         $fullPath = $this->resolveExistingAudioPath($audioPath);
         $language = is_string($options['language'] ?? null) && '' !== $options['language']
@@ -851,7 +890,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             $formData = new FormDataPart($fields);
 
             $response = $this->httpClient->request('POST', self::STT_ENDPOINT, [
-                'auth_bearer' => $this->apiKey,
+                'auth_bearer' => $key,
                 'headers' => $formData->getPreparedHeaders()->toArray(),
                 'body' => $formData->bodyToIterable(),
                 'timeout' => self::TIMEOUT_AUDIO_SECONDS,
@@ -951,6 +990,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
     private function requestSpeech(string $text, array $options): string
     {
         $this->assertApiKey();
+        $key = $this->resolveApiKey();
 
         $trimmed = trim($text);
         if ('' === $trimmed) {
@@ -991,7 +1031,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         try {
             $response = $this->httpClient->request('POST', self::TTS_ENDPOINT, [
                 'headers' => [
-                    'Authorization' => 'Bearer '.$this->apiKey,
+                    'Authorization' => 'Bearer '.$key,
                     'Content-Type' => 'application/json',
                 ],
                 'json' => $body,
@@ -1100,7 +1140,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
 
     private function assertApiKey(): void
     {
-        if (null === $this->client) {
+        if (null === $this->client()) {
             throw ProviderException::missingApiKey(self::PROVIDER_NAME, self::ENV_VAR);
         }
     }
@@ -1634,9 +1674,11 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
      */
     private function requestJson(string $method, string $url, ?array $body, int $timeout): array
     {
+        $key = $this->resolveApiKey();
+
         $requestOptions = [
             'headers' => [
-                'Authorization' => 'Bearer '.$this->apiKey,
+                'Authorization' => 'Bearer '.$key,
                 'Content-Type' => 'application/json',
             ],
             'timeout' => $timeout,

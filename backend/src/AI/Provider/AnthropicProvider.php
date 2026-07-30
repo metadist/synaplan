@@ -2,6 +2,7 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
@@ -72,13 +73,28 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-fable-5',
     ];
 
+    /**
+     * $apiKey is an explicit override (tests, custom wiring) that wins over
+     * the ProviderKeyStore. Production wiring passes only the store, so keys
+     * saved in the admin UI (or imported from env) apply without a restart.
+     */
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
         private ?string $apiKey = null,
         private int $timeout = 120,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?ProviderKeyStore $keyStore = null,
     ) {
+    }
+
+    private function resolveApiKey(): ?string
+    {
+        if (null !== $this->apiKey && '' !== $this->apiKey) {
+            return $this->apiKey;
+        }
+
+        return $this->keyStore?->getKey($this->getName());
     }
 
     public function getName(): string
@@ -111,7 +127,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
     public function getStatus(): array
     {
-        if (empty($this->apiKey)) {
+        if (null === $this->resolveApiKey()) {
             return [
                 'healthy' => false,
                 'error' => 'API key not configured',
@@ -128,7 +144,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
     public function isAvailable(): bool
     {
-        return !empty($this->apiKey);
+        return null !== $this->resolveApiKey();
     }
 
     public function getRequiredEnvVars(): array
@@ -149,7 +165,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             throw new ProviderException('Model must be specified in options', 'anthropic');
         }
 
-        if (empty($this->apiKey)) {
+        if (null === $this->resolveApiKey()) {
             throw ProviderException::missingApiKey('anthropic', 'ANTHROPIC_API_KEY');
         }
 
@@ -273,7 +289,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             throw new ProviderException('Model must be specified in options', 'anthropic');
         }
 
-        if (empty($this->apiKey)) {
+        if (null === $this->resolveApiKey()) {
             throw ProviderException::missingApiKey('anthropic', 'ANTHROPIC_API_KEY');
         }
 
@@ -472,7 +488,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
     public function analyzeImage(string $imagePath, string $prompt, array $options = []): string
     {
-        if (empty($this->apiKey)) {
+        if (null === $this->resolveApiKey()) {
             throw ProviderException::missingApiKey('anthropic', 'ANTHROPIC_API_KEY');
         }
 
@@ -536,7 +552,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     private function getHeaders(): array
     {
         return [
-            'x-api-key' => $this->apiKey,
+            'x-api-key' => $this->resolveApiKey(),
             'anthropic-version' => self::API_VERSION,
             'content-type' => 'application/json',
         ];

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Admin;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfigService;
+use App\Service\EncryptionService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -24,11 +26,20 @@ final class SystemConfigServiceTest extends TestCase
     {
         $this->configRepository = $this->createMock(ConfigRepository::class);
 
+        // ProviderKeyStore is final (not mockable); a real instance over the
+        // same repository mock is inert for these multitask-focused tests.
+        $providerKeyStore = new ProviderKeyStore(
+            $this->configRepository,
+            new EncryptionService('test-secret', new NullLogger()),
+            new NullLogger(),
+        );
+
         $this->service = new SystemConfigService(
             projectDir: sys_get_temp_dir(),
             logger: new NullLogger(),
             configRepository: $this->configRepository,
             defaultTtsUrl: 'http://localhost:10200',
+            providerKeyStore: $providerKeyStore,
         );
     }
 

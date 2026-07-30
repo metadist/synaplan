@@ -310,10 +310,63 @@ php bin/console app:seed --no-interaction || {
     echo "⚠️  app:seed failed — see logs above. Continuing startup."
 }
 
-# Ollama model downloads (optional, only if AUTO_DOWNLOAD_MODELS=true)
+# Point chat at a provider that actually has a key. The seeded default is a
+# cloud provider, so an install that only configured a different one (or none)
+# would otherwise greet the user with an "invalid API key" error. No-op when the
+# current default already works or was deliberately set to a keyless provider.
+echo "🔌 Checking default AI provider..."
+php bin/console app:provider:apply-defaults --auto --no-interaction || {
+    echo "⚠️  Could not verify the default AI provider — continuing startup."
+}
+
+# Ollama model downloads (optional, only if AUTO_DOWNLOAD_MODELS=true).
+# Progress is mirrored to var/ollama-download.json for GET /api/v1/config/local-ai/status.
+OLLAMA_STATUS_FILE="${OLLAMA_STATUS_FILE:-/var/www/backend/var/ollama-download.json}"
+
+write_ollama_download_status() {
+    # $1 status  $2 currentModel  $3 percent (number or empty)  $4 message
+    local status="$1"
+    local current_model="${2:-}"
+    local percent="${3:-}"
+    local message="${4:-}"
+    local updated_at
+    updated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    mkdir -p "$(dirname "$OLLAMA_STATUS_FILE")"
+
+    if command -v jq >/dev/null 2>&1; then
+        local percent_json="null"
+        if [ -n "$percent" ]; then
+            percent_json="$percent"
+        fi
+        jq -n \
+            --arg status "$status" \
+            --arg currentModel "$current_model" \
+            --argjson percent "$percent_json" \
+            --arg message "$message" \
+            --arg updatedAt "$updated_at" \
+            '{
+                status: $status,
+                currentModel: (if $currentModel == "" then null else $currentModel end),
+                percent: $percent,
+                message: (if $message == "" then null else $message end),
+                models: [],
+                updatedAt: $updatedAt
+            }' > "${OLLAMA_STATUS_FILE}.tmp" && mv "${OLLAMA_STATUS_FILE}.tmp" "$OLLAMA_STATUS_FILE"
+    else
+        # Minimal fallback when jq is unavailable (should not happen in our image).
+        printf '{"status":"%s","currentModel":%s,"percent":%s,"message":%s,"models":[],"updatedAt":"%s"}\n' \
+            "$status" \
+            "$([ -n "$current_model" ] && printf '"%s"' "$current_model" || echo null)" \
+            "$([ -n "$percent" ] && echo "$percent" || echo null)" \
+            "$([ -n "$message" ] && printf '"%s"' "$message" || echo null)" \
+            "$updated_at" > "${OLLAMA_STATUS_FILE}.tmp" && mv "${OLLAMA_STATUS_FILE}.tmp" "$OLLAMA_STATUS_FILE"
+    fi
+}
+
 if [ -n "${OLLAMA_BASE_URL:-}" ] && [ "${AUTO_DOWNLOAD_MODELS:-false}" = "true" ]; then
     echo ""
     echo "🤖 AUTO_DOWNLOAD_MODELS=true - Starting AI model downloads in background..."
+    write_ollama_download_status "waiting" "" "" "Waiting for Ollama service"
 
     (
         echo "[Background] Waiting for Ollama service..."
@@ -321,14 +374,27 @@ if [ -n "${OLLAMA_BASE_URL:-}" ] && [ "${AUTO_DOWNLOAD_MODELS:-false}" = "true" 
             sleep 3
         done
         echo "[Background] ✅ Ollama ready, downloading models..."
+        write_ollama_download_status "downloading" "" "0" "Ollama ready, starting model downloads"
 
         MODELS=("bge-m3")
-        if [ "${ENABLE_LOCAL_GPT_OSS:-true}" = "true" ]; then
+        # Default OFF, matching docker-compose.yml: pulling the chat model is a
+        # ~14 GB download, so it must stay an explicit opt-in — also for a bare
+        # `docker run` that does not go through compose.
+        if [ "${ENABLE_LOCAL_GPT_OSS:-false}" = "true" ]; then
             MODELS+=("gpt-oss:20b")
         fi
+        DOWNLOAD_FAILED=0
         for MODEL in "${MODELS[@]}"; do
-            if ! curl -s "$OLLAMA_BASE_URL/api/tags" | grep -q "\"name\":\"$MODEL\""; then
+            # Ollama reports untagged models with an implicit ":latest", so a bare
+            # name never matched here and every restart re-issued a pull.
+            case "$MODEL" in
+                *:*) MODEL_TAG="$MODEL" ;;
+                *) MODEL_TAG="$MODEL:latest" ;;
+            esac
+            if ! curl -s "$OLLAMA_BASE_URL/api/tags" | grep -qE "\"name\":\"($MODEL|$MODEL_TAG)\""; then
                 echo "[Background] 📥 Downloading $MODEL..."
+                write_ollama_download_status "downloading" "$MODEL" "0" "Downloading $MODEL"
+                LAST_MILESTONE=-1
                 if curl -sS -N "$OLLAMA_BASE_URL/api/pull" \
                     -H "Content-Type: application/json" \
                     -d "{\"name\":\"$MODEL\"}" | while IFS= read -r line; do
@@ -344,10 +410,14 @@ if [ -n "${OLLAMA_BASE_URL:-}" ] && [ "${AUTO_DOWNLOAD_MODELS:-false}" = "true" 
                             MB_COMPLETED=$((COMPLETED / 1048576))
                             MB_TOTAL=$((TOTAL / 1048576))
 
-                            # Only print at 10, 20, 30...90, 100% milestones
+                            # Only print / write at 10, 20, 30...90, 100% milestones
                             MILESTONE=$((PERCENT - PERCENT % 10))
                             if [ $PERCENT -gt 0 ] && [ $((PERCENT % 10)) -lt 2 ]; then
-                                echo "[Background] [${MODEL}] ${STATUS} - ${MB_COMPLETED}MB/${MB_TOTAL}MB (${MILESTONE}%)"
+                                if [ "$MILESTONE" -ne "$LAST_MILESTONE" ]; then
+                                    LAST_MILESTONE=$MILESTONE
+                                    echo "[Background] [${MODEL}] ${STATUS} - ${MB_COMPLETED}MB/${MB_TOTAL}MB (${MILESTONE}%)"
+                                    write_ollama_download_status "downloading" "$MODEL" "$MILESTONE" "Downloading $MODEL"
+                                fi
                             fi
                         elif [ -n "$STATUS" ]; then
                             # Show important status changes
@@ -359,18 +429,28 @@ if [ -n "${OLLAMA_BASE_URL:-}" ] && [ "${AUTO_DOWNLOAD_MODELS:-false}" = "true" 
                         fi
                     done; then
                     echo "[Background] ✅ $MODEL downloaded!"
+                    write_ollama_download_status "downloading" "$MODEL" "100" "$MODEL ready"
                 else
                     echo "[Background] ⚠️  $MODEL download failed"
+                    DOWNLOAD_FAILED=1
+                    write_ollama_download_status "error" "$MODEL" "" "Download failed for $MODEL"
                 fi
             else
                 echo "[Background] ✅ $MODEL already available"
+                write_ollama_download_status "downloading" "$MODEL" "100" "$MODEL already available"
             fi
         done
-        echo "[Background] 🎉 Model downloads completed!"
+        if [ "$DOWNLOAD_FAILED" -eq 0 ]; then
+            echo "[Background] 🎉 Model downloads completed!"
+            write_ollama_download_status "ready" "" "100" "Local AI models ready"
+        fi
     ) &
 
     echo "✅ Model download started in background"
 else
+    # Clear any status left behind by an earlier run, otherwise the UI keeps
+    # showing a download that is no longer happening.
+    write_ollama_download_status "idle" "" "" ""
     echo ""
     echo "⏭️  Skipping automatic model downloads"
     echo "   💡 Tip: Use 'AUTO_DOWNLOAD_MODELS=true docker compose up -d'"

@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\AI\Credential\ChatReadinessService;
+use App\AI\Credential\SecretValueGuard;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
@@ -16,6 +18,7 @@ use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Infrastructure\RedisService;
+use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
@@ -56,6 +59,8 @@ class ConfigController extends AbstractController
         private MobileVersionService $mobileVersionService,
         private MarketingNewsConfig $marketingNewsConfig,
         private UsageTaximeterConfig $usageTaximeterConfig,
+        private ChatReadinessService $chatReadiness,
+        private LocalAiDownloadStatusService $localAiDownloadStatus,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -349,6 +354,20 @@ class ConfigController extends AbstractController
                     items: new OA\Items(type: 'string', example: 'Anthropic'),
                     nullable: true
                 ),
+                new OA\Property(
+                    property: 'setup',
+                    type: 'object',
+                    description: 'First-run setup status (only for authenticated users). Drives the "connect an AI provider" banner and the admin setup wizard.',
+                    nullable: true,
+                    properties: [
+                        new OA\Property(
+                            property: 'chatReady',
+                            type: 'boolean',
+                            example: true,
+                            description: 'True when the provider serving the global default chat model is available (key configured / local AI reachable), i.e. sending a chat message can work.'
+                        ),
+                    ]
+                ),
             ]
         )
     )]
@@ -431,15 +450,18 @@ class ConfigController extends AbstractController
         ];
 
         $unavailableProviders = [];
+        $setup = null;
         if ($user) {
-            foreach ($this->providerRegistry->getUniqueProviders() as $name => $provider) {
-                if ('test' === $name) {
-                    continue;
-                }
-                if (!$provider->isAvailable()) {
-                    $unavailableProviders[] = $provider->getDisplayName();
-                }
-            }
+            // READ ONLY. Repairing a broken default is an explicit action
+            // (`app:provider:auto-default` at container start, or an admin
+            // saving a key) — never a side effect of this GET.
+            $unavailableProviders = $this->chatReadiness->unavailableProviderNames();
+
+            // First-run signal: can a plain chat message work right now? The
+            // frontend shows a "connect an AI provider" banner (admins get a
+            // wizard CTA) while this is false — e.g. a fresh install whose
+            // default chat model points at a provider without a key.
+            $setup = ['chatReady' => $this->chatReadiness->isChatReady()];
         }
 
         // Realtime / WebSocket gateway settings.
@@ -510,6 +532,9 @@ class ConfigController extends AbstractController
 
         if ($user && !empty($unavailableProviders)) {
             $response['unavailableProviders'] = $unavailableProviders;
+        }
+        if (null !== $setup) {
+            $response['setup'] = $setup;
         }
 
         return $this->json($response);
@@ -1279,7 +1304,7 @@ class ConfigController extends AbstractController
                     property: 'env_var',
                     type: 'string',
                     nullable: true,
-                    description: 'Environment variable that must be set for external providers',
+                    description: 'Provider credential identifier (env var name) when the key is missing from both the DB store and the environment',
                     example: 'OPENAI_API_KEY'
                 ),
                 new OA\Property(
@@ -1287,7 +1312,7 @@ class ConfigController extends AbstractController
                     type: 'string',
                     nullable: true,
                     description: 'Short setup hint when `env_var` is present',
-                    example: 'Set OPENAI_API_KEY in your environment (e.g. .env.local)'
+                    example: 'Configure OPENAI_API_KEY under Admin → AI Providers, or set it in the environment'
                 ),
             ]
         )
@@ -1330,21 +1355,19 @@ class ConfigController extends AbstractController
         if ('ollama' === $service) {
             $providerType = 'local';
 
-            // Check if Ollama provider is available
             try {
                 $provider = $this->providerRegistry->getChatProvider('ollama');
-
-                // Check if the specific model exists
                 $modelName = $model->getProviderId() ?: $model->getName();
 
-                // Try to list available models
-                $status = $provider->getStatus();
-                if (!empty($status['healthy'])) {
-                    // Model is available if Ollama is running
-                    // We assume it's available; the user will get a proper error if not
+                // A reachable Ollama says nothing about THIS model: a stock
+                // install has the server up with only the embedding model
+                // pulled. Report the concrete model, not the server health.
+                if (empty($provider->getStatus()['healthy'])) {
+                    $message = 'Ollama server is not running';
+                } elseif ($this->chatReadiness->isOllamaModelPulled($modelName)) {
                     $available = true;
                 } else {
-                    $message = 'Ollama server is not running';
+                    $message = sprintf('Ollama is running but the model "%s" is not downloaded yet', $modelName);
                 }
 
                 // Always provide install command for Ollama models
@@ -1353,7 +1376,9 @@ class ConfigController extends AbstractController
                 $message = 'Ollama not available: '.$e->getMessage();
             }
         } elseif (null !== ($registeredProvider = $this->findProviderForModelService($service))) {
-            // Same rules for every registered provider: use getRequiredEnvVars() (API keys, URLs, etc.)
+            // Prefer the provider's own availability (DB-backed ProviderKeyStore
+            // and/or env bootstrap) over raw getenv() — a UI-saved key must
+            // count as configured without requiring a matching .env entry.
             $providerType = 'external';
             $secretCheck = $this->evaluateProviderRequiredConfiguration($registeredProvider, $service);
             $available = $secretCheck['available'];
@@ -1381,7 +1406,7 @@ class ConfigController extends AbstractController
 
         if ($envVar) {
             $response['env_var'] = $envVar;
-            $response['setup_instructions'] = "Set {$envVar} in your environment (e.g. .env.local)";
+            $response['setup_instructions'] = "Configure {$envVar} under Admin → AI Providers, or set it in the environment";
         }
 
         return $this->json($response);
@@ -1420,73 +1445,120 @@ class ConfigController extends AbstractController
     }
 
     /**
-     * True if the env var is set to a non-placeholder non-empty string.
-     */
-    private function isMeaningfulEnvValueSet(string $envName): bool
-    {
-        $value = $_ENV[$envName] ?? getenv($envName);
-        if (!\is_string($value) || '' === $value) {
-            return false;
-        }
-
-        return 'your-api-key-here' !== $value;
-    }
-
-    /**
+     * Decide whether a registered provider has the credentials needed to run.
+     *
+     * Prefer {@see ProviderMetadataInterface::isAvailable()} so DB-backed keys
+     * from ProviderKeyStore (and env-bootstrap imports) count as configured.
+     * Setting a model must succeed whenever a key exists in either the DB or
+     * the environment. When unavailable, surface the first required credential
+     * name as a setup hint for the admin toast.
+     *
      * @return array{available: bool, message: ?string, env_var: ?string}
      */
     private function evaluateProviderRequiredConfiguration(ProviderMetadataInterface $provider, string $serviceLabel): array
     {
-        $requiredVars = $provider->getRequiredEnvVars();
-
-        if ([] === $requiredVars) {
+        // A key saved through the admin UI counts as configured even without a
+        // matching .env entry — that is what the DB-backed key store is for.
+        if ($provider->isAvailable()) {
             return ['available' => true, 'message' => null, 'env_var' => null];
         }
 
-        foreach ($requiredVars as $envName => $meta) {
+        // The provider's own check may only look at its primary key, while
+        // getRequiredEnvVars() documents accepted alternatives (`any_of`) and
+        // additional credentials. Honour those before declaring it unconfigured.
+        $envVarHint = null;
+        foreach ($provider->getRequiredEnvVars() as $envName => $meta) {
             if (false === ($meta['required'] ?? true)) {
                 continue;
             }
 
-            $candidates = (isset($meta['any_of']) && \is_array($meta['any_of']))
+            $candidates = isset($meta['any_of']) && \is_array($meta['any_of'])
                 ? array_values(array_filter($meta['any_of'], 'is_string'))
                 : [$envName];
 
-            if ([] === $candidates) {
-                $candidates = [$envName];
-            }
-
-            $satisfied = false;
             foreach ($candidates as $candidate) {
-                if ('' !== $candidate && $this->isMeaningfulEnvValueSet($candidate)) {
-                    $satisfied = true;
-                    break;
+                if (SecretValueGuard::isUsable($this->envValue($candidate))) {
+                    continue 2;
                 }
             }
 
-            if (!$satisfied) {
-                $first = $candidates[0];
-
-                return [
-                    'available' => false,
-                    'message' => "Configuration not complete for {$serviceLabel}",
-                    'env_var' => $first,
-                ];
-            }
+            $envVarHint ??= $candidates[0] ?? $envName;
         }
 
-        return ['available' => true, 'message' => null, 'env_var' => null];
+        if (null === $envVarHint) {
+            return ['available' => true, 'message' => null, 'env_var' => null];
+        }
+
+        return [
+            'available' => false,
+            'message' => "Configuration not complete for {$serviceLabel}",
+            'env_var' => $envVarHint,
+        ];
+    }
+
+    private function envValue(string $name): ?string
+    {
+        $value = $_ENV[$name] ?? getenv($name);
+
+        return \is_string($value) ? $value : null;
+    }
+
+    /**
+     * Local AI (Ollama) model-download progress written by the backend entrypoint.
+     * Authenticated users can poll this while AUTO_DOWNLOAD_MODELS pulls models.
+     */
+    #[Route('/local-ai/status', name: 'local_ai_download_status', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/local-ai/status',
+        summary: 'Get local AI model download status',
+        description: 'Returns progress of background Ollama model pulls started by the container entrypoint. When no download is running the status is idle/ready.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Local AI download status',
+        content: new OA\JsonContent(
+            required: ['status', 'currentModel', 'percent', 'message', 'models', 'updatedAt'],
+            properties: [
+                new OA\Property(property: 'status', type: 'string', enum: ['idle', 'waiting', 'downloading', 'ready', 'error'], example: 'downloading'),
+                new OA\Property(property: 'currentModel', type: 'string', nullable: true, example: 'bge-m3'),
+                new OA\Property(property: 'percent', type: 'integer', nullable: true, example: 43),
+                new OA\Property(property: 'message', type: 'string', nullable: true, example: 'Downloading bge-m3'),
+                new OA\Property(
+                    property: 'models',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'name', type: 'string', example: 'bge-m3'),
+                            new OA\Property(property: 'state', type: 'string', example: 'downloading'),
+                            new OA\Property(property: 'percent', type: 'integer', nullable: true, example: 43),
+                        ]
+                    )
+                ),
+                new OA\Property(property: 'updatedAt', type: 'string', nullable: true, example: '2026-07-30T10:00:00Z'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function getLocalAiDownloadStatus(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        return $this->json($this->localAiDownloadStatus->getStatus());
     }
 
     /**
      * Get status of all features and services (Web Search, AI Providers, Processing Services, etc.)
-     * Only available in development mode (APP_ENV=dev). Returns 403 Forbidden in production.
+     * Admin only (available in production builds).
      */
     #[Route('/features', name: 'features_status', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/config/features',
-        summary: 'Get feature and service status (dev only)',
-        description: 'Returns the live status of all configured features, AI providers, and infrastructure services. **Only available in `APP_ENV=dev`** – returns 403 Forbidden in production. Useful during local development to verify that all required services are reachable and correctly configured.',
+        summary: 'Get feature and service status (admin)',
+        description: 'Returns the live status of all configured features, AI providers, and infrastructure services. **Admin only** (available in production).',
         security: [['Bearer' => []]],
         tags: ['Configuration']
     )]
@@ -1525,17 +1597,15 @@ class ConfigController extends AbstractController
         )
     )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
-    #[OA\Response(response: 403, description: 'Only available in development mode (APP_ENV=dev)')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
     public function getFeaturesStatus(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Only allow in development mode
-        $env = $_ENV['APP_ENV'] ?? 'prod';
-        if ('dev' !== $env) {
-            return $this->json(['error' => 'Feature only available in development mode'], Response::HTTP_FORBIDDEN);
+        if (!$user->isAdmin()) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
         $features = [];
@@ -1589,9 +1659,9 @@ class ConfigController extends AbstractController
         $providersMetadata = $this->providerRegistry->getProvidersMetadata();
 
         foreach ($providersMetadata as $providerName => $providerData) {
-            // Skip test provider in production (only show in dev mode)
-            if ('test' === $providerName && 'dev' !== $env) {
-                continue; // @phpstan-ignore-line (env is dynamic at runtime)
+            // Skip the synthetic test provider outside local APP_ENV=dev.
+            if ('test' === $providerName && 'dev' !== ($_ENV['APP_ENV'] ?? 'prod')) {
+                continue;
             }
 
             // Get model count from database for this provider
