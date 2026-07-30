@@ -74,7 +74,7 @@ final class ProviderKeyStoreTest extends TestCase
     }
 
     /**
-     * @param array<string, string> $envKeys
+     * @param array<string, string|list<string>> $envKeys
      */
     private function makeStore(array $envKeys = []): ProviderKeyStore
     {
@@ -121,6 +121,62 @@ final class ProviderKeyStoreTest extends TestCase
         self::assertNotNull($payload, 'env key must be transferred into BCONFIG');
         self::assertSame('gsk_from_env', $payload['key']);
         self::assertSame(ProviderKeyStore::ORIGIN_ENV, $payload['origin']);
+    }
+
+    /**
+     * An untouched `.env.example` must NOT look like a configured provider —
+     * and the placeholder must never be persisted into BCONFIG.
+     */
+    public function testPlaceholderEnvValueIsIgnoredEntirely(): void
+    {
+        $store = $this->makeStore(['groq' => 'your-api-key-here', 'openai' => '<your-key>', 'xai' => 'CHANGEME']);
+
+        self::assertNull($store->getKey('groq'));
+        self::assertNull($store->getKey('openai'));
+        self::assertNull($store->getKey('xai'));
+        self::assertSame([], $this->store, 'a placeholder must not be imported');
+
+        self::assertFalse($store->getStatus('groq')['configured']);
+        self::assertSame('none', $store->getStatus('groq')['source']);
+    }
+
+    public function testSavingAPlaceholderIsRejected(): void
+    {
+        $store = $this->makeStore();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/placeholder/i');
+        $store->saveKey('groq', 'your-api-key-here');
+    }
+
+    /**
+     * A client that echoes back the masked display value must not overwrite the
+     * stored key with bullet characters.
+     */
+    public function testSavingTheMaskedDisplayValueIsRejected(): void
+    {
+        $store = $this->makeStore();
+        $store->saveKey('groq', 'gsk_real_key_value');
+
+        try {
+            $store->saveKey('groq', ProviderKeyStore::mask('gsk_real_key_value'));
+            self::fail('the masked value must be rejected');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('masked', $e->getMessage());
+        }
+
+        self::assertSame('gsk_real_key_value', $store->getKey('groq'), 'the stored key must survive');
+    }
+
+    /**
+     * Google documents GEMINI_API_KEY / GOOGLE_API_KEY as accepted aliases
+     * (GoogleProvider::getRequiredEnvVars any_of).
+     */
+    public function testEnvAliasesAreAcceptedInOrder(): void
+    {
+        $store = $this->makeStore(['google' => ['', 'gemini_alias_key', 'google_api_key']]);
+
+        self::assertSame('gemini_alias_key', $store->getKey('google'));
     }
 
     public function testStoredValueIsEncryptedAtRest(): void

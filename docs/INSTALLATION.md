@@ -7,7 +7,8 @@ Complete installation instructions for Synaplan.
 - **Docker** & **Docker Compose** (v2.0+)
 - **Git**
 - 8GB RAM minimum (16GB recommended for local AI)
-- 20GB disk space (Standard) or 10GB (Minimal)
+- ~9GB disk space (Standard) or ~5GB (Minimal). Add ~14GB if you enable the local
+  chat model (`ENABLE_LOCAL_GPT_OSS=true`, see [Standard Install](#standard-install-recommended))
 
 > **Apple Silicon (M1–M4) Macs:** the images are `linux/amd64` only and run under
 > emulation on Apple Silicon. Enable **Docker Desktop → Settings → General → "Use
@@ -37,12 +38,23 @@ Full-featured installation with local AI models and audio transcription.
 | Component | Size | Description |
 |-----------|------|-------------|
 | Base services | ~5 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika, Qdrant |
-| Ollama models | ~4 GB | Local AI (gpt-oss:20b, bge-m3) |
-| **Total** | **~9 GB** | Everything included |
+| Ollama embedding model | ~4 GB | `bge-m3` for RAG / semantic search |
+| **Total** | **~9 GB** | Everything except the local chat model |
 
 ```bash
 docker compose up -d
 ```
+
+**Local chat model is opt-in.** The standard install downloads the embedding model
+only. A local chat model (`gpt-oss:20b`, another ~14 GB, needs a GPU or a strong
+CPU box) is pulled only when you ask for it:
+
+```bash
+ENABLE_LOCAL_GPT_OSS=true docker compose up -d
+```
+
+Until then — or while the download runs — chat needs a cloud provider key
+(see [Connect an AI Provider](#connect-an-ai-provider)).
 
 **What's included:**
 - Full web app and REST API
@@ -51,7 +63,7 @@ docker compose up -d
 - Redis (cache, sessions, locks, message queues, realtime engine)
 - Centrifugo WebSocket gateway (live chat takeover, realtime events)
 - Background worker (Symfony Messenger consumer for async AI/indexing jobs)
-- Local Ollama AI models
+- Local Ollama server (embedding model downloaded automatically, chat model opt-in)
 - Whisper audio transcription
 - Cloud AI support (Groq, OpenAI, Anthropic, Gemini, xAI, …)
 - Qdrant vector database (AI memories, RAG, feedback)
@@ -64,7 +76,7 @@ Fastest way to start—uses cloud AI providers, skips large local models.
 | Component | Size | Description |
 |-----------|------|-------------|
 | Base services | ~5 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika |
-| **Total** | **~5 GB** | No local AI models |
+| **Total** | **~5 GB** | No local AI models (`AUTO_DOWNLOAD_MODELS=false`) |
 
 ```bash
 # Start minimal stack
@@ -91,17 +103,22 @@ After `docker compose up -d`, log in as `admin@synaplan.com` / `admin123` and op
 
 - Paste a cloud key (free tier: [console.groq.com](https://console.groq.com)) — it is
   tested live, stored encrypted in the database, and works immediately (no restart).
-- Or use local Ollama from the standard install (models download in the background).
-- Optional: put keys in `backend/.env` for scripted deploys; they are imported into
-  the encrypted store on first use.
+- Or run chat on local Ollama — start the stack with `ENABLE_LOCAL_GPT_OSS=true` and
+  wait for the model download to finish (progress is shown in the app and in
+  `docker compose logs -f backend`).
+- Optional: put keys in `backend/.env` for scripted deploys. The backend reads `.env`
+  at container start and imports the key into the encrypted store on first use, so
+  restart the container after editing the file.
 
 ```bash
 # Optional env bootstrap (UI is preferred)
 echo "GROQ_API_KEY=your_key_here" >> backend/.env
+docker compose restart backend worker
 ```
 
-> A legacy interactive helper still lives at `_devextras/_1st_install_linux.sh` for
-> operators who want a shell prompt. It is **not** the supported install path.
+> An optional interactive helper lives at `_devextras/_1st_install_linux.sh`. It
+> asks the same questions and then does exactly what this guide describes; the
+> manual path above stays the reference.
 
 ---
 
@@ -114,8 +131,10 @@ On first start, the system:
 3. Generates JWT keypair for authentication
 4. Creates database schema
 5. Loads test fixtures (if database is empty)
-6. Pulls required AI models
-7. Starts all services
+6. Downloads the Ollama embedding model in the background — standard install only,
+   and only while `AUTO_DOWNLOAD_MODELS=true` (the Minimal stack sets it to `false`)
+7. Points chat at a provider that has a usable key, if the default one has none
+8. Starts all services
 
 **First startup:** ~1-2 minutes  
 **Subsequent restarts:** ~15-30 seconds

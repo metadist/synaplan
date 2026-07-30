@@ -22,7 +22,7 @@
       </div>
       <span
         v-if="provider.configured"
-        class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-500/15 text-green-600 dark:text-green-400 whitespace-nowrap"
+        class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-[var(--status-success-muted)] text-[var(--status-success-text)] whitespace-nowrap"
       >
         <Icon icon="mdi:check-circle" class="w-3.5 h-3.5" />
         {{ $t('adminSetup.connected') }}
@@ -100,7 +100,7 @@
     <!-- Footer actions -->
     <div class="flex flex-wrap items-center gap-3 text-sm mt-auto">
       <a
-        :href="provider.consoleUrl"
+        :href="provider.consoleUrl || helpMeta?.url"
         target="_blank"
         rel="noopener noreferrer"
         class="txt-brand hover:underline inline-flex items-center gap-1"
@@ -136,10 +136,15 @@
         </button>
         <button
           v-if="provider.source === 'db'"
-          class="text-red-600 dark:text-red-400 hover:underline inline-flex items-center gap-1"
+          class="text-[var(--status-error)] hover:underline inline-flex items-center gap-1"
+          :disabled="removing"
           @click="remove"
         >
-          <Icon icon="mdi:trash-can-outline" class="w-4 h-4" />
+          <Icon
+            :icon="removing ? 'mdi:loading' : 'mdi:trash-can-outline'"
+            class="w-4 h-4"
+            :class="{ 'animate-spin': removing }"
+          />
           {{ $t('adminSetup.removeKey') }}
         </button>
       </template>
@@ -177,11 +182,24 @@ const { confirm } = useDialog()
 const { success, error: showError } = useNotification()
 
 const keyInput = ref('')
-const applyDefaultsChecked = ref(!props.isDefaultChat)
 const saving = ref(false)
 const testing = ref(false)
 const applying = ref(false)
+const removing = ref(false)
 const helpMeta = computed(() => providerHelpByName(props.provider.name))
+
+// Offer "also make this the default" only while it is not already the default.
+// A ref alone would keep the initial value after the parent re-fetches, so the
+// checkbox has to follow the prop.
+const applyDefaultsTouched = ref(false)
+const applyDefaultsOverride = ref(false)
+const applyDefaultsChecked = computed({
+  get: () => (applyDefaultsTouched.value ? applyDefaultsOverride.value : !props.isDefaultChat),
+  set: (value: boolean) => {
+    applyDefaultsTouched.value = true
+    applyDefaultsOverride.value = value
+  },
+})
 
 const save = async () => {
   const key = keyInput.value.trim()
@@ -241,18 +259,33 @@ const makeDefault = async () => {
 }
 
 const remove = async () => {
+  if (removing.value) return
   const confirmed = await confirm({
     title: t('adminSetup.removeConfirmTitle'),
     message: t('adminSetup.removeConfirmMessage', { provider: props.provider.displayName }),
     danger: true,
   })
   if (!confirmed) return
+  removing.value = true
   try {
-    await deleteProviderKey(props.provider.name)
-    success(t('adminSetup.removed', { provider: props.provider.displayName }))
+    const result = await deleteProviderKey(props.provider.name)
+    // "Removed" would be a half-truth while the env var still holds a key: the
+    // provider stays connected from that value on the next request.
+    if (result.envFallbackActive) {
+      success(
+        t('adminSetup.removedEnvStillSet', {
+          provider: props.provider.displayName,
+          envVar: result.envVar ?? props.provider.envVar,
+        })
+      )
+    } else {
+      success(t('adminSetup.removed', { provider: props.provider.displayName }))
+    }
     emit('changed')
   } catch (err) {
     showError(err instanceof Error ? err.message : t('adminSetup.saveFailed'))
+  } finally {
+    removing.value = false
   }
 }
 </script>

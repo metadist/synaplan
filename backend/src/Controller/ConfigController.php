@@ -2,9 +2,9 @@
 
 namespace App\Controller;
 
-use App\AI\Credential\ProviderDefaultsService;
+use App\AI\Credential\ChatReadinessService;
+use App\AI\Credential\SecretValueGuard;
 use App\AI\Interface\ProviderMetadataInterface;
-use App\AI\Provider\OllamaProvider;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\User;
@@ -59,7 +59,7 @@ class ConfigController extends AbstractController
         private MobileVersionService $mobileVersionService,
         private MarketingNewsConfig $marketingNewsConfig,
         private UsageTaximeterConfig $usageTaximeterConfig,
-        private ProviderDefaultsService $providerDefaultsService,
+        private ChatReadinessService $chatReadiness,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
@@ -452,46 +452,16 @@ class ConfigController extends AbstractController
         $unavailableProviders = [];
         $setup = null;
         if ($user) {
-            $availabilityByName = [];
-            foreach ($this->providerRegistry->getUniqueProviders() as $name => $provider) {
-                $available = $provider->isAvailable();
-                // TestProvider stays out of the user-facing list but must be in
-                // the map: in the test/E2E env it serves the default chat model,
-                // and a missing entry reads as "the default is broken".
-                $availabilityByName[strtolower($name)] = $available;
-                if (!$available && 'test' !== strtolower($name)) {
-                    $unavailableProviders[] = $provider->getDisplayName();
-                }
-            }
-
-            // Ollama answers as soon as the server is up, even with zero models
-            // pulled — treating that as "available" would route chat at a local
-            // model nobody downloaded (and falsely hide the setup banner).
-            if (array_key_exists('ollama', $availabilityByName)) {
-                $availabilityByName['ollama'] = $availabilityByName['ollama']
-                    && $this->isRecommendedOllamaChatModelPulled();
-            }
-
-            $defaultChatService = $this->defaultChatModelService();
-
-            // Repair a default that points at a cloud provider without a key so
-            // chatReady becomes true without an explicit "Use as default" click.
-            // Never touches a keyless (Ollama / test / self-hosted) default —
-            // see ProviderDefaultsService::autoApplyBestAvailable().
-            if (!$this->isDefaultChatModelReady($availabilityByName, $defaultChatService)) {
-                $applied = $this->providerDefaultsService->autoApplyBestAvailable($availabilityByName, $defaultChatService);
-                if (null !== $applied) {
-                    // Re-evaluate after the write (model_config cache was cleared).
-                    $availabilityByName[$applied] = true;
-                    $defaultChatService = $applied;
-                }
-            }
+            // READ ONLY. Repairing a broken default is an explicit action
+            // (`app:provider:auto-default` at container start, or an admin
+            // saving a key) — never a side effect of this GET.
+            $unavailableProviders = $this->chatReadiness->unavailableProviderNames();
 
             // First-run signal: can a plain chat message work right now? The
             // frontend shows a "connect an AI provider" banner (admins get a
             // wizard CTA) while this is false — e.g. a fresh install whose
             // default chat model points at a provider without a key.
-            $setup = ['chatReady' => $this->isDefaultChatModelReady($availabilityByName, $defaultChatService)];
+            $setup = ['chatReady' => $this->chatReadiness->isChatReady()];
         }
 
         // Realtime / WebSocket gateway settings.
@@ -568,81 +538,6 @@ class ConfigController extends AbstractController
         }
 
         return $this->json($response);
-    }
-
-    /**
-     * The provider serving the GLOBAL default chat model, or null when the
-     * binding does not resolve (fresh DB, retired model).
-     */
-    private function defaultChatModelService(): ?string
-    {
-        $bid = $this->modelConfigService->getDefaultModel('CHAT');
-        if (null === $bid) {
-            return null;
-        }
-
-        $model = $this->modelRepository->find($bid);
-
-        return null !== $model ? strtolower($model->getService()) : null;
-    }
-
-    /**
-     * Whether the provider serving the GLOBAL default chat model is currently
-     * available. Falls back to "any non-test chat provider available" when no
-     * default binding resolves (fresh DB, retired model).
-     *
-     * @param array<string, bool> $availabilityByName lowercase provider name => isAvailable()
-     */
-    private function isDefaultChatModelReady(array $availabilityByName, ?string $defaultChatService): bool
-    {
-        if (null !== $defaultChatService && isset($availabilityByName[$defaultChatService])) {
-            return $availabilityByName[$defaultChatService];
-        }
-
-        // Fallback: any chat-capable provider that is available. Uses the
-        // caller's map so the Ollama model-presence correction applies here too
-        // (a bare Ollama must not report the install as chat-ready).
-        foreach ($this->providerRegistry->getAvailableProviders('chat', false) as $name) {
-            if ($availabilityByName[strtolower($name)] ?? false) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Whether the local Ollama server actually has the model that the
-     * recommended Ollama defaults would bind CHAT to. Guards the auto-apply
-     * fallback: the compose stack only pulls gpt-oss:20b when
-     * ENABLE_LOCAL_GPT_OSS=true (default off), so on a stock install there is
-     * usually no local chat model at all.
-     */
-    private function isRecommendedOllamaChatModelPulled(): bool
-    {
-        $provider = null;
-        foreach ($this->providerRegistry->getUniqueProviders() as $name => $candidate) {
-            if ('ollama' === strtolower((string) $name) && $candidate instanceof OllamaProvider) {
-                $provider = $candidate;
-                break;
-            }
-        }
-        if (null === $provider) {
-            return false;
-        }
-
-        try {
-            $bid = $this->providerDefaultsService->getRecommendedDefaults('ollama')['CHAT'] ?? null;
-        } catch (\Throwable) {
-            return false;
-        }
-        if (null === $bid) {
-            return false;
-        }
-
-        $model = $this->modelRepository->find($bid);
-
-        return null !== $model && $provider->hasModel($model->getProviderId());
     }
 
     /**
@@ -1460,21 +1355,19 @@ class ConfigController extends AbstractController
         if ('ollama' === $service) {
             $providerType = 'local';
 
-            // Check if Ollama provider is available
             try {
                 $provider = $this->providerRegistry->getChatProvider('ollama');
-
-                // Check if the specific model exists
                 $modelName = $model->getProviderId() ?: $model->getName();
 
-                // Try to list available models
-                $status = $provider->getStatus();
-                if (!empty($status['healthy'])) {
-                    // Model is available if Ollama is running
-                    // We assume it's available; the user will get a proper error if not
+                // A reachable Ollama says nothing about THIS model: a stock
+                // install has the server up with only the embedding model
+                // pulled. Report the concrete model, not the server health.
+                if (empty($provider->getStatus()['healthy'])) {
+                    $message = 'Ollama server is not running';
+                } elseif ($this->chatReadiness->isOllamaModelPulled($modelName)) {
                     $available = true;
                 } else {
-                    $message = 'Ollama server is not running';
+                    $message = sprintf('Ollama is running but the model "%s" is not downloaded yet', $modelName);
                 }
 
                 // Always provide install command for Ollama models
@@ -1564,23 +1457,36 @@ class ConfigController extends AbstractController
      */
     private function evaluateProviderRequiredConfiguration(ProviderMetadataInterface $provider, string $serviceLabel): array
     {
+        // A key saved through the admin UI counts as configured even without a
+        // matching .env entry — that is what the DB-backed key store is for.
         if ($provider->isAvailable()) {
             return ['available' => true, 'message' => null, 'env_var' => null];
         }
 
+        // The provider's own check may only look at its primary key, while
+        // getRequiredEnvVars() documents accepted alternatives (`any_of`) and
+        // additional credentials. Honour those before declaring it unconfigured.
         $envVarHint = null;
         foreach ($provider->getRequiredEnvVars() as $envName => $meta) {
             if (false === ($meta['required'] ?? true)) {
                 continue;
             }
 
-            if (isset($meta['any_of']) && \is_array($meta['any_of'])) {
-                $candidates = array_values(array_filter($meta['any_of'], 'is_string'));
-                $envVarHint = $candidates[0] ?? $envName;
-            } else {
-                $envVarHint = $envName;
+            $candidates = isset($meta['any_of']) && \is_array($meta['any_of'])
+                ? array_values(array_filter($meta['any_of'], 'is_string'))
+                : [$envName];
+
+            foreach ($candidates as $candidate) {
+                if (SecretValueGuard::isUsable($this->envValue($candidate))) {
+                    continue 2;
+                }
             }
-            break;
+
+            $envVarHint ??= $candidates[0] ?? $envName;
+        }
+
+        if (null === $envVarHint) {
+            return ['available' => true, 'message' => null, 'env_var' => null];
         }
 
         return [
@@ -1588,6 +1494,13 @@ class ConfigController extends AbstractController
             'message' => "Configuration not complete for {$serviceLabel}",
             'env_var' => $envVarHint,
         ];
+    }
+
+    private function envValue(string $name): ?string
+    {
+        $value = $_ENV[$name] ?? getenv($name);
+
+        return \is_string($value) ? $value : null;
     }
 
     /**

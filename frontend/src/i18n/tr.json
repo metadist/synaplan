@@ -875,6 +875,7 @@
     "removeConfirmTitle": "API anahtarını kaldır",
     "removeConfirmMessage": "Kayıtlı {provider} API anahtarı kaldırılsın mı? .env dosyasında bir anahtar yoksa {provider} üzerinden sohbet çalışmayı durdurur.",
     "removed": "{provider} anahtarı kaldırıldı",
+    "removedEnvStillSet": "Kayıtlı {provider} anahtarı kaldırıldı — {envVar} ortamda hâlâ tanımlı, bu nedenle {provider} bu değerle bağlı kalır",
     "loadFailed": "Sağlayıcı durumu yüklenemedi",
     "localAi": {
       "title": "Yerel AI (Ollama) — anahtar gerekmez",
@@ -1758,8 +1759,8 @@
       "healthSummary": "{total} servisten {healthy} tanesi sağlıklı",
       "model": "model",
       "models": "model",
-      "devOnlyTitle": "Yönetici erişimi gerekli",
-      "devOnlyMessage": "Özellik durumu yalnızca yöneticiler için kullanılabilir."
+      "adminOnlyTitle": "Yönetici erişimi gerekli",
+      "adminOnlyMessage": "Özellik durumu yalnızca yöneticiler için kullanılabilir."
     }
   },
   "storage": {

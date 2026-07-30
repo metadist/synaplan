@@ -117,14 +117,17 @@ final readonly class ProviderDefaultsService
         ],
         // Local Ollama — last resort when a chat-capable model is already present.
         // providerId "gpt-oss:120b" normalises to "gpt-oss-120b" in ModelCatalog keys.
+        // gpt-oss:20b, not the 120b sibling: 20b is what
+        // _docker/backend/docker-entrypoint.sh downloads, so these bindings
+        // reference a model that can actually exist on a self-hosted install.
         'ollama' => [
-            'CHAT' => 'ollama:gpt-oss-120b:chat',
-            'TOOLS' => 'ollama:gpt-oss-120b:chat',
-            'ANALYZE' => 'ollama:gpt-oss-120b:chat',
-            'SORT' => 'ollama:gpt-oss-120b:chat',
-            'PLAN' => 'ollama:gpt-oss-120b:chat',
-            'SUMMARIZE' => 'ollama:gpt-oss-120b:chat',
-            'MEM' => 'ollama:gpt-oss-120b:mem',
+            'CHAT' => 'ollama:gpt-oss-20b:chat',
+            'TOOLS' => 'ollama:gpt-oss-20b:chat',
+            'ANALYZE' => 'ollama:gpt-oss-20b:chat',
+            'SORT' => 'ollama:gpt-oss-20b:chat',
+            'PLAN' => 'ollama:gpt-oss-20b:chat',
+            'SUMMARIZE' => 'ollama:gpt-oss-20b:chat',
+            'MEM' => 'ollama:gpt-oss-20b:mem',
         ],
     ];
 

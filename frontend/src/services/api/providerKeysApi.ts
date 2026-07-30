@@ -4,67 +4,31 @@
  * SECURITY: All endpoints require admin access. API keys are write-only:
  * responses only ever carry a masked hint (e.g. "gsk_••••••••••••abcd").
  */
-import { z } from 'zod'
+import type { z } from 'zod'
+import {
+  DeleteAdminProviderKeysDeleteResponseSchema,
+  GetAdminProviderKeysListResponseSchema,
+  PostAdminProviderKeysApplyDefaultsResponseSchema,
+  PostAdminProviderKeysTestResponseSchema,
+  PutAdminProviderKeysSaveResponseSchema,
+} from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
-// === Zod Schemas for Runtime Validation ===
-
-const ProviderKeyStatusZ = z.object({
-  name: z.string(),
-  displayName: z.string(),
-  configured: z.boolean(),
-  source: z.enum(['db', 'env', 'none']),
-  origin: z.enum(['env', 'ui']).nullable(),
-  maskedKey: z.string(),
-  consoleUrl: z.string(),
-  envVar: z.string(),
-  freeTier: z.boolean(),
-  recommended: z.boolean(),
-})
-
-const ListProviderKeysResponseZ = z.object({
-  success: z.literal(true),
-  defaultChatProvider: z.string(),
-  providers: z.array(ProviderKeyStatusZ),
-})
-
-const SaveProviderKeyResponseZ = z.object({
-  success: z.literal(true),
-  provider: z.string(),
-  maskedKey: z.string(),
-  defaultsApplied: z.boolean(),
-})
-
-const TestProviderKeyResponseZ = z.object({
-  ok: z.boolean(),
-  status: z.number().nullable().optional(),
-  error: z.string().nullable().optional(),
-})
-
-const ApplyDefaultsResponseZ = z.object({
-  success: z.literal(true),
-  provider: z.string(),
-  capabilities: z.array(z.string()),
-})
-
-const DeleteProviderKeyResponseZ = z.object({
-  success: z.literal(true),
-})
-
-// === Inferred Types ===
-
-export type ProviderKeyStatus = z.infer<typeof ProviderKeyStatusZ>
-export type ProviderKeysList = z.infer<typeof ListProviderKeysResponseZ>
-export type TestProviderKeyResult = z.infer<typeof TestProviderKeyResponseZ>
-
-// === API Functions ===
+export type ProviderKeysList = z.infer<typeof GetAdminProviderKeysListResponseSchema>
+export type ProviderKeyStatus = ProviderKeysList['providers'][number]
+export type TestProviderKeyResult = z.infer<typeof PostAdminProviderKeysTestResponseSchema>
+export type SaveProviderKeyResult = z.infer<typeof PutAdminProviderKeysSaveResponseSchema>
+export type ApplyProviderDefaultsResult = z.infer<
+  typeof PostAdminProviderKeysApplyDefaultsResponseSchema
+>
+export type DeleteProviderKeyResult = z.infer<typeof DeleteAdminProviderKeysDeleteResponseSchema>
 
 /**
  * List all supported cloud AI providers and their key status.
  */
 export async function listProviderKeys(): Promise<ProviderKeysList> {
   return httpClient('/api/v1/admin/provider-keys', {
-    schema: ListProviderKeysResponseZ,
+    schema: GetAdminProviderKeysListResponseSchema,
   })
 }
 
@@ -76,21 +40,22 @@ export async function saveProviderKey(
   provider: string,
   key: string,
   options: { applyDefaults?: boolean } = {}
-): Promise<z.infer<typeof SaveProviderKeyResponseZ>> {
+): Promise<SaveProviderKeyResult> {
   return httpClient(`/api/v1/admin/provider-keys/${encodeURIComponent(provider)}`, {
     method: 'PUT',
     body: JSON.stringify({ key, applyDefaults: options.applyDefaults ?? false }),
-    schema: SaveProviderKeyResponseZ,
+    schema: PutAdminProviderKeysSaveResponseSchema,
   })
 }
 
 /**
- * Delete the stored key (falls back to the env var, if set).
+ * Delete the stored key. When the provider's environment variable is still set,
+ * the response says so: the provider stays configured from that value.
  */
-export async function deleteProviderKey(provider: string): Promise<void> {
-  await httpClient(`/api/v1/admin/provider-keys/${encodeURIComponent(provider)}`, {
+export async function deleteProviderKey(provider: string): Promise<DeleteProviderKeyResult> {
+  return httpClient(`/api/v1/admin/provider-keys/${encodeURIComponent(provider)}`, {
     method: 'DELETE',
-    schema: DeleteProviderKeyResponseZ,
+    schema: DeleteAdminProviderKeysDeleteResponseSchema,
   })
 }
 
@@ -100,7 +65,7 @@ export async function deleteProviderKey(provider: string): Promise<void> {
 export async function testProviderKey(provider: string): Promise<TestProviderKeyResult> {
   return httpClient(`/api/v1/admin/provider-keys/${encodeURIComponent(provider)}/test`, {
     method: 'POST',
-    schema: TestProviderKeyResponseZ,
+    schema: PostAdminProviderKeysTestResponseSchema,
   })
 }
 
@@ -109,9 +74,9 @@ export async function testProviderKey(provider: string): Promise<TestProviderKey
  */
 export async function applyProviderDefaults(
   provider: string
-): Promise<z.infer<typeof ApplyDefaultsResponseZ>> {
+): Promise<ApplyProviderDefaultsResult> {
   return httpClient(`/api/v1/admin/provider-keys/${encodeURIComponent(provider)}/apply-defaults`, {
     method: 'POST',
-    schema: ApplyDefaultsResponseZ,
+    schema: PostAdminProviderKeysApplyDefaultsResponseSchema,
   })
 }

@@ -23,16 +23,33 @@ Synaplan supports multiple AI providers. Configure one or more.
 **Recommended: the setup UI.** Log in as admin and open **Admin → AI Providers**
 (`/admin/setup`). Keys entered there are validated with a live request, stored
 **AES-256-CBC encrypted in the database** (`BCONFIG`, group `provider_keys`,
-keyed off `APP_SECRET`), and take effect immediately — no restart needed. The
+keyed off `APP_SECRET`), and take effect without a restart — web requests use the
+new key at once, long-running processes (the messenger worker, FrankenPHP worker
+mode) within a few seconds, because each memoizes resolved keys briefly. The
 wizard can also apply the recommended default models for a provider in one
 click (same as `php bin/console app:provider:apply-defaults <provider>`).
 
 **Env variables still work** and are the right tool for scripted/orchestrated
-deploys: on first use, a key found in the environment is imported into the
-encrypted store automatically ("transfer on first load"). Rotating the env
-value rotates the stored copy; a key saved through the UI permanently wins
-over the env var, so you can delete it from `.env` afterwards. Keys never
-appear in migrations, seeders, or anything tracked by git.
+deploys: a key found in the environment is imported into the encrypted store the
+first time the backend resolves it ("transfer on first load"). Rotating the env
+value rotates the stored copy; a key saved through the UI permanently wins over
+the env var, so you can delete it from `.env` afterwards. Keys never appear in
+migrations, seeders, or anything tracked by git.
+
+Two caveats for the env path:
+
+- **The environment is read when the container starts.** Editing `backend/.env`
+  on a running stack changes nothing until you restart:
+  `docker compose restart backend worker`.
+- **Placeholder values are ignored.** Template text such as
+  `your-api-key-here` is not imported and the provider stays unconfigured, so an
+  untouched `.env.example` never looks like a working setup.
+
+> **Back up `APP_SECRET`.** Stored keys are encrypted with a key derived from it.
+> If `APP_SECRET` changes, existing rows can no longer be decrypted: the affected
+> providers report as unconfigured and you have to re-enter their keys (or restore
+> them from `.env` and restart). Rotate `APP_SECRET` only when you can re-enter
+> every provider key afterwards.
 
 ### Groq (Recommended - Free Tier)
 

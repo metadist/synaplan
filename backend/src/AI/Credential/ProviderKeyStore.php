@@ -65,9 +65,12 @@ final class ProviderKeyStore
     private array $memo = [];
 
     /**
-     * @param array<string, string> $envKeys provider name => key from the
-     *                                       environment ('' when unset);
-     *                                       wired in services.yaml
+     * @param array<string, string|list<string>> $envKeys provider name => key from the
+     *                                                    environment ('' when unset). A list
+     *                                                    holds accepted alternatives (Google
+     *                                                    reads GEMINI_API_KEY / GOOGLE_API_KEY
+     *                                                    too) and the first usable one wins;
+     *                                                    wired in services.yaml
      */
     public function __construct(
         private readonly ConfigRepository $configRepository,
@@ -118,6 +121,12 @@ final class ProviderKeyStore
         if ('' === $key) {
             throw new \InvalidArgumentException('API key must not be empty. Use deleteKey() to remove a stored key.');
         }
+        if (SecretValueGuard::isMasked($key)) {
+            throw new \InvalidArgumentException('That is the masked display value, not an API key. Leave the field untouched to keep the stored key, or paste a new one.');
+        }
+        if (SecretValueGuard::isPlaceholder($key)) {
+            throw new \InvalidArgumentException(sprintf('"%s" is a placeholder, not an API key. Paste the real key from the provider console.', $key));
+        }
 
         $payload = json_encode(['key' => $key, 'origin' => $origin], JSON_THROW_ON_ERROR);
         $this->configRepository->setValue(0, self::CONFIG_GROUP, $provider, $this->encryption->encrypt($payload));
@@ -165,7 +174,7 @@ final class ProviderKeyStore
             ];
         }
 
-        $envKey = trim($this->envKeys[$provider] ?? '');
+        $envKey = $this->envKey($provider);
         if ('' !== $envKey) {
             return [
                 'configured' => true,
@@ -176,6 +185,16 @@ final class ProviderKeyStore
         }
 
         return ['configured' => false, 'source' => 'none', 'origin' => null, 'maskedKey' => ''];
+    }
+
+    /**
+     * Is a usable key present in the environment for this provider? Deleting the
+     * stored row does NOT disable such a provider — the env value is imported
+     * again on the next resolution, and admins need to be told that.
+     */
+    public function hasEnvKey(string $provider): bool
+    {
+        return '' !== $this->envKey(strtolower(trim($provider)));
     }
 
     /**
@@ -194,7 +213,7 @@ final class ProviderKeyStore
 
     private function resolveKey(string $provider): ?string
     {
-        $envKey = trim($this->envKeys[$provider] ?? '');
+        $envKey = $this->envKey($provider);
         $row = $this->loadRow($provider);
 
         if (null === $row) {
@@ -233,6 +252,30 @@ final class ProviderKeyStore
         }
 
         return '' !== $row['key'] ? $row['key'] : null;
+    }
+
+    /**
+     * The provider's key from the environment, or '' when it is unset or holds a
+     * template placeholder. An untouched `.env.example` must leave the provider
+     * unconfigured instead of reporting a working setup and persisting the
+     * placeholder into BCONFIG.
+     */
+    private function envKey(string $provider): string
+    {
+        $candidates = $this->envKeys[$provider] ?? '';
+        foreach (is_array($candidates) ? $candidates : [$candidates] as $candidate) {
+            $candidate = trim($candidate);
+            if (SecretValueGuard::isUsable($candidate)) {
+                return $candidate;
+            }
+            if ('' !== $candidate) {
+                $this->logger->warning('Ignoring placeholder value in AI provider key environment variable', [
+                    'provider' => $provider,
+                ]);
+            }
+        }
+
+        return '';
     }
 
     /**

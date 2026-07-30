@@ -262,14 +262,13 @@ correctly reported unconfigured, and an authenticated runtime config returned
 
 ## 7. Next steps
 
-**Finish Tier 3** (small, high value):
-
-1. Resolve the default chat model **automatically** to the first provider with a
-   working key (Groq → OpenAI → … → Ollama-if-model-present) at seed time or first
-   request, so `chatReady` is true without an explicit "Use as default" click.
-   Note the `BCONFIG` rule: seeder defaults are bootstrap-only, so rolling out a
-   changed default for existing installs needs a migration that UPDATEs the rows.
-2. Open the Feature Status page to admins in production (currently 403).
+**Tier 3 is done:** the default chat model is resolved automatically to the first
+provider with a working key (Groq → OpenAI → … → Ollama-if-model-present), but
+from `app:provider:apply-defaults --auto` at container start rather than from a
+request — see §9.2. The Feature Status page is open to admins in production.
+Note the `BCONFIG` rule that shaped this: seeder defaults are bootstrap-only, so
+rolling out a changed default for existing installs needs a migration that UPDATEs
+the rows.
 
 **Then, in adoption order:** Tier 4 (download progress endpoint + card) → Tier 5
 (small-model default + arm64 images) → Tier 6 (Coolify/CapRover/Elestio/PikaPods/
@@ -307,15 +306,13 @@ as chat-ready. The plan's own wording — "Ollama-**if-model-present**" and
 "checking 'any provider reachable' would false-positive on a bare Ollama" —
 was the specification; the first implementation violated it.
 
-### 8.2 Deferred to Tier 5: the Ollama defaults point at a model we never pull
+### 8.2 Was deferred, now fixed in §9.1: Ollama defaults pointed at a model we never pull
 
-`PROVIDER_DEFAULTS['ollama']` binds `gpt-oss:120b`, but the entrypoint pulls
-`gpt-oss:20b` (and only when `ENABLE_LOCAL_GPT_OSS=true`). There is no catalog
-entry for a small local model, so **local-only chat is currently unreachable by
-design** — the guard in §8.1 makes that honest (banner stays up, user is guided
-to a free cloud key) instead of silently broken. Tier 5's small-model tier must
-add the catalog entry AND repoint these defaults at the model the stack actually
-downloads; catalog/seed changes need sign-off first.
+`PROVIDER_DEFAULTS['ollama']` bound `gpt-oss:120b`, but the entrypoint pulls
+`gpt-oss:20b` (and only when `ENABLE_LOCAL_GPT_OSS=true`). There was no catalog
+entry for a small local model, so **local-only chat was unreachable by design** —
+the guard in §8.1 made that honest (banner stays up, user is guided to a free
+cloud key) instead of silently broken. Resolved in §9.1.
 
 ### 8.3 Fixed: phantom "downloading forever" card
 
@@ -350,3 +347,79 @@ asserting the real shipped `en.json` copy).
 **Still thin:** no functional test boots `ConfigController::getRuntimeConfig()`
 with a keyless DB (the Ollama guard is covered at unit level only), and the
 entrypoint shell logic itself has no automated coverage.
+
+---
+
+## 9. PR #1392 external review — resolutions (2026-07-30)
+
+An external review of the branch raised three blockers, five security findings and
+a set of majors. What changed:
+
+### 9.1 Local Ollama chat is now actually reachable (blocker 1, closes §8.2)
+
+`ModelCatalog` gained Ollama `gpt-oss:20b` entries (chat + mem, priced 0 and
+`showWhenFree`), `PROVIDER_DEFAULTS['ollama']` points at them, and the entrypoint
+default for `ENABLE_LOCAL_GPT_OSS` is now `false` — matching `docker-compose.yml`,
+so a bare `docker run` no longer triggers a ~14 GB pull. Docs were corrected: the
+standard install pulls the **embedding** model only (~9 GB total); local chat is an
+explicit opt-in.
+
+### 9.2 `GET /config/runtime` no longer writes (blocker 2)
+
+Provider probing moved into `ChatReadinessService`, which is read-only and caches
+its snapshot for 30 s in the same pool a defaults change clears (also answers the
+"probe every provider on every poll" performance finding). The write path lives in
+`repairDefaultsIfBroken()`, reached only by
+`app:provider:apply-defaults --auto` — run once at container start after seeding —
+or by an admin saving a key. Saving/deleting a key and applying defaults invalidate
+the snapshot, so the banner reacts on the next page load instead of up to 30 s
+later.
+
+### 9.3 Placeholder and masked secrets are rejected again (blocker 3, security 6)
+
+New `SecretValueGuard` recognizes template text (`your-api-key-here`, `changeme`,
+…) and the masked display value. `ProviderKeyStore` refuses both on save and never
+imports a placeholder from the environment, so an untouched `.env.example` reports
+its providers as unconfigured instead of persisting the placeholder encrypted.
+`SystemConfigService::setValue()` rejects the mask server-side, so an API client
+echoing back `••••••••` can no longer destroy a working key. Env aliases
+(`GEMINI_API_KEY`, `GOOGLE_API_KEY`) and `any_of` requirements are honoured again.
+
+### 9.4 Install script hardened (security 7)
+
+Key entry uses `read -rs` (no scrollback), `.env` is written through a temp file
+with `printf '%s=%s'` instead of a `sed` replacement (a `/`, `&` or `\` in a key
+can no longer corrupt or inject settings), the file ends up `chmod 600`, and
+`--yes` plus `AI_PROVIDER` / `GROQ_API_KEY` make it usable non-interactively.
+`docker compose exec -T` and retry-the-real-command loops replace the TTY
+dependency and the `sleep 2` polling.
+
+### 9.5 Frontend and contract
+
+Undefined `--border-subtle` / `--bg-muted` replaced with real tokens; every raw
+Tailwind status color replaced with `--status-*`; download polling stops on
+`error`, `ready`, `idle` and on dismiss; `providerKeysApi.ts` uses the generated
+schemas, which required completing the OpenAPI annotations (`DELETE` body,
+400/403/404 content). Deleting a key while its env var is still set now says so
+instead of claiming the provider was removed.
+
+### 9.6 New tests
+
+`SecretValueGuardTest`, `ApplyProviderDefaultsCommandTest`,
+`LocalAiDownloadStatusServiceTest` (10, incl. truncated JSON and staleness),
+`ConfigControllerSetupEndpointsTest` (401/403 gates for `/config/features` and
+`/config/local-ai/status`), `ProviderKeyStoreTest` cases for placeholders, masks
+and env aliases, plus `providerKeyCard.spec.ts` and `providerSetupBanner.spec.ts`.
+
+### 9.7 Knowingly not changed
+
+- **AES-256-CBC without AEAD and no re-encrypt command** (security 4). Swapping
+  the cipher is a data-migration for every stored secret and belongs in its own
+  change. Mitigated for now by documenting that `APP_SECRET` must be backed up and
+  that rotating it means re-entering every key.
+- **`deleteKey()` does not disable a provider** (security 5). A tombstone row is a
+  schema/semantics decision; the UI now states the env fallback instead of
+  implying the provider is off.
+- **Provider classes without `declare(strict_types=1)` / `final`** and the
+  `set_time_limit(0)` teardown in `HiggsfieldProviderTest` — pre-existing, and
+  touching strict types on nine provider classes is a separate, riskier change.

@@ -98,7 +98,7 @@ const statusIcon = computed(() => {
 
 const statusColor = computed(() => {
   if (props.value.isSet) {
-    return 'text-green-500'
+    return 'text-[var(--status-success)]'
   }
   return 'txt-secondary'
 })
@@ -132,7 +132,7 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
           :is-download="helpMeta.isDownload"
         />
       </div>
-      <span v-if="isDirty" class="text-xs text-yellow-600 dark:text-yellow-400">
+      <span v-if="isDirty" class="text-xs text-[var(--status-warning)]">
         {{ $t('admin.config.unsaved') }}
       </span>
     </div>

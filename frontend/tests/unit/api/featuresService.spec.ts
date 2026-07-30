@@ -8,7 +8,7 @@ vi.mock('@/services/apiService', () => ({
 }))
 
 import { api } from '@/services/apiService'
-import { getFeaturesStatus, DevOnlyFeatureError } from '@/services/featuresService'
+import { getFeaturesStatus, FeatureStatusForbiddenError } from '@/services/featuresService'
 
 const mockedApi = vi.mocked(api)
 
@@ -103,17 +103,17 @@ describe('getFeaturesStatus', () => {
     await expect(getFeaturesStatus()).rejects.toThrow(ZodError)
   })
 
-  it('should throw DevOnlyFeatureError on 403', async () => {
+  it('should throw FeatureStatusForbiddenError on 403', async () => {
     mockedApi.get.mockRejectedValue(new Error('API Error: 403 Forbidden'))
 
-    await expect(getFeaturesStatus()).rejects.toThrow(DevOnlyFeatureError)
+    await expect(getFeaturesStatus()).rejects.toThrow(FeatureStatusForbiddenError)
     await expect(getFeaturesStatus()).rejects.toThrow('Feature status requires admin access')
   })
 
   it('should not match non-403 errors containing "403"', async () => {
     mockedApi.get.mockRejectedValue(new Error('Resource at /path/4032 not found'))
 
-    await expect(getFeaturesStatus()).rejects.not.toThrow(DevOnlyFeatureError)
+    await expect(getFeaturesStatus()).rejects.not.toThrow(FeatureStatusForbiddenError)
   })
 
   it('should re-throw other errors unchanged', async () => {
@@ -121,15 +121,15 @@ describe('getFeaturesStatus', () => {
     mockedApi.get.mockRejectedValue(networkError)
 
     await expect(getFeaturesStatus()).rejects.toThrow('Network Error')
-    await expect(getFeaturesStatus()).rejects.not.toThrow(DevOnlyFeatureError)
+    await expect(getFeaturesStatus()).rejects.not.toThrow(FeatureStatusForbiddenError)
   })
 })
 
-describe('DevOnlyFeatureError', () => {
+describe('FeatureStatusForbiddenError', () => {
   it('should have correct name and message', () => {
-    const error = new DevOnlyFeatureError()
+    const error = new FeatureStatusForbiddenError()
 
-    expect(error.name).toBe('DevOnlyFeatureError')
+    expect(error.name).toBe('FeatureStatusForbiddenError')
     expect(error.message).toBe('Feature status requires admin access')
     expect(error).toBeInstanceOf(Error)
   })

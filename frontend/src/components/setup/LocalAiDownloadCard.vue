@@ -1,7 +1,7 @@
 <template>
   <div v-if="visible" data-testid="local-ai-download-card">
     <div
-      class="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 flex items-start gap-3"
+      class="rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] p-4 flex items-start gap-3"
     >
       <Icon
         :icon="isError ? 'mdi:alert-circle-outline' : 'mdi:cloud-download-outline'"
@@ -13,7 +13,7 @@
         <p class="text-sm txt-secondary mt-0.5">{{ subtitle }}</p>
         <div
           v-if="showProgress"
-          class="mt-3 h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden"
+          class="mt-3 h-2 rounded-full bg-[var(--bg-chip)] overflow-hidden"
           role="progressbar"
           :aria-valuenow="percent ?? 0"
           aria-valuemin="0"
@@ -29,7 +29,7 @@
         class="txt-secondary hover:txt-primary shrink-0"
         :aria-label="$t('common.close')"
         data-testid="local-ai-download-dismiss"
-        @click="dismissed = true"
+        @click="dismiss"
       >
         <Icon icon="mdi:close" class="w-5 h-5" />
       </button>
@@ -86,7 +86,10 @@ const refresh = async () => {
   if (!authStore.isAuthenticated) return
   try {
     status.value = await getLocalAiDownloadStatus()
-    if (status.value.status === 'ready' || status.value.status === 'idle') {
+    // Only an ongoing pull can still change. 'ready' and 'idle' are done and
+    // 'error' will not recover without a container restart, so keep no timer
+    // running for any of them.
+    if (status.value.status !== 'waiting' && status.value.status !== 'downloading') {
       stopPolling()
     }
   } catch {
@@ -99,6 +102,11 @@ const stopPolling = () => {
     clearInterval(timer)
     timer = null
   }
+}
+
+const dismiss = () => {
+  dismissed.value = true
+  stopPolling()
 }
 
 onMounted(() => {

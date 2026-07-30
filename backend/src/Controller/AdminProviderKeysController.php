@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\AI\Credential\ChatReadinessService;
 use App\AI\Credential\ProviderDefaultsService;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
@@ -34,6 +35,7 @@ final class AdminProviderKeysController extends AbstractController
         private readonly ProviderKeyValidator $validator,
         private readonly ProviderDefaultsService $defaults,
         private readonly ConfigRepository $configRepository,
+        private readonly ChatReadinessService $chatReadiness,
     ) {
     }
 
@@ -56,7 +58,7 @@ final class AdminProviderKeysController extends AbstractController
                     property: 'providers',
                     type: 'array',
                     items: new OA\Items(
-                        required: ['name', 'displayName', 'configured', 'source', 'maskedKey', 'consoleUrl', 'envVar', 'freeTier', 'recommended'],
+                        required: ['name', 'displayName', 'configured', 'source', 'origin', 'maskedKey', 'consoleUrl', 'envVar', 'freeTier', 'recommended'],
                         properties: [
                             new OA\Property(property: 'name', type: 'string', example: 'groq'),
                             new OA\Property(property: 'displayName', type: 'string', example: 'Groq'),
@@ -76,7 +78,7 @@ final class AdminProviderKeysController extends AbstractController
             type: 'object'
         )
     )]
-    #[OA\Response(response: 403, description: 'Admin access required')]
+    #[OA\Response(response: 403, description: 'Admin access required', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
     public function list(#[CurrentUser] ?User $user): JsonResponse
     {
         if ($resp = $this->requireAdmin($user)) {
@@ -114,7 +116,7 @@ final class AdminProviderKeysController extends AbstractController
         response: 200,
         description: 'Key stored (and defaults applied when requested)',
         content: new OA\JsonContent(
-            required: ['success', 'provider', 'maskedKey'],
+            required: ['success', 'provider', 'maskedKey', 'defaultsApplied'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'provider', type: 'string', example: 'groq'),
@@ -124,9 +126,9 @@ final class AdminProviderKeysController extends AbstractController
             type: 'object'
         )
     )]
-    #[OA\Response(response: 400, description: 'Invalid input or the provider rejected the key')]
-    #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 404, description: 'Unknown provider')]
+    #[OA\Response(response: 400, description: 'Invalid input or the provider rejected the key', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string'), new OA\Property(property: 'status', type: 'integer', nullable: true, description: 'HTTP status returned by the provider when a live key check failed')], type: 'object'))]
+    #[OA\Response(response: 403, description: 'Admin access required', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
+    #[OA\Response(response: 404, description: 'Unknown provider', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
     public function save(string $provider, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if ($resp = $this->requireAdmin($user)) {
@@ -155,7 +157,16 @@ final class AdminProviderKeysController extends AbstractController
             }
         }
 
-        $this->keyStore->saveKey($provider, $key, ProviderKeyStore::ORIGIN_UI);
+        try {
+            $this->keyStore->saveKey($provider, $key, ProviderKeyStore::ORIGIN_UI);
+        } catch (\InvalidArgumentException $e) {
+            // Placeholder text or the masked display value — a client mistake,
+            // not a server fault. The message never contains a real key.
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+        // The setup banner reads a short-lived availability snapshot — drop it so
+        // the new key takes effect on the next page load instead of up to 30 s later.
+        $this->chatReadiness->invalidate();
 
         $defaultsApplied = false;
         if ($applyDefaults && ProviderDefaultsService::supports($provider)) {
@@ -187,14 +198,26 @@ final class AdminProviderKeysController extends AbstractController
     #[OA\Delete(
         path: '/api/v1/admin/provider-keys/{provider}',
         summary: 'Delete the stored API key for a provider',
-        description: 'Removes the DB-stored key. The provider falls back to its environment variable (if set), which will be re-imported on next use.',
+        description: 'Removes the DB-stored key. When the matching environment variable is still set, the provider stays configured: that value is imported again on the next use. The response reports this via envFallbackActive.',
         security: [['Bearer' => []]],
         tags: ['Admin Provider Keys']
     )]
     #[OA\Parameter(name: 'provider', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
-    #[OA\Response(response: 200, description: 'Key deleted')]
-    #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 404, description: 'Unknown provider or no stored key')]
+    #[OA\Response(
+        response: 200,
+        description: 'Key deleted',
+        content: new OA\JsonContent(
+            required: ['success', 'envFallbackActive'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'envFallbackActive', type: 'boolean', example: false, description: 'True when the environment still holds a key for this provider, so it remains configured'),
+                new OA\Property(property: 'envVar', type: 'string', example: 'GROQ_API_KEY', description: 'Name of that environment variable'),
+            ],
+            type: 'object'
+        )
+    )]
+    #[OA\Response(response: 403, description: 'Admin access required', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
+    #[OA\Response(response: 404, description: 'Unknown provider or no stored key', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
     public function delete(string $provider, #[CurrentUser] ?User $user): JsonResponse
     {
         if ($resp = $this->requireAdmin($user)) {
@@ -207,8 +230,13 @@ final class AdminProviderKeysController extends AbstractController
         if (!$this->keyStore->deleteKey($provider)) {
             return $this->json(['error' => 'No stored key for this provider.'], Response::HTTP_NOT_FOUND);
         }
+        $this->chatReadiness->invalidate();
 
-        return $this->json(['success' => true]);
+        return $this->json([
+            'success' => true,
+            'envFallbackActive' => $this->keyStore->hasEnvKey($provider),
+            'envVar' => ProviderKeyCatalog::get($provider)['envVar'],
+        ]);
     }
 
     #[Route('/{provider}/test', name: 'admin_provider_keys_test', methods: ['POST'])]
@@ -233,9 +261,9 @@ final class AdminProviderKeysController extends AbstractController
             type: 'object'
         )
     )]
-    #[OA\Response(response: 400, description: 'No key configured for this provider')]
-    #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 404, description: 'Unknown provider')]
+    #[OA\Response(response: 400, description: 'No key configured for this provider', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string'), new OA\Property(property: 'status', type: 'integer', nullable: true, description: 'HTTP status returned by the provider when a live key check failed')], type: 'object'))]
+    #[OA\Response(response: 403, description: 'Admin access required', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
+    #[OA\Response(response: 404, description: 'Unknown provider', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
     public function test(string $provider, #[CurrentUser] ?User $user): JsonResponse
     {
         if ($resp = $this->requireAdmin($user)) {
@@ -275,8 +303,8 @@ final class AdminProviderKeysController extends AbstractController
             type: 'object'
         )
     )]
-    #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 404, description: 'Unknown provider')]
+    #[OA\Response(response: 403, description: 'Admin access required', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
+    #[OA\Response(response: 404, description: 'Unknown provider', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
     public function applyDefaults(string $provider, #[CurrentUser] ?User $user): JsonResponse
     {
         if ($resp = $this->requireAdmin($user)) {
@@ -287,6 +315,7 @@ final class AdminProviderKeysController extends AbstractController
         }
 
         $applied = $this->defaults->applyGlobalDefaults($provider);
+        $this->chatReadiness->invalidate();
 
         return $this->json([
             'success' => true,

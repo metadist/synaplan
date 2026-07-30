@@ -6,6 +6,7 @@ namespace App\Service\Admin;
 
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
+use App\AI\Credential\SecretValueGuard;
 use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
@@ -249,9 +250,23 @@ final readonly class SystemConfigService
         $field = $this->schema[$key];
         $source = $field['source'] ?? 'env';
 
+        // Reading a sensitive field returns self::MASK, so a client that submits
+        // the form unchanged (or retries it) sends the mask back. Storing that
+        // would silently destroy a working secret — refuse it server-side
+        // instead of relying on the frontend to filter it out.
+        if ($field['sensitive'] && SecretValueGuard::isMasked($value)) {
+            return [
+                'success' => false,
+                'requiresRestart' => false,
+                'message' => 'That is the masked placeholder, not a real value. Leave the field untouched to keep the current secret, or enter a new one.',
+            ];
+        }
+
         // Cloud provider API keys are stored encrypted in the ProviderKeyStore
-        // and apply without a restart (providers resolve keys per call). An
-        // empty value removes the stored key (env fallback, if any, applies).
+        // and apply without a restart (providers resolve keys per call). An empty
+        // value removes the stored key (an env fallback, if set, then applies
+        // again) — the admin UI clears keys on the setup page instead, so this
+        // branch serves API clients that PUT an empty string.
         $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
         if (null !== $storeProvider) {
             try {
@@ -263,6 +278,10 @@ final readonly class SystemConfigService
                 $this->logChange($key, $value);
 
                 return ['success' => true, 'requiresRestart' => false];
+            } catch (\InvalidArgumentException $e) {
+                // Rejected value (placeholder, mask) — the message names the
+                // problem and is safe to show: it never contains a real key.
+                return ['success' => false, 'requiresRestart' => false, 'message' => $e->getMessage()];
             } catch (\Throwable $e) {
                 $this->logger->error('Failed to save provider key via system config', [
                     'key' => $key,

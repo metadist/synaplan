@@ -81,6 +81,18 @@ describe('LocalAiDownloadCard', () => {
     expect(wrapper.find('[role="progressbar"]').exists()).toBe(false)
   })
 
+  // A failed pull does not recover without a container restart, so polling it
+  // forever would only produce noise.
+  it('stops polling after a failed download', async () => {
+    getLocalAiDownloadStatus.mockResolvedValue(status({ status: 'error', percent: null }))
+    mountCard()
+    await flushPromises()
+    expect(getLocalAiDownloadStatus).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(getLocalAiDownloadStatus).toHaveBeenCalledTimes(1)
+  })
+
   it('can be dismissed', async () => {
     getLocalAiDownloadStatus.mockResolvedValue(status())
     const wrapper = mountCard()
@@ -89,5 +101,17 @@ describe('LocalAiDownloadCard', () => {
     await wrapper.find('[data-testid="local-ai-download-dismiss"]').trigger('click')
 
     expect(wrapper.find('[data-testid="local-ai-download-card"]').exists()).toBe(false)
+  })
+
+  it('stops polling when dismissed', async () => {
+    getLocalAiDownloadStatus.mockResolvedValue(status())
+    const wrapper = mountCard()
+    await flushPromises()
+    expect(getLocalAiDownloadStatus).toHaveBeenCalledTimes(1)
+
+    await wrapper.find('[data-testid="local-ai-download-dismiss"]').trigger('click')
+    await vi.advanceTimersByTimeAsync(20000)
+
+    expect(getLocalAiDownloadStatus).toHaveBeenCalledTimes(1)
   })
 })

@@ -224,7 +224,12 @@ services:
                 anthropic: '%env(ANTHROPIC_API_KEY)%'
                 openai: '%env(OPENAI_API_KEY)%'
                 groq: '%env(GROQ_API_KEY)%'
-                google: '%env(GOOGLE_GEMINI_API_KEY)%'
+                # Documented aliases (GoogleProvider::getRequiredEnvVars any_of):
+                # first usable value wins.
+                google:
+                    - '%env(GOOGLE_GEMINI_API_KEY)%'
+                    - '%env(default::GEMINI_API_KEY)%'
+                    - '%env(default::GOOGLE_API_KEY)%'
                 mistral: '%env(MISTRAL_API_KEY)%'
                 trustedtokens: '%env(TRUSTEDTOKENS_API_KEY)%'
                 huggingface: '%env(HUGGINGFACE_API_KEY)%'
@@ -562,6 +567,12 @@ services:
     # Shares the model_config pool so applying provider defaults invalidates
     # the same cached lookups ModelConfigService serves from.
     App\AI\Credential\ProviderDefaultsService:
+        arguments:
+            $cache: '@cache.model_config'
+
+    # Same pool: applying provider defaults clears it, so the cached provider
+    # availability snapshot can never outlive a defaults change.
+    App\AI\Credential\ChatReadinessService:
         arguments:
             $cache: '@cache.model_config'
 

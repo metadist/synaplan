@@ -4,10 +4,12 @@
     class="mx-auto max-w-4xl w-full px-4 pt-4"
     data-testid="provider-setup-banner"
   >
-    <div class="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+    <div
+      class="rounded-lg border border-[var(--status-warning)] bg-[var(--status-warning-muted)] p-4 flex items-start gap-3"
+    >
       <Icon
         icon="mdi:key-alert-outline"
-        class="w-6 h-6 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5"
+        class="w-6 h-6 shrink-0 text-[var(--status-warning)] mt-0.5"
       />
       <div class="flex-1 min-w-0">
         <p class="font-semibold txt-primary">{{ $t('setupBanner.title') }}</p>

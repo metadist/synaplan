@@ -39,10 +39,10 @@ export type Feature = z.infer<typeof FeatureSchema>
 export type FeaturesStatus = z.infer<typeof FeaturesStatusSchema>
 
 /** Thrown when `/api/v1/config/features` returns 403 (non-admin caller). */
-export class DevOnlyFeatureError extends Error {
+export class FeatureStatusForbiddenError extends Error {
   constructor() {
     super('Feature status requires admin access')
-    this.name = 'DevOnlyFeatureError'
+    this.name = 'FeatureStatusForbiddenError'
   }
 }
 
@@ -55,7 +55,7 @@ export async function getFeaturesStatus(): Promise<FeaturesStatus> {
     return FeaturesStatusSchema.parse(response.data)
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('API Error: 403')) {
-      throw new DevOnlyFeatureError()
+      throw new FeatureStatusForbiddenError()
     }
     throw error
   }

@@ -875,6 +875,7 @@
     "removeConfirmTitle": "Eliminar clave API",
     "removeConfirmMessage": "¿Eliminar la clave API guardada de {provider}? El chat con {provider} dejará de funcionar salvo que haya una clave en el archivo .env.",
     "removed": "Clave de {provider} eliminada",
+    "removedEnvStillSet": "Clave de {provider} eliminada de la base de datos: {envVar} sigue definida en el entorno, así que {provider} continúa conectado con ese valor",
     "loadFailed": "No se pudo cargar el estado de los proveedores",
     "localAi": {
       "title": "IA local (Ollama) — sin clave",
@@ -1757,8 +1758,8 @@
       "healthSummary": "{healthy} de {total} servicios saludables",
       "model": "modelo",
       "models": "modelos",
-      "devOnlyTitle": "Se requiere acceso de administrador",
-      "devOnlyMessage": "El estado de las funciones solo está disponible para administradores."
+      "adminOnlyTitle": "Se requiere acceso de administrador",
+      "adminOnlyMessage": "El estado de las funciones solo está disponible para administradores."
     }
   },
   "storage": {

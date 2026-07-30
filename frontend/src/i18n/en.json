@@ -2173,6 +2173,7 @@
     "removeConfirmTitle": "Remove API key",
     "removeConfirmMessage": "Remove the stored {provider} API key? Chat via {provider} will stop working unless a key is set in the .env file.",
     "removed": "{provider} key removed",
+    "removedEnvStillSet": "Stored {provider} key removed — {envVar} is still set in the environment, so {provider} stays connected from that value",
     "loadFailed": "Could not load provider status",
     "localAi": {
       "title": "Local AI (Ollama) — no key needed",
@@ -3713,8 +3714,8 @@
       "healthSummary": "{healthy} of {total} services healthy",
       "model": "model",
       "models": "models",
-      "devOnlyTitle": "Admin access required",
-      "devOnlyMessage": "Feature status is available to administrators only."
+      "adminOnlyTitle": "Admin access required",
+      "adminOnlyMessage": "Feature status is available to administrators only."
     }
   },
   "cookies": {

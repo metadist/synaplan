@@ -2188,6 +2188,7 @@
     "removeConfirmTitle": "API-Schlüssel entfernen",
     "removeConfirmMessage": "Gespeicherten {provider}-API-Schlüssel entfernen? Chat über {provider} funktioniert dann nur noch, wenn ein Schlüssel in der .env-Datei gesetzt ist.",
     "removed": "{provider}-Schlüssel entfernt",
+    "removedEnvStillSet": "Gespeicherter {provider}-Schlüssel entfernt — {envVar} ist in der Umgebung weiterhin gesetzt, {provider} bleibt damit verbunden",
     "loadFailed": "Anbieter-Status konnte nicht geladen werden",
     "localAi": {
       "title": "Lokale KI (Ollama) — kein Schlüssel nötig",
@@ -2740,8 +2741,8 @@
       "healthSummary": "{healthy} von {total} Services gesund",
       "model": "Modell",
       "models": "Modelle",
-      "devOnlyTitle": "Admin-Zugriff erforderlich",
-      "devOnlyMessage": "Der Feature-Status ist nur für Administratoren verfügbar."
+      "adminOnlyTitle": "Admin-Zugriff erforderlich",
+      "adminOnlyMessage": "Der Feature-Status ist nur für Administratoren verfügbar."
     }
   },
   "mail": {

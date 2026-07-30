@@ -16,16 +16,16 @@
       <div
         class="rounded-lg p-4 mb-6 flex items-start gap-3 border"
         :class="
-          chatReady ? 'bg-green-500/10 border-green-500/30' : 'bg-amber-500/10 border-amber-500/30'
+          chatReady
+            ? 'bg-[var(--status-success-muted)] border-[var(--status-success)]'
+            : 'bg-[var(--status-warning-muted)] border-[var(--status-warning)]'
         "
         data-testid="setup-status"
       >
         <Icon
           :icon="chatReady ? 'mdi:check-circle' : 'mdi:alert-circle-outline'"
           class="w-6 h-6 shrink-0 mt-0.5"
-          :class="
-            chatReady ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'
-          "
+          :class="chatReady ? 'text-[var(--status-success)]' : 'text-[var(--status-warning)]'"
         />
         <div>
           <p class="font-semibold txt-primary">
@@ -42,6 +42,19 @@
       <!-- Loading -->
       <div v-if="loading" class="text-center py-12">
         <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
+      </div>
+
+      <!-- Load failure: the page is useless without the provider list, so offer a retry -->
+      <div
+        v-else-if="loadFailed"
+        class="surface-card rounded-lg p-8 text-center"
+        data-testid="setup-load-error"
+      >
+        <Icon icon="mdi:cloud-alert" class="w-8 h-8 mx-auto text-[var(--status-warning)]" />
+        <p class="txt-secondary mt-3">{{ $t('adminSetup.loadFailed') }}</p>
+        <button class="btn-primary mt-4" data-testid="setup-retry" @click="refresh">
+          {{ $t('common.retry') }}
+        </button>
       </div>
 
       <template v-else>
@@ -99,6 +112,7 @@ const { error: showError } = useNotification()
 const config = useConfigStore()
 
 const loading = ref(true)
+const loadFailed = ref(false)
 const providers = ref<ProviderKeyStatus[]>([])
 const defaultChatProvider = ref('')
 
@@ -119,18 +133,21 @@ const load = async () => {
     const result = await listProviderKeys()
     providers.value = result.providers
     defaultChatProvider.value = result.defaultChatProvider
+    loadFailed.value = false
   } catch (err) {
+    loadFailed.value = true
     showError(err instanceof Error ? err.message : t('adminSetup.loadFailed'))
   } finally {
     loading.value = false
   }
 }
 
-// After any key change, re-fetch the list AND the runtime config so the
-// readiness banner (here and in the chat) reflects the new state immediately.
+// Re-fetch the list AND the runtime config, so the readiness banner (here and in
+// the chat) reflects the current state — also on a direct visit to this URL,
+// where the cached runtime config may predate the last key change.
 const refresh = async () => {
   await Promise.all([load(), config.reload()])
 }
 
-onMounted(load)
+onMounted(refresh)
 </script>

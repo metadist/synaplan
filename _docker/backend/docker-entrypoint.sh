@@ -310,6 +310,15 @@ php bin/console app:seed --no-interaction || {
     echo "⚠️  app:seed failed — see logs above. Continuing startup."
 }
 
+# Point chat at a provider that actually has a key. The seeded default is a
+# cloud provider, so an install that only configured a different one (or none)
+# would otherwise greet the user with an "invalid API key" error. No-op when the
+# current default already works or was deliberately set to a keyless provider.
+echo "🔌 Checking default AI provider..."
+php bin/console app:provider:apply-defaults --auto --no-interaction || {
+    echo "⚠️  Could not verify the default AI provider — continuing startup."
+}
+
 # Ollama model downloads (optional, only if AUTO_DOWNLOAD_MODELS=true).
 # Progress is mirrored to var/ollama-download.json for GET /api/v1/config/local-ai/status.
 OLLAMA_STATUS_FILE="${OLLAMA_STATUS_FILE:-/var/www/backend/var/ollama-download.json}"
@@ -368,7 +377,10 @@ if [ -n "${OLLAMA_BASE_URL:-}" ] && [ "${AUTO_DOWNLOAD_MODELS:-false}" = "true" 
         write_ollama_download_status "downloading" "" "0" "Ollama ready, starting model downloads"
 
         MODELS=("bge-m3")
-        if [ "${ENABLE_LOCAL_GPT_OSS:-true}" = "true" ]; then
+        # Default OFF, matching docker-compose.yml: pulling the chat model is a
+        # ~14 GB download, so it must stay an explicit opt-in — also for a bare
+        # `docker run` that does not go through compose.
+        if [ "${ENABLE_LOCAL_GPT_OSS:-false}" = "true" ]; then
             MODELS+=("gpt-oss:20b")
         fi
         DOWNLOAD_FAILED=0

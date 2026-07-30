@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Controller;
 
-use App\AI\Credential\ProviderDefaultsService;
+use App\AI\Credential\ChatReadinessService;
 use App\AI\Service\ProviderRegistry;
 use App\Controller\ConfigController;
 use App\Entity\Config;
@@ -87,7 +87,7 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->createStub(MobileVersionService::class),
             $this->createStub(MarketingNewsConfig::class),
             $this->createStub(UsageTaximeterConfig::class),
-            $this->createStub(ProviderDefaultsService::class),
+            $this->createStub(ChatReadinessService::class),
             $this->createStub(LocalAiDownloadStatusService::class),
             'http://qdrant.example',
         );

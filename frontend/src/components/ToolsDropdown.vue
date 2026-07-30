@@ -186,7 +186,7 @@ import {
 import { Icon } from '@iconify/vue'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { useAuthStore } from '@/stores/auth'
-import { getFeaturesStatus, DevOnlyFeatureError, type Feature } from '@/services/featuresService'
+import { getFeaturesStatus, type Feature } from '@/services/featuresService'
 import { useRouter } from 'vue-router'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 
@@ -280,9 +280,9 @@ const loadFeaturesStatus = async () => {
     isLoadingFeatures.value = true
     const status = await getFeaturesStatus()
     featuresStatus.value = status.features
-  } catch (error) {
-    if (error instanceof DevOnlyFeatureError) return
-    console.error('Failed to load features status:', error)
+  } catch {
+    // Feature badges are decoration — the tools themselves stay usable, so a
+    // failed status probe is silently ignored.
   } finally {
     isLoadingFeatures.value = false
   }
