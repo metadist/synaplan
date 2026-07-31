@@ -2152,18 +2152,14 @@
       "business": "Business"
     },
     "features": {
-      "unlimitedMessages": "Unbegrenzte Nachrichten",
-      "images": "{count} Bilder/Monat",
-      "unlimitedImages": "Unbegrenzte Bilder",
+      "usage": "{factor}× mehr Nutzung als im Free-Plan",
       "advancedModels": "Erweiterte KI-Modelle",
       "prioritySupport": "Priority Support",
-      "storage": "{size}GB Speicher",
       "everythingInPro": "Alles aus Pro",
       "everythingInTeam": "Alles aus Team",
       "teamCollaboration": "Team-Zusammenarbeit",
       "customPrompts": "Benutzerdefinierte Prompts",
       "apiAccess": "API-Zugriff",
-      "unlimitedVideo": "Unbegrenzte Video-Generierung",
       "whiteLabel": "White-label Widgets",
       "dedicatedSupport": "Dedizierter Support",
       "slaGuarantee": "SLA-Garantie"

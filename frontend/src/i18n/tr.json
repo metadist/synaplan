@@ -1673,18 +1673,14 @@
       "business": "İşletme"
     },
     "features": {
-      "unlimitedMessages": "Sınırsız Mesaj",
-      "images": "{count} Görsel/Ay",
-      "unlimitedImages": "Sınırsız Görsel",
+      "usage": "Ücretsiz plana göre {factor}× daha fazla kullanım",
       "advancedModels": "Gelişmiş AI Modelleri",
       "prioritySupport": "Öncelikli Destek",
-      "storage": "{size}GB Depolama",
       "everythingInPro": "Pro'daki Her Şey",
       "everythingInTeam": "Takım'daki Her Şey",
       "teamCollaboration": "Takım İşbirliği",
       "customPrompts": "Özel Promptlar",
       "apiAccess": "API Erişimi",
-      "unlimitedVideo": "Sınırsız Video Oluşturma",
       "whiteLabel": "White-label Widgetlar",
       "dedicatedSupport": "Özel Destek",
       "slaGuarantee": "SLA Garantisi"

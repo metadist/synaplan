@@ -1672,18 +1672,14 @@
       "business": "Empresa"
     },
     "features": {
-      "unlimitedMessages": "Mensajes Ilimitados",
-      "images": "{count} Imágenes/Mes",
-      "unlimitedImages": "Imágenes Ilimitadas",
+      "usage": "{factor}× más uso que el plan gratuito",
       "advancedModels": "Modelos de IA Avanzados",
       "prioritySupport": "Soporte Prioritario",
-      "storage": "{size}GB de Almacenamiento",
       "everythingInPro": "Todo en Pro",
       "everythingInTeam": "Todo en Equipo",
       "teamCollaboration": "Colaboración en Equipo",
       "customPrompts": "Prompts Personalizados",
       "apiAccess": "Acceso a API",
-      "unlimitedVideo": "Generación de Video Ilimitada",
       "whiteLabel": "Widgets White-label",
       "dedicatedSupport": "Soporte Dedicado",
       "slaGuarantee": "Garantía SLA"
