@@ -51,15 +51,16 @@ jobs:
           echo "Automatic tagging is inactive because the GitHub App credentials are not configured." |
             tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Checkout the tested commit
+      - name: Checkout the classifier from the default branch
         if: steps.config.outputs.configured == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
-          # Privileged context: the classifier is executed from the merged main
-          # commit, which is protected by review. Never leave a writable token
-          # in .git/config; the tag is created through the API instead.
+          # This job is privileged: workflow_run carries repository secrets. So
+          # it deliberately does NOT check out the reported head SHA — the code
+          # executed here always comes from the reviewed default branch, and the
+          # tested commit is only ever read as git history. Never leave a
+          # writable token in .git/config; the tag is created through the API.
           persist-credentials: false
 
       - name: Classify the merge
@@ -67,6 +68,12 @@ jobs:
         id: classify
         run: |
           set -euo pipefail
+          # Confirms the trust assumption of the checkout above: only a commit
+          # that is actually on the default branch may be classified or tagged.
+          if ! git merge-base --is-ancestor "$HEAD_SHA" HEAD; then
+            echo "::error::$HEAD_SHA is not contained in the default branch — refusing to tag."
+            exit 1
+          fi
           if git describe --tags --exact-match "$HEAD_SHA" >/dev/null 2>&1; then
             echo "needs_tag=false" >> "$GITHUB_OUTPUT"
             echo "reason=The commit already carries a release tag." >> "$GITHUB_OUTPUT"
