@@ -19,17 +19,19 @@ namespace App\Service;
  * ASC/Play catalogue prices used as the in-app display fallback.
  *
  * Product IDs and store price points are injected from env (configured once the
- * store products exist, Epic 5.5). Defaults match the App Store Connect
- * catalogue for the German launch. Open-source / web-only deployments keep
- * working with IAP effectively disabled via {@see isConfigured()}.
+ * store products exist, Epic 5.5). A tier without a product ID is simply not
+ * purchasable via IAP, so open-source / web-only deployments keep working with
+ * IAP disabled via {@see isConfigured()} without any extra configuration.
+ *
+ * The product IDs therefore default to EMPTY rather than to sample values. An
+ * earlier revision shipped `com.synaplan.app.<tier>.monthly` as "placeholder"
+ * defaults and treated exactly those strings as "not configured" — but those
+ * are the real App Store Connect IDs of the German launch, so a fully
+ * configured deployment reported `iapConfigured: false`. Never reintroduce a
+ * sentinel that a real store product could legitimately use.
  */
 final readonly class IapPricingService
 {
-    /** Placeholder product IDs shipped as defaults (no real store products yet). */
-    private const PLACEHOLDER_PRO = 'com.synaplan.app.pro.monthly';
-    private const PLACEHOLDER_TEAM = 'com.synaplan.app.team.monthly';
-    private const PLACEHOLDER_BUSINESS = 'com.synaplan.app.business.monthly';
-
     /** Default store commission passed on to app buyers (Apple/Google ≈30 %). */
     private const DEFAULT_STORE_MARKUP_PERCENT = 30.0;
 
@@ -42,9 +44,9 @@ final readonly class IapPricingService
     private const DEFAULT_STORE_PRICE_BUSINESS = 129.99;
 
     public function __construct(
-        private string $iapProductPro = self::PLACEHOLDER_PRO,
-        private string $iapProductTeam = self::PLACEHOLDER_TEAM,
-        private string $iapProductBusiness = self::PLACEHOLDER_BUSINESS,
+        private string $iapProductPro = '',
+        private string $iapProductTeam = '',
+        private string $iapProductBusiness = '',
         private float $storeMarkupPercent = self::DEFAULT_STORE_MARKUP_PERCENT,
         private float $storePricePro = self::DEFAULT_STORE_PRICE_PRO,
         private float $storePriceTeam = self::DEFAULT_STORE_PRICE_TEAM,
@@ -126,47 +128,43 @@ final readonly class IapPricingService
 
     /**
      * The store product ID configured for a given tier, or null for a tier that
-     * is not purchasable via IAP (e.g. NEW / ADMIN).
+     * is not purchasable via IAP (e.g. NEW / ADMIN, or an unconfigured tier).
      */
     public function productIdForTier(string $tier): ?string
     {
-        return match ($tier) {
+        $productId = match ($tier) {
             'PRO' => $this->iapProductPro,
             'TEAM' => $this->iapProductTeam,
             'BUSINESS' => $this->iapProductBusiness,
-            default => null,
+            default => '',
         };
+
+        return '' !== $productId ? $productId : null;
     }
 
     /**
-     * Tier → store product ID for every IAP-purchasable tier, in ascending order.
+     * Tier → store product ID for every tier that HAS a configured product, in
+     * ascending order. Tiers without one are omitted: they cannot be bought via
+     * IAP, and the app must not register an empty product with the store.
      *
      * @return array<string, string>
      */
     public function productCatalogue(): array
     {
-        return [
+        return array_filter([
             'PRO' => $this->iapProductPro,
             'TEAM' => $this->iapProductTeam,
             'BUSINESS' => $this->iapProductBusiness,
-        ];
+        ], static fn (string $productId): bool => '' !== $productId);
     }
 
     /**
-     * True once at least one tier points at a real (non-placeholder) store
-     * product — i.e. the deployment has actually configured IAP. Mirrors
+     * True once at least one tier points at a store product — i.e. the
+     * deployment has actually configured IAP. Mirrors
      * {@see BillingService::isEnabled()} for the Stripe side.
      */
     public function isConfigured(): bool
     {
-        $placeholders = [self::PLACEHOLDER_PRO, self::PLACEHOLDER_TEAM, self::PLACEHOLDER_BUSINESS, ''];
-
-        foreach ($this->productCatalogue() as $productId) {
-            if (!in_array($productId, $placeholders, true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return [] !== $this->productCatalogue();
     }
 }
