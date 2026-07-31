@@ -128,7 +128,7 @@ test('executable code never qualifies as an over-the-air asset', () => {
 test('release and classification tooling does not trigger an app release', () => {
   const toolingPaths = [
     '.github/workflows/ci.yml',
-    '.github/workflows/auto-tag.yml',
+    '.github/workflows/release-tag.yml',
     '.github/mobile-impact-policy.json',
     'scripts/next-release-tag.mjs',
     'tests/next-release-tag.test.mjs'

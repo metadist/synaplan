@@ -1,37 +1,42 @@
-name: Auto Tag Mobile Release
+name: Tag Mobile Release
 
-# Tags a green `main` commit automatically so the mobile release chain in
-# metadist/synaplan-apps can run without a manual step. Only changes that reach
-# the app get a tag: `backend-only` and `no-app-impact` merges are left untagged
-# so the tag series stays meaningful and CI minutes are not spent on releases
-# nobody consumes.
+# Cuts a release tag for `main` on request, which starts the mobile release
+# chain in metadist/synaplan-apps. Everything after the tag runs unattended:
+# the pin update, its pull request, and the over-the-air or store delivery.
+#
+# Releasing is deliberate rather than per-merge. The classifier is fail-closed,
+# so a large share of merges lands on the store path, and tagging each one would
+# produce a stream of review candidates and burn a patch version per merge. One
+# tag collects everything merged since the previous release, because the
+# classification is computed against the last release tag, not the last commit.
 #
 # The tag is created through a GitHub App installation token on purpose. Refs
 # created with the default GITHUB_TOKEN do not start new workflow runs, so the
 # tag would never reach CI and `mobile-release-artifacts.yml` would not publish.
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only report the classification and the tag that would be created
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
-  group: auto-tag
+  group: mobile-release-tag
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
   tag:
     name: Tag a mobile-relevant main commit
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     env:
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      HEAD_SHA: ${{ github.sha }}
     steps:
       - name: Check tagging credentials
         id: config
@@ -48,32 +53,52 @@ jobs:
       - name: Report missing credentials
         if: steps.config.outputs.configured == 'false'
         run: |
-          echo "Automatic tagging is inactive because the GitHub App credentials are not configured." |
+          echo "Tagging is inactive because the GitHub App credentials are not configured." |
             tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Checkout the classifier from the default branch
+      - name: Checkout
         if: steps.config.outputs.configured == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          # This job is privileged: workflow_run carries repository secrets. So
-          # it deliberately does NOT check out the reported head SHA — the code
-          # executed here always comes from the reviewed default branch, and the
-          # tested commit is only ever read as git history. Never leave a
-          # writable token in .git/config; the tag is created through the API.
+          # The tag is created through the API, so no writable token belongs in
+          # .git/config.
           persist-credentials: false
 
-      - name: Classify the merge
+      - name: Require the default branch
+        if: steps.config.outputs.configured == 'true'
+        env:
+          SELECTED: ${{ github.ref_name }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [ "$SELECTED" != "$DEFAULT" ]; then
+            echo "::error::A release is cut from ${DEFAULT}, not from ${SELECTED}."
+            exit 1
+          fi
+
+      - name: Require a green commit
+        if: steps.config.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The previous workflow_run trigger guaranteed this implicitly. Started
+          # by hand, nothing stops a release from a red commit, so verify that
+          # this exact commit passed CI on a branch push.
+          green="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&status=success" \
+            --jq '[.workflow_runs[] | select(.name == "CI" and .event == "push")] | length')"
+          if [ "$green" -eq 0 ]; then
+            echo "::error::No successful CI run exists for ${HEAD_SHA} — refusing to release an unverified commit."
+            exit 1
+          fi
+
+      - name: Classify the release
         if: steps.config.outputs.configured == 'true'
         id: classify
         run: |
           set -euo pipefail
-          # Confirms the trust assumption of the checkout above: only a commit
-          # that is actually on the default branch may be classified or tagged.
-          if ! git merge-base --is-ancestor "$HEAD_SHA" HEAD; then
-            echo "::error::$HEAD_SHA is not contained in the default branch — refusing to tag."
-            exit 1
-          fi
           # Only a release tag blocks a new one. Any other ref pointing at the
           # commit (a nightly or environment tag, say) must not suppress it.
           existing_release_tag=''
@@ -100,6 +125,7 @@ jobs:
             --output mobile-impact-manifest.json
           classification="$(jq -r '.classification' mobile-impact-manifest.json)"
           echo "classification=$classification" >> "$GITHUB_OUTPUT"
+          echo "previous=${previous_tag:-none}" >> "$GITHUB_OUTPUT"
           if [[ "$classification" == "ota-candidate" || "$classification" == "store-required" ]]; then
             echo "needs_tag=true" >> "$GITHUB_OUTPUT"
             echo "tag=$(node scripts/next-release-tag.mjs)" >> "$GITHUB_OUTPUT"
@@ -108,8 +134,22 @@ jobs:
             echo "reason=Classification \`${classification}\` does not reach the app." >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create tagging token
+      - name: Report the plan
         if: steps.classify.outputs.needs_tag == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.classify.outputs.tag }}
+          CLASSIFICATION: ${{ steps.classify.outputs.classification }}
+          PREVIOUS: ${{ steps.classify.outputs.previous }}
+        run: |
+          {
+            echo "Release \`$RELEASE_TAG\` collects everything since \`$PREVIOUS\`."
+            echo ""
+            echo "Classification: \`$CLASSIFICATION\` —" \
+              "$([ "$CLASSIFICATION" = 'ota-candidate' ] && echo 'ships over the air' || echo 'needs a store review')."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create tagging token
+        if: steps.classify.outputs.needs_tag == 'true' && !inputs.dry_run
         id: app-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
@@ -117,19 +157,21 @@ jobs:
           private-key: ${{ secrets.MOBILE_TAG_APP_PRIVATE_KEY }}
 
       - name: Create the release tag
-        if: steps.classify.outputs.needs_tag == 'true'
+        if: steps.classify.outputs.needs_tag == 'true' && !inputs.dry_run
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RELEASE_TAG: ${{ steps.classify.outputs.tag }}
-          CLASSIFICATION: ${{ steps.classify.outputs.classification }}
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
             -f "ref=refs/tags/${RELEASE_TAG}" \
             -f "sha=${HEAD_SHA}"
-          echo "Tagged \`${HEAD_SHA}\` as \`${RELEASE_TAG}\` (classification \`${CLASSIFICATION}\`)." |
-            tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Tagged \`${HEAD_SHA}\` as \`${RELEASE_TAG}\`." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Report a dry run
+        if: steps.classify.outputs.needs_tag == 'true' && inputs.dry_run
+        run: echo "Dry run — no tag was created." | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Report skipped tag
         if: steps.classify.outputs.needs_tag == 'false'
