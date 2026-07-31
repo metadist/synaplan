@@ -126,7 +126,7 @@ describe('SubscriptionPaywallModal', () => {
     const wrapper = await mountPaywall()
 
     const proCard = wrapper.find('[data-plan-id="PRO"]')
-    expect(proCard.text()).toContain('Unlimited Messages')
+    expect(proCard.text()).toContain('15× more usage than the free plan')
     expect(proCard.text()).not.toContain('from the server')
   })
 

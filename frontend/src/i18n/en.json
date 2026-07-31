@@ -2137,18 +2137,14 @@
       "business": "Business"
     },
     "features": {
-      "unlimitedMessages": "Unlimited Messages",
-      "images": "{count} Images/Month",
-      "unlimitedImages": "Unlimited Images",
+      "usage": "{factor}× more usage than the free plan",
       "advancedModels": "Advanced AI Models",
       "prioritySupport": "Priority Support",
-      "storage": "{size}GB Storage",
       "everythingInPro": "Everything in Pro",
       "everythingInTeam": "Everything in Team",
       "teamCollaboration": "Team Collaboration",
       "customPrompts": "Custom Prompts",
       "apiAccess": "API Access",
-      "unlimitedVideo": "Unlimited Video Generation",
       "whiteLabel": "White-label Widgets",
       "dedicatedSupport": "Dedicated Support",
       "slaGuarantee": "SLA Guarantee"

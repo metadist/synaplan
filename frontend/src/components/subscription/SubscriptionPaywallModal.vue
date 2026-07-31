@@ -295,29 +295,29 @@ const planGridClass = computed(() => {
  * Localized benefits per tier, mirroring the server-side plan catalogue. The
  * API returns English-only `features`, which we only fall back to for a tier
  * this build does not know yet.
+ *
+ * The usage factors mirror the cost budgets of the reference deployment
+ * (Free €1 / Pro €15 / Team €40 / Business €80 per month). Plans are
+ * budget-based, so never list absolute message/image/video/storage counts
+ * here — keep in sync with `SubscriptionController::PLAN_CATALOGUE`.
  */
 const PLAN_BENEFITS: Record<string, Array<{ key: string; params?: Record<string, number> }>> = {
   PRO: [
-    { key: 'unlimitedMessages' },
-    { key: 'images', params: { count: 100 } },
+    { key: 'usage', params: { factor: 15 } },
     { key: 'advancedModels' },
     { key: 'prioritySupport' },
-    { key: 'storage', params: { size: 5 } },
   ],
   TEAM: [
     { key: 'everythingInPro' },
-    { key: 'images', params: { count: 500 } },
+    { key: 'usage', params: { factor: 40 } },
     { key: 'teamCollaboration' },
     { key: 'customPrompts' },
-    { key: 'storage', params: { size: 20 } },
     { key: 'apiAccess' },
   ],
   BUSINESS: [
     { key: 'everythingInTeam' },
-    { key: 'unlimitedImages' },
-    { key: 'unlimitedVideo' },
+    { key: 'usage', params: { factor: 80 } },
     { key: 'whiteLabel' },
-    { key: 'storage', params: { size: 100 } },
     { key: 'dedicatedSupport' },
     { key: 'slaGuarantee' },
   ],
