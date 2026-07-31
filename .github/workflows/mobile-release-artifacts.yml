@@ -131,11 +131,15 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
-          gh api --method POST repos/metadist/synaplan-apps/dispatches \
-            -f event_type=synaplan-mobile-release \
-            -f "client_payload[tag]=$RELEASE_TAG" \
-            -f "client_payload[sha]=$RELEASE_SHA" \
-            -f "client_payload[source_run_id]=${{ github.run_id }}"
+          # A repository dispatch would need Contents write on the private app
+          # repository, and this key lives in a PUBLIC repository. Starting the
+          # workflow directly needs only Actions write, so a leak cannot push code.
+          gh api --method POST \
+            repos/metadist/synaplan-apps/actions/workflows/sync-synaplan.yml/dispatches \
+            -f ref=main \
+            -f "inputs[synaplan_ref]=$RELEASE_TAG" \
+            -f "inputs[synaplan_sha]=$RELEASE_SHA" \
+            -f "inputs[source_run_id]=${{ github.run_id }}"
 
       - name: Report skipped dispatch
         if: steps.manifest.outputs.needs_sync == 'true' && steps.app-token.outcome == 'skipped'
