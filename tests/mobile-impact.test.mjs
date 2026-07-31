@@ -139,6 +139,61 @@ test('release and classification tooling does not trigger an app release', () =>
   }
 })
 
+test('local development, container, and test tooling does not trigger an app release', () => {
+  const toolingPaths = [
+    '_docker/backend/Dockerfile',
+    '_docker/backend/docker-entrypoint.sh',
+    '_devextras/reorganize-env.sh',
+    '_devextras/screenvideo/package.json',
+    '_1st_install_linux.sh',
+    'docker-compose.yml',
+    'docker-compose.test.yml',
+    'backend/.env.example',
+    'backend/phpstan-baseline.neon',
+    'backend/phpunit.xml.dist',
+    'frontend/tests/unit/setup.ts',
+    'frontend/tests/e2e/tests/memories.spec.ts'
+  ]
+
+  for (const path of toolingPaths) {
+    assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'no-app-impact', path)
+  }
+})
+
+test('classifies server-side configuration, migrations, and providers as backend-only', () => {
+  const backendPaths = [
+    'backend/config/packages/messenger.yaml',
+    'backend/config/services.yaml',
+    'backend/migrations/Version20260729120000.php',
+    'backend/src/AI/Provider/OpenAIProvider.php',
+    'backend/src/DTO/UserMemoryDTO.php',
+    'backend/src/Model/ModelCatalog.php',
+    'backend/src/Prompt/PromptCatalog.php'
+  ]
+
+  for (const path of backendPaths) {
+    assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'backend-only', path)
+  }
+})
+
+test('security, mobile, and payment implementations stay store-required by an explicit rule', () => {
+  const guardedPaths = [
+    'backend/config/packages/security.yaml',
+    'backend/src/Service/MobilePurchaseService.php',
+    'backend/src/AI/Service/StripeBillingBridge.php',
+    'frontend/package.json',
+    'frontend/package-lock.json'
+  ]
+
+  for (const path of guardedPaths) {
+    const result = classifyFiles([entry(path, 'M')], policy)
+    assert.equal(result.classification, 'store-required', path)
+    // A named rule must catch these, otherwise the manifest only reports that
+    // the path was never allow-listed and hides why the release is gated.
+    assert.equal(result.reasons[0].reason, policy.storeRequired.reason, path)
+  }
+})
+
 test('uses the highest classification for mixed changes', () => {
   assert.equal(classifyFiles([
     entry('README.md'),
