@@ -368,6 +368,36 @@ class ModelCatalog
             ],
         ],
         [
+            // The local chat model the compose stack actually pulls
+            // (_docker/backend/docker-entrypoint.sh, ENABLE_LOCAL_GPT_OSS=true).
+            // ProviderDefaultsService binds the Ollama defaults here: the 120b
+            // sibling above needs ~65 GB of VRAM and is never downloaded by the
+            // entrypoint, so pointing the defaults at it made the advertised
+            // "runs fully local" path unreachable.
+            'id' => 322,
+            'service' => 'Ollama',
+            'name' => 'gpt-oss:20b',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            // Free at point of use, but it is the local install's default chat
+            // model — keep it in the user-facing list (see bge-m3 above).
+            'showWhenFree' => 1,
+            'providerId' => 'gpt-oss:20b',
+            'priceIn' => 0,
+            'inUnit' => 'free',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI\'s open-weight GPT-OSS (20B) on the operator\'s own Ollama server — the model the Synaplan compose stack downloads for local AI. 128K context, Apache-2.0, MXFP4 quantization; runs on a single GPU or a well-equipped CPU box (~14 GB).',
+                'max_tokens' => 16384,
+                'params' => ['model' => 'gpt-oss:20b'],
+                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
+            ],
+        ],
+        [
             'id' => 172,
             'service' => 'Ollama',
             'name' => 'Qwen 3.5 35B',
@@ -636,6 +666,31 @@ class ModelCatalog
                 'max_tokens' => 4096,
                 'is_system' => true,
                 'params' => ['model' => 'gpt-oss:120b'],
+                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
+            ],
+        ],
+        [
+            // Memory-extraction twin of BID 322 — the local model the entrypoint
+            // downloads, so a fully local install can run the memory pipeline
+            // without the 120b weights.
+            'id' => 323,
+            'service' => 'Ollama',
+            'name' => 'gpt-oss:20b',
+            'tag' => 'mem',
+            'selectable' => 0,
+            'active' => 1,
+            'providerId' => 'gpt-oss:20b',
+            'priceIn' => 0,
+            'inUnit' => 'free',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Local Ollama gpt-oss:20b for memory extraction. Same weights as the local chat default (BID 322); zero per-token cost, latency depends on hardware.',
+                'max_tokens' => 4096,
+                'is_system' => true,
+                'params' => ['model' => 'gpt-oss:20b'],
                 'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
             ],
         ],

@@ -17,7 +17,7 @@ AI-powered knowledge management with RAG, chat widgets, and multi-channel integr
 - **Docker** + **Docker Compose v2** (Docker Desktop on macOS/Windows, or Docker Engine + the Compose plugin on Linux)
 - **Git**
 - **8 GB RAM** minimum (16 GB recommended for the local-AI standard install)
-- **~9 GB free disk** for the standard install (~5 GB for minimal)
+- **~9 GB free disk** for the standard install (~5 GB for minimal, +~14 GB if you enable the local chat model)
 - Free TCP ports `5173`, `8000`, `8082`, `8025`, `3307`, `6333`, `11435`
 
 > **Apple Silicon (M1–M4) Macs:** Synaplan's container images are published for `linux/amd64`, so they run under emulation on Apple Silicon. In **Docker Desktop → Settings → General**, enable **"Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) for much faster, more stable containers than the default QEMU. Everything works without it — just slower, and the first build takes longer.
@@ -30,7 +30,11 @@ cd synaplan
 docker compose up -d
 ```
 
-Open http://localhost:5173 — the **UI is ready in ~2 minutes**. With the standard install, local Ollama models (`gpt-oss:20b`, `bge-m3`, ~14 GB total) continue downloading in the background — chat that uses local AI will start working once that download finishes (`docker compose logs -f backend` shows progress). For the fastest first experience, use the [Minimal](#install-options) install below.
+Open http://localhost:5173 — the **UI is ready in ~2 minutes**. The standard install downloads the local embedding model (`bge-m3`, ~1 GB) in the background for RAG and semantic search; progress is shown in the app.
+
+**Then connect an AI provider:** log in as `admin@synaplan.com` / `admin123` and open **Admin → AI Providers** — paste any provider key (free tier: [Groq](https://console.groq.com)), it is tested live, stored encrypted, and chat works immediately.
+
+**Want chat without any cloud key?** Start the stack with `ENABLE_LOCAL_GPT_OSS=true docker compose up -d` to also pull a local chat model (`gpt-oss:20b`, ~14 GB, GPU or strong CPU recommended). Chat starts working when that download finishes — `docker compose logs -f backend` shows progress.
 
 ---
 
@@ -38,19 +42,18 @@ Open http://localhost:5173 — the **UI is ready in ~2 minutes**. With the stand
 
 | Mode | Command | Size | Best For |
 |------|---------|------|----------|
-| **Standard** | `docker compose up -d` | ~9 GB | Full features, local AI |
+| **Standard** | `docker compose up -d` | ~9 GB | Full features, local embeddings (local chat model optional, +~14 GB) |
 | **Minimal** | `docker compose -f docker-compose-minimal.yml up -d` | ~5 GB | Cloud AI only (Groq/OpenAI) |
 
-For the minimal install, set your API key **before** starting the stack so the first boot already sees it (avoids a restart). Get a free key at [console.groq.com](https://console.groq.com):
+**Connecting a cloud AI provider (recommended: the UI).** Log in as admin and open **Admin → AI Providers** (`/admin/setup`): paste a key, it is tested live, stored **encrypted in the database**, and active immediately — no restart, no `.env` editing. Get a free key at [console.groq.com](https://console.groq.com).
+
+Prefer the shell? Keys in `backend/.env` still work — the backend reads that file when the container starts and imports the key into the encrypted store on first use. Write the key before starting, or restart the containers afterwards:
 
 ```bash
 echo "GROQ_API_KEY=your_key" >> backend/.env
 docker compose -f docker-compose-minimal.yml up -d
-```
-
-Already started without a key? Add it and restart the backend:
-```bash
-echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
+# already running? pick up the new key with:
+# docker compose restart backend worker
 ```
 
 ---
@@ -96,7 +99,7 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 
 ## AI Providers & Models
 
-Synaplan is provider-neutral: add the API keys you want to `backend/.env`, restart the backend, and the matching models appear in the selector. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
+Synaplan is provider-neutral: connect the providers you want in **Admin → AI Providers** (keys are validated live and stored encrypted in the database, active without a restart), or set the env variables below in `backend/.env` — those are read at container start and imported into the encrypted store on first use. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
 
 | Provider | Variable in `backend/.env` | Models |
 |----------|---------------------------|--------|

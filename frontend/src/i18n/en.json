@@ -71,6 +71,7 @@
     "admin": "Admin Panel",
     "adminFeatures": "Feature Status",
     "adminConfig": "System Configuration",
+    "adminSetup": "AI Provider Setup",
     "subscription": "Subscription",
     "subscriptionSuccess": "Subscription Successful",
     "subscriptionCancel": "Subscription Cancelled",
@@ -457,6 +458,7 @@
       "saveError": "Failed to save configuration",
       "saved": "Configuration saved",
       "savedLive": "Saved — takes effect immediately",
+      "dbOverridesEnv": "Stored encrypted in the database — overrides any matching value in .env.",
       "unsaved": "Unsaved changes",
       "testConnection": "Test Connection",
       "testFailed": "Connection test failed",
@@ -517,6 +519,7 @@
     "adminDashboard": "Dashboard",
     "adminFeatureStatus": "Feature Status",
     "adminSystemConfig": "System Config",
+    "adminProviderSetup": "AI Providers",
     "more": "More",
     "moreDescription": "More sections and account",
     "menu": "Menu"
@@ -1266,7 +1269,7 @@
       "availableModels": "Available Models",
       "noModels": "No models available for this purpose",
       "modelNotAvailable": "{model} is not available. Please check provider configuration.",
-      "modelNotConfigured": "{model} is not ready: set {envVar} in your environment (e.g. .env.local).",
+      "modelNotConfigured": "{model} is not ready: add {envVar} under Admin → AI Providers (or in your environment).",
       "id": "ID",
       "purpose": "PURPOSE",
       "service": "SERVICE",
@@ -2168,6 +2171,101 @@
       "tryAgain": "Try Again",
       "backToPlans": "Back to Plans"
     }
+  },
+  "adminSetup": {
+    "title": "AI Provider Setup",
+    "description": "Connect an AI provider so your team can chat. Keys are stored encrypted on your server and take effect immediately — no restart needed.",
+    "statusReadyTitle": "Your AI is ready",
+    "statusReadyText": "The default chat model has a working provider. You can add more providers below at any time.",
+    "statusNotReadyTitle": "No AI provider connected yet",
+    "statusNotReadyText": "Chat will not work until a provider is connected. Add an API key below — Groq offers a free key that works in under a minute.",
+    "cloudProviders": "Cloud providers",
+    "cloudProvidersHint": "Paste an API key, it is tested live and stored encrypted. Keys from your .env file are picked up automatically.",
+    "recommended": "Recommended",
+    "freeTier": "Free tier available",
+    "connected": "Connected",
+    "sourceEnv": "imported from .env",
+    "sourceDbFromEnv": "stored in DB (from .env)",
+    "sourceDbOverridesEnv": "Stored encrypted in the database — overrides any matching value in .env.",
+    "sourceDbFromEnvHint": "Stored encrypted in the database (imported from .env). A key saved here permanently overrides .env.",
+    "currentDefault": "Current default",
+    "keyPlaceholder": "Paste API key…",
+    "replaceKeyPlaceholder": "Paste new API key to replace…",
+    "saveAndTest": "Test & Save",
+    "applyDefaultsOnSave": "Also use this provider for chat and other AI tasks",
+    "getKey": "Get API key",
+    "testKey": "Test",
+    "makeDefault": "Use as default",
+    "removeKey": "Remove",
+    "saved": "{provider} key saved — active immediately",
+    "savedWithDefaults": "{provider} key saved and set as your default AI provider",
+    "saveFailed": "Saving the key failed",
+    "testOk": "{provider} key works",
+    "testFailed": "{provider} key test failed",
+    "defaultsApplied": "{provider} is now the default AI provider",
+    "removeConfirmTitle": "Remove API key",
+    "removeConfirmMessage": "Remove the stored {provider} API key? Chat via {provider} will stop working unless a key is set in the .env file.",
+    "removed": "{provider} key removed",
+    "removedEnvStillSet": "Stored {provider} key removed — {envVar} is still set in the environment, so {provider} stays connected from that value",
+    "loadFailed": "Could not load provider status",
+    "localAi": {
+      "title": "Local AI (Ollama) — no key needed",
+      "description": "The standard installation includes local AI models that run entirely on your hardware. Downloading models can take a while on first start; cloud providers above are available instantly."
+    }
+  },
+  "providerHelp": {
+    "openAria": "How to set this up",
+    "createKeyLink": "Create API key",
+    "downloadLink": "Download Ollama",
+    "groq": {
+      "title": "Groq API key",
+      "message": "Create a free Groq API key in the Groq console, then paste it here. The free tier is usually enough to start chatting in under a minute."
+    },
+    "openai": {
+      "title": "OpenAI API key",
+      "message": "Create an API key in your OpenAI account (API keys page), then paste it here. Usage is billed by OpenAI."
+    },
+    "anthropic": {
+      "title": "Anthropic API key",
+      "message": "Create an API key in the Anthropic console (Settings → Keys), then paste it here to use Claude models."
+    },
+    "google": {
+      "title": "Google Gemini API key",
+      "message": "Create a Gemini API key in Google AI Studio, then paste it here. A free tier is available for many models."
+    },
+    "mistral": {
+      "title": "Mistral API key",
+      "message": "Create an API key in the Mistral console, then paste it here. Mistral offers a free tier for getting started."
+    },
+    "trustedtokens": {
+      "title": "TrustedTokens API key",
+      "message": "Create an API key at TrustedTokens (Account → API Access), then paste it here. Inference runs on German GPUs with EU data residency."
+    },
+    "huggingface": {
+      "title": "HuggingFace API token",
+      "message": "Create an access token in your HuggingFace settings, then paste it here to use HuggingFace Inference models."
+    },
+    "xai": {
+      "title": "xAI API key",
+      "message": "Create an API key in the xAI console, then paste it here to use Grok models."
+    },
+    "ollama": {
+      "title": "Local AI with Ollama",
+      "message": "Download Ollama and pull a capable model such as gpt-oss:120b (or a smaller one like llama3.2 if your machine has less RAM). No API key is needed — Synaplan talks to Ollama at the configured URL."
+    }
+  },
+  "setupBanner": {
+    "title": "No AI provider connected",
+    "adminText": "Chat needs an AI provider. Connect one in a minute — free options available.",
+    "userText": "Chat is not ready yet. Please ask your administrator to connect an AI provider.",
+    "cta": "Set up AI provider"
+  },
+  "localAiDownload": {
+    "waitingTitle": "Local AI is starting",
+    "downloadingTitle": "Local AI is downloading, {percent}%",
+    "cloudWorksText": "Cloud chat works now — local models will be ready when the download finishes.",
+    "errorTitle": "Local AI download failed",
+    "errorText": "Cloud chat still works. Check Ollama logs or retry with AUTO_DOWNLOAD_MODELS=true."
   },
   "common": {
     "ok": "OK",
@@ -3649,8 +3747,8 @@
       "healthSummary": "{healthy} of {total} services healthy",
       "model": "model",
       "models": "models",
-      "devOnlyTitle": "Development Mode Only",
-      "devOnlyMessage": "This page is only available in development environments. System status monitoring is restricted in production."
+      "adminOnlyTitle": "Admin access required",
+      "adminOnlyMessage": "Feature status is available to administrators only."
     }
   },
   "cookies": {

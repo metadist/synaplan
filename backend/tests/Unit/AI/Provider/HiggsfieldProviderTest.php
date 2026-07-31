@@ -20,6 +20,17 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  */
 class HiggsfieldProviderTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        // pollUntilTerminal() re-arms set_time_limit() per iteration (needed
+        // under FrankenPHP). In the CLI test runner that call converts the
+        // process-wide budget from 0 (unlimited) to 45s of CPU time — and the
+        // fatal then fires in whatever unrelated test happens to be running
+        // when the whole suite crosses 45s. Restore "unlimited" after each
+        // test so this class can never time-bomb the rest of the run.
+        set_time_limit(0);
+    }
+
     /**
      * @param array<int, array{status: int, data: array<string, mixed>}>              $responses
      *                                                                                           Ordered HTTP responses (submit first, then each poll)

@@ -33,19 +33,6 @@ const guardSubscription = (
   }
 }
 
-/** System / feature status page is for local development only (not shown in production builds). */
-const guardDevOnlyAdminFeatures = (
-  _to: RouteLocationNormalized,
-  _from: RouteLocationNormalized,
-  next: NavigationGuardNext
-) => {
-  if (!import.meta.env.DEV) {
-    next({ name: 'admin' })
-    return
-  }
-  next()
-}
-
 /**
  * Build-time fallback brand name. The live name comes from the runtime branding
  * config (`useConfigStore().branding.name`, Epic 4); this constant only covers
@@ -415,7 +402,6 @@ const router = createRouter({
       path: '/admin/features',
       name: 'admin-features',
       component: () => import('@/views/FeatureStatusView.vue'),
-      beforeEnter: guardDevOnlyAdminFeatures,
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminFeatures' },
     },
     {
@@ -423,6 +409,12 @@ const router = createRouter({
       name: 'admin-config',
       component: () => import('@/views/AdminConfigView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminConfig' },
+    },
+    {
+      path: '/admin/setup',
+      name: 'admin-setup',
+      component: () => import('@/views/ProviderSetupView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminSetup' },
     },
     {
       path: '/subscription',

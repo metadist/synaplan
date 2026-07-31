@@ -2,6 +2,7 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
@@ -18,20 +19,57 @@ use Psr\Log\LoggerInterface;
  */
 class GroqProvider implements ChatProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface
 {
-    private $client;
+    private ?OpenAI\Client $client = null;
 
+    /** Key the cached client was built with (rebuild on key change). */
+    private ?string $clientKey = null;
+
+    /**
+     * $apiKey is an explicit override (tests, custom wiring) that wins over
+     * the ProviderKeyStore. Production wiring passes only the store, so keys
+     * saved in the admin UI (or imported from env) apply without a restart.
+     */
     public function __construct(
         private LoggerInterface $logger,
         private ?string $apiKey = null,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?ProviderKeyStore $keyStore = null,
     ) {
-        if (!empty($apiKey)) {
+    }
+
+    private function resolveApiKey(): ?string
+    {
+        if (null !== $this->apiKey && '' !== $this->apiKey) {
+            return $this->apiKey;
+        }
+
+        return $this->keyStore?->getKey($this->getName());
+    }
+
+    /**
+     * Lazily build the API client with the CURRENT key; rebuilt when the key
+     * changes at runtime (admin UI save / env import).
+     */
+    private function client(): ?OpenAI\Client
+    {
+        $key = $this->resolveApiKey();
+        if (null === $key || '' === $key) {
+            $this->client = null;
+            $this->clientKey = null;
+
+            return null;
+        }
+
+        if (null === $this->client || $this->clientKey !== $key) {
             // Groq uses OpenAI-compatible client with custom base URL
             $this->client = \OpenAI::factory()
-                ->withApiKey($apiKey)
+                ->withApiKey($key)
                 ->withBaseUri('https://api.groq.com/openai/v1')
                 ->make();
+            $this->clientKey = $key;
         }
+
+        return $this->client;
     }
 
     public function getName(): string
@@ -61,7 +99,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
     public function getStatus(): array
     {
-        if (!$this->client) {
+        if (null === $this->client()) {
             return [
                 'healthy' => false,
                 'error' => 'API key not configured',
@@ -78,7 +116,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
     public function isAvailable(): bool
     {
-        return !empty($this->apiKey) && null !== $this->client;
+        return null !== $this->client();
     }
 
     public function getRequiredEnvVars(): array
@@ -99,7 +137,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             throw new ProviderException('Model must be specified in options', 'groq');
         }
 
-        if (!$this->client) {
+        if (null === $this->client()) {
             throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
         }
 
@@ -121,15 +159,18 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 $requestOptions['temperature'] = $options['temperature'];
             }
 
-            $response = $this->client->chat()->create($requestOptions);
+            $response = $this->client()->chat()->create($requestOptions);
 
             $responseArray = $response->toArray();
-            $cachedTokens = $responseArray['usage']['prompt_tokens_details']['cached_tokens'] ?? 0;
+            // Groq extends the SDK's sealed usage shape with prompt_tokens_details.
+            /** @var array<string, mixed> $usageRaw */
+            $usageRaw = $responseArray['usage'] ?? [];
+            $promptDetails = is_array($usageRaw['prompt_tokens_details'] ?? null) ? $usageRaw['prompt_tokens_details'] : [];
             $usage = [
-                'prompt_tokens' => $responseArray['usage']['prompt_tokens'] ?? 0,
-                'completion_tokens' => $responseArray['usage']['completion_tokens'] ?? 0,
-                'total_tokens' => $responseArray['usage']['total_tokens'] ?? 0,
-                'cached_tokens' => $cachedTokens,
+                'prompt_tokens' => (int) ($usageRaw['prompt_tokens'] ?? 0),
+                'completion_tokens' => (int) ($usageRaw['completion_tokens'] ?? 0),
+                'total_tokens' => (int) ($usageRaw['total_tokens'] ?? 0),
+                'cached_tokens' => (int) ($promptDetails['cached_tokens'] ?? 0),
                 'cache_creation_tokens' => 0,
             ];
 
@@ -153,7 +194,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             throw new ProviderException('Model must be specified in options', 'groq');
         }
 
-        if (!$this->client) {
+        if (null === $this->client()) {
             throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
         }
 
@@ -177,7 +218,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 $requestOptions['temperature'] = $options['temperature'];
             }
 
-            $stream = $this->client->chat()->createStreamed($requestOptions);
+            $stream = $this->client()->chat()->createStreamed($requestOptions);
 
             $chunkCount = 0;
             $usage = [
@@ -253,7 +294,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
     public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
     {
-        if (!$this->client) {
+        if (null === $this->client()) {
             throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
         }
 
@@ -286,7 +327,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             ]);
 
             // Groq uses OpenAI-compatible vision API
-            $response = $this->client->chat()->create([
+            $response = $this->client()->chat()->create([
                 'model' => $model,
                 'messages' => [[
                     'role' => 'user',
@@ -319,7 +360,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
     public function compareImages(string $imageUrl1, string $imageUrl2): array
     {
-        if (!$this->client) {
+        if (null === $this->client()) {
             throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
         }
 
@@ -353,7 +394,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'image2' => basename($imageUrl2),
             ]);
 
-            $response = $this->client->chat()->create([
+            $response = $this->client()->chat()->create([
                 'model' => $model,
                 'messages' => [[
                     'role' => 'user',
@@ -407,7 +448,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
      */
     public function transcribe(string $audioPath, array $options = []): array
     {
-        if (!$this->client) {
+        if (null === $this->client()) {
             throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
         }
 
@@ -466,7 +507,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                     $requestParams['temperature'] = (float) $options['temperature'];
                 }
 
-                $response = $this->client->audio()->transcribe($requestParams);
+                $response = $this->client()->audio()->transcribe($requestParams);
 
                 $this->logger->info('Groq: Transcription complete', [
                     'model' => $model,
@@ -510,7 +551,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
      */
     public function translateAudio(string $audioPath, string $targetLang): string
     {
-        if (!$this->client) {
+        if (null === $this->client()) {
             throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
         }
 
@@ -547,7 +588,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             }
 
             try {
-                $response = $this->client->audio()->translate([
+                $response = $this->client()->audio()->translate([
                     'model' => $model,
                     'file' => $fileHandle,
                     'response_format' => 'text',

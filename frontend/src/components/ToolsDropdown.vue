@@ -185,7 +185,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { type Command, useCommandsStore } from '@/stores/commands'
-import { getFeaturesStatus, DevOnlyFeatureError, type Feature } from '@/services/featuresService'
+import { useAuthStore } from '@/stores/auth'
+import { getFeaturesStatus, type Feature } from '@/services/featuresService'
 import { useRouter } from 'vue-router'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 
@@ -235,6 +236,7 @@ const commandTools = [
 ] as const
 
 const router = useRouter()
+const authStore = useAuthStore()
 const commandsStore = useCommandsStore()
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])
@@ -266,20 +268,21 @@ const getToolMessage = (toolId: string): string => {
 }
 
 const loadFeaturesStatus = async () => {
-  // `/api/v1/config/features` is dev-only and returns 403 in production, which
-  // spammed the console on every Tools open (issues #1105, #1066). Outside dev
-  // there is nothing to fetch, so skip the request entirely — matching the
-  // guard already used in `useNavItems`.
-  if (!import.meta.env.DEV) return
+  // `/api/v1/config/features` is admin-only. Non-admins get 403 — skip the
+  // request entirely so Tools open does not spam the console. The loading flag
+  // must still clear, otherwise every tool stays in its "checking" state.
+  if (!authStore.isAdmin) {
+    isLoadingFeatures.value = false
+    return
+  }
 
   try {
     isLoadingFeatures.value = true
     const status = await getFeaturesStatus()
     featuresStatus.value = status.features
-  } catch (error) {
-    // A 403 here just means we're not in dev mode — expected, not an error.
-    if (error instanceof DevOnlyFeatureError) return
-    console.error('Failed to load features status:', error)
+  } catch {
+    // Feature badges are decoration — the tools themselves stay usable, so a
+    // failed status probe is silently ignored.
   } finally {
     isLoadingFeatures.value = false
   }

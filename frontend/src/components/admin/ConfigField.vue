@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { Icon } from '@iconify/vue'
+import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigApi'
+import { providerHelpByEnvVar } from '@/utils/providerHelp'
 
 interface Props {
   fieldKey: string
@@ -96,20 +98,41 @@ const statusIcon = computed(() => {
 
 const statusColor = computed(() => {
   if (props.value.isSet) {
-    return 'text-green-500'
+    return 'text-[var(--status-success)]'
   }
   return 'txt-secondary'
 })
+
+/** Cloud provider keys (source=database) — DB value overrides any matching .env entry. */
+const showDbOverrideHint = computed(
+  () =>
+    props.schema.source === 'database' &&
+    props.schema.type === 'password' &&
+    props.value.isSet &&
+    !isDirty.value
+)
+
+const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
 </script>
 
 <template>
   <div class="config-field">
     <div class="flex items-center justify-between mb-1.5">
-      <label :for="fieldKey" class="flex items-center gap-2 text-sm font-medium txt-primary">
-        <code class="text-xs bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">{{ fieldKey }}</code>
-        <Icon :icon="statusIcon" :class="['w-4 h-4', statusColor]" />
-      </label>
-      <span v-if="isDirty" class="text-xs text-yellow-600 dark:text-yellow-400">
+      <div class="flex items-center gap-1.5 min-w-0">
+        <label :for="fieldKey" class="flex items-center gap-2 text-sm font-medium txt-primary">
+          <code class="text-xs bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">{{
+            fieldKey
+          }}</code>
+          <Icon :icon="statusIcon" :class="['w-4 h-4', statusColor]" />
+        </label>
+        <ProviderHelpHint
+          v-if="helpMeta"
+          :help-id="helpMeta.id"
+          :url="helpMeta.url"
+          :is-download="helpMeta.isDownload"
+        />
+      </div>
+      <span v-if="isDirty" class="text-xs text-[var(--status-warning)]">
         {{ $t('admin.config.unsaved') }}
       </span>
     </div>
@@ -212,6 +235,14 @@ const statusColor = computed(() => {
         {{ $t('common.save') }}
       </button>
     </div>
+
+    <p
+      v-if="showDbOverrideHint"
+      class="text-xs txt-secondary mt-1.5"
+      data-testid="config-field-db-override-hint"
+    >
+      {{ $t('admin.config.dbOverridesEnv') }}
+    </p>
   </div>
 </template>
 
