@@ -94,11 +94,16 @@ app shows once loaded.
 | Stripe | price ID → tier | `SubscriptionController::mapPriceIdToLevel()` |
 | IAP | store product ID → tier | `IapPricingService::mapProductIdToLevel()` |
 
-IAP product IDs are configured via env (`IAP_PRODUCT_PRO` / `_TEAM` / `_BUSINESS`). Defaults are
-the documented placeholder convention (`com.synaplan.app.<tier>.monthly`), so web-only /
-open-source deployments keep IAP **off** (`IapPricingService::isConfigured()` is false, mirroring
-`BillingService::isEnabled()` for Stripe). `GET /api/v1/subscription/plans` exposes the resolved
-`iapProductId` per tier plus an `iapConfigured` flag so the app knows whether to offer a purchase.
+IAP product IDs are configured via env (`IAP_PRODUCT_PRO` / `_TEAM` / `_BUSINESS`) and default to
+**empty**, so web-only / open-source deployments keep IAP **off**
+(`IapPricingService::isConfigured()` is false, mirroring `BillingService::isEnabled()` for Stripe).
+A deployment that sells through the stores must set all three explicitly.
+`GET /api/v1/subscription/plans` exposes the resolved `iapProductId` per tier (null for a tier
+without a product) plus an `iapConfigured` flag so the app knows whether to offer a purchase.
+
+> Do not reintroduce sample product IDs as defaults. The previous
+> `com.synaplan.app.<tier>.monthly` "placeholder convention" collided with the real App Store
+> Connect IDs, so a fully configured production deployment reported `iapConfigured: false`.
 
 ## Server-side IAP validation (Epic 5.4)
 
