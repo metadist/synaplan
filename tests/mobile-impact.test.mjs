@@ -109,7 +109,11 @@ test('executable code never qualifies as an over-the-air asset', () => {
   ]
 
   for (const path of executableAssets) {
-    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'store-required', path)
+    const result = classifyFiles([entry(path, 'A')], policy)
+    assert.equal(result.classification, 'store-required', path)
+    // The manifest must name the exclusion rather than claim the path was
+    // never allow-listed — it is, and is held back for being executable.
+    assert.equal(result.reasons[0].reason, policy.otaCandidate.excludedReason, path)
   }
 
   assert.equal(

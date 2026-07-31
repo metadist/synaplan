@@ -75,6 +75,7 @@
       "frontend/public/**/*.webp",
       "frontend/src/components/icons/**"
     ],
+    "excludedReason": "The path sits in a web-asset directory but is executable code or markup, which may not be delivered over the air.",
     "excludedPatterns": [
       "**/*.ts",
       "**/*.tsx",
