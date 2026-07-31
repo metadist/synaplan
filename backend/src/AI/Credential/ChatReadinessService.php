@@ -71,12 +71,14 @@ final class ChatReadinessService
     }
 
     /**
-     * The provider serving the GLOBAL default chat model, or null when the
-     * binding does not resolve (fresh DB, retired model).
+     * The provider serving the default chat model — the per-user override when
+     * a user id is given (mirroring the lookup the chat pipeline itself uses),
+     * otherwise the GLOBAL default. Null when the binding does not resolve
+     * (fresh DB, retired model).
      */
-    public function defaultChatService(): ?string
+    public function defaultChatService(?int $userId = null): ?string
     {
-        $bid = $this->modelConfigService->getDefaultModel('CHAT');
+        $bid = $this->modelConfigService->getDefaultModel('CHAT', $userId);
         if (null === $bid) {
             return null;
         }
@@ -88,15 +90,19 @@ final class ChatReadinessService
 
     /**
      * Whether a plain chat message can be answered right now: the provider
-     * behind the global default chat model must be usable. Falls back to "any
-     * chat-capable provider is usable" only when the binding does not resolve.
+     * behind the effective default chat model must be usable. Pass the user id
+     * so a per-user model override is honoured — the chat pipeline resolves
+     * the model per user, and readiness must measure the same thing, or a user
+     * whose chat works fine is shown a "no AI provider connected" banner.
+     * Falls back to "any chat-capable provider is usable" only when the
+     * binding does not resolve.
      *
      * @param array<string, bool>|null $availability defaults to the cached snapshot
      */
-    public function isChatReady(?array $availability = null, ?string $defaultChatService = null): bool
+    public function isChatReady(?array $availability = null, ?string $defaultChatService = null, ?int $userId = null): bool
     {
         $availability ??= $this->providerAvailability();
-        $defaultChatService ??= $this->defaultChatService();
+        $defaultChatService ??= $this->defaultChatService($userId);
 
         if (null !== $defaultChatService && isset($availability[$defaultChatService])) {
             return $availability[$defaultChatService];
@@ -183,7 +189,7 @@ final class ChatReadinessService
         // Ollama answers as soon as the server is up, even with zero models
         // pulled. Treating that as "available" would route chat at a model
         // nobody downloaded and falsely hide the setup banner.
-        if (($available['ollama'] ?? false) && !$this->recommendedOllamaChatModelPulled()) {
+        if (($available['ollama'] ?? false) && !$this->ollamaChatModelPulled()) {
             $available['ollama'] = false;
         }
 
@@ -194,6 +200,26 @@ final class ChatReadinessService
         $this->cache->save($item);
 
         return $snapshot;
+    }
+
+    /**
+     * Is the Ollama chat model this install would actually use pulled? When
+     * the configured GLOBAL default chat model is an Ollama model, that exact
+     * model is checked — an operator who deliberately bound chat to a pulled
+     * local model must not be flagged "not ready" just because the recommended
+     * model is absent. Otherwise falls back to the recommended binding.
+     */
+    private function ollamaChatModelPulled(): bool
+    {
+        $bid = $this->modelConfigService->getDefaultModel('CHAT');
+        if (null !== $bid) {
+            $model = $this->modelRepository->find($bid);
+            if (null !== $model && 'ollama' === strtolower($model->getService())) {
+                return $this->isOllamaModelPulled($model->getProviderId());
+            }
+        }
+
+        return $this->recommendedOllamaChatModelPulled();
     }
 
     /**
