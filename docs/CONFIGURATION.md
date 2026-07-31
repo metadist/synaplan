@@ -1,8 +1,16 @@
 # Configuration Guide
 
-All configuration is done via environment variables in `backend/.env`.
+Synaplan reads configuration from three places, and it matters which one you reach for:
 
-![Settings Page](images/settings.png)
+| Where | What belongs there | Takes effect |
+|-------|--------------------|--------------|
+| `backend/.env` | Infrastructure and boot settings: database, Redis, public URLs, `APP_SECRET`, channel credentials | When the container starts |
+| **Admin → AI Providers** (`/admin/setup`) | AI provider API keys — validated live, stored encrypted in the database | Immediately, no restart |
+| **Admin → System Configuration** (`/admin/config`), backed by `BCONFIG` rows | Behavior switches: multi-task routing, async media jobs, white-label branding | Immediately, no restart |
+
+Provider keys are the common case and belong in the UI — see [AI Providers](#ai-providers) below. Environment variables remain supported for scripted and orchestrated deploys.
+
+![Admin → AI Providers: every provider listed with a connection badge, a free-tier hint and a single field to paste the key into](images/tour/provider-setup.webp)
 
 ## Quick Reference
 
@@ -285,9 +293,7 @@ See [Email Integration Guide](EMAIL.md) for full setup.
 Qdrant is included in `docker-compose.yml` and starts automatically with Synaplan.
 It powers AI memories (user profiling) and RAG document vector search.
 
-Configure in `backend/.env`:
-
-Qdrant runs as an internal Docker service — no configuration needed beyond the default `QDRANT_URL=http://qdrant:6333` in `.env`.
+Qdrant runs as an internal Docker service — no configuration needed beyond the default `QDRANT_URL=http://qdrant:6333` in `backend/.env`.
 
 **This is optional** — Synaplan works fully without it (memories and vector search will be disabled).
 

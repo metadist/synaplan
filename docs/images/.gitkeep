@@ -4,10 +4,17 @@ Screenshots for Synaplan documentation.
 
 | Image | Used In |
 |-------|---------|
-| dashboard.png | README.md |
-| chat.png | FEATURES.md |
-| widget-embed.png | WIDGET.md |
-| rag-search.png | RAG.md |
-| settings.png | CONFIGURATION.md |
+| synaplan-tour.webp | README.md (animated hero) |
+| tour/*.webp | README.md (tour grid, click-to-enlarge) |
+| tour/thumbs/*.webp | README.md (tour grid thumbnails) |
+| tour/chat.webp | FEATURES.md |
+| tour/rag-search.webp | RAG.md |
+| tour/chat-widget.webp | WIDGET.md |
+| tour/provider-setup.webp | CONFIGURATION.md |
 
-Recommended size: 1200px width, PNG or WebP format
+Every image here is generated — run `scripts/build-readme-tour.sh` to rebuild
+them from the raw captures in `tour/src/` (gitignored). Do not edit the
+generated files by hand; recapture the source PNG and rerun the script, so the
+docs and the README hero never drift apart.
+
+Recommended size for new hand-added screenshots: 1200px width, PNG or WebP.
