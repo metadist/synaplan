@@ -64,6 +64,77 @@ test('classifies mobile contracts and dependencies as store-required', () => {
   }
 })
 
+test('classifies the four release-critical categories as store-required', () => {
+  const categories = {
+    'in-app purchases': [
+      'frontend/src/services/purchases.ts',
+      'frontend/src/components/subscription/PaywallModal.vue',
+      'backend/src/Service/SubscriptionService.php',
+      'backend/src/Service/StripeCheckoutService.php'
+    ],
+    'device permissions': [
+      'frontend/src/composables/useCameraCapture.ts',
+      'android/app/src/main/AndroidManifest.xml',
+      'ios/App/App/Info.plist'
+    ],
+    'authentication transport': [
+      'frontend/src/services/authService.ts',
+      'frontend/src/utils/pendingAuthRedirect.ts',
+      'backend/config/packages/security.yaml'
+    ],
+    privacy: [
+      'ios/App/App/PrivacyInfo.xcprivacy',
+      'frontend/public/site.webmanifest',
+      'frontend/src/services/otaUpdates.ts'
+    ]
+  }
+
+  for (const [category, paths] of Object.entries(categories)) {
+    for (const path of paths) {
+      assert.equal(
+        classifyFiles([entry(path, 'A')], policy).classification,
+        'store-required',
+        `${category}: ${path}`
+      )
+    }
+  }
+})
+
+test('executable code never qualifies as an over-the-air asset', () => {
+  const executableAssets = [
+    'frontend/src/assets/tracking.ts',
+    'frontend/src/assets/vendor/analytics.js',
+    'frontend/src/components/icons/iconRegistry.ts',
+    'frontend/src/assets/embed.html'
+  ]
+
+  for (const path of executableAssets) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'store-required', path)
+  }
+
+  assert.equal(
+    classifyFiles([
+      entry('frontend/src/assets/logo.svg'),
+      entry('frontend/src/components/icons/ProviderIcon.vue')
+    ], policy).classification,
+    'ota-candidate'
+  )
+})
+
+test('release and classification tooling does not trigger an app release', () => {
+  const toolingPaths = [
+    '.github/workflows/ci.yml',
+    '.github/workflows/auto-tag.yml',
+    '.github/mobile-impact-policy.json',
+    'scripts/next-release-tag.mjs',
+    'tests/next-release-tag.test.mjs'
+  ]
+
+  for (const path of toolingPaths) {
+    assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'no-app-impact', path)
+  }
+})
+
 test('uses the highest classification for mixed changes', () => {
   assert.equal(classifyFiles([
     entry('README.md'),

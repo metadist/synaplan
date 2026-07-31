@@ -85,7 +85,10 @@ export const classifyFiles = (entries, policy = loadPolicy()) => {
     } else if (matchesAny(entry.path, policy.storeRequired.patterns)) {
       classification = 'store-required'
       reason = policy.storeRequired.reason
-    } else if (matchesAny(entry.path, policy.otaCandidate.patterns)) {
+    } else if (
+      matchesAny(entry.path, policy.otaCandidate.patterns) &&
+      !matchesAny(entry.path, policy.otaCandidate.excludedPatterns ?? [])
+    ) {
       classification = 'ota-candidate'
       reason = policy.otaCandidate.reason
     } else if (

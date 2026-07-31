@@ -74,6 +74,14 @@
       "frontend/public/**/*.jpeg",
       "frontend/public/**/*.webp",
       "frontend/src/components/icons/**"
+    ],
+    "excludedPatterns": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "**/*.mjs",
+      "**/*.cjs",
+      "**/*.html"
     ]
   },
   "backendOnly": {
@@ -105,15 +113,18 @@
     ]
   },
   "noAppImpact": {
-    "reason": "The change only affects documentation or mobile-impact classification tooling.",
+    "reason": "The change only affects documentation, continuous integration, or mobile release tooling, none of which is delivered to an installed app.",
     "patterns": [
       "**/*.md",
       "docs/**",
       ".github/ISSUE_TEMPLATE/**",
       ".github/PULL_REQUEST_TEMPLATE.md",
       ".github/mobile-impact-policy.json",
+      ".github/workflows/**",
       "scripts/mobile-impact.mjs",
-      "tests/mobile-impact.test.mjs"
+      "scripts/next-release-tag.mjs",
+      "tests/mobile-impact.test.mjs",
+      "tests/next-release-tag.test.mjs"
     ]
   },
   "fallback": {
