@@ -1,0 +1,138 @@
+name: Auto Tag Mobile Release
+
+# Tags a green `main` commit automatically so the mobile release chain in
+# metadist/synaplan-apps can run without a manual step. Only changes that reach
+# the app get a tag: `backend-only` and `no-app-impact` merges are left untagged
+# so the tag series stays meaningful and CI minutes are not spent on releases
+# nobody consumes.
+#
+# The tag is created through a GitHub App installation token on purpose. Refs
+# created with the default GITHUB_TOKEN do not start new workflow runs, so the
+# tag would never reach CI and `mobile-release-artifacts.yml` would not publish.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+concurrency:
+  group: auto-tag
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    name: Tag a mobile-relevant main commit
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    env:
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Check tagging credentials
+        id: config
+        env:
+          APP_ID: ${{ secrets.MOBILE_TAG_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.MOBILE_TAG_APP_PRIVATE_KEY }}
+        run: |
+          if test -n "$APP_ID" && test -n "$APP_PRIVATE_KEY"; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report missing credentials
+        if: steps.config.outputs.configured == 'false'
+        run: |
+          echo "Automatic tagging is inactive because the GitHub App credentials are not configured." |
+            tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout the classifier from the default branch
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          # This job is privileged: workflow_run carries repository secrets. So
+          # it deliberately does NOT check out the reported head SHA — the code
+          # executed here always comes from the reviewed default branch, and the
+          # tested commit is only ever read as git history. Never leave a
+          # writable token in .git/config; the tag is created through the API.
+          persist-credentials: false
+
+      - name: Classify the merge
+        if: steps.config.outputs.configured == 'true'
+        id: classify
+        run: |
+          set -euo pipefail
+          # Confirms the trust assumption of the checkout above: only a commit
+          # that is actually on the default branch may be classified or tagged.
+          if ! git merge-base --is-ancestor "$HEAD_SHA" HEAD; then
+            echo "::error::$HEAD_SHA is not contained in the default branch — refusing to tag."
+            exit 1
+          fi
+          # Only a release tag blocks a new one. Any other ref pointing at the
+          # commit (a nightly or environment tag, say) must not suppress it.
+          existing_release_tag=''
+          while IFS= read -r candidate; do
+            if [[ "$candidate" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              existing_release_tag="$candidate"
+              break
+            fi
+          done < <(git tag --points-at "$HEAD_SHA" --list 'v*')
+          if [ -n "$existing_release_tag" ]; then
+            echo "needs_tag=false" >> "$GITHUB_OUTPUT"
+            echo "reason=The commit already carries the release tag \`${existing_release_tag}\`." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          previous_tag=''
+          while IFS= read -r candidate; do
+            previous_tag="$candidate"
+            break
+          done < <(git tag --merged "$HEAD_SHA" --list 'v*' --sort=-version:refname)
+          base_ref="${previous_tag:-$(git rev-list --max-parents=0 "$HEAD_SHA")}"
+          node scripts/mobile-impact.mjs \
+            --base "$base_ref" \
+            --head "$HEAD_SHA" \
+            --output mobile-impact-manifest.json
+          classification="$(jq -r '.classification' mobile-impact-manifest.json)"
+          echo "classification=$classification" >> "$GITHUB_OUTPUT"
+          if [[ "$classification" == "ota-candidate" || "$classification" == "store-required" ]]; then
+            echo "needs_tag=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$(node scripts/next-release-tag.mjs)" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_tag=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Classification \`${classification}\` does not reach the app." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create tagging token
+        if: steps.classify.outputs.needs_tag == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.MOBILE_TAG_APP_ID }}
+          private-key: ${{ secrets.MOBILE_TAG_APP_PRIVATE_KEY }}
+
+      - name: Create the release tag
+        if: steps.classify.outputs.needs_tag == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_TAG: ${{ steps.classify.outputs.tag }}
+          CLASSIFICATION: ${{ steps.classify.outputs.classification }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/tags/${RELEASE_TAG}" \
+            -f "sha=${HEAD_SHA}"
+          echo "Tagged \`${HEAD_SHA}\` as \`${RELEASE_TAG}\` (classification \`${CLASSIFICATION}\`)." |
+            tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Report skipped tag
+        if: steps.classify.outputs.needs_tag == 'false'
+        env:
+          REASON: ${{ steps.classify.outputs.reason }}
+        run: echo "No release tag was created. $REASON" | tee -a "$GITHUB_STEP_SUMMARY"
