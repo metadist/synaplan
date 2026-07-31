@@ -4,7 +4,7 @@ Everything Synaplan can do.
 
 ## AI Chat
 
-![Chat Interface](images/chat.png)
+![Chat Interface](images/tour/chat.webp)
 
 Multi-provider AI conversations:
 

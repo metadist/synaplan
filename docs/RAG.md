@@ -2,7 +2,7 @@
 
 Retrieval-Augmented Generation (RAG) for semantic document search.
 
-![RAG Search Interface](images/rag-search.png)
+![RAG Search Interface](images/tour/rag-search.webp)
 
 ## Overview
 

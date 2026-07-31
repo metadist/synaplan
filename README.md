@@ -6,9 +6,98 @@ AI-powered knowledge management with RAG, chat widgets, and multi-channel integr
 
 > **Live instance**: [web.synaplan.com](https://web.synaplan.com/) &nbsp;|&nbsp; **Docs**: [docs.synaplan.com](https://docs.synaplan.com/) &nbsp;|&nbsp; **API**: [Swagger UI](https://web.synaplan.com/api/doc)
 
-[![Watch the Synaplan demo](docs/images/chat-screen.png)](https://www.youtube.com/watch?v=WjO9mE43uec)
+![A tour through Synaplan: chat with live cost tracking, one-key provider setup, per-task model choice, document search, media generation, the embeddable chat widget and white-label branding](docs/images/synaplan-tour.webp)
 
-<p align="center"><a href="https://www.youtube.com/watch?v=WjO9mE43uec">▶ Watch the demo on YouTube</a></p>
+<p align="center"><a href="https://www.youtube.com/watch?v=WjO9mE43uec">▶ Watch the full demo on YouTube</a></p>
+
+---
+
+## Your first answer in three steps
+
+```bash
+git clone https://github.com/metadist/synaplan.git
+cd synaplan
+docker compose up -d
+```
+
+1. **Open <http://localhost:5173>.** The UI is ready in about two minutes.
+2. **Log in** as `admin@synaplan.com` / `admin123`.
+3. **Open Admin → AI Providers and paste one API key.** Free tier: [Groq](https://console.groq.com).
+
+That third step is the whole setup. **You never touch a config file to connect an AI provider.**
+
+### Key management, the short version
+
+- **Paste it in the UI.** **Admin → AI Providers** (`/admin/setup`) lists every provider with a *Connected* badge and a free-tier hint.
+- **Tested before it's saved.** The key is validated against the live provider API, so a typo fails immediately instead of at your first chat.
+- **Encrypted at rest.** It lives encrypted in your own database, not in a plaintext file on disk.
+- **Active instantly.** No restart and no rebuild — the next message already uses it.
+- **Defaults repair themselves.** If the default chat model points at a provider you have no key for, Synaplan repoints it to one that works, so chat is never dead on a fresh install.
+- **`.env` still works.** Keys already in `backend/.env` are imported into the encrypted store on first use, and a key you later save in the UI wins permanently.
+
+**No cloud key at all?** Start with `ENABLE_LOCAL_GPT_OSS=true docker compose up -d` to pull a local chat model (`gpt-oss:20b`, ~14 GB, GPU or a strong CPU recommended). Chat begins working when the download finishes; `docker compose logs -f backend` shows progress.
+
+---
+
+## Take the tour
+
+Click any screenshot to see it full size.
+
+<table>
+  <tr>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/chat.webp"><img src="docs/images/tour/thumbs/chat.webp" alt="Chat with per-model cost tracking" width="100%"></a><br>
+      <sub><b>Chat</b><br>Every answer shows what it cost</sub>
+    </td>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/provider-setup.webp"><img src="docs/images/tour/thumbs/provider-setup.webp" alt="AI provider setup with live key validation" width="100%"></a><br>
+      <sub><b>Provider setup</b><br>One key, tested and encrypted</sub>
+    </td>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/model-selection.webp"><img src="docs/images/tour/thumbs/model-selection.webp" alt="Per-task model selection with cost badges" width="100%"></a><br>
+      <sub><b>Model choice</b><br>A different model per task</sub>
+    </td>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/rag-search.webp"><img src="docs/images/tour/thumbs/rag-search.webp" alt="Semantic search across uploaded documents" width="100%"></a><br>
+      <sub><b>RAG search</b><br>Semantic search over your files</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/media-generation.webp"><img src="docs/images/tour/thumbs/media-generation.webp" alt="Gallery of AI-generated images and video" width="100%"></a><br>
+      <sub><b>Media generation</b><br>Images, video and audio in chat</sub>
+    </td>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/chat-widget.webp"><img src="docs/images/tour/thumbs/chat-widget.webp" alt="Embed code for the chat widget" width="100%"></a><br>
+      <sub><b>Chat widget</b><br>One snippet, any website</sub>
+    </td>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/system-prompts.webp"><img src="docs/images/tour/thumbs/system-prompts.webp" alt="System prompt editor" width="100%"></a><br>
+      <sub><b>AI instructions</b><br>Your own system prompts</sub>
+    </td>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/file-manager.webp"><img src="docs/images/tour/thumbs/file-manager.webp" alt="File manager with folders and storage quota" width="100%"></a><br>
+      <sub><b>Files</b><br>Uploads become knowledge</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/plugins.webp"><img src="docs/images/tour/thumbs/plugins.webp" alt="Plugin view showing Synaform collections" width="100%"></a><br>
+      <sub><b>Plugins</b><br>Extend without forking</sub>
+    </td>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/admin-panel.webp"><img src="docs/images/tour/thumbs/admin-panel.webp" alt="Admin panel with system info and user counts" width="100%"></a><br>
+      <sub><b>Admin</b><br>Users, usage and health</sub>
+    </td>
+    <td width="25%" align="center">
+      <a href="docs/images/tour/branding.webp"><img src="docs/images/tour/thumbs/branding.webp" alt="White-label branding settings" width="100%"></a><br>
+      <sub><b>Branding</b><br>White-label the whole app</sub>
+    </td>
+    <td width="25%"></td>
+  </tr>
+</table>
+
+<sub>Regenerate these assets after a UI change with <code>scripts/build-readme-tour.sh</code>.</sub>
 
 ---
 
@@ -20,21 +109,7 @@ AI-powered knowledge management with RAG, chat widgets, and multi-channel integr
 - **~9 GB free disk** for the standard install (~5 GB for minimal, +~14 GB if you enable the local chat model)
 - Free TCP ports `5173`, `8000`, `8082`, `8025`, `3307`, `6333`, `11435`
 
-> **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The Quick Start below already does this: `docker compose up -d` builds the backend and worker locally from a multi-arch base image, so PHP/FrankenPHP runs **natively on `arm64`** with no emulation tax. That is by far the fastest setup, and it is the default — you don't have to do anything special. The pre-built `ghcr.io/metadist/synaplan` image published for production deployments is `linux/amd64` only, so pulling it instead means running the whole backend under emulation. The first local build takes a few minutes; every later start is a cache hit. Two optional dev tools (phpMyAdmin, MailHog) are still amd64-only upstream images — if you keep them, enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) so those two emulate quickly.
-
-## Quick Start
-
-```bash
-git clone https://github.com/metadist/synaplan.git
-cd synaplan
-docker compose up -d
-```
-
-Open http://localhost:5173 — the **UI is ready in ~2 minutes**. The standard install downloads the local embedding model (`bge-m3`, ~1 GB) in the background for RAG and semantic search; progress is shown in the app.
-
-**Then connect an AI provider:** log in as `admin@synaplan.com` / `admin123` and open **Admin → AI Providers** — paste any provider key (free tier: [Groq](https://console.groq.com)), it is tested live, stored encrypted, and chat works immediately.
-
-**Want chat without any cloud key?** Start the stack with `ENABLE_LOCAL_GPT_OSS=true docker compose up -d` to also pull a local chat model (`gpt-oss:20b`, ~14 GB, GPU or strong CPU recommended). Chat starts working when that download finishes — `docker compose logs -f backend` shows progress.
+> **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The three-step start above already does this: `docker compose up -d` builds the backend and worker locally from a multi-arch base image, so PHP/FrankenPHP runs **natively on `arm64`** with no emulation tax. That is by far the fastest setup, and it is the default — you don't have to do anything special. The pre-built `ghcr.io/metadist/synaplan` image published for production deployments is `linux/amd64` only, so pulling it instead means running the whole backend under emulation. The first local build takes a few minutes; every later start is a cache hit. Two optional dev tools (phpMyAdmin, MailHog) are still amd64-only upstream images — if you keep them, enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) so those two emulate quickly.
 
 ---
 
@@ -45,9 +120,9 @@ Open http://localhost:5173 — the **UI is ready in ~2 minutes**. The standard i
 | **Standard** | `docker compose up -d` | ~9 GB | Full features, local embeddings (local chat model optional, +~14 GB) |
 | **Minimal** | `docker compose -f docker-compose-minimal.yml up -d` | ~5 GB | Cloud AI only (Groq/OpenAI) |
 
-**Connecting a cloud AI provider (recommended: the UI).** Log in as admin and open **Admin → AI Providers** (`/admin/setup`): paste a key, it is tested live, stored **encrypted in the database**, and active immediately — no restart, no `.env` editing. Get a free key at [console.groq.com](https://console.groq.com).
+The standard install downloads the local embedding model (`bge-m3`, ~1 GB) in the background for RAG and semantic search; progress is shown in the app.
 
-Prefer the shell? Keys in `backend/.env` still work — the backend reads that file when the container starts and imports the key into the encrypted store on first use. Write the key before starting, or restart the containers afterwards:
+Prefer the shell to the UI for provider keys? Keys in `backend/.env` still work — the backend reads that file when the container starts and imports the key into the encrypted store on first use. Write the key before starting, or restart the containers afterwards:
 
 ```bash
 echo "GROQ_API_KEY=your_key" >> backend/.env
