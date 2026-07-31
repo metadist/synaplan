@@ -20,7 +20,7 @@ AI-powered knowledge management with RAG, chat widgets, and multi-channel integr
 - **~9 GB free disk** for the standard install (~5 GB for minimal, +~14 GB if you enable the local chat model)
 - Free TCP ports `5173`, `8000`, `8082`, `8025`, `3307`, `6333`, `11435`
 
-> **Apple Silicon (M1–M4) Macs:** Synaplan's container images are published for `linux/amd64`, so they run under emulation on Apple Silicon. In **Docker Desktop → Settings → General**, enable **"Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) for much faster, more stable containers than the default QEMU. Everything works without it — just slower, and the first build takes longer.
+> **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The Quick Start below already does this: `docker compose up -d` builds the backend and worker locally from a multi-arch base image, so PHP/FrankenPHP runs **natively on `arm64`** with no emulation tax. That is by far the fastest setup, and it is the default — you don't have to do anything special. The pre-built `ghcr.io/metadist/synaplan` image published for production deployments is `linux/amd64` only, so pulling it instead means running the whole backend under emulation. The first local build takes a few minutes; every later start is a cache hit. Two optional dev tools (phpMyAdmin, MailHog) are still amd64-only upstream images — if you keep them, enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) so those two emulate quickly.
 
 ## Quick Start
 

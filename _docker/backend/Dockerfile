@@ -1,4 +1,4 @@
-# synaplan-base-php 1.1.0 ships fully-tuned PHP ini files under
+# synaplan-base-php 1.2.0 ships fully-tuned PHP ini files under
 # /usr/local/etc/php/conf.d/ (10-runtime, 20-opcache+JIT, 25-realpath,
 # 27-grpc, 28-apcu, 30-errors, 40-security) and an entrypoint shim at
 # /usr/local/bin/synaplan-php-configure that handles APP_ENV=dev override
@@ -12,7 +12,14 @@
 # moving floating tag. To bump:
 #   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:latest
 # and replace the @sha256:... below.
-FROM ghcr.io/metadist/synaplan-base-php:1.1.0@sha256:6378ce497415579b9a8ded6395bc497e5589110a1b9bbb7544d1d490b1d3e1da AS dev
+#
+# The digest MUST be the manifest-list (OCI index) digest, not one of the
+# per-platform manifest digests listed underneath it. 1.2.0 is the first
+# multi-arch release (linux/amd64 + linux/arm64); pinning a per-platform
+# digest would hard-lock every build — including Apple Silicon dev machines,
+# which now run the backend natively instead of under emulation — to that one
+# architecture.
+FROM ghcr.io/metadist/synaplan-base-php:1.2.0@sha256:1c3381bce4673afb2eb96a163c301100584ce98af4e86cbd3158b5bb694d79ef AS dev
 
 WORKDIR /var/www/backend
 

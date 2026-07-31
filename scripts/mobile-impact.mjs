@@ -86,8 +86,15 @@ export const classifyFiles = (entries, policy = loadPolicy()) => {
       classification = 'store-required'
       reason = policy.storeRequired.reason
     } else if (matchesAny(entry.path, policy.otaCandidate.patterns)) {
-      classification = 'ota-candidate'
-      reason = policy.otaCandidate.reason
+      // An excluded path is reported with its own reason rather than the generic
+      // fallback, so the manifest says why an asset-looking file is held back.
+      if (matchesAny(entry.path, policy.otaCandidate.excludedPatterns ?? [])) {
+        classification = policy.fallback.classification
+        reason = policy.otaCandidate.excludedReason ?? policy.fallback.reason
+      } else {
+        classification = 'ota-candidate'
+        reason = policy.otaCandidate.reason
+      }
     } else if (
       matchesAny(entry.path, policy.backendOnly.patterns) &&
       !matchesAny(entry.path, policy.backendOnly.excludedPatterns)

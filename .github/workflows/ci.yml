@@ -55,6 +55,24 @@ jobs:
         working-directory: backend
         run: composer lint
 
+  mobile-tooling:
+    name: Mobile Release Tooling
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+
+      # The impact classifier decides whether a change may reach an installed app
+      # over the air, so its own tests are a release gate, not a nicety.
+      - name: Run release tooling tests
+        run: node --test "tests/*.test.mjs"
+
   backend:
     name: Backend (PHP/Symfony)
     # Free runner on purpose: this job is off the critical path (done around
@@ -902,13 +920,14 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
+    needs: [lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
     if: always()
     steps:
       - name: Check for failures
         if: |
           !cancelled() && (
             needs.lint.result != 'success' ||
+            needs.mobile-tooling.result != 'success' ||
             needs.backend.result != 'success' ||
             needs.frontend-build.result != 'success' ||
             needs.frontend-checks.result != 'success' ||

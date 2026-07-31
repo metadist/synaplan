@@ -1,0 +1,214 @@
+name: Tag Mobile Release
+
+# Cuts a release tag for `main` on request, which starts the mobile release
+# chain in metadist/synaplan-apps. Everything after the tag runs unattended:
+# the pin update, its pull request, and the over-the-air or store delivery.
+#
+# Releasing is deliberate rather than per-merge. The classifier is fail-closed,
+# so a large share of merges lands on the store path, and tagging each one would
+# produce a stream of review candidates and burn a patch version per merge. One
+# tag collects everything merged since the previous release, because the
+# classification is computed against the last release tag, not the last commit.
+#
+# By default the tip of the default branch is released. The `commit` input
+# selects an earlier commit on that branch, for when the tip carries work that
+# should not ship yet.
+#
+# The tag is created through a GitHub App installation token on purpose. Refs
+# created with the default GITHUB_TOKEN do not start new workflow runs, so the
+# tag would never reach CI and `mobile-release-artifacts.yml` would not publish.
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Commit on the default branch to release, or empty for its tip
+        required: false
+        default: ''
+        type: string
+      dry_run:
+        description: Only report the classification and the tag that would be created
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: mobile-release-tag
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  tag:
+    name: Tag a mobile-relevant main commit
+    runs-on: ubuntu-latest
+    env:
+      # The dispatch API only accepts a branch or tag as `ref`, so an older
+      # commit is selected through an input rather than through the ref. The
+      # workflow and the classifier therefore always run from the default
+      # branch, and the selected commit stays data.
+      HEAD_SHA: ${{ inputs.commit || github.sha }}
+    steps:
+      - name: Check tagging credentials
+        id: config
+        env:
+          APP_ID: ${{ secrets.MOBILE_TAG_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.MOBILE_TAG_APP_PRIVATE_KEY }}
+        run: |
+          if test -n "$APP_ID" && test -n "$APP_PRIVATE_KEY"; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report missing credentials
+        if: steps.config.outputs.configured == 'false'
+        run: |
+          echo "Tagging is inactive because the GitHub App credentials are not configured." |
+            tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          # The tag is created through the API, so no writable token belongs in
+          # .git/config.
+          persist-credentials: false
+
+      - name: Require the default branch
+        if: steps.config.outputs.configured == 'true'
+        env:
+          SELECTED: ${{ github.ref_name }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [ "$SELECTED" != "$DEFAULT" ]; then
+            echo "::error::A release is cut from ${DEFAULT}, not from ${SELECTED}."
+            exit 1
+          fi
+
+      - name: Require a commit on the default branch
+        if: steps.config.outputs.configured == 'true' && inputs.commit != ''
+        env:
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Select a commit by its full 40-character SHA, not by ${HEAD_SHA}."
+            exit 1
+          fi
+          if ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
+            echo "::error::Commit ${HEAD_SHA} does not exist in this repository."
+            exit 1
+          fi
+          # HEAD is the tip of the default branch, because the step above
+          # refuses every other ref.
+          if ! git merge-base --is-ancestor "$HEAD_SHA" HEAD; then
+            echo "::error::Commit ${HEAD_SHA} is not part of ${DEFAULT} — refusing to release an unreviewed commit."
+            exit 1
+          fi
+
+      - name: Require a green commit
+        if: steps.config.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The previous workflow_run trigger guaranteed this implicitly. Started
+          # by hand, nothing stops a release from a red commit, so verify that
+          # this exact commit passed CI on a branch push.
+          green="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&status=success" \
+            --jq '[.workflow_runs[] | select(.name == "CI" and .event == "push")] | length')"
+          if [ "$green" -eq 0 ]; then
+            echo "::error::No successful CI run exists for ${HEAD_SHA} — refusing to release an unverified commit."
+            exit 1
+          fi
+
+      - name: Classify the release
+        if: steps.config.outputs.configured == 'true'
+        id: classify
+        run: |
+          set -euo pipefail
+          # Only a release tag blocks a new one. Any other ref pointing at the
+          # commit (a nightly or environment tag, say) must not suppress it.
+          existing_release_tag=''
+          while IFS= read -r candidate; do
+            if [[ "$candidate" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              existing_release_tag="$candidate"
+              break
+            fi
+          done < <(git tag --points-at "$HEAD_SHA" --list 'v*')
+          if [ -n "$existing_release_tag" ]; then
+            echo "needs_tag=false" >> "$GITHUB_OUTPUT"
+            echo "reason=The commit already carries the release tag \`${existing_release_tag}\`." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          previous_tag=''
+          while IFS= read -r candidate; do
+            previous_tag="$candidate"
+            break
+          done < <(git tag --merged "$HEAD_SHA" --list 'v*' --sort=-version:refname)
+          base_ref="${previous_tag:-$(git rev-list --max-parents=0 "$HEAD_SHA")}"
+          node scripts/mobile-impact.mjs \
+            --base "$base_ref" \
+            --head "$HEAD_SHA" \
+            --output mobile-impact-manifest.json
+          classification="$(jq -r '.classification' mobile-impact-manifest.json)"
+          echo "classification=$classification" >> "$GITHUB_OUTPUT"
+          echo "previous=${previous_tag:-none}" >> "$GITHUB_OUTPUT"
+          if [[ "$classification" == "ota-candidate" || "$classification" == "store-required" ]]; then
+            echo "needs_tag=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$(node scripts/next-release-tag.mjs)" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_tag=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Classification \`${classification}\` does not reach the app." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report the plan
+        if: steps.classify.outputs.needs_tag == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.classify.outputs.tag }}
+          CLASSIFICATION: ${{ steps.classify.outputs.classification }}
+          PREVIOUS: ${{ steps.classify.outputs.previous }}
+        run: |
+          {
+            echo "Release \`$RELEASE_TAG\` tags \`${HEAD_SHA}\` and collects everything since \`$PREVIOUS\`."
+            echo ""
+            echo "Classification: \`$CLASSIFICATION\` —" \
+              "$([ "$CLASSIFICATION" = 'ota-candidate' ] && echo 'ships over the air' || echo 'needs a store review')."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create tagging token
+        if: steps.classify.outputs.needs_tag == 'true' && !inputs.dry_run
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.MOBILE_TAG_APP_ID }}
+          private-key: ${{ secrets.MOBILE_TAG_APP_PRIVATE_KEY }}
+
+      - name: Create the release tag
+        if: steps.classify.outputs.needs_tag == 'true' && !inputs.dry_run
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_TAG: ${{ steps.classify.outputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/tags/${RELEASE_TAG}" \
+            -f "sha=${HEAD_SHA}"
+          echo "Tagged \`${HEAD_SHA}\` as \`${RELEASE_TAG}\`." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Report a dry run
+        if: steps.classify.outputs.needs_tag == 'true' && inputs.dry_run
+        run: echo "Dry run — no tag was created." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Report skipped tag
+        if: steps.classify.outputs.needs_tag == 'false'
+        env:
+          REASON: ${{ steps.classify.outputs.reason }}
+        run: echo "No release tag was created. $REASON" | tee -a "$GITHUB_STEP_SUMMARY"
