@@ -10,10 +10,13 @@ Complete installation instructions for Synaplan.
 - ~9GB disk space (Standard) or ~5GB (Minimal). Add ~14GB if you enable the local
   chat model (`ENABLE_LOCAL_GPT_OSS=true`, see [Standard Install](#standard-install-recommended))
 
-> **Apple Silicon (M1–M4) Macs:** the images are `linux/amd64` only and run under
-> emulation on Apple Silicon. Enable **Docker Desktop → Settings → General → "Use
-> Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) for a much faster
-> experience than the default QEMU. See [Troubleshooting](#slow-performance-on-apple-silicon-mac).
+> **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The
+> Quick Install below already does: `docker compose up -d` builds the backend and
+> worker locally from a multi-arch base, so PHP runs natively on `arm64` with no
+> emulation tax. That is the fastest setup and needs no extra steps. The pre-built
+> `ghcr.io/metadist/synaplan` production image is `linux/amd64` only — pulling it
+> instead runs the whole backend emulated. See
+> [Troubleshooting](#slow-performance-on-apple-silicon-mac).
 
 ## Quick Install
 
@@ -197,17 +200,30 @@ docker compose exec ollama ollama pull bge-m3
 
 ### Slow performance on Apple Silicon (Mac)
 
-Synaplan's container images are `linux/amd64` only, so on Apple Silicon (M1–M4)
-they run under emulation. For the best experience:
+On Apple Silicon (M1–M4) the fastest setup is to **build the backend image
+locally**, which is what both compose files do by default (`pull_policy: build`
+on the `backend` and `worker` services). The base image is published for
+`linux/amd64` *and* `linux/arm64`, so a local build produces a native `arm64`
+backend — no emulation.
 
-- Enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64
-  emulation on Apple Silicon"** (macOS 13+). Rosetta is significantly faster than
-  the default QEMU translation.
-- The first `docker compose up -d` is slower because the backend image is built
-  locally under emulation; subsequent restarts are fast.
-- `docker compose` may print a platform-mismatch warning
-  (`requested image's platform (linux/amd64) does not match ...`) — it is expected
-  and safe to ignore.
+If PHP still feels slow, check what you are actually running:
+
+```bash
+docker compose exec backend uname -m   # expect: aarch64
+```
+
+- `x86_64` means you are on an emulated image — most likely you pulled the
+  pre-built `ghcr.io/metadist/synaplan` production image (`linux/amd64` only)
+  instead of building. Rebuild with `docker compose build --pull backend worker`,
+  then `docker compose up -d`.
+- The optional `phpmyadmin` and `mailhog` services use amd64-only upstream images
+  and stay emulated. Enable **Docker Desktop → Settings → General → "Use Rosetta
+  for x86/amd64 emulation on Apple Silicon"** (macOS 13+) — much faster than the
+  default QEMU — or drop those two services if you don't need them. The
+  `requested image's platform (linux/amd64) does not match ...` warning refers to
+  them and is safe to ignore.
+- The first `docker compose up -d` is slower because the image is built; every
+  later start is a cache hit.
 
 ### Port conflicts
 Default host ports: 5173 (frontend), 8000 (backend), 3307 (database), 8082 (phpMyAdmin), 8025/1025 (MailHog), 6333 (Qdrant), 11435 (Ollama), 9999 (Tika)
