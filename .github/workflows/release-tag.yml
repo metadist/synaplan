@@ -10,6 +10,10 @@ name: Tag Mobile Release
 # tag collects everything merged since the previous release, because the
 # classification is computed against the last release tag, not the last commit.
 #
+# By default the tip of the default branch is released. The `commit` input
+# selects an earlier commit on that branch, for when the tip carries work that
+# should not ship yet.
+#
 # The tag is created through a GitHub App installation token on purpose. Refs
 # created with the default GITHUB_TOKEN do not start new workflow runs, so the
 # tag would never reach CI and `mobile-release-artifacts.yml` would not publish.
@@ -17,6 +21,11 @@ name: Tag Mobile Release
 on:
   workflow_dispatch:
     inputs:
+      commit:
+        description: Commit on the default branch to release, or empty for its tip
+        required: false
+        default: ''
+        type: string
       dry_run:
         description: Only report the classification and the tag that would be created
         required: false
@@ -36,7 +45,11 @@ jobs:
     name: Tag a mobile-relevant main commit
     runs-on: ubuntu-latest
     env:
-      HEAD_SHA: ${{ github.sha }}
+      # The dispatch API only accepts a branch or tag as `ref`, so an older
+      # commit is selected through an input rather than through the ref. The
+      # workflow and the classifier therefore always run from the default
+      # branch, and the selected commit stays data.
+      HEAD_SHA: ${{ inputs.commit || github.sha }}
     steps:
       - name: Check tagging credentials
         id: config
@@ -74,6 +87,27 @@ jobs:
           set -euo pipefail
           if [ "$SELECTED" != "$DEFAULT" ]; then
             echo "::error::A release is cut from ${DEFAULT}, not from ${SELECTED}."
+            exit 1
+          fi
+
+      - name: Require a commit on the default branch
+        if: steps.config.outputs.configured == 'true' && inputs.commit != ''
+        env:
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Select a commit by its full 40-character SHA, not by ${HEAD_SHA}."
+            exit 1
+          fi
+          if ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
+            echo "::error::Commit ${HEAD_SHA} does not exist in this repository."
+            exit 1
+          fi
+          # HEAD is the tip of the default branch, because the step above
+          # refuses every other ref.
+          if ! git merge-base --is-ancestor "$HEAD_SHA" HEAD; then
+            echo "::error::Commit ${HEAD_SHA} is not part of ${DEFAULT} — refusing to release an unreviewed commit."
             exit 1
           fi
 
@@ -142,7 +176,7 @@ jobs:
           PREVIOUS: ${{ steps.classify.outputs.previous }}
         run: |
           {
-            echo "Release \`$RELEASE_TAG\` collects everything since \`$PREVIOUS\`."
+            echo "Release \`$RELEASE_TAG\` tags \`${HEAD_SHA}\` and collects everything since \`$PREVIOUS\`."
             echo ""
             echo "Classification: \`$CLASSIFICATION\` —" \
               "$([ "$CLASSIFICATION" = 'ota-candidate' ] && echo 'ships over the air' || echo 'needs a store review')."
