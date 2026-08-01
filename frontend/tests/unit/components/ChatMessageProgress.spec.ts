@@ -73,6 +73,9 @@ describe('ChatMessage pre-answer progress indicator', () => {
   })
 })
 
+const processingCopy = (messages: unknown): Record<string, string> =>
+  (messages as { processing: Record<string, string> }).processing
+
 describe('pre-answer progress copy', () => {
   // A missing key silently falls back to English, which reads as a bug in the
   // other three UI languages.
@@ -81,22 +84,20 @@ describe('pre-answer progress copy', () => {
     ['es', es],
     ['tr', tr],
   ])('is translated in %s', (_locale, messages) => {
-    const keys = Object.keys((en as Record<string, Record<string, string>>).processing).filter(
+    const english = processingCopy(en)
+    const keys = Object.keys(english).filter(
       (key) =>
         key.startsWith('analyzingPrompt') ||
         key.startsWith('planning') ||
         key.startsWith('searchingFiles') ||
         key.startsWith('checkingMemories')
     )
-    const locale = (messages as Record<string, Record<string, string>>).processing
+    const locale = processingCopy(messages)
 
     expect(keys).toHaveLength(8)
     for (const key of keys) {
       expect(locale[key], `missing processing.${key}`).toBeTruthy()
-      expect(locale[key]).not.toBe(
-        (en as Record<string, Record<string, string>>).processing[key],
-        `processing.${key} is still the English string`
-      )
+      expect(locale[key], `processing.${key} is still the English string`).not.toBe(english[key])
     }
   })
 })
