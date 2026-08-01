@@ -505,5 +505,52 @@ describe('History Store', () => {
         vi.useRealTimers()
       }
     })
+
+    it('bails without clobbering a chat the user switched to mid-backoff', async () => {
+      vi.useFakeTimers()
+      vi.resetModules()
+
+      const getChatMessages = vi
+        .fn()
+        // Recovery poll #1 (chat 42): only the prompt, turn still running.
+        .mockResolvedValueOnce({
+          success: true,
+          messages: [{ id: 1, direction: 'IN', text: 'Question', timestamp: 1700000000 }],
+          pagination: { hasMore: false },
+        })
+        // Foreground load of chat 99 (the user switched away): its own history.
+        .mockResolvedValueOnce({
+          success: true,
+          messages: [{ id: 50, direction: 'OUT', text: 'Chat 99 answer', timestamp: 1700000100 }],
+          pagination: { hasMore: false },
+        })
+
+      vi.doMock('@/services/api', () => ({
+        chatApi: { getChatMessages },
+      }))
+
+      try {
+        const { useHistoryStore: useStore } = await import('@/stores/history')
+        const store = useStore()
+
+        const recovery = store.recoverInterruptedTurn(42)
+        // Let recovery poll #1 settle and park on its backoff timer.
+        await vi.advanceTimersByTimeAsync(0)
+
+        // User switches to chat 99: a foreground load bumps loadGeneration.
+        await store.loadMessages(99)
+        expect(store.messages.at(-1)?.parts[0].content).toBe('Chat 99 answer')
+
+        // Fire the backoff: recovery must detect the generation change and bail
+        // rather than reload chat 42 over chat 99.
+        await vi.advanceTimersByTimeAsync(1000)
+        await recovery
+
+        expect(getChatMessages).toHaveBeenCalledTimes(2)
+        expect(store.messages.at(-1)?.parts[0].content).toBe('Chat 99 answer')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })

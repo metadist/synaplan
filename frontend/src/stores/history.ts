@@ -607,13 +607,27 @@ export const useHistoryStore = defineStore('history', () => {
    * (`inProgressTurn`), the existing 2s in-progress poll (#1142/#1343) takes
    * over and this loop stops. Every fetch is an idempotent GET, so retrying is
    * safe.
+   *
+   * Recovery uses silent loads, which deliberately share the current
+   * `loadGeneration`. If the user switches chats while we are parked on a
+   * backoff timer, a foreground load for the new chat bumps `loadGeneration`;
+   * we capture it on entry and bail the moment it changes so a late recovery
+   * poll for the old chat can never overwrite the newly-selected chat.
    */
   const recoverInterruptedTurn = async (chatId: number): Promise<void> => {
+    const recoveryGeneration = loadGeneration
+
     for (let attempt = 0; attempt <= DROP_RECOVERY_DELAYS_MS.length; attempt++) {
+      if (recoveryGeneration !== loadGeneration) return
+
       const loadedMessageCount = messages.value.filter(
         (message) => message.id !== IN_PROGRESS_TURN_ID
       ).length
       await loadMessages(chatId, 0, Math.max(50, loadedMessageCount), true)
+
+      // A foreground load (chat switch or manual reload) superseded us while
+      // the silent reload was in flight — never touch the new chat's list.
+      if (recoveryGeneration !== loadGeneration) return
 
       // Backend reports the turn is still running → hand off to the 2s poll.
       if (inProgressPollChatId === chatId) return
