@@ -156,6 +156,16 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'sort_analyze', 'text' => 'what is on this picture', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'analyze', 'language' => 'en']],
             ['id' => 'sort_websearch', 'text' => 'what is the weather tomorrow', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'web_search' => true]],
 
+            // ---- Sorter-driven: BMULTI vote (planner skip) ----
+            // The vote rides along with the classification and decides whether
+            // TaskPlanExecutor pays for a planner round-trip. `false` (single
+            // deliverable) must reach the executor untouched; `true` must too.
+            ['id' => 'sort_single_deliverable_vote', 'text' => 'write me a short poem about rain', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_intent' => false]],
+            ['id' => 'sort_multi_deliverable_vote', 'text' => 'write me a poem about rain and read it to me as MP3', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_intent' => true]],
+            // A sorter that never voted (older seeded prompt) stays null so the
+            // planner keeps deciding — this is the safe fallback.
+            ['id' => 'sort_no_deliverable_vote', 'text' => 'tell me about the weather on mars', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en']],
+
             // ---- Sorter-driven: CUSTOM user topic — migration-risk #1 ----
             // A user-authored BPROMPTS topic (BOWNERID>0) is NOT in the canonical
             // map, so today it falls back to the chat intent. This baseline proves

@@ -9,10 +9,12 @@ use App\Repository\ConfigRepository;
 /**
  * Feature-flag resolver for the multi-task routing engine.
  *
- * Three flags live in BCONFIG group {@see self::CONFIG_GROUP}:
+ * Flags live in BCONFIG group {@see self::CONFIG_GROUP}:
  *   - ROUTING_ENABLED  — master switch: route through the TaskPlanner/executor.
  *   - SHADOW_MODE      — generate + persist a plan but let the legacy path answer.
  *   - PARALLEL_ENABLED — run independent DAG nodes concurrently (Phase 4).
+ *   - PLAN_ONLY_MULTI_INTENT — trust the sorter's BMULTI vote and skip the
+ *     planner round-trip on single-deliverable turns.
  *
  * Resolution mirrors {@see \App\Service\ModelConfigService::getDefaultModel}:
  * per-user row (BOWNERID = userId) overrides the global row (BOWNERID = 0),
@@ -27,6 +29,9 @@ use App\Repository\ConfigRepository;
  *                                switch unless an explicit per-user row is set)
  *   - SHADOW_MODE      → false
  *   - PARALLEL_ENABLED → false
+ *   - PLAN_ONLY_MULTI_INTENT → true (skip the planner when the sorter voted
+ *                                    "single deliverable"; see
+ *                                    {@see planOnlyMultiIntent()})
  *
  * NOTE (Sprint 0): the executor is not wired yet, so these flags are inert —
  * toggling them changes nothing observable. They exist so later phases can be
@@ -39,6 +44,7 @@ final readonly class MultitaskRoutingConfig
     public const KEY_ROUTING_ENABLED = 'ROUTING_ENABLED';
     public const KEY_SHADOW_MODE = 'SHADOW_MODE';
     public const KEY_PARALLEL_ENABLED = 'PARALLEL_ENABLED';
+    public const KEY_PLAN_ONLY_MULTI_INTENT = 'PLAN_ONLY_MULTI_INTENT';
     public const KEY_MAX_PARALLEL = 'MAX_PARALLEL';
     public const KEY_NODE_TIMEOUT = 'NODE_TIMEOUT';
     public const KEY_URL_FETCH_ENABLED = 'URL_FETCH_ENABLED';
@@ -48,6 +54,7 @@ final readonly class MultitaskRoutingConfig
     private const DEFAULT_ROUTING_ENABLED = true;
     private const DEFAULT_SHADOW_MODE = false;
     private const DEFAULT_PARALLEL_ENABLED = false;
+    private const DEFAULT_PLAN_ONLY_MULTI_INTENT = true;
     private const DEFAULT_MAX_PARALLEL = 3;
     private const DEFAULT_NODE_TIMEOUT = 120;
 
@@ -75,6 +82,25 @@ final readonly class MultitaskRoutingConfig
     public function isShadowMode(): bool
     {
         return $this->resolveFlag(self::KEY_SHADOW_MODE, null, self::DEFAULT_SHADOW_MODE);
+    }
+
+    /**
+     * Whether the planner may be skipped when the AI sorter voted "this message
+     * asks for a single deliverable" (BMULTI = 0).
+     *
+     * The planner is a blocking LLM round-trip in front of the answer model, and
+     * on a single-deliverable turn it returns a one-node plan that
+     * {@see TaskPlanExecutor::shouldUseLegacyRouter()} hands straight back to the
+     * legacy router — the same answer, one round-trip later. Trusting the vote
+     * removes that round-trip from time-to-first-token.
+     *
+     * ON by default; this is the kill switch for putting every AI-sorted turn
+     * back through the planner without a deploy. A turn with no vote (null) is
+     * always planned, so the fallback is the pre-vote behaviour.
+     */
+    public function planOnlyMultiIntent(?int $userId): bool
+    {
+        return $this->resolveFlag(self::KEY_PLAN_ONLY_MULTI_INTENT, $userId, self::DEFAULT_PLAN_ONLY_MULTI_INTENT);
     }
 
     /**

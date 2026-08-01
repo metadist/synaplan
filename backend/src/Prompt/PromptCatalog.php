@@ -441,6 +441,36 @@ This is the list, use only this:
    - "Make an 8K video" → BRESOLUTION: "4K" (highest supported tier)
    - "Create a video of a cat" → (no BRESOLUTION, use default)
 
+12. **Detect combined requests (BMULTI)**: Decide whether this one message asks for
+   MORE THAN ONE deliverable that has to be produced in separate steps. Be
+   conservative — default to 0. Almost every message is a single request.
+
+   Set BMULTI to 1 ONLY when the message links a CONTENT step (write, draft,
+   summarize, translate, generate, schreibe, erstelle, fasse zusammen) with a
+   SECOND, DIFFERENT deliverable, such as:
+   - Content plus a spoken version ("write a poem and read it to me as MP3",
+     "schreib einen Text und lies ihn vor")
+   - Content plus a document or spreadsheet ("summarize this and put it in a DOCX")
+   - Content plus a picture or video ("write the invitation and make an image for it")
+   - A generated file plus a description of it ("create an image of a cat and
+     tell me what you see in it")
+   - A chain where the second step consumes the first ("make a logo, then make
+     it blue", "translate this and email it")
+   - Two clearly separate questions or jobs in one message, each needing its own
+     answer or artefact
+
+   Set BMULTI to 0 for everything else, including:
+   - Any plain question, greeting or smalltalk
+   - One deliverable described with several adjectives, constraints or details
+     ("write a long, friendly, formal email to my landlord about the heating")
+   - One media request with accompanying text baked into it (rule 2 already
+     routes those to "mediamaker" — the text is produced downstream)
+   - A request to redo, refine or continue the previous answer
+   - Anything you are unsure about
+
+   BMULTI is INDEPENDENT of BTOPIC: a combined request still gets the BTOPIC of
+   its main deliverable. BMULTI only says "this needs more than one step".
+
 # Answer format
 
 You must respond with the **same JSON object as received**, modifying only:
@@ -448,6 +478,7 @@ You must respond with the **same JSON object as received**, modifying only:
 * "BTOPIC": [KEYLIST]
 * "BLANG": [LANGLIST]
 * "BWEBSEARCH": 0 | 1
+* "BMULTI": 0 | 1
 * "BMEDIA": "image" | "video" | "audio" (only when BTOPIC is "mediamaker")
 * "BINPUTMODE": "text_only" | "reference_images" (only when BTOPIC is "mediamaker" AND BMEDIA is "image")
 * "BDURATION": integer (only when BMEDIA is "video" AND user specified a duration)
@@ -462,7 +493,7 @@ If BTEXT is empty, but BFILETEXT is set, use BFILETEXT primarily to define the t
 If the user changes topics mid-conversation, update BTOPIC to match the new topic in your next response.
 
 Do not change any other fields.
-Do not add any new fields beyond BTOPIC, BLANG, BWEBSEARCH, BMEDIA, BINPUTMODE, BDURATION, and BRESOLUTION.
+Do not add any new fields beyond BTOPIC, BLANG, BWEBSEARCH, BMULTI, BMEDIA, BINPUTMODE, BDURATION, and BRESOLUTION.
 Do not add any additional text beyond the JSON.
 **Do not answer the question of the user.**
 Only send the JSON object.

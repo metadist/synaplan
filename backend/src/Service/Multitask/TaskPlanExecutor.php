@@ -71,6 +71,7 @@ final readonly class TaskPlanExecutor
         private TaskPlanner $planner,
         private DagExecutor $dagExecutor,
         private ModelConfigService $modelConfigService,
+        private MultitaskRoutingConfig $multitaskConfig,
         private LoggerInterface $logger,
     ) {
     }
@@ -92,7 +93,7 @@ final readonly class TaskPlanExecutor
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
-        $plan = $this->planForExecution($message, $thread, $classification, $options);
+        $plan = $this->planForExecution($message, $thread, $classification, $options, $progressCallback);
 
         if (null === $plan) {
             return $this->runSingleNode(
@@ -157,7 +158,7 @@ final readonly class TaskPlanExecutor
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
-        $plan = $this->planForExecution($message, $thread, $classification, $options);
+        $plan = $this->planForExecution($message, $thread, $classification, $options, $progressCallback);
 
         if (null === $plan) {
             return $this->runSingleNode(
@@ -224,7 +225,7 @@ final readonly class TaskPlanExecutor
      * @param array<string, mixed> $classification
      * @param array<string, mixed> $options
      */
-    private function planForExecution(Message $message, array $thread, array $classification, array $options = []): ?TaskPlanResult
+    private function planForExecution(Message $message, array $thread, array $classification, array $options = [], ?callable $progressCallback = null): ?TaskPlanResult
     {
         // Messages eligible for multi-task planning:
         //   - `ai_sorting`: genuinely AI-classified turns.
@@ -250,6 +251,28 @@ final readonly class TaskPlanExecutor
         // (planning-doc §3.4 invariant).
         if (!empty($classification['is_widget_mode'])) {
             return null;
+        }
+
+        if ($this->sorterVotedSingleDeliverable($message, $classification)) {
+            $this->logger->info('TaskPlanExecutor: sorter voted single deliverable, skipping planner', [
+                'message_id' => $message->getId(),
+                'topic' => $classification['topic'] ?? null,
+                'source' => $source,
+            ]);
+
+            return null;
+        }
+
+        // The planner is a blocking LLM round-trip with no visible output of its
+        // own, so without this the UI sits on "Generating response…" for the
+        // whole call. Tell the user what is actually happening.
+        if (null !== $progressCallback) {
+            $progressCallback([
+                'status' => 'planning',
+                'message' => 'Planning the steps for this request...',
+                'metadata' => [],
+                'timestamp' => time(),
+            ]);
         }
 
         try {
@@ -284,6 +307,45 @@ final readonly class TaskPlanExecutor
             ]);
 
             return null;
+        }
+    }
+
+    /**
+     * Whether the AI sorter already told us this turn has a single deliverable,
+     * so the planner round-trip can be skipped.
+     *
+     * The sorter runs on every AI-classified turn anyway and now returns a
+     * BMULTI vote alongside BTOPIC/BWEBSEARCH, so the decision costs nothing
+     * extra. On a single-deliverable turn the planner would return a one-node
+     * plan that {@see shouldUseLegacyRouter()} hands straight back to the legacy
+     * router — identical output, one blocking LLM call later.
+     *
+     * Deliberately strict: only an explicit `false` skips planning. A missing
+     * vote (`null` — older seeded prompt, a SORT model that dropped the field,
+     * or a branch that never ran the sorter such as a file attachment) keeps the
+     * pre-vote behaviour and plans.
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function sorterVotedSingleDeliverable(Message $message, array $classification): bool
+    {
+        if (false !== ($classification['multi_intent'] ?? null)) {
+            return false;
+        }
+
+        try {
+            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+
+            return $this->multitaskConfig->planOnlyMultiIntent($userId);
+        } catch (\Throwable $e) {
+            // A config lookup glitch must never silently change routing —
+            // fall back to planning, which is what we did before the vote.
+            $this->logger->warning('TaskPlanExecutor: multi-intent flag lookup failed, planning anyway', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
         }
     }
 

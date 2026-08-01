@@ -470,4 +470,51 @@ class MessageSorterTest extends TestCase
         $this->assertSame('4K', $result['resolution']);
         $this->assertSame('text_only', $result['input_mode']);
     }
+
+    // ===========================================
+    // BMULTI (multi-deliverable vote)
+    // ===========================================
+
+    /**
+     * @return array<string, array{0: string, 1: bool|null}>
+     */
+    public static function multiIntentProvider(): array
+    {
+        return [
+            'integer one' => ['{"BTOPIC": "general", "BMULTI": 1}', true],
+            'integer zero' => ['{"BTOPIC": "general", "BMULTI": 0}', false],
+            'boolean true' => ['{"BTOPIC": "general", "BMULTI": true}', true],
+            'boolean false' => ['{"BTOPIC": "general", "BMULTI": false}', false],
+            'string one' => ['{"BTOPIC": "general", "BMULTI": "1"}', true],
+            'string true' => ['{"BTOPIC": "general", "BMULTI": "true"}', true],
+            // No vote must stay null so the planner keeps deciding — an absent
+            // field is NOT the same as "single deliverable".
+            'absent' => ['{"BTOPIC": "general"}', null],
+            'null' => ['{"BTOPIC": "general", "BMULTI": null}', null],
+            'garbage' => ['{"BTOPIC": "general", "BMULTI": "maybe"}', null],
+        ];
+    }
+
+    #[DataProvider('multiIntentProvider')]
+    public function testParseResponseReadsTheMultiDeliverableVote(string $response, ?bool $expected): void
+    {
+        $result = $this->parseResponseMethod->invoke(
+            $this->sorter,
+            $response,
+            ['BTOPIC' => 'general', 'BLANG' => 'en'],
+        );
+
+        $this->assertSame($expected, $result['multi_intent']);
+    }
+
+    public function testParseResponseFallbackCarriesNoMultiDeliverableVote(): void
+    {
+        $result = $this->parseResponseMethod->invoke(
+            $this->sorter,
+            'not json at all',
+            ['BTOPIC' => 'general', 'BLANG' => 'en'],
+        );
+
+        $this->assertNull($result['multi_intent']);
+    }
 }
