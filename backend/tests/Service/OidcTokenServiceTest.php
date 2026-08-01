@@ -349,6 +349,72 @@ class OidcTokenServiceTest extends TestCase
         $this->assertTrue($result);
     }
 
+    public function testRefreshOidcTokensReturnsFreshIdToken(): void
+    {
+        $discoveryResponse = $this->createMock(ResponseInterface::class);
+        $discoveryResponse->method('toArray')->willReturn([
+            'issuer' => 'https://keycloak.example.com/realms/test',
+            'token_endpoint' => 'https://keycloak.example.com/realms/test/protocol/openid-connect/token',
+            'jwks_uri' => 'https://keycloak.example.com/realms/test/protocol/openid-connect/certs',
+        ]);
+
+        $tokenResponse = $this->createMock(ResponseInterface::class);
+        $tokenResponse->method('getStatusCode')->willReturn(200);
+        $tokenResponse->method('toArray')->willReturn([
+            'access_token' => 'new-access',
+            'refresh_token' => 'new-refresh',
+            'expires_in' => 300,
+            'id_token' => 'fresh-id-token',
+        ]);
+
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient->method('request')->willReturnCallback(
+            function ($method, $url) use ($discoveryResponse, $tokenResponse) {
+                return str_contains($url, '.well-known') ? $discoveryResponse : $tokenResponse;
+            }
+        );
+
+        $service = $this->createService($httpClient);
+        $result = $service->refreshOidcTokens('old-refresh', 'keycloak');
+
+        $this->assertNotNull($result);
+        $this->assertSame('new-access', $result['access_token']);
+        $this->assertSame('fresh-id-token', $result['id_token']);
+    }
+
+    public function testRefreshOidcTokensReturnsNullIdTokenWhenProviderOmitsIt(): void
+    {
+        $discoveryResponse = $this->createMock(ResponseInterface::class);
+        $discoveryResponse->method('toArray')->willReturn([
+            'issuer' => 'https://keycloak.example.com/realms/test',
+            'token_endpoint' => 'https://keycloak.example.com/realms/test/protocol/openid-connect/token',
+            'jwks_uri' => 'https://keycloak.example.com/realms/test/protocol/openid-connect/certs',
+        ]);
+
+        $tokenResponse = $this->createMock(ResponseInterface::class);
+        $tokenResponse->method('getStatusCode')->willReturn(200);
+        $tokenResponse->method('toArray')->willReturn([
+            'access_token' => 'new-access',
+            'refresh_token' => 'new-refresh',
+            'expires_in' => 300,
+            // no id_token
+        ]);
+
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient->method('request')->willReturnCallback(
+            function ($method, $url) use ($discoveryResponse, $tokenResponse) {
+                return str_contains($url, '.well-known') ? $discoveryResponse : $tokenResponse;
+            }
+        );
+
+        $service = $this->createService($httpClient);
+        $result = $service->refreshOidcTokens('old-refresh', 'keycloak');
+
+        $this->assertNotNull($result);
+        $this->assertArrayHasKey('id_token', $result);
+        $this->assertNull($result['id_token']);
+    }
+
     public function testGetEndSessionUrlReturnsUrlWhenSupported(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
