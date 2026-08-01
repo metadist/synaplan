@@ -83,6 +83,9 @@ function mountView() {
 
 describe('SubscriptionView — plan benefits', () => {
   const previousLocale = i18n.global.locale.value
+  // jsdom has no layout, so the view's scroll call would throw. Stubbing the
+  // prototype leaks across files, hence the restore below.
+  const previousScrollIntoView = Element.prototype.scrollIntoView
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -91,6 +94,7 @@ describe('SubscriptionView — plan benefits', () => {
 
   afterEach(() => {
     i18n.global.locale.value = previousLocale
+    Element.prototype.scrollIntoView = previousScrollIntoView
   })
 
   it('translates the benefits instead of printing the English server list', async () => {

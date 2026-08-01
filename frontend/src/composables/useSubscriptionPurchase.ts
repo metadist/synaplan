@@ -21,6 +21,11 @@ export const PAID_LEVELS = ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'] as const
 /** Purchasable tiers, ordered from cheapest to most expensive. */
 export const PLAN_HIERARCHY = ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'] as const
 
+interface PlanBenefit {
+  key: string
+  params?: Record<string, number>
+}
+
 /**
  * Localized benefits per tier, mirroring the server-side plan catalogue. The
  * API returns English-only `features`, so every surface must translate here
@@ -31,8 +36,12 @@ export const PLAN_HIERARCHY = ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'] as con
  * (Free €1 / Pro €15 / Team €40 / Business €80 per month). Plans are
  * budget-based, so never list absolute message/image/video/storage counts
  * here — keep in sync with `SubscriptionController::PLAN_CATALOGUE`.
+ *
+ * `satisfies` pins the keys to known tiers: a typo would otherwise compile and
+ * silently drop that tier back to the untranslated server list. The declared
+ * index signature stays wide because the lookup key is a runtime plan id.
  */
-const PLAN_BENEFITS: Record<string, Array<{ key: string; params?: Record<string, number> }>> = {
+const PLAN_BENEFITS: Record<string, PlanBenefit[]> = {
   PRO: [
     { key: 'usage', params: { factor: 15 } },
     { key: 'advancedModels' },
@@ -52,7 +61,7 @@ const PLAN_BENEFITS: Record<string, Array<{ key: string; params?: Record<string,
     { key: 'dedicatedSupport' },
     { key: 'slaGuarantee' },
   ],
-}
+} satisfies Partial<Record<(typeof PLAN_HIERARCHY)[number], PlanBenefit[]>>
 
 interface UseSubscriptionPurchaseOptions {
   /**
