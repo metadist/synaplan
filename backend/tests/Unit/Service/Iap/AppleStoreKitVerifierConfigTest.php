@@ -43,7 +43,25 @@ final class AppleStoreKitVerifierConfigTest extends TestCase
         );
 
         $this->expectException(IapNotConfiguredException::class);
-        $this->expectExceptionMessage($dir);
+        $this->expectExceptionMessage(sprintf('directory "%s" holds no files', $dir));
+        $verifier->verifySignedTransaction('irrelevant');
+    }
+
+    /**
+     * A vanished directory means the bind mount is missing, which is a different
+     * repair than an empty one — that distinction is the whole point here.
+     */
+    public function testDistinguishesAVanishedDirectoryFromAnEmptyOne(): void
+    {
+        $dir = sys_get_temp_dir().'/apple-roots-never-created';
+
+        $verifier = new AppleStoreKitVerifier(
+            bundleId: 'com.example.app',
+            rootCertsDir: $dir,
+        );
+
+        $this->expectException(IapNotConfiguredException::class);
+        $this->expectExceptionMessage(sprintf('directory "%s" does not exist', $dir));
         $verifier->verifySignedTransaction('irrelevant');
     }
 

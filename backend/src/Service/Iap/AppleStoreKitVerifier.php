@@ -179,16 +179,29 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
         if ('' === $this->bundleId) {
             $missing[] = 'IAP_APPLE_BUNDLE_ID is empty';
         }
+
+        // A directory that ceased to exist (what a container recreate does to an
+        // unmounted one) is named separately from an empty one: the first points
+        // at a missing bind mount, the second at a failed download.
+        $certificates = null;
         if ('' === $this->rootCertsDir) {
-            $missing[] = 'IAP_APPLE_ROOT_CERTS_DIR is empty';
+            $certificates = 'IAP_APPLE_ROOT_CERTS_DIR is empty';
+        } elseif (!is_dir($this->rootCertsDir)) {
+            $certificates = sprintf('the root certificate directory "%s" does not exist', $this->rootCertsDir);
         } elseif ([] === $this->rootCertificates()) {
-            $missing[] = sprintf(
-                'no Apple root certificates in "%s" (download them from https://www.apple.com/certificateauthority/ and keep them in DER form; a bind mount survives container recreation, a copy into the container does not)',
-                $this->rootCertsDir
-            );
+            $certificates = sprintf('the root certificate directory "%s" holds no files', $this->rootCertsDir);
+        }
+        if (null !== $certificates) {
+            $missing[] = $certificates;
         }
 
-        return 'Apple IAP is not configured on this server: '.implode('; ', $missing).'.';
+        $message = 'Apple IAP is not configured on this server: '.implode('; ', $missing).'.';
+        if (null !== $certificates) {
+            $message .= ' Download the roots from https://www.apple.com/certificateauthority/ and keep them'
+                .' DER-encoded; a bind mount survives container recreation, a copy into the container does not.';
+        }
+
+        return $message;
     }
 
     /**
