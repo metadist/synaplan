@@ -9,6 +9,7 @@ use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Realtime\Notifier\ChatActivityNotifier;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
@@ -102,6 +103,7 @@ final class WhatsAppService
         private int $whatsappUserId,
         private string $appUrl = '',
         ?string $whatsappGraphApiBaseUrl = null,
+        private ?ChatActivityNotifier $chatActivityNotifier = null,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
@@ -741,7 +743,20 @@ final class WhatsAppService
             $mediaDownloadError = $this->handleMediaDownload($message, $dto, $mediaId, $mediaUrl, $effectiveUserId);
         }
 
+        // Bump the chat's activity timestamp so the inbound message re-sorts
+        // the conversation to the top of the chat list — on a full reload
+        // (backend ORDER BY updatedAt) and, via the realtime push below, live
+        // in an already-open browser (#1372).
+        $chat->updateTimestamp();
+
         $this->em->flush();
+
+        $this->chatActivityNotifier?->publishActivity(
+            $chat,
+            $user->getId(),
+            'IN',
+            $message->getText(),
+        );
 
         // Check for media download errors and send user-friendly error message
         if ($mediaDownloadError) {

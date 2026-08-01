@@ -450,6 +450,32 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  /**
+   * React to activity that happened outside this browser tab — an inbound
+   * message on an inbound channel (WhatsApp, email) pushed over the realtime
+   * `user:{id}` channel (#1372).
+   *
+   * If the chat is already in the local store, bump it so it re-sorts to the
+   * top immediately. If it is not (e.g. a brand-new inbound conversation), pull
+   * the chat list so the new conversation appears without a manual reload.
+   *
+   * @param chatId Target chat.
+   * @param options.firstMessagePreview Optional preview to lift an "empty" chat
+   *   out of the empty-chat filter once it has real content.
+   */
+  async function noteExternalActivity(
+    chatId: number,
+    options: { firstMessagePreview?: string } = {}
+  ) {
+    const chat = chats.value.find((c) => c.id === chatId)
+    if (chat) {
+      bumpChatActivity(chatId, { firstMessagePreview: options.firstMessagePreview })
+      return
+    }
+
+    await loadChats()
+  }
+
   function $reset() {
     chats.value = []
     historyChats.value = []
@@ -480,6 +506,7 @@ export const useChatsStore = defineStore('chats', () => {
     getShareInfo,
     setActiveChat,
     bumpChatActivity,
+    noteExternalActivity,
     $reset,
   }
 })
