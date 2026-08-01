@@ -476,6 +476,7 @@ import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import { httpClient } from '@/services/api/httpClient'
+import { pluginCommands } from '@/stores/commands'
 import { z } from 'zod'
 import {
   parseMediaJobPayload,
@@ -1697,6 +1698,56 @@ const handleContinueResponse = async (message: Message) => {
   stopStreamingFn = stopStreaming
 }
 
+interface PluginChatRoute {
+  pluginName: string
+  endpoint: string
+}
+
+/**
+ * Match a "/command …" message against the slash-commands contributed by
+ * installed plugins (manifest `chatCommands`, surfaced via runtime config).
+ * Returns the owning plugin + endpoint, or null for non-plugin input.
+ */
+const matchPluginChatCommand = (content: string): PluginChatRoute | null => {
+  const match = content.trim().match(/^\/([A-Za-z0-9_-]+)(?:\s|$)/)
+  if (!match) {
+    return null
+  }
+  const name = match[1].toLowerCase()
+  const command = pluginCommands().find((c) => c.name.toLowerCase() === name)
+  if (!command?.pluginName || !command.endpoint) {
+    return null
+  }
+  return { pluginName: command.pluginName, endpoint: command.endpoint }
+}
+
+/**
+ * Run a plugin slash-command by posting the message to the plugin's own chat
+ * endpoint and rendering the reply locally. Deliberately does NOT go through
+ * the AI message pipeline, so no classifier/characterization change is needed.
+ */
+const runPluginChatCommand = async (route: PluginChatRoute, text: string): Promise<void> => {
+  historyStore.addMessage('user', [{ type: 'text' as const, content: text }])
+  const userId = authStore.user?.id
+  if (!userId) {
+    return
+  }
+  const streamingId = historyStore.addStreamingMessage('assistant')
+  try {
+    const data = await httpClient<{ message?: string }>(
+      `/api/v1/user/${userId}/plugins/${route.pluginName}${route.endpoint}`,
+      { method: 'POST', body: JSON.stringify({ message: text, chatId: 'webchat' }) }
+    )
+    historyStore.finishStreamingMessage(streamingId, [
+      { type: 'text' as const, content: data?.message || t('plugins.commandEmpty') },
+    ])
+  } catch {
+    historyStore.finishStreamingMessage(streamingId, [
+      { type: 'text' as const, content: t('plugins.commandError') },
+    ])
+  }
+}
+
 const handleSendMessage = async (
   content: string,
   options?: {
@@ -1710,6 +1761,14 @@ const handleSendMessage = async (
     quotedMessageId?: number
   }
 ) => {
+  // Plugin slash-commands (e.g. "/fastbill show overdue") are handled by the
+  // owning plugin, not the AI pipeline. Intercept before any other processing.
+  const pluginRoute = matchPluginChatCommand(content)
+  if (pluginRoute) {
+    await runPluginChatCommand(pluginRoute, content.trim())
+    return
+  }
+
   autoScroll.value = true
   stickToBottom = false
 

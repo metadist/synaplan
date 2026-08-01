@@ -646,7 +646,9 @@
   "plugins": {
     "title": "Eklentiler",
     "description": "İş akışınız için genişletilmiş işlevsellik",
-    "notFound": "Eklenti bulunamadı veya hesabınız için etkinleştirilmemiş"
+    "notFound": "Eklenti bulunamadı veya hesabınız için etkinleştirilmemiş",
+    "commandEmpty": "Eklenti boş bir yanıt döndürdü.",
+    "commandError": "Eklenti komutu başarısız oldu. Lütfen tekrar deneyin."
   },
   "tools": {
     "title": "Mevcut Araçlar",

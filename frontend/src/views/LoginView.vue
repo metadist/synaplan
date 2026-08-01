@@ -360,7 +360,10 @@
               </button>
             </form>
 
-            <p class="mt-6 text-center text-sm txt-secondary">
+            <p
+              v-if="config.auth.registrationEnabled"
+              class="mt-6 text-center text-sm txt-secondary"
+            >
               {{ $t('auth.noAccount') }}
               <router-link
                 to="/register"

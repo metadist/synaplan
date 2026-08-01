@@ -24,6 +24,7 @@ use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
+use App\Service\RegistrationConfig;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
 use App\Service\WhisperService;
@@ -60,6 +61,7 @@ class ConfigController extends AbstractController
         private MobileVersionService $mobileVersionService,
         private MarketingNewsConfig $marketingNewsConfig,
         private UsageTaximeterConfig $usageTaximeterConfig,
+        private RegistrationConfig $registrationConfig,
         private ChatReadinessService $chatReadiness,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
         private CapabilityService $capabilityService,
@@ -122,6 +124,14 @@ class ConfigController extends AbstractController
                     description: 'Billing/subscription status (false for open-source deployments)',
                     properties: [
                         new OA\Property(property: 'enabled', type: 'boolean', example: false),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'auth',
+                    type: 'object',
+                    description: 'Authentication surface flags. Lets the frontend hide sign-up affordances when the operator runs an SSO-/OIDC-only instance.',
+                    properties: [
+                        new OA\Property(property: 'registrationEnabled', type: 'boolean', example: true, description: 'When false, local email/password self-registration is disabled (set REGISTRATION_ENABLED=false, e.g. for OIDC-only deployments). The /register endpoint is also refused server-side.'),
                     ]
                 ),
                 new OA\Property(
@@ -199,6 +209,19 @@ class ConfigController extends AbstractController
                             new OA\Property(property: 'version', type: 'string', example: '1.0.0'),
                             new OA\Property(property: 'description', type: 'string', example: 'A simple hello world plugin'),
                             new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string')),
+                            new OA\Property(
+                                property: 'chatCommands',
+                                type: 'array',
+                                description: 'Slash-commands this plugin registers in the chat composer',
+                                items: new OA\Items(
+                                    properties: [
+                                        new OA\Property(property: 'command', type: 'string', example: 'fastbill'),
+                                        new OA\Property(property: 'endpoint', type: 'string', example: '/chat'),
+                                        new OA\Property(property: 'description', type: 'string', example: 'Talk to your FastBill account'),
+                                    ],
+                                    type: 'object'
+                                )
+                            ),
                         ]
                     )
                 ),
@@ -437,6 +460,7 @@ class ConfigController extends AbstractController
                     'version' => $plugin->version,
                     'description' => $plugin->description,
                     'capabilities' => $plugin->capabilities,
+                    'chatCommands' => $plugin->chatCommands,
                 ];
             }
         }
@@ -515,6 +539,11 @@ class ConfigController extends AbstractController
         $response = [
             'billing' => [
                 'enabled' => $this->billingService->isEnabled(),
+            ],
+            'auth' => [
+                // Default ON; operators set REGISTRATION_ENABLED=false for
+                // SSO-/OIDC-only instances so no local sign-up is offered.
+                'registrationEnabled' => $this->registrationConfig->isEnabled(),
             ],
             'recaptcha' => $recaptchaConfig,
             'branding' => $this->brandingService->getBranding(),
