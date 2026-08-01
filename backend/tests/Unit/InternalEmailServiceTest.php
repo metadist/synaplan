@@ -366,6 +366,31 @@ class InternalEmailServiceTest extends TestCase
     }
 
     /**
+     * A report is stored before the notification is attempted, so a bad operator
+     * address must never travel back to the reporting user. The controller maps
+     * InvalidArgumentException to a 400 with the raw message, which is exactly
+     * what an App Review tester would see.
+     */
+    public function testAnUnusableOperatorAddressNeverReachesTheReportingUser(): void
+    {
+        $previous = $_ENV['APP_ADMIN_EMAIL'] ?? null;
+        $_ENV['APP_ADMIN_EMAIL'] = 'not an address';
+
+        $mailer = $this->createMock(MailerInterface::class);
+        $mailer->expects($this->never())->method('send');
+
+        try {
+            $this->serviceWithMailer($mailer)->sendModerationReportEmail($this->moderationReport());
+        } finally {
+            if (null === $previous) {
+                unset($_ENV['APP_ADMIN_EMAIL']);
+            } else {
+                $_ENV['APP_ADMIN_EMAIL'] = $previous;
+            }
+        }
+    }
+
+    /**
      * @param array<string, string> $env
      *
      * @return list<string>
@@ -391,18 +416,7 @@ class InternalEmailServiceTest extends TestCase
             });
 
         try {
-            $this->serviceWithMailer($mailer)->sendModerationReportEmail([
-                'id' => 7,
-                'contentType' => 'message',
-                'contentId' => 42,
-                'reason' => 'hate_speech',
-                'details' => null,
-                'reporterId' => 1,
-                'reporterEmail' => 'reporter@example.test',
-                'reportedUserId' => null,
-                'reportedUserEmail' => null,
-                'created' => '2026-08-01 12:00:00',
-            ]);
+            $this->serviceWithMailer($mailer)->sendModerationReportEmail($this->moderationReport());
         } finally {
             foreach ($previous as $key => $value) {
                 if (null === $value) {
@@ -414,5 +428,24 @@ class InternalEmailServiceTest extends TestCase
         }
 
         return $recipients;
+    }
+
+    /**
+     * @return array{id:int,contentType:string,contentId:int,reason:string,details:?string,reporterId:int,reporterEmail:?string,reportedUserId:?int,reportedUserEmail:?string,created:string}
+     */
+    private function moderationReport(): array
+    {
+        return [
+            'id' => 7,
+            'contentType' => 'message',
+            'contentId' => 42,
+            'reason' => 'hate_speech',
+            'details' => null,
+            'reporterId' => 1,
+            'reporterEmail' => 'reporter@example.test',
+            'reportedUserId' => null,
+            'reportedUserEmail' => null,
+            'created' => '2026-08-01 12:00:00',
+        ];
     }
 }
