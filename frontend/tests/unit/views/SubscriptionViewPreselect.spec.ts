@@ -40,7 +40,15 @@ vi.mock('@/stores/auth', () => ({
 }))
 
 vi.mock('@/stores/config', () => ({
-  useConfigStore: () => ({ billing: { enabled: true } }),
+  useConfigStore: () => ({
+    billing: { enabled: true },
+    // The view links to the legal pages (App Store Review Guideline 3.1.2);
+    // the real store always resolves these, falling back to the brand pages.
+    branding: {
+      termsUrl: 'https://example.test/terms',
+      privacyUrl: 'https://example.test/privacy',
+    },
+  }),
 }))
 
 vi.mock('@/composables/useDialog', () => ({

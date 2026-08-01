@@ -264,6 +264,39 @@
             </button>
             <p class="txt-secondary text-xs">{{ $t('subscription.native.storeNote') }}</p>
           </div>
+
+          <!--
+            MOBILE-APP SEAM (Epic 9.4): App Store Review Guideline 3.1.2 requires the
+            renewal terms and functional links to the terms of use and privacy policy
+            on the surface that sells the subscription. The paywall modal already
+            carries them; this page sells the same plans and needs the same disclosure.
+          -->
+          <div
+            v-if="stripeConfigured || isNative"
+            data-testid="section-purchase-disclosure"
+            class="max-w-2xl mx-auto mt-8 text-center space-y-2"
+          >
+            <p class="text-xs txt-tertiary leading-relaxed">
+              {{ isNative ? $t('paywall.renewalNoteStore') : $t('paywall.renewalNoteWeb') }}
+            </p>
+            <p class="text-xs txt-tertiary">
+              <a
+                :href="config.branding.termsUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-brand hover:underline underline-offset-2"
+                >{{ $t('auth.termsOfService') }}</a
+              >
+              <span class="mx-2">·</span>
+              <a
+                :href="config.branding.privacyUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-brand hover:underline underline-offset-2"
+                >{{ $t('auth.privacyPolicy') }}</a
+              >
+            </p>
+          </div>
         </template>
       </div>
     </div>
