@@ -75,6 +75,8 @@ security:
         # Public runtime configuration (reCAPTCHA site key, etc.)
         - { path: ^/api/v1/config/runtime, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/config/memory-service/check, roles: PUBLIC_ACCESS }
+        # Public capability discovery (supported file formats, languages, summary options)
+        - { path: ^/api/v1/config/capabilities, roles: PUBLIC_ACCESS }
 
         # Public marketing news for the anonymous guest landing (feed + image proxy)
         - { path: ^/api/v1/news/, roles: PUBLIC_ACCESS }

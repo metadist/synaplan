@@ -14,6 +14,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
+use App\Service\Capability\CapabilityService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
@@ -89,6 +90,7 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->createStub(UsageTaximeterConfig::class),
             $this->createStub(ChatReadinessService::class),
             $this->createStub(LocalAiDownloadStatusService::class),
+            new CapabilityService(),
             'http://qdrant.example',
         );
 
