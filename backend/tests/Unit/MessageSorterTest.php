@@ -472,13 +472,13 @@ class MessageSorterTest extends TestCase
     }
 
     // ===========================================
-    // BMULTI (multi-deliverable vote)
+    // BMULTI (multi-step vote)
     // ===========================================
 
     /**
      * @return array<string, array{0: string, 1: bool|null}>
      */
-    public static function multiIntentProvider(): array
+    public static function multiStepProvider(): array
     {
         return [
             'integer one' => ['{"BTOPIC": "general", "BMULTI": 1}', true],
@@ -488,14 +488,14 @@ class MessageSorterTest extends TestCase
             'string one' => ['{"BTOPIC": "general", "BMULTI": "1"}', true],
             'string true' => ['{"BTOPIC": "general", "BMULTI": "true"}', true],
             // No vote must stay null so the planner keeps deciding — an absent
-            // field is NOT the same as "single deliverable".
+            // field is NOT the same as "single step".
             'absent' => ['{"BTOPIC": "general"}', null],
             'null' => ['{"BTOPIC": "general", "BMULTI": null}', null],
             'garbage' => ['{"BTOPIC": "general", "BMULTI": "maybe"}', null],
         ];
     }
 
-    #[DataProvider('multiIntentProvider')]
+    #[DataProvider('multiStepProvider')]
     public function testParseResponseReadsTheMultiDeliverableVote(string $response, ?bool $expected): void
     {
         $result = $this->parseResponseMethod->invoke(
@@ -504,7 +504,7 @@ class MessageSorterTest extends TestCase
             ['BTOPIC' => 'general', 'BLANG' => 'en'],
         );
 
-        $this->assertSame($expected, $result['multi_intent']);
+        $this->assertSame($expected, $result['multi_step']);
     }
 
     public function testParseResponseFallbackCarriesNoMultiDeliverableVote(): void
@@ -515,6 +515,6 @@ class MessageSorterTest extends TestCase
             ['BTOPIC' => 'general', 'BLANG' => 'en'],
         );
 
-        $this->assertNull($result['multi_intent']);
+        $this->assertNull($result['multi_step']);
     }
 }

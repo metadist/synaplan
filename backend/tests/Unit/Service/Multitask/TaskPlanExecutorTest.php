@@ -37,7 +37,7 @@ final class TaskPlanExecutorTest extends TestCase
         $this->dagExecutor = $this->createMock(DagExecutor::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->multitaskConfig = $this->createMock(MultitaskRoutingConfig::class);
-        $this->multitaskConfig->method('planOnlyMultiIntent')->willReturn(true);
+        $this->multitaskConfig->method('planOnlyMultiStep')->willReturn(true);
         // Real mapper so the round-trip is genuinely exercised.
         $this->executor = new TaskPlanExecutor(
             $this->router,
@@ -477,9 +477,9 @@ final class TaskPlanExecutorTest extends TestCase
         self::assertSame('document', $result['metadata']['file']['type']);
     }
 
-    public function testSorterVoteOfSingleDeliverableSkipsThePlanner(): void
+    public function testSorterVoteOfASingleStepSkipsThePlanner(): void
     {
-        // The whole point of the vote: on a one-deliverable turn the planner
+        // The whole point of the vote: on a one-step turn the planner
         // would only produce a single-node plan that we hand straight back to
         // the legacy router, so the round-trip is pure latency.
         $this->planner->expects(self::never())->method('plan');
@@ -488,14 +488,14 @@ final class TaskPlanExecutorTest extends TestCase
         $result = $this->executor->executeStream(
             $this->message(),
             [],
-            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_intent' => false],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => false],
             static function (): void {},
         );
 
         self::assertSame(['content' => 'router answer'], $result);
     }
 
-    public function testSorterVoteOfMultipleDeliverablesStillPlans(): void
+    public function testSorterVoteOfMultipleStepsStillPlans(): void
     {
         $this->planner->expects(self::once())
             ->method('plan')
@@ -505,7 +505,7 @@ final class TaskPlanExecutorTest extends TestCase
         $this->executor->executeStream(
             $this->message(),
             [],
-            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_intent' => true],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => true],
             static function (): void {},
         );
     }
@@ -527,12 +527,12 @@ final class TaskPlanExecutorTest extends TestCase
         );
     }
 
-    public function testDisabledFlagPlansEvenOnASingleDeliverableVote(): void
+    public function testDisabledFlagPlansEvenOnASingleStepVote(): void
     {
-        // PLAN_ONLY_MULTI_INTENT is the kill switch: turning it off must put
+        // PLAN_ONLY_MULTI_STEP is the kill switch: turning it off must put
         // every AI-sorted turn back through the planner.
         $config = $this->createMock(MultitaskRoutingConfig::class);
-        $config->method('planOnlyMultiIntent')->willReturn(false);
+        $config->method('planOnlyMultiStep')->willReturn(false);
         $executor = new TaskPlanExecutor(
             $this->router,
             new ClassificationPlanMapper(),
@@ -552,7 +552,7 @@ final class TaskPlanExecutorTest extends TestCase
         $executor->executeStream(
             $this->message(),
             [],
-            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_intent' => false],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => false],
             static function (): void {},
         );
     }
@@ -568,7 +568,7 @@ final class TaskPlanExecutorTest extends TestCase
         $this->executor->executeStream(
             $this->message(),
             [],
-            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_intent' => true],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => true],
             static function (): void {},
             function (array $event) use (&$statuses): void { $statuses[] = $event['status'] ?? null; },
         );
@@ -584,7 +584,7 @@ final class TaskPlanExecutorTest extends TestCase
         $this->executor->executeStream(
             $this->message(),
             [],
-            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_intent' => false],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => false],
             static function (): void {},
             function (array $event) use (&$statuses): void { $statuses[] = $event['status'] ?? null; },
         );

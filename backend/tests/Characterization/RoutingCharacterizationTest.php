@@ -158,13 +158,18 @@ final class RoutingCharacterizationTest extends TestCase
 
             // ---- Sorter-driven: BMULTI vote (planner skip) ----
             // The vote rides along with the classification and decides whether
-            // TaskPlanExecutor pays for a planner round-trip. `false` (single
-            // deliverable) must reach the executor untouched; `true` must too.
-            ['id' => 'sort_single_deliverable_vote', 'text' => 'write me a short poem about rain', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_intent' => false]],
-            ['id' => 'sort_multi_deliverable_vote', 'text' => 'write me a poem about rain and read it to me as MP3', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_intent' => true]],
+            // TaskPlanExecutor pays for a planner round-trip. `false` (one step)
+            // must reach the executor untouched; `true` must too.
+            ['id' => 'sort_single_step_vote', 'text' => 'write me a short poem about rain', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => false]],
+            ['id' => 'sort_multi_step_vote', 'text' => 'write me a poem about rain and read it to me as MP3', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => true]],
+            // A single deliverable the chat model cannot produce on its own
+            // (calendar invite) also votes true — those capabilities only exist
+            // in the DAG, so skipping the planner would silently degrade them
+            // into a chat answer that merely talks about the appointment.
+            ['id' => 'sort_calendar_needs_planning', 'text' => 'set up a meeting tomorrow at 15:00 with Tom', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => true]],
             // A sorter that never voted (older seeded prompt) stays null so the
             // planner keeps deciding — this is the safe fallback.
-            ['id' => 'sort_no_deliverable_vote', 'text' => 'tell me about the weather on mars', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en']],
+            ['id' => 'sort_no_step_vote', 'text' => 'tell me about the weather on mars', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en']],
 
             // ---- Sorter-driven: CUSTOM user topic — migration-risk #1 ----
             // A user-authored BPROMPTS topic (BOWNERID>0) is NOT in the canonical

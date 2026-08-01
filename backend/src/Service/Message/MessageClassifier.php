@@ -237,7 +237,7 @@ final readonly class MessageClassifier
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
-            'multi_intent' => $result['multi_intent'] ?? null,
+            'multi_step' => $result['multi_step'] ?? null,
             'media_type' => $result['media_type'] ?? null,
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
@@ -250,10 +250,10 @@ final readonly class MessageClassifier
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
             // Sorter's BMULTI vote: true = needs several steps, false = one
-            // deliverable, null = no vote (older prompt row / model dropped the
+            // step, null = no vote (older prompt row / model dropped the
             // field). TaskPlanExecutor uses it to skip the planner round-trip
-            // on single-deliverable turns; null keeps the pre-vote behaviour.
-            'multi_intent' => $result['multi_intent'] ?? null,
+            // on single-step turns; null keeps the pre-vote behaviour.
+            'multi_step' => $result['multi_step'] ?? null,
             'source' => $source,
             'skip_sorting' => false,
             'intent' => $this->mapTopicToIntent($canonicalTopic),
@@ -297,9 +297,9 @@ final readonly class MessageClassifier
             unset($classification['media_type']);
             // This reroute only produces the requested audio because the
             // planner chains `file_analysis → text2sound`. Force the planner on
-            // even if the sorter voted "single deliverable" for the describe
-            // half of the request.
-            $classification['multi_intent'] = true;
+            // even if the sorter voted "single step" for the describe half of
+            // the request.
+            $classification['multi_step'] = true;
         }
 
         // Pass through duration if detected (for video generation)

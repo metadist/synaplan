@@ -123,7 +123,7 @@ final readonly class MessageSorter
                     'web_search' => false,
                     // Likewise no BMULTI vote — null keeps the planner's own
                     // decision in charge for rule-matched turns.
-                    'multi_intent' => null,
+                    'multi_step' => null,
                     'raw_response' => 'Rule-based routing',
                     'prompt_metadata' => $promptMetadata,
                     'sorting_model_id' => null,
@@ -233,7 +233,7 @@ final readonly class MessageSorter
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
                 'web_search' => $parsed['web_search'] ?? false,
-                'multi_intent' => $parsed['multi_intent'] ?? null,
+                'multi_step' => $parsed['multi_step'] ?? null,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
                 'resolution' => $parsed['resolution'] ?? null,
@@ -272,7 +272,7 @@ final readonly class MessageSorter
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
                 'web_search' => $parsed['web_search'] ?? false,
-                'multi_intent' => $parsed['multi_intent'] ?? null,
+                'multi_step' => $parsed['multi_step'] ?? null,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
                 'resolution' => $parsed['resolution'] ?? null,
@@ -394,13 +394,13 @@ final readonly class MessageSorter
                 $webSearch = (bool) $data['BWEBSEARCH'];
             }
 
-            // Parse BMULTI — the sorter's vote on whether this one message asks
-            // for more than one deliverable. Stays null when the model omitted
+            // Parse BMULTI — the sorter's vote on whether answering this
+            // message takes more than one step. Stays null when the model omitted
             // the field (older seeded prompt, model that drops unknown keys) so
             // downstream consumers can tell "no vote" from an explicit "no".
-            $multiIntent = null;
+            $multiStep = null;
             if (array_key_exists('BMULTI', $data) && null !== $data['BMULTI']) {
-                $multiIntent = filter_var($data['BMULTI'], \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+                $multiStep = filter_var($data['BMULTI'], \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
             }
 
             // Parse BMEDIA for mediamaker topic (image, video, audio)
@@ -442,7 +442,7 @@ final readonly class MessageSorter
                 'topic' => $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general',
                 'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
                 'web_search' => $webSearch,
-                'multi_intent' => $multiIntent,
+                'multi_step' => $multiStep,
                 'media_type' => $mediaType,
                 'duration' => $duration,
                 'resolution' => $resolution,
@@ -459,7 +459,7 @@ final readonly class MessageSorter
                 'topic' => $originalData['BTOPIC'] ?? 'general',
                 'language' => $originalData['BLANG'] ?? 'en',
                 'web_search' => false,
-                'multi_intent' => null,
+                'multi_step' => null,
                 'media_type' => null,
                 'duration' => null,
                 'resolution' => null,

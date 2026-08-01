@@ -441,13 +441,13 @@ This is the list, use only this:
    - "Make an 8K video" → BRESOLUTION: "4K" (highest supported tier)
    - "Create a video of a cat" → (no BRESOLUTION, use default)
 
-12. **Detect combined requests (BMULTI)**: Decide whether this one message asks for
-   MORE THAN ONE deliverable that has to be produced in separate steps. Be
-   conservative — default to 0. Almost every message is a single request.
+12. **Detect requests that need more than one step (BMULTI)**: Decide whether
+   answering this message takes more than writing a single reply. Be
+   conservative — default to 0. Most messages are one step.
 
-   Set BMULTI to 1 ONLY when the message links a CONTENT step (write, draft,
+   Set BMULTI to 1 when the message links a CONTENT step (write, draft,
    summarize, translate, generate, schreibe, erstelle, fasse zusammen) with a
-   SECOND, DIFFERENT deliverable, such as:
+   SECOND, DIFFERENT deliverable:
    - Content plus a spoken version ("write a poem and read it to me as MP3",
      "schreib einen Text und lies ihn vor")
    - Content plus a document or spreadsheet ("summarize this and put it in a DOCX")
@@ -459,6 +459,19 @@ This is the list, use only this:
    - Two clearly separate questions or jobs in one message, each needing its own
      answer or artefact
 
+   ALSO set BMULTI to 1 — even for a single deliverable — when answering
+   requires an action a written reply cannot deliver by itself:
+   - A calendar entry, meeting invite, appointment or timed reminder
+     ("set up a meeting tomorrow at 15:00 with Tom", "erinnere mich an den
+     Termin morgen um 9")
+   - Reading the live content of a concrete URL written in the message
+     ("summarize this article: https://…", "was steht auf dieser Seite?")
+   - Looking something up in one of the user's connected systems
+     ("look up customer X in our CRM", "check the wiki for the onboarding page")
+   - Searching the user's own mailbox
+     ("search my emails for the Acme offer", "was hat mir Tom letzte Woche gemailt?")
+   - Sending the result by email ("mail it to me", "schick es mir per Mail")
+
    Set BMULTI to 0 for everything else, including:
    - Any plain question, greeting or smalltalk
    - One deliverable described with several adjectives, constraints or details
@@ -466,10 +479,11 @@ This is the list, use only this:
    - One media request with accompanying text baked into it (rule 2 already
      routes those to "mediamaker" — the text is produced downstream)
    - A request to redo, refine or continue the previous answer
+   - A general web-search question (that is BWEBSEARCH, not BMULTI)
    - Anything you are unsure about
 
-   BMULTI is INDEPENDENT of BTOPIC: a combined request still gets the BTOPIC of
-   its main deliverable. BMULTI only says "this needs more than one step".
+   BMULTI is INDEPENDENT of BTOPIC: a request that needs several steps still
+   gets the BTOPIC of its main deliverable.
 
 # Answer format
 
