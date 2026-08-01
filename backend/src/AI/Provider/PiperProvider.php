@@ -198,24 +198,49 @@ class PiperProvider implements TextToSpeechProviderInterface
     }
 
     /**
-     * Resolve the Piper voice name from explicit voice or language code.
+     * Resolve the Piper voice name from explicit voice, message language,
+     * or the user's configured voice model.
      *
-     * Priority: explicit voice → language-based lookup → default (English).
-     * Handles both short ("de") and locale ("de_DE") language codes.
+     * Priority (issue #490):
+     *   1. Explicit per-request `voice` (deliberate override) always wins.
+     *   2. A voice matching the message `language`, so e.g. a German reply is
+     *      pronounced in German even when the configured default voice targets
+     *      another language. If the configured `model` already targets that
+     *      language, it is kept (respects a user's specific voice choice).
+     *   3. The user's configured `model` (the TEXT2SOUND default is a Piper
+     *      voice name) — used when the language is unknown/unmapped, instead of
+     *      silently falling back to the English default.
+     *   4. The English default as a last resort.
+     *
+     * Handles both short ("de") and locale ("de_DE" / "de-DE") language codes.
      *
      * @param array<string, mixed> $options
      */
     private function resolveVoice(array $options): string
     {
         if (!empty($options['voice'])) {
-            return $options['voice'];
+            return (string) $options['voice'];
         }
 
-        $language = $options['language'] ?? 'en';
+        $configuredModel = !empty($options['model']) ? (string) $options['model'] : '';
 
-        // Normalize locale codes (e.g. "de_DE" or "de-DE") to short form
-        $shortLang = strtolower(substr($language, 0, 2));
+        // Normalize locale codes (e.g. "de_DE" or "de-DE") to short form.
+        $shortLang = strtolower(substr((string) ($options['language'] ?? ''), 0, 2));
 
-        return self::LANGUAGE_VOICE_MAP[$shortLang] ?? self::DEFAULT_VOICE;
+        if ('' !== $shortLang && isset(self::LANGUAGE_VOICE_MAP[$shortLang])) {
+            // Keep the configured voice when it already targets this language
+            // (Piper voice names are locale-prefixed, e.g. "de_DE-...").
+            if ('' !== $configuredModel && str_starts_with(strtolower($configuredModel), $shortLang)) {
+                return $configuredModel;
+            }
+
+            return self::LANGUAGE_VOICE_MAP[$shortLang];
+        }
+
+        if ('' !== $configuredModel) {
+            return $configuredModel;
+        }
+
+        return self::DEFAULT_VOICE;
     }
 }
