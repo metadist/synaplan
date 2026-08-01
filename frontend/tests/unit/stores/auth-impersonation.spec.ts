@@ -23,6 +23,16 @@ vi.mock('@/stores/realtime', () => ({
   }),
 }))
 
+// #1381: auth.ts tears down mediaJobs and re-subscribes it on a principal swap.
+const mediaJobsSubscribeMock = vi.fn().mockResolvedValue(undefined)
+const mediaJobsUnsubscribeMock = vi.fn()
+vi.mock('@/stores/mediaJobs', () => ({
+  useMediaJobsStore: () => ({
+    subscribe: mediaJobsSubscribeMock,
+    unsubscribe: mediaJobsUnsubscribeMock,
+  }),
+}))
+
 const refreshUserMock = vi.fn()
 vi.mock('@/services/authService', async () => {
   const { ref } = await import('vue')
@@ -97,6 +107,11 @@ describe('useAuthStore — impersonation', () => {
     refreshUserMock.mockClear()
     startApiMock.mockReset()
     stopApiMock.mockReset()
+    // Module-scoped mocks accumulate across tests otherwise — reset the
+    // realtime/mediaJobs teardown spies so per-test call counts are accurate.
+    realtimeDisconnectMock.mockClear()
+    mediaJobsSubscribeMock.mockClear()
+    mediaJobsUnsubscribeMock.mockClear()
     localStorage.clear()
   })
 

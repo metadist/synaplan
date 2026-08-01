@@ -177,6 +177,31 @@ export const useAuthStore = defineStore('auth', () => {
     clearSseToken()
   }
 
+  /**
+   * Tear down the realtime client and its per-user subscriptions on a principal
+   * swap (impersonation start/stop). Unlike `logout()`, the two impersonation
+   * paths previously kept the Centrifugo client alive, so a subscription minted
+   * for the *previous* principal's `user:{id}` channel kept 403-ing forever
+   * against the new access cookie (#1381). Dropping the client here forces a
+   * fresh connection + subscription for the new principal.
+   */
+  async function teardownRealtimeState(): Promise<void> {
+    const [{ useMediaJobsStore }, { useRealtimeStore }] = await Promise.all([
+      import('./mediaJobs'),
+      import('@/stores/realtime'),
+    ])
+    useMediaJobsStore().unsubscribe()
+    await useRealtimeStore().disconnect()
+  }
+
+  /** Re-open the per-user realtime subscription for the current principal. */
+  async function resubscribeRealtimeState(): Promise<void> {
+    const userId = user.value?.id
+    if (userId == null || userId <= 0) return
+    const { useMediaJobsStore } = await import('./mediaJobs')
+    await useMediaJobsStore().subscribe(userId)
+  }
+
   // Actions
   async function login(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
     loading.value = true
@@ -408,6 +433,7 @@ export const useAuthStore = defineStore('auth', () => {
     // clean slate.
     try {
       await resetUserScopedClientState()
+      await teardownRealtimeState()
     } catch (cleanupErr) {
       console.warn('User state cleanup failed during impersonation start', cleanupErr)
     }
@@ -422,6 +448,13 @@ export const useAuthStore = defineStore('auth', () => {
       // Non-fatal: the auth state is already correct, config will reload on
       // the next route navigation.
       console.warn('Config reload after impersonation start failed:', err)
+    }
+
+    // Re-open realtime for the now-impersonated principal.
+    try {
+      await resubscribeRealtimeState()
+    } catch (realtimeErr) {
+      console.warn('Realtime resubscribe after impersonation start failed:', realtimeErr)
     }
 
     return { success: true }
@@ -444,6 +477,7 @@ export const useAuthStore = defineStore('auth', () => {
     // admin's own session (#999).
     try {
       await resetUserScopedClientState()
+      await teardownRealtimeState()
     } catch (cleanupErr) {
       console.warn('User state cleanup failed during impersonation stop', cleanupErr)
     }
@@ -453,6 +487,13 @@ export const useAuthStore = defineStore('auth', () => {
       await useConfigStore().reload()
     } catch (err) {
       console.warn('Config reload after impersonation stop failed:', err)
+    }
+
+    // Re-open realtime for the restored admin principal.
+    try {
+      await resubscribeRealtimeState()
+    } catch (realtimeErr) {
+      console.warn('Realtime resubscribe after impersonation stop failed:', realtimeErr)
     }
 
     return { success: true }

@@ -308,4 +308,40 @@ describe('Chats Store', () => {
       expect(sorted[0].id).toBe(2)
     })
   })
+
+  describe('noteExternalActivity', () => {
+    it('bumps an already-loaded chat instead of reloading', async () => {
+      const store = useChatsStore()
+      store.chats = [
+        {
+          id: 2,
+          title: 'WhatsApp chat',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          messageCount: 1,
+          source: 'whatsapp',
+        },
+      ]
+
+      const before = Date.now()
+      await store.noteExternalActivity(2, { firstMessagePreview: 'Hi from WhatsApp' })
+
+      expect(httpClientMock).not.toHaveBeenCalled()
+      expect(Date.parse(store.chats[0].updatedAt)).toBeGreaterThanOrEqual(before)
+      expect(store.chats[0].messageCount).toBe(2)
+      expect(store.chats[0].firstMessagePreview).toBe('Hi from WhatsApp')
+    })
+
+    it('reloads the chat list when the chat is not loaded yet', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chats: [{ ...chatPayload(42).chat, messageCount: 1 }],
+      })
+
+      await store.noteExternalActivity(42)
+
+      expect(httpClientMock).toHaveBeenCalledWith('/api/v1/chats')
+      expect(store.chats.map((c) => c.id)).toContain(42)
+    })
+  })
 })

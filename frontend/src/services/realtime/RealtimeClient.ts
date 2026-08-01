@@ -14,7 +14,13 @@
  * Pinia).
  */
 
-import { Centrifuge, type PublicationContext, type SubscriptionErrorContext } from 'centrifuge'
+import {
+  Centrifuge,
+  UnauthorizedError,
+  type PublicationContext,
+  type SubscriptionErrorContext,
+} from 'centrifuge'
+import { ApiError } from '@/services/api/httpClient'
 import { isNativeApp, getNativeApiBaseUrl } from '@/services/api/nativeRuntime'
 import {
   fetchOperatorConnectionToken,
@@ -214,16 +220,34 @@ export class RealtimeClient {
 
     const sub = c.newSubscription(channel, {
       getToken: async () => {
-        const result = await fetchSubscriptionToken(channel, {
-          anonymous: this.options.identity.kind === 'visitor',
-          widgetId:
-            this.options.identity.kind === 'visitor' ? this.options.identity.widgetId : undefined,
-          sessionId:
-            this.options.identity.kind === 'visitor' ? this.options.identity.sessionId : undefined,
-          apiBaseUrl:
-            this.options.identity.kind === 'visitor' ? this.options.identity.apiBaseUrl : undefined,
-        })
-        return result.token
+        try {
+          const result = await fetchSubscriptionToken(channel, {
+            anonymous: this.options.identity.kind === 'visitor',
+            widgetId:
+              this.options.identity.kind === 'visitor' ? this.options.identity.widgetId : undefined,
+            sessionId:
+              this.options.identity.kind === 'visitor'
+                ? this.options.identity.sessionId
+                : undefined,
+            apiBaseUrl:
+              this.options.identity.kind === 'visitor'
+                ? this.options.identity.apiBaseUrl
+                : undefined,
+          })
+          return result.token
+        } catch (err) {
+          // A genuine authorization failure — e.g. a subscription left over
+          // for another principal's `user:{id}` channel after an impersonation
+          // swap — can never be fixed by retrying with the same identity. The
+          // httpClient already ran (and exhausted) its 401 access-token refresh
+          // before throwing, so surface this as centrifuge-js's
+          // UnauthorizedError to STOP the unbounded token-refresh loop instead
+          // of hammering /realtime/subscribe every ~15s forever (#1381).
+          if (err instanceof ApiError && (401 === err.status || 403 === err.status)) {
+            throw new UnauthorizedError(err.message)
+          }
+          throw err
+        }
       },
     })
 

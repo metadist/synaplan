@@ -605,13 +605,17 @@ class AuthController extends AbstractController
             ],
         ]);
 
-        // Update OIDC tokens
+        // Update OIDC tokens. Pass the refreshed id_token (when the provider
+        // returned one) so the id_token cookie backing the RP-Initiated Logout
+        // hint stays current instead of the stale login-time token (#472). A
+        // null id_token leaves the existing cookie untouched.
         $this->oidcTokenService->storeOidcTokens(
             $response,
             $newTokens['access_token'],
             $newTokens['refresh_token'],
             $newTokens['expires_in'],
-            $provider
+            $provider,
+            $newTokens['id_token'] ?? null,
         );
 
         // Also update our internal tokens

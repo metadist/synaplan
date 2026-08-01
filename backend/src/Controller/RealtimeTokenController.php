@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Realtime\Authorizer\ChannelAuthorizerLocator;
 use App\Realtime\Authorizer\SubscriberContext;
 use App\Realtime\Channel\ChannelParser;
+use App\Realtime\Channel\UserChannel;
 use App\Realtime\Exception\InvalidChannelException;
 use App\Realtime\Exception\UnauthorizedSubscriptionException;
 use App\Realtime\Token\RealtimeSubject;
@@ -213,6 +214,7 @@ final class RealtimeTokenController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Invalid channel name')]
+    #[OA\Response(response: 401, description: 'Authentication required for this channel (anonymous caller)')]
     #[OA\Response(response: 403, description: 'Subscription not authorised')]
     #[OA\Response(response: 429, description: 'Rate limit exceeded (anonymous callers)')]
     public function issueSubscriptionToken(Request $request, #[CurrentUser] ?User $user): JsonResponse
@@ -263,6 +265,18 @@ final class RealtimeTokenController extends AbstractController
                 'user_id' => $user?->getId(),
                 'reason' => $e->getMessage(),
             ]);
+
+            // An anonymous caller refused a per-user channel gets 401, not 403,
+            // so the frontend's standard access-token refresh path engages and
+            // resubscribes once the cookie is restored — instead of
+            // centrifuge-js looping on /realtime/subscribe forever with a stale
+            // access cookie (#1381). This is scoped to the auth-only user
+            // channel: a refused *authenticated* caller (cross-user channel) and
+            // any refused widget/visitor channel stay 403, because no cookie
+            // refresh can grant them access.
+            if (null === $user && $channel instanceof UserChannel) {
+                return $this->json(['error' => 'unauthenticated'], Response::HTTP_UNAUTHORIZED);
+            }
 
             return $this->json(['error' => 'forbidden'], Response::HTTP_FORBIDDEN);
         }

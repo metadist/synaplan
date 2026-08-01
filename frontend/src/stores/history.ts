@@ -274,6 +274,29 @@ export interface TaskPlanState {
   trackId?: number
 }
 
+/**
+ * Backoff schedule (ms between attempts) for recovering a turn whose SSE
+ * stream dropped mid-flight (#1413). Roughly 19s total — long enough for the
+ * backend to finish and persist a turn that was still running at drop time,
+ * short enough to feel like a live recovery rather than a reload.
+ */
+const DROP_RECOVERY_DELAYS_MS = [1000, 2000, 3000, 5000, 8000]
+
+/**
+ * Whether a message already carries something the user can see — rendered
+ * text, a media/link part, etc. Used to tell a persisted, finished answer
+ * apart from an empty placeholder while recovering a dropped turn.
+ */
+function messageHasRenderableContent(message: Message): boolean {
+  return message.parts.some(
+    (part) =>
+      (typeof part.content === 'string' && '' !== part.content.trim()) ||
+      Boolean(part.url) ||
+      Boolean(part.imageUrl) ||
+      (Array.isArray(part.items) && part.items.length > 0)
+  )
+}
+
 export const useHistoryStore = defineStore('history', () => {
   const messages = ref<Message[]>([])
   const isLoadingMessages = ref(false)
@@ -568,6 +591,62 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  /**
+   * Issue #1413: a mid-turn SSE transport drop can land BEFORE the backend has
+   * persisted the answer — the turn keeps running on the server after the
+   * socket closes (#1230/#1265). The previous recovery reconciled/reloaded
+   * exactly ONCE, immediately, so it found nothing and the answer never
+   * rendered until a manual page reload (re-sending then produced a duplicate
+   * turn).
+   *
+   * Re-poll the persisted turn with bounded backoff instead. A plain reload is
+   * used (not `reconcileMessage`) because the reconcile path deliberately keeps
+   * the live-streamed text authoritative — for a drop the streamed text is
+   * incomplete/empty, so only a fresh mapping of the persisted row shows the
+   * answer. As soon as the backend reports the turn is still running
+   * (`inProgressTurn`), the existing 2s in-progress poll (#1142/#1343) takes
+   * over and this loop stops. Every fetch is an idempotent GET, so retrying is
+   * safe.
+   *
+   * Recovery uses silent loads, which deliberately share the current
+   * `loadGeneration`. If the user switches chats while we are parked on a
+   * backoff timer, a foreground load for the new chat bumps `loadGeneration`;
+   * we capture it on entry and bail the moment it changes so a late recovery
+   * poll for the old chat can never overwrite the newly-selected chat.
+   */
+  const recoverInterruptedTurn = async (chatId: number): Promise<void> => {
+    const recoveryGeneration = loadGeneration
+
+    for (let attempt = 0; attempt <= DROP_RECOVERY_DELAYS_MS.length; attempt++) {
+      if (recoveryGeneration !== loadGeneration) return
+
+      const loadedMessageCount = messages.value.filter(
+        (message) => message.id !== IN_PROGRESS_TURN_ID
+      ).length
+      await loadMessages(chatId, 0, Math.max(50, loadedMessageCount), true)
+
+      // A foreground load (chat switch or manual reload) superseded us while
+      // the silent reload was in flight — never touch the new chat's list.
+      if (recoveryGeneration !== loadGeneration) return
+
+      // Backend reports the turn is still running → hand off to the 2s poll.
+      if (inProgressPollChatId === chatId) return
+
+      // A persisted assistant answer for the turn has landed (a completed turn
+      // ends with the assistant message).
+      const lastReal = [...messages.value]
+        .reverse()
+        .find((message) => message.id !== IN_PROGRESS_TURN_ID)
+      if (lastReal && 'assistant' === lastReal.role && messageHasRenderableContent(lastReal)) {
+        return
+      }
+
+      const delay = DROP_RECOVERY_DELAYS_MS[attempt]
+      if (undefined === delay) return // backoff schedule exhausted
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+  }
+
   return {
     messages,
     isLoadingMessages,
@@ -585,5 +664,6 @@ export const useHistoryStore = defineStore('history', () => {
     loadMessages,
     loadMoreMessages,
     reconcileMessage,
+    recoverInterruptedTurn,
   }
 })
