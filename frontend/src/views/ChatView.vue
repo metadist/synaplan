@@ -477,6 +477,7 @@ import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import { httpClient } from '@/services/api/httpClient'
 import { pluginCommands } from '@/stores/commands'
+import { i18n } from '@/i18n'
 import { z } from 'zod'
 import {
   parseMediaJobPayload,
@@ -1736,7 +1737,10 @@ const runPluginChatCommand = async (route: PluginChatRoute, text: string): Promi
   try {
     const data = await httpClient<{ message?: string }>(
       `/api/v1/user/${userId}/plugins/${route.pluginName}${route.endpoint}`,
-      { method: 'POST', body: JSON.stringify({ message: text, chatId: 'webchat' }) }
+      {
+        method: 'POST',
+        body: JSON.stringify({ message: text, chatId: 'webchat', lang: i18n.global.locale.value }),
+      }
     )
     historyStore.finishStreamingMessage(streamingId, [
       { type: 'text' as const, content: data?.message || t('plugins.commandEmpty') },
