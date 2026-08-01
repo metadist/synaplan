@@ -103,7 +103,7 @@
 
                   <ul class="space-y-2.5 mb-6 flex-1">
                     <li
-                      v-for="(benefit, index) in benefitsFor(plan)"
+                      v-for="(benefit, index) in planBenefits(plan)"
                       :key="index"
                       class="flex items-start gap-2.5 text-sm txt-secondary"
                     >
@@ -259,6 +259,8 @@ const {
   currentLevel,
   loadPlans,
   displayPrice,
+  planName,
+  planBenefits,
   isCurrentPlan,
   isLowerPlan,
   selectPlan,
@@ -292,53 +294,10 @@ const planGridClass = computed(() => {
 })
 
 /**
- * Localized benefits per tier, mirroring the server-side plan catalogue. The
- * API returns English-only `features`, which we only fall back to for a tier
- * this build does not know yet.
- *
- * The usage factors mirror the cost budgets of the reference deployment
- * (Free €1 / Pro €15 / Team €40 / Business €80 per month). Plans are
- * budget-based, so never list absolute message/image/video/storage counts
- * here — keep in sync with `SubscriptionController::PLAN_CATALOGUE`.
+ * The tagline falls back to nothing for a tier this build has no copy for —
+ * `t()` would otherwise print the raw key path, e.g.
+ * `paywall.plans.studio.tagline`, right into the card.
  */
-const PLAN_BENEFITS: Record<string, Array<{ key: string; params?: Record<string, number> }>> = {
-  PRO: [
-    { key: 'usage', params: { factor: 15 } },
-    { key: 'advancedModels' },
-    { key: 'prioritySupport' },
-  ],
-  TEAM: [
-    { key: 'everythingInPro' },
-    { key: 'usage', params: { factor: 40 } },
-    { key: 'teamCollaboration' },
-    { key: 'customPrompts' },
-    { key: 'apiAccess' },
-  ],
-  BUSINESS: [
-    { key: 'everythingInTeam' },
-    { key: 'usage', params: { factor: 80 } },
-    { key: 'whiteLabel' },
-    { key: 'dedicatedSupport' },
-    { key: 'slaGuarantee' },
-  ],
-}
-
-function benefitsFor(plan: SubscriptionPlan): string[] {
-  const mapped = PLAN_BENEFITS[plan.id]
-  if (!mapped) return plan.features
-  return mapped.map((benefit) => t(`subscription.features.${benefit.key}`, benefit.params ?? {}))
-}
-
-/**
- * Tier name and tagline fall back to what the server sent (and to nothing) for
- * a tier this build has no copy for — `t()` would otherwise print the raw key
- * path, e.g. `paywall.plans.studio.tagline`, right into the card.
- */
-function planName(plan: SubscriptionPlan): string {
-  const key = `subscription.plans.${plan.id.toLowerCase()}`
-  return te(key) ? t(key) : plan.name
-}
-
 function taglineFor(plan: SubscriptionPlan): string {
   const key = `paywall.plans.${plan.id.toLowerCase()}.tagline`
   return te(key) ? t(key) : ''

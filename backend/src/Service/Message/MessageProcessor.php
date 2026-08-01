@@ -304,7 +304,7 @@ final readonly class MessageProcessor
                 // answers the user. Inert unless MULTITASK_SHADOW_MODE is on, and
                 // wrapped so it can never affect the turn. Runs only on the
                 // normal-classification branch (never widget/fixed-prompt/again).
-                $this->maybeShadowPlan($message, $conversationHistory);
+                $this->maybeShadowPlan($message, $conversationHistory, $perfTimer);
             }
 
             // User-selected knowledge-base folder (RAG group key) from the chat
@@ -1144,7 +1144,7 @@ final readonly class MessageProcessor
         }
     }
 
-    private function maybeShadowPlan(Message $message, array $conversationHistory): void
+    private function maybeShadowPlan(Message $message, array $conversationHistory, ?PerfTimer $perfTimer = null): void
     {
         try {
             if (!$this->multitaskConfig->isShadowMode()) {
@@ -1158,7 +1158,15 @@ final readonly class MessageProcessor
             }
 
             $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-            $result = $this->taskPlanner->plan($message, $conversationHistory, $userId);
+            // Shadow planning does not answer the user but still blocks the
+            // turn, so it needs its own phase rather than silently inflating
+            // the surrounding ones.
+            $perfTimer?->start('plan_shadow');
+            try {
+                $result = $this->taskPlanner->plan($message, $conversationHistory, $userId);
+            } finally {
+                $perfTimer?->stop('plan_shadow');
+            }
 
             // The early return above guarantees a persisted message here.
             $messageId = $message->getId();

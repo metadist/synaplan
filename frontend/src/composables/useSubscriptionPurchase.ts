@@ -21,6 +21,48 @@ export const PAID_LEVELS = ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'] as const
 /** Purchasable tiers, ordered from cheapest to most expensive. */
 export const PLAN_HIERARCHY = ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'] as const
 
+interface PlanBenefit {
+  key: string
+  params?: Record<string, number>
+}
+
+/**
+ * Localized benefits per tier, mirroring the server-side plan catalogue. The
+ * API returns English-only `features`, so every surface must translate here
+ * instead of printing them — otherwise a German user reads English bullets
+ * next to German headings.
+ *
+ * The usage factors mirror the cost budgets of the reference deployment
+ * (Free €1 / Pro €15 / Team €40 / Business €80 per month). Plans are
+ * budget-based, so never list absolute message/image/video/storage counts
+ * here — keep in sync with `SubscriptionController::PLAN_CATALOGUE`.
+ *
+ * `satisfies` pins the keys to known tiers: a typo would otherwise compile and
+ * silently drop that tier back to the untranslated server list. The declared
+ * index signature stays wide because the lookup key is a runtime plan id.
+ */
+const PLAN_BENEFITS: Record<string, PlanBenefit[]> = {
+  PRO: [
+    { key: 'usage', params: { factor: 15 } },
+    { key: 'advancedModels' },
+    { key: 'prioritySupport' },
+  ],
+  TEAM: [
+    { key: 'everythingInPro' },
+    { key: 'usage', params: { factor: 40 } },
+    { key: 'teamCollaboration' },
+    { key: 'customPrompts' },
+    { key: 'apiAccess' },
+  ],
+  BUSINESS: [
+    { key: 'everythingInTeam' },
+    { key: 'usage', params: { factor: 80 } },
+    { key: 'whiteLabel' },
+    { key: 'dedicatedSupport' },
+    { key: 'slaGuarantee' },
+  ],
+} satisfies Partial<Record<(typeof PLAN_HIERARCHY)[number], PlanBenefit[]>>
+
 interface UseSubscriptionPurchaseOptions {
   /**
    * Invoked after the server-side entitlement may have changed (successful
@@ -40,7 +82,7 @@ interface UseSubscriptionPurchaseOptions {
  * keeps the Stripe redirect.
  */
 export function useSubscriptionPurchase(options: UseSubscriptionPurchaseOptions = {}) {
-  const { t } = useI18n()
+  const { t, te } = useI18n()
   const authStore = useAuthStore()
   const dialog = useDialog()
   const { success } = useNotification()
@@ -99,6 +141,26 @@ export function useSubscriptionPurchase(options: UseSubscriptionPurchaseOptions 
       return formatPlanPrice(plan.appPrice, plan.currency)
     }
     return formatPlanPrice(plan.price, plan.currency)
+  }
+
+  /**
+   * The tier name falls back to what the server sent for a tier this build has
+   * no copy for — `t()` would otherwise print the raw key path,
+   * e.g. `subscription.plans.studio`, as the card heading.
+   */
+  function planName(plan: SubscriptionPlan): string {
+    const key = `subscription.plans.${plan.id.toLowerCase()}`
+    return te(key) ? t(key) : plan.name
+  }
+
+  /**
+   * Falls back to the server's English list only for a tier this build has no
+   * copy for — better an untranslated benefit than an empty card.
+   */
+  function planBenefits(plan: SubscriptionPlan): string[] {
+    const mapped = PLAN_BENEFITS[plan.id]
+    if (!mapped) return plan.features
+    return mapped.map((benefit) => t(`subscription.features.${benefit.key}`, benefit.params ?? {}))
   }
 
   function isCurrentPlan(planId: string): boolean {
@@ -268,6 +330,8 @@ export function useSubscriptionPurchase(options: UseSubscriptionPurchaseOptions 
     hasActivePlan,
     loadPlans,
     displayPrice,
+    planName,
+    planBenefits,
     isCurrentPlan,
     isLowerPlan,
     selectPlan,

@@ -11,6 +11,7 @@ use App\Service\Multitask\Execution\DagExecutor;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlan;
+use App\Service\PerfTimer;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -275,12 +276,25 @@ final readonly class TaskPlanExecutor
             ]);
         }
 
+        // The planner is a blocking, non-streaming LLM round-trip that sits
+        // between classification and the answer model, so it lands directly in
+        // the user's time-to-first-token. Time it as its own phase — folded
+        // into `handler_total` it was indistinguishable from the answer
+        // model's own latency in the `perf` SSE event.
+        $perfTimer = $options['perf_timer'] ?? null;
+        $perfTimer = $perfTimer instanceof PerfTimer ? $perfTimer : null;
+
         try {
             $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
             // Forward the classification so dynamic skill blocks (mcp_fetch)
             // can resolve the matched topic's per-prompt gates at plan time.
-            $result = $this->planner->plan($message, $thread, $userId, $options + ['classification' => $classification]);
+            $perfTimer?->start('plan');
+            try {
+                $result = $this->planner->plan($message, $thread, $userId, $options + ['classification' => $classification]);
+            } finally {
+                $perfTimer?->stop('plan');
+            }
 
             $collapsed = $this->collapseRedundantSingleMediaPlan($result->plan, $classification);
             if ($collapsed !== $result->plan) {

@@ -15,6 +15,7 @@ use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanResult;
 use App\Service\Multitask\TaskPlanStore;
+use App\Service\PerfTimer;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -590,5 +591,71 @@ final class TaskPlanExecutorTest extends TestCase
         );
 
         self::assertNotContains('planning', $statuses);
+    }
+
+    public function testPlannerCallIsRecordedAsItsOwnPerfPhase(): void
+    {
+        // The planner is a blocking LLM round-trip in front of the answer
+        // model, so it has to show up separately in the `perf` SSE event
+        // instead of hiding inside `handler_total`.
+        $this->planner->method('plan')->willReturnCallback(function (): TaskPlanResult {
+            usleep(20_000);
+
+            return new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: false, modelId: 76);
+        });
+        $this->router->method('routeStream')->willReturn(['content' => 'router answer']);
+
+        $perfTimer = new PerfTimer();
+        $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting'],
+            static function (): void {},
+            null,
+            ['perf_timer' => $perfTimer],
+        );
+
+        self::assertArrayHasKey('plan', $perfTimer->totals());
+        self::assertGreaterThan(10.0, $perfTimer->totals()['plan']);
+    }
+
+    public function testPlanPhaseIsClosedWhenThePlannerThrows(): void
+    {
+        // A planner failure degrades to the legacy router; the phase must not
+        // stay open, otherwise it silently vanishes from the perf payload.
+        $this->planner->method('plan')->willThrowException(new \RuntimeException('planner down'));
+        $this->router->expects(self::once())->method('routeStream')->willReturn(['content' => 'legacy answer']);
+
+        $perfTimer = new PerfTimer();
+        $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting'],
+            static function (): void {},
+            null,
+            ['perf_timer' => $perfTimer],
+        );
+
+        self::assertArrayHasKey('plan', $perfTimer->totals());
+    }
+
+    public function testSkippedPlanningRecordsNoPlanPhase(): void
+    {
+        // Deterministic branches never reach the planner, so they must not
+        // report a (zero) planning cost either.
+        $this->planner->expects(self::never())->method('plan');
+        $this->router->method('routeStream')->willReturn(['content' => 'x']);
+
+        $perfTimer = new PerfTimer();
+        $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'tool_command'],
+            static function (): void {},
+            null,
+            ['perf_timer' => $perfTimer],
+        );
+
+        self::assertArrayNotHasKey('plan', $perfTimer->totals());
     }
 }

@@ -179,7 +179,7 @@
               <!-- Plan Header -->
               <div class="mb-6">
                 <h3 class="text-2xl font-bold txt-primary mb-2">
-                  {{ $t(`subscription.plans.${plan.id.toLowerCase()}`) }}
+                  {{ planName(plan) }}
                 </h3>
                 <div class="flex items-baseline gap-1">
                   <span class="text-4xl font-bold txt-primary">{{ displayPrice(plan) }}</span>
@@ -192,7 +192,7 @@
               <!-- Features List -->
               <ul class="space-y-3 mb-8 flex-grow">
                 <li
-                  v-for="(feature, index) in plan.features"
+                  v-for="(feature, index) in planBenefits(plan)"
                   :key="index"
                   class="flex items-start gap-3"
                 >
@@ -308,6 +308,8 @@ const {
   hasActivePlan,
   loadPlans,
   displayPrice,
+  planName,
+  planBenefits,
   isCurrentPlan,
   isLowerPlan,
   selectPlan,
