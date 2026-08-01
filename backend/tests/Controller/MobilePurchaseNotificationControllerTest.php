@@ -47,7 +47,7 @@ final class MobilePurchaseNotificationControllerTest extends WebTestCase
         $service = $this->createStub(MobilePurchaseService::class);
         $service->method('verifyAppleNotification')
             ->willThrowException(new IapNotConfiguredException('no root certificates'));
-        $client->getContainer()->set(MobilePurchaseService::class, $service);
+        static::getContainer()->set(MobilePurchaseService::class, $service);
 
         $client->request(
             'POST',
@@ -71,7 +71,7 @@ final class MobilePurchaseNotificationControllerTest extends WebTestCase
         $service = $this->createStub(MobilePurchaseService::class);
         $service->method('decodeGoogleNotification')
             ->willThrowException(new IapNotConfiguredException('no service account'));
-        $client->getContainer()->set(MobilePurchaseService::class, $service);
+        static::getContainer()->set(MobilePurchaseService::class, $service);
 
         $client->request(
             'POST',

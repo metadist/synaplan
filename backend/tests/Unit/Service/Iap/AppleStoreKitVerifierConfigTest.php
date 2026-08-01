@@ -65,6 +65,24 @@ final class AppleStoreKitVerifierConfigTest extends TestCase
         $verifier->verifySignedTransaction('irrelevant');
     }
 
+    /**
+     * An unconfigured server must still be able to construct the verifier and
+     * answer. Refusing at construction time turns every /iap/ endpoint into a
+     * 500 and defeats the whole not-configured path — which is what a reversed
+     * pair of env processors did to CI and to every self-host.
+     */
+    public function testConstructsWithoutAnAppAppleId(): void
+    {
+        $verifier = new AppleStoreKitVerifier(
+            bundleId: 'com.example.app',
+            appAppleId: null,
+            rootCertsDir: $this->makeRootCertsDir(withCertificate: false),
+        );
+
+        $this->expectException(IapNotConfiguredException::class);
+        $verifier->verifySignedTransaction('irrelevant');
+    }
+
     public function testReportsAMissingBundleId(): void
     {
         $verifier = new AppleStoreKitVerifier(rootCertsDir: $this->makeRootCertsDir());

@@ -688,7 +688,11 @@ services:
     App\Service\Iap\AppleStoreKitVerifier:
         arguments:
             $bundleId: '%env(string:default::IAP_APPLE_BUNDLE_ID)%'
-            $appAppleId: '%env(default::int:IAP_APPLE_APP_APPLE_ID)%'
+            # `int:` must wrap `default::`, not the other way round: with the
+            # processors reversed an unset variable resolves to null, and the
+            # service then cannot be constructed at all — every /iap/ endpoint
+            # answers 500 instead of the intended "not configured" response.
+            $appAppleId: '%env(int:default::IAP_APPLE_APP_APPLE_ID)%'
             $environment: '%env(string:default::IAP_APPLE_ENVIRONMENT)%'
             $rootCertsDir: '%env(string:default::IAP_APPLE_ROOT_CERTS_DIR)%'
             $projectDir: '%kernel.project_dir%'

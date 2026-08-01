@@ -174,11 +174,14 @@ final class MobilePurchaseController extends AbstractController
             // good on a server that is only temporarily misconfigured — which
             // is exactly what a wiped root-certificate mount produces. Fail
             // loudly instead and let Apple's retries cover the repair window.
-            $this->logger->error('Apple ASSN V2 dropped: IAP is not configured on this server', [
+            $this->logger->error('Apple ASSN V2 not processed: IAP is not configured, answering 503 so Apple retries', [
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->json(['error' => 'IAP not configured'], Response::HTTP_SERVICE_UNAVAILABLE);
+            return $this->json([
+                'error' => 'In-app purchases are not available on this server.',
+                'code' => 'IAP_NOT_CONFIGURED',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (IapVerificationException $e) {
             // Error, not warning: production runs at LOG_LEVEL=error, and a
             // rejected notification means an entitlement change was dropped.
@@ -216,11 +219,14 @@ final class MobilePurchaseController extends AbstractController
             // Same reasoning as the Apple webhook: acknowledging a message we
             // could not process drops the entitlement change. Pub/Sub retries
             // with backoff, so refusing here is recoverable.
-            $this->logger->error('Google RTDN dropped: IAP is not configured on this server', [
+            $this->logger->error('Google RTDN not processed: IAP is not configured, answering 503 so Pub/Sub retries', [
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->json(['error' => 'IAP not configured'], Response::HTTP_SERVICE_UNAVAILABLE);
+            return $this->json([
+                'error' => 'In-app purchases are not available on this server.',
+                'code' => 'IAP_NOT_CONFIGURED',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (IapVerificationException $e) {
             $this->logger->error('Google RTDN decode failed', ['error' => $e->getMessage()]);
 

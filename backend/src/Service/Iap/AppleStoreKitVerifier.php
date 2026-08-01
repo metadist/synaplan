@@ -37,15 +37,17 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
 
     public function __construct(
         private readonly string $bundleId = '',
-        int $appAppleId = 0,
+        ?int $appAppleId = null,
         private readonly string $environment = 'production',
         string $rootCertsDir = '',
         private readonly bool $enableOnlineChecks = false,
         string $projectDir = '',
     ) {
-        // Env wiring passes 0 when APPLE_APP_APPLE_ID is unset; normalize to null
-        // (the verifier only requires it for the Production environment).
-        $this->appAppleId = $appAppleId > 0 ? $appAppleId : null;
+        // Env wiring passes 0 (or null, if a processor is ever reordered) when
+        // IAP_APPLE_APP_APPLE_ID is unset. Absorb both rather than refusing to
+        // construct: an unconfigured server must still be able to answer, and
+        // the verifier only needs this id for the Production environment.
+        $this->appAppleId = null !== $appAppleId && $appAppleId > 0 ? $appAppleId : null;
 
         // A relative IAP_APPLE_ROOT_CERTS_DIR (e.g. "var/apple-roots") must be
         // anchored to the project dir — the web SAPI's cwd is public/, so a
