@@ -137,6 +137,7 @@ describe('SubscriptionView — plan benefits', () => {
  * subscription — not only in the paywall modal.
  */
 describe('SubscriptionView — purchase disclosure', () => {
+  const previousLocale = i18n.global.locale.value
   const previousScrollIntoView = Element.prototype.scrollIntoView
 
   beforeEach(() => {
@@ -145,17 +146,21 @@ describe('SubscriptionView — purchase disclosure', () => {
   })
 
   afterEach(() => {
+    i18n.global.locale.value = previousLocale
     Element.prototype.scrollIntoView = previousScrollIntoView
   })
 
   it('states the renewal terms and links to the terms and the privacy policy', async () => {
+    // Pinned, so the assertion below does not depend on whichever locale the
+    // runner happens to start in.
+    i18n.global.locale.value = 'de'
     mockGetPlans.mockResolvedValue({ plans: [plan('PRO')], stripeConfigured: true })
 
     const wrapper = mountView()
     await flushPromises()
 
     const disclosure = wrapper.get('[data-testid="section-purchase-disclosure"]')
-    expect(disclosure.text()).toContain('renew')
+    expect(disclosure.text()).toContain('Abonnements verlängern sich automatisch')
 
     const hrefs = disclosure.findAll('a').map((a) => a.attributes('href'))
     expect(hrefs).toContain('https://example.test/terms')
