@@ -34,6 +34,20 @@ final readonly class MessageSorter
     private const SUPPORTED_LANGUAGES = ['de', 'en', 'it', 'es', 'fr', 'nl', 'pt', 'ru', 'sv', 'tr'];
 
     /**
+     * Completion budget for the classification call.
+     *
+     * The JSON answer itself is a few dozen tokens, but the SORT binding is
+     * routinely a reasoning model (the shipped default is Groq gpt-oss-120b),
+     * and those spend the same budget on thinking tokens BEFORE emitting the
+     * JSON. When the cap runs out mid-object the response no longer parses and
+     * {@see parseResponse()} silently falls back to topic `general` with no
+     * BWEBSEARCH and no BMULTI vote — a mis-route plus a pointless planner
+     * round-trip, with nothing but a log line to show for it. The headroom is
+     * a cap, not a spend: a well-behaved answer still costs the same.
+     */
+    private const CLASSIFICATION_MAX_TOKENS = 2048;
+
+    /**
      * Canonical video resolutions accepted downstream by MediaGenerationService
      * and the Veo provider. Keep in sync with
      * MediaGenerationService::SUPPORTED_VIDEO_RESOLUTIONS so the AI never
@@ -213,7 +227,7 @@ final readonly class MessageSorter
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1, // Low temperature for consistent classification
-                'max_tokens' => 1024,
+                'max_tokens' => self::CLASSIFICATION_MAX_TOKENS,
             ]);
 
             $aiResponse = $response['content'];

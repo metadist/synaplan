@@ -31,6 +31,20 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class TaskPlanner
 {
+    /**
+     * Completion budget for the planning call.
+     *
+     * A plan is bigger than a classification — several nodes, each with
+     * inputs, params and scoped instruction text — and the PLAN binding falls
+     * back to the SORT model, which is routinely a reasoning model that burns
+     * the same budget on thinking tokens first. A cap that runs out mid-object
+     * makes {@see decodeJson()} return null and degrades the turn to a
+     * single-`chat` fallback, so a genuine combo request ("write X and read it
+     * as MP3") silently loses its second step. The headroom is a cap, not a
+     * spend.
+     */
+    private const PLANNING_MAX_TOKENS = 3000;
+
     public function __construct(
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
@@ -76,7 +90,7 @@ final readonly class TaskPlanner
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1,
-                'max_tokens' => 1500,
+                'max_tokens' => self::PLANNING_MAX_TOKENS,
             ]);
             $raw = (string) ($response['content'] ?? '');
 

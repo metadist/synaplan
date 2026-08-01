@@ -158,4 +158,25 @@ final class TaskPlannerTest extends TestCase
         self::assertTrue($result->fallback);
         self::assertTrue($result->plan->isSingleNode());
     }
+
+    public function testPlanningCallLeavesRoomForReasoningTokens(): void
+    {
+        // The PLAN binding falls back to the SORT model, which is routinely a
+        // reasoning model: it spends completion budget on thinking tokens
+        // before the JSON starts. A cap that runs out mid-object degrades a
+        // real multi-step request to a single-chat fallback, and the only
+        // symptom is a log line.
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"version":1,"reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}'];
+            }
+        );
+
+        $this->planner->plan($this->message(), [], 1);
+
+        self::assertGreaterThanOrEqual(3000, $options['max_tokens'] ?? 0);
+    }
 }
