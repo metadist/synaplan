@@ -20,10 +20,12 @@ use AppStoreServerLibrary\SignedDataVerifier\VerificationException;
  * against Apple's root CAs. All store-specific shapes are normalized to
  * {@see IapEntitlement} here so the rest of the app stays store-agnostic.
  *
- * NOTE: this class is intentionally NOT unit tested — it needs real Apple root
- * certificates + bundle id and produces values only Apple can sign. The
- * business logic that consumes it ({@see \App\Service\MobilePurchaseService})
- * is tested against {@see AppleReceiptVerifierInterface} fakes instead.
+ * NOTE: the verification path is intentionally NOT unit tested — it needs real
+ * Apple root certificates + bundle id and produces values only Apple can sign.
+ * The business logic that consumes it ({@see \App\Service\MobilePurchaseService})
+ * is tested against {@see AppleReceiptVerifierInterface} fakes instead. The
+ * configuration guards below run before any Apple data is touched and ARE
+ * covered, because a misconfigured deployment fails silently in production.
  */
 final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
 {
@@ -144,11 +146,11 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
     private function verifier(): SignedDataVerifier
     {
         if (!$this->isConfigured()) {
-            throw new IapNotConfiguredException('Apple IAP is not configured on this server.');
+            throw new IapNotConfiguredException($this->missingConfigurationMessage());
         }
 
         if (null === $this->verifier) {
-            $environment = Environment::tryFrom($this->environment) ?? Environment::PRODUCTION;
+            $environment = $this->environment();
             try {
                 $this->verifier = new SignedDataVerifier(
                     rootCertificates: $this->rootCertificates(),
@@ -163,6 +165,51 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
         }
 
         return $this->verifier;
+    }
+
+    /**
+     * Names what is actually missing. The generic "not configured" message cost
+     * hours once: a container recreate wiped the root-cert directory, every
+     * purchase failed with an opaque client-side error, and the server log did
+     * not say which half of the configuration was gone.
+     */
+    private function missingConfigurationMessage(): string
+    {
+        $missing = [];
+        if ('' === $this->bundleId) {
+            $missing[] = 'IAP_APPLE_BUNDLE_ID is empty';
+        }
+        if ('' === $this->rootCertsDir) {
+            $missing[] = 'IAP_APPLE_ROOT_CERTS_DIR is empty';
+        } elseif ([] === $this->rootCertificates()) {
+            $missing[] = sprintf(
+                'no Apple root certificates in "%s" (download them from https://www.apple.com/certificateauthority/ and keep them in DER form; a bind mount survives container recreation, a copy into the container does not)',
+                $this->rootCertsDir
+            );
+        }
+
+        return 'Apple IAP is not configured on this server: '.implode('; ', $missing).'.';
+    }
+
+    /**
+     * Apple spells the environment `Sandbox`/`Production`. Accept any casing but
+     * refuse an outright unknown value instead of silently falling back to
+     * Production — that fallback turns a typo into every sandbox receipt being
+     * rejected, with nothing in the log pointing at the environment.
+     */
+    private function environment(): Environment
+    {
+        if ('' === $this->environment) {
+            return Environment::PRODUCTION;
+        }
+
+        foreach (Environment::cases() as $case) {
+            if (0 === strcasecmp($case->value, $this->environment)) {
+                return $case;
+            }
+        }
+
+        throw new IapNotConfiguredException(sprintf('IAP_APPLE_ENVIRONMENT is "%s"; expected one of %s.', $this->environment, implode(', ', array_map(static fn (Environment $c): string => $c->value, Environment::cases()))));
     }
 
     /**
