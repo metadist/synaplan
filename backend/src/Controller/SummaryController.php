@@ -8,6 +8,7 @@ use App\Repository\FileRepository;
 use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Service\Summary\SummaryOptions;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -207,20 +208,18 @@ class SummaryController extends AbstractController
         $focusAreas = $data['focusAreas'] ?? ['main-ideas', 'key-facts'];
 
         // Validate summary type
-        $validTypes = ['abstractive', 'extractive', 'bullet-points'];
-        if (!in_array($summaryType, $validTypes, true)) {
+        if (!in_array($summaryType, SummaryOptions::TYPES, true)) {
             return $this->json([
                 'success' => false,
-                'error' => 'Invalid summary type. Must be: '.implode(', ', $validTypes),
+                'error' => 'Invalid summary type. Must be: '.implode(', ', SummaryOptions::TYPES),
             ], Response::HTTP_BAD_REQUEST);
         }
 
         // Validate length
-        $validLengths = ['short', 'medium', 'long', 'custom'];
-        if (!in_array($length, $validLengths, true)) {
+        if (!in_array($length, SummaryOptions::LENGTHS, true)) {
             return $this->json([
                 'success' => false,
-                'error' => 'Invalid length. Must be: '.implode(', ', $validLengths),
+                'error' => 'Invalid length. Must be: '.implode(', ', SummaryOptions::LENGTHS),
             ], Response::HTTP_BAD_REQUEST);
         }
 

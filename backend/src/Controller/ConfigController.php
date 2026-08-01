@@ -12,6 +12,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
+use App\Service\Capability\CapabilityService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
@@ -61,6 +62,7 @@ class ConfigController extends AbstractController
         private UsageTaximeterConfig $usageTaximeterConfig,
         private ChatReadinessService $chatReadiness,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
+        private CapabilityService $capabilityService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -540,6 +542,89 @@ class ConfigController extends AbstractController
         }
 
         return $this->json($response);
+    }
+
+    /**
+     * Expose supported file formats, languages and summary options so consumer
+     * integrations can discover capabilities dynamically instead of hardcoding
+     * lists that drift when Synaplan adds support for new formats/languages.
+     *
+     * Public (no auth): the descriptor is static, non-sensitive capability
+     * metadata sourced from the same constants the runtime enforces (#676).
+     */
+    #[Route('/capabilities', name: 'capabilities', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/capabilities',
+        summary: 'Get supported file formats, languages and summary options',
+        description: 'Returns the file formats accepted for upload (grouped by category), the languages available for '
+            .'translation/summary output, the summary types/lengths/focus areas, and the maximum upload size. Consumer '
+            .'integrations (e.g. synaplan-nextcloud, synaplan-opencloud) should read this instead of hardcoding lists. '
+            .'No authentication required.',
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Capability descriptor',
+        content: new OA\JsonContent(
+            required: ['file_formats', 'languages', 'summary', 'max_file_size_bytes'],
+            properties: [
+                new OA\Property(
+                    property: 'file_formats',
+                    type: 'object',
+                    description: 'Allowed upload extensions (lowercase, no leading dot) grouped by category. '
+                        .'A category is omitted when it has no allowed extensions, and an "other" bucket holds any '
+                        .'allowed extension without a dedicated category, so clients should tolerate extra keys.',
+                    properties: [
+                        new OA\Property(property: 'text', type: 'array', items: new OA\Items(type: 'string', example: 'txt')),
+                        new OA\Property(property: 'documents', type: 'array', items: new OA\Items(type: 'string', example: 'pdf')),
+                        new OA\Property(property: 'spreadsheets', type: 'array', items: new OA\Items(type: 'string', example: 'xlsx')),
+                        new OA\Property(property: 'presentations', type: 'array', items: new OA\Items(type: 'string', example: 'pptx')),
+                        new OA\Property(property: 'images', type: 'array', items: new OA\Items(type: 'string', example: 'png')),
+                        new OA\Property(property: 'audio', type: 'array', items: new OA\Items(type: 'string', example: 'mp3')),
+                        new OA\Property(property: 'video', type: 'array', items: new OA\Items(type: 'string', example: 'mp4')),
+                        new OA\Property(property: 'calendar', type: 'array', items: new OA\Items(type: 'string', example: 'ics')),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'languages',
+                    type: 'array',
+                    description: 'Language codes available for translation and summary output.',
+                    items: new OA\Items(type: 'string', example: 'en')
+                ),
+                new OA\Property(
+                    property: 'summary',
+                    type: 'object',
+                    required: ['types', 'lengths', 'focus_areas'],
+                    properties: [
+                        new OA\Property(
+                            property: 'types',
+                            type: 'array',
+                            items: new OA\Items(type: 'string', example: 'abstractive')
+                        ),
+                        new OA\Property(
+                            property: 'lengths',
+                            type: 'array',
+                            items: new OA\Items(type: 'string', example: 'medium')
+                        ),
+                        new OA\Property(
+                            property: 'focus_areas',
+                            type: 'array',
+                            items: new OA\Items(type: 'string', example: 'main-ideas')
+                        ),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'max_file_size_bytes',
+                    type: 'integer',
+                    description: 'Maximum size of a single upload, in bytes.',
+                    example: 134217728
+                ),
+            ]
+        )
+    )]
+    public function getCapabilities(): JsonResponse
+    {
+        return $this->json($this->capabilityService->getCapabilities());
     }
 
     /**
