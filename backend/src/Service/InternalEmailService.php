@@ -385,12 +385,38 @@ final readonly class InternalEmailService
     }
 
     /**
+     * A configured address, or null when the variable is unset or blank.
+     */
+    private function configuredAddress(string $key): ?string
+    {
+        $address = trim((string) ($_ENV[$key] ?? ''));
+
+        return '' !== $address ? $address : null;
+    }
+
+    /**
+     * The operator inbox for incident and abuse alerts.
+     *
+     * `??` is not enough for this chain: `.env.example` ships APP_ADMIN_EMAIL
+     * blank, so every deployment that copied it has the key set to an empty
+     * string, which `??` happily returns instead of falling through. The
+     * moderation report Apple requires an operator to act on (Guideline 1.2)
+     * was then addressed to nobody and lost in a warning log.
+     */
+    private function operatorInbox(?string $default = null): ?string
+    {
+        return $this->configuredAddress('APP_ADMIN_EMAIL')
+            ?? $this->configuredAddress('APP_SENDER_EMAIL')
+            ?? $default;
+    }
+
+    /**
      * Send a warning email when the embedding fallback provider activates.
      */
     public function sendEmbeddingFallbackWarning(string $primaryProvider, string $fallbackProvider, string $errorMessage): void
     {
-        $adminEmail = $_ENV['APP_ADMIN_EMAIL'] ?? $_ENV['APP_SENDER_EMAIL'] ?? null;
-        if (!$adminEmail) {
+        $adminEmail = $this->operatorInbox();
+        if (null === $adminEmail) {
             $this->logger->debug('No admin email configured, skipping fallback warning');
 
             return;
@@ -455,8 +481,8 @@ final readonly class InternalEmailService
      */
     public function sendModerationReportEmail(array $report): void
     {
-        $adminEmail = $_ENV['APP_ADMIN_EMAIL'] ?? $_ENV['APP_SENDER_EMAIL'] ?? 'team@synaplan.com';
-        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $adminEmail = $this->operatorInbox('team@synaplan.com');
+        $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
 
         $reason = htmlspecialchars($report['reason'], ENT_QUOTES);
