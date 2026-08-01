@@ -180,7 +180,10 @@ final class MobilePurchaseController extends AbstractController
 
             return $this->json(['error' => 'IAP not configured'], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (IapVerificationException $e) {
-            $this->logger->warning('Apple ASSN V2 verification failed', ['error' => $e->getMessage()]);
+            // Error, not warning: production runs at LOG_LEVEL=error, and a
+            // rejected notification means an entitlement change was dropped.
+            // At warning level the only trace of that would be invisible.
+            $this->logger->error('Apple ASSN V2 verification failed', ['error' => $e->getMessage()]);
 
             return $this->json(['error' => 'Invalid payload'], Response::HTTP_BAD_REQUEST);
         }
@@ -197,6 +200,7 @@ final class MobilePurchaseController extends AbstractController
     )]
     #[OA\Response(response: 200, description: 'Notification processed (or safely ignored)')]
     #[OA\Response(response: 400, description: 'Malformed envelope')]
+    #[OA\Response(response: 503, description: 'IAP not configured here — unacknowledged so Pub/Sub retries')]
     public function googleNotifications(Request $request): JsonResponse
     {
         try {
@@ -205,13 +209,20 @@ final class MobilePurchaseController extends AbstractController
                 $this->mobilePurchaseService->applyNotification($entitlement);
             }
 
-            // Always 200 so Pub/Sub considers the message delivered (avoids
-            // redelivery storms); unactionable messages are a no-op.
+            // 200 so Pub/Sub considers the message delivered; unactionable
+            // messages are a deliberate no-op.
             return $this->json(['success' => true]);
-        } catch (IapNotConfiguredException) {
-            return $this->json(['success' => true, 'status' => 'not_configured']);
+        } catch (IapNotConfiguredException $e) {
+            // Same reasoning as the Apple webhook: acknowledging a message we
+            // could not process drops the entitlement change. Pub/Sub retries
+            // with backoff, so refusing here is recoverable.
+            $this->logger->error('Google RTDN dropped: IAP is not configured on this server', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'IAP not configured'], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (IapVerificationException $e) {
-            $this->logger->warning('Google RTDN decode failed', ['error' => $e->getMessage()]);
+            $this->logger->error('Google RTDN decode failed', ['error' => $e->getMessage()]);
 
             return $this->json(['error' => 'Malformed envelope'], Response::HTTP_BAD_REQUEST);
         }

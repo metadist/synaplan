@@ -62,4 +62,24 @@ final class MobilePurchaseNotificationControllerTest extends WebTestCase
             'Acknowledging a notification the server could not process loses it permanently.'
         );
     }
+
+    public function testDoesNotAcknowledgeGoogleNotificationsWhenIapIsNotConfigured(): void
+    {
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+
+        $service = $this->createStub(MobilePurchaseService::class);
+        $service->method('decodeGoogleNotification')
+            ->willThrowException(new IapNotConfiguredException('no service account'));
+        $client->getContainer()->set(MobilePurchaseService::class, $service);
+
+        $client->request(
+            'POST',
+            '/api/v1/iap/google/notifications',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['message' => ['data' => 'e30=']], JSON_THROW_ON_ERROR)
+        );
+
+        self::assertSame(503, $client->getResponse()->getStatusCode());
+    }
 }
