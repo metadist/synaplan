@@ -3338,14 +3338,12 @@ const streamAIResponse = async (
             // error-bubble path below.
             if (isRecoverableStreamError(data) && !incognito && chatId) {
               historyStore.finishStreamingMessage(messageId)
-              const backendId =
-                data.messageId ??
-                historyStore.messages.find((m) => m.id === messageId)?.backendMessageId
-              if (backendId) {
-                void historyStore.reconcileMessage(messageId, backendId)
-              } else {
-                void historyStore.loadMessages(chatId)
-              }
+              // #1413: the drop can land before the still-running turn has
+              // persisted its answer. Re-poll the persisted turn with bounded
+              // backoff instead of reconciling exactly once, so the answer
+              // renders without a manual reload (which otherwise invites a
+              // duplicate re-send).
+              void historyStore.recoverInterruptedTurn(chatId)
               streamingAbortController = null
               stopStreamingFn = null
               currentTrackId = undefined
