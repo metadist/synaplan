@@ -25,6 +25,7 @@ use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
+use App\Service\RegistrationConfig;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
 use App\Service\WhisperService;
@@ -74,6 +75,7 @@ final class ConfigControllerPlannerModelTest extends TestCase
             $this->createStub(MobileVersionService::class),
             $this->createStub(MarketingNewsConfig::class),
             $this->createStub(UsageTaximeterConfig::class),
+            $this->createStub(RegistrationConfig::class),
             $this->createStub(ChatReadinessService::class),
             $this->createStub(LocalAiDownloadStatusService::class),
             new CapabilityService(),
