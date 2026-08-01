@@ -13,6 +13,7 @@ use App\Service\Client\MobileVersionService;
 use App\Service\FeedbackConstants;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Media\MediaJobConfig;
+use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
@@ -117,6 +118,15 @@ final readonly class SystemConfigService
                 'label' => 'Routing',
                 'sections' => [
                     'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
+                    'conversation_summary' => ['label' => 'Rolling conversation summary', 'fields' => [
+                        'CONVERSATION_SUMMARY_ENABLED',
+                        'CONVERSATION_SUMMARY_TARGET_WINDOW_CHARS',
+                        'CONVERSATION_SUMMARY_RECENT_VERBATIM_CHARS',
+                        'CONVERSATION_SUMMARY_MAX_CHARS',
+                        'CONVERSATION_SUMMARY_MAX_SOURCE_MESSAGES',
+                        'CONVERSATION_SUMMARY_TIERS',
+                        'CONVERSATION_SUMMARY_CACHE_TTL',
+                    ]],
                 ],
             ],
             'interface' => [
@@ -370,6 +380,16 @@ final readonly class SystemConfigService
                 if ($numericValue < 1 || floor($numericValue) !== $numericValue) {
                     return ['success' => false, 'requiresRestart' => false, 'message' => 'Limit must be a positive integer'];
                 }
+            }
+
+            // Rolling-summary sizes are whole counts (characters, messages,
+            // tiers, seconds). ConversationSummaryConfigService discards a
+            // non-positive value and uses its default, so reject it here
+            // instead of storing a row that does nothing.
+            if (ConversationSummaryConstants::CONFIG_GROUP === ($field['dbGroup'] ?? null)
+                && ($numericValue < 1 || floor($numericValue) !== $numericValue)
+            ) {
+                return ['success' => false, 'requiresRestart' => false, 'message' => 'Value must be a positive whole number'];
             }
         }
 
@@ -802,6 +822,74 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
+            ],
+            // === Routing — rolling conversation summary (database-backed) ===
+            // BCONFIG group CONVERSATION_SUMMARY (ownerId=0), the rows
+            // ConversationSummaryConfigService reads. No row means "use the
+            // ConversationSummaryConstants default", so the defaults below must
+            // stay in sync with that class.
+            'CONVERSATION_SUMMARY_ENABLED' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Condense the earlier part of a long chat into a rolling summary that is injected into the system prompt, while the newest turns are still replayed word for word. Keeps the topic, the user\'s position and past decisions alive many answers later. The summary is written asynchronously after each turn by the Summary model (configurable under AI → Routing), so answering stays snappy. When OFF, a long chat only ever sees the most recent turns.',
+                'default' => var_export(ConversationSummaryConstants::ENABLED, true),
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_ENABLED,
+            ],
+            'CONVERSATION_SUMMARY_TARGET_WINDOW_CHARS' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Total characters of conversational memory sent to the answering model: the verbatim recent turns plus the injected summary. Clamped to '.ConversationSummaryConstants::MIN_WINDOW_CHARS.'–'.ConversationSummaryConstants::MAX_WINDOW_CHARS.'.',
+                'default' => (string) ConversationSummaryConstants::TARGET_WINDOW_CHARS,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_TARGET_WINDOW_CHARS,
+            ],
+            'CONVERSATION_SUMMARY_RECENT_VERBATIM_CHARS' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Share of the window reserved for the newest turns, which are replayed word for word. Everything older is condensed. Raise it to keep more literal context, lower it to summarize sooner. Always leaves at least 500 characters for the summary.',
+                'default' => (string) ConversationSummaryConstants::RECENT_VERBATIM_CHARS,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_RECENT_VERBATIM_CHARS,
+            ],
+            'CONVERSATION_SUMMARY_MAX_CHARS' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Hard cap on the injected summary itself. Capped at whatever the window has left after the verbatim turns.',
+                'default' => (string) ConversationSummaryConstants::SUMMARY_MAX_CHARS,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_SUMMARY_MAX_CHARS,
+            ],
+            'CONVERSATION_SUMMARY_MAX_SOURCE_MESSAGES' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Upper bound on how many older messages are fed to the Summary model in one call. Bounds the cost of summarizing a very long conversation; older messages beyond this are represented by the previous summary.',
+                'default' => (string) ConversationSummaryConstants::MAX_SOURCE_MESSAGES,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_MAX_SOURCE_MESSAGES,
+            ],
+            'CONVERSATION_SUMMARY_TIERS' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Number of recency tiers used for gradient compression: the oldest tier is condensed hardest, the tier next to the verbatim turns the least. 1–5.',
+                'default' => (string) ConversationSummaryConstants::TIERS,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_TIERS,
+            ],
+            'CONVERSATION_SUMMARY_CACHE_TTL' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Seconds the stored summary is kept before Redis expires it. The summary is refreshed asynchronously after each long-chat turn, so a follow-up turn never waits on the summarizer. Raise this on quiet installs; lower it only if you need settings changes to take effect faster.',
+                'default' => (string) ConversationSummaryConstants::CACHE_TTL,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_CACHE_TTL,
             ],
             // Stored in BCONFIG group MEDIA / setting ASYNC_JOBS_ENABLED (the row
             // MediaJobConfig reads). Master switch for detaching media renders to

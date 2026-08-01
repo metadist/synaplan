@@ -9,6 +9,7 @@ use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\ClassificationPlanMapper;
 use App\Service\Multitask\Execution\DagExecutor;
+use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanner;
@@ -26,6 +27,7 @@ final class TaskPlanExecutorTest extends TestCase
     private TaskPlanner&MockObject $planner;
     private DagExecutor&MockObject $dagExecutor;
     private ModelConfigService&MockObject $modelConfigService;
+    private MultitaskRoutingConfig&MockObject $multitaskConfig;
     private TaskPlanExecutor $executor;
 
     protected function setUp(): void
@@ -35,6 +37,8 @@ final class TaskPlanExecutorTest extends TestCase
         $this->planner = $this->createMock(TaskPlanner::class);
         $this->dagExecutor = $this->createMock(DagExecutor::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
+        $this->multitaskConfig = $this->createMock(MultitaskRoutingConfig::class);
+        $this->multitaskConfig->method('planOnlyMultiStep')->willReturn(true);
         // Real mapper so the round-trip is genuinely exercised.
         $this->executor = new TaskPlanExecutor(
             $this->router,
@@ -43,6 +47,7 @@ final class TaskPlanExecutorTest extends TestCase
             $this->planner,
             $this->dagExecutor,
             $this->modelConfigService,
+            $this->multitaskConfig,
             $this->createMock(LoggerInterface::class),
         );
     }
@@ -471,6 +476,121 @@ final class TaskPlanExecutorTest extends TestCase
 
         self::assertSame('Calendar invite "Meeting mit Oliver"', $result['content']);
         self::assertSame('document', $result['metadata']['file']['type']);
+    }
+
+    public function testSorterVoteOfASingleStepSkipsThePlanner(): void
+    {
+        // The whole point of the vote: on a one-step turn the planner
+        // would only produce a single-node plan that we hand straight back to
+        // the legacy router, so the round-trip is pure latency.
+        $this->planner->expects(self::never())->method('plan');
+        $this->router->expects(self::once())->method('routeStream')->willReturn(['content' => 'router answer']);
+
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => false],
+            static function (): void {},
+        );
+
+        self::assertSame(['content' => 'router answer'], $result);
+    }
+
+    public function testSorterVoteOfMultipleStepsStillPlans(): void
+    {
+        $this->planner->expects(self::once())
+            ->method('plan')
+            ->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: false, modelId: 76));
+        $this->router->method('routeStream')->willReturn(['content' => 'router answer']);
+
+        $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => true],
+            static function (): void {},
+        );
+    }
+
+    public function testMissingSorterVoteStillPlans(): void
+    {
+        // No vote (older seeded prompt, a SORT model that dropped the field, or
+        // a branch that never ran the sorter) must keep the pre-vote behaviour.
+        $this->planner->expects(self::once())
+            ->method('plan')
+            ->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: false, modelId: 76));
+        $this->router->method('routeStream')->willReturn(['content' => 'router answer']);
+
+        $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting'],
+            static function (): void {},
+        );
+    }
+
+    public function testDisabledFlagPlansEvenOnASingleStepVote(): void
+    {
+        // PLAN_ONLY_MULTI_STEP is the kill switch: turning it off must put
+        // every AI-sorted turn back through the planner.
+        $config = $this->createMock(MultitaskRoutingConfig::class);
+        $config->method('planOnlyMultiStep')->willReturn(false);
+        $executor = new TaskPlanExecutor(
+            $this->router,
+            new ClassificationPlanMapper(),
+            $this->store,
+            $this->planner,
+            $this->dagExecutor,
+            $this->modelConfigService,
+            $config,
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $this->planner->expects(self::once())
+            ->method('plan')
+            ->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: false, modelId: 76));
+        $this->router->method('routeStream')->willReturn(['content' => 'router answer']);
+
+        $executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => false],
+            static function (): void {},
+        );
+    }
+
+    public function testPlanningEmitsAProgressStatusBeforeTheBlockingCall(): void
+    {
+        // Without this the UI shows "Generating response…" for the whole
+        // planner round-trip and looks stuck.
+        $this->planner->method('plan')->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: false, modelId: 76));
+        $this->router->method('routeStream')->willReturn(['content' => 'router answer']);
+
+        $statuses = [];
+        $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => true],
+            static function (): void {},
+            function (array $event) use (&$statuses): void { $statuses[] = $event['status'] ?? null; },
+        );
+
+        self::assertContains('planning', $statuses);
+    }
+
+    public function testSkippedPlanningEmitsNoPlanningStatus(): void
+    {
+        $this->router->method('routeStream')->willReturn(['content' => 'router answer']);
+
+        $statuses = [];
+        $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => false],
+            static function (): void {},
+            function (array $event) use (&$statuses): void { $statuses[] = $event['status'] ?? null; },
+        );
+
+        self::assertNotContains('planning', $statuses);
     }
 
     public function testPlannerCallIsRecordedAsItsOwnPerfPhase(): void

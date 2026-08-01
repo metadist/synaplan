@@ -35,6 +35,10 @@ final readonly class MultitaskConfigSeeder
             // MCP.CLIENT_ENABLED in McpConfigSeeder). Insert-if-missing, so an
             // operator's explicit OFF row is preserved across deploys.
             ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_MCP_FETCH_ENABLED, 'value' => '1'],
+            // Trust the sorter's BMULTI vote and skip the planner round-trip on
+            // single-step turns. ON so the latency win is the default;
+            // the row exists so it can be flipped without a deploy.
+            ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_PLAN_ONLY_MULTI_STEP, 'value' => '1'],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'multitask_config', $rows);

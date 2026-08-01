@@ -3,6 +3,7 @@
 namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
+use App\Entity\Prompt;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
 use App\Service\Message\MessageSorter;
@@ -469,5 +470,99 @@ class MessageSorterTest extends TestCase
         $this->assertSame(6, $result['duration']);
         $this->assertSame('4K', $result['resolution']);
         $this->assertSame('text_only', $result['input_mode']);
+    }
+
+    // ===========================================
+    // BMULTI (multi-step vote)
+    // ===========================================
+
+    /**
+     * @return array<string, array{0: string, 1: bool|null}>
+     */
+    public static function multiStepProvider(): array
+    {
+        return [
+            'integer one' => ['{"BTOPIC": "general", "BMULTI": 1}', true],
+            'integer zero' => ['{"BTOPIC": "general", "BMULTI": 0}', false],
+            'boolean true' => ['{"BTOPIC": "general", "BMULTI": true}', true],
+            'boolean false' => ['{"BTOPIC": "general", "BMULTI": false}', false],
+            'string one' => ['{"BTOPIC": "general", "BMULTI": "1"}', true],
+            'string true' => ['{"BTOPIC": "general", "BMULTI": "true"}', true],
+            // No vote must stay null so the planner keeps deciding — an absent
+            // field is NOT the same as "single step".
+            'absent' => ['{"BTOPIC": "general"}', null],
+            'null' => ['{"BTOPIC": "general", "BMULTI": null}', null],
+            'garbage' => ['{"BTOPIC": "general", "BMULTI": "maybe"}', null],
+        ];
+    }
+
+    #[DataProvider('multiStepProvider')]
+    public function testParseResponseReadsTheMultiStepVote(string $response, ?bool $expected): void
+    {
+        $result = $this->parseResponseMethod->invoke(
+            $this->sorter,
+            $response,
+            ['BTOPIC' => 'general', 'BLANG' => 'en'],
+        );
+
+        $this->assertSame($expected, $result['multi_step']);
+    }
+
+    public function testParseResponseFallbackCarriesNoMultiStepVote(): void
+    {
+        $result = $this->parseResponseMethod->invoke(
+            $this->sorter,
+            'not json at all',
+            ['BTOPIC' => 'general', 'BLANG' => 'en'],
+        );
+
+        $this->assertNull($result['multi_step']);
+    }
+
+    // ===========================================
+    // Completion budget
+    // ===========================================
+
+    public function testClassificationCallLeavesRoomForReasoningTokens(): void
+    {
+        // The SORT binding is routinely a reasoning model, which spends
+        // completion budget on thinking tokens before the JSON starts. A cap
+        // that runs out mid-object drops the turn to topic `general` with no
+        // BWEBSEARCH and no BMULTI vote, and the only symptom is a log line.
+        $aiFacade = $this->createMock(AiFacade::class);
+        $promptRepository = $this->createMock(PromptRepository::class);
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('SORT. Topics: [DYNAMICLIST] Keys: [KEYLIST] Langs: [LANGLIST]');
+        $promptRepository->expects($this->any())->method('findByTopic')->with('tools:sort', 0)->willReturn($prompt);
+        $promptRepository->method('getAllTopics')->willReturn(['general']);
+        $promptRepository->method('getTopicsWithDescriptions')->willReturn([
+            ['topic' => 'general', 'description' => 'catch-all'],
+        ]);
+
+        $options = null;
+        $aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"BTOPIC":"general","BLANG":"en"}', 'provider' => 'groq'];
+            }
+        );
+
+        $sorter = new MessageSorter(
+            $aiFacade,
+            $promptRepository,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(PromptService::class),
+            $this->createMock(RateLimitService::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DiscordNotificationService::class),
+        );
+
+        // A null user id skips the rule-based routing lookup and the usage record.
+        $sorter->classify(['BTEXT' => 'hello', 'BLANG' => 'en', 'BTOPIC' => ''], [], null);
+
+        $this->assertGreaterThanOrEqual(2048, $options['max_tokens'] ?? 0);
     }
 }

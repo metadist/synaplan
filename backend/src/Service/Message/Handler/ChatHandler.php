@@ -615,7 +615,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
-        $this->notify($progressCallback, 'generating', 'Generating response...');
+        $this->notify($progressCallback, 'analyzing_prompt', 'Analyzing the prompt...');
 
         $perfTimer = $options['perf_timer'] ?? null;
         if (!$perfTimer instanceof PerfTimer) {
@@ -669,6 +669,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         if (!empty($message->getText()) && $ragGroupKey) {
             try {
                 error_log('🔍 ChatHandler: Attempting to load RAG context for topic: '.$topic.' (groupKey: '.$ragGroupKey.')');
+
+                $this->notify($progressCallback, 'searching_files', 'Looking for related files...');
 
                 $perfTimer->start('rag');
                 $sharedVector = $resolveSharedVector();
@@ -1097,6 +1099,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'user_id' => $message->getUserId(),
             'reasoning' => $aiOptions['reasoning'] ?? false,
         ]);
+
+        // Announced here, not at the top of the method: everything above
+        // (knowledge-base lookup, memories, prompt assembly) reports its own
+        // step, and claiming "generating" before them would show the last
+        // stage first and then appear to go backwards.
+        $this->notify($progressCallback, 'generating', 'Generating response...');
 
         $fullResponseText = '';
         $sawFirstToken = false;
@@ -2641,6 +2649,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     'user_id' => $message->getUserId(),
                     'message_text' => substr($message->getText(), 0, 100),
                 ]);
+
+                $this->notify($progressCallback, 'checking_memories', 'Checking memories...');
 
                 $perfTimer->start('memories_search');
                 $memoryVector = $resolveMemoryVector();

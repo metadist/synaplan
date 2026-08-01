@@ -135,6 +135,52 @@ class MessageClassifierTest extends TestCase
     }
 
     /**
+     * The sorter input must NOT seed BMULTI. Seeding 0 made a lazy echo of the
+     * inbound JSON look like an explicit single-step vote and skipped the
+     * planner — the unsafe fallback the vote was designed to avoid (Copilot
+     * review of PR #1420).
+     */
+    public function testSorterInputOmitsBmultiSoAnEchoCannotSkipThePlanner(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Hello');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFileType')->willReturn('');
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $captured = null;
+        $this->messageSorter
+            ->expects($this->once())
+            ->method('classify')
+            ->willReturnCallback(function (array $messageData) use (&$captured): array {
+                $captured = $messageData;
+
+                return [
+                    'topic' => 'general',
+                    'language' => 'en',
+                    'multi_step' => null,
+                    'sorting_model_id' => 5,
+                    'sorting_provider' => 'ollama',
+                    'sorting_model_name' => 'llama3',
+                ];
+            });
+
+        $this->service->classify($message);
+
+        $this->assertIsArray($captured);
+        $this->assertArrayNotHasKey('BMULTI', $captured);
+    }
+
+    /**
      * Incognito turns run through the classifier as TRANSIENT messages whose
      * id is null (they are never persisted). The prompt/model override lookups
      * key on the message id, so a null id must short-circuit them instead of

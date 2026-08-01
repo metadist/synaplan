@@ -101,6 +101,10 @@ framework:
             # Route your messages to the transports
             'App\Message\ProcessMessageCommand': async_ai_high
             'App\Message\ExtractMemoriesCommand': async_ai_high
+            # Rolling conversation summary — folds newly aged-out turns into the
+            # stored summary after the chat turn is persisted, so the hot path
+            # never waits on the summarizer.
+            'App\Message\RefreshConversationSummaryCommand': async_ai_high
             'App\Message\ProvisionDefaultUserPluginsMessage': async_index
             'App\Message\CrawlWidgetUrlMessage': async_index
             'App\Message\ReVectorizeMessage': async_index

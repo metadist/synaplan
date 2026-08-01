@@ -1252,6 +1252,158 @@ class ConfigController extends AbstractController
     }
 
     /**
+     * Get the platform-wide summary model (DEFAULTMODEL.SUMMARIZE).
+     *
+     * The rolling conversation summary condenses the older turns of a long chat
+     * on every affected turn, so it wants a small, fast model (the seeded
+     * default is GPT-OSS-120B on Groq) rather than the answering model. Unlike
+     * the planner selection this is deliberately global: the summary is part of
+     * the server-side pipeline every user's chat runs through, and it also
+     * backs widget titles and document summaries.
+     */
+    #[Route('/routing/summary-model', name: 'routing_summary_model_get', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/routing/summary-model',
+        summary: 'Get the platform summary model',
+        description: 'Admin only. Returns the global DEFAULTMODEL.SUMMARIZE selection and the Sorting model it falls back to when none is set.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Summary model selection',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'modelId', type: 'integer', nullable: true, description: 'Selected summary model id, or null when none is configured (falls back to the Sorting model)', example: 300),
+                new OA\Property(property: 'fallbackModelId', type: 'integer', nullable: true, description: 'Sorting model id used when no summary model is set', example: 7),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    public function getSummaryModel(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        if (!$this->isGranted('ROLE_ADMIN')) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+
+        $config = $this->configRepository->findOneBy([
+            'ownerId' => 0,
+            'group' => 'DEFAULTMODEL',
+            'setting' => 'SUMMARIZE',
+        ]);
+
+        $modelId = null;
+        if ($config) {
+            $candidate = (int) $config->getValue();
+            $model = $this->modelRepository->find($candidate);
+            $modelId = ($model && 1 === $model->getActive()) ? $candidate : null;
+        }
+
+        return $this->json([
+            'success' => true,
+            'modelId' => $modelId,
+            'fallbackModelId' => $this->modelConfigService->getDefaultModel('SORT', 0),
+        ]);
+    }
+
+    /**
+     * Save (or clear) the platform-wide summary model (DEFAULTMODEL.SUMMARIZE).
+     *
+     * A null `modelId` removes the row so summarization reverts to the Sorting
+     * model.
+     */
+    #[Route('/routing/summary-model', name: 'routing_summary_model_save', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/config/routing/summary-model',
+        summary: 'Save the platform summary model',
+        description: 'Admin only. Writes the global DEFAULTMODEL.SUMMARIZE row. Pass `modelId: null` to clear it and fall back to the Sorting model.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['modelId'],
+                properties: [
+                    new OA\Property(property: 'modelId', type: 'integer', nullable: true, description: 'Summary model id, or null to clear the selection', example: 300),
+                ]
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Summary model saved',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'modelId', type: 'integer', nullable: true, example: 300),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid request body or model not available')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    public function saveSummaryModel(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        if (!$this->isGranted('ROLE_ADMIN')) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || !array_key_exists('modelId', $data)) {
+            return $this->json(['error' => 'Invalid data'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $raw = $data['modelId'];
+        $existing = $this->configRepository->findOneBy([
+            'ownerId' => 0,
+            'group' => 'DEFAULTMODEL',
+            'setting' => 'SUMMARIZE',
+        ]);
+
+        if (null === $raw) {
+            if ($existing) {
+                $this->em->remove($existing);
+                $this->em->flush();
+            }
+
+            return $this->json(['success' => true, 'modelId' => null]);
+        }
+
+        if (!is_int($raw) && !(is_string($raw) && ctype_digit($raw))) {
+            return $this->json(['error' => 'Invalid model id'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $modelId = (int) $raw;
+        $model = $this->modelRepository->find($modelId);
+        if (!$model || 1 !== $model->getActive()) {
+            return $this->json(['error' => 'Model not found or inactive'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $config = $existing;
+        if (!$config) {
+            $config = new Config();
+            $config->setOwnerId(0);
+            $config->setGroup('DEFAULTMODEL');
+            $config->setSetting('SUMMARIZE');
+        }
+        $config->setValue((string) $modelId);
+        $this->em->persist($config);
+        $this->em->flush();
+
+        return $this->json(['success' => true, 'modelId' => $modelId]);
+    }
+
+    /**
      * Check if a model is available/ready to use.
      *
      * @param int $modelId Model ID to check

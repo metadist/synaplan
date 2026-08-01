@@ -18,6 +18,15 @@ final readonly class ConversationSummaryConstants
     public const CONFIG_GROUP = 'CONVERSATION_SUMMARY';
     public const CONFIG_OWNER_ID = 0;
 
+    /** BCONFIG setting names, shared by the reader and the admin config schema. */
+    public const KEY_ENABLED = 'ENABLED';
+    public const KEY_TARGET_WINDOW_CHARS = 'TARGET_WINDOW_CHARS';
+    public const KEY_RECENT_VERBATIM_CHARS = 'RECENT_VERBATIM_CHARS';
+    public const KEY_SUMMARY_MAX_CHARS = 'SUMMARY_MAX_CHARS';
+    public const KEY_MAX_SOURCE_MESSAGES = 'MAX_SOURCE_MESSAGES';
+    public const KEY_TIERS = 'TIERS';
+    public const KEY_CACHE_TTL = 'CACHE_TTL';
+
     /** Master toggle (1 = enabled). */
     public const ENABLED = true;
 
