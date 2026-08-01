@@ -10,12 +10,12 @@ namespace App\Service\Plugin;
 final readonly class PluginManifest
 {
     /**
-     * @param string                                                                        $name         The plugin internal name
-     * @param string                                                                        $version      Version of the plugin
-     * @param string                                                                        $description  Short description
-     * @param array<int, string>                                                            $capabilities List of features enabled by the plugin
-     * @param array<string, mixed>                                                          $config       Default configuration values
-     * @param array<int, array{command: string, endpoint: string, description: string}>    $chatCommands Slash-commands this plugin registers in the chat composer
+     * @param string                                                                    $name         The plugin internal name
+     * @param string                                                                    $version      Version of the plugin
+     * @param string                                                                    $description  Short description
+     * @param array<int, string>                                                        $capabilities List of features enabled by the plugin
+     * @param array<string, mixed>                                                      $config       Default configuration values
+     * @param array<int, array{command: string, endpoint: string, description: string}> $chatCommands Slash-commands this plugin registers in the chat composer
      */
     public function __construct(
         public string $name,
@@ -47,8 +47,6 @@ final readonly class PluginManifest
     /**
      * Keep only well-formed chat-command entries, so a malformed manifest can
      * never inject partial/incorrect commands into the composer.
-     *
-     * @param mixed $raw
      *
      * @return array<int, array{command: string, endpoint: string, description: string}>
      */
