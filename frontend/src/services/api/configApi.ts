@@ -97,6 +97,29 @@ export const savePlannerModel = async (
 }
 
 /**
+ * Get the platform-wide summary model (DEFAULTMODEL.SUMMARIZE) that condenses
+ * long conversations, plus the Sorting model it falls back to. Admin only.
+ */
+export const getSummaryModel = async (): Promise<PlannerModelResponse> => {
+  return httpClient<PlannerModelResponse>('/api/v1/config/routing/summary-model')
+}
+
+/**
+ * Save (modelId) or clear (null) the platform-wide summary model. Admin only.
+ */
+export const saveSummaryModel = async (
+  modelId: number | null
+): Promise<{ success: boolean; modelId: number | null }> => {
+  return httpClient<{ success: boolean; modelId: number | null }>(
+    '/api/v1/config/routing/summary-model',
+    {
+      method: 'POST',
+      body: JSON.stringify({ modelId }),
+    }
+  )
+}
+
+/**
  * Remove all user-specific model overrides so the user falls back
  * to the platform defaults.
  */
@@ -114,6 +137,8 @@ export const configApi = {
   resetDefaultModels,
   getPlannerModel,
   savePlannerModel,
+  getSummaryModel,
+  saveSummaryModel,
 }
 
 // Qdrant Availability Check

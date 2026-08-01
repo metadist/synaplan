@@ -395,7 +395,11 @@ final readonly class MessageClassifier
             'BFILETEXT' => $message->getFileText() ?: '',
             'BFILE' => $message->getFile(),
             'BWEBSEARCH' => 0,
-            'BMULTI' => 0,
+            // Intentionally omit BMULTI. The sorter prompt asks the model to
+            // set it to 0|1, and TaskPlanExecutor only skips the planner on an
+            // *explicit* false. Seeding 0 here would make a lazy/truncated
+            // echo of the inbound JSON look like a single-step vote and skip
+            // planning — the unsafe fallback the vote was designed to avoid.
         ];
 
         $fileType = $message->getFileType();

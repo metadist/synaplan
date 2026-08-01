@@ -169,10 +169,10 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         // heuristic cannot confidently detect a language from the text.
         $data['BLANG'] = $this->detectLanguage($text ?: $fileText, is_string($data['BLANG'] ?? null) ? $data['BLANG'] : 'en');
         $data['BWEBSEARCH'] = $this->needsWebSearch($text) ? 1 : 0;
-        // The inbound JSON carries BMULTI = 0, and TaskPlanExecutor skips the
-        // planner on an explicit 0 — so echoing the input unchanged would mean
-        // the DAG never runs in the test stack. Vote from the same predicates
-        // mockTaskPlan() routes on, so the two stubs cannot disagree.
+        // Always set BMULTI explicitly. The inbound JSON omits it (so a real
+        // model that echoes without deciding leaves multi_step = null and the
+        // planner still runs). The test stub must vote, from the same
+        // predicates mockTaskPlan() routes on, so the two cannot disagree.
         $data['BMULTI'] = $this->needsMultiStepPlan($text ?: $fileText) ? 1 : 0;
 
         $availableTopics = $this->extractAvailableTopics($systemContent);

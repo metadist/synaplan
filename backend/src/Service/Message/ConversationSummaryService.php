@@ -12,17 +12,18 @@ use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Builds a rolling, tiered, condensing summary of a conversation so long chats
- * keep their topic, the user's position, decisions and any external results
- * discussed — while the combined context (verbatim recent turns + summary)
- * stays inside a 10 000-15 000 character memory window.
+ * Rolling conversation summary — read on the hot path, written off it.
  *
- * The most recent turns are kept verbatim; older turns are condensed with a
- * *gradient*: the oldest segment is compressed the hardest, the segment nearest
- * the verbatim window the least. The condensing model is configurable and
- * defaults to the sorting (SORT) model.
+ * Hot path ({@see buildRollingContext()}): never calls an AI model. It reads
+ * the stored summary for the chat (if any), keeps the newest turns verbatim,
+ * and — when the store is one turn behind — appends the small raw gap so no
+ * context is lost while the worker catches up.
  *
- * Never throws into the chat turn: on any failure it returns
+ * Worker path ({@see refresh()}): runs after the turn is persisted. Folds only
+ * the newly aged-out messages into the previous summary (or bootstraps from
+ * scratch on the first refresh). Uses the SUMMARIZE model default.
+ *
+ * Never throws into the chat turn: on any failure the hot path returns
  * {@see RollingSummaryResult::notApplied()} and the caller keeps its normal
  * history window.
  */
@@ -33,6 +34,12 @@ final readonly class ConversationSummaryService
      * would not be worth it and dropping that little from the window is harmless.
      */
     private const MIN_OLDER_CHARS = 500;
+
+    /**
+     * Cap on the raw gap appended on the hot path when the store is one turn
+     * behind. Keeps a lagging worker from bloating the system prompt.
+     */
+    private const GAP_CHAR_CAP = 3000;
 
     public function __construct(
         private AiFacade $aiFacade,
@@ -45,14 +52,7 @@ final readonly class ConversationSummaryService
     }
 
     /**
-     * Build the rolling context WITHOUT loading the whole chat up front.
-     *
-     * The caller passes the recent window it already loaded for classification
-     * ({@see MessageRepository::findChatHistory()}) plus a cheap total message
-     * count. The verbatim tail is derived from that window (it is always the
-     * newest messages), and the full history is only queried on a genuine cache
-     * miss — so long chats that hit the cache pay a single COUNT per turn, not a
-     * full-history hydration (PR #1282 review, point 1).
+     * Hot-path read: inject the stored summary, never call an AI model.
      *
      * @param Message[] $recentWindow      recent window already loaded by the caller, chronological (oldest first)
      * @param int       $totalMessageCount total messages in the chat (cheap COUNT)
@@ -64,41 +64,76 @@ final readonly class ConversationSummaryService
         }
 
         $recentWindow = array_values($recentWindow);
-        $recentBudget = $this->config->getRecentVerbatimChars();
-
-        // Verbatim tail = newest messages within the char budget. Always a subset
-        // of the recent window, so no full-history query is needed to compute it.
-        $tail = $this->recentTail($recentWindow, $recentBudget);
+        $tail = $this->recentTail($recentWindow, $this->config->getRecentVerbatimChars());
         $tailCount = count($tail);
 
-        // Messages before the tail (the summarization source). Derived from the
-        // cheap COUNT — never from loading the whole history.
         $olderCount = $totalMessageCount - $tailCount;
         if ($olderCount <= 0) {
             return RollingSummaryResult::notApplied($recentWindow);
         }
 
-        // Newest "older" message id (the per-span cache key). When the tail did
-        // not consume the entire loaded window the boundary message is already in
-        // memory, so a cache hit needs NO full-history query.
-        $olderLastId = $tailCount < count($recentWindow)
-            ? (int) $recentWindow[count($recentWindow) - $tailCount - 1]->getId()
-            : null;
+        $olderLastId = $this->resolveOlderLastId($recentWindow, $tailCount, $userId, $chatId);
+        if (null === $olderLastId) {
+            return RollingSummaryResult::notApplied($recentWindow);
+        }
 
-        if (null !== $olderLastId) {
-            $cached = $this->readCachedSummary($chatId, $olderLastId, $olderCount);
-            if (null !== $cached) {
-                return new RollingSummaryResult(true, $cached, $tail, $olderCount);
+        $stored = $this->readStored($chatId);
+        if (null === $stored) {
+            // First long-chat turn (or cache eviction): answer without a summary
+            // this turn. The async refresh after the flush fills the store for
+            // the next one — never block time-to-first-token on a cold start.
+            return RollingSummaryResult::notApplied($recentWindow);
+        }
+
+        $summary = $stored['summary'];
+        if ($stored['upToMessageId'] < $olderLastId) {
+            // Worker is one turn behind. Append the small raw gap so those
+            // messages aren't invisible until the fold lands.
+            $gap = $this->messageRepository->findMessagesBetween(
+                $userId ?? 0,
+                $chatId,
+                $stored['upToMessageId'],
+                $olderLastId,
+            );
+            if ([] !== $gap) {
+                $summary = $this->appendRawGap($summary, $gap);
             }
         }
 
-        // Cache miss (or the boundary was outside the loaded window): load the
-        // full history once to build the summary source.
-        $fullHistory = array_values($this->messageRepository->findAllByChatId($userId ?? 0, $chatId));
-        $tail = $this->recentTail($fullHistory, $recentBudget);
+        return new RollingSummaryResult(true, $summary, $tail, $olderCount);
+    }
+
+    /**
+     * Worker entry point: refresh the stored summary for a chat.
+     *
+     * Incremental when a previous summary exists (fold only newly aged-out
+     * messages). Bootstrap from scratch otherwise. Safe to call on every turn —
+     * no-ops when the store already covers the current older span.
+     *
+     * @return bool true when a new summary was written
+     */
+    public function refresh(int $chatId, int $userId): bool
+    {
+        if (!$this->config->isEnabled()) {
+            return false;
+        }
+
+        $fullHistory = array_values($this->messageRepository->findAllByChatId($userId, $chatId));
+        if ([] === $fullHistory) {
+            return false;
+        }
+
+        // Match the hot path's window contract: MessageProcessor loads at most
+        // HISTORY_MAX_MESSAGES, then recentTail trims that by char budget.
+        // Applying only the char budget to the FULL history would leave short
+        // message chats unsummarized forever (everything fits in 8000 chars).
+        $window = count($fullHistory) > MessageProcessor::HISTORY_MAX_MESSAGES
+            ? array_slice($fullHistory, -MessageProcessor::HISTORY_MAX_MESSAGES)
+            : $fullHistory;
+        $tail = $this->recentTail($window, $this->config->getRecentVerbatimChars());
         $olderCount = count($fullHistory) - count($tail);
         if ($olderCount <= 0) {
-            return RollingSummaryResult::notApplied($fullHistory);
+            return false;
         }
 
         /** @var list<Message> $older */
@@ -110,15 +145,246 @@ final readonly class ConversationSummaryService
             $olderChars += $this->messageLength($msg);
         }
         if ($olderChars < self::MIN_OLDER_CHARS) {
-            return RollingSummaryResult::notApplied($fullHistory);
+            return false;
         }
 
-        $summary = $this->summarizeOlder($older, $olderLastId, $olderCount, $userId, $chatId);
+        $stored = $this->readStored($chatId);
+        if (null !== $stored && $stored['upToMessageId'] >= $olderLastId) {
+            return false;
+        }
+
+        if (null !== $stored && $stored['upToMessageId'] > 0) {
+            $newMessages = array_values(array_filter(
+                $older,
+                static fn (Message $m): bool => (int) $m->getId() > $stored['upToMessageId'],
+            ));
+            if ([] === $newMessages) {
+                return false;
+            }
+
+            $summary = $this->foldIncremental($stored['summary'], $newMessages, $userId, $chatId);
+        } else {
+            $summary = $this->bootstrap($older, $userId, $chatId);
+        }
+
         if (null === $summary || '' === trim($summary)) {
-            return RollingSummaryResult::notApplied($fullHistory);
+            return false;
         }
 
-        return new RollingSummaryResult(true, $summary, $tail, $olderCount);
+        $this->writeStored($chatId, $summary, $olderLastId, $olderCount);
+
+        return true;
+    }
+
+    /**
+     * @param Message[] $recentWindow
+     */
+    private function resolveOlderLastId(array $recentWindow, int $tailCount, ?int $userId, int $chatId): ?int
+    {
+        if ($tailCount < count($recentWindow)) {
+            return (int) $recentWindow[count($recentWindow) - $tailCount - 1]->getId();
+        }
+
+        return $this->messageRepository->findIdBefore(
+            $userId ?? 0,
+            $chatId,
+            (int) $recentWindow[0]->getId(),
+            $recentWindow[0]->getUnixTimestamp(),
+        );
+    }
+
+    /**
+     * @param list<Message> $older
+     */
+    private function bootstrap(array $older, int $userId, int $chatId): ?string
+    {
+        $summaryMax = $this->config->getSummaryMaxChars();
+        $maxSource = $this->config->getMaxSourceMessages();
+        $source = count($older) > $maxSource ? array_slice($older, -$maxSource) : $older;
+
+        return $this->callSummarizer(
+            $this->buildBootstrapSystemPrompt($summaryMax),
+            $this->buildSourceText($source, $this->config->getTiers()),
+            $userId,
+            $chatId,
+            'bootstrap',
+        );
+    }
+
+    /**
+     * @param list<Message> $newMessages
+     */
+    private function foldIncremental(string $previousSummary, array $newMessages, int $userId, int $chatId): ?string
+    {
+        $summaryMax = $this->config->getSummaryMaxChars();
+        $lines = ["## Previous rolling summary\n", $previousSummary, "\n## Newly aged-out messages\n"];
+        foreach ($newMessages as $msg) {
+            $lines[] = $this->renderMessage($msg);
+        }
+
+        return $this->callSummarizer(
+            $this->buildIncrementalSystemPrompt($summaryMax),
+            trim(implode("\n", $lines)),
+            $userId,
+            $chatId,
+            'incremental',
+        );
+    }
+
+    private function callSummarizer(string $systemPrompt, string $userContent, int $userId, int $chatId, string $mode): ?string
+    {
+        $summaryMax = $this->config->getSummaryMaxChars();
+
+        try {
+            $modelConfig = $this->modelConfigService->getSummaryModelConfig($userId);
+
+            $response = $this->aiFacade->chat([
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userContent],
+            ], $userId, [
+                'provider' => $modelConfig['provider'] ?? null,
+                'model' => $modelConfig['model'] ?? null,
+                'temperature' => 0.2,
+                'max_tokens' => $this->tokenBudgetFor($summaryMax),
+            ]);
+
+            $summary = $this->clip(trim((string) ($response['content'] ?? '')), $summaryMax);
+            if ('' === $summary) {
+                return null;
+            }
+
+            $this->logger->info('ConversationSummaryService: refreshed rolling summary', [
+                'chat_id' => $chatId,
+                'mode' => $mode,
+                'summary_chars' => mb_strlen($summary),
+                'provider' => $modelConfig['provider'] ?? null,
+                'model' => $modelConfig['model'] ?? null,
+            ]);
+
+            return $summary;
+        } catch (\Throwable $e) {
+            $this->logger->warning('ConversationSummaryService: refresh failed', [
+                'chat_id' => $chatId,
+                'mode' => $mode,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @return array{summary: string, upToMessageId: int, summarizedCount: int}|null
+     */
+    private function readStored(int $chatId): ?array
+    {
+        $item = $this->cache->getItem($this->storeKey($chatId));
+        if (!$item->isHit()) {
+            return null;
+        }
+
+        $raw = $item->get();
+        if (!is_array($raw)) {
+            return null;
+        }
+
+        $summary = $raw['summary'] ?? null;
+        $upTo = $raw['upToMessageId'] ?? null;
+        if (!is_string($summary) || '' === $summary || !is_int($upTo) || $upTo <= 0) {
+            return null;
+        }
+
+        return [
+            'summary' => $summary,
+            'upToMessageId' => $upTo,
+            'summarizedCount' => is_int($raw['summarizedCount'] ?? null) ? $raw['summarizedCount'] : 0,
+        ];
+    }
+
+    private function writeStored(int $chatId, string $summary, int $upToMessageId, int $summarizedCount): void
+    {
+        $item = $this->cache->getItem($this->storeKey($chatId));
+        $item->set([
+            'summary' => $summary,
+            'upToMessageId' => $upToMessageId,
+            'summarizedCount' => $summarizedCount,
+        ]);
+        $item->expiresAfter($this->config->getCacheTtl());
+        $this->cache->save($item);
+    }
+
+    /**
+     * Per-chat store key. Config knobs that change the summary shape are folded
+     * into a fingerprint so a settings change invalidates the previous store.
+     */
+    private function storeKey(int $chatId): string
+    {
+        $fingerprint = md5(implode(':', [
+            $this->config->getSummaryMaxChars(),
+            $this->config->getTiers(),
+            $this->config->getRecentVerbatimChars(),
+            'v2-async',
+        ]));
+
+        return sprintf('conv_summary.chat.%d.%s', $chatId, $fingerprint);
+    }
+
+    private function buildBootstrapSystemPrompt(int $summaryMax): string
+    {
+        return <<<PROMPT
+            You compress the earlier part of an ongoing chat conversation into a compact "rolling summary" that a chat assistant will read as background context. The most recent turns are shown to the assistant separately and verbatim, so DO NOT restate them — summarize only what is provided below.
+
+            Rules:
+            - Write in the SAME language the conversation uses.
+            - Apply GRADIENT compression: segments are ordered oldest → newest. Condense the OLDEST segment the hardest (only durable facts / the overall topic). Condense LATER segments progressively less, keeping more specifics for the newest segment.
+            - Be factual. Never invent information that is not present in the source.
+            - Output plain prose / short bullet lines under these headings (skip a heading when empty):
+              ## Topic
+              ## User position / goal
+              ## Decisions & constraints
+              ## Open questions
+              ## Already covered / answered
+              ## External results
+            - "Already covered / answered" is what stops the assistant from repeating earlier answers — list conclusions and deliverables already produced.
+            - No preamble, no meta commentary.
+            - Keep the whole summary under {$summaryMax} characters.
+            PROMPT;
+    }
+
+    private function buildIncrementalSystemPrompt(int $summaryMax): string
+    {
+        return <<<PROMPT
+            You maintain a rolling summary of an ongoing chat. You receive the PREVIOUS rolling summary plus a small set of NEWLY AGED-OUT messages that just left the verbatim window. Fold the new messages into the previous summary and return the updated summary.
+
+            Rules:
+            - Write in the SAME language the conversation uses.
+            - Keep durable facts from the previous summary; do not drop the user's position, decisions, or open questions unless the new messages explicitly resolve or replace them.
+            - Condense older material more aggressively than the newly aged-out messages.
+            - Be factual. Never invent information.
+            - Output plain prose / short bullet lines under these headings (skip a heading when empty):
+              ## Topic
+              ## User position / goal
+              ## Decisions & constraints
+              ## Open questions
+              ## Already covered / answered
+              ## External results
+            - "Already covered / answered" must grow when the new messages contain conclusions or deliverables, so the assistant does not repeat itself.
+            - No preamble, no meta commentary.
+            - Keep the whole summary under {$summaryMax} characters.
+            PROMPT;
+    }
+
+    /**
+     * @param list<Message> $gap
+     */
+    private function appendRawGap(string $summary, array $gap): string
+    {
+        $lines = ["\n\n## Recent (not yet condensed)"];
+        foreach ($gap as $msg) {
+            $lines[] = $this->renderMessage($msg);
+        }
+
+        return $this->clip($summary.implode("\n", $lines), $this->config->getSummaryMaxChars() + self::GAP_CHAR_CAP);
     }
 
     /**
@@ -145,127 +411,6 @@ final readonly class ConversationSummaryService
     }
 
     /**
-     * Summarize the older span with gradient compression, storing it in the
-     * per-span cache. {@see $olderCount} is the UNCAPPED older-span size so the
-     * key matches the cheap cache-hit lookup in {@see buildRollingContext()}.
-     *
-     * @param list<Message> $older
-     */
-    private function summarizeOlder(array $older, int $olderLastId, int $olderCount, ?int $userId, int $chatId): ?string
-    {
-        $summaryMax = $this->config->getSummaryMaxChars();
-        $tiers = $this->config->getTiers();
-
-        // Bound cost on very long chats: only the most recent slice of the older
-        // span feeds the summarizer (the cache key still uses the full count).
-        $maxSource = $this->config->getMaxSourceMessages();
-        $source = count($older) > $maxSource ? array_slice($older, -$maxSource) : $older;
-
-        $cacheKey = $this->cacheKey($chatId, $olderLastId, $olderCount);
-        $item = $this->cache->getItem($cacheKey);
-        if ($item->isHit()) {
-            $cached = $item->get();
-            if (is_string($cached) && '' !== $cached) {
-                return $cached;
-            }
-        }
-
-        try {
-            $modelConfig = $this->modelConfigService->getSummaryModelConfig($userId);
-
-            $messages = [
-                ['role' => 'system', 'content' => $this->buildSummarizerSystemPrompt($summaryMax)],
-                ['role' => 'user', 'content' => $this->buildSourceText($source, $tiers)],
-            ];
-
-            $response = $this->aiFacade->chat($messages, $userId, [
-                'provider' => $modelConfig['provider'] ?? null,
-                'model' => $modelConfig['model'] ?? null,
-                'temperature' => 0.2,
-                'max_tokens' => $this->tokenBudgetFor($summaryMax),
-            ]);
-
-            $summary = $this->clip(trim((string) ($response['content'] ?? '')), $summaryMax);
-
-            if ('' === $summary) {
-                return null;
-            }
-
-            $item->set($summary);
-            $item->expiresAfter($this->config->getCacheTtl());
-            $this->cache->save($item);
-
-            $this->logger->info('ConversationSummaryService: built rolling summary', [
-                'chat_id' => $chatId,
-                'older_count' => $olderCount,
-                'summary_chars' => mb_strlen($summary),
-                'provider' => $modelConfig['provider'] ?? null,
-                'model' => $modelConfig['model'] ?? null,
-            ]);
-
-            return $summary;
-        } catch (\Throwable $e) {
-            // Never break the chat turn because summarization failed.
-            $this->logger->warning('ConversationSummaryService: summarization failed, falling back', [
-                'chat_id' => $chatId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
-    }
-
-    /**
-     * Look up a cached summary for a stable older-span without loading history.
-     */
-    private function readCachedSummary(int $chatId, int $olderLastId, int $olderCount): ?string
-    {
-        $item = $this->cache->getItem($this->cacheKey($chatId, $olderLastId, $olderCount));
-        if ($item->isHit()) {
-            $cached = $item->get();
-            if (is_string($cached) && '' !== $cached) {
-                return $cached;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Per-span cache key. Config knobs that change the summary shape are folded
-     * into a fingerprint so a settings change invalidates stale summaries.
-     */
-    private function cacheKey(int $chatId, int $olderLastId, int $olderCount): string
-    {
-        $fingerprint = md5(implode(':', [
-            $this->config->getSummaryMaxChars(),
-            $this->config->getTiers(),
-            $this->config->getRecentVerbatimChars(),
-        ]));
-
-        return sprintf('conv_summary.%d.%d.%d.%s', $chatId, $olderLastId, $olderCount, $fingerprint);
-    }
-
-    private function buildSummarizerSystemPrompt(int $summaryMax): string
-    {
-        return <<<PROMPT
-            You compress the earlier part of an ongoing chat conversation into a compact "rolling summary" that a chat assistant will read as background context. The most recent turns are shown to the assistant separately and verbatim, so DO NOT restate them — summarize only what is provided below.
-
-            Rules:
-            - Write in the SAME language the conversation uses.
-            - Apply GRADIENT compression: segments are ordered oldest → newest. Condense the OLDEST segment the hardest (only durable facts / the overall topic). Condense LATER segments progressively less, keeping more specifics for the newest segment.
-            - Preserve, above all: the main topic, the USER'S position / goal / stance, firm decisions and conclusions, important facts and constraints, and any external or web results that were referenced.
-            - Note unresolved or open questions.
-            - Be factual. Never invent information that is not present in the source.
-            - Output plain prose/short bullet lines. No preamble, no meta commentary.
-            - Keep the whole summary under {$summaryMax} characters.
-            PROMPT;
-    }
-
-    /**
-     * Render the older span into recency-labelled segments with per-segment
-     * compression hints (oldest → condense most, newest → condense least).
-     *
      * @param list<Message> $older
      */
     private function buildSourceText(array $older, int $tiers): string
@@ -331,10 +476,6 @@ final readonly class ConversationSummaryService
         return rtrim(mb_substr($value, 0, $maxChars)).'…';
     }
 
-    /**
-     * Rough char→token budget (~3 chars/token) with headroom, so the model is
-     * not cut off before it reaches the character cap we later enforce.
-     */
     private function tokenBudgetFor(int $summaryMaxChars): int
     {
         return max(256, (int) ceil($summaryMaxChars / 3) + 256);

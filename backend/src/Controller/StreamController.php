@@ -9,6 +9,7 @@ use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
+use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
@@ -83,6 +84,7 @@ class StreamController extends AbstractController
         private PromptService $promptService,
         private MessageForwardingService $messageForwardingService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
+        private ConversationSummaryRefreshDispatcher $conversationSummaryRefreshDispatcher,
         private DocumentGeneratorService $documentGenerator,
         private DocumentImageReferenceResolver $documentImageReferenceResolver,
         private MediaCancellationStore $cancellationStore,
@@ -1843,6 +1845,16 @@ class StreamController extends AbstractController
                     // null payload for incognito turns; this guard is the second
                     // line of defense.
                     $this->dispatchDeferredMemoryExtraction($response['metadata'] ?? []);
+                    // Rolling summary refresh runs after the OUT row is visible
+                    // so the worker sees the just-finished turn in the history
+                    // window when it decides what aged out. Never blocks the
+                    // SSE complete event — dispatch failures are swallowed.
+                    if (null !== $chat) {
+                        $this->conversationSummaryRefreshDispatcher->dispatch(
+                            (int) $chat->getId(),
+                            (int) $user->getId(),
+                        );
+                    }
                 }
 
                 if (!$isWidgetMode && !$isGuestMode && !$incognito && $chat) {
@@ -2633,6 +2645,13 @@ class StreamController extends AbstractController
                 // writes the extracted_memories meta. Fire the deferred
                 // dispatch the same way the streaming branch does.
                 $this->dispatchDeferredMemoryExtraction($metadata);
+
+                if (null !== $chat) {
+                    $this->conversationSummaryRefreshDispatcher->dispatch(
+                        (int) $chat->getId(),
+                        (int) $user->getId(),
+                    );
+                }
             }
 
             if ('WEB' === $source && !$incognito && $chat) {

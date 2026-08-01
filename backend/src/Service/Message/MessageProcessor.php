@@ -467,28 +467,21 @@ final readonly class MessageProcessor
                 }
             }
 
-            // Step 2.9: Rolling conversation summary.
+            // Step 2.9: Rolling conversation summary (read-only on the hot path).
             //
-            // Condense the OLDER turns of the chat into a compact summary that
-            // ChatHandler injects into the system prompt, while the newest turns
-            // are still replayed verbatim. This lets long threads keep their
-            // topic / the user's position "7-8 answers later" while the combined
-            // context stays inside the configured 10-15k character memory window.
+            // Injects the stored summary of older turns into the system prompt
+            // while the newest turns stay verbatim. NEVER calls an AI model
+            // here — the worker refreshes the store after the turn is
+            // persisted ({@see RefreshConversationSummaryCommand}), so this
+            // step is a cache read and must not show up in time-to-first-token.
             //
-            // Only for the chat-style path with a persisted chat (needs the full
-            // history via chatId); other intents simply ignore the option. The
-            // service never throws into the turn — on failure it leaves the
-            // standard windowed history untouched.
+            // Only for the chat-style path with a persisted chat; other intents
+            // ignore the option. On a cold store the turn proceeds without a
+            // summary and the async refresh fills it for the next one.
             $summaryIntent = $classification['intent'] ?? 'chat';
             $summaryChatId = $message->getChatId();
             if ('chat' === $summaryIntent && null !== $summaryChatId && $summaryChatId > 0) {
                 $perfTimer->start('summary');
-                // Reuse the recent window already loaded above and pass a cheap
-                // COUNT instead of re-loading the whole chat: the service only
-                // hydrates the full history on an actual cache miss (PR #1282).
-                // excludeFailed:false so the count matches findAllByChatId(),
-                // which the summarizer loads (no status filtering) — otherwise the
-                // older-span size would drift and defeat the cache.
                 $totalMessages = $this->messageRepository->countByChatId(
                     $summaryChatId,
                     excludeFailed: false,
@@ -502,9 +495,6 @@ final readonly class MessageProcessor
                 if ($rolling->applied) {
                     $options['conversation_summary'] = $rolling->summary;
                     $conversationHistory = $rolling->recentMessages;
-                    $this->notify($statusCallback, 'summarizing', 'Condensing earlier conversation...', [
-                        'summarized_messages' => $rolling->summarizedCount,
-                    ]);
                 }
                 $perfTimer->stop('summary');
             }

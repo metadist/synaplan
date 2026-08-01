@@ -4,6 +4,7 @@ namespace App\MessageHandler;
 
 use App\Entity\Message;
 use App\Message\ProcessMessageCommand;
+use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\Message\MessageProcessor;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -21,6 +22,7 @@ class ProcessMessageCommandHandler
     public function __construct(
         private EntityManagerInterface $em,
         private MessageProcessor $processor,
+        private ConversationSummaryRefreshDispatcher $conversationSummaryRefreshDispatcher,
         private LoggerInterface $logger,
     ) {
     }
@@ -80,6 +82,11 @@ class ProcessMessageCommandHandler
 
             $this->em->persist($outgoingMessage);
             $this->em->flush();
+
+            $chatId = $message->getChatId();
+            if (null !== $chatId && $chatId > 0) {
+                $this->conversationSummaryRefreshDispatcher->dispatch($chatId, $message->getUserId());
+            }
 
             $this->logger->info('✅ Queue Worker: Message processed successfully', [
                 'message_id' => $messageId,

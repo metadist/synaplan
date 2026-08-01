@@ -286,11 +286,10 @@ PROMPT;
 
     public function testVotesMultiStepForTheRequestTheTaskPlanStubExpands(): void
     {
-        // The sort stub echoes the inbound JSON, which carries BMULTI = 0, and
-        // TaskPlanExecutor skips the planner on an explicit 0. If this vote is
-        // not raised for the same request mockTaskPlan() expands, the DAG never
-        // runs in the test stack and the @multitask E2E test loses its cards
-        // with no other symptom.
+        // The inbound JSON omits BMULTI; the stub must set it from the same
+        // predicates mockTaskPlan() expands on. If this vote stays unset, the
+        // planner still runs (safe), but if it were wrongly left at 0 the DAG
+        // would never run and the @multitask E2E test would lose its cards.
         $result = $this->classifyMessage(
             'Please summarize the following note for me and then translate that summary into German.'
         );
