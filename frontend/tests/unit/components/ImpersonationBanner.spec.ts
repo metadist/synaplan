@@ -71,6 +71,17 @@ vi.mock('@/stores/userMemories', () => ({
 vi.mock('@/stores/userFeedback', () => ({
   useFeedbackStore: () => ({ $reset: vi.fn() }),
 }))
+// #1381: auth.ts tears the realtime client down and resubscribes mediaJobs on
+// every principal swap. Stub both so the banner spec stays hermetic and fast.
+vi.mock('@/stores/realtime', () => ({
+  useRealtimeStore: () => ({ disconnect: vi.fn().mockResolvedValue(undefined) }),
+}))
+vi.mock('@/stores/mediaJobs', () => ({
+  useMediaJobsStore: () => ({
+    subscribe: vi.fn().mockResolvedValue(undefined),
+    unsubscribe: vi.fn(),
+  }),
+}))
 
 const buildRouter = () =>
   createRouter({
