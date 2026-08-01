@@ -62,6 +62,14 @@ class GRPCInferenceServiceClient extends BaseStub
  */
 class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterface
 {
+    /**
+     * Maximum texts per batched embedding ModelInfer request.
+     *
+     * Must not exceed the embedding model's `max_batch_size` in Triton's
+     * config.pbtxt (bge-m3 ships with 32). Larger inputs are chunked.
+     */
+    private const MAX_BATCH_SIZE = 32;
+
     private ?GRPCInferenceServiceClient $client = null;
 
     public function __construct(
@@ -434,24 +442,91 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
     }
 
+    /**
+     * Embed multiple texts using batched gRPC ModelInfer requests.
+     *
+     * bge-m3 on Triton is served with max_batch_size: 32, so instead of one
+     * round-trip per text (the old sequential loop) we pack up to 32 texts
+     * into a single ModelInfer call with input shape [N, 1]. Larger inputs are
+     * split into chunks of MAX_BATCH_SIZE. Output embeddings are returned in
+     * the same order as the input texts.
+     */
     public function embedBatch(array $texts, array $options = []): array
     {
-        $embeddings = [];
-        $totalPromptTokens = 0;
+        if (!$this->client) {
+            throw new ProviderException('Triton client not initialized', 'triton');
+        }
 
-        foreach ($texts as $text) {
-            $result = $this->embed($text, $options);
-            $embeddings[] = $result['embedding'];
-            $totalPromptTokens += $result['usage']['prompt_tokens'];
+        if (!isset($options['model'])) {
+            throw new ProviderException('Embedding model must be specified in options', 'triton');
+        }
+
+        $texts = array_values($texts);
+        if ([] === $texts) {
+            return [
+                'embeddings' => [],
+                'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
+            ];
+        }
+
+        $model = $options['model'];
+        $embeddings = [];
+
+        foreach (array_chunk($texts, self::MAX_BATCH_SIZE) as $chunk) {
+            foreach ($this->embedChunk($chunk, $model) as $embedding) {
+                $embeddings[] = $embedding;
+            }
         }
 
         return [
             'embeddings' => $embeddings,
             'usage' => [
-                'prompt_tokens' => $totalPromptTokens,
-                'total_tokens' => $totalPromptTokens,
+                'prompt_tokens' => 0,
+                'total_tokens' => 0,
             ],
         ];
+    }
+
+    /**
+     * Embed a single batch (<= MAX_BATCH_SIZE) in one ModelInfer call.
+     *
+     * @param list<string> $texts
+     *
+     * @return list<array<float>> One embedding per input text, in input order
+     */
+    private function embedChunk(array $texts, string $model): array
+    {
+        try {
+            $request = $this->createBatchEmbedInferRequest($texts, $model);
+
+            /** @var \Grpc\UnaryCall $call */
+            $call = $this->client->ModelInfer($request);
+            /** @var \Inference\ModelInferResponse $response */
+            [$response, $status] = $call->wait();
+
+            if (0 !== $status->code) {
+                throw new \RuntimeException('gRPC error: '.$status->details);
+            }
+
+            // A batched request returns a single [N, dims] output tensor whose
+            // raw contents are the concatenated row-major FP32 values.
+            $rawContents = $response->getRawOutputContents();
+            if (!isset($rawContents[0]) || '' === $rawContents[0]) {
+                throw new \RuntimeException('No embedding output returned');
+            }
+
+            return $this->splitFlatEmbeddings($this->decodeFp32Array($rawContents[0]), count($texts));
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            $this->logger->error('Triton batch embedding error', [
+                'error' => $e->getMessage(),
+                'model' => $model,
+                'batch_size' => count($texts),
+            ]);
+
+            throw new ProviderException('Triton embedding error: '.$e->getMessage(), 'triton');
+        }
     }
 
     public function getDimensions(string $model): int
@@ -580,6 +655,61 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         $request->setOutputs([$embeddingOutput]);
 
         return $request;
+    }
+
+    /**
+     * Create a batched embedding inference request.
+     *
+     * Packs all texts into a single BYTES input tensor with shape [N, 1], so
+     * Triton runs one forward pass for the whole batch instead of N requests.
+     *
+     * @param list<string> $texts
+     */
+    private function createBatchEmbedInferRequest(array $texts, string $modelName): ModelInferRequest
+    {
+        $count = count($texts);
+
+        $textInput = new InferInputTensor();
+        $textInput->setName('text_input');
+        $textInput->setDatatype('BYTES');
+        $textInput->setShape([$count, 1]); // [N, 1] — batch dim carries all texts
+
+        $textContents = new InferTensorContents();
+        $textContents->setBytesContents($texts);
+        $textInput->setContents($textContents);
+
+        $embeddingOutput = new InferRequestedOutputTensor();
+        $embeddingOutput->setName('embedding');
+
+        $request = new ModelInferRequest();
+        $request->setModelName($modelName);
+        $request->setId('emb-batch-'.uniqid());
+        $request->setInputs([$textInput]);
+        $request->setOutputs([$embeddingOutput]);
+
+        return $request;
+    }
+
+    /**
+     * Split a flat FP32 buffer (row-major [N, dims]) into N embedding vectors.
+     *
+     * @param array<float> $flat  Concatenated embedding values for the batch
+     * @param int          $count Number of texts in the batch (N)
+     *
+     * @return list<array<float>>
+     */
+    private function splitFlatEmbeddings(array $flat, int $count): array
+    {
+        if ($count <= 0) {
+            return [];
+        }
+
+        $total = count($flat);
+        if (0 !== $total % $count) {
+            throw new \RuntimeException(sprintf('Triton batch embedding output size %d is not divisible by batch size %d', $total, $count));
+        }
+
+        return array_chunk($flat, intdiv($total, $count));
     }
 
     /**
