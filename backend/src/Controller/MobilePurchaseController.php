@@ -153,6 +153,7 @@ final class MobilePurchaseController extends AbstractController
     )]
     #[OA\Response(response: 200, description: 'Notification processed (or safely ignored)')]
     #[OA\Response(response: 400, description: 'Invalid / untrusted payload')]
+    #[OA\Response(response: 503, description: 'IAP not configured here — unacknowledged so Apple retries')]
     public function appleNotifications(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -167,9 +168,17 @@ final class MobilePurchaseController extends AbstractController
             $this->mobilePurchaseService->applyNotification($entitlement);
 
             return $this->json(['success' => true]);
-        } catch (IapNotConfiguredException) {
-            // Nothing to do here, but ACK so Apple doesn't keep retrying.
-            return $this->json(['success' => true, 'status' => 'not_configured']);
+        } catch (IapNotConfiguredException $e) {
+            // Acknowledging would tell Apple the event is delivered, and Apple
+            // never sends it again: a cancellation or refund would be lost for
+            // good on a server that is only temporarily misconfigured — which
+            // is exactly what a wiped root-certificate mount produces. Fail
+            // loudly instead and let Apple's retries cover the repair window.
+            $this->logger->error('Apple ASSN V2 dropped: IAP is not configured on this server', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'IAP not configured'], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (IapVerificationException $e) {
             $this->logger->warning('Apple ASSN V2 verification failed', ['error' => $e->getMessage()]);
 
