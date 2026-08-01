@@ -273,6 +273,38 @@ PROMPT;
         $this->assertSame('en', $decoded['BLANG']);
     }
 
+    // ================================================
+    // BMULTI vote (must agree with the task-plan stub)
+    // ================================================
+
+    public function testVotesSingleStepForAnOrdinaryQuestion(): void
+    {
+        $result = $this->classifyMessage('What is the capital of France?');
+
+        $this->assertSame(0, $result['BMULTI']);
+    }
+
+    public function testVotesMultiStepForTheRequestTheTaskPlanStubExpands(): void
+    {
+        // The sort stub echoes the inbound JSON, which carries BMULTI = 0, and
+        // TaskPlanExecutor skips the planner on an explicit 0. If this vote is
+        // not raised for the same request mockTaskPlan() expands, the DAG never
+        // runs in the test stack and the @multitask E2E test loses its cards
+        // with no other symptom.
+        $result = $this->classifyMessage(
+            'Please summarize the following note for me and then translate that summary into German.'
+        );
+
+        $this->assertSame(1, $result['BMULTI']);
+    }
+
+    public function testVotesMultiStepForTheWebSearchPlanPrefix(): void
+    {
+        $result = $this->classifyMessage('websearch: what happened in AI this week?');
+
+        $this->assertSame(1, $result['BMULTI']);
+    }
+
     public function testDoesNotTriggerSortForNormalChat(): void
     {
         $messages = [
