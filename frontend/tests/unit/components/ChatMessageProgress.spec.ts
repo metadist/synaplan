@@ -1,0 +1,102 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import ChatMessage from '@/components/ChatMessage.vue'
+import en from '@/i18n/en.json'
+import de from '@/i18n/de.json'
+import es from '@/i18n/es.json'
+import tr from '@/i18n/tr.json'
+
+// The backend now narrates the phases that run before the first token, so the
+// user is not left staring at "Generating response…" while the pipeline plans,
+// searches the knowledge base and looks up memories. These specs pin that each
+// backend status reaches the indicator with its own copy.
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: vi.fn(), resolve: () => ({ href: '#' }) }),
+}))
+
+const mountOptions = {
+  global: {
+    mocks: {
+      $t: (key: string) => key,
+    },
+    stubs: {
+      RouterLink: true,
+      Icon: true,
+      MessagePart: true,
+      MessageMemories: true,
+      MessageFeedbacks: true,
+      ServiceIcon: true,
+      ModelCostBadge: true,
+      ToolBadge: true,
+      TaskPlanBubble: true,
+      MediaJobStatus: true,
+      ExternalLinkWarning: true,
+    },
+  },
+}
+
+const indicatorText = (processingStatus: string): string =>
+  mount(ChatMessage, {
+    ...mountOptions,
+    props: {
+      role: 'assistant' as const,
+      parts: [],
+      timestamp: new Date(),
+      isStreaming: true,
+      processingStatus,
+    },
+  })
+    .get('[data-testid="loading-typing-indicator"]')
+    .text()
+
+describe('ChatMessage pre-answer progress indicator', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it.each([
+    ['analyzing_prompt', 'processing.analyzingPromptTitle', 'processing.analyzingPromptDesc'],
+    ['planning', 'processing.planningTitle', 'processing.planningDesc'],
+    ['searching_files', 'processing.searchingFilesTitle', 'processing.searchingFilesDesc'],
+    ['checking_memories', 'processing.checkingMemoriesTitle', 'processing.checkingMemoriesDesc'],
+  ])('renders its own copy for the %s phase', (status, titleKey, descKey) => {
+    const text = indicatorText(status)
+
+    expect(text).toContain(titleKey)
+    expect(text).toContain(descKey)
+  })
+
+  it('does not fall back to the generic generating copy', () => {
+    expect(indicatorText('planning')).not.toContain('processing.generatingTitle')
+  })
+})
+
+describe('pre-answer progress copy', () => {
+  // A missing key silently falls back to English, which reads as a bug in the
+  // other three UI languages.
+  it.each([
+    ['de', de],
+    ['es', es],
+    ['tr', tr],
+  ])('is translated in %s', (_locale, messages) => {
+    const keys = Object.keys((en as Record<string, Record<string, string>>).processing).filter(
+      (key) =>
+        key.startsWith('analyzingPrompt') ||
+        key.startsWith('planning') ||
+        key.startsWith('searchingFiles') ||
+        key.startsWith('checkingMemories')
+    )
+    const locale = (messages as Record<string, Record<string, string>>).processing
+
+    expect(keys).toHaveLength(8)
+    for (const key of keys) {
+      expect(locale[key], `missing processing.${key}`).toBeTruthy()
+      expect(locale[key]).not.toBe(
+        (en as Record<string, Record<string, string>>).processing[key],
+        `processing.${key} is still the English string`
+      )
+    }
+  })
+})

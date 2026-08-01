@@ -676,6 +676,19 @@ type StreamingProcessingMetadata = {
 
 const processingMetadata = ref<StreamingProcessingMetadata>({})
 
+// Backend pipeline steps that only need a label in the thinking indicator:
+// no metadata, no side effects. Kept in one list so the guest and the
+// authenticated stream handler stay in sync.
+const PIPELINE_PROGRESS_STATUSES = [
+  'analyzing_prompt',
+  'planning',
+  'searching_files',
+  'checking_memories',
+]
+
+const isPipelineProgressStatus = (status: string | undefined): status is string =>
+  typeof status === 'string' && PIPELINE_PROGRESS_STATUSES.includes(status)
+
 // Phase 3e: non-blocking pill that surfaces when backgrounded memory
 // extraction (Phase 2) completes after the assistant message has already
 // landed. Lives outside the bubble so it can never push content around.
@@ -2064,6 +2077,9 @@ const streamAIResponse = async (
           } else if (data.status === 'analyzing') {
             processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (isPipelineProgressStatus(data.status)) {
+            processingStatus.value = data.status
+            processingMetadata.value = {}
           } else if (data.status === 'classifying') {
             processingStatus.value = 'classifying'
             processingMetadata.value = data.metadata || {}
@@ -2561,6 +2577,9 @@ const streamAIResponse = async (
             // Analyzing phase (e.g., understanding media generation request)
             processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (isPipelineProgressStatus(data.status)) {
+            processingStatus.value = data.status
+            processingMetadata.value = {}
           } else if (data.status === 'classifying') {
             processingStatus.value = 'classifying'
             processingMetadata.value = data.metadata || {}
