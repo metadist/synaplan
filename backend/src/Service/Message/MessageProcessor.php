@@ -31,6 +31,19 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class MessageProcessor
 {
+    /**
+     * Conversation window replayed verbatim to the models on every turn.
+     *
+     * Every message in this window is re-sent on each turn, to the sorter AND
+     * the answer model, so the window is paid for in prompt tokens and in
+     * provider time-to-first-token. Older turns are not lost: once a chat grows
+     * past the window, {@see ConversationSummaryService} condenses the earlier
+     * span into the system prompt.
+     */
+    public const HISTORY_MAX_MESSAGES = 15;
+
+    public const HISTORY_MAX_CHARS = 15000;
+
     public function __construct(
         private MessageRepository $messageRepository,
         private ?SearchResultRepository $searchResultRepository,
@@ -218,8 +231,8 @@ final readonly class MessageProcessor
                 $conversationHistory = $this->messageRepository->findChatHistory(
                     $message->getUserId(),
                     $message->getChatId(),
-                    30,      // Max 30 messages
-                    15000    // Max ~15k chars (~4k tokens)
+                    self::HISTORY_MAX_MESSAGES,
+                    self::HISTORY_MAX_CHARS,
                 );
                 $this->logger->debug('Using chat history for streaming', [
                     'chat_id' => $message->getChatId(),
@@ -676,8 +689,8 @@ final readonly class MessageProcessor
                 $conversationHistory = $this->messageRepository->findChatHistory(
                     $message->getUserId(),
                     $message->getChatId(),
-                    30,      // Max 30 messages
-                    15000    // Max ~15k chars (~4k tokens)
+                    self::HISTORY_MAX_MESSAGES,
+                    self::HISTORY_MAX_CHARS,
                 );
                 $this->logger->debug('Using chat history for non-streaming', [
                     'chat_id' => $message->getChatId(),
