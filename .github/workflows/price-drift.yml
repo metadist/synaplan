@@ -110,6 +110,7 @@ jobs:
 
       - name: Open or update drift issue
         if: failure() && steps.drift.outputs.exit_code == '2'
+        working-directory: backend
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

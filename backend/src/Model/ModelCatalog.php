@@ -82,8 +82,8 @@ class ModelCatalog
         'gpt-5.5' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0],
         'gpt-5.5-pro' => ['threshold_tokens' => 272000, 'price_in_above' => 60.0, 'price_out_above' => 270.0],
         'gpt-5.6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0],
-        'gpt-5.6-terra' => ['threshold_tokens' => 272000, 'price_in_above' => 5.0, 'price_out_above' => 22.5],
-        'gpt-5.6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 2.0, 'price_out_above' => 9.0],
+        'gpt-5.6-terra' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
+        'gpt-5.6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.40, 'price_out_above' => 1.80],
         'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0],
         'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
         'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0],
@@ -1057,7 +1057,10 @@ class ModelCatalog
         // Sol: flagship. Terra: balanced, ~GPT-5.5-competitive. Luna:
         // fastest / most affordable. All use the Responses API, support
         // configurable reasoning effort and vision.
-        // Pricing per 1M tokens from the launch announcement.
+        // Pricing per 1M tokens from https://developers.openai.com/api/docs/pricing.
+        // 2026-07-30 price cut: Terra 2.50/15 -> 2.00/12 (-20%), Luna 1.00/6 ->
+        // 0.20/1.20 (-80%); Sol unchanged. Long-context (>272k) tiers updated in
+        // CONTEXT_PRICING accordingly.
         // ----------------------------------------------------------------
         [
             'id' => 251,
@@ -1121,9 +1124,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gpt-5.6-terra',
-            'priceIn' => 2.50,
+            'priceIn' => 2.00,
             'inUnit' => 'per1M',
-            'priceOut' => 15,
+            'priceOut' => 12,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -1148,9 +1151,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gpt-5.6-terra',
-            'priceIn' => 2.50,
+            'priceIn' => 2.00,
             'inUnit' => 'per1M',
-            'priceOut' => 15,
+            'priceOut' => 12,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -1175,9 +1178,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gpt-5.6-luna',
-            'priceIn' => 1,
+            'priceIn' => 0.20,
             'inUnit' => 'per1M',
-            'priceOut' => 6,
+            'priceOut' => 1.20,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
@@ -1202,9 +1205,9 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gpt-5.6-luna',
-            'priceIn' => 1,
+            'priceIn' => 0.20,
             'inUnit' => 'per1M',
-            'priceOut' => 6,
+            'priceOut' => 1.20,
             'outUnit' => 'per1M',
             'quality' => 9,
             'rating' => 1,
