@@ -257,9 +257,11 @@ import { useRouter } from 'vue-router'
 import { subscriptionApi } from '@/services/api/subscriptionApi'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
+import { useConfigStore } from '@/stores/config'
 
 const { t } = useI18n()
 const router = useRouter()
+const config = useConfigStore()
 
 interface Props {
   isOpen: boolean
@@ -299,11 +301,13 @@ const topupSteps = ref(1)
 // in the native shell (no IAP consumable is wired yet); the upgrade CTA still
 // routes to the in-app subscription view, which gates itself for native.
 const isNative = isNativeApp()
-const showTopup = computed(() => props.topupAvailable && !isNative)
+// #462: no Stripe → no top-up (self-hosted/open-source installs have billing off).
+const showTopup = computed(() => props.topupAvailable && !isNative && config.billing.enabled)
 
-// On a custom server in the native app there is no purchase path at all —
-// the modal only informs about the limit, without upgrade steering.
-const purchaseAllowed = isPurchaseAllowed()
+// On a custom server in the native app there is no purchase path at all, and on
+// self-hosted/open-source installs billing is disabled — in both cases the modal
+// only informs about the limit, without upgrade steering.
+const purchaseAllowed = computed(() => isPurchaseAllowed() && config.billing.enabled)
 
 const topupTotalEur = computed(() => topupSteps.value * props.topupStepEur)
 

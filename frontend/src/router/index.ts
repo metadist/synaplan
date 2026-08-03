@@ -33,6 +33,20 @@ const guardSubscription = (
   }
 }
 
+// #462: on SSO-/OIDC-only instances (REGISTRATION_ENABLED=false) the /register
+// route must be unreachable by direct URL, not just hidden from the login page.
+const guardRegistration = (
+  _to: RouteLocationNormalized,
+  _from: RouteLocationNormalized,
+  next: NavigationGuardNext
+) => {
+  if (!useConfigStore().auth.registrationEnabled) {
+    next({ name: 'login' })
+  } else {
+    next()
+  }
+}
+
 /**
  * Build-time fallback brand name. The live name comes from the runtime branding
  * config (`useConfigStore().branding.name`, Epic 4); this constant only covers
@@ -59,6 +73,7 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: () => import('@/views/RegisterView.vue'),
+      beforeEnter: guardRegistration,
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.register' },
     },
     {

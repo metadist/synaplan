@@ -642,7 +642,9 @@
   "plugins": {
     "title": "Plugins",
     "description": "Extended functionality for your workflow",
-    "notFound": "Plugin not found or not enabled for your account"
+    "notFound": "Plugin not found or not enabled for your account",
+    "commandEmpty": "The plugin returned an empty response.",
+    "commandError": "The plugin command failed. Please try again."
   },
   "tools": {
     "title": "Available Tools",

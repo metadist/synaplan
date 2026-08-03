@@ -14,6 +14,7 @@ use App\Service\InternalEmailService;
 use App\Service\NativeAuthHandoffService;
 use App\Service\OidcTokenService;
 use App\Service\RecaptchaService;
+use App\Service\RegistrationConfig;
 use App\Service\TokenService;
 use App\Service\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -52,6 +53,7 @@ class AuthController extends AbstractController
         private ClientContextResolver $clientContextResolver,
         private NativeAuthHandoffService $handoffService,
         private UserLifecycleService $userLifecycleService,
+        private RegistrationConfig $registrationConfig,
     ) {
         $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
         $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
@@ -188,10 +190,21 @@ class AuthController extends AbstractController
     )]
     #[OA\Response(response: 409, description: 'Email already registered')]
     #[OA\Response(response: 400, description: 'Validation error')]
+    #[OA\Response(response: 403, description: 'Registration is disabled on this instance (e.g. OIDC-only)')]
     public function register(
         #[MapRequestPayload] RegisterRequest $dto,
         Request $request,
     ): JsonResponse {
+        // #462: refuse local sign-up when the operator runs an SSO-/OIDC-only
+        // instance (REGISTRATION_ENABLED=false). Enforced server-side so hiding
+        // the frontend link/route is not the only line of defence.
+        if (!$this->registrationConfig->isEnabled()) {
+            return $this->json([
+                'error' => 'Registration is disabled on this instance.',
+                'code' => 'REGISTRATION_DISABLED',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         // Verify reCAPTCHA
         $recaptchaToken = $request->request->get('recaptchaToken') ?? $request->toArray()['recaptchaToken'] ?? '';
         if (!$this->recaptchaService->verify($recaptchaToken, 'register', $request->getClientIp())) {

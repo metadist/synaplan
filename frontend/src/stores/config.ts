@@ -65,6 +65,18 @@ const config = {
   },
 
   /**
+   * Authentication surface flags (loaded from backend at runtime).
+   * `registrationEnabled` is false on SSO-/OIDC-only instances
+   * (REGISTRATION_ENABLED=false); defaults to true so unconfigured/older
+   * backends keep offering local sign-up. The backend enforces it regardless.
+   */
+  auth: {
+    get registrationEnabled(): boolean {
+      return getConfigSync().auth?.registrationEnabled ?? true
+    },
+  },
+
+  /**
    * Google reCAPTCHA v3 configuration
    * Loaded from backend at runtime
    */

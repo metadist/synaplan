@@ -1252,7 +1252,9 @@
   "plugins": {
     "title": "Plugins",
     "description": "Erweiterte Funktionen für Ihren Workflow",
-    "notFound": "Plugin nicht gefunden oder nicht für Ihren Account aktiviert"
+    "notFound": "Plugin nicht gefunden oder nicht für Ihren Account aktiviert",
+    "commandEmpty": "Das Plugin hat eine leere Antwort zurückgegeben.",
+    "commandError": "Der Plugin-Befehl ist fehlgeschlagen. Bitte versuche es erneut."
   },
   "config": {
     "aiModels": {

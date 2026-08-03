@@ -646,7 +646,9 @@
   "plugins": {
     "title": "Plugins",
     "description": "Funcionalidad extendida para tu flujo de trabajo",
-    "notFound": "Plugin no encontrado o no habilitado para tu cuenta"
+    "notFound": "Plugin no encontrado o no habilitado para tu cuenta",
+    "commandEmpty": "El plugin devolvió una respuesta vacía.",
+    "commandError": "El comando del plugin falló. Inténtalo de nuevo."
   },
   "tools": {
     "title": "Herramientas Disponibles",

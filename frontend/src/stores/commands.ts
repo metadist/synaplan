@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import config from '@/stores/config'
 
 export interface Command {
   name: string
@@ -7,6 +8,12 @@ export interface Command {
   usage: string
   requiresArgs: boolean
   icon: string
+  /** True for commands contributed by an installed plugin's manifest. */
+  isPlugin?: boolean
+  /** Owning plugin id (plugin commands only). */
+  pluginName?: string
+  /** Plugin chat endpoint the command routes to, e.g. "/chat" (plugin commands only). */
+  endpoint?: string
   validate?: (args: string[]) => { valid: boolean; error?: string }
 }
 
@@ -41,8 +48,42 @@ export const commandsData: Command[] = [
   },
 ]
 
+/**
+ * Slash-commands contributed by installed plugins via their manifest
+ * `chatCommands`, exposed through the runtime config. This is the generic seam
+ * that lets any plugin register a `/command` in the composer — no core change
+ * per plugin.
+ */
+export function pluginCommands(): Command[] {
+  const result: Command[] = []
+  for (const plugin of config.plugins) {
+    const chatCommands = plugin.chatCommands
+    if (!chatCommands) {
+      continue
+    }
+    for (const entry of chatCommands) {
+      const name = (entry.command ?? '').replace(/^\//, '')
+      const endpoint = entry.endpoint ?? ''
+      if (!name || !endpoint) {
+        continue
+      }
+      result.push({
+        name,
+        description: entry.description || `Talk to the ${plugin.name} plugin`,
+        usage: `/${name} [message]`,
+        requiresArgs: true,
+        icon: 'mdi:puzzle-outline',
+        isPlugin: true,
+        pluginName: plugin.name,
+        endpoint: endpoint.startsWith('/') ? endpoint : `/${endpoint}`,
+      })
+    }
+  }
+  return result
+}
+
 export const useCommandsStore = defineStore('commands', () => {
-  const commands = ref<Command[]>(commandsData)
+  const commands = computed<Command[]>(() => [...commandsData, ...pluginCommands()])
 
   const recentCommands = ref<string[]>(JSON.parse(localStorage.getItem('recentCommands') || '[]'))
 

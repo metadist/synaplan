@@ -1021,7 +1021,7 @@
               </div>
               <div class="flex flex-wrap gap-2">
                 <button
-                  v-if="purchaseAllowed"
+                  v-if="purchaseAllowed && config.billing.enabled"
                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg transition-all"
                   @click="$router.push('/subscription')"
                 >
