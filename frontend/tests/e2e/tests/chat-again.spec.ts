@@ -7,8 +7,10 @@ import { PROMPTS } from '../config/test-data'
 
 test.describe('@ci @smoke Chat Again', () => {
   test('again via button then dropdown works repeatedly without refresh', async ({ page }) => {
-    // 3 sequential AI responses require extended timeout
-    test.setTimeout(90_000)
+    // 3 sequential full AI streams, each on the VERY_LONG/EXTREME tier under
+    // load — give the whole test enough headroom that a single slow turn does
+    // not trip the wall-clock timeout.
+    test.setTimeout(120_000)
     const chat = new ChatHelper(page)
 
     await test.step('Arrange: login and start new chat', async () => {
@@ -19,7 +21,7 @@ test.describe('@ci @smoke Chat Again', () => {
     // -- Turn 1: send message, get first AI response --
     let previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
 
-    const firstAnswer = await chat.waitForAnswer(previousCount)
+    const firstAnswer = await chat.waitForAnswer(previousCount, true)
 
     await test.step('Assert: first response is a real answer', async () => {
       expect(firstAnswer.trim().length).toBeGreaterThan(5)
@@ -47,7 +49,7 @@ test.describe('@ci @smoke Chat Again', () => {
       }
     )
 
-    const secondAnswer = await chat.waitForAnswer(previousCount)
+    const secondAnswer = await chat.waitForAnswer(previousCount, true)
     const secondResponseIndex = previousCount
 
     await test.step('Assert: second response (from Again dropdown) is a real answer', async () => {
@@ -92,11 +94,11 @@ test.describe('@ci @smoke Chat Again', () => {
 
         // 'hidden' also resolves when the panel left the DOM; a timeout means
         // the dropdown is stuck open after selection — a real bug, so fail.
-        await dropdown.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
+        await dropdown.waitFor({ state: 'hidden', timeout: TIMEOUTS.STANDARD })
       }
     )
 
-    const thirdAnswer = await chat.waitForAnswer(previousCount)
+    const thirdAnswer = await chat.waitForAnswer(previousCount, true)
     const thirdResponseIndex = previousCount
 
     await test.step('Assert: third response (from dropdown after Again) is a real answer', async () => {

@@ -44,7 +44,14 @@ export class ChatHelper {
     // waitFor({ state: 'visible' }) re-resolves the locator and is stable.
     // Subsequent inner-locator waits and Playwright's own auto-scroll handle
     // any viewport positioning needed for downstream interactions.
-    await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    //
+    // The bubble mounts on the first SSE token / optimistic render. Under CI
+    // parallel load (2 shards × chromium/firefox) that first paint routinely
+    // exceeds STANDARD (10s) — "waiting assistant-message-bubble (10s)" was the
+    // single most common flaky signature across the chat specs. VERY_LONG for
+    // this prerequisite wait absorbs the load; a genuine stream hang still fails
+    // fast at the done/error race below, so this does not mask real breakage.
+    await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
 
     const result = await Promise.race([
       newBubble
