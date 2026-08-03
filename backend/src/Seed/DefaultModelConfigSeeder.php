@@ -50,7 +50,10 @@ final readonly class DefaultModelConfigSeeder
         // Standard — an image-to-video model. Shares the text2vid BTAG (see
         // ModelCatalog::CAPABILITY_TAGS) but has its own default slot.
         ['group' => 'DEFAULTMODEL', 'setting' => 'IMG2VID',    'modelKey' => 'higgsfield:higgsfield-ai/dop/standard:text2vid'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'modelKey' => 'piper:piper-multi:text2sound'],
+        // Gemini 2.5 Flash TTS: natural DE/EN without Piper's accent issues.
+        // Applied via "select suggested models" / new-user defaults; existing
+        // installs are not silently rewritten (seeder is insert-if-missing).
+        ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'modelKey' => 'google:gemini-2.5-flash-preview-tts:text2sound'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',   'modelKey' => 'groq:meta-llama/llama-4-scout-17b-16e-instruct:pic2text'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'modelKey' => 'groq:whisper-large-v3:sound2text'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'modelKey' => 'anthropic:claude-sonnet-5:chat'],

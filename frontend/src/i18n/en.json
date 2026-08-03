@@ -969,9 +969,14 @@
     "noSearchResults": "No files matching \"{query}\"",
     "noSearchResultsHint": "Try a different term or adjust the filters.",
     "filterToggle": "Filters",
+    "filterType": "Type",
     "filterTypeAll": "All types",
+    "filterTypePdf": "PDF",
+    "filterTypeDocx": "Word (DOCX)",
+    "filterTypeTxt": "Text",
     "filterTypeImages": "Images",
     "filterTypeAudio": "Audio/Video",
+    "filterTypeSpreadsheet": "Spreadsheet",
     "filterDateFrom": "From",
     "filterDateTo": "To",
     "tabFiles": "Files",
@@ -2324,7 +2329,8 @@
     "remove": "Remove",
     "clearSelection": "Clear selection",
     "view": "View",
-    "expand": "Expand"
+    "expand": "Expand",
+    "noResults": "No results"
   },
   "search": {
     "sources": "Sources",
@@ -3563,7 +3569,8 @@
     "copied": "Copied to clipboard",
     "copyFailed": "Could not copy",
     "expand": "Show text",
-    "collapse": "Hide text"
+    "collapse": "Hide text",
+    "redundantCollapsed": "Step output collapsed — expand to inspect, or read the answer below."
   },
   "processing": {
     "started": "Starting processing...",
