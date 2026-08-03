@@ -976,7 +976,8 @@
     "enabled": "Habilitado",
     "disabled": "Deshabilitado",
     "reset": "Restablecer",
-    "expand": "Expandir"
+    "expand": "Expandir",
+    "noResults": "Sin resultados"
   },
   "search": {
     "sources": "Fuentes",
@@ -1480,7 +1481,8 @@
     "copied": "Copiado al portapapeles",
     "copyFailed": "No se pudo copiar",
     "expand": "Mostrar texto",
-    "collapse": "Ocultar texto"
+    "collapse": "Ocultar texto",
+    "redundantCollapsed": "Salida del paso oculta — expande para verla o lee la respuesta abajo."
   },
   "processing": {
     "started": "Iniciando procesamiento...",
@@ -1935,9 +1937,14 @@
     "noSearchResults": "No hay archivos que coincidan con \"{query}\"",
     "noSearchResultsHint": "Prueba con otro término o ajusta los filtros.",
     "filterToggle": "Filtros",
+    "filterType": "Tipo",
     "filterTypeAll": "Todos los tipos",
+    "filterTypePdf": "PDF",
+    "filterTypeDocx": "Word (DOCX)",
+    "filterTypeTxt": "Texto",
     "filterTypeImages": "Imágenes",
     "filterTypeAudio": "Audio/Vídeo",
+    "filterTypeSpreadsheet": "Hoja de cálculo",
     "filterDateFrom": "Desde",
     "filterDateTo": "Hasta",
     "tabFiles": "Archivos",
