@@ -38,7 +38,13 @@ vi.mock('@/stores/auth', () => ({
 }))
 
 vi.mock('@/stores/config', () => ({
-  useConfigStore: () => ({ billing: { enabled: true } }),
+  useConfigStore: () => ({
+    billing: { enabled: true },
+    branding: {
+      termsUrl: 'https://example.test/terms',
+      privacyUrl: 'https://example.test/privacy',
+    },
+  }),
 }))
 
 vi.mock('@/composables/useDialog', () => ({
@@ -121,6 +127,44 @@ describe('SubscriptionView — plan benefits', () => {
     expect(card.text()).toContain(SERVER_FEATURE)
     // The heading must not degrade into the raw key path either.
     expect(card.text()).not.toContain('subscription.plans.studio')
+    wrapper.unmount()
+  })
+})
+
+/**
+ * App Store Review Guideline 3.1.2 wants the renewal terms and working links to
+ * the terms of use and the privacy policy on the screen that sells the
+ * subscription — not only in the paywall modal.
+ */
+describe('SubscriptionView — purchase disclosure', () => {
+  const previousLocale = i18n.global.locale.value
+  const previousScrollIntoView = Element.prototype.scrollIntoView
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    Element.prototype.scrollIntoView = () => {}
+  })
+
+  afterEach(() => {
+    i18n.global.locale.value = previousLocale
+    Element.prototype.scrollIntoView = previousScrollIntoView
+  })
+
+  it('states the renewal terms and links to the terms and the privacy policy', async () => {
+    // Pinned, so the assertion below does not depend on whichever locale the
+    // runner happens to start in.
+    i18n.global.locale.value = 'de'
+    mockGetPlans.mockResolvedValue({ plans: [plan('PRO')], stripeConfigured: true })
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    const disclosure = wrapper.get('[data-testid="section-purchase-disclosure"]')
+    expect(disclosure.text()).toContain('Abonnements verlängern sich automatisch')
+
+    const hrefs = disclosure.findAll('a').map((a) => a.attributes('href'))
+    expect(hrefs).toContain('https://example.test/terms')
+    expect(hrefs).toContain('https://example.test/privacy')
     wrapper.unmount()
   })
 })
