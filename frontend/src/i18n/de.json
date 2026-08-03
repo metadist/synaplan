@@ -1141,7 +1141,8 @@
     "copied": "In die Zwischenablage kopiert",
     "copyFailed": "Kopieren fehlgeschlagen",
     "expand": "Text anzeigen",
-    "collapse": "Text ausblenden"
+    "collapse": "Text ausblenden",
+    "redundantCollapsed": "Schrittausgabe eingeklappt — zum Prüfen aufklappen oder die Antwort unten lesen."
   },
   "processing": {
     "started": "Starte Verarbeitung...",
@@ -2345,7 +2346,8 @@
     "remove": "Entfernen",
     "clearSelection": "Auswahl aufheben",
     "view": "Ansehen",
-    "expand": "Erweitern"
+    "expand": "Erweitern",
+    "noResults": "Keine Ergebnisse"
   },
   "search": {
     "sources": "Quellen",
@@ -2499,9 +2501,14 @@
     "noSearchResults": "Keine Dateien für \"{query}\" gefunden",
     "noSearchResultsHint": "Versuche einen anderen Begriff oder passe die Filter an.",
     "filterToggle": "Filter",
+    "filterType": "Typ",
     "filterTypeAll": "Alle Typen",
+    "filterTypePdf": "PDF",
+    "filterTypeDocx": "Word (DOCX)",
+    "filterTypeTxt": "Text",
     "filterTypeImages": "Bilder",
     "filterTypeAudio": "Audio/Video",
+    "filterTypeSpreadsheet": "Tabelle",
     "filterDateFrom": "Von",
     "filterDateTo": "Bis",
     "tabFiles": "Dateien",

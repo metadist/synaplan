@@ -976,7 +976,8 @@
     "enabled": "Etkin",
     "disabled": "Devre Dışı",
     "reset": "Sıfırla",
-    "expand": "Genişlet"
+    "expand": "Genişlet",
+    "noResults": "Sonuç bulunamadı"
   },
   "search": {
     "sources": "Kaynaklar",
@@ -1480,7 +1481,8 @@
     "copied": "Panoya kopyalandı",
     "copyFailed": "Kopyalanamadı",
     "expand": "Metni göster",
-    "collapse": "Metni gizle"
+    "collapse": "Metni gizle",
+    "redundantCollapsed": "Adım çıktısı daraltıldı — incelemek için genişletin veya aşağıdaki yanıtı okuyun."
   },
   "processing": {
     "started": "İşlem başlatılıyor...",
@@ -1936,9 +1938,14 @@
     "noSearchResults": "\"{query}\" ile eşleşen dosya yok",
     "noSearchResultsHint": "Farklı bir terim dene veya filtreleri ayarla.",
     "filterToggle": "Filtreler",
+    "filterType": "Tür",
     "filterTypeAll": "Tüm türler",
+    "filterTypePdf": "PDF",
+    "filterTypeDocx": "Word (DOCX)",
+    "filterTypeTxt": "Metin",
     "filterTypeImages": "Görseller",
     "filterTypeAudio": "Ses/Video",
+    "filterTypeSpreadsheet": "Tablo",
     "filterDateFrom": "Başlangıç",
     "filterDateTo": "Bitiş",
     "tabFiles": "Dosyalar",
