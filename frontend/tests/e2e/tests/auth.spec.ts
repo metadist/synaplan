@@ -39,7 +39,13 @@ test.describe('@ci @auth Authentication', () => {
     })
 
     await test.step('Assert: navigating to protected route does not restore session', async () => {
-      await page.goto('/profile')
+      // Resolve as soon as the /profile document commits: booting the app fires
+      // a store request that 401s and hard-redirects via window.location to
+      // /login?reason=auth_required. Waiting for `load` races that redirect and
+      // aborts the navigation (NS_BINDING_ABORTED / "interrupted by another
+      // navigation"). `commit` decouples goto from the follow-up redirect; the
+      // assertions below verify we actually land on the logged-out surface.
+      await page.goto('/profile', { waitUntil: 'commit' })
       await expect(
         page.locator(`${selectors.login.email}, ${selectors.loggedOut.page}`).first()
       ).toBeVisible({ timeout: 15_000 })
