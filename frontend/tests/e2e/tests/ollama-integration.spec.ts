@@ -3,7 +3,7 @@ import { request as playwrightRequest } from '@playwright/test'
 import { openApp, getAuthHeaders } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { CREDENTIALS } from '../config/credentials'
-import { getApiUrl, URLS } from '../config/config'
+import { getApiUrl, URLS, TIMEOUTS } from '../config/config'
 import { PROMPTS } from '../config/test-data'
 import { resetStub, configureStub, getStubRequests, getChatRequests } from '../helpers/ollama-stub'
 
@@ -63,6 +63,11 @@ test.describe('@ci @smoke Ollama Integration', () => {
   })
 
   test('chat via Ollama provider produces response', async ({ page }) => {
+    // Stub reply still flows through the full backend chat pipeline + SSE; under
+    // CI load the bubble mount alone can approach VERY_LONG, so give headroom
+    // over the 60s default. The recorded flake was "waiting
+    // assistant-message-bubble (10s)", now absorbed by the helper wait.
+    test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     const chat = new ChatHelper(page)
 
     await test.step('Arrange: login and start new chat', async () => {
@@ -92,6 +97,7 @@ test.describe('@ci @smoke Ollama Integration', () => {
   })
 
   test('thinking/reasoning tokens are forwarded', async ({ page }) => {
+    test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     await test.step('Arrange: configure stub with thinking enabled', async () => {
       await resetStub(apiCtx)
       await configureStub(apiCtx, { enableThinking: true })

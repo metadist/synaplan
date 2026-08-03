@@ -12,6 +12,9 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
     request,
     credentials,
   }) => {
+    // Admin UI login + navigation + impersonate + a full chat stream (on the
+    // longTimeout tier) exceed the 60s default under CI load; give headroom.
+    test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     const chat = new ChatHelper(page)
     const adminCreds = CREDENTIALS.getAdminCredentials()
     let targetUserId: number

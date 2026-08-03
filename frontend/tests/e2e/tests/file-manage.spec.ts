@@ -24,6 +24,11 @@ test.describe('@ci File Management', () => {
   test('user can create a folder, upload into it, use it in chat and delete the file', async ({
     page,
   }) => {
+    // Upload + vectorization plus create/open/use-in-chat/delete navigations
+    // routinely push this past the 60s default under CI load — the recorded
+    // flake was always "Test timeout of 60000ms exceeded". Give the same
+    // headroom rag-search.spec.ts uses for the upload path.
+    test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     const folderName = `e2e-folder-${Date.now()}`
 
     await test.step('Arrange: open the Files page', async () => {
@@ -54,10 +59,12 @@ test.describe('@ci File Management', () => {
       await page.locator(FILES.folderCard(folderName)).click()
       await page.locator(FILES.table).waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
       // Each file renders twice (mobile card + desktop table row, one hidden
-      // via CSS) — count only the visible representation.
+      // via CSS) — count only the visible representation. VERY_LONG because the
+      // row only appears once the upload+vectorize round-trip finishes, which
+      // can lag well past STANDARD under CI load.
       await expect(
         page.locator(FILES.fileRow).filter({ hasText: fixtureName }).filter({ visible: true })
-      ).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
+      ).toHaveCount(1, { timeout: TIMEOUTS.VERY_LONG })
     })
 
     await test.step('Act: "Use in chat" opens a chat scoped to the folder', async () => {
@@ -86,7 +93,7 @@ test.describe('@ci File Management', () => {
         .locator(FILES.fileRow)
         .filter({ hasText: fixtureName })
         .filter({ visible: true })
-      await row.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      await row.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
       await row.locator(FILES.btnDeleteFile).click()
       await page.locator(selectors.confirmDialog.accept).click()
     })

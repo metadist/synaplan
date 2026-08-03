@@ -36,7 +36,10 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
 
     for (const [oldPath, newPath] of REDIRECTS) {
       await test.step(`${oldPath} → ${newPath}`, async () => {
-        await page.goto(oldPath)
+        // Resolve on document commit, not `load`: the app boots and immediately
+        // redirects to the canonical path, which aborts a `load`-gated goto
+        // (NS_BINDING_ABORTED on firefox). toHaveURL below is the real assertion.
+        await page.goto(oldPath, { waitUntil: 'commit' })
         const expected = new RegExp(`${newPath.replace(/[/]/g, '\\/')}$`)
         await expect(page, `${oldPath} should land on ${newPath}`).toHaveURL(expected, {
           timeout: TIMEOUTS.STANDARD,
@@ -47,7 +50,7 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
 
   test('@ci redirect preserves the query string', async ({ page }) => {
     await openApp(page)
-    await page.goto('/config/task-prompts?topic=mail')
+    await page.goto('/config/task-prompts?topic=mail', { waitUntil: 'commit' })
     await expect(page).toHaveURL(/\/ai\/instructions\?topic=mail$/, {
       timeout: TIMEOUTS.STANDARD,
     })
