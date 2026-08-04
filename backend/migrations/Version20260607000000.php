@@ -39,8 +39,7 @@ final class Version20260607000000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        // Guard: if neither table exists (unexpected), do nothing rather than fail.
-        if (!$schema->hasTable('BUSER') || !$schema->hasTable('BCONFIG')) {
+        if (!$this->requiredTablesExist()) {
             return;
         }
 
@@ -53,6 +52,10 @@ final class Version20260607000000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
+        if (!$this->configTableExists()) {
+            return;
+        }
+
         // Remove the per-user grandfather rows. This also removes any per-user
         // ROUTING_ENABLED row a user set themselves — acceptable for a down
         // migration (reverts to the global default); the global ownerId=0 row
@@ -63,5 +66,29 @@ final class Version20260607000000 extends AbstractMigration
               AND BSETTING = 'ROUTING_ENABLED'
               AND BOWNERID > 0
         SQL);
+    }
+
+    private function requiredTablesExist(): bool
+    {
+        $tableCount = $this->connection->fetchOne(<<<'SQL'
+            SELECT COUNT(DISTINCT TABLE_NAME)
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME IN ('BUSER', 'BCONFIG')
+        SQL);
+
+        return 2 === (int) $tableCount;
+    }
+
+    private function configTableExists(): bool
+    {
+        $tableCount = $this->connection->fetchOne(<<<'SQL'
+            SELECT COUNT(*)
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'BCONFIG'
+        SQL);
+
+        return (int) $tableCount > 0;
     }
 }

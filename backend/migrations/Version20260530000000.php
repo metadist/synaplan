@@ -43,12 +43,8 @@ final class Version20260530000000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        if ($schema->hasTable('BWIDGET_EVENTS')) {
-            return;
-        }
-
         $this->addSql(<<<'SQL'
-            CREATE TABLE BWIDGET_EVENTS (
+            CREATE TABLE IF NOT EXISTS BWIDGET_EVENTS (
               BID BIGINT AUTO_INCREMENT NOT NULL,
               BWIDGETID VARCHAR(64) NOT NULL,
               BSESSIONID VARCHAR(128) NOT NULL,
