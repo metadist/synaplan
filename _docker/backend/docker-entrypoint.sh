@@ -10,6 +10,36 @@ set -euo pipefail
 # shellcheck source=/dev/null
 source /usr/local/bin/synaplan-php-configure
 
+# Locate shared role helpers both in the production image and when the script is
+# run directly from a repository checkout by shell characterization tests.
+_RUNTIME_LIB=""
+for _candidate in \
+    "$(dirname "$0")/lib/container-runtime.sh" \
+    "/usr/local/bin/lib/container-runtime.sh"; do
+    if [ -r "$_candidate" ]; then
+        _RUNTIME_LIB="$_candidate"
+        break
+    fi
+done
+
+if [ -z "$_RUNTIME_LIB" ]; then
+    echo "❌ ERROR: container-runtime.sh not found"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+. "$_RUNTIME_LIB"
+
+SYNAPLAN_ROLE="${SYNAPLAN_ROLE:-web}"
+export SYNAPLAN_ROLE
+case "$SYNAPLAN_ROLE" in
+    web|worker|scheduler) ;;
+    *)
+        echo "❌ ERROR: Unsupported SYNAPLAN_ROLE '${SYNAPLAN_ROLE}'. Expected web, worker, or scheduler."
+        exit 64
+        ;;
+esac
+
 # Test mode: disable the PHP 8.4 tracing JIT and re-stat .php files.
 #
 # The base image (synaplan-base-php >= 1.0.0) ships production-tuned OPcache
@@ -104,6 +134,15 @@ if [ -z "${APP_URL:-}" ]; then
     exit 1
 fi
 
+# Tier 1 of the first-admin bootstrap guard: the pairing rule, checked here
+# because it is free — it needs only the environment that was just loaded, no
+# vendor/ and no PHP — so the most common mistake fails within milliseconds.
+# Tier 2 (require_valid_bootstrap_admin_config) validates the remaining rules
+# with the application's own validator once vendor/ is guaranteed to exist; see
+# below, after the /docker-entrypoint.d block. Both tiers apply to every role,
+# since all of them receive the same environment.
+require_bootstrap_admin_pair
+
 # Build DATABASE URLs from environment variables if not already set
 # Fallback for deployments that provide DB credentials as separate env vars
 if [ -z "${DATABASE_WRITE_URL:-}" ] && [ -n "${DB_HOST:-}" ]; then
@@ -179,13 +218,34 @@ if [ -d "$PLUGINS_DIR" ] && [ "$(ls -A "$PLUGINS_DIR" 2>/dev/null)" ]; then
     echo "✅ Autoloader regenerated with plugin support"
 fi
 
+# Tier 2 of the first-admin bootstrap guard: the complete rule set, decided by
+# the application's own validator (App\Service\Admin\BootstrapAdminConfiguration).
+#
+# This is the earliest point where that is possible: it needs vendor/, which the
+# dev stack only populates in the /docker-entrypoint.d block above, and it must
+# see the plugin-aware autoloader regenerated just above it. It still runs before
+# the role dispatch, the database wait, the migrations and the seeders below, so
+# an invalid email or password fails in seconds instead of crash-looping the
+# container after every full initialization attempt.
+#
+# Completely inert when neither bootstrap variable is set.
+require_valid_bootstrap_admin_config
+
+# Non-web roles share the same environment and filesystem preparation above,
+# but never run migrations or seeders. They wait for the web role to complete
+# database initialization before starting their long-running process.
+case "$SYNAPLAN_ROLE" in
+    worker)
+        run_worker_role
+        ;;
+    scheduler)
+        run_scheduler_role
+        exit $?
+        ;;
+esac
+
 # Wait for database to be ready
-echo "⏳ Waiting for database connection..."
-until php bin/console dbal:run-sql "SELECT 1" 2>&1; do
-    echo "   Database is not ready yet - sleeping..."
-    sleep 2
-done
-echo "✅ Database is ready!"
+wait_for_database 0 2
 
 # Run database migrations.
 #
@@ -318,6 +378,15 @@ echo "🔌 Checking default AI provider..."
 php bin/console app:provider:apply-defaults --auto --no-interaction || {
     echo "⚠️  Could not verify the default AI provider — continuing startup."
 }
+
+# Managed deployments may provide first-admin credentials. The command is
+# intentionally called only when at least one bootstrap value is present, so
+# existing development and self-host behavior remains unchanged. The command
+# validates incomplete configuration and is idempotent after an admin exists.
+if [ -n "${BOOTSTRAP_ADMIN_EMAIL:-}" ] || [ -n "${BOOTSTRAP_ADMIN_PASSWORD:-}" ]; then
+    echo "👤 Bootstrapping initial administrator..."
+    php bin/console app:bootstrap-admin --no-interaction
+fi
 
 # Ollama model downloads (optional, only if AUTO_DOWNLOAD_MODELS=true).
 # Progress is mirrored to var/ollama-download.json for GET /api/v1/config/local-ai/status.
