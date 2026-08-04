@@ -32,7 +32,24 @@ jobs:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           set -euo pipefail
-          git fetch --no-tags origin "pull/${PR_NUMBER}/head:refs/remotes/pull/head"
+          # GitHub publishes refs/pull/<n>/head to the git backend a few seconds
+          # after the pull_request event fires. When the branch push and PR
+          # creation land back-to-back the workflow can start before the ref
+          # exists, and the fetch dies with "couldn't find remote ref". Retry
+          # with backoff to ride out that eventual-consistency window.
+          for attempt in 1 2 3 4 5 6; do
+            if git fetch --no-tags origin "pull/${PR_NUMBER}/head:refs/remotes/pull/head"; then
+              break
+            fi
+            echo "pull/${PR_NUMBER}/head not available yet (attempt ${attempt}), retrying in 5s..." >&2
+            sleep 5
+          done
+          # Fail closed if the ref never appeared, or if it does not match the
+          # SHA the event was raised for (PR-tampering guard).
+          git rev-parse refs/remotes/pull/head >/dev/null 2>&1 || {
+            echo "::error::refs/pull/${PR_NUMBER}/head never became available" >&2
+            exit 1
+          }
           test "$(git rev-parse refs/remotes/pull/head)" = "$HEAD_SHA"
           # Bootstrap-only: the classifier tooling is checked out from the base
           # branch (fail-closed against PR tampering), but the PR that first
