@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Prompt;
 
+use App\Service\File\Presentation\PptxTheme;
+use App\Service\File\Presentation\SlideTransitionKind;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -615,6 +617,11 @@ Allowed topic keys: [KEYLIST]
    `"depends_on": ["n1"], "inputs": { "prompt": "...", "images": ["$n1.file"] }`.
    Pictures from EARLIER turns need no wiring — the document node already sees
    the images of this conversation.
+   A PPTX carries its OWN design (theme, titled slides, bullets, tables, slide
+   transitions) and embeds pictures the same way. So for "a presentation with
+   a few images", plan `image_generation` nodes for the PICTURES and let the
+   `document_generation` node embed them — NEVER plan image nodes that draw
+   whole slides, and never promise animated elements inside a presentation.
 6. Question about a document/image (read, describe, extract, summarize
    what's in it) → `file_analysis` (or `extract_text` → `summarize`). This
    applies to BOTH a file the user attached AND a file produced by an earlier
@@ -1138,9 +1145,20 @@ Examples:
 PROMPT;
     }
 
+    /**
+     * The theme and transition names come from the renderer enums: they are the
+     * vocabulary the PPTX directive accepts, and a hand-copied list here would
+     * silently start offering names the renderer no longer knows.
+     */
     private static function officeMakerPrompt(): string
     {
-        return <<<'PROMPT'
+        return str_replace(
+            ['%themes%', '%transitions%'],
+            [
+                implode(' | ', PptxTheme::names()),
+                implode(' | ', SlideTransitionKind::names()),
+            ],
+            <<<'PROMPT'
 # Office Document Generation
 You receive a request to generate an Excel, PowerPoint or Word document (CSV, XLSX, DOCX, PPTX formats).
 
@@ -1192,7 +1210,31 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
      asks to remove or replace that image.
 
 3. **PowerPoint** (.pptx):
-   - Provide BFILETEXT as Markdown; each top-level heading (#) starts a new slide
+   - Provide BFILETEXT as Markdown. Every `#` or `##` heading starts a NEW
+     slide, and so does a `---` line on its own. The heading is the slide
+     title, the lines under it are the slide body.
+   - Use `-` for bullets (indent by two spaces for a sub-bullet), `1.` for
+     numbered lists, `###` for a sub-heading inside a slide, `**bold**` and
+     `*italic*` for emphasis, and Markdown tables for figures. All of this is
+     rendered as real slide formatting.
+   - Write slides, not prose: one idea per slide, 3-6 short bullets, no long
+     paragraphs. Make the FIRST slide a cover — only a title and one short
+     line below it.
+   - To place a picture on a slide, copy one of the markers listed under
+     "Images available for this document" onto its own line inside that
+     slide, exactly as listed (e.g. `{{IMAGE:file:123}}`). It is embedded
+     into the .pptx. NEVER invent a marker; when the requested picture is not
+     listed, build the presentation without it.
+   - Optional look and feel: ONE directive on the very first line, e.g.
+     `{{PPTX:theme=ocean, transition=fade}}`
+     - `theme`: %themes%
+     - `transition`: %transitions%
+       Only set a transition when the user asks for animated slide changes.
+     Keep an existing directive line unchanged when you edit a presentation.
+   - Animation limits, be honest about them: transitions BETWEEN slides work
+     through `transition`. Animating individual elements (text flying in,
+     objects appearing one after another, motion paths) is NOT possible.
+     Never describe the result as containing element animations.
 
 4. **Markdown/Text** (.md, .txt):
    - For simple text documents
@@ -1240,7 +1282,8 @@ For a sales data CSV request, respond with EXACTLY this format (no backticks!):
 - Do NOT use ```json or ``` around your response
 - Start your response directly with {
 - End your response directly with }
-PROMPT;
+PROMPT
+        );
     }
 
     private static function enhancePrompt(): string

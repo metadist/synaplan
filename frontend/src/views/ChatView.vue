@@ -473,6 +473,7 @@ import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaParts'
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
+import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import { httpClient } from '@/services/api/httpClient'
@@ -1475,16 +1476,8 @@ function handleMediaJobCompleted(message: Message, payload: { url: string; type:
 }
 
 function renderStreamingContent(content: string, msgId: string): void {
-  const trimmedContent = content.trim()
-
-  // Detect file generation JSON — hide content during generation
-  const looksLikeFileGeneration =
-    (trimmedContent.startsWith('{') ||
-      trimmedContent.startsWith('```json\n{') ||
-      trimmedContent.startsWith('```\n{')) &&
-    (trimmedContent.includes('BFILEPATH') || trimmedContent.includes('"BFILEPATH"'))
-
-  if (looksLikeFileGeneration) {
+  // Hide the raw generation envelope even when the model prepends prose.
+  if (looksLikeFileGenerationEnvelope(content)) {
     if (processingStatus.value !== 'generating_file') {
       processingStatus.value = 'generating_file'
       processingMetadata.value = { customMessage: t('processing.generatingFile') }

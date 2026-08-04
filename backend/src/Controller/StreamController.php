@@ -14,6 +14,7 @@ use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
+use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
@@ -97,6 +98,24 @@ class StreamController extends AbstractController
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
     ) {
+    }
+
+    private function suppressUnparseableOfficemakerEnvelope(
+        string $text,
+        ?string $topic,
+        bool $hasGeneratedFile,
+    ): string {
+        if ($hasGeneratedFile
+            || 'officemaker' !== $topic
+            || !FileGenerationEnvelope::hasSignature($text)) {
+            return $text;
+        }
+
+        $this->logger->warning('StreamController: officemaker reply carried an unparseable file envelope; suppressing raw blob', [
+            'text_length' => strlen($text),
+        ]);
+
+        return '__FILE_GENERATION_FAILED__';
     }
 
     /**
@@ -1631,14 +1650,11 @@ class StreamController extends AbstractController
                     // salvaged into a file must never be shown verbatim: for a
                     // document request, surface the translated failure marker
                     // instead of leaking the raw {"BFILEPATH",…} blob (#1406).
-                    if (null === $generatedFile
-                        && 'officemaker' === ($classification['topic'] ?? '')
-                        && str_contains($finalText, '"BFILETEXT"')) {
-                        $this->logger->warning('StreamController: officemaker reply carried an unparseable file envelope; suppressing raw blob', [
-                            'text_length' => strlen($finalText),
-                        ]);
-                        $finalText = '__FILE_GENERATION_FAILED__';
-                    }
+                    $finalText = $this->suppressUnparseableOfficemakerEnvelope(
+                        $finalText,
+                        is_string($classification['topic'] ?? null) ? $classification['topic'] : null,
+                        null !== $generatedFile,
+                    );
 
                     // A document request that produced neither a file nor any
                     // text must not be saved as an empty bubble — surface the
@@ -3234,6 +3250,10 @@ class StreamController extends AbstractController
         }
 
         try {
+            if ('pptx' === strtolower($extension)) {
+                $content = PptxRequestDirectiveResolver::apply($content, (string) $message->getText());
+            }
+
             $resolvedDocument = $this->documentImageReferenceResolver->resolve($content, $message);
             $content = $resolvedDocument['content'];
 

@@ -1175,6 +1175,52 @@ class ChatHandlerTest extends TestCase
         $this->handler->dispatchPendingMemoryExtraction($command);
     }
 
+    public function testHandleSuppressesMalformedOfficemakerEnvelope(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Create a presentation');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260804083000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('officemaker');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $rawEnvelope = 'Here is your presentation: {"BFILEPATH":"slides.pptx","BFILETEXT":"unterminated';
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => $rawEnvelope,
+            'provider' => 'openai',
+            'model' => 'gpt-5.5-pro',
+        ]);
+
+        $this->logger
+            ->expects($this->once())
+            ->method('warning')
+            ->with(
+                'ChatHandler: officemaker reply carried an unparseable file envelope; suppressing raw blob',
+                ['text_length' => strlen($rawEnvelope)],
+            );
+
+        $result = $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'officemaker', 'language' => 'en', 'model_id' => 206],
+        );
+
+        self::assertSame('__FILE_GENERATION_FAILED__', $result['content']);
+        self::assertStringNotContainsString('BFILETEXT', $result['content']);
+    }
+
     /**
      * GPT-5.5 Pro officemaker regression: models whose JSON says
      * `supportsStreaming: false` (and nothing else) are treated as "no
