@@ -112,9 +112,9 @@
  * All server logic (normalize, probe, persist) stays app-owned behind the
  * `nativeServer.ts` seam. `saveNativeServerUrl()` only persists — it does not
  * reload the WebView, so this modal explicitly calls `reloadNativeApp()` once
- * the save succeeds. The onboarding resume step is written to page 1 BEFORE
- * saving and rolled back if the probe rejects the server. No sign-out step is
- * needed here (there is no session yet before onboarding completes).
+ * the save succeeds. The reload lands back on the onboarding page (completion
+ * is not persisted yet). No sign-out step is needed here (there is no session
+ * yet before onboarding completes).
  */
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
@@ -125,7 +125,6 @@ import {
   saveNativeServerUrl,
   reloadNativeApp,
 } from '@/services/api/nativeServer'
-import { setOnboardingResumeStep, clearOnboardingResumeStep } from '@/composables/useOnboarding'
 
 /** Public repo where the self-hosting / own-server setup guide lives. */
 const SELF_HOST_DOCS_URL = 'https://github.com/metadist/synaplan'
@@ -164,13 +163,9 @@ async function connect() {
   }
   error.value = ''
   connecting.value = true
-  // Remember to resume at page 1 BEFORE saving (the reload below is about to
-  // happen), and roll it back if the probe rejects the server.
-  setOnboardingResumeStep(1)
   try {
     const result = await saveNativeServerUrl(candidate)
     if (!result.ok) {
-      clearOnboardingResumeStep()
       error.value = result.error || t('onboarding.server.connectError')
       return
     }

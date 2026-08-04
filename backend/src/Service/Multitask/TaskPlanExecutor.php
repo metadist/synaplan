@@ -11,6 +11,7 @@ use App\Service\Multitask\Execution\DagExecutor;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlan;
+use App\Service\PerfTimer;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -71,6 +72,7 @@ final readonly class TaskPlanExecutor
         private TaskPlanner $planner,
         private DagExecutor $dagExecutor,
         private ModelConfigService $modelConfigService,
+        private MultitaskRoutingConfig $multitaskConfig,
         private LoggerInterface $logger,
     ) {
     }
@@ -92,7 +94,7 @@ final readonly class TaskPlanExecutor
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
-        $plan = $this->planForExecution($message, $thread, $classification, $options);
+        $plan = $this->planForExecution($message, $thread, $classification, $options, $progressCallback);
 
         if (null === $plan) {
             return $this->runSingleNode(
@@ -157,7 +159,7 @@ final readonly class TaskPlanExecutor
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
-        $plan = $this->planForExecution($message, $thread, $classification, $options);
+        $plan = $this->planForExecution($message, $thread, $classification, $options, $progressCallback);
 
         if (null === $plan) {
             return $this->runSingleNode(
@@ -224,7 +226,7 @@ final readonly class TaskPlanExecutor
      * @param array<string, mixed> $classification
      * @param array<string, mixed> $options
      */
-    private function planForExecution(Message $message, array $thread, array $classification, array $options = []): ?TaskPlanResult
+    private function planForExecution(Message $message, array $thread, array $classification, array $options = [], ?callable $progressCallback = null): ?TaskPlanResult
     {
         // Messages eligible for multi-task planning:
         //   - `ai_sorting`: genuinely AI-classified turns.
@@ -252,12 +254,47 @@ final readonly class TaskPlanExecutor
             return null;
         }
 
+        if ($this->sorterVotedSingleStep($message, $classification)) {
+            $this->logger->info('TaskPlanExecutor: sorter voted single step, skipping planner', [
+                'message_id' => $message->getId(),
+                'topic' => $classification['topic'] ?? null,
+                'source' => $source,
+            ]);
+
+            return null;
+        }
+
+        // The planner is a blocking LLM round-trip with no visible output of its
+        // own, so without this the UI sits on "Generating response…" for the
+        // whole call. Tell the user what is actually happening.
+        if (null !== $progressCallback) {
+            $progressCallback([
+                'status' => 'planning',
+                'message' => 'Planning the steps for this request...',
+                'metadata' => [],
+                'timestamp' => time(),
+            ]);
+        }
+
+        // The planner is a blocking, non-streaming LLM round-trip that sits
+        // between classification and the answer model, so it lands directly in
+        // the user's time-to-first-token. Time it as its own phase — folded
+        // into `handler_total` it was indistinguishable from the answer
+        // model's own latency in the `perf` SSE event.
+        $perfTimer = $options['perf_timer'] ?? null;
+        $perfTimer = $perfTimer instanceof PerfTimer ? $perfTimer : null;
+
         try {
             $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
             // Forward the classification so dynamic skill blocks (mcp_fetch)
             // can resolve the matched topic's per-prompt gates at plan time.
-            $result = $this->planner->plan($message, $thread, $userId, $options + ['classification' => $classification]);
+            $perfTimer?->start('plan');
+            try {
+                $result = $this->planner->plan($message, $thread, $userId, $options + ['classification' => $classification]);
+            } finally {
+                $perfTimer?->stop('plan');
+            }
 
             $collapsed = $this->collapseRedundantSingleMediaPlan($result->plan, $classification);
             if ($collapsed !== $result->plan) {
@@ -284,6 +321,51 @@ final readonly class TaskPlanExecutor
             ]);
 
             return null;
+        }
+    }
+
+    /**
+     * Whether the AI sorter already told us this turn is a single step, so the
+     * planner round-trip can be skipped.
+     *
+     * The sorter runs on every AI-classified turn anyway and now returns a
+     * BMULTI vote alongside BTOPIC/BWEBSEARCH, so the decision costs nothing
+     * extra. On a single-step turn the planner would return a one-node plan
+     * that {@see shouldUseLegacyRouter()} hands straight back to the legacy
+     * router — identical output, one blocking LLM call later.
+     *
+     * The sorter prompt counts the DAG-only capabilities (calendar entry, URL
+     * fetch, connected-system lookup, mailbox search, "mail it to me") as
+     * multi-step even though they produce one deliverable: they have no legacy
+     * router equivalent, so skipping the planner would silently degrade them
+     * into a chat answer that only talks about the action.
+     *
+     * Deliberately strict: only an explicit `false` skips planning. A missing
+     * vote (`null` — older seeded prompt, a SORT model that dropped the field,
+     * or a branch that never ran the sorter such as a file attachment) keeps the
+     * pre-vote behaviour and plans.
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function sorterVotedSingleStep(Message $message, array $classification): bool
+    {
+        if (false !== ($classification['multi_step'] ?? null)) {
+            return false;
+        }
+
+        try {
+            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+
+            return $this->multitaskConfig->planOnlyMultiStep($userId);
+        } catch (\Throwable $e) {
+            // A config lookup glitch must never silently change routing —
+            // fall back to planning, which is what we did before the vote.
+            $this->logger->warning('TaskPlanExecutor: multi-step flag lookup failed, planning anyway', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
         }
     }
 

@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Admin;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfigService;
+use App\Service\EncryptionService;
+use App\Service\Message\ConversationSummaryConstants;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
  * Focused tests for SystemConfigService's database-backed config writes —
- * notably the multi-task routing master switch, which uses a dbGroup/dbKey
- * override to target the MULTITASK/ROUTING_ENABLED row.
+ * notably the multi-task routing master switch and the rolling-summary knobs,
+ * which use a dbGroup/dbKey override to target a row outside the default group.
  */
 final class SystemConfigServiceTest extends TestCase
 {
@@ -24,11 +27,20 @@ final class SystemConfigServiceTest extends TestCase
     {
         $this->configRepository = $this->createMock(ConfigRepository::class);
 
+        // ProviderKeyStore is final (not mockable); a real instance over the
+        // same repository mock is inert for these multitask-focused tests.
+        $providerKeyStore = new ProviderKeyStore(
+            $this->configRepository,
+            new EncryptionService('test-secret', new NullLogger()),
+            new NullLogger(),
+        );
+
         $this->service = new SystemConfigService(
             projectDir: sys_get_temp_dir(),
             logger: new NullLogger(),
             configRepository: $this->configRepository,
             defaultTtsUrl: 'http://localhost:10200',
+            providerKeyStore: $providerKeyStore,
         );
     }
 
@@ -138,5 +150,59 @@ final class SystemConfigServiceTest extends TestCase
         $this->assertSame('true', $routing['value']);
         $this->assertFalse($routing['hasPersonalOverride']);
         $this->assertSame('true', $routing['effectiveForMe']);
+    }
+
+    /**
+     * The rolling-summary knobs are exposed under flat CONVERSATION_SUMMARY_*
+     * admin keys but must land in the BCONFIG rows
+     * ConversationSummaryConfigService reads: group CONVERSATION_SUMMARY with
+     * the bare setting name.
+     */
+    public function testConversationSummaryWritesToTheSummaryGroupRow(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('setValue')
+            ->with(0, ConversationSummaryConstants::CONFIG_GROUP, 'RECENT_VERBATIM_CHARS', '6000');
+
+        $result = $this->service->setValue('CONVERSATION_SUMMARY_RECENT_VERBATIM_CHARS', '6000', 7);
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['requiresRestart']);
+    }
+
+    /**
+     * ConversationSummaryConfigService discards a non-positive value and uses
+     * its constant default, so storing one would be a silent no-op.
+     */
+    public function testConversationSummaryRejectsNonPositiveSizes(): void
+    {
+        $this->configRepository->expects($this->never())->method('setValue');
+
+        $result = $this->service->setValue('CONVERSATION_SUMMARY_TIERS', '0', 7);
+
+        $this->assertFalse($result['success']);
+    }
+
+    public function testConversationSummaryDefaultsMirrorTheConstants(): void
+    {
+        // No BCONFIG rows exist by default (there is no seeder), so what the
+        // admin UI shows has to be what the code actually falls back to.
+        $this->configRepository->method('getValue')->willReturn(null);
+
+        $values = $this->service->getValues();
+
+        $this->assertFalse($values['CONVERSATION_SUMMARY_ENABLED']['isSet']);
+        $this->assertSame(
+            var_export(ConversationSummaryConstants::ENABLED, true),
+            $values['CONVERSATION_SUMMARY_ENABLED']['value'],
+        );
+        $this->assertSame(
+            (string) ConversationSummaryConstants::RECENT_VERBATIM_CHARS,
+            $values['CONVERSATION_SUMMARY_RECENT_VERBATIM_CHARS']['value'],
+        );
+        $this->assertSame(
+            (string) ConversationSummaryConstants::TIERS,
+            $values['CONVERSATION_SUMMARY_TIERS']['value'],
+        );
     }
 }

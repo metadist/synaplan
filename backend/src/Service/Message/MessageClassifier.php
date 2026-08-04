@@ -237,6 +237,7 @@ final readonly class MessageClassifier
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
+            'multi_step' => $result['multi_step'] ?? null,
             'media_type' => $result['media_type'] ?? null,
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
@@ -248,6 +249,11 @@ final readonly class MessageClassifier
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
+            // Sorter's BMULTI vote: true = needs several steps, false = one
+            // step, null = no vote (older prompt row / model dropped the
+            // field). TaskPlanExecutor uses it to skip the planner round-trip
+            // on single-step turns; null keeps the pre-vote behaviour.
+            'multi_step' => $result['multi_step'] ?? null,
             'source' => $source,
             'skip_sorting' => false,
             'intent' => $this->mapTopicToIntent($canonicalTopic),
@@ -289,6 +295,11 @@ final readonly class MessageClassifier
             $classification['topic'] = 'general';
             $classification['intent'] = 'chat';
             unset($classification['media_type']);
+            // This reroute only produces the requested audio because the
+            // planner chains `file_analysis → text2sound`. Force the planner on
+            // even if the sorter voted "single step" for the describe half of
+            // the request.
+            $classification['multi_step'] = true;
         }
 
         // Pass through duration if detected (for video generation)
@@ -384,6 +395,11 @@ final readonly class MessageClassifier
             'BFILETEXT' => $message->getFileText() ?: '',
             'BFILE' => $message->getFile(),
             'BWEBSEARCH' => 0,
+            // Intentionally omit BMULTI. The sorter prompt asks the model to
+            // set it to 0|1, and TaskPlanExecutor only skips the planner on an
+            // *explicit* false. Seeding 0 here would make a lazy/truncated
+            // echo of the inbound JSON look like a single-step vote and skip
+            // planning — the unsafe fallback the vote was designed to avoid.
         ];
 
         $fileType = $message->getFileType();

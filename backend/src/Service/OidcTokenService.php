@@ -154,6 +154,13 @@ final class OidcTokenService
                 'refresh_token' => $data['refresh_token'] ?? $refreshToken, // Some providers don't rotate
                 'expires_in' => $data['expires_in'] ?? 3600,
                 'token_type' => $data['token_type'] ?? 'Bearer',
+                // Keycloak returns a fresh id_token on the refresh_token grant.
+                // Surfacing it lets callers re-store the id_token cookie so the
+                // RP-Initiated Logout id_token_hint stays current instead of the
+                // stale login-time token living for the full cookie lifetime (#472).
+                // Null when the provider omits it — callers must not clobber the
+                // existing cookie in that case.
+                'id_token' => $data['id_token'] ?? null,
             ];
         } catch (\Exception $e) {
             $this->logger->error('OIDC token refresh error', [

@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\AI\Credential\ChatReadinessService;
+use App\AI\Credential\SecretValueGuard;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
@@ -10,15 +12,18 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
+use App\Service\Capability\CapabilityService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Infrastructure\RedisService;
+use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
+use App\Service\RegistrationConfig;
 use App\Service\Search\BraveSearchService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
@@ -56,6 +61,10 @@ class ConfigController extends AbstractController
         private MobileVersionService $mobileVersionService,
         private MarketingNewsConfig $marketingNewsConfig,
         private UsageTaximeterConfig $usageTaximeterConfig,
+        private RegistrationConfig $registrationConfig,
+        private ChatReadinessService $chatReadiness,
+        private LocalAiDownloadStatusService $localAiDownloadStatus,
+        private CapabilityService $capabilityService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -115,6 +124,14 @@ class ConfigController extends AbstractController
                     description: 'Billing/subscription status (false for open-source deployments)',
                     properties: [
                         new OA\Property(property: 'enabled', type: 'boolean', example: false),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'auth',
+                    type: 'object',
+                    description: 'Authentication surface flags. Lets the frontend hide sign-up affordances when the operator runs an SSO-/OIDC-only instance.',
+                    properties: [
+                        new OA\Property(property: 'registrationEnabled', type: 'boolean', example: true, description: 'When false, local email/password self-registration is disabled (set REGISTRATION_ENABLED=false, e.g. for OIDC-only deployments). The /register endpoint is also refused server-side.'),
                     ]
                 ),
                 new OA\Property(
@@ -192,6 +209,19 @@ class ConfigController extends AbstractController
                             new OA\Property(property: 'version', type: 'string', example: '1.0.0'),
                             new OA\Property(property: 'description', type: 'string', example: 'A simple hello world plugin'),
                             new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string')),
+                            new OA\Property(
+                                property: 'chatCommands',
+                                type: 'array',
+                                description: 'Slash-commands this plugin registers in the chat composer',
+                                items: new OA\Items(
+                                    properties: [
+                                        new OA\Property(property: 'command', type: 'string', example: 'fastbill'),
+                                        new OA\Property(property: 'endpoint', type: 'string', example: '/chat'),
+                                        new OA\Property(property: 'description', type: 'string', example: 'Talk to your FastBill account'),
+                                    ],
+                                    type: 'object'
+                                )
+                            ),
                         ]
                     )
                 ),
@@ -349,6 +379,20 @@ class ConfigController extends AbstractController
                     items: new OA\Items(type: 'string', example: 'Anthropic'),
                     nullable: true
                 ),
+                new OA\Property(
+                    property: 'setup',
+                    type: 'object',
+                    description: 'First-run setup status (only for authenticated users). Drives the "connect an AI provider" banner and the admin setup wizard.',
+                    nullable: true,
+                    properties: [
+                        new OA\Property(
+                            property: 'chatReady',
+                            type: 'boolean',
+                            example: true,
+                            description: 'True when the provider serving the requesting user\'s effective default chat model (per-user override, then global default) is available (key configured / local AI reachable), i.e. sending a chat message can work for this user.'
+                        ),
+                    ]
+                ),
             ]
         )
     )]
@@ -416,6 +460,7 @@ class ConfigController extends AbstractController
                     'version' => $plugin->version,
                     'description' => $plugin->description,
                     'capabilities' => $plugin->capabilities,
+                    'chatCommands' => $plugin->chatCommands,
                 ];
             }
         }
@@ -431,15 +476,20 @@ class ConfigController extends AbstractController
         ];
 
         $unavailableProviders = [];
+        $setup = null;
         if ($user) {
-            foreach ($this->providerRegistry->getUniqueProviders() as $name => $provider) {
-                if ('test' === $name) {
-                    continue;
-                }
-                if (!$provider->isAvailable()) {
-                    $unavailableProviders[] = $provider->getDisplayName();
-                }
-            }
+            // READ ONLY. Repairing a broken default is an explicit action
+            // (`app:provider:auto-default` at container start, or an admin
+            // saving a key) — never a side effect of this GET.
+            $unavailableProviders = $this->chatReadiness->unavailableProviderNames();
+
+            // First-run signal: can a plain chat message work right now for
+            // THIS user? The frontend shows a "connect an AI provider" banner
+            // (admins get a wizard CTA) while this is false — e.g. a fresh
+            // install whose default chat model points at a provider without a
+            // key. Evaluated per user so a working per-user model override is
+            // honoured, exactly like the chat pipeline resolves it.
+            $setup = ['chatReady' => $this->chatReadiness->isChatReady(userId: $user->getId())];
         }
 
         // Realtime / WebSocket gateway settings.
@@ -490,6 +540,11 @@ class ConfigController extends AbstractController
             'billing' => [
                 'enabled' => $this->billingService->isEnabled(),
             ],
+            'auth' => [
+                // Default ON; operators set REGISTRATION_ENABLED=false for
+                // SSO-/OIDC-only instances so no local sign-up is offered.
+                'registrationEnabled' => $this->registrationConfig->isEnabled(),
+            ],
             'recaptcha' => $recaptchaConfig,
             'branding' => $this->brandingService->getBranding(),
             'features' => $features,
@@ -511,8 +566,94 @@ class ConfigController extends AbstractController
         if ($user && !empty($unavailableProviders)) {
             $response['unavailableProviders'] = $unavailableProviders;
         }
+        if (null !== $setup) {
+            $response['setup'] = $setup;
+        }
 
         return $this->json($response);
+    }
+
+    /**
+     * Expose supported file formats, languages and summary options so consumer
+     * integrations can discover capabilities dynamically instead of hardcoding
+     * lists that drift when Synaplan adds support for new formats/languages.
+     *
+     * Public (no auth): the descriptor is static, non-sensitive capability
+     * metadata sourced from the same constants the runtime enforces (#676).
+     */
+    #[Route('/capabilities', name: 'capabilities', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/capabilities',
+        summary: 'Get supported file formats, languages and summary options',
+        description: 'Returns the file formats accepted for upload (grouped by category), the languages available for '
+            .'translation/summary output, the summary types/lengths/focus areas, and the maximum upload size. Consumer '
+            .'integrations (e.g. synaplan-nextcloud, synaplan-opencloud) should read this instead of hardcoding lists. '
+            .'No authentication required.',
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Capability descriptor',
+        content: new OA\JsonContent(
+            required: ['file_formats', 'languages', 'summary', 'max_file_size_bytes'],
+            properties: [
+                new OA\Property(
+                    property: 'file_formats',
+                    type: 'object',
+                    description: 'Allowed upload extensions (lowercase, no leading dot) grouped by category. '
+                        .'A category is omitted when it has no allowed extensions, and an "other" bucket holds any '
+                        .'allowed extension without a dedicated category, so clients should tolerate extra keys.',
+                    properties: [
+                        new OA\Property(property: 'text', type: 'array', items: new OA\Items(type: 'string', example: 'txt')),
+                        new OA\Property(property: 'documents', type: 'array', items: new OA\Items(type: 'string', example: 'pdf')),
+                        new OA\Property(property: 'spreadsheets', type: 'array', items: new OA\Items(type: 'string', example: 'xlsx')),
+                        new OA\Property(property: 'presentations', type: 'array', items: new OA\Items(type: 'string', example: 'pptx')),
+                        new OA\Property(property: 'images', type: 'array', items: new OA\Items(type: 'string', example: 'png')),
+                        new OA\Property(property: 'audio', type: 'array', items: new OA\Items(type: 'string', example: 'mp3')),
+                        new OA\Property(property: 'video', type: 'array', items: new OA\Items(type: 'string', example: 'mp4')),
+                        new OA\Property(property: 'calendar', type: 'array', items: new OA\Items(type: 'string', example: 'ics')),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'languages',
+                    type: 'array',
+                    description: 'Language codes available for translation and summary output.',
+                    items: new OA\Items(type: 'string', example: 'en')
+                ),
+                new OA\Property(
+                    property: 'summary',
+                    type: 'object',
+                    required: ['types', 'lengths', 'focus_areas'],
+                    properties: [
+                        new OA\Property(
+                            property: 'types',
+                            type: 'array',
+                            items: new OA\Items(type: 'string', example: 'abstractive')
+                        ),
+                        new OA\Property(
+                            property: 'lengths',
+                            type: 'array',
+                            items: new OA\Items(type: 'string', example: 'medium')
+                        ),
+                        new OA\Property(
+                            property: 'focus_areas',
+                            type: 'array',
+                            items: new OA\Items(type: 'string', example: 'main-ideas')
+                        ),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'max_file_size_bytes',
+                    type: 'integer',
+                    description: 'Maximum size of a single upload, in bytes.',
+                    example: 134217728
+                ),
+            ]
+        )
+    )]
+    public function getCapabilities(): JsonResponse
+    {
+        return $this->json($this->capabilityService->getCapabilities());
     }
 
     /**
@@ -1225,6 +1366,158 @@ class ConfigController extends AbstractController
     }
 
     /**
+     * Get the platform-wide summary model (DEFAULTMODEL.SUMMARIZE).
+     *
+     * The rolling conversation summary condenses the older turns of a long chat
+     * on every affected turn, so it wants a small, fast model (the seeded
+     * default is GPT-OSS-120B on Groq) rather than the answering model. Unlike
+     * the planner selection this is deliberately global: the summary is part of
+     * the server-side pipeline every user's chat runs through, and it also
+     * backs widget titles and document summaries.
+     */
+    #[Route('/routing/summary-model', name: 'routing_summary_model_get', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/routing/summary-model',
+        summary: 'Get the platform summary model',
+        description: 'Admin only. Returns the global DEFAULTMODEL.SUMMARIZE selection and the Sorting model it falls back to when none is set.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Summary model selection',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'modelId', type: 'integer', nullable: true, description: 'Selected summary model id, or null when none is configured (falls back to the Sorting model)', example: 300),
+                new OA\Property(property: 'fallbackModelId', type: 'integer', nullable: true, description: 'Sorting model id used when no summary model is set', example: 7),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    public function getSummaryModel(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        if (!$this->isGranted('ROLE_ADMIN')) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+
+        $config = $this->configRepository->findOneBy([
+            'ownerId' => 0,
+            'group' => 'DEFAULTMODEL',
+            'setting' => 'SUMMARIZE',
+        ]);
+
+        $modelId = null;
+        if ($config) {
+            $candidate = (int) $config->getValue();
+            $model = $this->modelRepository->find($candidate);
+            $modelId = ($model && 1 === $model->getActive()) ? $candidate : null;
+        }
+
+        return $this->json([
+            'success' => true,
+            'modelId' => $modelId,
+            'fallbackModelId' => $this->modelConfigService->getDefaultModel('SORT', 0),
+        ]);
+    }
+
+    /**
+     * Save (or clear) the platform-wide summary model (DEFAULTMODEL.SUMMARIZE).
+     *
+     * A null `modelId` removes the row so summarization reverts to the Sorting
+     * model.
+     */
+    #[Route('/routing/summary-model', name: 'routing_summary_model_save', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/config/routing/summary-model',
+        summary: 'Save the platform summary model',
+        description: 'Admin only. Writes the global DEFAULTMODEL.SUMMARIZE row. Pass `modelId: null` to clear it and fall back to the Sorting model.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['modelId'],
+                properties: [
+                    new OA\Property(property: 'modelId', type: 'integer', nullable: true, description: 'Summary model id, or null to clear the selection', example: 300),
+                ]
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Summary model saved',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'modelId', type: 'integer', nullable: true, example: 300),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid request body or model not available')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    public function saveSummaryModel(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        if (!$this->isGranted('ROLE_ADMIN')) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || !array_key_exists('modelId', $data)) {
+            return $this->json(['error' => 'Invalid data'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $raw = $data['modelId'];
+        $existing = $this->configRepository->findOneBy([
+            'ownerId' => 0,
+            'group' => 'DEFAULTMODEL',
+            'setting' => 'SUMMARIZE',
+        ]);
+
+        if (null === $raw) {
+            if ($existing) {
+                $this->em->remove($existing);
+                $this->em->flush();
+            }
+
+            return $this->json(['success' => true, 'modelId' => null]);
+        }
+
+        if (!is_int($raw) && !(is_string($raw) && ctype_digit($raw))) {
+            return $this->json(['error' => 'Invalid model id'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $modelId = (int) $raw;
+        $model = $this->modelRepository->find($modelId);
+        if (!$model || 1 !== $model->getActive()) {
+            return $this->json(['error' => 'Model not found or inactive'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $config = $existing;
+        if (!$config) {
+            $config = new Config();
+            $config->setOwnerId(0);
+            $config->setGroup('DEFAULTMODEL');
+            $config->setSetting('SUMMARIZE');
+        }
+        $config->setValue((string) $modelId);
+        $this->em->persist($config);
+        $this->em->flush();
+
+        return $this->json(['success' => true, 'modelId' => $modelId]);
+    }
+
+    /**
      * Check if a model is available/ready to use.
      *
      * @param int $modelId Model ID to check
@@ -1279,7 +1572,7 @@ class ConfigController extends AbstractController
                     property: 'env_var',
                     type: 'string',
                     nullable: true,
-                    description: 'Environment variable that must be set for external providers',
+                    description: 'Provider credential identifier (env var name) when the key is missing from both the DB store and the environment',
                     example: 'OPENAI_API_KEY'
                 ),
                 new OA\Property(
@@ -1287,7 +1580,7 @@ class ConfigController extends AbstractController
                     type: 'string',
                     nullable: true,
                     description: 'Short setup hint when `env_var` is present',
-                    example: 'Set OPENAI_API_KEY in your environment (e.g. .env.local)'
+                    example: 'Configure OPENAI_API_KEY under Admin → AI Providers, or set it in the environment'
                 ),
             ]
         )
@@ -1330,21 +1623,19 @@ class ConfigController extends AbstractController
         if ('ollama' === $service) {
             $providerType = 'local';
 
-            // Check if Ollama provider is available
             try {
                 $provider = $this->providerRegistry->getChatProvider('ollama');
-
-                // Check if the specific model exists
                 $modelName = $model->getProviderId() ?: $model->getName();
 
-                // Try to list available models
-                $status = $provider->getStatus();
-                if (!empty($status['healthy'])) {
-                    // Model is available if Ollama is running
-                    // We assume it's available; the user will get a proper error if not
+                // A reachable Ollama says nothing about THIS model: a stock
+                // install has the server up with only the embedding model
+                // pulled. Report the concrete model, not the server health.
+                if (empty($provider->getStatus()['healthy'])) {
+                    $message = 'Ollama server is not running';
+                } elseif ($this->chatReadiness->isOllamaModelPulled($modelName)) {
                     $available = true;
                 } else {
-                    $message = 'Ollama server is not running';
+                    $message = sprintf('Ollama is running but the model "%s" is not downloaded yet', $modelName);
                 }
 
                 // Always provide install command for Ollama models
@@ -1353,7 +1644,9 @@ class ConfigController extends AbstractController
                 $message = 'Ollama not available: '.$e->getMessage();
             }
         } elseif (null !== ($registeredProvider = $this->findProviderForModelService($service))) {
-            // Same rules for every registered provider: use getRequiredEnvVars() (API keys, URLs, etc.)
+            // Prefer the provider's own availability (DB-backed ProviderKeyStore
+            // and/or env bootstrap) over raw getenv() — a UI-saved key must
+            // count as configured without requiring a matching .env entry.
             $providerType = 'external';
             $secretCheck = $this->evaluateProviderRequiredConfiguration($registeredProvider, $service);
             $available = $secretCheck['available'];
@@ -1381,7 +1674,7 @@ class ConfigController extends AbstractController
 
         if ($envVar) {
             $response['env_var'] = $envVar;
-            $response['setup_instructions'] = "Set {$envVar} in your environment (e.g. .env.local)";
+            $response['setup_instructions'] = "Configure {$envVar} under Admin → AI Providers, or set it in the environment";
         }
 
         return $this->json($response);
@@ -1420,73 +1713,120 @@ class ConfigController extends AbstractController
     }
 
     /**
-     * True if the env var is set to a non-placeholder non-empty string.
-     */
-    private function isMeaningfulEnvValueSet(string $envName): bool
-    {
-        $value = $_ENV[$envName] ?? getenv($envName);
-        if (!\is_string($value) || '' === $value) {
-            return false;
-        }
-
-        return 'your-api-key-here' !== $value;
-    }
-
-    /**
+     * Decide whether a registered provider has the credentials needed to run.
+     *
+     * Prefer {@see ProviderMetadataInterface::isAvailable()} so DB-backed keys
+     * from ProviderKeyStore (and env-bootstrap imports) count as configured.
+     * Setting a model must succeed whenever a key exists in either the DB or
+     * the environment. When unavailable, surface the first required credential
+     * name as a setup hint for the admin toast.
+     *
      * @return array{available: bool, message: ?string, env_var: ?string}
      */
     private function evaluateProviderRequiredConfiguration(ProviderMetadataInterface $provider, string $serviceLabel): array
     {
-        $requiredVars = $provider->getRequiredEnvVars();
-
-        if ([] === $requiredVars) {
+        // A key saved through the admin UI counts as configured even without a
+        // matching .env entry — that is what the DB-backed key store is for.
+        if ($provider->isAvailable()) {
             return ['available' => true, 'message' => null, 'env_var' => null];
         }
 
-        foreach ($requiredVars as $envName => $meta) {
+        // The provider's own check may only look at its primary key, while
+        // getRequiredEnvVars() documents accepted alternatives (`any_of`) and
+        // additional credentials. Honour those before declaring it unconfigured.
+        $envVarHint = null;
+        foreach ($provider->getRequiredEnvVars() as $envName => $meta) {
             if (false === ($meta['required'] ?? true)) {
                 continue;
             }
 
-            $candidates = (isset($meta['any_of']) && \is_array($meta['any_of']))
+            $candidates = isset($meta['any_of']) && \is_array($meta['any_of'])
                 ? array_values(array_filter($meta['any_of'], 'is_string'))
                 : [$envName];
 
-            if ([] === $candidates) {
-                $candidates = [$envName];
-            }
-
-            $satisfied = false;
             foreach ($candidates as $candidate) {
-                if ('' !== $candidate && $this->isMeaningfulEnvValueSet($candidate)) {
-                    $satisfied = true;
-                    break;
+                if (SecretValueGuard::isUsable($this->envValue($candidate))) {
+                    continue 2;
                 }
             }
 
-            if (!$satisfied) {
-                $first = $candidates[0];
-
-                return [
-                    'available' => false,
-                    'message' => "Configuration not complete for {$serviceLabel}",
-                    'env_var' => $first,
-                ];
-            }
+            $envVarHint ??= $candidates[0] ?? $envName;
         }
 
-        return ['available' => true, 'message' => null, 'env_var' => null];
+        if (null === $envVarHint) {
+            return ['available' => true, 'message' => null, 'env_var' => null];
+        }
+
+        return [
+            'available' => false,
+            'message' => "Configuration not complete for {$serviceLabel}",
+            'env_var' => $envVarHint,
+        ];
+    }
+
+    private function envValue(string $name): ?string
+    {
+        $value = $_ENV[$name] ?? getenv($name);
+
+        return \is_string($value) ? $value : null;
+    }
+
+    /**
+     * Local AI (Ollama) model-download progress written by the backend entrypoint.
+     * Authenticated users can poll this while AUTO_DOWNLOAD_MODELS pulls models.
+     */
+    #[Route('/local-ai/status', name: 'local_ai_download_status', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/local-ai/status',
+        summary: 'Get local AI model download status',
+        description: 'Returns progress of background Ollama model pulls started by the container entrypoint. When no download is running the status is idle/ready.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Local AI download status',
+        content: new OA\JsonContent(
+            required: ['status', 'currentModel', 'percent', 'message', 'models', 'updatedAt'],
+            properties: [
+                new OA\Property(property: 'status', type: 'string', enum: ['idle', 'waiting', 'downloading', 'ready', 'error'], example: 'downloading'),
+                new OA\Property(property: 'currentModel', type: 'string', nullable: true, example: 'bge-m3'),
+                new OA\Property(property: 'percent', type: 'integer', nullable: true, example: 43),
+                new OA\Property(property: 'message', type: 'string', nullable: true, example: 'Downloading bge-m3'),
+                new OA\Property(
+                    property: 'models',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'name', type: 'string', example: 'bge-m3'),
+                            new OA\Property(property: 'state', type: 'string', example: 'downloading'),
+                            new OA\Property(property: 'percent', type: 'integer', nullable: true, example: 43),
+                        ]
+                    )
+                ),
+                new OA\Property(property: 'updatedAt', type: 'string', nullable: true, example: '2026-07-30T10:00:00Z'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function getLocalAiDownloadStatus(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        return $this->json($this->localAiDownloadStatus->getStatus());
     }
 
     /**
      * Get status of all features and services (Web Search, AI Providers, Processing Services, etc.)
-     * Only available in development mode (APP_ENV=dev). Returns 403 Forbidden in production.
+     * Admin only (available in production builds).
      */
     #[Route('/features', name: 'features_status', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/config/features',
-        summary: 'Get feature and service status (dev only)',
-        description: 'Returns the live status of all configured features, AI providers, and infrastructure services. **Only available in `APP_ENV=dev`** – returns 403 Forbidden in production. Useful during local development to verify that all required services are reachable and correctly configured.',
+        summary: 'Get feature and service status (admin)',
+        description: 'Returns the live status of all configured features, AI providers, and infrastructure services. **Admin only** (available in production).',
         security: [['Bearer' => []]],
         tags: ['Configuration']
     )]
@@ -1525,17 +1865,15 @@ class ConfigController extends AbstractController
         )
     )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
-    #[OA\Response(response: 403, description: 'Only available in development mode (APP_ENV=dev)')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
     public function getFeaturesStatus(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Only allow in development mode
-        $env = $_ENV['APP_ENV'] ?? 'prod';
-        if ('dev' !== $env) {
-            return $this->json(['error' => 'Feature only available in development mode'], Response::HTTP_FORBIDDEN);
+        if (!$user->isAdmin()) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
         $features = [];
@@ -1589,9 +1927,9 @@ class ConfigController extends AbstractController
         $providersMetadata = $this->providerRegistry->getProvidersMetadata();
 
         foreach ($providersMetadata as $providerName => $providerData) {
-            // Skip test provider in production (only show in dev mode)
-            if ('test' === $providerName && 'dev' !== $env) {
-                continue; // @phpstan-ignore-line (env is dynamic at runtime)
+            // Skip the synthetic test provider outside local APP_ENV=dev.
+            if ('test' === $providerName && 'dev' !== ($_ENV['APP_ENV'] ?? 'prod')) {
+                continue;
             }
 
             // Get model count from database for this provider

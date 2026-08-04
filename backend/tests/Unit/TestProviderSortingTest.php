@@ -273,6 +273,37 @@ PROMPT;
         $this->assertSame('en', $decoded['BLANG']);
     }
 
+    // ================================================
+    // BMULTI vote (must agree with the task-plan stub)
+    // ================================================
+
+    public function testVotesSingleStepForAnOrdinaryQuestion(): void
+    {
+        $result = $this->classifyMessage('What is the capital of France?');
+
+        $this->assertSame(0, $result['BMULTI']);
+    }
+
+    public function testVotesMultiStepForTheRequestTheTaskPlanStubExpands(): void
+    {
+        // The inbound JSON omits BMULTI; the stub must set it from the same
+        // predicates mockTaskPlan() expands on. If this vote stays unset, the
+        // planner still runs (safe), but if it were wrongly left at 0 the DAG
+        // would never run and the @multitask E2E test would lose its cards.
+        $result = $this->classifyMessage(
+            'Please summarize the following note for me and then translate that summary into German.'
+        );
+
+        $this->assertSame(1, $result['BMULTI']);
+    }
+
+    public function testVotesMultiStepForTheWebSearchPlanPrefix(): void
+    {
+        $result = $this->classifyMessage('websearch: what happened in AI this week?');
+
+        $this->assertSame(1, $result['BMULTI']);
+    }
+
     public function testDoesNotTriggerSortForNormalChat(): void
     {
         $messages = [

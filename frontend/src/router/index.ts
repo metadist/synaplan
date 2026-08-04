@@ -33,17 +33,18 @@ const guardSubscription = (
   }
 }
 
-/** System / feature status page is for local development only (not shown in production builds). */
-const guardDevOnlyAdminFeatures = (
+// #462: on SSO-/OIDC-only instances (REGISTRATION_ENABLED=false) the /register
+// route must be unreachable by direct URL, not just hidden from the login page.
+const guardRegistration = (
   _to: RouteLocationNormalized,
   _from: RouteLocationNormalized,
   next: NavigationGuardNext
 ) => {
-  if (!import.meta.env.DEV) {
-    next({ name: 'admin' })
-    return
+  if (!useConfigStore().auth.registrationEnabled) {
+    next({ name: 'login' })
+  } else {
+    next()
   }
-  next()
 }
 
 /**
@@ -72,6 +73,7 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: () => import('@/views/RegisterView.vue'),
+      beforeEnter: guardRegistration,
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.register' },
     },
     {
@@ -128,9 +130,9 @@ const router = createRouter({
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.loggedOut' },
     },
     {
-      // MOBILE-APP SEAM (first-run onboarding): native-only first-run flow
-      // (welcome → plans). Web builds never navigate here — the beforeEach
-      // guard redirects the route away unless the flow applies.
+      // MOBILE-APP SEAM (first-run onboarding): native-only first-run welcome
+      // page. Web builds never navigate here — the beforeEach guard redirects
+      // the route away unless the flow applies.
       path: '/onboarding',
       name: 'onboarding',
       component: () => import('@/views/OnboardingView.vue'),
@@ -415,7 +417,6 @@ const router = createRouter({
       path: '/admin/features',
       name: 'admin-features',
       component: () => import('@/views/FeatureStatusView.vue'),
-      beforeEnter: guardDevOnlyAdminFeatures,
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminFeatures' },
     },
     {
@@ -423,6 +424,12 @@ const router = createRouter({
       name: 'admin-config',
       component: () => import('@/views/AdminConfigView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminConfig' },
+    },
+    {
+      path: '/admin/setup',
+      name: 'admin-setup',
+      component: () => import('@/views/ProviderSetupView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminSetup' },
     },
     {
       path: '/subscription',
@@ -675,10 +682,10 @@ router.beforeEach(async (to, from, next) => {
     next(resolveDefaultRoute())
   } else if (to.name === 'chat' && !authenticated && !useGuestStore().isGuestMode) {
     // MOBILE-APP SEAM (first-run onboarding): the very first entry navigation
-    // of a signed-out native user goes to the one-time onboarding flow
-    // (welcome → plans). `shouldShowOnboarding` is false on web, for
-    // signed-in users, after completion/skip, and for existing guest sessions
-    // — so this branch is a no-op everywhere except the app's true first run.
+    // of a signed-out native user goes to the one-time welcome page.
+    // `shouldShowOnboarding` is false on web, for signed-in users, after
+    // completion, and for existing guest sessions — so this branch is a no-op
+    // everywhere except the app's true first run.
     if (shouldShowOnboarding(authenticated)) {
       next({ name: 'onboarding' })
       return
@@ -695,7 +702,7 @@ router.beforeEach(async (to, from, next) => {
       next()
     }
   } else if (to.name === 'onboarding' && (!isNativeApp() || authenticated)) {
-    // MOBILE-APP SEAM (first-run onboarding): the flow is native-only and for
+    // MOBILE-APP SEAM (first-run onboarding): the page is native-only and for
     // signed-out users. Web or signed-in navigations bounce to their normal
     // entry. No loop is possible: the chat branch above only redirects here
     // while `shouldShowOnboarding` is true, which requires native + signed-out.

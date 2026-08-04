@@ -17,6 +17,7 @@ use App\Service\FeedbackConstants;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
+use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
@@ -615,7 +616,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
-        $this->notify($progressCallback, 'generating', 'Generating response...');
+        $this->notify($progressCallback, 'analyzing_prompt', 'Analyzing the prompt...');
 
         $perfTimer = $options['perf_timer'] ?? null;
         if (!$perfTimer instanceof PerfTimer) {
@@ -669,6 +670,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         if (!empty($message->getText()) && $ragGroupKey) {
             try {
                 error_log('🔍 ChatHandler: Attempting to load RAG context for topic: '.$topic.' (groupKey: '.$ragGroupKey.')');
+
+                $this->notify($progressCallback, 'searching_files', 'Looking for related files...');
 
                 $perfTimer->start('rag');
                 $sharedVector = $resolveSharedVector();
@@ -1097,6 +1100,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'user_id' => $message->getUserId(),
             'reasoning' => $aiOptions['reasoning'] ?? false,
         ]);
+
+        // Announced here, not at the top of the method: everything above
+        // (knowledge-base lookup, memories, prompt assembly) reports its own
+        // step, and claiming "generating" before them would show the last
+        // stage first and then appear to go backwards.
+        $this->notify($progressCallback, 'generating', 'Generating response...');
 
         $fullResponseText = '';
         $sawFirstToken = false;
@@ -2215,55 +2224,22 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
     private function extractFileGenerationData(string $content): ?array
     {
-        // Check if content looks like JSON or is wrapped in markdown code blocks
-        $jsonContent = trim($content);
-
-        // Extract JSON from markdown code blocks if present (```json ... ``` or ``` ... ```)
-        if (preg_match('/```(?:json)?\s*\n(.*?)\n```/s', $content, $matches)) {
-            $jsonContent = trim($matches[1]);
-            $this->logger->info('ChatHandler: Extracted JSON from markdown code block');
-        }
-
-        if (!str_starts_with($jsonContent, '{')) {
+        // Tolerate a prose preamble or markdown fence around the envelope: the
+        // model sometimes prepends a sentence before the {"BFILEPATH",…} object,
+        // which previously skipped file generation and leaked the raw blob into
+        // the chat (#1406).
+        $fileData = FileGenerationEnvelope::extract($content);
+        if (null === $fileData) {
             return null;
         }
 
-        try {
-            $jsonData = json_decode($jsonContent, true, 512, JSON_THROW_ON_ERROR);
+        $this->logger->info('ChatHandler: Detected file generation', [
+            'filename' => $fileData['filename'],
+            'extension' => $fileData['extension'],
+            'content_length' => strlen($fileData['content']),
+        ]);
 
-            // Check for file generation format
-            if (isset($jsonData['BFILEPATH']) && isset($jsonData['BFILETEXT'])) {
-                $filename = trim($jsonData['BFILEPATH']);
-                $fileContent = $jsonData['BFILETEXT'];
-
-                if (empty($filename) || !is_string($fileContent) || '' === trim($fileContent)) {
-                    return null;
-                }
-
-                $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-
-                $this->logger->info('ChatHandler: Detected file generation', [
-                    'filename' => $filename,
-                    'extension' => $extension,
-                    'content_length' => strlen($fileContent),
-                ]);
-
-                return [
-                    'filename' => $filename,
-                    'content' => $fileContent,
-                    'extension' => $extension,
-                ];
-            }
-
-            return null;
-        } catch (\JsonException $e) {
-            // Not JSON or invalid format
-            $this->logger->debug('ChatHandler: Content is not valid JSON for file generation', [
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
+        return $fileData;
     }
 
     /**
@@ -2641,6 +2617,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     'user_id' => $message->getUserId(),
                     'message_text' => substr($message->getText(), 0, 100),
                 ]);
+
+                $this->notify($progressCallback, 'checking_memories', 'Checking memories...');
 
                 $perfTimer->start('memories_search');
                 $memoryVector = $resolveMemoryVector();

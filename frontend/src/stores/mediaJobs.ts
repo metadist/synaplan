@@ -187,6 +187,15 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
           onPublication: (envelope) => {
             if ('media_job.update' === envelope.type) {
               applyUpdate(envelope.data as unknown as MediaJobUpdate)
+            } else if ('chat.activity' === envelope.type) {
+              // An inbound-channel message (WhatsApp, email) landed — re-sort
+              // that chat to the top of the list without a manual reload (#1372).
+              const data = envelope.data as { chat_id?: number; preview?: string | null }
+              if ('number' === typeof data.chat_id) {
+                void useChatsStore().noteExternalActivity(data.chat_id, {
+                  firstMessagePreview: data.preview ?? undefined,
+                })
+              }
             }
           },
         })

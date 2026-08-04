@@ -34,6 +34,20 @@ final readonly class MessageSorter
     private const SUPPORTED_LANGUAGES = ['de', 'en', 'it', 'es', 'fr', 'nl', 'pt', 'ru', 'sv', 'tr'];
 
     /**
+     * Completion budget for the classification call.
+     *
+     * The JSON answer itself is a few dozen tokens, but the SORT binding is
+     * routinely a reasoning model (the shipped default is Groq gpt-oss-120b),
+     * and those spend the same budget on thinking tokens BEFORE emitting the
+     * JSON. When the cap runs out mid-object the response no longer parses and
+     * {@see parseResponse()} silently falls back to topic `general` with no
+     * BWEBSEARCH and no BMULTI vote — a mis-route plus a pointless planner
+     * round-trip, with nothing but a log line to show for it. The headroom is
+     * a cap, not a spend: a well-behaved answer still costs the same.
+     */
+    private const CLASSIFICATION_MAX_TOKENS = 2048;
+
+    /**
      * Canonical video resolutions accepted downstream by MediaGenerationService
      * and the Veo provider. Keep in sync with
      * MediaGenerationService::SUPPORTED_VIDEO_RESOLUTIONS so the AI never
@@ -121,6 +135,9 @@ final readonly class MessageSorter
                     // WebSearchTopicPolicy in MessageProcessor (a custom topic
                     // that needs live data can set tool_internet=true).
                     'web_search' => false,
+                    // Likewise no BMULTI vote — null keeps the planner's own
+                    // decision in charge for rule-matched turns.
+                    'multi_step' => null,
                     'raw_response' => 'Rule-based routing',
                     'prompt_metadata' => $promptMetadata,
                     'sorting_model_id' => null,
@@ -210,7 +227,7 @@ final readonly class MessageSorter
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1, // Low temperature for consistent classification
-                'max_tokens' => 1024,
+                'max_tokens' => self::CLASSIFICATION_MAX_TOKENS,
             ]);
 
             $aiResponse = $response['content'];
@@ -230,6 +247,7 @@ final readonly class MessageSorter
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
                 'web_search' => $parsed['web_search'] ?? false,
+                'multi_step' => $parsed['multi_step'] ?? null,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
                 'resolution' => $parsed['resolution'] ?? null,
@@ -268,6 +286,7 @@ final readonly class MessageSorter
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
                 'web_search' => $parsed['web_search'] ?? false,
+                'multi_step' => $parsed['multi_step'] ?? null,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
                 'resolution' => $parsed['resolution'] ?? null,
@@ -389,6 +408,15 @@ final readonly class MessageSorter
                 $webSearch = (bool) $data['BWEBSEARCH'];
             }
 
+            // Parse BMULTI — the sorter's vote on whether answering this
+            // message takes more than one step. Stays null when the model omitted
+            // the field (older seeded prompt, model that drops unknown keys) so
+            // downstream consumers can tell "no vote" from an explicit "no".
+            $multiStep = null;
+            if (array_key_exists('BMULTI', $data) && null !== $data['BMULTI']) {
+                $multiStep = filter_var($data['BMULTI'], \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+            }
+
             // Parse BMEDIA for mediamaker topic (image, video, audio)
             $mediaType = null;
             if (isset($data['BMEDIA']) && is_string($data['BMEDIA'])) {
@@ -428,6 +456,7 @@ final readonly class MessageSorter
                 'topic' => $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general',
                 'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
                 'web_search' => $webSearch,
+                'multi_step' => $multiStep,
                 'media_type' => $mediaType,
                 'duration' => $duration,
                 'resolution' => $resolution,
@@ -444,6 +473,7 @@ final readonly class MessageSorter
                 'topic' => $originalData['BTOPIC'] ?? 'general',
                 'language' => $originalData['BLANG'] ?? 'en',
                 'web_search' => false,
+                'multi_step' => null,
                 'media_type' => null,
                 'duration' => null,
                 'resolution' => null,

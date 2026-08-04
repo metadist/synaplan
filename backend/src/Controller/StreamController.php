@@ -9,9 +9,11 @@ use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
+use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
+use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
@@ -60,13 +62,13 @@ class StreamController extends AbstractController
 
     /**
      * Server-side caps for the incognito conversation history sent by the
-     * client. Mirrors {@see \App\Repository\MessageRepository::findChatHistory()}
-     * (30 messages / ~15k chars) so an incognito turn gets the same context
-     * budget as a persisted chat — and a crafted request cannot bloat the
-     * AI prompt.
+     * client. Mirrors the persisted-chat window
+     * ({@see MessageProcessor::HISTORY_MAX_MESSAGES}) so an incognito turn gets
+     * the same context budget as a persisted chat — and a crafted request
+     * cannot bloat the AI prompt.
      */
-    private const MAX_INCOGNITO_HISTORY_MESSAGES = 30;
-    private const MAX_INCOGNITO_HISTORY_CHARS = 15000;
+    private const MAX_INCOGNITO_HISTORY_MESSAGES = MessageProcessor::HISTORY_MAX_MESSAGES;
+    private const MAX_INCOGNITO_HISTORY_CHARS = MessageProcessor::HISTORY_MAX_CHARS;
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -83,6 +85,7 @@ class StreamController extends AbstractController
         private PromptService $promptService,
         private MessageForwardingService $messageForwardingService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
+        private ConversationSummaryRefreshDispatcher $conversationSummaryRefreshDispatcher,
         private DocumentGeneratorService $documentGenerator,
         private DocumentImageReferenceResolver $documentImageReferenceResolver,
         private MediaCancellationStore $cancellationStore,
@@ -1544,70 +1547,71 @@ class StreamController extends AbstractController
                     $outgoingMessage->setTopic($classification['topic']);
                     $outgoingMessage->setLanguage($classification['language']);
 
-                    // Parse JSON response if AI responded in JSON format
-                    $jsonContent = $responseText;
-                    if (preg_match('/```(?:json)?\s*\n(.*?)\n```/s', $responseText, $matches)) {
-                        $jsonContent = trim($matches[1]);
-                        $this->logger->info('StreamController: Extracted JSON from markdown code block');
-                    }
+                    // File generation: tolerate a prose preamble or markdown
+                    // fence around the {"BFILEPATH",…} envelope so a leading
+                    // sentence no longer skips file creation and leaks the raw
+                    // blob into the chat (#1406).
+                    $fileEnvelope = FileGenerationEnvelope::extract($responseText);
 
-                    if (str_starts_with(trim($jsonContent), '{')) {
-                        try {
-                            $jsonData = json_decode($jsonContent, true, 512, JSON_THROW_ON_ERROR);
+                    if (null !== $fileEnvelope) {
+                        $this->logger->info('StreamController: Detected AI file generation', [
+                            'filename' => $fileEnvelope['filename'],
+                        ]);
 
-                            if (isset($jsonData['BFILEPATH']) && isset($jsonData['BFILETEXT'])) {
-                                $this->logger->info('StreamController: Detected AI file generation', [
-                                    'filename' => $jsonData['BFILEPATH'],
-                                ]);
+                        // The document text is complete — now convert it into the
+                        // actual office file. The frontend translates the stage;
+                        // never send hardcoded user-facing strings from here.
+                        $this->sendSSE('generating_file', [
+                            'metadata' => [
+                                'stage' => 'converting',
+                                'filename' => $fileEnvelope['filename'],
+                            ],
+                        ]);
 
-                                // The document text is complete — now convert it
-                                // into the actual office file. The frontend
-                                // translates the stage; never send hardcoded
-                                // user-facing strings from here.
-                                $this->sendSSE('generating_file', [
-                                    'metadata' => [
-                                        'stage' => 'converting',
-                                        'filename' => $jsonData['BFILEPATH'],
-                                    ],
-                                ]);
+                        $generatedFile = $this->storeGeneratedFileInStream($fileEnvelope, $incomingMessage, $incognito);
 
-                                $fileData = [
-                                    'filename' => $jsonData['BFILEPATH'],
-                                    'content' => $jsonData['BFILETEXT'],
-                                    'extension' => strtolower(pathinfo($jsonData['BFILEPATH'], PATHINFO_EXTENSION)),
-                                ];
+                        if ($generatedFile) {
+                            $finalText = "__FILE_GENERATED__:{$fileEnvelope['filename']}";
+                            $this->logger->info('StreamController: File generation successful', [
+                                'file_id' => $generatedFile->getId(),
+                                'filename' => $generatedFile->getFileName(),
+                            ]);
+                        } else {
+                            $finalText = '__FILE_GENERATION_FAILED__';
+                            $this->logger->error('StreamController: File generation failed');
+                        }
+                    } else {
+                        // Legacy {"BTEXT":…} envelope (non-file JSON reply).
+                        $jsonContent = $responseText;
+                        if (preg_match('/```(?:json)?\s*\n(.*?)\n```/s', $responseText, $matches)) {
+                            $jsonContent = trim($matches[1]);
+                            $this->logger->info('StreamController: Extracted JSON from markdown code block');
+                        }
 
-                                $generatedFile = $this->storeGeneratedFileInStream($fileData, $incomingMessage, $incognito);
-
-                                if ($generatedFile) {
-                                    $finalText = "__FILE_GENERATED__:{$jsonData['BFILEPATH']}";
-                                    $this->logger->info('StreamController: File generation successful', [
-                                        'file_id' => $generatedFile->getId(),
-                                        'filename' => $generatedFile->getFileName(),
-                                    ]);
-                                } else {
-                                    $finalText = '__FILE_GENERATION_FAILED__';
-                                    $this->logger->error('StreamController: File generation failed');
-                                }
-                            } elseif (isset($jsonData['BTEXT'])) {
-                                $finalText = $jsonData['BTEXT'];
-                            }
-                        } catch (\JsonException $e) {
-                            $cleanedJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0'."\n", $jsonContent);
-                            $cleanedJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0'."\r\n", $cleanedJson);
-                            $cleanedJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $cleanedJson);
-
+                        if (str_starts_with(trim($jsonContent), '{')) {
                             try {
-                                $jsonData = json_decode($cleanedJson, true, 512, JSON_THROW_ON_ERROR);
+                                $jsonData = json_decode($jsonContent, true, 512, JSON_THROW_ON_ERROR);
 
                                 if (isset($jsonData['BTEXT'])) {
                                     $finalText = $jsonData['BTEXT'];
                                 }
-                            } catch (\JsonException $e2) {
-                                $this->logger->warning('StreamController: Failed to parse JSON', [
-                                    'error' => $e2->getMessage(),
-                                    'content_preview' => substr($jsonContent, 0, 200),
-                                ]);
+                            } catch (\JsonException $e) {
+                                $cleanedJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0'."\n", $jsonContent);
+                                $cleanedJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0'."\r\n", $cleanedJson);
+                                $cleanedJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $cleanedJson);
+
+                                try {
+                                    $jsonData = json_decode((string) $cleanedJson, true, 512, JSON_THROW_ON_ERROR);
+
+                                    if (isset($jsonData['BTEXT'])) {
+                                        $finalText = $jsonData['BTEXT'];
+                                    }
+                                } catch (\JsonException $e2) {
+                                    $this->logger->warning('StreamController: Failed to parse JSON', [
+                                        'error' => $e2->getMessage(),
+                                        'content_preview' => substr($jsonContent, 0, 200),
+                                    ]);
+                                }
                             }
                         }
                     }
@@ -1621,6 +1625,19 @@ class StreamController extends AbstractController
                             'audio' => '__AUDIO_GENERATING__',
                             default => '__VIDEO_GENERATING__',
                         };
+                    }
+
+                    // A prose-wrapped or malformed envelope that could not be
+                    // salvaged into a file must never be shown verbatim: for a
+                    // document request, surface the translated failure marker
+                    // instead of leaking the raw {"BFILEPATH",…} blob (#1406).
+                    if (null === $generatedFile
+                        && 'officemaker' === ($classification['topic'] ?? '')
+                        && str_contains($finalText, '"BFILETEXT"')) {
+                        $this->logger->warning('StreamController: officemaker reply carried an unparseable file envelope; suppressing raw blob', [
+                            'text_length' => strlen($finalText),
+                        ]);
+                        $finalText = '__FILE_GENERATION_FAILED__';
                     }
 
                     // A document request that produced neither a file nor any
@@ -1843,6 +1860,16 @@ class StreamController extends AbstractController
                     // null payload for incognito turns; this guard is the second
                     // line of defense.
                     $this->dispatchDeferredMemoryExtraction($response['metadata'] ?? []);
+                    // Rolling summary refresh runs after the OUT row is visible
+                    // so the worker sees the just-finished turn in the history
+                    // window when it decides what aged out. Never blocks the
+                    // SSE complete event — dispatch failures are swallowed.
+                    if (null !== $chat) {
+                        $this->conversationSummaryRefreshDispatcher->dispatch(
+                            (int) $chat->getId(),
+                            (int) $user->getId(),
+                        );
+                    }
                 }
 
                 if (!$isWidgetMode && !$isGuestMode && !$incognito && $chat) {
@@ -2633,6 +2660,13 @@ class StreamController extends AbstractController
                 // writes the extracted_memories meta. Fire the deferred
                 // dispatch the same way the streaming branch does.
                 $this->dispatchDeferredMemoryExtraction($metadata);
+
+                if (null !== $chat) {
+                    $this->conversationSummaryRefreshDispatcher->dispatch(
+                        (int) $chat->getId(),
+                        (int) $user->getId(),
+                    );
+                }
             }
 
             if ('WEB' === $source && !$incognito && $chat) {

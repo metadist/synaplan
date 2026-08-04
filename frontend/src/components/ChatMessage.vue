@@ -127,7 +127,11 @@
             <svg
               v-if="processingStatus.includes('memories')"
               class="w-5 h-5 txt-brand flex-shrink-0"
-              :class="{ 'animate-pulse': processingStatus === 'analyzing_memories' }"
+              :class="{
+                'animate-pulse':
+                  processingStatus === 'analyzing_memories' ||
+                  processingStatus === 'checking_memories',
+              }"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -219,6 +223,36 @@
                 <div class="font-medium animate-pulse">{{ $t('processing.analyzingTitle') }}</div>
                 <div class="text-sm txt-tertiary mt-0.5">
                   {{ processingMetadata?.customMessage || $t('processing.analyzingDesc') }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'analyzing_prompt'">
+                <div class="font-medium animate-pulse">
+                  {{ $t('processing.analyzingPromptTitle') }}
+                </div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{ $t('processing.analyzingPromptDesc') }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'planning'">
+                <div class="font-medium animate-pulse">{{ $t('processing.planningTitle') }}</div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{ $t('processing.planningDesc') }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'searching_files'">
+                <div class="font-medium animate-pulse">
+                  {{ $t('processing.searchingFilesTitle') }}
+                </div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{ $t('processing.searchingFilesDesc') }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'checking_memories'">
+                <div class="font-medium animate-pulse">
+                  {{ $t('processing.checkingMemoriesTitle') }}
+                </div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{ $t('processing.checkingMemoriesDesc') }}
                 </div>
               </template>
               <template v-else-if="processingStatus === 'processing'">
@@ -987,7 +1021,7 @@
               </div>
               <div class="flex flex-wrap gap-2">
                 <button
-                  v-if="purchaseAllowed"
+                  v-if="purchaseAllowed && config.billing.enabled"
                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg transition-all"
                   @click="$router.push('/subscription')"
                 >

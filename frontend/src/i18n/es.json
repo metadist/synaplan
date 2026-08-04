@@ -69,6 +69,7 @@
     "admin": "Panel de administración",
     "adminFeatures": "Estado de funciones",
     "adminConfig": "Configuración del Sistema",
+    "adminSetup": "Configuración de Proveedores de IA",
     "subscription": "Suscripción",
     "subscriptionSuccess": "Suscripción exitosa",
     "subscriptionCancel": "Suscripción cancelada",
@@ -448,6 +449,7 @@
       "loadError": "Error al cargar la configuración",
       "saveError": "Error al guardar la configuración",
       "saved": "Configuración guardada",
+      "dbOverridesEnv": "Guardada cifrada en la base de datos — tiene prioridad sobre cualquier valor coincidente en .env.",
       "unsaved": "Cambios sin guardar",
       "testConnection": "Probar Conexión",
       "testFailed": "Prueba de conexión fallida",
@@ -505,6 +507,7 @@
     "adminDashboard": "Panel",
     "adminFeatureStatus": "Estado de Funciones",
     "adminSystemConfig": "Configuración del Sistema",
+    "adminProviderSetup": "Proveedores de IA",
     "profile": "Perfil",
     "more": "Más",
     "moreDescription": "Más secciones y cuenta",
@@ -643,7 +646,9 @@
   "plugins": {
     "title": "Plugins",
     "description": "Funcionalidad extendida para tu flujo de trabajo",
-    "notFound": "Plugin no encontrado o no habilitado para tu cuenta"
+    "notFound": "Plugin no encontrado o no habilitado para tu cuenta",
+    "commandEmpty": "El plugin devolvió una respuesta vacía.",
+    "commandError": "El comando del plugin falló. Inténtalo de nuevo."
   },
   "tools": {
     "title": "Herramientas Disponibles",
@@ -838,6 +843,101 @@
       "visionModelHintDetail": "Tu mensaje incluye imágenes, pero tu modelo de chat actual no puede analizarlas. Ve a **Configuración → Modelos IA** y activa un modelo con soporte de visión (p. ej. GPT-4o, Gemini, Llama 4), o configura un modelo **Pic→Text** predeterminado."
     }
   },
+  "adminSetup": {
+    "title": "Configuración de Proveedores de IA",
+    "description": "Conecta un proveedor de IA para que tu equipo pueda chatear. Las claves se guardan cifradas en tu servidor y se aplican al instante — sin reiniciar.",
+    "statusReadyTitle": "Tu IA está lista",
+    "statusReadyText": "El modelo de chat predeterminado tiene un proveedor funcional. Puedes añadir más proveedores abajo en cualquier momento.",
+    "statusNotReadyTitle": "Aún no hay un proveedor de IA conectado",
+    "statusNotReadyText": "El chat no funcionará hasta que conectes un proveedor. Añade una clave API abajo — Groq ofrece una clave gratuita que funciona en menos de un minuto.",
+    "cloudProviders": "Proveedores en la nube",
+    "cloudProvidersHint": "Pega una clave API: se prueba en vivo y se guarda cifrada. Las claves de tu archivo .env se detectan automáticamente.",
+    "recommended": "Recomendado",
+    "freeTier": "Nivel gratuito disponible",
+    "connected": "Conectado",
+    "sourceEnv": "importada de .env",
+    "sourceDbFromEnv": "guardada en BD (desde .env)",
+    "sourceDbOverridesEnv": "Guardada cifrada en la base de datos — tiene prioridad sobre cualquier valor coincidente en .env.",
+    "sourceDbFromEnvHint": "Guardada cifrada en la base de datos (importada desde .env). Una clave guardada aquí tiene prioridad permanente sobre .env.",
+    "currentDefault": "Predeterminado actual",
+    "keyPlaceholder": "Pega la clave API…",
+    "replaceKeyPlaceholder": "Pega una nueva clave API para reemplazar…",
+    "saveAndTest": "Probar y Guardar",
+    "applyDefaultsOnSave": "Usar también este proveedor para el chat y otras tareas de IA",
+    "getKey": "Obtener clave API",
+    "testKey": "Probar",
+    "makeDefault": "Usar como predeterminado",
+    "removeKey": "Eliminar",
+    "saved": "Clave de {provider} guardada — activa de inmediato",
+    "savedWithDefaults": "Clave de {provider} guardada y establecida como proveedor de IA predeterminado",
+    "saveFailed": "Error al guardar la clave",
+    "testOk": "La clave de {provider} funciona",
+    "testFailed": "La prueba de la clave de {provider} falló",
+    "defaultsApplied": "{provider} es ahora el proveedor de IA predeterminado",
+    "removeConfirmTitle": "Eliminar clave API",
+    "removeConfirmMessage": "¿Eliminar la clave API guardada de {provider}? El chat con {provider} dejará de funcionar salvo que haya una clave en el archivo .env.",
+    "removed": "Clave de {provider} eliminada",
+    "removedEnvStillSet": "Clave de {provider} eliminada de la base de datos: {envVar} sigue definida en el entorno, así que {provider} continúa conectado con ese valor",
+    "loadFailed": "No se pudo cargar el estado de los proveedores",
+    "localAi": {
+      "title": "IA local (Ollama) — sin clave",
+      "description": "La instalación estándar incluye modelos de IA locales que se ejecutan completamente en tu hardware. La descarga de modelos puede tardar en el primer arranque; los proveedores en la nube de arriba están disponibles al instante."
+    }
+  },
+  "providerHelp": {
+    "openAria": "Cómo configurar esto",
+    "createKeyLink": "Crear clave API",
+    "downloadLink": "Descargar Ollama",
+    "groq": {
+      "title": "Clave API de Groq",
+      "message": "Crea una clave API gratuita de Groq en la consola de Groq y pégala aquí. El nivel gratuito suele bastar para empezar a chatear en menos de un minuto."
+    },
+    "openai": {
+      "title": "Clave API de OpenAI",
+      "message": "Crea una clave API en tu cuenta de OpenAI (página de API keys) y pégala aquí. El uso lo factura OpenAI."
+    },
+    "anthropic": {
+      "title": "Clave API de Anthropic",
+      "message": "Crea una clave API en la consola de Anthropic (Ajustes → Keys) y pégala aquí para usar los modelos Claude."
+    },
+    "google": {
+      "title": "Clave API de Google Gemini",
+      "message": "Crea una clave API de Gemini en Google AI Studio y pégala aquí. Hay un nivel gratuito para muchos modelos."
+    },
+    "mistral": {
+      "title": "Clave API de Mistral",
+      "message": "Crea una clave API en la consola de Mistral y pégala aquí. Mistral ofrece un nivel gratuito para empezar."
+    },
+    "trustedtokens": {
+      "title": "Clave API de TrustedTokens",
+      "message": "Crea una clave API en TrustedTokens (Cuenta → Acceso API) y pégala aquí. La inferencia se ejecuta en GPUs alemanas con residencia de datos en la UE."
+    },
+    "huggingface": {
+      "title": "Token API de HuggingFace",
+      "message": "Crea un token de acceso en la configuración de HuggingFace y pégalo aquí para usar los modelos de HuggingFace Inference."
+    },
+    "xai": {
+      "title": "Clave API de xAI",
+      "message": "Crea una clave API en la consola de xAI y pégala aquí para usar los modelos Grok."
+    },
+    "ollama": {
+      "title": "IA local con Ollama",
+      "message": "Descarga Ollama e instala un modelo potente como gpt-oss:120b (o uno más pequeño como llama3.2 si tienes menos RAM). No hace falta clave API: Synaplan habla con Ollama en la URL configurada."
+    }
+  },
+  "setupBanner": {
+    "title": "Ningún proveedor de IA conectado",
+    "adminText": "El chat necesita un proveedor de IA. Conecta uno en un minuto — hay opciones gratuitas.",
+    "userText": "El chat aún no está listo. Pide a tu administrador que conecte un proveedor de IA.",
+    "cta": "Configurar proveedor de IA"
+  },
+  "localAiDownload": {
+    "waitingTitle": "La IA local se está iniciando",
+    "downloadingTitle": "La IA local se está descargando, {percent} %",
+    "cloudWorksText": "El chat en la nube ya funciona — los modelos locales estarán listos al terminar la descarga.",
+    "errorTitle": "Error al descargar la IA local",
+    "errorText": "El chat en la nube sigue funcionando. Revisa los logs de Ollama o reinténtalo con AUTO_DOWNLOAD_MODELS=true."
+  },
   "common": {
     "ok": "OK",
     "cancel": "Cancelar",
@@ -878,7 +978,8 @@
     "enabled": "Habilitado",
     "disabled": "Deshabilitado",
     "reset": "Restablecer",
-    "expand": "Expandir"
+    "expand": "Expandir",
+    "noResults": "Sin resultados"
   },
   "search": {
     "sources": "Fuentes",
@@ -1382,7 +1483,8 @@
     "copied": "Copiado al portapapeles",
     "copyFailed": "No se pudo copiar",
     "expand": "Mostrar texto",
-    "collapse": "Ocultar texto"
+    "collapse": "Ocultar texto",
+    "redundantCollapsed": "Salida del paso oculta — expande para verla o lee la respuesta abajo."
   },
   "processing": {
     "started": "Iniciando procesamiento...",
@@ -1406,6 +1508,14 @@
     "analyzing": "Analizando solicitud...",
     "analyzingTitle": "Analizando tu solicitud",
     "analyzingDesc": "Entendiendo lo que necesitas",
+    "analyzingPromptTitle": "Analizando el prompt",
+    "analyzingPromptDesc": "Determinando qué instrucciones y contexto necesita esta respuesta",
+    "planningTitle": "Planificando los pasos",
+    "planningDesc": "Comprobando si esta solicitud necesita más de un paso",
+    "searchingFilesTitle": "Buscando archivos",
+    "searchingFilesDesc": "Buscando documentos relacionados en tu base de conocimiento",
+    "checkingMemoriesTitle": "Consultando memorias",
+    "checkingMemoriesDesc": "Buscando cosas que me contaste antes",
     "routing": "Enrutando al manejador",
     "routingTitle": "Enrutando solicitud",
     "routingDesc": "Dirigiendo al manejador apropiado:",
@@ -1471,6 +1581,39 @@
     "cancelledByUser": "⚠️ Cancelado por el usuario",
     "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
     "continueButton": "Continuar respuesta"
+  },
+  "paywall": {
+    "title": {
+      "guest_limit": "Has agotado tus mensajes gratuitos",
+      "free_limit": "Has agotado tus mensajes gratuitos",
+      "quota_exhausted": "Has agotado tu cuota de este mes",
+      "reminder": "Saca más partido a Synaplan"
+    },
+    "subtitle": {
+      "guest_limit": "Elige un plan para seguir chateando, con tu propio historial, memorias y archivos.",
+      "free_limit": "Tu cuota gratuita está agotada. Elige un plan para seguir chateando sin límites.",
+      "quota_exhausted": "Cambia a un plan superior para continuar ahora mismo, o espera a que tu cuota se reinicie el mes que viene.",
+      "reminder": "Un plan te da más mensajes, modelos de IA más potentes y más almacenamiento."
+    },
+    "unavailable": "Ahora mismo no se puede comprar ningún plan aquí. Vuelve a intentarlo más tarde.",
+    "recommended": "Recomendado",
+    "choosePlan": "Elegir {plan}",
+    "guestNote": "Crea primero una cuenta gratuita: tu plan queda vinculado a ella.",
+    "login": "Ya tengo una cuenta",
+    "maybeLater": "Quizás más tarde",
+    "renewalNoteStore": "Las suscripciones se renuevan automáticamente hasta que las canceles. Puedes gestionarlas o cancelarlas cuando quieras en los ajustes de tu cuenta de la tienda.",
+    "renewalNoteWeb": "Las suscripciones se renuevan automáticamente hasta que las canceles. Puedes cancelar cuando quieras.",
+    "plans": {
+      "pro": {
+        "tagline": "Para el trabajo diario con IA"
+      },
+      "team": {
+        "tagline": "Para equipos pequeños que colaboran"
+      },
+      "business": {
+        "tagline": "Para empresas con las máximas exigencias"
+      }
+    }
   },
   "subscription": {
     "serviceNotAvailable": "Servicio No Disponible",
@@ -1541,18 +1684,14 @@
       "business": "Empresa"
     },
     "features": {
-      "unlimitedMessages": "Mensajes Ilimitados",
-      "images": "{count} Imágenes/Mes",
-      "unlimitedImages": "Imágenes Ilimitadas",
+      "usage": "{factor}× más uso que el plan gratuito",
       "advancedModels": "Modelos de IA Avanzados",
       "prioritySupport": "Soporte Prioritario",
-      "storage": "{size}GB de Almacenamiento",
       "everythingInPro": "Todo en Pro",
       "everythingInTeam": "Todo en Equipo",
       "teamCollaboration": "Colaboración en Equipo",
       "customPrompts": "Prompts Personalizados",
       "apiAccess": "Acceso a API",
-      "unlimitedVideo": "Generación de Video Ilimitada",
       "whiteLabel": "Widgets White-label",
       "dedicatedSupport": "Soporte Dedicado",
       "slaGuarantee": "Garantía SLA"
@@ -1660,8 +1799,8 @@
       "healthSummary": "{healthy} de {total} servicios saludables",
       "model": "modelo",
       "models": "modelos",
-      "devOnlyTitle": "Solo Modo de Desarrollo",
-      "devOnlyMessage": "Esta página solo está disponible en entornos de desarrollo. El monitoreo del estado del sistema está restringido en producción."
+      "adminOnlyTitle": "Se requiere acceso de administrador",
+      "adminOnlyMessage": "El estado de las funciones solo está disponible para administradores."
     }
   },
   "storage": {
@@ -1800,9 +1939,14 @@
     "noSearchResults": "No hay archivos que coincidan con \"{query}\"",
     "noSearchResultsHint": "Prueba con otro término o ajusta los filtros.",
     "filterToggle": "Filtros",
+    "filterType": "Tipo",
     "filterTypeAll": "Todos los tipos",
+    "filterTypePdf": "PDF",
+    "filterTypeDocx": "Word (DOCX)",
+    "filterTypeTxt": "Texto",
     "filterTypeImages": "Imágenes",
     "filterTypeAudio": "Audio/Vídeo",
+    "filterTypeSpreadsheet": "Hoja de cálculo",
     "filterDateFrom": "Desde",
     "filterDateTo": "Hasta",
     "tabFiles": "Archivos",
@@ -2062,7 +2206,7 @@
       "availableModels": "Modelos Disponibles",
       "noModels": "No hay modelos disponibles para este propósito",
       "modelNotAvailable": "{model} no está disponible. Verifique la configuración del proveedor.",
-      "modelNotConfigured": "{model} no está listo: configure {envVar} en el entorno (p. ej. .env.local).",
+      "modelNotConfigured": "{model} no está listo: añade {envVar} en Admin → Proveedores de IA (o en el entorno).",
       "id": "ID",
       "purpose": "PROPÓSITO",
       "service": "SERVICIO",
@@ -2177,6 +2321,15 @@
       "plannerModelSaved": "Modelo del planificador guardado.",
       "plannerModelSaveFailed": "No se pudo guardar el modelo del planificador.",
       "plannerModelLoadFailed": "No se pudo cargar el modelo del planificador.",
+      "summaryModelTitle": "Modelo de resumen",
+      "summaryModelDesc": "Las conversaciones largas se condensan en un resumen continuo para que el asistente siga conociendo el tema y tu posición muchas respuestas después. Elige el modelo que lo escribe: conviene uno pequeño y rápido, porque se ejecuta en cada conversación larga.",
+      "summaryModelLabel": "Modelo",
+      "summaryModelAuto": "Automático (usar modelo de clasificación)",
+      "summaryModelFallbackHint": "No hay modelo de resumen seleccionado: los resúmenes los escribe el modelo de clasificación.",
+      "summaryModelGlobalHint": "Se aplica a todos los usuarios de esta plataforma.",
+      "summaryModelSaved": "Modelo de resumen guardado.",
+      "summaryModelSaveFailed": "No se pudo guardar el modelo de resumen.",
+      "summaryModelLoadFailed": "No se pudo cargar el modelo de resumen.",
       "legacyTitle": "Alternativa heredada (admin)",
       "legacyDesc": "El prompt del clasificador de IA de un solo tema, usado cuando el enrutamiento multitarea está desactivado."
     },
@@ -3121,11 +3274,7 @@
     }
   },
   "onboarding": {
-    "skip": "Omitir",
-    "back": "Atrás",
-    "next": "Continuar",
     "getStarted": "Empezar",
-    "stepLabel": "Paso {step} de {total}",
     "welcome": {
       "title": "Bienvenido a",
       "subtitle": "Todas las IA, todas las funciones en un solo lugar",
@@ -3172,43 +3321,6 @@
       "connect": "Conectar",
       "connecting": "Comprobando la conexión…",
       "connectError": "No se puede acceder a este servidor. Comprueba la dirección e inténtalo de nuevo."
-    },
-    "plans": {
-      "title": "¿Cómo quieres empezar?",
-      "subtitle": "Pruébalo gratis — puedes mejorar tu plan en cualquier momento",
-      "guestCta": "Continuar sin cuenta",
-      "popular": "Popular",
-      "continueWith": "Continuar con {plan}",
-      "restore": "Restaurar compras",
-      "restoring": "Restaurando…",
-      "restoreNone": "No se encontró ninguna compra anterior. Si compraste con una cuenta, inicia sesión.",
-      "registerCta": "Crear una cuenta gratuita",
-      "loginHint": "¿Ya tienes una cuenta?",
-      "loginCta": "Iniciar sesión"
-    },
-    "account": {
-      "title": "Casi listo",
-      "subtitle": "Inicia sesión o crea tu cuenta para activar tu suscripción.",
-      "providerCta": "Continuar con {provider}",
-      "emailCta": "Continuar con correo electrónico",
-      "note": "Tu suscripción se vinculará a esta cuenta.",
-      "redeemTitle": "Pago completado",
-      "redeemSubtitle": "Crea tu cuenta ahora para activar tu suscripción — tarda menos de un minuto.",
-      "redeemNote": "Tu compra se vincula automáticamente a tu nueva cuenta."
-    },
-    "purchase": {
-      "checking": "Comprobando tu cuenta…",
-      "purchasing": "Completando la compra en la tienda…",
-      "alreadyTitle": "Ya tienes una suscripción",
-      "alreadyBody": "Esta cuenta ya tiene una suscripción activa ({plan}). No se te cobrará de nuevo.",
-      "alreadyManage": "Gestionar suscripción",
-      "toChat": "Ir al chat",
-      "pendingTitle": "Compra pendiente",
-      "retryTitle": "Compra no completada",
-      "cancelledBody": "La compra se canceló. No se te ha cobrado nada.",
-      "checkFailed": "No se pudo comprobar el estado de tu suscripción. Inténtalo de nuevo.",
-      "retryCta": "Intentar de nuevo",
-      "later": "Quizás más tarde"
     }
   },
   "iap": {

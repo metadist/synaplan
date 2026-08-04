@@ -61,6 +61,9 @@ platform/
 _devextras/agents_yusuf.md
 _devextras/agents_furkan.md
 
+# README tour: only the generated WebP is committed, not the raw captures
+docs/images/tour/src/
+
 # Screenvideo outputs
 _devextras/screenvideo/videos/*
 !_devextras/screenvideo/videos/.gitkeep
@@ -74,6 +77,7 @@ plugins/brogent/
 plugins/synaform/
 plugins/synasort/
 plugins/synaads/
+plugins/synafastbill/
 
 #local development stuff
 _devextras/local-ignore/

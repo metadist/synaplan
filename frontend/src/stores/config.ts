@@ -65,6 +65,18 @@ const config = {
   },
 
   /**
+   * Authentication surface flags (loaded from backend at runtime).
+   * `registrationEnabled` is false on SSO-/OIDC-only instances
+   * (REGISTRATION_ENABLED=false); defaults to true so unconfigured/older
+   * backends keep offering local sign-up. The backend enforces it regardless.
+   */
+  auth: {
+    get registrationEnabled(): boolean {
+      return getConfigSync().auth?.registrationEnabled ?? true
+    },
+  },
+
+  /**
    * Google reCAPTCHA v3 configuration
    * Loaded from backend at runtime
    */
@@ -238,6 +250,21 @@ const config = {
   usageTaximeter: {
     get enabled(): boolean {
       return getConfigSync().usageTaximeter?.enabled ?? true
+    },
+  },
+
+  /**
+   * First-run setup status (authenticated users only).
+   * chatReady is false when the provider serving the current user's effective
+   * default chat model (per-user override, then global default) has no usable
+   * key/connection — the chat shows a "connect an AI provider" banner and
+   * admins are pointed at /admin/setup.
+   * Defaults to true so anonymous pages and the pre-config phase never flash
+   * the banner.
+   */
+  setup: {
+    get chatReady(): boolean {
+      return getConfigSync().setup?.chatReady ?? true
     },
   },
 

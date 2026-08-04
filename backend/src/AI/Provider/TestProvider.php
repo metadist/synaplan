@@ -169,6 +169,11 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         // heuristic cannot confidently detect a language from the text.
         $data['BLANG'] = $this->detectLanguage($text ?: $fileText, is_string($data['BLANG'] ?? null) ? $data['BLANG'] : 'en');
         $data['BWEBSEARCH'] = $this->needsWebSearch($text) ? 1 : 0;
+        // Always set BMULTI explicitly. The inbound JSON omits it (so a real
+        // model that echoes without deciding leaves multi_step = null and the
+        // planner still runs). The test stub must vote, from the same
+        // predicates mockTaskPlan() routes on, so the two cannot disagree.
+        $data['BMULTI'] = $this->needsMultiStepPlan($text ?: $fileText) ? 1 : 0;
 
         $availableTopics = $this->extractAvailableTopics($systemContent);
         $classification = $this->classifyTopic($text ?: $fileText, $data, $availableTopics);
@@ -205,7 +210,7 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         $data = json_decode($userContent, true);
         $text = is_array($data) ? strtolower((string) ($data['BTEXT'] ?? '')) : strtolower($userContent);
 
-        if (str_contains($text, 'summ') && str_contains($text, 'translat')) {
+        if ($this->isSummarizeTranslateRequest($text)) {
             return json_encode([
                 'version' => 1,
                 'language' => 'en',
@@ -219,7 +224,7 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         }
 
         // web_search + chat plan — used by @webSearch E2E tests.
-        if (str_contains($text, 'websearch:')) {
+        if ($this->isWebSearchPlanRequest($text)) {
             return json_encode([
                 'version' => 1,
                 'language' => 'en',
@@ -239,6 +244,27 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
                 ['id' => 'n1', 'capability' => 'chat', 'inputs' => ['text' => '$message.text']],
             ],
         ], JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * The two request shapes {@see mockTaskPlan()} expands into a multi-node
+     * plan. Shared with the sort stub so its BMULTI vote and the plan it would
+     * produce always agree — a vote of 0 makes TaskPlanExecutor skip planning
+     * altogether, so a disagreement silently kills the DAG.
+     */
+    private function needsMultiStepPlan(string $text): bool
+    {
+        return $this->isSummarizeTranslateRequest($text) || $this->isWebSearchPlanRequest($text);
+    }
+
+    private function isSummarizeTranslateRequest(string $text): bool
+    {
+        return str_contains($text, 'summ') && str_contains($text, 'translat');
+    }
+
+    private function isWebSearchPlanRequest(string $text): bool
+    {
+        return str_contains($text, 'websearch:');
     }
 
     /**

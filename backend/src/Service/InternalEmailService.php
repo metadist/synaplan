@@ -65,7 +65,7 @@ final readonly class InternalEmailService
     public function sendVerificationEmail(string $to, string $token, string $locale = 'en'): void
     {
         $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
-        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
 
         $verificationUrl = sprintf('%s/verify-email-callback?token=%s', $frontendUrl, $token);
@@ -99,7 +99,7 @@ final readonly class InternalEmailService
     public function sendPasswordResetEmail(string $to, string $token, string $locale = 'en'): void
     {
         $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
-        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
 
         $resetUrl = sprintf('%s/reset-password?token=%s', $frontendUrl, $token);
@@ -133,7 +133,7 @@ final readonly class InternalEmailService
     public function sendWelcomeEmail(string $to, string $name, string $locale = 'en'): void
     {
         $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
-        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
 
         // Translate subject
@@ -191,7 +191,7 @@ final readonly class InternalEmailService
         $smartAddress = ($originalRecipient && \App\Service\Email\SmartEmailHelper::isValidSmartAddress($originalRecipient))
             ? $originalRecipient
             : $fallbackAddress;
-        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'smart@synaplan.net';
+        $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'smart@synaplan.net';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
         $replyToEmail = $smartAddress;
 
@@ -312,7 +312,7 @@ final readonly class InternalEmailService
      */
     public function sendTaskResultEmail(string $to, string $subject, string $markdown, array $attachments = []): void
     {
-        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
 
         $parsedown = new \Parsedown();
@@ -385,18 +385,45 @@ final readonly class InternalEmailService
     }
 
     /**
+     * A configured address, or null when the variable is unset or blank.
+     */
+    private function configuredAddress(string $key): ?string
+    {
+        $address = trim((string) ($_ENV[$key] ?? ''));
+
+        return '' !== $address ? $address : null;
+    }
+
+    /**
+     * The operator inbox for incident and abuse alerts.
+     *
+     * `??` is not enough for this chain: `.env.example` ships APP_ADMIN_EMAIL
+     * blank, so every deployment that copied it has the key set to an empty
+     * string, which `??` happily returns instead of falling through. Building
+     * an Email for that empty recipient then throws, and the report controller
+     * turns the exception into a 400 — so the abuse report Apple requires
+     * (Guideline 1.2) failed in the user's face.
+     */
+    private function operatorInbox(?string $default = null): ?string
+    {
+        return $this->configuredAddress('APP_ADMIN_EMAIL')
+            ?? $this->configuredAddress('APP_SENDER_EMAIL')
+            ?? $default;
+    }
+
+    /**
      * Send a warning email when the embedding fallback provider activates.
      */
     public function sendEmbeddingFallbackWarning(string $primaryProvider, string $fallbackProvider, string $errorMessage): void
     {
-        $adminEmail = $_ENV['APP_ADMIN_EMAIL'] ?? $_ENV['APP_SENDER_EMAIL'] ?? null;
-        if (!$adminEmail) {
+        $adminEmail = $this->operatorInbox();
+        if (null === $adminEmail) {
             $this->logger->debug('No admin email configured, skipping fallback warning');
 
             return;
         }
 
-        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
         $timestamp = (new \DateTimeImmutable())->format('Y-m-d H:i:s T');
 
@@ -448,15 +475,16 @@ final readonly class InternalEmailService
      * Notify the operator inbox about a new content report (Apple Guideline 1.2).
      *
      * Sent to APP_ADMIN_EMAIL, falling back to the sender address and finally the
-     * fixed abuse contact so a report is never silently dropped. Best-effort: a
-     * transport failure is logged, never surfaced to the reporting user.
+     * fixed abuse contact so a report is never silently dropped. Best-effort: an
+     * unusable address or a transport failure is logged, never surfaced to the
+     * reporting user — the report itself is already stored.
      *
      * @param array{id:int,contentType:string,contentId:int,reason:string,details:?string,reporterId:int,reporterEmail:?string,reportedUserId:?int,reportedUserEmail:?string,created:string} $report
      */
     public function sendModerationReportEmail(array $report): void
     {
-        $adminEmail = $_ENV['APP_ADMIN_EMAIL'] ?? $_ENV['APP_SENDER_EMAIL'] ?? 'team@synaplan.com';
-        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $adminEmail = $this->operatorInbox('team@synaplan.com');
+        $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
 
         $reason = htmlspecialchars($report['reason'], ENT_QUOTES);
@@ -495,14 +523,17 @@ final readonly class InternalEmailService
             </div>
             HTML;
 
-        $email = (new Email())
-            ->from(sprintf('%s <%s>', $fromName, $fromEmail))
-            ->to($adminEmail)
-            ->subject('[MODERATION][Synaplan] Content report #'.$report['id'].' — '.$report['reason'])
-            ->priority(Email::PRIORITY_HIGH)
-            ->html($html);
-
+        // Building the Email is inside the guard on purpose: a typo in the
+        // configured address makes ->to() throw an InvalidArgumentException,
+        // which the report controller would hand the user as a 400.
         try {
+            $email = (new Email())
+                ->from(sprintf('%s <%s>', $fromName, $fromEmail))
+                ->to($adminEmail)
+                ->subject('[MODERATION][Synaplan] Content report #'.$report['id'].' — '.$report['reason'])
+                ->priority(Email::PRIORITY_HIGH)
+                ->html($html);
+
             $this->sendWithRetry($email);
             $this->logger->info('Moderation report email sent', ['to' => $adminEmail, 'report_id' => $report['id']]);
         } catch (\Exception $e) {

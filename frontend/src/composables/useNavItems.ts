@@ -55,8 +55,7 @@ export function useNavItems() {
 
   const loadFeatureStatus = async () => {
     try {
-      if (!import.meta.env.DEV) return
-      if (!authStore.user || !authStore.isAuthenticated) return
+      if (!authStore.isAdmin || !authStore.isAuthenticated) return
       if (featureStatusRequested) return
       featureStatusRequested = true
 
@@ -161,17 +160,20 @@ export function useNavItems() {
         { key: 'admin-dashboard', path: '/admin', label: t('nav.adminDashboard') },
       ]
 
-      if (import.meta.env.DEV) {
-        const featureStatusItem: NavChild = {
-          key: 'admin-features',
-          path: '/admin/features',
-          label: t('nav.adminFeatureStatus'),
-        }
-        if (disabledFeaturesCount.value > 0) {
-          featureStatusItem.badge = String(disabledFeaturesCount.value)
-        }
-        adminChildren.push(featureStatusItem)
+      const featureStatusItem: NavChild = {
+        key: 'admin-features',
+        path: '/admin/features',
+        label: t('nav.adminFeatureStatus'),
       }
+      if (disabledFeaturesCount.value > 0) {
+        featureStatusItem.badge = String(disabledFeaturesCount.value)
+      }
+      adminChildren.push(featureStatusItem)
+      adminChildren.push({
+        key: 'admin-setup',
+        path: '/admin/setup',
+        label: t('nav.adminProviderSetup'),
+      })
       adminChildren.push({
         key: 'admin-config',
         path: '/admin/config',

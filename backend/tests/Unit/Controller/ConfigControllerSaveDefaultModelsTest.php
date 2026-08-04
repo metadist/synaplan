@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Controller;
 
+use App\AI\Credential\ChatReadinessService;
 use App\AI\Service\ProviderRegistry;
 use App\Controller\ConfigController;
 use App\Entity\Config;
@@ -13,15 +14,18 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
+use App\Service\Capability\CapabilityService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Infrastructure\RedisService;
+use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
+use App\Service\RegistrationConfig;
 use App\Service\Search\BraveSearchService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
@@ -85,6 +89,10 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->createStub(MobileVersionService::class),
             $this->createStub(MarketingNewsConfig::class),
             $this->createStub(UsageTaximeterConfig::class),
+            $this->createStub(RegistrationConfig::class),
+            $this->createStub(ChatReadinessService::class),
+            $this->createStub(LocalAiDownloadStatusService::class),
+            new CapabilityService(),
             'http://qdrant.example',
         );
 

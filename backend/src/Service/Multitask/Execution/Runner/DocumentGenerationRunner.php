@@ -108,6 +108,16 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];
         $descriptor = $this->fileDescriptor($metadata);
         if (null === $descriptor) {
+            // The handler returned success but carried no usable file — e.g. a
+            // prose-wrapped or malformed envelope that could not be salvaged.
+            // Surface why in the worker log instead of failing the node
+            // silently (#1406), mirroring MediaGenerationRunner.
+            $this->logger->warning('DocumentGenerationRunner: node produced no file', [
+                'node_id' => $node->id,
+                'metadata_error' => is_scalar($metadata['error'] ?? null) ? $metadata['error'] : null,
+                'metadata_keys' => array_keys($metadata),
+            ]);
+
             return NodeResult::failed('document_generation produced no file'.(isset($metadata['error']) && is_string($metadata['error']) ? ': '.$metadata['error'] : ''));
         }
 

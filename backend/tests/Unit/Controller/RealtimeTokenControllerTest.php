@@ -230,6 +230,39 @@ final class RealtimeTokenControllerTest extends TestCase
         $this->assertSame(403, $response->getStatusCode());
     }
 
+    public function testAnonymousUserChannelSubscribeReturns401SoRefreshEngages(): void
+    {
+        // #1381: an anonymous caller (expired access cookie) subscribing to a
+        // per-user channel gets 401, not 403, so the frontend's access-token
+        // refresh path engages and resubscribes instead of looping forever.
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $this->createMock(WidgetRepository::class),
+            sessionRepo: $this->createMock(WidgetSessionRepository::class),
+        );
+
+        $request = new Request(content: (string) json_encode(['channel' => 'user:7']));
+        $response = $controller->issueSubscriptionToken($request, null);
+
+        $this->assertSame(401, $response->getStatusCode());
+    }
+
+    public function testCrossUserChannelSubscribeStays403ForAuthenticatedCaller(): void
+    {
+        // A logged-in caller requesting another principal's user channel stays
+        // 403 — a token refresh cannot grant access (#1381).
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $this->createMock(WidgetRepository::class),
+            sessionRepo: $this->createMock(WidgetSessionRepository::class),
+        );
+
+        $request = new Request(content: (string) json_encode(['channel' => 'user:999']));
+        $response = $controller->issueSubscriptionToken($request, $this->buildUser(7));
+
+        $this->assertSame(403, $response->getStatusCode());
+    }
+
     public function testWidgetTokenLookupFailuresAreIndistinguishable(): void
     {
         // Unknown widget.

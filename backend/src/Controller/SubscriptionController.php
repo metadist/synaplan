@@ -48,6 +48,14 @@ class SubscriptionController extends AbstractController
      * inserts them on `app:seed`); once a row exists, the operator-configured
      * DB values win. Feature bullets stay code-owned.
      *
+     * The usage multipliers mirror the cost budgets configured on the
+     * reference deployment (Free EUR 1 / Pro EUR 15 / Team EUR 40 /
+     * Business EUR 80 per month). Never advertise absolute message, image,
+     * video, or storage quantities here — plans are budget-based, so any
+     * fixed count would be a false claim. Keep these bullets in sync with
+     * the localized paywall copy (`SubscriptionPaywallModal.vue` +
+     * `subscription.features.*` in the frontend i18n files).
+     *
      * @var array<string, array{name: string, price: float, features: list<string>}>
      */
     private const PLAN_CATALOGUE = [
@@ -55,11 +63,9 @@ class SubscriptionController extends AbstractController
             'name' => 'Pro',
             'price' => 19.95,
             'features' => [
-                'Unlimited Messages',
-                '100 Images/Month',
+                '15× more usage than the free plan',
                 'Advanced AI Models',
                 'Priority Support',
-                '5GB Storage',
             ],
         ],
         'TEAM' => [
@@ -67,10 +73,9 @@ class SubscriptionController extends AbstractController
             'price' => 49.95,
             'features' => [
                 'Everything in Pro',
-                '500 Images/Month',
+                '40× more usage than the free plan',
                 'Team Collaboration',
                 'Custom Prompts',
-                '20GB Storage',
                 'API Access',
             ],
         ],
@@ -79,10 +84,8 @@ class SubscriptionController extends AbstractController
             'price' => 99.95,
             'features' => [
                 'Everything in Team',
-                'Unlimited Images',
-                'Unlimited Video Generation',
+                '80× more usage than the free plan',
                 'White-label Widgets',
-                '100GB Storage',
                 'Dedicated Support',
                 'SLA Guarantee',
             ],

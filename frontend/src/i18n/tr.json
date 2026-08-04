@@ -69,6 +69,7 @@
     "admin": "Yönetici Paneli",
     "adminFeatures": "Özellik Durumu",
     "adminConfig": "Sistem Yapılandırması",
+    "adminSetup": "AI Sağlayıcı Kurulumu",
     "subscription": "Abonelik",
     "subscriptionSuccess": "Abonelik Başarılı",
     "subscriptionCancel": "Abonelik İptal Edildi",
@@ -448,6 +449,7 @@
       "loadError": "Yapılandırma yüklenemedi",
       "saveError": "Yapılandırma kaydedilemedi",
       "saved": "Yapılandırma kaydedildi",
+      "dbOverridesEnv": "Veritabanında şifreli saklanır — .env içindeki eşleşen herhangi bir değerin üzerine yazar.",
       "unsaved": "Kaydedilmemiş değişiklikler",
       "testConnection": "Bağlantıyı Test Et",
       "testFailed": "Bağlantı testi başarısız",
@@ -505,6 +507,7 @@
     "adminDashboard": "Kontrol Paneli",
     "adminFeatureStatus": "Özellik Durumu",
     "adminSystemConfig": "Sistem Yapılandırması",
+    "adminProviderSetup": "AI Sağlayıcıları",
     "profile": "Profil",
     "more": "Daha fazla",
     "moreDescription": "Diğer bölümler ve hesap",
@@ -643,7 +646,9 @@
   "plugins": {
     "title": "Eklentiler",
     "description": "İş akışınız için genişletilmiş işlevsellik",
-    "notFound": "Eklenti bulunamadı veya hesabınız için etkinleştirilmemiş"
+    "notFound": "Eklenti bulunamadı veya hesabınız için etkinleştirilmemiş",
+    "commandEmpty": "Eklenti boş bir yanıt döndürdü.",
+    "commandError": "Eklenti komutu başarısız oldu. Lütfen tekrar deneyin."
   },
   "tools": {
     "title": "Mevcut Araçlar",
@@ -838,6 +843,101 @@
       "visionModelHintDetail": "Mesajınız görüntüler içeriyor, ancak mevcut sohbet modeliniz bunları analiz edemiyor. **Ayarlar → AI Modelleri**'ne gidin ve görüntü destekli bir model etkinleştirin (ör. GPT-4o, Gemini, Llama 4) veya varsayılan bir **Pic→Text** modeli ayarlayın."
     }
   },
+  "adminSetup": {
+    "title": "AI Sağlayıcı Kurulumu",
+    "description": "Ekibinizin sohbet edebilmesi için bir AI sağlayıcısı bağlayın. Anahtarlar sunucunuzda şifrelenmiş olarak saklanır ve anında geçerli olur — yeniden başlatma gerekmez.",
+    "statusReadyTitle": "AI'nız hazır",
+    "statusReadyText": "Varsayılan sohbet modelinin çalışan bir sağlayıcısı var. Aşağıdan istediğiniz zaman başka sağlayıcılar ekleyebilirsiniz.",
+    "statusNotReadyTitle": "Henüz bağlı bir AI sağlayıcısı yok",
+    "statusNotReadyText": "Bir sağlayıcı bağlanana kadar sohbet çalışmaz. Aşağıya bir API anahtarı ekleyin — Groq, bir dakikadan kısa sürede çalışan ücretsiz bir anahtar sunuyor.",
+    "cloudProviders": "Bulut sağlayıcıları",
+    "cloudProvidersHint": "Bir API anahtarı yapıştırın; canlı olarak test edilir ve şifrelenmiş saklanır. .env dosyanızdaki anahtarlar otomatik olarak alınır.",
+    "recommended": "Önerilen",
+    "freeTier": "Ücretsiz kullanım mevcut",
+    "connected": "Bağlı",
+    "sourceEnv": ".env dosyasından içe aktarıldı",
+    "sourceDbFromEnv": "DB'de saklandı (.env'den)",
+    "sourceDbOverridesEnv": "Veritabanında şifreli saklanır — .env içindeki eşleşen herhangi bir değerin üzerine yazar.",
+    "sourceDbFromEnvHint": "Veritabanında şifreli saklanır (.env'den içe aktarıldı). Buraya kaydedilen bir anahtar .env'yi kalıcı olarak geçersiz kılar.",
+    "currentDefault": "Geçerli varsayılan",
+    "keyPlaceholder": "API anahtarını yapıştırın…",
+    "replaceKeyPlaceholder": "Değiştirmek için yeni API anahtarını yapıştırın…",
+    "saveAndTest": "Test Et ve Kaydet",
+    "applyDefaultsOnSave": "Bu sağlayıcıyı sohbet ve diğer AI görevleri için de kullan",
+    "getKey": "API anahtarı al",
+    "testKey": "Test et",
+    "makeDefault": "Varsayılan olarak kullan",
+    "removeKey": "Kaldır",
+    "saved": "{provider} anahtarı kaydedildi — hemen etkin",
+    "savedWithDefaults": "{provider} anahtarı kaydedildi ve varsayılan AI sağlayıcısı olarak ayarlandı",
+    "saveFailed": "Anahtar kaydedilemedi",
+    "testOk": "{provider} anahtarı çalışıyor",
+    "testFailed": "{provider} anahtarı testi başarısız oldu",
+    "defaultsApplied": "{provider} artık varsayılan AI sağlayıcısı",
+    "removeConfirmTitle": "API anahtarını kaldır",
+    "removeConfirmMessage": "Kayıtlı {provider} API anahtarı kaldırılsın mı? .env dosyasında bir anahtar yoksa {provider} üzerinden sohbet çalışmayı durdurur.",
+    "removed": "{provider} anahtarı kaldırıldı",
+    "removedEnvStillSet": "Kayıtlı {provider} anahtarı kaldırıldı — {envVar} ortamda hâlâ tanımlı, bu nedenle {provider} bu değerle bağlı kalır",
+    "loadFailed": "Sağlayıcı durumu yüklenemedi",
+    "localAi": {
+      "title": "Yerel AI (Ollama) — anahtar gerekmez",
+      "description": "Standart kurulum, tamamen kendi donanımınızda çalışan yerel AI modelleri içerir. İlk başlatmada model indirme biraz sürebilir; yukarıdaki bulut sağlayıcıları anında kullanılabilir."
+    }
+  },
+  "providerHelp": {
+    "openAria": "Bunu nasıl kurarsınız",
+    "createKeyLink": "API anahtarı oluştur",
+    "downloadLink": "Ollama'yı indir",
+    "groq": {
+      "title": "Groq API anahtarı",
+      "message": "Groq konsolunda ücretsiz bir Groq API anahtarı oluşturun ve buraya yapıştırın. Ücretsiz katman genellikle bir dakikadan kısa sürede sohbete başlamak için yeterlidir."
+    },
+    "openai": {
+      "title": "OpenAI API anahtarı",
+      "message": "OpenAI hesabınızda (API keys sayfası) bir API anahtarı oluşturun ve buraya yapıştırın. Kullanım OpenAI tarafından faturalandırılır."
+    },
+    "anthropic": {
+      "title": "Anthropic API anahtarı",
+      "message": "Anthropic konsolunda (Ayarlar → Keys) bir API anahtarı oluşturun ve Claude modellerini kullanmak için buraya yapıştırın."
+    },
+    "google": {
+      "title": "Google Gemini API anahtarı",
+      "message": "Google AI Studio'da bir Gemini API anahtarı oluşturun ve buraya yapıştırın. Birçok model için ücretsiz katman vardır."
+    },
+    "mistral": {
+      "title": "Mistral API anahtarı",
+      "message": "Mistral konsolunda bir API anahtarı oluşturun ve buraya yapıştırın. Mistral başlangıç için ücretsiz katman sunar."
+    },
+    "trustedtokens": {
+      "title": "TrustedTokens API anahtarı",
+      "message": "TrustedTokens'ta (Hesap → API Erişimi) bir API anahtarı oluşturun ve buraya yapıştırın. Çıkarım, AB veri yerleşimli Alman GPU'larda çalışır."
+    },
+    "huggingface": {
+      "title": "HuggingFace API jetonu",
+      "message": "HuggingFace ayarlarında bir erişim jetonu oluşturun ve HuggingFace Inference modellerini kullanmak için buraya yapıştırın."
+    },
+    "xai": {
+      "title": "xAI API anahtarı",
+      "message": "xAI konsolunda bir API anahtarı oluşturun ve Grok modellerini kullanmak için buraya yapıştırın."
+    },
+    "ollama": {
+      "title": "Ollama ile yerel AI",
+      "message": "Ollama'yı indirin ve gpt-oss:120b gibi güçlü bir model çekin (daha az RAM varsa llama3.2 gibi daha küçük bir model). API anahtarı gerekmez — Synaplan yapılandırılan URL'deki Ollama ile konuşur."
+    }
+  },
+  "setupBanner": {
+    "title": "Bağlı AI sağlayıcısı yok",
+    "adminText": "Sohbet için bir AI sağlayıcısı gerekiyor. Bir dakikada bağlayın — ücretsiz seçenekler mevcut.",
+    "userText": "Sohbet henüz hazır değil. Lütfen yöneticinizden bir AI sağlayıcısı bağlamasını isteyin.",
+    "cta": "AI sağlayıcısını kur"
+  },
+  "localAiDownload": {
+    "waitingTitle": "Yerel AI başlatılıyor",
+    "downloadingTitle": "Yerel AI indiriliyor, {percent}%",
+    "cloudWorksText": "Bulut sohbeti şimdi çalışıyor — indirme bitince yerel modeller hazır olacak.",
+    "errorTitle": "Yerel AI indirmesi başarısız",
+    "errorText": "Bulut sohbeti çalışmaya devam eder. Ollama günlüklerini kontrol edin veya AUTO_DOWNLOAD_MODELS=true ile yeniden deneyin."
+  },
   "common": {
     "ok": "Tamam",
     "cancel": "İptal",
@@ -878,7 +978,8 @@
     "enabled": "Etkin",
     "disabled": "Devre Dışı",
     "reset": "Sıfırla",
-    "expand": "Genişlet"
+    "expand": "Genişlet",
+    "noResults": "Sonuç bulunamadı"
   },
   "search": {
     "sources": "Kaynaklar",
@@ -1382,7 +1483,8 @@
     "copied": "Panoya kopyalandı",
     "copyFailed": "Kopyalanamadı",
     "expand": "Metni göster",
-    "collapse": "Metni gizle"
+    "collapse": "Metni gizle",
+    "redundantCollapsed": "Adım çıktısı daraltıldı — incelemek için genişletin veya aşağıdaki yanıtı okuyun."
   },
   "processing": {
     "started": "İşlem başlatılıyor...",
@@ -1406,6 +1508,14 @@
     "analyzing": "İstek analiz ediliyor...",
     "analyzingTitle": "İsteğiniz analiz ediliyor",
     "analyzingDesc": "Neye ihtiyacınız olduğu anlaşılıyor",
+    "analyzingPromptTitle": "Prompt analiz ediliyor",
+    "analyzingPromptDesc": "Bu yanıt için hangi talimatların ve bağlamın gerektiği belirleniyor",
+    "planningTitle": "Adımlar planlanıyor",
+    "planningDesc": "Bu isteğin birden fazla adım gerektirip gerektirmediği kontrol ediliyor",
+    "searchingFilesTitle": "Dosyalar aranıyor",
+    "searchingFilesDesc": "Bilgi tabanınızda ilgili belgeler aranıyor",
+    "checkingMemoriesTitle": "Hafıza kontrol ediliyor",
+    "checkingMemoriesDesc": "Daha önce bana anlattıklarınız aranıyor",
     "routing": "İşleyiciye yönlendiriliyor",
     "routingTitle": "İstek yönlendiriliyor",
     "routingDesc": "Uygun işleyiciye yönlendiriliyor:",
@@ -1471,6 +1581,39 @@
     "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
     "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",
     "continueButton": "Yanıtı sürdür"
+  },
+  "paywall": {
+    "title": {
+      "guest_limit": "Ücretsiz mesajların bitti",
+      "free_limit": "Ücretsiz mesajların bitti",
+      "quota_exhausted": "Bu ayki kotan doldu",
+      "reminder": "Synaplan'dan daha fazlasını al"
+    },
+    "subtitle": {
+      "guest_limit": "Kendi geçmişin, hafızaların ve dosyalarınla sohbete devam etmek için bir plan seç.",
+      "free_limit": "Ücretsiz kotan tükendi. Sınır olmadan sohbete devam etmek için bir plan seç.",
+      "quota_exhausted": "Hemen devam etmek için üst bir plana geç ya da kotanın gelecek ay sıfırlanmasını bekle.",
+      "reminder": "Bir plan sana daha fazla mesaj, daha güçlü AI modelleri ve daha fazla depolama verir."
+    },
+    "unavailable": "Şu anda burada bir plan satın alınamıyor. Lütfen daha sonra tekrar dene.",
+    "recommended": "Önerilen",
+    "choosePlan": "{plan} planını seç",
+    "guestNote": "Önce ücretsiz bir hesap oluştur; planın bu hesaba bağlanır.",
+    "login": "Zaten hesabım var",
+    "maybeLater": "Belki sonra",
+    "renewalNoteStore": "Abonelikler sen iptal edene kadar otomatik yenilenir. Mağaza hesabının ayarlarından istediğin zaman yönetebilir veya iptal edebilirsin.",
+    "renewalNoteWeb": "Abonelikler sen iptal edene kadar otomatik yenilenir. İstediğin zaman iptal edebilirsin.",
+    "plans": {
+      "pro": {
+        "tagline": "Yapay zekâyla günlük çalışma için"
+      },
+      "team": {
+        "tagline": "Birlikte çalışan küçük ekipler için"
+      },
+      "business": {
+        "tagline": "En yüksek beklentileri olan şirketler için"
+      }
+    }
   },
   "subscription": {
     "serviceNotAvailable": "Hizmet Kullanılamıyor",
@@ -1542,18 +1685,14 @@
       "business": "İşletme"
     },
     "features": {
-      "unlimitedMessages": "Sınırsız Mesaj",
-      "images": "{count} Görsel/Ay",
-      "unlimitedImages": "Sınırsız Görsel",
+      "usage": "Ücretsiz plana göre {factor}× daha fazla kullanım",
       "advancedModels": "Gelişmiş AI Modelleri",
       "prioritySupport": "Öncelikli Destek",
-      "storage": "{size}GB Depolama",
       "everythingInPro": "Pro'daki Her Şey",
       "everythingInTeam": "Takım'daki Her Şey",
       "teamCollaboration": "Takım İşbirliği",
       "customPrompts": "Özel Promptlar",
       "apiAccess": "API Erişimi",
-      "unlimitedVideo": "Sınırsız Video Oluşturma",
       "whiteLabel": "White-label Widgetlar",
       "dedicatedSupport": "Özel Destek",
       "slaGuarantee": "SLA Garantisi"
@@ -1661,8 +1800,8 @@
       "healthSummary": "{total} servisten {healthy} tanesi sağlıklı",
       "model": "model",
       "models": "model",
-      "devOnlyTitle": "Yalnızca Geliştirme Modu",
-      "devOnlyMessage": "Bu sayfa yalnızca geliştirme ortamlarında kullanılabilir. Sistem durumu izleme üretimde kısıtlanmıştır."
+      "adminOnlyTitle": "Yönetici erişimi gerekli",
+      "adminOnlyMessage": "Özellik durumu yalnızca yöneticiler için kullanılabilir."
     }
   },
   "storage": {
@@ -1801,9 +1940,14 @@
     "noSearchResults": "\"{query}\" ile eşleşen dosya yok",
     "noSearchResultsHint": "Farklı bir terim dene veya filtreleri ayarla.",
     "filterToggle": "Filtreler",
+    "filterType": "Tür",
     "filterTypeAll": "Tüm türler",
+    "filterTypePdf": "PDF",
+    "filterTypeDocx": "Word (DOCX)",
+    "filterTypeTxt": "Metin",
     "filterTypeImages": "Görseller",
     "filterTypeAudio": "Ses/Video",
+    "filterTypeSpreadsheet": "Tablo",
     "filterDateFrom": "Başlangıç",
     "filterDateTo": "Bitiş",
     "tabFiles": "Dosyalar",
@@ -2063,7 +2207,7 @@
       "availableModels": "Mevcut Modeller",
       "noModels": "Bu amaç için model yok",
       "modelNotAvailable": "{model} kullanılamıyor. Lütfen sağlayıcı yapılandırmasını kontrol edin.",
-      "modelNotConfigured": "{model} hazır değil: Ortamınızda {envVar} ayarlayın (ör. .env.local).",
+      "modelNotConfigured": "{model} hazır değil: {envVar} değerini Admin → AI Sağlayıcıları altında (veya ortamınızda) ekleyin.",
       "id": "ID",
       "purpose": "AMAÇ",
       "service": "HİZMET",
@@ -2178,6 +2322,15 @@
       "plannerModelSaved": "Planlayıcı modeli kaydedildi.",
       "plannerModelSaveFailed": "Planlayıcı modeli kaydedilemedi.",
       "plannerModelLoadFailed": "Planlayıcı modeli yüklenemedi.",
+      "summaryModelTitle": "Özet Modeli",
+      "summaryModelDesc": "Uzun sohbetler sürekli güncellenen bir özete indirgenir; böylece asistan çok sayıda yanıt sonrasında bile konuyu ve sizin duruşunuzu bilir. Bunu yazan modeli seçin — her uzun konuşmada çalıştığı için küçük ve hızlı bir model doğru tercihtir.",
+      "summaryModelLabel": "Model",
+      "summaryModelAuto": "Otomatik (Sıralama modelini kullan)",
+      "summaryModelFallbackHint": "Özet modeli seçilmedi — özetleri Sıralama modeli yazar.",
+      "summaryModelGlobalHint": "Bu platformdaki tüm kullanıcılar için geçerlidir.",
+      "summaryModelSaved": "Özet modeli kaydedildi.",
+      "summaryModelSaveFailed": "Özet modeli kaydedilemedi.",
+      "summaryModelLoadFailed": "Özet modeli yüklenemedi.",
       "legacyTitle": "Eski yedek (yönetici)",
       "legacyDesc": "Tek konulu yapay zeka sıralayıcı promptu; yalnızca çoklu görev yönlendirmesi kapalıyken kullanılır."
     },
@@ -3122,11 +3275,7 @@
     }
   },
   "onboarding": {
-    "skip": "Atla",
-    "back": "Geri",
-    "next": "Devam",
     "getStarted": "Başlayalım",
-    "stepLabel": "Adım {step} / {total}",
     "welcome": {
       "title": "Hoş geldin",
       "subtitle": "Tüm yapay zekâlar, tüm özellikler tek bir yerde",
@@ -3173,43 +3322,6 @@
       "connect": "Bağlan",
       "connecting": "Bağlantı kontrol ediliyor…",
       "connectError": "Bu sunucuya ulaşılamıyor. Adresi kontrol edip tekrar dene."
-    },
-    "plans": {
-      "title": "Nasıl başlamak istersin?",
-      "subtitle": "Ücretsiz dene — istediğin zaman yükseltebilirsin",
-      "guestCta": "Hesapsız devam et",
-      "popular": "Popüler",
-      "continueWith": "{plan} ile devam et",
-      "restore": "Satın alımları geri yükle",
-      "restoring": "Geri yükleniyor…",
-      "restoreNone": "Önceki bir satın alma bulunamadı. Bir hesapla satın aldıysan bunun yerine giriş yap.",
-      "registerCta": "Ücretsiz hesap oluştur",
-      "loginHint": "Zaten bir hesabın var mı?",
-      "loginCta": "Giriş yap"
-    },
-    "account": {
-      "title": "Neredeyse tamam",
-      "subtitle": "Aboneliğini etkinleştirmek için giriş yap veya bir hesap oluştur.",
-      "providerCta": "{provider} ile devam et",
-      "emailCta": "E-posta ile devam et",
-      "note": "Aboneliğin bu hesaba bağlanacak.",
-      "redeemTitle": "Ödeme başarılı",
-      "redeemSubtitle": "Aboneliğini etkinleştirmek için şimdi hesabını oluştur — bir dakikadan az sürer.",
-      "redeemNote": "Satın alman otomatik olarak yeni hesabına bağlanır."
-    },
-    "purchase": {
-      "checking": "Hesabın kontrol ediliyor…",
-      "purchasing": "Satın alma mağazada tamamlanıyor…",
-      "alreadyTitle": "Zaten abonesin",
-      "alreadyBody": "Bu hesabın zaten aktif bir aboneliği var ({plan}). Tekrar ücret alınmayacak.",
-      "alreadyManage": "Aboneliği yönet",
-      "toChat": "Sohbete git",
-      "pendingTitle": "Satın alma beklemede",
-      "retryTitle": "Satın alma tamamlanmadı",
-      "cancelledBody": "Satın alma iptal edildi. Ücret alınmadı.",
-      "checkFailed": "Abonelik durumun kontrol edilemedi. Lütfen tekrar dene.",
-      "retryCta": "Tekrar dene",
-      "later": "Belki daha sonra"
     }
   },
   "iap": {

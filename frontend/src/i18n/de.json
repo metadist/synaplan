@@ -71,6 +71,7 @@
     "admin": "Admin-Panel",
     "adminFeatures": "Feature-Status",
     "adminConfig": "Systemkonfiguration",
+    "adminSetup": "KI-Anbieter einrichten",
     "subscription": "Abonnement",
     "subscriptionSuccess": "Abonnement erfolgreich",
     "subscriptionCancel": "Abonnement gekündigt",
@@ -452,6 +453,7 @@
       "saveError": "Konfiguration konnte nicht gespeichert werden",
       "saved": "Konfiguration gespeichert",
       "savedLive": "Gespeichert — sofort wirksam",
+      "dbOverridesEnv": "Verschlüsselt in der Datenbank gespeichert — überschreibt jeden passenden Wert in .env.",
       "unsaved": "Nicht gespeicherte Änderungen",
       "testConnection": "Verbindung testen",
       "testFailed": "Verbindungstest fehlgeschlagen",
@@ -513,6 +515,7 @@
     "adminDashboard": "Dashboard",
     "adminFeatureStatus": "Feature-Status",
     "adminSystemConfig": "Systemkonfiguration",
+    "adminProviderSetup": "KI-Anbieter",
     "more": "Mehr",
     "moreDescription": "Weitere Bereiche und Konto",
     "menu": "Menü"
@@ -1138,7 +1141,8 @@
     "copied": "In die Zwischenablage kopiert",
     "copyFailed": "Kopieren fehlgeschlagen",
     "expand": "Text anzeigen",
-    "collapse": "Text ausblenden"
+    "collapse": "Text ausblenden",
+    "redundantCollapsed": "Schrittausgabe eingeklappt — zum Prüfen aufklappen oder die Antwort unten lesen."
   },
   "processing": {
     "started": "Starte Verarbeitung...",
@@ -1162,6 +1166,14 @@
     "analyzing": "Analysiere Anfrage...",
     "analyzingTitle": "Analysiere deine Anfrage",
     "analyzingDesc": "Verstehe was du brauchst",
+    "analyzingPromptTitle": "Prompt wird analysiert",
+    "analyzingPromptDesc": "Ermittle, welche Anweisungen und welcher Kontext für die Antwort nötig sind",
+    "planningTitle": "Schritte werden geplant",
+    "planningDesc": "Prüfe, ob diese Anfrage mehr als einen Schritt braucht",
+    "searchingFilesTitle": "Suche nach Dateien",
+    "searchingFilesDesc": "Durchsuche deine Wissensdatenbank nach passenden Dokumenten",
+    "checkingMemoriesTitle": "Erinnerungen werden geprüft",
+    "checkingMemoriesDesc": "Suche nach Dingen, die du mir früher erzählt hast",
     "routing": "Leite zu Handler",
     "routingTitle": "Leite Anfrage weiter",
     "routingDesc": "Leite zum passenden Handler:",
@@ -1240,7 +1252,9 @@
   "plugins": {
     "title": "Plugins",
     "description": "Erweiterte Funktionen für Ihren Workflow",
-    "notFound": "Plugin nicht gefunden oder nicht für Ihren Account aktiviert"
+    "notFound": "Plugin nicht gefunden oder nicht für Ihren Account aktiviert",
+    "commandEmpty": "Das Plugin hat eine leere Antwort zurückgegeben.",
+    "commandError": "Der Plugin-Befehl ist fehlgeschlagen. Bitte versuche es erneut."
   },
   "config": {
     "aiModels": {
@@ -1306,7 +1320,7 @@
         "applyTooltip": "{model} als Standardmodell für „{purpose}“ festlegen"
       },
       "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
-      "modelNotConfigured": "{model} ist nicht bereit: Setze {envVar} in der Umgebung (z. B. .env.local).",
+      "modelNotConfigured": "{model} ist nicht bereit: Füge {envVar} unter Admin → KI-Anbieter hinzu (oder in der Umgebung).",
       "admin": {
         "catalogSubtitle": "System-Modellkatalog durchsuchen und bearbeiten.",
         "bulkImportSubtitle": "SQL aus Anbieter-Dokumentation erzeugen und anwenden (erweitert).",
@@ -1691,6 +1705,15 @@
       "plannerModelSaved": "Planer-Modell gespeichert.",
       "plannerModelSaveFailed": "Planer-Modell konnte nicht gespeichert werden.",
       "plannerModelLoadFailed": "Planer-Modell konnte nicht geladen werden.",
+      "summaryModelTitle": "Zusammenfassungs-Modell",
+      "summaryModelDesc": "Lange Chats werden zu einer laufenden Zusammenfassung verdichtet, damit der Assistent auch viele Antworten später noch das Thema und Ihre Position kennt. Wählen Sie das Modell, das sie schreibt – ein kleines, schnelles ist die richtige Wahl, denn es läuft bei jedem langen Gespräch mit.",
+      "summaryModelLabel": "Modell",
+      "summaryModelAuto": "Automatisch (Sortier-Modell verwenden)",
+      "summaryModelFallbackHint": "Kein Zusammenfassungs-Modell ausgewählt – die Zusammenfassungen schreibt das Sortier-Modell.",
+      "summaryModelGlobalHint": "Gilt für alle Nutzer dieser Plattform.",
+      "summaryModelSaved": "Zusammenfassungs-Modell gespeichert.",
+      "summaryModelSaveFailed": "Zusammenfassungs-Modell konnte nicht gespeichert werden.",
+      "summaryModelLoadFailed": "Zusammenfassungs-Modell konnte nicht geladen werden.",
       "legacyTitle": "Legacy-Fallback (Admin)",
       "legacyDesc": "Der Einzelthema-AI-Sorter-Prompt, der verwendet wird, wenn Multi-Task-Routing aus ist.",
       "fallbackTitle": "AI-Fallback-Sort-Prompt",
@@ -2042,6 +2065,39 @@
     "messageBlockedDesc": "Du hast dein {action}-Limit erreicht. Upgrade deinen Plan oder warte bis das Limit zurückgesetzt wird.",
     "retryLater": "Erneut versuchen"
   },
+  "paywall": {
+    "title": {
+      "guest_limit": "Deine Gratis-Nachrichten sind aufgebraucht",
+      "free_limit": "Deine Gratis-Nachrichten sind aufgebraucht",
+      "quota_exhausted": "Dein Kontingent für diesen Monat ist aufgebraucht",
+      "reminder": "Hol mehr aus Synaplan heraus"
+    },
+    "subtitle": {
+      "guest_limit": "Wähle einen Tarif und chatte weiter – mit eigenem Verlauf, Erinnerungen und Dateien.",
+      "free_limit": "Dein Gratis-Kontingent ist verbraucht. Wähle einen Tarif und chatte ohne Limit weiter.",
+      "quota_exhausted": "Wechsle in einen größeren Tarif und mach sofort weiter, oder warte bis dein Kontingent nächsten Monat zurückgesetzt wird.",
+      "reminder": "Mit einem Tarif bekommst du mehr Nachrichten, stärkere KI-Modelle und mehr Speicher."
+    },
+    "unavailable": "Hier kann gerade kein Tarif gekauft werden. Bitte versuche es später noch einmal.",
+    "recommended": "Empfohlen",
+    "choosePlan": "{plan} wählen",
+    "guestNote": "Erstelle zuerst ein kostenloses Konto – dein Tarif wird damit verknüpft.",
+    "login": "Ich habe schon ein Konto",
+    "maybeLater": "Vielleicht später",
+    "renewalNoteStore": "Abonnements verlängern sich automatisch, bis du sie kündigst. Verwalten und kündigen kannst du sie jederzeit in den Einstellungen deines Store-Kontos.",
+    "renewalNoteWeb": "Abonnements verlängern sich automatisch, bis du sie kündigst. Du kannst jederzeit kündigen.",
+    "plans": {
+      "pro": {
+        "tagline": "Für die tägliche Arbeit mit KI"
+      },
+      "team": {
+        "tagline": "Für kleine Teams, die zusammenarbeiten"
+      },
+      "business": {
+        "tagline": "Für Unternehmen mit höchsten Ansprüchen"
+      }
+    }
+  },
   "subscription": {
     "serviceNotAvailable": "Dienst nicht verfügbar",
     "title": "Abonnements",
@@ -2116,18 +2172,14 @@
       "business": "Business"
     },
     "features": {
-      "unlimitedMessages": "Unbegrenzte Nachrichten",
-      "images": "{count} Bilder/Monat",
-      "unlimitedImages": "Unbegrenzte Bilder",
+      "usage": "{factor}× mehr Nutzung als im Free-Plan",
       "advancedModels": "Erweiterte KI-Modelle",
       "prioritySupport": "Priority Support",
-      "storage": "{size}GB Speicher",
       "everythingInPro": "Alles aus Pro",
       "everythingInTeam": "Alles aus Team",
       "teamCollaboration": "Team-Zusammenarbeit",
       "customPrompts": "Benutzerdefinierte Prompts",
       "apiAccess": "API-Zugriff",
-      "unlimitedVideo": "Unbegrenzte Video-Generierung",
       "whiteLabel": "White-label Widgets",
       "dedicatedSupport": "Dedizierter Support",
       "slaGuarantee": "SLA-Garantie"
@@ -2150,6 +2202,101 @@
       "tryAgain": "Erneut versuchen",
       "backToPlans": "Zurück zu den Plänen"
     }
+  },
+  "adminSetup": {
+    "title": "KI-Anbieter einrichten",
+    "description": "Verbinde einen KI-Anbieter, damit dein Team chatten kann. Schlüssel werden verschlüsselt auf deinem Server gespeichert und gelten sofort — kein Neustart nötig.",
+    "statusReadyTitle": "Deine KI ist bereit",
+    "statusReadyText": "Das Standard-Chat-Modell hat einen funktionierenden Anbieter. Du kannst unten jederzeit weitere Anbieter hinzufügen.",
+    "statusNotReadyTitle": "Noch kein KI-Anbieter verbunden",
+    "statusNotReadyText": "Der Chat funktioniert erst, wenn ein Anbieter verbunden ist. Füge unten einen API-Schlüssel hinzu — Groq bietet einen kostenlosen Schlüssel, der in unter einer Minute funktioniert.",
+    "cloudProviders": "Cloud-Anbieter",
+    "cloudProvidersHint": "API-Schlüssel einfügen — er wird live getestet und verschlüsselt gespeichert. Schlüssel aus deiner .env-Datei werden automatisch übernommen.",
+    "recommended": "Empfohlen",
+    "freeTier": "Kostenlose Stufe verfügbar",
+    "connected": "Verbunden",
+    "sourceEnv": "aus .env importiert",
+    "sourceDbFromEnv": "in DB gespeichert (aus .env)",
+    "sourceDbOverridesEnv": "Verschlüsselt in der Datenbank gespeichert — überschreibt jeden passenden Wert in .env.",
+    "sourceDbFromEnvHint": "Verschlüsselt in der Datenbank gespeichert (aus .env importiert). Ein hier gespeicherter Schlüssel überschreibt .env dauerhaft.",
+    "currentDefault": "Aktueller Standard",
+    "keyPlaceholder": "API-Schlüssel einfügen…",
+    "replaceKeyPlaceholder": "Neuen API-Schlüssel zum Ersetzen einfügen…",
+    "saveAndTest": "Testen & Speichern",
+    "applyDefaultsOnSave": "Diesen Anbieter auch für Chat und andere KI-Aufgaben verwenden",
+    "getKey": "API-Schlüssel holen",
+    "testKey": "Testen",
+    "makeDefault": "Als Standard verwenden",
+    "removeKey": "Entfernen",
+    "saved": "{provider}-Schlüssel gespeichert — sofort aktiv",
+    "savedWithDefaults": "{provider}-Schlüssel gespeichert und als Standard-KI-Anbieter gesetzt",
+    "saveFailed": "Speichern des Schlüssels fehlgeschlagen",
+    "testOk": "{provider}-Schlüssel funktioniert",
+    "testFailed": "Test des {provider}-Schlüssels fehlgeschlagen",
+    "defaultsApplied": "{provider} ist jetzt der Standard-KI-Anbieter",
+    "removeConfirmTitle": "API-Schlüssel entfernen",
+    "removeConfirmMessage": "Gespeicherten {provider}-API-Schlüssel entfernen? Chat über {provider} funktioniert dann nur noch, wenn ein Schlüssel in der .env-Datei gesetzt ist.",
+    "removed": "{provider}-Schlüssel entfernt",
+    "removedEnvStillSet": "Gespeicherter {provider}-Schlüssel entfernt — {envVar} ist in der Umgebung weiterhin gesetzt, {provider} bleibt damit verbunden",
+    "loadFailed": "Anbieter-Status konnte nicht geladen werden",
+    "localAi": {
+      "title": "Lokale KI (Ollama) — kein Schlüssel nötig",
+      "description": "Die Standard-Installation enthält lokale KI-Modelle, die vollständig auf deiner Hardware laufen. Der Modell-Download kann beim ersten Start etwas dauern; die Cloud-Anbieter oben sind sofort verfügbar."
+    }
+  },
+  "providerHelp": {
+    "openAria": "So richtest du das ein",
+    "createKeyLink": "API-Schlüssel erstellen",
+    "downloadLink": "Ollama herunterladen",
+    "groq": {
+      "title": "Groq-API-Schlüssel",
+      "message": "Erstelle einen kostenlosen Groq-API-Schlüssel in der Groq-Konsole und füge ihn hier ein. Die kostenlose Stufe reicht meist, um in unter einer Minute zu chatten."
+    },
+    "openai": {
+      "title": "OpenAI-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in deinem OpenAI-Konto (API-Keys-Seite) und füge ihn hier ein. Die Nutzung wird von OpenAI abgerechnet."
+    },
+    "anthropic": {
+      "title": "Anthropic-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in der Anthropic-Konsole (Einstellungen → Keys) und füge ihn hier ein, um Claude-Modelle zu nutzen."
+    },
+    "google": {
+      "title": "Google-Gemini-API-Schlüssel",
+      "message": "Erstelle einen Gemini-API-Schlüssel in Google AI Studio und füge ihn hier ein. Für viele Modelle gibt es eine kostenlose Stufe."
+    },
+    "mistral": {
+      "title": "Mistral-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in der Mistral-Konsole und füge ihn hier ein. Zum Einstieg bietet Mistral eine kostenlose Stufe."
+    },
+    "trustedtokens": {
+      "title": "TrustedTokens-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel bei TrustedTokens (Konto → API-Zugang) und füge ihn hier ein. Die Inferenz läuft auf deutschen GPUs mit EU-Datenresidenz."
+    },
+    "huggingface": {
+      "title": "HuggingFace-API-Token",
+      "message": "Erstelle ein Access-Token in den HuggingFace-Einstellungen und füge es hier ein, um HuggingFace-Inference-Modelle zu nutzen."
+    },
+    "xai": {
+      "title": "xAI-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in der xAI-Konsole und füge ihn hier ein, um Grok-Modelle zu nutzen."
+    },
+    "ollama": {
+      "title": "Lokale KI mit Ollama",
+      "message": "Lade Ollama herunter und ziehe ein leistungsfähiges Modell wie gpt-oss:120b (oder ein kleineres wie llama3.2 bei weniger RAM). Kein API-Schlüssel nötig — Synaplan spricht mit Ollama unter der konfigurierten URL."
+    }
+  },
+  "setupBanner": {
+    "title": "Kein KI-Anbieter verbunden",
+    "adminText": "Der Chat braucht einen KI-Anbieter. Verbinde einen in einer Minute — kostenlose Optionen verfügbar.",
+    "userText": "Der Chat ist noch nicht bereit. Bitte deinen Administrator, einen KI-Anbieter zu verbinden.",
+    "cta": "KI-Anbieter einrichten"
+  },
+  "localAiDownload": {
+    "waitingTitle": "Lokale KI startet",
+    "downloadingTitle": "Lokale KI wird heruntergeladen, {percent} %",
+    "cloudWorksText": "Cloud-Chat funktioniert jetzt — lokale Modelle sind bereit, sobald der Download fertig ist.",
+    "errorTitle": "Download der lokalen KI fehlgeschlagen",
+    "errorText": "Cloud-Chat funktioniert weiter. Prüfe die Ollama-Logs oder starte mit AUTO_DOWNLOAD_MODELS=true neu."
   },
   "common": {
     "ok": "OK",
@@ -2201,7 +2348,8 @@
     "remove": "Entfernen",
     "clearSelection": "Auswahl aufheben",
     "view": "Ansehen",
-    "expand": "Erweitern"
+    "expand": "Erweitern",
+    "noResults": "Keine Ergebnisse"
   },
   "search": {
     "sources": "Quellen",
@@ -2355,9 +2503,14 @@
     "noSearchResults": "Keine Dateien für \"{query}\" gefunden",
     "noSearchResultsHint": "Versuche einen anderen Begriff oder passe die Filter an.",
     "filterToggle": "Filter",
+    "filterType": "Typ",
     "filterTypeAll": "Alle Typen",
+    "filterTypePdf": "PDF",
+    "filterTypeDocx": "Word (DOCX)",
+    "filterTypeTxt": "Text",
     "filterTypeImages": "Bilder",
     "filterTypeAudio": "Audio/Video",
+    "filterTypeSpreadsheet": "Tabelle",
     "filterDateFrom": "Von",
     "filterDateTo": "Bis",
     "tabFiles": "Dateien",
@@ -2643,8 +2796,8 @@
       "healthSummary": "{healthy} von {total} Services gesund",
       "model": "Modell",
       "models": "Modelle",
-      "devOnlyTitle": "Nur Entwicklungsmodus",
-      "devOnlyMessage": "Diese Seite ist nur in Entwicklungsumgebungen verfügbar. Die Systemstatusüberwachung ist in der Produktion eingeschränkt."
+      "adminOnlyTitle": "Admin-Zugriff erforderlich",
+      "adminOnlyMessage": "Der Feature-Status ist nur für Administratoren verfügbar."
     }
   },
   "mail": {
@@ -4103,11 +4256,7 @@
     }
   },
   "onboarding": {
-    "skip": "Überspringen",
-    "back": "Zurück",
-    "next": "Weiter",
     "getStarted": "Los geht's",
-    "stepLabel": "Schritt {step} von {total}",
     "welcome": {
       "title": "Willkommen bei",
       "subtitle": "Alle KIs, alle Funktionen an einem Platz",
@@ -4154,43 +4303,6 @@
       "connect": "Verbinden",
       "connecting": "Verbindung wird geprüft…",
       "connectError": "Dieser Server ist nicht erreichbar. Prüfe die Adresse und versuche es erneut."
-    },
-    "plans": {
-      "title": "Wie möchtest du starten?",
-      "subtitle": "Probiere es kostenlos aus — upgraden kannst du jederzeit",
-      "guestCta": "Ohne Konto fortfahren",
-      "popular": "Beliebt",
-      "continueWith": "Weiter mit {plan}",
-      "restore": "Käufe wiederherstellen",
-      "restoring": "Wird wiederhergestellt…",
-      "restoreNone": "Kein früherer Kauf gefunden. Wenn du mit einem Konto gekauft hast, melde dich stattdessen an.",
-      "registerCta": "Kostenloses Konto erstellen",
-      "loginHint": "Du hast schon ein Konto?",
-      "loginCta": "Anmelden"
-    },
-    "account": {
-      "title": "Fast geschafft",
-      "subtitle": "Melde dich an oder erstelle ein Konto, um dein Abo zu aktivieren.",
-      "providerCta": "Weiter mit {provider}",
-      "emailCta": "Weiter mit E-Mail",
-      "note": "Dein Abo wird mit diesem Konto verknüpft.",
-      "redeemTitle": "Zahlung erfolgreich",
-      "redeemSubtitle": "Erstelle jetzt dein Konto, um dein Abo zu aktivieren — das dauert weniger als eine Minute.",
-      "redeemNote": "Dein Kauf wird automatisch mit deinem neuen Konto verknüpft."
-    },
-    "purchase": {
-      "checking": "Dein Konto wird geprüft…",
-      "purchasing": "Der Kauf wird im Store abgeschlossen…",
-      "alreadyTitle": "Bereits abonniert",
-      "alreadyBody": "Dieses Konto hat bereits ein aktives Abo ({plan}). Es wird nichts erneut berechnet.",
-      "alreadyManage": "Abo verwalten",
-      "toChat": "Zum Chat",
-      "pendingTitle": "Kauf ausstehend",
-      "retryTitle": "Kauf nicht abgeschlossen",
-      "cancelledBody": "Der Kauf wurde abgebrochen. Es wurde nichts berechnet.",
-      "checkFailed": "Dein Abo-Status konnte nicht geprüft werden. Bitte versuche es erneut.",
-      "retryCta": "Erneut versuchen",
-      "later": "Vielleicht später"
     }
   },
   "iap": {

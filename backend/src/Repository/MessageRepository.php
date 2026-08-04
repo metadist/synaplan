@@ -141,6 +141,70 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Id of the newest message in a chat that sits strictly before the given
+     * one in the {@see findChatHistory()} ordering (unixTimestamp, then id).
+     *
+     * Lets {@see \App\Service\Message\ConversationSummaryService} identify the
+     * boundary of the older span with a single indexed row read when the
+     * verbatim tail consumed the whole loaded window, instead of hydrating the
+     * entire chat just to look at one id.
+     *
+     * @param int $userId Owner of the chat (verified via Chat.userId)
+     */
+    public function findIdBefore(int $userId, int $chatId, int $beforeId, int $beforeTimestamp): ?int
+    {
+        $row = $this->createQueryBuilder('m')
+            ->select('m.id')
+            ->join('m.chat', 'c')
+            ->where('m.chatId = :chatId')
+            ->andWhere('c.userId = :userId')
+            ->andWhere('m.unixTimestamp < :ts OR (m.unixTimestamp = :ts AND m.id < :id)')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('userId', $userId)
+            ->setParameter('ts', $beforeTimestamp)
+            ->setParameter('id', $beforeId)
+            ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return is_array($row) && isset($row['id']) ? (int) $row['id'] : null;
+    }
+
+    /**
+     * Messages of a chat whose id is strictly after {@see $afterId} and at most
+     * {@see $upToIdInclusive}, chronological. Used by the rolling-summary hot
+     * path to append a small raw gap when the async store is one turn behind.
+     *
+     * @return list<Message>
+     */
+    public function findMessagesBetween(int $userId, int $chatId, int $afterId, int $upToIdInclusive): array
+    {
+        if ($afterId >= $upToIdInclusive) {
+            return [];
+        }
+
+        /** @var list<Message> $rows */
+        $rows = $this->createQueryBuilder('m')
+            ->join('m.chat', 'c')
+            ->where('m.chatId = :chatId')
+            ->andWhere('c.userId = :userId')
+            ->andWhere('m.id > :afterId')
+            ->andWhere('m.id <= :upToId')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('userId', $userId)
+            ->setParameter('afterId', $afterId)
+            ->setParameter('upToId', $upToIdInclusive)
+            ->orderBy('m.unixTimestamp', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
+    }
+
+    /**
      * Find all messages for a chat, ordered chronologically. No character or count limits.
      * Used for summary analysis where we need the complete conversation.
      *

@@ -99,11 +99,13 @@ parameters:
     env(STRIPE_PRICE_TEAM): ''
     env(STRIPE_PRICE_BUSINESS): ''
     env(STRIPE_PAYMENT_METHODS): ''
-    # Native IAP store product IDs (Epic 5.5). Defaults are the documented
-    # placeholder convention so web-only / open-source deployments stay IAP-off.
-    env(IAP_PRODUCT_PRO): 'com.synaplan.app.pro.monthly'
-    env(IAP_PRODUCT_TEAM): 'com.synaplan.app.team.monthly'
-    env(IAP_PRODUCT_BUSINESS): 'com.synaplan.app.business.monthly'
+    # Native IAP store product IDs (Epic 5.5). Empty by default so web-only /
+    # open-source deployments stay IAP-off; a deployment that sells through the
+    # stores sets its own IDs. Never default these to real store IDs — that is
+    # what broke `iapConfigured` before (see IapPricingService).
+    env(IAP_PRODUCT_PRO): ''
+    env(IAP_PRODUCT_TEAM): ''
+    env(IAP_PRODUCT_BUSINESS): ''
     # Store commission passed on to app buyers (percent on top of the web price).
     # Used only when a tier has no fixed IAP_STORE_PRICE_* (0 / unset).
     env(IAP_PRICE_MARKUP_PERCENT): '30'
@@ -210,9 +212,39 @@ services:
         arguments:
             $environment: '%kernel.environment%'
 
+    # DB-backed platform API keys for the cloud AI providers, encrypted at
+    # rest in BCONFIG (group `provider_keys`) via EncryptionService. The env
+    # map below is the BOOTSTRAP/fallback: a key present in the environment is
+    # transferred into the DB on first resolution (origin "env"), after which
+    # the DB row is the source of truth — keys saved through the admin wizard
+    # (origin "ui") always win over the environment. Providers resolve their
+    # key per call through this store, so key changes apply WITHOUT a restart
+    # in both the backend and the messenger worker.
+    App\AI\Credential\ProviderKeyStore:
+        arguments:
+            $envKeys:
+                anthropic: '%env(ANTHROPIC_API_KEY)%'
+                openai: '%env(OPENAI_API_KEY)%'
+                groq: '%env(GROQ_API_KEY)%'
+                # Documented aliases (GoogleProvider::getRequiredEnvVars any_of):
+                # first usable value wins.
+                google:
+                    - '%env(GOOGLE_GEMINI_API_KEY)%'
+                    - '%env(default::GEMINI_API_KEY)%'
+                    - '%env(default::GOOGLE_API_KEY)%'
+                mistral: '%env(MISTRAL_API_KEY)%'
+                trustedtokens: '%env(TRUSTEDTOKENS_API_KEY)%'
+                huggingface: '%env(HUGGINGFACE_API_KEY)%'
+                xai: '%env(XAI_API_KEY)%'
+
+    # Written by _docker/backend/docker-entrypoint.sh during AUTO_DOWNLOAD_MODELS pulls.
+    App\Service\LocalAi\LocalAiDownloadStatusService:
+        arguments:
+            $statusFilePath: '%kernel.project_dir%/var/ollama-download.json'
+
     App\AI\Provider\AnthropicProvider:
         arguments:
-            $apiKey: '%env(ANTHROPIC_API_KEY)%'
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
@@ -220,7 +252,7 @@ services:
 
     App\AI\Provider\OpenAIProvider:
         arguments:
-            $apiKey: '%env(OPENAI_API_KEY)%'
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $storeResponses: '%env(bool:OPENAI_STORE_RESPONSES)%'
         tags:
@@ -247,7 +279,7 @@ services:
 
     App\AI\Provider\GroqProvider:
         arguments:
-            $apiKey: '%env(GROQ_API_KEY)%'
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
@@ -256,7 +288,7 @@ services:
 
     App\AI\Provider\MistralProvider:
         arguments:
-            $apiKey: '%env(MISTRAL_API_KEY)%'
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
@@ -266,7 +298,7 @@ services:
 
     App\AI\Provider\TrustedTokensProvider:
         arguments:
-            $apiKey: '%env(TRUSTEDTOKENS_API_KEY)%'
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
@@ -274,7 +306,7 @@ services:
 
     App\AI\Provider\XaiProvider:
         arguments:
-            $apiKey: '%env(XAI_API_KEY)%'
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
@@ -286,7 +318,7 @@ services:
 
     App\AI\Provider\GoogleProvider:
         arguments:
-            $apiKey: '%env(GOOGLE_GEMINI_API_KEY)%'
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $projectId: '%env(GOOGLE_CLOUD_PROJECT_ID)%'
             $region: 'us-central1'
             $uploadDir: '%kernel.project_dir%/var/uploads'
@@ -328,7 +360,7 @@ services:
 
     App\AI\Provider\HuggingFaceProvider:
         arguments:
-            $apiKey: '%env(HUGGINGFACE_API_KEY)%'
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
@@ -534,6 +566,18 @@ services:
             $cache: '@cache.model_config'
             $environment: '%kernel.environment%'
 
+    # Shares the model_config pool so applying provider defaults invalidates
+    # the same cached lookups ModelConfigService serves from.
+    App\AI\Credential\ProviderDefaultsService:
+        arguments:
+            $cache: '@cache.model_config'
+
+    # Same pool: applying provider defaults clears it, so the cached provider
+    # availability snapshot can never outlive a defaults change.
+    App\AI\Credential\ChatReadinessService:
+        arguments:
+            $cache: '@cache.model_config'
+
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\InternalEmailService: ~
 
@@ -644,7 +688,11 @@ services:
     App\Service\Iap\AppleStoreKitVerifier:
         arguments:
             $bundleId: '%env(string:default::IAP_APPLE_BUNDLE_ID)%'
-            $appAppleId: '%env(default::int:IAP_APPLE_APP_APPLE_ID)%'
+            # `int:` must wrap `default::`, not the other way round: with the
+            # processors reversed an unset variable resolves to null, and the
+            # service then cannot be constructed at all — every /iap/ endpoint
+            # answers 500 instead of the intended "not configured" response.
+            $appAppleId: '%env(int:default::IAP_APPLE_APP_APPLE_ID)%'
             $environment: '%env(string:default::IAP_APPLE_ENVIRONMENT)%'
             $rootCertsDir: '%env(string:default::IAP_APPLE_ROOT_CERTS_DIR)%'
             $projectDir: '%kernel.project_dir%'

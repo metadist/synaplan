@@ -20,9 +20,6 @@ import {
   isOnboardingCompleted,
   markOnboardingCompleted,
   shouldShowOnboarding,
-  setOnboardingResumeStep,
-  clearOnboardingResumeStep,
-  consumeOnboardingResumeStep,
 } from '@/composables/useOnboarding'
 import { GUEST_STORAGE_KEY } from '@/stores/guest'
 
@@ -64,28 +61,6 @@ describe('useOnboarding', () => {
       markOnboardingCompleted()
       expect(isOnboardingCompleted()).toBe(true)
       expect(localStorage.getItem('synaplan.onboardingCompleted')).toBe('1')
-    })
-  })
-
-  describe('resume step (server-switch WebView reload)', () => {
-    it('sets and consumes the resume step exactly once', () => {
-      setOnboardingResumeStep(2)
-      expect(consumeOnboardingResumeStep()).toBe(2)
-      // One-shot: the second read is empty.
-      expect(consumeOnboardingResumeStep()).toBeNull()
-    })
-
-    it('can be cleared (probe rejected → no reload happened)', () => {
-      setOnboardingResumeStep(2)
-      clearOnboardingResumeStep()
-      expect(consumeOnboardingResumeStep()).toBeNull()
-    })
-
-    it('rejects garbage values instead of resuming at a broken step', () => {
-      sessionStorage.setItem('synaplan.onboardingResumeStep', 'NaN')
-      expect(consumeOnboardingResumeStep()).toBeNull()
-      sessionStorage.setItem('synaplan.onboardingResumeStep', '99')
-      expect(consumeOnboardingResumeStep()).toBeNull()
     })
   })
 })

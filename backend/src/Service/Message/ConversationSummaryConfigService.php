@@ -27,7 +27,7 @@ final class ConversationSummaryConfigService
 
     public function isEnabled(): bool
     {
-        $raw = $this->getCached('ENABLED');
+        $raw = $this->getCached(ConversationSummaryConstants::KEY_ENABLED);
 
         if (null === $raw || '' === $raw) {
             return ConversationSummaryConstants::ENABLED;
@@ -42,7 +42,7 @@ final class ConversationSummaryConfigService
      */
     public function getTargetWindowChars(): int
     {
-        $value = $this->getInt('TARGET_WINDOW_CHARS', ConversationSummaryConstants::TARGET_WINDOW_CHARS);
+        $value = $this->getInt(ConversationSummaryConstants::KEY_TARGET_WINDOW_CHARS, ConversationSummaryConstants::TARGET_WINDOW_CHARS);
 
         return max(
             ConversationSummaryConstants::MIN_WINDOW_CHARS,
@@ -59,7 +59,7 @@ final class ConversationSummaryConfigService
     public function getRecentVerbatimChars(): int
     {
         $window = $this->getTargetWindowChars();
-        $value = $this->getInt('RECENT_VERBATIM_CHARS', ConversationSummaryConstants::RECENT_VERBATIM_CHARS);
+        $value = $this->getInt(ConversationSummaryConstants::KEY_RECENT_VERBATIM_CHARS, ConversationSummaryConstants::RECENT_VERBATIM_CHARS);
 
         // Leave room for at least a minimal summary inside the window.
         return max(1000, min($window - 500, $value));
@@ -73,26 +73,26 @@ final class ConversationSummaryConfigService
     {
         $window = $this->getTargetWindowChars();
         $recent = $this->getRecentVerbatimChars();
-        $value = $this->getInt('SUMMARY_MAX_CHARS', ConversationSummaryConstants::SUMMARY_MAX_CHARS);
+        $value = $this->getInt(ConversationSummaryConstants::KEY_SUMMARY_MAX_CHARS, ConversationSummaryConstants::SUMMARY_MAX_CHARS);
 
         return max(500, min($window - $recent, $value));
     }
 
     public function getMaxSourceMessages(): int
     {
-        return $this->getInt('MAX_SOURCE_MESSAGES', ConversationSummaryConstants::MAX_SOURCE_MESSAGES);
+        return $this->getInt(ConversationSummaryConstants::KEY_MAX_SOURCE_MESSAGES, ConversationSummaryConstants::MAX_SOURCE_MESSAGES);
     }
 
     public function getTiers(): int
     {
-        $value = $this->getInt('TIERS', ConversationSummaryConstants::TIERS);
+        $value = $this->getInt(ConversationSummaryConstants::KEY_TIERS, ConversationSummaryConstants::TIERS);
 
         return max(1, min(5, $value));
     }
 
     public function getCacheTtl(): int
     {
-        return $this->getInt('CACHE_TTL', ConversationSummaryConstants::CACHE_TTL);
+        return $this->getInt(ConversationSummaryConstants::KEY_CACHE_TTL, ConversationSummaryConstants::CACHE_TTL);
     }
 
     private function getInt(string $setting, int $default): int

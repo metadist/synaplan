@@ -37,6 +37,10 @@
         </div>
       </Transition>
 
+      <!-- First-run: no usable AI provider yet — admins get a wizard CTA -->
+      <ProviderSetupBanner />
+      <LocalAiDownloadCard class="mx-auto max-w-4xl w-full px-4 pt-4" />
+
       <div
         ref="chatContainer"
         class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
@@ -335,8 +339,16 @@
       @verify-phone="closeLimitModal"
     />
 
-    <!-- Guest Signup Modal (shown when guest message limit is reached) -->
+    <!-- Guest Signup Modal (fallback when there is no purchase channel) -->
     <GuestSignupModal :is-open="showGuestSignupModal" @close="showGuestSignupModal = false" />
+
+    <!-- Upgrade paywall (trial spent, monthly allowance spent, daily reminder) -->
+    <SubscriptionPaywallModal
+      :is-open="isPaywallOpen"
+      :reason="paywallReason"
+      @close="closePaywall"
+      @unavailable="fallBackFromPaywall"
+    />
 
     <!-- Guest hint popover (shown when a guest taps a restricted feature) -->
     <GuestHintPopover
@@ -427,6 +439,8 @@ import ExamplePrompts from '@/components/ExamplePrompts.vue'
 import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
+import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
+import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
@@ -449,7 +463,7 @@ import { useFeedbackStore } from '@/stores/userFeedback'
 import { useIncognitoStore } from '@/stores/incognito'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
-import { useLimitCheck } from '@/composables/useLimitCheck'
+import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
 import { prefetchSseToken } from '@/services/api/chatApi'
@@ -462,6 +476,8 @@ import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import { httpClient } from '@/services/api/httpClient'
+import { pluginCommands } from '@/stores/commands'
+import { i18n } from '@/i18n'
 import { z } from 'zod'
 import {
   parseMediaJobPayload,
@@ -492,6 +508,8 @@ import GuestBanner from '@/components/guest/GuestBanner.vue'
 import PendingPurchaseBanner from '@/components/guest/PendingPurchaseBanner.vue'
 import GuestSignupModal from '@/components/guest/GuestSignupModal.vue'
 import GuestHintPopover from '@/components/guest/GuestHintPopover.vue'
+import SubscriptionPaywallModal from '@/components/subscription/SubscriptionPaywallModal.vue'
+import { paywallReasonForLimit, usePaywallPrompt } from '@/composables/usePaywallPrompt'
 import { hasPendingIapRedemption } from '@/services/nativeIap'
 import { usePromoTips } from '@/composables/usePromoTips'
 import { useDateFormat } from '@/composables/useDateFormat'
@@ -509,6 +527,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
+const { isPaywallOpen, paywallReason, shouldRemind, openPaywall, closePaywall } = usePaywallPrompt()
 const { error: showErrorToast, success: showSuccessToast } = useNotification()
 
 const chatContainer = ref<HTMLElement | null>(null)
@@ -567,6 +586,53 @@ const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
 
+/** The block that opened the paywall, kept so the fallback modal can show it. */
+const blockedLimit = ref<LimitCheckResult | null>(null)
+
+/**
+ * A blocked message either opens the upgrade paywall or the plain informational
+ * limit modal — `paywallReasonForLimit` owns which block deserves which.
+ */
+function showLimitOrPaywall(result: LimitCheckResult): void {
+  blockedLimit.value = result
+  const reason = paywallReasonForLimit(result)
+
+  if (reason && openPaywall(reason)) {
+    return
+  }
+  checkAndShowLimit(result)
+}
+
+/**
+ * The paywall has nothing to sell (catalogue unreachable, or every tier above
+ * this user deactivated). Hand the user back to the modal the paywall replaced
+ * so a blocked message still explains itself; a mere reminder just goes away.
+ */
+function fallBackFromPaywall(): void {
+  const reason = paywallReason.value
+  closePaywall()
+
+  if ('guest_limit' === reason) {
+    showGuestSignupModal.value = true
+    return
+  }
+  if ('reminder' === reason) return
+  if (blockedLimit.value) checkAndShowLimit(blockedLimit.value)
+}
+
+/**
+ * Opportunistic upgrade reminder, throttled to once a day by
+ * `usePaywallPrompt`. Skipped in a brand-new session so nothing pops up right
+ * after onboarding — the user has to have sent something first.
+ */
+function maybeRemindAboutUpgrade(): void {
+  const hasUsedTheApp = authStore.isAuthenticated
+    ? historyStore.messages.length > 0
+    : guestStore.messageCount > 0
+  if (!hasUsedTheApp || !shouldRemind()) return
+  openPaywall('reminder')
+}
+
 // Empty landing: no messages, not loading, and not the guest-error state.
 // Keeps the welcome content vertically centered while the composer remains
 // docked at the bottom, leaving enough room for its upward-opening menus.
@@ -611,6 +677,19 @@ type StreamingProcessingMetadata = {
 }
 
 const processingMetadata = ref<StreamingProcessingMetadata>({})
+
+// Backend pipeline steps that only need a label in the thinking indicator:
+// no metadata, no side effects. Kept in one list so the guest and the
+// authenticated stream handler stay in sync.
+const PIPELINE_PROGRESS_STATUSES = [
+  'analyzing_prompt',
+  'planning',
+  'searching_files',
+  'checking_memories',
+]
+
+const isPipelineProgressStatus = (status: string | undefined): status is string =>
+  typeof status === 'string' && PIPELINE_PROGRESS_STATUSES.includes(status)
 
 // Phase 3e: non-blocking pill that surfaces when backgrounded memory
 // extraction (Phase 2) completes after the assistant message has already
@@ -724,6 +803,7 @@ onMounted(async () => {
 
     window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
     window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+    maybeRemindAboutUpgrade()
     return
   }
 
@@ -785,6 +865,8 @@ onMounted(async () => {
   prefetchSseToken()
   window.addEventListener('focus', prefetchSseToken)
   document.addEventListener('visibilitychange', handleVisibilityChangeForToken)
+
+  maybeRemindAboutUpgrade()
 })
 
 const handleVisibilityChangeForToken = () => {
@@ -1617,6 +1699,59 @@ const handleContinueResponse = async (message: Message) => {
   stopStreamingFn = stopStreaming
 }
 
+interface PluginChatRoute {
+  pluginName: string
+  endpoint: string
+}
+
+/**
+ * Match a "/command …" message against the slash-commands contributed by
+ * installed plugins (manifest `chatCommands`, surfaced via runtime config).
+ * Returns the owning plugin + endpoint, or null for non-plugin input.
+ */
+const matchPluginChatCommand = (content: string): PluginChatRoute | null => {
+  const match = content.trim().match(/^\/([A-Za-z0-9_-]+)(?:\s|$)/)
+  if (!match) {
+    return null
+  }
+  const name = match[1].toLowerCase()
+  const command = pluginCommands().find((c) => c.name.toLowerCase() === name)
+  if (!command?.pluginName || !command.endpoint) {
+    return null
+  }
+  return { pluginName: command.pluginName, endpoint: command.endpoint }
+}
+
+/**
+ * Run a plugin slash-command by posting the message to the plugin's own chat
+ * endpoint and rendering the reply locally. Deliberately does NOT go through
+ * the AI message pipeline, so no classifier/characterization change is needed.
+ */
+const runPluginChatCommand = async (route: PluginChatRoute, text: string): Promise<void> => {
+  historyStore.addMessage('user', [{ type: 'text' as const, content: text }])
+  const userId = authStore.user?.id
+  if (!userId) {
+    return
+  }
+  const streamingId = historyStore.addStreamingMessage('assistant')
+  try {
+    const data = await httpClient<{ message?: string }>(
+      `/api/v1/user/${userId}/plugins/${route.pluginName}${route.endpoint}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ message: text, chatId: 'webchat', lang: i18n.global.locale.value }),
+      }
+    )
+    historyStore.finishStreamingMessage(streamingId, [
+      { type: 'text' as const, content: data?.message || t('plugins.commandEmpty') },
+    ])
+  } catch {
+    historyStore.finishStreamingMessage(streamingId, [
+      { type: 'text' as const, content: t('plugins.commandError') },
+    ])
+  }
+}
+
 const handleSendMessage = async (
   content: string,
   options?: {
@@ -1630,6 +1765,14 @@ const handleSendMessage = async (
     quotedMessageId?: number
   }
 ) => {
+  // Plugin slash-commands (e.g. "/fastbill show overdue") are handled by the
+  // owning plugin, not the AI pipeline. Intercept before any other processing.
+  const pluginRoute = matchPluginChatCommand(content)
+  if (pluginRoute) {
+    await runPluginChatCommand(pluginRoute, content.trim())
+    return
+  }
+
   autoScroll.value = true
   stickToBottom = false
 
@@ -1964,7 +2107,12 @@ const streamAIResponse = async (
             // authenticated rate-limit path (removeMessage), otherwise the
             // guest sees a blank bubble above the signup modal.
             historyStore.removeMessage(messageId)
-            showGuestSignupModal.value = true
+            // The trial is over, so the upgrade sheet is the useful next step.
+            // Without a purchase channel (billing off / custom server) it is not
+            // eligible and the plain signup modal takes over.
+            if (!openPaywall('guest_limit')) {
+              showGuestSignupModal.value = true
+            }
             processingStatus.value = ''
             processingMetadata.value = {}
             streamingAbortController = null
@@ -1992,6 +2140,9 @@ const streamAIResponse = async (
           } else if (data.status === 'analyzing') {
             processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (isPipelineProgressStatus(data.status)) {
+            processingStatus.value = data.status
+            processingMetadata.value = {}
           } else if (data.status === 'classifying') {
             processingStatus.value = 'classifying'
             processingMetadata.value = data.metadata || {}
@@ -2489,6 +2640,9 @@ const streamAIResponse = async (
             // Analyzing phase (e.g., understanding media generation request)
             processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (isPipelineProgressStatus(data.status)) {
+            processingStatus.value = data.status
+            processingMetadata.value = {}
           } else if (data.status === 'classifying') {
             processingStatus.value = 'classifying'
             processingMetadata.value = data.metadata || {}
@@ -3247,14 +3401,12 @@ const streamAIResponse = async (
             // error-bubble path below.
             if (isRecoverableStreamError(data) && !incognito && chatId) {
               historyStore.finishStreamingMessage(messageId)
-              const backendId =
-                data.messageId ??
-                historyStore.messages.find((m) => m.id === messageId)?.backendMessageId
-              if (backendId) {
-                void historyStore.reconcileMessage(messageId, backendId)
-              } else {
-                void historyStore.loadMessages(chatId)
-              }
+              // #1413: the drop can land before the still-running turn has
+              // persisted its answer. Re-poll the persisted turn with bounded
+              // backoff instead of reconciling exactly once, so the answer
+              // renders without a manual reload (which otherwise invites a
+              // duplicate re-send).
+              void historyStore.recoverInterruptedTurn(chatId)
               streamingAbortController = null
               stopStreamingFn = null
               currentTrackId = undefined
@@ -3336,7 +3488,7 @@ const streamAIResponse = async (
                 })
               }
 
-              checkAndShowLimit({
+              showLimitOrPaywall({
                 allowed: false,
                 limitType:
                   data.limit_type === 'hourly' ||
@@ -3371,7 +3523,7 @@ const streamAIResponse = async (
             ) {
               historyStore.removeMessage(messageId)
 
-              checkAndShowLimit({
+              showLimitOrPaywall({
                 allowed: false,
                 limitType: 'monthly',
                 actionType: data.action_type || 'MESSAGES',

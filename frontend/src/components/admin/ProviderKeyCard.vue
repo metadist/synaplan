@@ -1,0 +1,291 @@
+<template>
+  <div
+    class="surface-card rounded-lg p-5 flex flex-col gap-3"
+    :data-testid="`provider-card-${provider.name}`"
+  >
+    <!-- Header: name + badges -->
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <h3 class="text-lg font-semibold txt-primary truncate">{{ provider.displayName }}</h3>
+        <ProviderHelpHint
+          v-if="helpMeta"
+          :help-id="helpMeta.id"
+          :url="provider.consoleUrl || helpMeta.url"
+          :is-download="helpMeta.isDownload"
+        />
+        <span
+          v-if="provider.recommended"
+          class="text-xs font-medium px-2 py-0.5 rounded-full bg-[var(--brand)] text-white whitespace-nowrap"
+        >
+          {{ $t('adminSetup.recommended') }}
+        </span>
+      </div>
+      <span
+        v-if="provider.configured"
+        class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-[var(--status-success-muted)] text-[var(--status-success-text)] whitespace-nowrap"
+      >
+        <Icon icon="mdi:check-circle" class="w-3.5 h-3.5" />
+        {{ $t('adminSetup.connected') }}
+      </span>
+    </div>
+
+    <!-- Meta line -->
+    <div class="flex flex-wrap items-center gap-2 text-xs txt-secondary">
+      <span v-if="provider.freeTier" class="inline-flex items-center gap-1">
+        <Icon icon="mdi:gift-outline" class="w-3.5 h-3.5" />
+        {{ $t('adminSetup.freeTier') }}
+      </span>
+      <span v-if="provider.configured" class="font-mono">{{ provider.maskedKey }}</span>
+      <span v-if="provider.configured && provider.source === 'env'">
+        ({{ $t('adminSetup.sourceEnv') }})
+      </span>
+      <span v-if="provider.configured && provider.source === 'db' && provider.origin === 'env'">
+        ({{ $t('adminSetup.sourceDbFromEnv') }})
+      </span>
+      <span v-if="isDefaultChat" class="inline-flex items-center gap-1 txt-brand font-medium">
+        <Icon icon="mdi:star" class="w-3.5 h-3.5" />
+        {{ $t('adminSetup.currentDefault') }}
+      </span>
+    </div>
+
+    <!-- Key input -->
+    <div class="flex flex-col gap-2">
+      <div class="flex gap-2">
+        <input
+          v-model="keyInput"
+          type="password"
+          :placeholder="
+            provider.configured
+              ? $t('adminSetup.replaceKeyPlaceholder')
+              : $t('adminSetup.keyPlaceholder')
+          "
+          class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
+          :data-testid="`provider-key-input-${provider.name}`"
+          autocomplete="off"
+          @keydown.enter="save"
+        />
+        <button
+          class="btn-primary whitespace-nowrap"
+          :disabled="saving || keyInput.trim() === ''"
+          :data-testid="`provider-key-save-${provider.name}`"
+          @click="save"
+        >
+          <Icon v-if="saving" icon="mdi:loading" class="w-4 h-4 animate-spin" />
+          <span v-else>{{ $t('adminSetup.saveAndTest') }}</span>
+        </button>
+      </div>
+      <p
+        v-if="provider.source === 'db' && provider.origin === 'ui'"
+        class="text-xs txt-secondary"
+        data-testid="provider-key-db-override-hint"
+      >
+        {{ $t('adminSetup.sourceDbOverridesEnv') }}
+      </p>
+      <p
+        v-else-if="provider.source === 'db' && provider.origin === 'env'"
+        class="text-xs txt-secondary"
+        data-testid="provider-key-db-from-env-hint"
+      >
+        {{ $t('adminSetup.sourceDbFromEnvHint') }}
+      </p>
+      <label
+        v-if="keyInput.trim() !== ''"
+        class="flex items-center gap-2 text-sm txt-secondary cursor-pointer"
+      >
+        <input v-model="applyDefaultsChecked" type="checkbox" class="accent-[var(--brand)]" />
+        {{ $t('adminSetup.applyDefaultsOnSave') }}
+      </label>
+    </div>
+
+    <!-- Footer actions -->
+    <div class="flex flex-wrap items-center gap-3 text-sm mt-auto">
+      <a
+        :href="provider.consoleUrl || helpMeta?.url"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="txt-brand hover:underline inline-flex items-center gap-1"
+      >
+        <Icon icon="mdi:open-in-new" class="w-4 h-4" />
+        {{ $t('adminSetup.getKey') }}
+      </a>
+      <template v-if="provider.configured">
+        <button
+          class="txt-secondary hover:txt-primary inline-flex items-center gap-1"
+          :disabled="testing"
+          @click="test"
+        >
+          <Icon
+            :icon="testing ? 'mdi:loading' : 'mdi:connection'"
+            class="w-4 h-4"
+            :class="{ 'animate-spin': testing }"
+          />
+          {{ $t('adminSetup.testKey') }}
+        </button>
+        <button
+          v-if="!isDefaultChat"
+          class="txt-secondary hover:txt-primary inline-flex items-center gap-1"
+          :disabled="applying"
+          @click="makeDefault"
+        >
+          <Icon
+            :icon="applying ? 'mdi:loading' : 'mdi:star-outline'"
+            class="w-4 h-4"
+            :class="{ 'animate-spin': applying }"
+          />
+          {{ $t('adminSetup.makeDefault') }}
+        </button>
+        <button
+          v-if="provider.source === 'db'"
+          class="text-[var(--status-error)] hover:underline inline-flex items-center gap-1"
+          :disabled="removing"
+          @click="remove"
+        >
+          <Icon
+            :icon="removing ? 'mdi:loading' : 'mdi:trash-can-outline'"
+            class="w-4 h-4"
+            :class="{ 'animate-spin': removing }"
+          />
+          {{ $t('adminSetup.removeKey') }}
+        </button>
+      </template>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { Icon } from '@iconify/vue'
+import { useI18n } from 'vue-i18n'
+import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
+import { useDialog } from '@/composables/useDialog'
+import { useNotification } from '@/composables/useNotification'
+import {
+  applyProviderDefaults,
+  deleteProviderKey,
+  saveProviderKey,
+  testProviderKey,
+  type ProviderKeyStatus,
+} from '@/services/api/providerKeysApi'
+import { providerHelpByName } from '@/utils/providerHelp'
+
+const props = defineProps<{
+  provider: ProviderKeyStatus
+  isDefaultChat: boolean
+}>()
+
+const emit = defineEmits<{
+  changed: []
+}>()
+
+const { t } = useI18n()
+const { confirm } = useDialog()
+const { success, error: showError } = useNotification()
+
+const keyInput = ref('')
+const saving = ref(false)
+const testing = ref(false)
+const applying = ref(false)
+const removing = ref(false)
+const helpMeta = computed(() => providerHelpByName(props.provider.name))
+
+// Offer "also make this the default" only while it is not already the default.
+// A ref alone would keep the initial value after the parent re-fetches, so the
+// checkbox has to follow the prop.
+const applyDefaultsTouched = ref(false)
+const applyDefaultsOverride = ref(false)
+const applyDefaultsChecked = computed({
+  get: () => (applyDefaultsTouched.value ? applyDefaultsOverride.value : !props.isDefaultChat),
+  set: (value: boolean) => {
+    applyDefaultsTouched.value = true
+    applyDefaultsOverride.value = value
+  },
+})
+
+const save = async () => {
+  const key = keyInput.value.trim()
+  if (key === '' || saving.value) return
+  saving.value = true
+  try {
+    const result = await saveProviderKey(props.provider.name, key, {
+      applyDefaults: applyDefaultsChecked.value,
+    })
+    keyInput.value = ''
+    success(
+      result.defaultsApplied
+        ? t('adminSetup.savedWithDefaults', { provider: props.provider.displayName })
+        : t('adminSetup.saved', { provider: props.provider.displayName })
+    )
+    emit('changed')
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('adminSetup.saveFailed'))
+  } finally {
+    saving.value = false
+  }
+}
+
+const test = async () => {
+  testing.value = true
+  try {
+    const result = await testProviderKey(props.provider.name)
+    if (result.ok) {
+      success(t('adminSetup.testOk', { provider: props.provider.displayName }))
+    } else {
+      showError(
+        result.error || t('adminSetup.testFailed', { provider: props.provider.displayName })
+      )
+    }
+  } catch (err) {
+    showError(
+      err instanceof Error
+        ? err.message
+        : t('adminSetup.testFailed', { provider: props.provider.displayName })
+    )
+  } finally {
+    testing.value = false
+  }
+}
+
+const makeDefault = async () => {
+  applying.value = true
+  try {
+    await applyProviderDefaults(props.provider.name)
+    success(t('adminSetup.defaultsApplied', { provider: props.provider.displayName }))
+    emit('changed')
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('adminSetup.saveFailed'))
+  } finally {
+    applying.value = false
+  }
+}
+
+const remove = async () => {
+  if (removing.value) return
+  const confirmed = await confirm({
+    title: t('adminSetup.removeConfirmTitle'),
+    message: t('adminSetup.removeConfirmMessage', { provider: props.provider.displayName }),
+    danger: true,
+  })
+  if (!confirmed) return
+  removing.value = true
+  try {
+    const result = await deleteProviderKey(props.provider.name)
+    // "Removed" would be a half-truth while the env var still holds a key: the
+    // provider stays connected from that value on the next request.
+    if (result.envFallbackActive) {
+      success(
+        t('adminSetup.removedEnvStillSet', {
+          provider: props.provider.displayName,
+          envVar: result.envVar ?? props.provider.envVar,
+        })
+      )
+    } else {
+      success(t('adminSetup.removed', { provider: props.provider.displayName }))
+    }
+    emit('changed')
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('adminSetup.saveFailed'))
+  } finally {
+    removing.value = false
+  }
+}
+</script>

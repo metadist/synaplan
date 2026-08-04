@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Controller;
 
 use App\Controller\StreamController;
+use App\Service\Message\MessageProcessor;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Pins the request contract of the incognito `history` payload: only valid
  * {role, content} pairs survive, roles are normalized, and the result is
- * capped to the same message/char budget as `findChatHistory()` — keeping
+ * capped to the same message/char budget as a persisted chat — keeping
  * the NEWEST entries.
  *
  * The parser is exercised via reflection: the controller's constructor pulls
@@ -81,18 +82,20 @@ final class StreamControllerIncognitoHistoryTest extends TestCase
         self::assertSame([['role' => 'assistant', 'content' => 'Case-normalized']], $result);
     }
 
-    public function testCapsToNewestThirtyMessages(): void
+    public function testCapsToTheNewestMessagesOfThePersistedChatWindow(): void
     {
+        $window = MessageProcessor::HISTORY_MAX_MESSAGES;
+
         $history = [];
-        for ($i = 1; $i <= 40; ++$i) {
+        for ($i = 1; $i <= $window + 10; ++$i) {
             $history[] = ['role' => 'user', 'content' => "msg {$i}"];
         }
 
         $result = $this->parse($history);
 
-        self::assertCount(30, $result);
+        self::assertCount($window, $result);
         self::assertSame('msg 11', $result[0]['content'], 'oldest overflow entries must be dropped');
-        self::assertSame('msg 40', $result[29]['content'], 'newest entry must be kept');
+        self::assertSame('msg '.($window + 10), $result[$window - 1]['content'], 'newest entry must be kept');
     }
 
     public function testCharBudgetKeepsNewestEntries(): void

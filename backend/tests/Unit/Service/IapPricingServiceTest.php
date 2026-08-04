@@ -52,19 +52,26 @@ final class IapPricingServiceTest extends TestCase
         $this->assertSame(['PRO', 'TEAM', 'BUSINESS'], array_keys($svc->productCatalogue()));
     }
 
-    public function testIsConfiguredFalseForPlaceholderDefaults(): void
+    public function testIsConfiguredFalseWithoutAnyProductId(): void
     {
-        // Default constructor = documented placeholders → IAP effectively off.
+        // No product IDs configured → IAP off, which is the web-only default.
         $svc = new IapPricingService();
 
         $this->assertFalse($svc->isConfigured());
+        $this->assertSame([], $svc->productCatalogue());
+        $this->assertNull($svc->productIdForTier('PRO'));
     }
 
-    public function testIsConfiguredTrueWhenAnyRealProductSet(): void
+    public function testIsConfiguredTrueWhenAnyProductSet(): void
     {
-        $svc = new IapPricingService('com.real.pro', 'com.synaplan.app.team.monthly', 'com.synaplan.app.business.monthly');
+        $svc = new IapPricingService('com.synaplan.app.pro.monthly');
 
         $this->assertTrue($svc->isConfigured());
+        // A tier without its own product stays unpurchasable, and the catalogue
+        // omits it so the app never registers an empty product with the store.
+        $this->assertSame(['PRO' => 'com.synaplan.app.pro.monthly'], $svc->productCatalogue());
+        $this->assertNull($svc->productIdForTier('TEAM'));
+        $this->assertSame('NEW', $svc->mapProductIdToLevel('com.synaplan.app.team.monthly'));
     }
 
     public function testAppPriceAddsDefaultStoreMarkupAndSnapsToPricePoint(): void

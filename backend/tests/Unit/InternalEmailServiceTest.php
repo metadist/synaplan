@@ -8,6 +8,9 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
 use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\RawMessage;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Twig\Environment;
 
@@ -157,7 +160,7 @@ class InternalEmailServiceTest extends TestCase
     /**
      * Service whose mailer captures the (single) sent email into $captured.
      */
-    private function taskResultService(?\Symfony\Component\Mime\Email &$captured): InternalEmailService
+    private function taskResultService(?Email &$captured): InternalEmailService
     {
         $mailer = $this->createMock(MailerInterface::class);
         $mailer->expects($this->once())
@@ -320,5 +323,129 @@ class InternalEmailServiceTest extends TestCase
 
         $this->serviceWithMailer($mailer)
             ->sendTaskResultEmail('owner@example.com', 'Your results', 'Body.');
+    }
+
+    // ---- operator inbox for abuse reports (App Store Review Guideline 1.2) ----
+
+    /**
+     * `.env.example` ships APP_ADMIN_EMAIL blank, so a deployment that copied it
+     * has the key set to an empty string. `??` returns that empty string instead
+     * of falling through, and the report Apple requires an operator to act on
+     * was addressed to nobody.
+     */
+    public function testAbuseReportFallsBackWhenTheAdminInboxIsBlank(): void
+    {
+        $recipients = $this->recipientsOfModerationReport([
+            'APP_ADMIN_EMAIL' => '',
+            'APP_SENDER_EMAIL' => 'ops@example.test',
+        ]);
+
+        self::assertSame(['ops@example.test'], $recipients);
+    }
+
+    /** With neither address configured the report still reaches the abuse contact. */
+    public function testAbuseReportReachesTheFixedContactWhenNothingIsConfigured(): void
+    {
+        $recipients = $this->recipientsOfModerationReport([
+            'APP_ADMIN_EMAIL' => '   ',
+            'APP_SENDER_EMAIL' => '',
+        ]);
+
+        self::assertSame(['team@synaplan.com'], $recipients);
+    }
+
+    /** A configured operator inbox wins over both fallbacks. */
+    public function testAbuseReportPrefersTheConfiguredOperatorInbox(): void
+    {
+        $recipients = $this->recipientsOfModerationReport([
+            'APP_ADMIN_EMAIL' => 'abuse@example.test',
+            'APP_SENDER_EMAIL' => 'ops@example.test',
+        ]);
+
+        self::assertSame(['abuse@example.test'], $recipients);
+    }
+
+    /**
+     * A report is stored before the notification is attempted, so a bad operator
+     * address must never travel back to the reporting user. The controller maps
+     * InvalidArgumentException to a 400 with the raw message, which is exactly
+     * what an App Review tester would see.
+     */
+    public function testAnUnusableOperatorAddressNeverReachesTheReportingUser(): void
+    {
+        $previous = $_ENV['APP_ADMIN_EMAIL'] ?? null;
+        $_ENV['APP_ADMIN_EMAIL'] = 'not an address';
+
+        $mailer = $this->createMock(MailerInterface::class);
+        $mailer->expects($this->never())->method('send');
+
+        try {
+            $this->serviceWithMailer($mailer)->sendModerationReportEmail($this->moderationReport());
+        } finally {
+            if (null === $previous) {
+                unset($_ENV['APP_ADMIN_EMAIL']);
+            } else {
+                $_ENV['APP_ADMIN_EMAIL'] = $previous;
+            }
+        }
+    }
+
+    /**
+     * @param array<string, string> $env
+     *
+     * @return list<string>
+     */
+    private function recipientsOfModerationReport(array $env): array
+    {
+        $previous = [];
+        foreach ($env as $key => $value) {
+            $previous[$key] = $_ENV[$key] ?? null;
+            $_ENV[$key] = $value;
+        }
+
+        $recipients = [];
+        $mailer = $this->createMock(MailerInterface::class);
+        $mailer->expects($this->once())
+            ->method('send')
+            ->willReturnCallback(function (RawMessage $message) use (&$recipients): void {
+                self::assertInstanceOf(Email::class, $message);
+                $recipients = array_map(
+                    static fn (Address $address): string => $address->getAddress(),
+                    $message->getTo(),
+                );
+            });
+
+        try {
+            $this->serviceWithMailer($mailer)->sendModerationReportEmail($this->moderationReport());
+        } finally {
+            foreach ($previous as $key => $value) {
+                if (null === $value) {
+                    unset($_ENV[$key]);
+                } else {
+                    $_ENV[$key] = $value;
+                }
+            }
+        }
+
+        return $recipients;
+    }
+
+    /**
+     * @return array{id:int,contentType:string,contentId:int,reason:string,details:?string,reporterId:int,reporterEmail:?string,reportedUserId:?int,reportedUserEmail:?string,created:string}
+     */
+    private function moderationReport(): array
+    {
+        return [
+            'id' => 7,
+            'contentType' => 'message',
+            'contentId' => 42,
+            'reason' => 'hate_speech',
+            'details' => null,
+            'reporterId' => 1,
+            'reporterEmail' => 'reporter@example.test',
+            'reportedUserId' => null,
+            'reportedUserEmail' => null,
+            'created' => '2026-08-01 12:00:00',
+        ];
     }
 }

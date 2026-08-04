@@ -4,6 +4,7 @@ namespace App\Tests\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\TritonProvider;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -162,12 +163,126 @@ class TritonProviderTest extends TestCase
         $this->assertEqualsWithDelta(1.0, $result[0], 1e-6);
     }
 
-    public function testEmbedBatchDelegatesToEmbed(): void
+    public function testEmbedBatchThrowsWhenUnavailable(): void
     {
-        // embedBatch on unavailable provider should throw on first text
         $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('not initialized');
 
         $this->unavailableProvider->embedBatch(['hello', 'world'], ['model' => 'bge-m3']);
+    }
+
+    public function testEmbedBatchReturnsEmptyForEmptyInput(): void
+    {
+        $result = $this->provider->embedBatch([], ['model' => 'bge-m3']);
+
+        $this->assertSame([], $result['embeddings']);
+        $this->assertSame(0, $result['usage']['total_tokens']);
+    }
+
+    public function testEmbedBatchRequiresModelOption(): void
+    {
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('Embedding model must be specified');
+
+        $this->provider->embedBatch(['hello'], []);
+    }
+
+    /**
+     * The batched request packs all texts into a single [N, 1] BYTES tensor,
+     * so Triton runs one forward pass per chunk. Verify shape + payload for
+     * batch sizes 1, 32 and >32 (33).
+     */
+    #[DataProvider('batchSizeProvider')]
+    public function testCreateBatchEmbedInferRequestShape(int $count): void
+    {
+        $texts = [];
+        for ($i = 0; $i < $count; ++$i) {
+            $texts[] = 'text-'.$i;
+        }
+
+        $reflection = new \ReflectionClass($this->provider);
+        $method = $reflection->getMethod('createBatchEmbedInferRequest');
+
+        /** @var \Inference\ModelInferRequest $request */
+        $request = $method->invoke($this->provider, $texts, 'bge-m3');
+
+        $this->assertEquals('bge-m3', $request->getModelName());
+
+        $inputs = iterator_to_array($request->getInputs());
+        $this->assertCount(1, $inputs);
+
+        $input = $inputs[0];
+        $this->assertEquals('text_input', $input->getName());
+        $this->assertEquals('BYTES', $input->getDatatype());
+        $this->assertEquals([$count, 1], iterator_to_array($input->getShape()));
+
+        $bytes = iterator_to_array($input->getContents()->getBytesContents());
+        $this->assertCount($count, $bytes);
+        $this->assertSame($texts, $bytes);
+    }
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function batchSizeProvider(): array
+    {
+        return [
+            'single' => [1],
+            'full batch' => [32],
+            'over batch (chunked)' => [33],
+        ];
+    }
+
+    public function testSplitFlatEmbeddingsSplitsInInputOrder(): void
+    {
+        $reflection = new \ReflectionClass($this->provider);
+        $method = $reflection->getMethod('splitFlatEmbeddings');
+
+        // 3 vectors of dimension 2, concatenated row-major.
+        $flat = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+        $result = $method->invoke($this->provider, $flat, 3);
+
+        $this->assertSame([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], $result);
+    }
+
+    public function testSplitFlatEmbeddingsSingleVector(): void
+    {
+        $reflection = new \ReflectionClass($this->provider);
+        $method = $reflection->getMethod('splitFlatEmbeddings');
+
+        $flat = [0.1, 0.2, 0.3, 0.4];
+        $result = $method->invoke($this->provider, $flat, 1);
+
+        $this->assertSame([[0.1, 0.2, 0.3, 0.4]], $result);
+    }
+
+    public function testSplitFlatEmbeddingsThrowsOnIndivisibleOutput(): void
+    {
+        $reflection = new \ReflectionClass($this->provider);
+        $method = $reflection->getMethod('splitFlatEmbeddings');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('not divisible');
+
+        // 5 floats cannot be evenly split across 2 texts.
+        $method->invoke($this->provider, [1.0, 2.0, 3.0, 4.0, 5.0], 2);
+    }
+
+    public function testSplitFlatEmbeddingsHandlesFullAndOverBatch(): void
+    {
+        $reflection = new \ReflectionClass($this->provider);
+        $method = $reflection->getMethod('splitFlatEmbeddings');
+
+        // Simulate a 32- and a 33-vector output with dimension 4.
+        foreach ([32, 33] as $count) {
+            $flat = range(1, $count * 4);
+            $result = $method->invoke($this->provider, $flat, $count);
+
+            $this->assertCount($count, $result);
+            $this->assertCount(4, $result[0]);
+            $this->assertSame([1, 2, 3, 4], $result[0]);
+            $this->assertSame([$count * 4 - 3, $count * 4 - 2, $count * 4 - 1, $count * 4], $result[$count - 1]);
+        }
     }
 
     public function testRequiredEnvVars(): void

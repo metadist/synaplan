@@ -12,6 +12,8 @@ interface FakeSubscription {
   unsubscribe: ReturnType<typeof vi.fn>
   removeAllListeners: ReturnType<typeof vi.fn>
   publish: ReturnType<typeof vi.fn>
+  /** Options passed to `newSubscription` (e.g. the `getToken` callback). */
+  __options: { getToken?: () => Promise<string> }
   /** Helper used by the tests to fire an event back into the wrapper. */
   __emit: (event: string, ctx: unknown) => void
 }
@@ -39,6 +41,7 @@ function buildFakeSubscription(): FakeSubscription {
     unsubscribe: vi.fn(),
     removeAllListeners: vi.fn(),
     publish: vi.fn().mockResolvedValue({ ok: true }),
+    __options: {},
     __emit(event, ctx) {
       handlers.get(event)?.(ctx)
     },
@@ -55,8 +58,9 @@ function buildFakeCentrifuge(): FakeCentrifuge {
       handlers.set(event, handler)
     }),
     removeAllListeners: vi.fn(),
-    newSubscription: vi.fn(() => {
+    newSubscription: vi.fn((_channel: string, options?: { getToken?: () => Promise<string> }) => {
       lastSub = buildFakeSubscription()
+      lastSub.__options = options ?? {}
       fake.__lastSubscription = lastSub
       return lastSub
     }),
@@ -75,7 +79,10 @@ vi.mock('centrifuge', () => {
     instances.push(inst)
     return inst
   }
-  return { Centrifuge }
+  // Declared inside the factory (which is hoisted) so it exists before the
+  // wrapper's `import { UnauthorizedError } from 'centrifuge'` resolves.
+  class UnauthorizedError extends Error {}
+  return { Centrifuge, UnauthorizedError }
 })
 
 vi.mock('@/services/realtime/tokenApi', () => ({
@@ -96,8 +103,13 @@ vi.mock('@/services/realtime/tokenApi', () => ({
   }),
 }))
 
+import { UnauthorizedError } from 'centrifuge'
 import { RealtimeClient } from '@/services/realtime/RealtimeClient'
 import type { ConnectionState } from '@/services/realtime/types'
+import { fetchSubscriptionToken } from '@/services/realtime/tokenApi'
+import { ApiError } from '@/services/api/httpClient'
+
+const fetchSubscriptionTokenMock = vi.mocked(fetchSubscriptionToken)
 
 describe('RealtimeClient', () => {
   beforeEach(() => {
@@ -209,6 +221,34 @@ describe('RealtimeClient', () => {
     handle.unsubscribe()
     expect(sub.unsubscribe).toHaveBeenCalledOnce()
     expect(c.removeSubscription).toHaveBeenCalledOnce()
+  })
+
+  it('converts a 403 subscription-token failure into UnauthorizedError to stop the retry loop (#1381)', async () => {
+    const sink: { state?: ConnectionState; error?: string } = {}
+    const client = buildClient(sink)
+
+    await client.subscribe('user:1', { onPublication: () => {} })
+    const getToken = instances[0].__lastSubscription!.__options.getToken!
+    expect(typeof getToken).toBe('function')
+
+    // A stale subscription to another principal's channel (e.g. after
+    // impersonation) resolves to a 403 that no token refresh can fix.
+    fetchSubscriptionTokenMock.mockRejectedValueOnce(new ApiError(403, 'forbidden'))
+
+    await expect(getToken()).rejects.toBeInstanceOf(UnauthorizedError)
+  })
+
+  it('rethrows a transient subscription-token failure so centrifuge can retry (#1381)', async () => {
+    const sink: { state?: ConnectionState; error?: string } = {}
+    const client = buildClient(sink)
+
+    await client.subscribe('user:1', { onPublication: () => {} })
+    const getToken = instances[0].__lastSubscription!.__options.getToken!
+
+    // A network blip is not an auth failure — must NOT become UnauthorizedError.
+    fetchSubscriptionTokenMock.mockRejectedValueOnce(new Error('network down'))
+
+    await expect(getToken()).rejects.not.toBeInstanceOf(UnauthorizedError)
   })
 
   it('forwards subscription errors via onError', async () => {

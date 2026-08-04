@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Service\Admin;
 
+use App\AI\Credential\ProviderKeyCatalog;
+use App\AI\Credential\ProviderKeyStore;
+use App\AI\Credential\SecretValueGuard;
 use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
 use App\Service\FeedbackConstants;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Media\MediaJobConfig;
+use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
@@ -35,6 +39,7 @@ final readonly class SystemConfigService
         private readonly LoggerInterface $logger,
         private readonly ConfigRepository $configRepository,
         private readonly string $defaultTtsUrl,
+        private readonly ProviderKeyStore $providerKeyStore,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -51,8 +56,10 @@ final readonly class SystemConfigService
                 'label' => 'AI Services',
                 'sections' => [
                     'ollama' => ['label' => 'Local AI (Ollama)', 'fields' => ['OLLAMA_BASE_URL']],
-                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN', 'XAI_API_KEY']],
+                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
                     'selfhosted' => ['label' => 'Self-Hosted AI', 'fields' => ['TRITON_SERVER_URL']],
+                    'media' => ['label' => 'Image & Video Generation', 'fields' => ['THEHIVE_API_KEY', 'HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET']],
+                    'embeddings' => ['label' => 'Embeddings (Cloudflare Workers AI)', 'fields' => ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'EMBEDDING_FALLBACK_PROVIDER']],
                     'tts' => ['label' => 'Text-to-Speech', 'fields' => ['SYNAPLAN_TTS_URL', 'ELEVENLABS_API_KEY']],
                 ],
             ],
@@ -111,6 +118,15 @@ final readonly class SystemConfigService
                 'label' => 'Routing',
                 'sections' => [
                     'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
+                    'conversation_summary' => ['label' => 'Rolling conversation summary', 'fields' => [
+                        'CONVERSATION_SUMMARY_ENABLED',
+                        'CONVERSATION_SUMMARY_TARGET_WINDOW_CHARS',
+                        'CONVERSATION_SUMMARY_RECENT_VERBATIM_CHARS',
+                        'CONVERSATION_SUMMARY_MAX_CHARS',
+                        'CONVERSATION_SUMMARY_MAX_SOURCE_MESSAGES',
+                        'CONVERSATION_SUMMARY_TIERS',
+                        'CONVERSATION_SUMMARY_CACHE_TTL',
+                    ]],
                 ],
             ],
             'interface' => [
@@ -160,6 +176,20 @@ final readonly class SystemConfigService
 
         foreach ($this->schema as $key => $field) {
             $source = $field['source'] ?? 'env';
+
+            // Cloud provider API keys live in the encrypted ProviderKeyStore
+            // (BCONFIG), not in .env — report their status from there so this
+            // legacy surface and the provider-key wizard agree.
+            $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
+            if (null !== $storeProvider) {
+                $status = $this->providerKeyStore->getStatus($storeProvider);
+                $values[$key] = [
+                    'value' => $status['configured'] ? self::MASK : $field['default'],
+                    'isSet' => $status['configured'],
+                    'isMasked' => $status['configured'],
+                ];
+                continue;
+            }
 
             if ('database' === $source) {
                 $rawValue = $this->configRepository->getValue(
@@ -229,6 +259,48 @@ final readonly class SystemConfigService
 
         $field = $this->schema[$key];
         $source = $field['source'] ?? 'env';
+
+        // Reading a sensitive field returns self::MASK, so a client that submits
+        // the form unchanged (or retries it) sends the mask back. Storing that
+        // would silently destroy a working secret — refuse it server-side
+        // instead of relying on the frontend to filter it out.
+        if ($field['sensitive'] && SecretValueGuard::isMasked($value)) {
+            return [
+                'success' => false,
+                'requiresRestart' => false,
+                'message' => 'That is the masked placeholder, not a real value. Leave the field untouched to keep the current secret, or enter a new one.',
+            ];
+        }
+
+        // Cloud provider API keys are stored encrypted in the ProviderKeyStore
+        // and apply without a restart (providers resolve keys per call). An empty
+        // value removes the stored key (an env fallback, if set, then applies
+        // again) — the admin UI clears keys on the setup page instead, so this
+        // branch serves API clients that PUT an empty string.
+        $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
+        if (null !== $storeProvider) {
+            try {
+                if ('' === trim($value)) {
+                    $this->providerKeyStore->deleteKey($storeProvider);
+                } else {
+                    $this->providerKeyStore->saveKey($storeProvider, $value, ProviderKeyStore::ORIGIN_UI);
+                }
+                $this->logChange($key, $value);
+
+                return ['success' => true, 'requiresRestart' => false];
+            } catch (\InvalidArgumentException $e) {
+                // Rejected value (placeholder, mask) — the message names the
+                // problem and is safe to show: it never contains a real key.
+                return ['success' => false, 'requiresRestart' => false, 'message' => $e->getMessage()];
+            } catch (\Throwable $e) {
+                $this->logger->error('Failed to save provider key via system config', [
+                    'key' => $key,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to save the API key'];
+            }
+        }
 
         // Database-backed fields: write to BCONFIG, no restart needed
         if ('database' === $source) {
@@ -308,6 +380,16 @@ final readonly class SystemConfigService
                 if ($numericValue < 1 || floor($numericValue) !== $numericValue) {
                     return ['success' => false, 'requiresRestart' => false, 'message' => 'Limit must be a positive integer'];
                 }
+            }
+
+            // Rolling-summary sizes are whole counts (characters, messages,
+            // tiers, seconds). ConversationSummaryConfigService discards a
+            // non-positive value and uses its default, so reject it here
+            // instead of storing a row that does nothing.
+            if (ConversationSummaryConstants::CONFIG_GROUP === ($field['dbGroup'] ?? null)
+                && ($numericValue < 1 || floor($numericValue) !== $numericValue)
+            ) {
+                return ['success' => false, 'requiresRestart' => false, 'message' => 'Value must be a positive whole number'];
             }
         }
 
@@ -741,6 +823,74 @@ final readonly class SystemConfigService
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
             ],
+            // === Routing — rolling conversation summary (database-backed) ===
+            // BCONFIG group CONVERSATION_SUMMARY (ownerId=0), the rows
+            // ConversationSummaryConfigService reads. No row means "use the
+            // ConversationSummaryConstants default", so the defaults below must
+            // stay in sync with that class.
+            'CONVERSATION_SUMMARY_ENABLED' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Condense the earlier part of a long chat into a rolling summary that is injected into the system prompt, while the newest turns are still replayed word for word. Keeps the topic, the user\'s position and past decisions alive many answers later. The summary is written asynchronously after each turn by the Summary model (configurable under AI → Routing), so answering stays snappy. When OFF, a long chat only ever sees the most recent turns.',
+                'default' => var_export(ConversationSummaryConstants::ENABLED, true),
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_ENABLED,
+            ],
+            'CONVERSATION_SUMMARY_TARGET_WINDOW_CHARS' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Total characters of conversational memory sent to the answering model: the verbatim recent turns plus the injected summary. Clamped to '.ConversationSummaryConstants::MIN_WINDOW_CHARS.'–'.ConversationSummaryConstants::MAX_WINDOW_CHARS.'.',
+                'default' => (string) ConversationSummaryConstants::TARGET_WINDOW_CHARS,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_TARGET_WINDOW_CHARS,
+            ],
+            'CONVERSATION_SUMMARY_RECENT_VERBATIM_CHARS' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Share of the window reserved for the newest turns, which are replayed word for word. Everything older is condensed. Raise it to keep more literal context, lower it to summarize sooner. Always leaves at least 500 characters for the summary.',
+                'default' => (string) ConversationSummaryConstants::RECENT_VERBATIM_CHARS,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_RECENT_VERBATIM_CHARS,
+            ],
+            'CONVERSATION_SUMMARY_MAX_CHARS' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Hard cap on the injected summary itself. Capped at whatever the window has left after the verbatim turns.',
+                'default' => (string) ConversationSummaryConstants::SUMMARY_MAX_CHARS,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_SUMMARY_MAX_CHARS,
+            ],
+            'CONVERSATION_SUMMARY_MAX_SOURCE_MESSAGES' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Upper bound on how many older messages are fed to the Summary model in one call. Bounds the cost of summarizing a very long conversation; older messages beyond this are represented by the previous summary.',
+                'default' => (string) ConversationSummaryConstants::MAX_SOURCE_MESSAGES,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_MAX_SOURCE_MESSAGES,
+            ],
+            'CONVERSATION_SUMMARY_TIERS' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Number of recency tiers used for gradient compression: the oldest tier is condensed hardest, the tier next to the verbatim turns the least. 1–5.',
+                'default' => (string) ConversationSummaryConstants::TIERS,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_TIERS,
+            ],
+            'CONVERSATION_SUMMARY_CACHE_TTL' => [
+                'tab' => 'routing', 'section' => 'conversation_summary', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Seconds the stored summary is kept before Redis expires it. The summary is refreshed asynchronously after each long-chat turn, so a follow-up turn never waits on the summarizer. Raise this on quiet installs; lower it only if you need settings changes to take effect faster.',
+                'default' => (string) ConversationSummaryConstants::CACHE_TTL,
+                'source' => 'database',
+                'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
+                'dbKey' => ConversationSummaryConstants::KEY_CACHE_TTL,
+            ],
             // Stored in BCONFIG group MEDIA / setting ASYNC_JOBS_ENABLED (the row
             // MediaJobConfig reads). Master switch for detaching media renders to
             // background jobs vs running them inline.
@@ -994,25 +1144,52 @@ final readonly class SystemConfigService
                 'sensitive' => false, 'description' => 'Ollama server URL',
                 'default' => 'http://ollama:11434',
             ],
+            // Every field below whose env var is known to ProviderKeyCatalog is
+            // stored encrypted in BCONFIG by ProviderKeyStore and applies without
+            // a restart — hence 'source' => 'database'. getValues()/setValue()
+            // route them through the store before the source check ever runs; the
+            // marker only tells the UI to label them "saved live".
             'OPENAI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true, 'description' => 'OpenAI API key',
-                'default' => '',
+                'default' => '', 'source' => 'database',
             ],
             'ANTHROPIC_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true, 'description' => 'Anthropic (Claude) API key',
-                'default' => '',
+                'default' => '', 'source' => 'database',
             ],
             'GROQ_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true, 'description' => 'Groq API key',
-                'default' => '',
+                'sensitive' => true, 'description' => 'Groq API key (free tier available)',
+                'default' => '', 'source' => 'database',
             ],
             'GOOGLE_GEMINI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true, 'description' => 'Google Gemini API key',
-                'default' => '',
+                'sensitive' => true, 'description' => 'Google Gemini API key — also unlocks Imagen, Nano Banana, Veo and Gemini TTS',
+                'default' => '', 'source' => 'database',
+            ],
+            'MISTRAL_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Mistral API key — chat, vision and the Voxtral audio pair',
+                'default' => '', 'source' => 'database',
+            ],
+            'XAI_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
+                'default' => '', 'source' => 'database',
+            ],
+            'TRUSTEDTOKENS_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'TrustedTokens API key — sovereign inference on German GPUs (GLM, Qwen, GPT OSS)',
+                'default' => '', 'source' => 'database',
+            ],
+            'HUGGINGFACE_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true, 'description' => 'HuggingFace API token — routes the Kimi K2 models through HF Inference',
+                'default' => '', 'source' => 'database',
             ],
             'GOOGLE_VERTEX_ACCESS_TOKEN' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
@@ -1020,15 +1197,40 @@ final readonly class SystemConfigService
                 'description' => 'Optional OAuth bearer for Vertex AI Imagen; leave empty to use Gemini API (Imagen 4) with the key above',
                 'default' => '',
             ],
-            'XAI_API_KEY' => [
-                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true,
-                'description' => 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
-                'default' => '',
-            ],
             'TRITON_SERVER_URL' => [
                 'tab' => 'ai', 'section' => 'selfhosted', 'type' => 'url',
                 'sensitive' => false, 'description' => 'NVIDIA Triton gRPC endpoint',
+                'default' => '',
+            ],
+            'THEHIVE_API_KEY' => [
+                'tab' => 'ai', 'section' => 'media', 'type' => 'password',
+                'sensitive' => true, 'description' => 'TheHive API key — Flux Schnell and SDXL image generation',
+                'default' => '',
+            ],
+            'HIGGSFIELD_API_KEY' => [
+                'tab' => 'ai', 'section' => 'media', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Higgsfield API key — Soul/Reve images, DoP and Kling video. Both halves are required',
+                'default' => '',
+            ],
+            'HIGGSFIELD_API_SECRET' => [
+                'tab' => 'ai', 'section' => 'media', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Higgsfield API secret — the key alone will not authenticate',
+                'default' => '',
+            ],
+            'CLOUDFLARE_ACCOUNT_ID' => [
+                'tab' => 'ai', 'section' => 'embeddings', 'type' => 'text',
+                'sensitive' => false, 'description' => 'Cloudflare account ID for Workers AI embeddings (bge-m3)',
+                'default' => '',
+            ],
+            'CLOUDFLARE_API_TOKEN' => [
+                'tab' => 'ai', 'section' => 'embeddings', 'type' => 'password',
+                'sensitive' => true, 'description' => 'Cloudflare API token with Workers AI access',
+                'default' => '',
+            ],
+            'EMBEDDING_FALLBACK_PROVIDER' => [
+                'tab' => 'ai', 'section' => 'embeddings', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Provider to try when the primary embedding fails (e.g. "cloudflare"); empty disables fallback',
                 'default' => '',
             ],
             'SYNAPLAN_TTS_URL' => [
