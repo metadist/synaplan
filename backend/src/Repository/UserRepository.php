@@ -23,6 +23,11 @@ class UserRepository extends ServiceEntityRepository
         return $this->findOneBy(['providerId' => $providerId]);
     }
 
+    public function hasAdmin(): bool
+    {
+        return $this->count(['userLevel' => 'ADMIN']) > 0;
+    }
+
     /**
      * Find user by Stripe customer ID (searches in paymentDetails JSON).
      */

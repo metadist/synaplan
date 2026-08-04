@@ -1,0 +1,97 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service\Admin;
+
+use App\Repository\UserRepository;
+use App\Service\UserLifecycleService;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+
+/**
+ * Creates the first administrator from deployment credentials.
+ *
+ * Once any administrator exists, this service is deliberately a no-op. This
+ * makes it safe to run on every container start without turning the bootstrap
+ * secret into a permanent password-reset mechanism.
+ *
+ * The rules for the configured values are not implemented here: they belong to
+ * BootstrapAdminConfiguration, which the container entrypoint also calls long
+ * before this service runs. One implementation, no drift.
+ */
+final readonly class BootstrapAdminService
+{
+    public const RESULT_NOT_CONFIGURED = 'not_configured';
+    public const RESULT_ADMIN_EXISTS = 'admin_exists';
+    public const RESULT_PROMOTED = 'promoted';
+    public const RESULT_CREATED = 'created';
+
+    private const LOCK_TTL_SECONDS = 60.0;
+
+    public function __construct(
+        private UserRepository $userRepository,
+        private UserLifecycleService $userLifecycleService,
+        private EntityManagerInterface $entityManager,
+        private UserPasswordHasherInterface $passwordHasher,
+        private LockFactory $lockFactory,
+        private LoggerInterface $logger,
+    ) {
+    }
+
+    public function bootstrap(
+        string $configuredEmail,
+        #[\SensitiveParameter]
+        string $configuredPassword,
+    ): string {
+        $configuration = BootstrapAdminConfiguration::fromConfiguration($configuredEmail, $configuredPassword);
+        if (null === $configuration) {
+            return self::RESULT_NOT_CONFIGURED;
+        }
+
+        $email = $configuration->email;
+        $password = $configuration->password();
+
+        $lock = $this->lockFactory->createLock('bootstrap-first-admin', self::LOCK_TTL_SECONDS, false);
+        if (!$lock->acquire(true)) {
+            throw new \RuntimeException('Could not acquire the first-admin bootstrap lock.');
+        }
+
+        try {
+            if ($this->userRepository->hasAdmin()) {
+                return self::RESULT_ADMIN_EXISTS;
+            }
+
+            $user = $this->userRepository->findByEmail($email);
+            if (null !== $user) {
+                $user->setUserLevel('ADMIN');
+                $user->setEmailVerified(true);
+                $user->setPw($this->passwordHasher->hashPassword($user, $password));
+                $this->entityManager->flush();
+
+                $this->logger->notice('Promoted existing user during first-admin bootstrap', [
+                    'user_id' => $user->getId(),
+                ]);
+
+                return self::RESULT_PROMOTED;
+            }
+
+            $user = $this->userLifecycleService->createUser(
+                email: $email,
+                plainPassword: $password,
+                userLevel: 'ADMIN',
+                emailVerified: true,
+            );
+
+            $this->logger->notice('Created user during first-admin bootstrap', [
+                'user_id' => $user->getId(),
+            ]);
+
+            return self::RESULT_CREATED;
+        } finally {
+            $lock->release();
+        }
+    }
+}

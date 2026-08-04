@@ -140,6 +140,11 @@ parameters:
     # "web.synaplan.com".
     env(MCP_ALLOWED_HOSTS): ''
 
+    # Optional first-admin bootstrap. Both values must be set together; once an
+    # admin exists, app:bootstrap-admin never changes any account or password.
+    env(BOOTSTRAP_ADMIN_EMAIL): ''
+    env(BOOTSTRAP_ADMIN_PASSWORD): ''
+
 services:
     _defaults:
         autowire: true
@@ -594,6 +599,11 @@ services:
             $appUrl: '%env(APP_URL)%'
         tags:
             - { name: 'console.command' }
+
+    App\Command\BootstrapAdminCommand:
+        arguments:
+            $bootstrapAdminEmail: '%env(string:BOOTSTRAP_ADMIN_EMAIL)%'
+            $bootstrapAdminPassword: '%env(string:BOOTSTRAP_ADMIN_PASSWORD)%'
 
     # Encryption Service (for sensitive data like IMAP passwords)
     App\Service\EncryptionService:
