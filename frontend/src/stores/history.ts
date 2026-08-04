@@ -529,6 +529,12 @@ export const useHistoryStore = defineStore('history', () => {
 
         // If offset is 0, replace messages; otherwise, prepend (for infinite scroll)
         if (offset === 0) {
+          // A foreground hydration may have started just before the user sent
+          // a message. The live stream is newer than that response and must not
+          // be replaced by its stale snapshot.
+          if (!silent && messages.value.some((message) => message.isStreaming)) {
+            return
+          }
           messages.value = loadedMessages
         } else {
           messages.value = [...loadedMessages, ...messages.value]

@@ -102,6 +102,38 @@ describe('History Store', () => {
     expect(store.messages[0].isSuperseded).toBe(true)
   })
 
+  it('does not replace a newer live stream with a stale foreground load', async () => {
+    let resolveLoad!: (value: {
+      success: boolean
+      messages: unknown[]
+      pagination: { hasMore: boolean }
+    }) => void
+    const getChatMessages = vi.fn(
+      () =>
+        new Promise<{
+          success: boolean
+          messages: unknown[]
+          pagination: { hasMore: boolean }
+        }>((resolve) => {
+          resolveLoad = resolve
+        })
+    )
+    vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+    const store = useHistoryStore()
+    const loading = store.loadMessages(42)
+    await vi.waitFor(() => expect(getChatMessages).toHaveBeenCalledOnce())
+
+    store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+    const assistantId = store.addStreamingMessage('assistant')
+    resolveLoad({ success: true, messages: [], pagination: { hasMore: false } })
+    await loading
+
+    expect(store.messages).toHaveLength(2)
+    expect(store.messages.at(-1)?.id).toBe(assistantId)
+    expect(store.messages.at(-1)?.isStreaming).toBe(true)
+  })
+
   /**
    * Issue #955 regression coverage. The chat API ships uploaded voice
    * notes and TTS audio in two shapes:
