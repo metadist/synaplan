@@ -2,23 +2,207 @@
 
 Complete installation instructions for Synaplan.
 
-## Prerequisites
+## Choose the Right Deployment Path
+
+Synaplan has separate development and production deployment contracts:
+
+- **Local development:** use the root `docker-compose.yml` or
+  `docker-compose-minimal.yml`. These files build from source and include
+  development tooling. They are not the supported production contract.
+- **Production self-hosting:** use `deploy/compose.yaml` with a pinned Synaplan
+  image version and secrets supplied through `deploy/.env`.
+- **Elestio evaluation:** import the repository as a custom Docker Compose
+  CI/CD pipeline. The root `elestio.yml` delegates to the same production
+  contract under `deploy/`.
+
+The Elestio files make a custom import possible; they do **not** mean that
+Synaplan has been accepted into Elestio's Fully Managed Catalog.
+
+## Production Self-Hosting
+
+### Requirements
+
+- Docker Engine and Docker Compose v2
+- A Linux server with at least 4 vCPU, 8 GB RAM, and sufficient persistent disk
+- A DNS name and HTTPS-capable reverse proxy or managed platform
+- A released Synaplan version to pin instead of `latest`
+
+The production stack exposes only the web service. MariaDB, Redis, Centrifugo,
+Tika, and Qdrant remain on its internal network.
+
+### Start the Cloud-AI Stack
+
+Copy the production environment template, then set the required URL, version,
+password, and secret values:
+
+```bash
+cp deploy/selfhost.env.example deploy/.env
+# Edit deploy/.env and replace every required placeholder. The image version
+# must already be published and immutable.
+deploy/scripts/prepare.sh
+docker compose --env-file deploy/.env -f deploy/compose.yaml pull
+deploy/scripts/validate-release.sh
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+Keep `deploy/.env` outside version control, restrict its permissions,
+and preserve the same secret values across updates and redeployments.
+
+Cloud AI is the production default. Ollama and Whisper are not started, model
+downloads are disabled, and an AI provider key can be added after login under
+**Admin → AI Providers**.
+
+### Create the First Administrator
+
+Before the first start, set a unique email and strong password in the deployment
+environment:
+
+```dotenv
+BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+BOOTSTRAP_ADMIN_PASSWORD=REPLACE-ME
+```
+
+`REPLACE-ME` is rejected by the checks below on purpose, so a copied example can
+never become a working administrator account.
+
+The email must be a valid address of at most 128 characters. Very long or unusual
+addresses can still be refused: the part before the `@` may not be longer than 64
+characters or contain a dot at the start, at the end, or twice in a row, and each
+part of the domain name may not be longer than 63 characters or start or end with
+a hyphen. If your own address is refused, put a different valid address in
+`BOOTSTRAP_ADMIN_EMAIL`, or leave both bootstrap variables empty, sign up in the
+app afterwards, and make that account the administrator (see
+[User Management](ADMIN.md#user-management)).
+
+The password must be 8 to 64 characters long; below 16 characters it must also
+contain at least one uppercase letter, one lowercase letter, and one number. A
+password of 16 characters or more has no character requirements.
+
+Following [NIST SP 800-63B](https://pages.nist.gov/800-63-3/sp800-63b.html),
+composition rules apply only to short passwords, because length already provides
+the entropy they are meant to enforce. This also means a long generated password
+from a managed platform is accepted as-is: the application never shortens or
+rewrites it.
+
+> **The `deploy/.env` file itself can change a password before the application
+> ever sees it.** Docker Compose reads that file with its own rules: it cuts a
+> value off at the first `$`, removes one matching pair of surrounding quotes,
+> drops everything after a space followed by `#`, and trims leading and trailing
+> spaces. A password containing those characters is therefore stored in a changed
+> form, and the password you typed no longer opens the account. Use only letters,
+> digits, `-` and `_`, or generate the value like the other secrets with
+> `openssl rand -hex 32` — 64 characters, the longest length allowed above, and
+> safe in this file. A deployment that finds such a value in `deploy/.env` stops
+> with a message naming the variable, instead of creating an administrator whose
+> password nobody knows. Values that a hosting platform passes in directly as
+> environment variables are used exactly as given and are not affected. For a
+> value you cannot choose freely — your SMTP provider's password inside
+> `MAILER_DSN` — percent-encode the special characters instead, as described in
+> [Outgoing Email](EMAIL.md#outgoing-email-smtp).
+
+**Set both variables together, or leave both empty.** Leaving both empty is a
+valid choice: no administrator is created automatically, and you can promote one
+later (see [User Management](ADMIN.md#user-management)). Setting only one of the
+two is a configuration error.
+
+> **A half-configured pair stops the container on purpose.** Each application
+> container checks the pair first and, when only one value is set, prints which
+> variable is missing and exits with code `78` before it touches the database.
+> Because the production stack restarts containers automatically, the deployment
+> keeps restarting until you either supply the missing value or clear both. This
+> is intended fail-fast behavior, not a bug — read the container log to see
+> which variable is missing.
+
+The production bootstrap creates or promotes this account only when no
+administrator exists. If an administrator is already present, it changes nothing,
+so it is safe on every start. Later restarts do not reset an existing
+administrator's password or role.
+
+On the deployment path shown above, `deploy/scripts/validate-release.sh` checks
+both values **before the stack starts**. An unusable value fails that command
+once, with a message naming the problem, and nothing is deployed. Only a value
+that reaches the containers anyway — because it was changed after the check, or
+because the check was skipped — is rejected by the application itself, within
+seconds of container start and before it waits for the database, applies
+migrations, or seeds anything; that container then exits with code `1`.
+
+In short: exit code `78` means the pair is half-configured, exit code `1` means
+the email or the password does not meet the rules above.
+
+Remove both bootstrap variables from platform-visible configuration after the
+first login when the platform permits it — always both, never only one — and
+store the credentials in a password manager. Changing the variables later does
+not change the password of the administrator that already exists; if you no
+longer have those credentials, see
+[Lost Administrator Password](ADMIN.md#lost-administrator-password).
+
+### Optional Local AI
+
+The optional `local-ai` Compose profile adds Ollama and Whisper. It requires an
+explicit redeploy, at least 16 GB RAM, and substantially more disk than the
+Cloud-AI stack:
+
+```bash
+COMPOSE_PROFILES=local-ai \
+  docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+Enabling the profile installs the local AI services; a local chat model remains
+an additional opt-in. Leave `COMPOSE_PROFILES` empty to keep the Cloud-AI
+default.
+
+### Evaluate on Elestio
+
+Use Elestio's custom Docker Compose import for evaluation:
+
+1. Start the free three-day trial, note its exact expiry time, disable
+   Auto-Refill immediately, and confirm the current trial terms. Elestio
+   currently requires a payment card.
+2. Create an isolated target with at least 4 vCPU and 8 GB RAM.
+3. Import this repository as a custom CI/CD pipeline. Keep
+   `COMPOSE_PROFILES` empty for the initial Cloud-AI deployment and use the
+   generated HTTPS domain.
+4. Sign in with the generated first-administrator credentials, configure a
+   cloud AI provider, and test chat, file/RAG search, widgets, realtime
+   connections, restart, and redeploy.
+5. Trigger a backup and restore it into a separate pipeline or clone. Confirm
+   database records, uploads, and Qdrant-backed search results.
+6. Before the trial expires, delete every pipeline, target, service, and backup,
+   choose immediate backup deletion, verify Auto-Refill is still disabled, and
+   confirm that no billable resource remains.
+
+Test `local-ai` only when the selected machine and remaining trial credit are
+sufficient. Do not publish credentials, deployment logs containing secrets, or
+private endpoint details.
+
+See [Administration Guide](ADMIN.md) for production updates, backups, restore,
+and cleanup.
+
+---
+
+## Local Development
+
+The remaining instructions are for a source checkout used for development and
+local evaluation. Do not use this root Compose stack as the production
+deployment contract.
+
+### Prerequisites
 
 - **Docker** & **Docker Compose** (v2.0+)
 - **Git**
 - 8GB RAM minimum (16GB recommended for local AI)
 - ~9GB disk space (Standard) or ~5GB (Minimal). Add ~14GB if you enable the local
-  chat model (`ENABLE_LOCAL_GPT_OSS=true`, see [Standard Install](#standard-install-recommended))
+  chat model (`ENABLE_LOCAL_GPT_OSS=true`, see
+  [Standard Development Stack](#standard-development-stack))
 
 > **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The
-> Quick Install below already does: `docker compose up -d` builds the backend and
+> Quick Start below already does: `docker compose up -d` builds the backend and
 > worker locally from a multi-arch base, so PHP runs natively on `arm64` with no
-> emulation tax. That is the fastest setup and needs no extra steps. The pre-built
-> `ghcr.io/metadist/synaplan` production image is `linux/amd64` only — pulling it
-> instead runs the whole backend emulated. See
+> emulation tax. That is the fastest setup and needs no extra steps. Released
+> production images support both `linux/amd64` and `linux/arm64`. See
 > [Troubleshooting](#slow-performance-on-apple-silicon-mac).
 
-## Quick Install
+### Quick Start
 
 ```bash
 git clone <repository-url>
@@ -32,9 +216,9 @@ That's it! Visit http://localhost:5173 after ~2 minutes, log in as
 
 ---
 
-## Installation Modes
+## Local Development Modes
 
-### Standard Install (Recommended)
+### Standard Development Stack
 
 Full-featured installation with local AI models and audio transcription.
 
@@ -72,7 +256,7 @@ Until then — or while the download runs — chat needs a cloud provider key
 - Qdrant vector database (AI memories, RAG, feedback)
 - Dev tools (phpMyAdmin, MailHog)
 
-### Minimal Install (Cloud AI Only)
+### Minimal Development Stack (Cloud AI Only)
 
 Fastest way to start—uses cloud AI providers, skips large local models.
 
@@ -142,9 +326,11 @@ On first start, the system:
 **First startup:** ~1-2 minutes  
 **Subsequent restarts:** ~15-30 seconds
 
-## Default Login Credentials
+## Development Login Credentials
 
-After first startup, the following test accounts are available:
+After the local development stack starts for the first time, the following test
+accounts are available. They are development fixtures and are never the
+production first-administrator mechanism:
 
 | Email | Password | Level |
 |-------|----------|-------|
@@ -212,10 +398,9 @@ If PHP still feels slow, check what you are actually running:
 docker compose exec backend uname -m   # expect: aarch64
 ```
 
-- `x86_64` means you are on an emulated image — most likely you pulled the
-  pre-built `ghcr.io/metadist/synaplan` production image (`linux/amd64` only)
-  instead of building. Rebuild with `docker compose build --pull backend worker`,
-  then `docker compose up -d`.
+- `x86_64` means the local development container is running under emulation.
+  Rebuild with `docker compose build --pull backend worker`, then run
+  `docker compose up -d`.
 - The optional `phpmyadmin` and `mailhog` services use amd64-only upstream images
   and stay emulated. Enable **Docker Desktop → Settings → General → "Use Rosetta
   for x86/amd64 emulation on Apple Silicon"** (macOS 13+) — much faster than the

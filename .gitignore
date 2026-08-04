@@ -26,6 +26,8 @@ Thumbs.db
 # Docker volumes and data
 volumes/
 /data/
+/deploy/data/
+/deploy/.lifecycle/
 # But allow frontend source data
 !frontend/src/data/
 

@@ -107,6 +107,25 @@ Configure in `backend/.env`:
 MAILER_DSN=smtp://user:pass@smtp.example.com:587
 ```
 
+> **Percent-encode special characters in the user name and password.** The DSN is
+> a URL, so a character that has a meaning in a URL ends the password early or is
+> read as the start of the next part of the address. Replace each one with its
+> percent code and leave the rest of the value untouched: `$` becomes `%24`, `@`
+> becomes `%40`, `:` becomes `%3A`, `/` becomes `%2F`, `#` becomes `%23`, `?`
+> becomes `%3F`, and a literal `%` becomes `%25`. Synaplan decodes them again
+> before it connects, so your SMTP server receives the original password.
+>
+> ```bash
+> # SMTP password: pa$$:word
+> MAILER_DSN=smtp://user:pa%24%24%3Aword@smtp.example.com:587
+> ```
+>
+> Encoding is also what keeps the value intact in a production `deploy/.env`
+> file. Docker Compose reads that file with its own rules and would silently drop
+> everything from the first `$` onwards, and the deployment refuses such a value
+> instead of mailing with a truncated password. An encoded DSN contains no `$` at
+> all and is passed through exactly as written.
+
 > **AWS SES (and other strict SMTP servers):** SES hard-closes connections
 > that are idle for more than ~10 seconds, while Symfony Mailer keeps the
 > connection open between sends and only health-checks it after 100 seconds.

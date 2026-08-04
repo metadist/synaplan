@@ -1,0 +1,15 @@
+services:
+  db:
+    volumes: !override
+      - desktop_mariadb:/var/lib/mysql
+  redis:
+    volumes: !override
+      - desktop_redis:/data
+  qdrant:
+    volumes: !override
+      - desktop_qdrant:/qdrant/storage
+
+volumes:
+  desktop_mariadb:
+  desktop_redis:
+  desktop_qdrant:
