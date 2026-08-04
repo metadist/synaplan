@@ -530,6 +530,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $this->logger->error('ChatHandler: File generation failed');
             }
         }
+        // Non-streaming channels must follow the same no-leak contract as the
+        // web stream. A malformed officemaker envelope cannot create a file,
+        // but its raw document body must never become the assistant response.
+        elseif ('officemaker' === $topic
+            && is_string($content)
+            && FileGenerationEnvelope::hasSignature($content)) {
+            $this->logger->warning('ChatHandler: officemaker reply carried an unparseable file envelope; suppressing raw blob', [
+                'text_length' => strlen($content),
+            ]);
+            $content = '__FILE_GENERATION_FAILED__';
+        }
         // Legacy: Check for old JSON format (BTEXT, BFILE, BFILETEXT)
         // This is only for backward compatibility with old AI responses
         // New responses return plain text directly

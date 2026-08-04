@@ -81,5 +81,14 @@ class FileGenerationEnvelopeTest extends TestCase
         $reply = 'Here is your file: {"BFILEPATH":"a.docx","BFILETEXT":"unterminated';
 
         $this->assertNull(FileGenerationEnvelope::extract($reply));
+        $this->assertTrue(FileGenerationEnvelope::hasSignature($reply));
+    }
+
+    public function testSignatureRequiresBothFileEnvelopeKeys(): void
+    {
+        $this->assertFalse(FileGenerationEnvelope::hasSignature('Plain prose'));
+        $this->assertFalse(FileGenerationEnvelope::hasSignature('{"BFILEPATH":"a.docx"}'));
+        $this->assertFalse(FileGenerationEnvelope::hasSignature('The BFILEPATH field is mentioned in prose.'));
+        $this->assertTrue(FileGenerationEnvelope::hasSignature('{"BFILEPATH":"a.docx","BFILETEXT":'));
     }
 }

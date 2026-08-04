@@ -666,7 +666,17 @@ final class RunnersTest extends TestCase
         $handler = $this->createMock(ChatHandler::class);
         $handler->method('handle')->willReturn(['content' => '__FILE_GENERATION_FAILED__', 'metadata' => ['error' => 'llm error']]);
 
-        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger
+            ->expects(self::once())
+            ->method('warning')
+            ->with('DocumentGenerationRunner: node produced no file', [
+                'node_id' => 'n1',
+                'metadata_error' => 'llm error',
+                'metadata_keys' => ['error'],
+            ]);
+
+        $runner = new DocumentGenerationRunner($handler, $logger);
         $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'make a doc']);
 
         $result = $runner->run($node, $this->context($this->message('make a doc')));

@@ -99,6 +99,24 @@ class StreamController extends AbstractController
     ) {
     }
 
+    private function suppressUnparseableOfficemakerEnvelope(
+        string $text,
+        ?string $topic,
+        bool $hasGeneratedFile,
+    ): string {
+        if ($hasGeneratedFile
+            || 'officemaker' !== $topic
+            || !FileGenerationEnvelope::hasSignature($text)) {
+            return $text;
+        }
+
+        $this->logger->warning('StreamController: officemaker reply carried an unparseable file envelope; suppressing raw blob', [
+            'text_length' => strlen($text),
+        ]);
+
+        return '__FILE_GENERATION_FAILED__';
+    }
+
     /**
      * Merge stream parameters from the query string and (for POST) the JSON
      * body into one bag. Body values override query values; only scalar body
@@ -1631,14 +1649,11 @@ class StreamController extends AbstractController
                     // salvaged into a file must never be shown verbatim: for a
                     // document request, surface the translated failure marker
                     // instead of leaking the raw {"BFILEPATH",…} blob (#1406).
-                    if (null === $generatedFile
-                        && 'officemaker' === ($classification['topic'] ?? '')
-                        && str_contains($finalText, '"BFILETEXT"')) {
-                        $this->logger->warning('StreamController: officemaker reply carried an unparseable file envelope; suppressing raw blob', [
-                            'text_length' => strlen($finalText),
-                        ]);
-                        $finalText = '__FILE_GENERATION_FAILED__';
-                    }
+                    $finalText = $this->suppressUnparseableOfficemakerEnvelope(
+                        $finalText,
+                        is_string($classification['topic'] ?? null) ? $classification['topic'] : null,
+                        null !== $generatedFile,
+                    );
 
                     // A document request that produced neither a file nor any
                     // text must not be saved as an empty bubble — surface the

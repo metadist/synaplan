@@ -44,6 +44,17 @@ final class FileGenerationEnvelope
     }
 
     /**
+     * Whether a reply still carries the file-envelope signature even though it
+     * could not be decoded. Callers use this to suppress malformed raw payloads
+     * instead of exposing document content to the user.
+     */
+    public static function hasSignature(string $content): bool
+    {
+        return str_contains($content, '"BFILEPATH"')
+            && str_contains($content, '"BFILETEXT"');
+    }
+
+    /**
      * Candidate JSON object strings to attempt, in order of confidence.
      *
      * @return list<string>
