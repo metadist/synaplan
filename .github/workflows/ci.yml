@@ -55,6 +55,13 @@ jobs:
         working-directory: backend
         run: composer lint
 
+      # Host-side deployment helpers (deploy/scripts/lib.sh), including the
+      # first-admin preflight. The suite stubs `compose()`/`resolved_app_image()`,
+      # so it needs nothing but bash and a checkout — this is the leanest job in
+      # the gate that already provides both.
+      - name: Run deploy-lifecycle bash tests
+        run: bash deploy/scripts/tests/test-lifecycle.sh
+
   mobile-tooling:
     name: Mobile Release Tooling
     runs-on: ubuntu-latest
@@ -205,6 +212,32 @@ jobs:
 
       - name: Run migrations-bootstrap bash tests
         run: bash _docker/backend/tests/test-migrations-bootstrap.sh
+
+      - name: Run container-runtime bash tests
+        run: bash _docker/backend/tests/test-container-runtime.sh
+
+      # The lint job runs the same suite Docker-free, which SKIPS its tier-1
+      # (host shell) vs tier-2 (PHP filter_var) email contract case — the very
+      # drift that once shipped and crash-looped managed deployments. This job
+      # already pulls the backend base image for protoc, so re-running the suite
+      # against the exact PHP that production ships costs a container start.
+      - name: Run deploy-lifecycle bash tests (email contract)
+        run: |
+          set -euo pipefail
+          BASE_IMAGE="$(grep -oP 'FROM \K\S+' _docker/backend/Dockerfile | head -1 || true)"
+          [ -n "$BASE_IMAGE" ] || {
+            echo "::error::Could not resolve the backend base image from _docker/backend/Dockerfile"
+            exit 1
+          }
+          SYNAPLAN_CONTRACT_PHP_IMAGE="$BASE_IMAGE" \
+            bash deploy/scripts/tests/test-lifecycle.sh | tee /tmp/lifecycle-contract.log
+          # The suite skips the contract case and still exits 0 when the image
+          # variable is empty, so a green step alone would not prove the contract
+          # ran. Assert the verification line instead of trusting the exit code.
+          grep -q 'Bootstrap email contract verified against' /tmp/lifecycle-contract.log || {
+            echo "::error::The bootstrap email contract case did not run; it must never be skipped in this job"
+            exit 1
+          }
 
   frontend-build:
     name: Frontend Build
@@ -435,6 +468,8 @@ jobs:
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           # Export to tar file for sharing between jobs
@@ -846,32 +881,60 @@ jobs:
           docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v
 
   docker-push:
-    name: Push Docker Image
+    name: Publish Multi-Arch Docker Image
     runs-on: ubuntu-latest
-    # backend and frontend-checks are listed explicitly: docker-build no longer
-    # depends on them transitively (frontend-build has no `needs`), and a
-    # `latest` image must never be published when tests or checks fail —
-    # e.g. a semantic conflict between two individually green PRs surfacing
-    # only on the merged main. Costs no time: e2e always finishes last.
-    needs: [docker-build, e2e, backend, frontend-checks]
-    # Only run on main branch or tags (e2e tests already passed)
+    # The amd64 tar produced by docker-build is the exact image consumed by E2E
+    # and later published. Only arm64 is built after the gates pass; the final
+    # manifest combines that build with the tested amd64 digest.
+    needs: [lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
+    # Only publish green main pushes and release tags.
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Download Docker image artifact
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download frontend build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      - name: Download widget build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: widget-dist
+          path: frontend/dist-widget/
+
+      - name: Download tested amd64 image artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: docker-image
           path: /tmp
 
-      - name: Load Docker image
-        run: |
-          docker load -i /tmp/docker-image.tar
-          echo "Loaded images:"
-          docker images
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Extract release metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Prevent metadata-action's SemVer flavor from moving latest on tags.
+          flavor: latest=false
+          tags: |
+            # Only the default branch moves latest.
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Release tags vX.Y.Z publish the immutable version and aliases.
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
 
       - name: Log in to the Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -880,14 +943,140 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push Docker image
+      - name: Push the tested amd64 image
+        id: amd64
+        env:
+          TESTED_IMAGE_TAGS: ${{ needs.docker-build.outputs.image-tags }}
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         run: |
-          echo "Pushing all tags..."
-          docker images --format "{{.Repository}}:{{.Tag}}" | grep "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | while read -r tag; do
-            echo "Pushing: $tag"
-            docker push "$tag"
-          done
-          echo "✅ All images pushed successfully"
+          set -euo pipefail
+          docker load -i /tmp/docker-image.tar
+          source_tag="$(printf '%s\n' "$TESTED_IMAGE_TAGS" | sed -n '/./{p;q;}')"
+          [ -n "$source_tag" ] || {
+            echo "::error::docker-build did not provide a tested image tag"
+            exit 1
+          }
+
+          temporary_tag="${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-amd64"
+          docker tag "$source_tag" "$temporary_tag"
+          docker push "$temporary_tag"
+          digest="$(
+            docker buildx imagetools inspect "$temporary_tag" \
+              --format '{{ .Manifest.Digest }}'
+          )"
+          echo "ref=${temporary_tag}@${digest}" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push arm64 image
+        id: arm64
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: _docker/backend/Dockerfile
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.sha }}-arm64
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Publish multi-arch manifest
+        id: release
+        env:
+          AMD64_REF: ${{ steps.amd64.outputs.ref }}
+          ARM64_DIGEST: ${{ steps.arm64.outputs.digest }}
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          set -euo pipefail
+          arm64_ref="${REGISTRY_IMAGE}@${ARM64_DIGEST}"
+          manifest_digest=""
+
+          while IFS= read -r image; do
+            [ -n "$image" ] || continue
+            docker buildx imagetools create \
+              --tag "$image" \
+              "$AMD64_REF" \
+              "$arm64_ref"
+            current_digest="$(
+              docker buildx imagetools inspect "$image" \
+                --format '{{ .Manifest.Digest }}'
+            )"
+            if [ -z "$manifest_digest" ]; then
+              manifest_digest="$current_digest"
+            elif [ "$current_digest" != "$manifest_digest" ]; then
+              echo "::error::${image} resolved to ${current_digest}, expected ${manifest_digest}"
+              exit 1
+            fi
+          done <<< "$IMAGE_TAGS"
+
+          [ -n "$manifest_digest" ] || {
+            echo "::error::No release tags were generated"
+            exit 1
+          }
+          echo "digest=${manifest_digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify manifest and platforms
+        env:
+          IMAGE_DIGEST: ${{ steps.release.outputs.digest }}
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+          TESTED_AMD64_DIGEST: ${{ steps.amd64.outputs.digest }}
+          ARM64_DIGEST: ${{ steps.arm64.outputs.digest }}
+        run: |
+          set -euo pipefail
+          expected='["linux/amd64","linux/arm64"]'
+
+          while IFS= read -r image; do
+            [ -n "$image" ] || continue
+            echo "Verifying ${image}"
+
+            resolved_digest="$(
+              docker buildx imagetools inspect "$image" \
+                --format '{{ .Manifest.Digest }}'
+            )"
+            if [ "$resolved_digest" != "$IMAGE_DIGEST" ]; then
+              echo "::error::${image} resolved to ${resolved_digest}, expected ${IMAGE_DIGEST}"
+              exit 1
+            fi
+
+            platforms="$(
+              docker buildx imagetools inspect --raw "$image" |
+                jq -c '[.manifests[].platform
+                  | select(.os == "linux" and (.architecture == "amd64" or .architecture == "arm64"))
+                  | "\(.os)/\(.architecture)"] | unique | sort'
+            )"
+            if [ "$platforms" != "$expected" ]; then
+              echo "::error::${image} exposes ${platforms}, expected ${expected}"
+              exit 1
+            fi
+
+            raw_manifest="$(docker buildx imagetools inspect --raw "$image")"
+            amd64_digest="$(
+              jq -r '.manifests[]
+                | select(.platform.os == "linux" and .platform.architecture == "amd64")
+                | .digest' <<< "$raw_manifest"
+            )"
+            arm64_digest="$(
+              jq -r '.manifests[]
+                | select(.platform.os == "linux" and .platform.architecture == "arm64")
+                | .digest' <<< "$raw_manifest"
+            )"
+            if [ "$amd64_digest" != "$TESTED_AMD64_DIGEST" ]; then
+              echo "::error::${image} amd64 digest ${amd64_digest} is not the tested ${TESTED_AMD64_DIGEST}"
+              exit 1
+            fi
+            if [ "$arm64_digest" != "$ARM64_DIGEST" ]; then
+              echo "::error::${image} arm64 digest ${arm64_digest} is not the built ${ARM64_DIGEST}"
+              exit 1
+            fi
+          done <<< "$IMAGE_TAGS"
+
+          # Also verify the immutable digest directly, independent of tag lookup.
+          docker buildx imagetools inspect \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${IMAGE_DIGEST}"
 
   cloudflare-deploy:
     name: Deploy Cloudflare Worker
