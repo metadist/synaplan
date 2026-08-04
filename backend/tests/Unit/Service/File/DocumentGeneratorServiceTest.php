@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\File;
 
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\Presentation\PptxRenderer;
+use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\Presentation\SlideMarkdownParser;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -371,6 +372,23 @@ class DocumentGeneratorServiceTest extends TestCase
         $this->service->write("{{PPTX:transition=fade}}\n## One\n\n- a\n\n## Two\n\n- b", 'pptx', $animatedPath);
         $this->assertStringContainsString('p:transition', $this->readPptxSlide($animatedPath, 1));
         $this->assertStringContainsString('p:transition', $this->readPptxSlide($animatedPath, 2));
+    }
+
+    public function testExplicitRequestOptionsApplyWhenModelOmitsDirective(): void
+    {
+        $content = PptxRequestDirectiveResolver::apply(
+            "## One\n\n- a\n\n## Two\n\n- b",
+            'Erstelle eine Präsentation mit Ocean-Theme und Fade-Übergängen.',
+        );
+        $path = $this->tmpDir.'/requested_options.pptx';
+
+        $this->service->write($content, 'pptx', $path);
+
+        $firstSlide = $this->readPptxSlide($path, 1);
+        $this->assertStringContainsString('F3F9FC', $firstSlide, 'The requested Ocean background must be rendered');
+        $this->assertStringContainsString('<p:transition', $firstSlide);
+        $this->assertStringContainsString('<p:fade', $firstSlide);
+        $this->assertStringContainsString('<p:fade', $this->readPptxSlide($path, 2));
     }
 
     public function testPptxThemeDirectiveChangesTheSlideColors(): void

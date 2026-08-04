@@ -14,6 +14,7 @@ use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
+use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
@@ -3249,6 +3250,10 @@ class StreamController extends AbstractController
         }
 
         try {
+            if ('pptx' === strtolower($extension)) {
+                $content = PptxRequestDirectiveResolver::apply($content, (string) $message->getText());
+            }
+
             $resolvedDocument = $this->documentImageReferenceResolver->resolve($content, $message);
             $content = $resolvedDocument['content'];
 

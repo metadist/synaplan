@@ -19,6 +19,7 @@ use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\FileHelper;
+use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\ModelConfigService;
@@ -2269,6 +2270,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $extension = $fileData['extension'];
 
         try {
+            if ('pptx' === strtolower($extension)) {
+                $content = PptxRequestDirectiveResolver::apply($content, (string) $message->getText());
+            }
+
             $resolvedDocument = $this->documentImageReferenceResolver->resolve($content, $message);
             $content = $resolvedDocument['content'];
 
