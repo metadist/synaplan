@@ -1,0 +1,92 @@
+config:
+  runTime: "dockerCompose"
+  version: ""
+  framework: ""
+  installCommand: ""
+  # Both commands go through deploy/scripts/, which reaches Compose through
+  # lib.sh's compose(). A `docker compose` call here would read deploy/.env only
+  # and miss a configuration materialised as a checkout-root .env.
+  buildCommand: "./deploy/scripts/build.sh"
+  buildDir: "/"
+  runCommand: "./deploy/scripts/run.sh"
+  isMonoRepoPackageInRoot: false
+
+environments:
+  - key: "COMPOSE_PROJECT_NAME"
+    value: "synaplan"
+  # Deliberately non-deployable: replace only after the compatible release exists
+  # in GHCR. The pre-install hook rejects this placeholder and any mutable tag
+  # before a container starts, so a catalog submission must carry a published
+  # SemVer version, never this value, `latest`, or an anticipated future tag.
+  - key: "SYNAPLAN_VERSION"
+    value: "REPLACE_WITH_PUBLISHED_COMPATIBLE_VERSION"
+  - key: "SYNAPLAN_HTTP_BIND"
+    value: "0.0.0.0"
+  - key: "SYNAPLAN_HTTP_PORT"
+    value: "8000"
+  - key: "APP_URL"
+    value: "https://[CI_CD_DOMAIN]"
+  - key: "FRONTEND_URL"
+    value: "https://[CI_CD_DOMAIN]"
+  - key: "APP_SECRET"
+    value: "random_password"
+  - key: "TOKEN_SECRET"
+    value: "random_password"
+  - key: "MARIADB_DATABASE"
+    value: "synaplan"
+  - key: "MARIADB_USER"
+    value: "synaplan"
+  - key: "MARIADB_PASSWORD"
+    value: "random_password"
+  - key: "MARIADB_ROOT_PASSWORD"
+    value: "random_password"
+  - key: "REALTIME_API_KEY"
+    value: "random_password"
+  - key: "REALTIME_TOKEN_SECRET"
+    value: "random_password"
+  - key: "REALTIME_ADMIN_PASSWORD"
+    value: "random_password"
+  - key: "REALTIME_ADMIN_SECRET"
+    value: "random_password"
+  - key: "REALTIME_ALLOWED_ORIGINS"
+    value: "https://[CI_CD_DOMAIN]"
+  - key: "BOOTSTRAP_ADMIN_EMAIL"
+    value: "[EMAIL]"
+  - key: "BOOTSTRAP_ADMIN_PASSWORD"
+    value: "random_password"
+  - key: "AI_DEFAULT_PROVIDER"
+    value: "groq"
+  - key: "COMPOSE_PROFILES"
+    value: ""
+  - key: "ENABLE_LOCAL_GPT_OSS"
+    value: "false"
+
+ports:
+  - protocol: "HTTPS"
+    targetProtocol: "HTTP"
+    listeningPort: "443"
+    targetPort: "8000"
+    targetIP: "172.17.0.1"
+    public: true
+    path: "/"
+    isAuth: false
+
+lifeCycleConfig:
+  preInstallCommand: "./deploy/elestio/pre-install.sh"
+  postInstallCommand: "./deploy/elestio/post-install.sh"
+  preBackupCommand: "./deploy/elestio/pre-backup.sh"
+  postBackupCommand: "./deploy/elestio/post-backup.sh"
+  preRestoreCommand: "./deploy/elestio/pre-restore.sh"
+  postRestoreCommand: "./deploy/elestio/post-restore.sh"
+  preUpdateCommand: "./deploy/elestio/pre-update.sh"
+  postUpdateCommand: "./deploy/elestio/post-update.sh"
+  preDeployCommand: "./deploy/elestio/pre-deploy.sh"
+  postDeployCommand: "./deploy/elestio/post-deploy.sh"
+
+webUI:
+  - url: "https://[CI_CD_DOMAIN]"
+    label: "Synaplan"
+    login: "[BOOTSTRAP_ADMIN_EMAIL]"
+    password: "[BOOTSTRAP_ADMIN_PASSWORD]"
+
+monoRepoWorkSpaces: []
