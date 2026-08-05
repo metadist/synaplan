@@ -28,6 +28,11 @@ x-app-environment: &app-environment
   # the admin UI links to. Optional — an unset or unknown value means the
   # self-hosted guide, so nothing breaks when a deployment never sets it.
   SYNAPLAN_PLATFORM: "${SYNAPLAN_PLATFORM:-selfhost}"
+  # The version the operator pinned. Overrides the value baked into the image so
+  # the sidebar and the update check always show the release that is actually
+  # configured — never a mutable registry tag such as `latest` that an older
+  # image build may have recorded as APP_VERSION.
+  APP_VERSION: "${SYNAPLAN_VERSION}"
   APP_URL: "${APP_URL:?Set APP_URL to the public HTTPS URL}"
   FRONTEND_URL: "${FRONTEND_URL:?Set FRONTEND_URL to the public HTTPS URL}"
   APP_SECRET: "${APP_SECRET:?Set a stable APP_SECRET}"
