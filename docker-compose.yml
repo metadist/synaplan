@@ -23,7 +23,7 @@ services:
     environment:
       NODE_ENV: development
       BACKEND_URL: http://backend
-      # Vite dev-server host check (anti DNS-rebinding). EMPTY by default →
+      # Vite dev-server host check (anti DNS-rebinding). EMPTY by default ->
       # ignored, so the dev server answers to ALL hosts out of the box (works
       # behind any domain / reverse proxy). Set ALLOWED_HOSTS to a
       # comma-separated allow-list to restrict to ONLY those hosts.
@@ -38,14 +38,14 @@ services:
       - /app/node_modules
     depends_on:
       # service_STARTED, not service_healthy: the Vite dev server does not need a
-      # HEALTHY backend to boot — its only backend dependency is schema generation
+      # HEALTHY backend to boot -- its only backend dependency is schema generation
       # (20-generate-schemas.sh), which already polls the backend for ~5 min and,
       # combined with `restart: unless-stopped`, retries until it succeeds.
       #
       # Gating on service_healthy made `docker compose up -d` BLOCK for the
       # backend's 900s health start_period. If that blocking command was ever
       # interrupted (Ctrl+C, IDE/tool timeout, laptop sleep) the frontend was left
-      # in state "Created" and NEVER started — and restart policies do not cover a
+      # in state "Created" and NEVER started -- and restart policies do not cover a
       # container that never started, so it sat there forever ("just wait" never
       # helped). service_started returns immediately, so the stack self-heals.
       backend:
@@ -53,7 +53,7 @@ services:
     # Vite dev server readiness: npm ci + schema generation + server start can
     # take 1-3 min (longer on a cold first boot while the backend is still
     # running migrations). Without this healthcheck the container shows
-    # "Started" immediately, which is misleading — the dev server is not yet
+    # "Started" immediately, which is misleading -- the dev server is not yet
     # listening. start_period matches the schema script's 5-min poll ceiling.
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:5173',r=>{r.resume();process.exit(r.statusCode<400?0:1)}).on('error',()=>process.exit(1))"]
@@ -92,8 +92,8 @@ services:
   # Symfony PHP Backend
   # Serves both API and production frontend from frontend/dist
   backend:
-    # Docker's embedded resolver (127.0.0.11) MUST be listed first — otherwise
-    # only public DNS is used and service hostnames (db, ollama, …) never resolve,
+    # Docker's embedded resolver (127.0.0.11) MUST be listed first -- otherwise
+    # only public DNS is used and service hostnames (db, ollama, ...) never resolve,
     # which puts the backend in a crash loop and prevents the frontend schema step
     # from ever reaching a healthy API.
     dns:
@@ -213,7 +213,7 @@ services:
       - "docker-host:host-gateway"
     # Generous start_period so a slow first boot never blocks the frontend.
     #
-    # The frontend `depends_on: backend: service_healthy` — it is only created
+    # The frontend `depends_on: backend: service_healthy` -- it is only created
     # once this probe passes. On a FRESH checkout the very first `up -d` runs
     # the backend boot (migrations + app:seed + cache warm) WHILE the machine is
     # saturated pulling images, building the dev image, and downloading multi-GB
@@ -225,7 +225,7 @@ services:
     # `depends_on: service_healthy` keeps WAITING instead of aborting the
     # frontend with "dependency failed to start: container synaplan-backend is
     # unhealthy". The moment /api/health answers 200 the container flips to
-    # "healthy" — the long start_period is only an upper bound, it does not delay
+    # "healthy" -- the long start_period is only an upper bound, it does not delay
     # a backend that boots quickly. (Model downloads themselves are backgrounded
     # in the entrypoint and never block FrankenPHP from binding port 80.)
     healthcheck:
@@ -282,7 +282,7 @@ services:
       # in dev and worker in prod, the worker happily consumed
       # AdvanceMediaJobCommand messages but every findByKey() lookup missed
       # because the job lived under synaplan:dev:mediajob:* and the worker
-      # looked under synaplan:prod:mediajob:* — silent "job not found",
+      # looked under synaplan:prod:mediajob:* -- silent "job not found",
       # bubble stuck in queued forever. The synaplan-platform compose
       # overrides both to prod for production.
       APP_ENV: ${APP_ENV:-dev}
@@ -301,12 +301,12 @@ services:
       # transport). The worker consumes async_ai_high/async_extract/async_index,
       # all of which use the Redis transport, so REDIS_DSN is mandatory here.
       REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
-      # Realtime gateway (Centrifugo) — MUST resolve to the same values as the
+      # Realtime gateway (Centrifugo) -- MUST resolve to the same values as the
       # backend and centrifugo services, which read them from the same compose
       # interpolation. Without these entries the worker falls through to
       # `env_file: backend/.env`; any REALTIME_API_KEY set there diverges from
       # centrifugo's, every publish is rejected with 401, and async media jobs
-      # complete on the server while the browser bubble stays "Working…"
+      # complete on the server while the browser bubble stays "Working..."
       # forever because no progress event ever arrives.
       REALTIME_ENABLED: ${REALTIME_ENABLED:-true}
       REALTIME_API_URL: ${REALTIME_API_URL:-http://centrifugo:8000/api}
@@ -334,7 +334,7 @@ services:
 
         # Fail-fast diagnostic: a broken bind-mount (the codebase missing from
         # /var/www/backend, leaving only the anonymous var/cache volume) used
-        # to make the DB-wait loop below silently hang forever — every retry
+        # to make the DB-wait loop below silently hang forever -- every retry
         # hit "Could not open input file: bin/console" but the error was
         # suppressed, so messenger:consume never started and every queued
         # AdvanceMediaJobCommand sat unprocessed. Crash loudly instead.
@@ -352,7 +352,7 @@ services:
         #
         # If we ran a console command first (e.g. dbal:run-sql), Symfony would
         # try to load the stale compiled container and crash on any class that
-        # was removed in the new code — for example after the Doctrine DBAL
+        # was removed in the new code -- for example after the Doctrine DBAL
         # upgrade the cached container references the removed
         # `Doctrine\DBAL\Schema\LegacySchemaManagerFactory` and the worker
         # deadlocks on its own DB readiness loop (issue #882). Same class of
@@ -362,7 +362,7 @@ services:
         echo "[worker] clearing $$ENV cache..."
         rm -rf "var/cache/$$ENV"
         if ! php bin/console --env="$$ENV" cache:warmup; then
-          echo "[worker] FATAL: cache:warmup failed — refusing to start." >&2
+          echo "[worker] FATAL: cache:warmup failed -- refusing to start." >&2
           exit 65
         fi
 
@@ -370,7 +370,7 @@ services:
         # first consume cycle races against schema and crashes with
         # "Table doctrine_migration_versions doesn't exist".
         #
-        # Bounded: 60 attempts × 3s = ~3 min ceiling. After that we exit so the
+        # Bounded: 60 attempts x 3s = ~3 min ceiling. After that we exit so the
         # `restart: unless-stopped` policy + `docker compose ps` surface the
         # problem instead of letting the worker pretend it is healthy forever.
         attempt=0
@@ -391,7 +391,7 @@ services:
           sleep 3
         done
 
-        # Liveness sentinel — touched on boot, refreshed by the consumer (see
+        # Liveness sentinel -- touched on boot, refreshed by the consumer (see
         # messenger middleware in production for periodic refresh). The
         # healthcheck below treats an old sentinel as unhealthy.
         mkdir -p var/worker
@@ -411,8 +411,8 @@ services:
     restart: unless-stopped
     # Worker liveness: probe that messenger:consume is actually running.
     # Surfaces the silent-hang class of failure that took us hours to diagnose
-    # (broken bind mount → infinite "waiting for db schema..." loop with no
-    # consumer ever starting; or env-prefix mismatch → consumer running but
+    # (broken bind mount -> infinite "waiting for db schema..." loop with no
+    # consumer ever starting; or env-prefix mismatch -> consumer running but
     # every job a no-op). A missing process = unhealthy = visible in
     # `docker compose ps`.
     #
@@ -528,7 +528,7 @@ services:
       # Redis engine address (cross-node pub/sub). Override REALTIME_REDIS_ADDRESS
       # in production to point at the shared/managed Redis, e.g.
       # redis://redis-prod.internal:6379/3. Keep the dedicated logical DB suffix
-      # (/3) — it isolates Centrifugo keys from Symfony cache/lock/messenger which
+      # (/3) -- it isolates Centrifugo keys from Symfony cache/lock/messenger which
       # use /0 via REDIS_DSN. (For Redis Cluster use a host without a DB suffix.)
       CENTRIFUGO_ENGINE_REDIS_ADDRESS: ${REALTIME_REDIS_ADDRESS:-redis://redis:6379/3}
     ulimits:
@@ -555,7 +555,7 @@ services:
     # GPU support should be configured via an override file if needed
     # Healthcheck uses bash /dev/tcp + HTTP probe (the ollama/ollama image has
     # no curl/wget/nc). Measures the round-trip and treats anything slower than
-    # 3000 ms as not-yet-ready — protects against the warm-up window where the
+    # 3000 ms as not-yet-ready -- protects against the warm-up window where the
     # API socket is open but the runtime is still loading models.
     healthcheck:
       test:
@@ -588,7 +588,7 @@ services:
       - "9999:9998"
     # Healthcheck uses bash /dev/tcp + HTTP probe (the apache/tika image has no
     # curl/wget). Measures the round-trip on /version and treats anything
-    # slower than 3000 ms as not-yet-ready — Tika's JVM warm-up can keep the
+    # slower than 3000 ms as not-yet-ready -- Tika's JVM warm-up can keep the
     # port open long before the parser registry is actually responsive.
     healthcheck:
       test:
