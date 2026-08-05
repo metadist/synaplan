@@ -14,12 +14,16 @@ config:
 environments:
   - key: "COMPOSE_PROJECT_NAME"
     value: "synaplan"
-  # Deliberately non-deployable: replace only after the compatible release exists
-  # in GHCR. The pre-install hook rejects this placeholder and any mutable tag
-  # before a container starts, so a catalog submission must carry a published
-  # SemVer version, never this value, `latest`, or an anticipated future tag.
+  # Elestio materialises these values into the deployment's .env automatically,
+  # so this has to name a release that already exists in GHCR — there is no step
+  # in which an operator could substitute a placeholder before the first deploy.
+  # Only an immutable SemVer release is accepted here: the pre-install hook
+  # rejects `latest`, any mutable tag and any version that is not published yet,
+  # before a container starts. Raising this value is what ships a new release to
+  # new deployments; existing ones stay on their pinned version until their
+  # operator changes it, as described in docs/UPDATE_ELESTIO.md.
   - key: "SYNAPLAN_VERSION"
-    value: "REPLACE_WITH_PUBLISHED_COMPATIBLE_VERSION"
+    value: "4.0.13"
   # Deployment hint for the release notice, so the admin UI links to the Elestio
   # update guide instead of the self-hosted one. Display only: Synaplan never
   # updates itself.
