@@ -171,14 +171,10 @@ RESTORE_PORTABLE_BACKUP=true deploy/scripts/post-restore.sh
 
 ## Update
 
-Set a tested, concrete `SYNAPLAN_VERSION`, then run:
-
-```bash
-deploy/scripts/pre-update.sh
-# Redeploy through the platform, or:
-docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
-deploy/scripts/post-update.sh
-```
+Step-by-step instructions:
+[Update a Self-Hosted Deployment](../docs/UPDATE_SELFHOST.md), or
+[Update on Elestio](../docs/UPDATE_ELESTIO.md) for a pipeline on that platform.
+Only a tested, concrete `SYNAPLAN_VERSION` may be deployed.
 
 The pre hook enforces a successful backup and pulls the pin. The post hook waits
 for every role and dependency, then verifies health and reports the running image

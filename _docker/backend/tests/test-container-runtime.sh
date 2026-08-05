@@ -84,7 +84,7 @@ echo "Case 1: worker waits for initialization and preserves Messenger defaults"
 assert_contains "doctrine:migrations:up-to-date --no-interaction" "$COMMAND_LOG" "worker waits until migrations are current"
 assert_contains "messenger:consume async_ai_high async_extract async_index --time-limit=3600 --memory-limit=512M -v" "$COMMAND_LOG" "worker consumes all current transports with current limits"
 
-echo "Case 2: scheduler runs both commands initially and writes a heartbeat"
+echo "Case 2: scheduler runs every slot's command initially and writes a heartbeat"
 : > "$COMMAND_LOG"
 (
     cd "$TMP_DIR/app" || exit
@@ -104,6 +104,7 @@ echo "Case 2: scheduler runs both commands initially and writes a heartbeat"
 )
 assert_contains "app:media:reap-jobs --no-interaction" "$COMMAND_LOG" "scheduler runs media reaper"
 assert_contains "app:files:reap-ephemeral --no-interaction" "$COMMAND_LOG" "scheduler runs ephemeral-file reaper"
+assert_contains "app:updates:check --no-interaction" "$COMMAND_LOG" "scheduler runs the daily update check"
 if [ -s "$TMP_DIR/runtime/scheduler.heartbeat" ]; then
     assert_eq 1 1 "scheduler writes liveness heartbeat"
 else

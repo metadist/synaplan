@@ -403,15 +403,61 @@ resume_paused_services
 grep -Fxq "start backend ollama db" "$compose_log"
 [[ ! -e "$PAUSED_SERVICES_FILE" ]]
 
-resolved_app_image() {
-    printf '%s\n' "ghcr.io/metadist/synaplan:5.0.0-rc.1"
+# The guarantee that a redeploy never silently upgrades: compose.yaml sets
+# `pull_policy: always`, so every start re-pulls the configured tag. On an
+# IMMUTABLE tag that returns the identical digest and the operator gets the
+# release they pinned; on a MUTABLE one the same restart — a reboot, a platform
+# redeploy, an unrelated `docker compose up` — quietly installs a different
+# application. validate_release_pin is the only thing standing between the two,
+# so every mutable form the registry actually publishes is pinned here, not just
+# `latest`: metadata-action also moves `4` and `4.0` on every release, which is
+# the realistic floating-tag mistake.
+assert_release_pin() {
+    local expected_status="$1"
+    local description="$2"
+    local image="$3"
+    local output status=0
+
+    resolved_app_image() { printf '%s\n' "$image"; }
+    output="$(validate_release_pin 2>&1)" || status=$?
+    [[ "$status" == "$expected_status" ]] || {
+        printf 'Release pin case "%s": expected status %s, got %s:\n%s\n' \
+            "$description" "$expected_status" "$status" "$output" >&2
+        exit 1
+    }
 }
-validate_release_pin
+
+assert_release_pin 0 "the immutable release tag every pin must be" \
+    "ghcr.io/metadist/synaplan:4.0.13"
+assert_release_pin 0 "a pre-release, which is immutable too" \
+    "ghcr.io/metadist/synaplan:5.0.0-rc.1"
+# A registry port contains the only other colon an image reference can carry, so
+# a rule anchored on the wrong one would reject a mirrored deployment.
+assert_release_pin 0 "the same pin behind a private registry mirror" \
+    "registry.example.com:5000/metadist/synaplan:4.0.13"
+assert_release_pin 1 "latest, which moves on every release" \
+    "ghcr.io/metadist/synaplan:latest"
+assert_release_pin 1 "a branch tag, which moves on every merge" \
+    "ghcr.io/metadist/synaplan:main"
+assert_release_pin 1 "a channel name that is not published at all" \
+    "ghcr.io/metadist/synaplan:stable"
+assert_release_pin 1 "the floating major alias" "ghcr.io/metadist/synaplan:4"
+assert_release_pin 1 "the floating major.minor alias" "ghcr.io/metadist/synaplan:4.0"
+# The git tag is `v4.0.13`, the published image tag is `4.0.13`. Copying the
+# former must fail the preflight rather than the image pull.
+assert_release_pin 1 "the v-prefixed git tag" "ghcr.io/metadist/synaplan:v4.0.13"
+assert_release_pin 1 "an empty version" "ghcr.io/metadist/synaplan:"
+assert_release_pin 1 "no tag at all, which docker reads as latest" \
+    "ghcr.io/metadist/synaplan"
+
+# Unset, compose.yaml's `${SYNAPLAN_VERSION:?}` makes `compose config` itself
+# fail, so validate_release_pin never sees an image reference. That has to be a
+# rejection as well, instead of an empty value falling through the pattern.
 resolved_app_image() {
-    printf '%s\n' "ghcr.io/metadist/synaplan:latest"
+    return 1
 }
 if validate_release_pin 2>/dev/null; then
-    echo "Mutable release tag unexpectedly passed validation" >&2
+    echo "A deployment whose image cannot be resolved unexpectedly passed validation" >&2
     exit 1
 fi
 

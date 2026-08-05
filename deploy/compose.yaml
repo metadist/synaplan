@@ -16,6 +16,10 @@ x-app-command: &app-command
 x-app-environment: &app-environment
   APP_ENV: prod
   APP_DEBUG: "0"
+  # Deployment hint for the release notice: it decides which manual-update guide
+  # the admin UI links to. Optional — an unset or unknown value means the
+  # self-hosted guide, so nothing breaks when a deployment never sets it.
+  SYNAPLAN_PLATFORM: "${SYNAPLAN_PLATFORM:-selfhost}"
   APP_URL: "${APP_URL:?Set APP_URL to the public HTTPS URL}"
   FRONTEND_URL: "${FRONTEND_URL:?Set FRONTEND_URL to the public HTTPS URL}"
   APP_SECRET: "${APP_SECRET:?Set a stable APP_SECRET}"

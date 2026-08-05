@@ -892,6 +892,12 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      # The version release-manifest advertises. Taken from the metadata step
+      # that produced the pushed image tags, so the manifest can only ever name
+      # a version this job actually published — never one re-derived from the
+      # ref by a second, possibly diverging, expression.
+      version: ${{ steps.meta.outputs.version }}
 
     steps:
       - name: Checkout
@@ -1078,6 +1084,110 @@ jobs:
           docker buildx imagetools inspect \
             "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${IMAGE_DIGEST}"
 
+  release-manifest:
+    name: Publish Release Manifest
+    runs-on: ubuntu-latest
+    # An instance learns that a newer release exists from versions.json, so the
+    # manifest must never exist before the image it names. docker-push completes
+    # only after the multi-arch manifest was created AND verified to expose both
+    # platforms at the tested digests, which makes it the earliest point where
+    # advertising the version is honest.
+    needs: [docker-push]
+    # Release tags only. A main push publishes `latest`, which is not a release,
+    # and a pull request publishes nothing at all.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      # The only write privilege in this workflow, and only for the push below.
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nothing but scripts/release-manifest.mjs is used from this checkout,
+          # and the push below authenticates through its own remote URL, so no
+          # writable token belongs in .git/config.
+          persist-credentials: false
+
+      - name: Publish versions.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.docker-push.outputs.version }}
+          # NOT main, and this is the reason the branch exists: Elestio pipelines
+          # track main and redeploy on every commit, so a manifest commit there
+          # would restart every managed instance on every release. The branch
+          # holds versions.json on an orphan history and nothing else, which also
+          # keeps it out of diffs, release archives and CI runs on main.
+          BRANCH: release-manifest
+        run: |
+          set -euo pipefail
+
+          # docker/metadata-action derives {{version}} from the tag. Cross-check
+          # it against the ref so a change in that derivation cannot shift the
+          # advertised version away from the tag that was actually published.
+          if [ "$VERSION" != "${GITHUB_REF_NAME#v}" ]; then
+            echo "::error::Published version ${VERSION} does not match tag ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+          # A pre-release (v5.0.0-rc.1) is a legitimate deployment pin, but it
+          # must never become `stable` — so it publishes nothing instead of
+          # failing the release run. The generator refuses one as a backstop.
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag ${GITHUB_REF_NAME} is not a plain release; no manifest is published." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          work_dir="$(mktemp -d)"
+          branch_dir="$work_dir/branch"
+          mkdir -p "$branch_dir"
+          git -C "$branch_dir" init -q -b "$BRANCH"
+          git -C "$branch_dir" config user.name 'github-actions[bot]'
+          git -C "$branch_dir" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C "$branch_dir" remote add origin \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          manifest=(--version "$VERSION" --repository "$GITHUB_REPOSITORY")
+          if git -C "$branch_dir" fetch -q --depth 1 origin "refs/heads/${BRANCH}"; then
+            git -C "$branch_dir" reset -q --hard FETCH_HEAD
+            # The current manifest is read from OUTSIDE the work tree: the
+            # generator's stdout is redirected onto versions.json, which
+            # truncates the file before it could be read in place — and its
+            # `yanked` list has to survive this release.
+            if [ -f "$branch_dir/versions.json" ]; then
+              cp "$branch_dir/versions.json" "$work_dir/existing.json"
+              manifest+=(--existing "$work_dir/existing.json")
+            fi
+          else
+            echo "Branch ${BRANCH} does not exist yet; this push creates it."
+          fi
+
+          node scripts/release-manifest.mjs "${manifest[@]}" > "$branch_dir/versions.json"
+
+          git -C "$branch_dir" add versions.json
+          # Re-running the same tag produces the same manifest, so there is
+          # nothing to commit — the job is idempotent and safe to re-run.
+          if git -C "$branch_dir" diff --quiet --cached; then
+            echo "versions.json is already up to date; nothing was published." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git -C "$branch_dir" commit -q -m "chore(release): publish versions.json for ${VERSION}"
+          git -C "$branch_dir" push -q origin "HEAD:refs/heads/${BRANCH}"
+
+          {
+            echo "Published \`versions.json\` on \`${BRANCH}\`:"
+            echo ''
+            echo '```json'
+            cat "$branch_dir/versions.json"
+            echo '```'
+            echo ''
+            echo "A security release is marked by editing \`severity\` to" \
+              "\`security\` on \`${BRANCH}\`; the next release resets it, which is" \
+              "correct — the field describes that release."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   cloudflare-deploy:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
@@ -1109,7 +1219,7 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
+    needs: [lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push, release-manifest, cloudflare-deploy]
     if: always()
     steps:
       - name: Check for failures
@@ -1124,6 +1234,7 @@ jobs:
             needs.e2e.result != 'success' ||
             needs.e2e-visual.result != 'success' ||
             (needs.docker-push.result != 'success' && needs.docker-push.result != 'skipped') ||
+            (needs.release-manifest.result != 'success' && needs.release-manifest.result != 'skipped') ||
             (needs.cloudflare-deploy.result != 'success' && needs.cloudflare-deploy.result != 'skipped')
           )
         run: |

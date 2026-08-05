@@ -20,6 +20,11 @@ environments:
   # SemVer version, never this value, `latest`, or an anticipated future tag.
   - key: "SYNAPLAN_VERSION"
     value: "REPLACE_WITH_PUBLISHED_COMPATIBLE_VERSION"
+  # Deployment hint for the release notice, so the admin UI links to the Elestio
+  # update guide instead of the self-hosted one. Display only: Synaplan never
+  # updates itself.
+  - key: "SYNAPLAN_PLATFORM"
+    value: "elestio"
   - key: "SYNAPLAN_HTTP_BIND"
     value: "0.0.0.0"
   - key: "SYNAPLAN_HTTP_PORT"

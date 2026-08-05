@@ -15,6 +15,12 @@ parameters:
     # nothing hard-codes a release number that inevitably drifts.
     app_version_default: 'dev'
 
+    # Deployment platform hint for the release-notice guide link. Optional and
+    # additive: an unset (or unknown) value means the self-hosted guide, so
+    # nothing breaks when a deployment does not set it. deploy/compose.yaml
+    # passes it through; elestio.yml sets it to 'elestio'.
+    env(SYNAPLAN_PLATFORM): 'selfhost'
+
     # OIDC admin role claim values (comma-separated, case-insensitive)
     env(OIDC_ADMIN_ROLES): 'admin,realm-admin,synaplan-admin,administrator'
 
@@ -948,6 +954,19 @@ services:
     # Alias for injection
     App\Service\RAG\VectorStorage\VectorStorageInterface:
         alias: App\Service\RAG\VectorStorage\VectorStorageFacade
+
+    # Release-notice detection (app:updates:check + /api/v1/admin/updates).
+    # Never changes the installation: the scheduler stores the published
+    # manifest's stable version in BCONFIG and the admin API only reads it.
+    # The running version comes from APP_VERSION, exactly like the runtime
+    # config's build.version, and falls back to 'dev' in a source checkout.
+    App\Service\Update\UpdateStatusService:
+        arguments:
+            $appVersion: '%env(default:app_version_default:APP_VERSION)%'
+
+    App\Service\Update\UpdatePlatformGuide:
+        arguments:
+            $platform: '%env(string:SYNAPLAN_PLATFORM)%'
 
     # Widget real-time event store (SSE backing).
     # DB-backed (Galera-replicated) so events are visible cluster-wide; swap this
