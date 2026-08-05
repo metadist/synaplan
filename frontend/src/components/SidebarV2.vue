@@ -87,26 +87,6 @@
       </button>
     </div>
 
-    <!-- User Avatar -->
-    <div class="flex items-center justify-center py-4 flex-shrink-0">
-      <button
-        ref="userBtnRef"
-        class="v2-rail-icon w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5"
-        :title="authStore.user?.email || $t('nav.accountDescription')"
-        data-testid="btn-sidebar-v2-user"
-        @click="toggleUserMenu"
-      >
-        <div
-          class="w-8 h-8 rounded-full surface-chip flex items-center justify-center text-xs font-semibold"
-        >
-          {{ initials }}
-        </div>
-        <span class="v2-rail-label text-[10px] font-medium leading-tight">
-          {{ $t('nav.account') }}
-        </span>
-      </button>
-    </div>
-
     <!--
       Running release, for every user. Admins with a pending release get a link
       to the manual-update guide instead — Synaplan never updates itself, the
@@ -114,7 +94,7 @@
     -->
     <div
       v-if="versionLabel"
-      class="flex items-center justify-center pb-3 flex-shrink-0"
+      class="flex items-center justify-center pt-2 flex-shrink-0"
       data-testid="section-sidebar-v2-version"
     >
       <a
@@ -143,6 +123,26 @@
       >
         {{ versionLabel }}
       </span>
+    </div>
+
+    <!-- User Avatar -->
+    <div class="flex items-center justify-center py-4 flex-shrink-0">
+      <button
+        ref="userBtnRef"
+        class="v2-rail-icon w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5"
+        :title="authStore.user?.email || $t('nav.accountDescription')"
+        data-testid="btn-sidebar-v2-user"
+        @click="toggleUserMenu"
+      >
+        <div
+          class="w-8 h-8 rounded-full surface-chip flex items-center justify-center text-xs font-semibold"
+        >
+          {{ initials }}
+        </div>
+        <span class="v2-rail-label text-[10px] font-medium leading-tight">
+          {{ $t('nav.account') }}
+        </span>
+      </button>
     </div>
   </aside>
 
