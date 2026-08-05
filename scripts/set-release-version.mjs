@@ -37,7 +37,7 @@ export const parseReleaseVersion = (value) => {
 export const applyElestioVersion = (text, version) => {
   const lines = text.split('\n')
   let keySeen = false
-  let replaced = false
+  let replaced = 0
 
   const result = lines.map((line) => {
     if (/^\s*-\s*key:\s*"?SYNAPLAN_VERSION"?\s*$/.test(line)) {
@@ -55,12 +55,18 @@ export const applyElestioVersion = (text, version) => {
     }
 
     keySeen = false
-    replaced = true
+    replaced += 1
     return `${match[1]}value: "${version}"`
   })
 
-  if (!replaced) {
-    throw new Error('elestio.yml: no SYNAPLAN_VERSION entry found')
+  // Exactly one, like the example configuration below. A second entry is a
+  // mistake worth reporting rather than rewriting: Elestio keeps the last value
+  // for a duplicated key, so the deployment would install whichever entry came
+  // last while both looked correct here.
+  if (replaced !== 1) {
+    throw new Error(
+      `elestio.yml: expected exactly one SYNAPLAN_VERSION entry, found ${replaced}`
+    )
   }
 
   return result.join('\n')

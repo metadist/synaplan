@@ -62,12 +62,28 @@ test('keeps the surrounding comments and indentation of the manifest', () => {
 test('fails loudly when the manifest anchor is gone', () => {
   assert.throws(
     () => applyElestioVersion('environments:\n  - key: "OTHER"\n    value: "x"', '4.0.13'),
-    /no SYNAPLAN_VERSION entry found/
+    /expected exactly one SYNAPLAN_VERSION entry, found 0/
   )
 
   assert.throws(
     () => applyElestioVersion('  - key: "SYNAPLAN_VERSION"\n  - key: "NEXT"', '4.0.13'),
     /not a value line/
+  )
+})
+
+// Elestio keeps the last value for a duplicated key, so a second entry would
+// decide the installed version while both lines looked correct here.
+test('fails when the manifest carries the release pin twice', () => {
+  const duplicated = [
+    '  - key: "SYNAPLAN_VERSION"',
+    '    value: "4.0.12"',
+    '  - key: "SYNAPLAN_VERSION"',
+    '    value: "4.0.11"',
+  ].join('\n')
+
+  assert.throws(
+    () => applyElestioVersion(duplicated, '4.0.13'),
+    /expected exactly one SYNAPLAN_VERSION entry, found 2/
   )
 })
 
