@@ -16,6 +16,7 @@
       "updateAvailable": "Hay una versión más reciente disponible",
       "securityUpdate": "Hay una actualización de seguridad disponible",
       "unknownState": "Todavía no se ha buscado ninguna versión",
+      "statusUnavailable": "No se ha podido cargar la información de versión. Seleccione «Buscar ahora» para volver a intentarlo.",
       "openGuide": "Cómo actualizar",
       "releaseNotes": "Novedades",
       "dismiss": "Ocultar este aviso",

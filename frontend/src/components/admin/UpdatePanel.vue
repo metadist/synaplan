@@ -159,9 +159,28 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-if="!status" class="flex justify-center py-8" data-testid="state-admin-updates-loading">
+    <div
+      v-if="updatesStore.loading"
+      class="flex justify-center py-8"
+      data-testid="state-admin-updates-loading"
+    >
       <Icon icon="mdi:loading" class="w-6 h-6 animate-spin txt-secondary" aria-hidden="true" />
     </div>
+
+    <!-- Reading the stored status failed. "Check now" fetches it again, so the
+         card stays usable instead of looking like it is still loading. -->
+    <p
+      v-else-if="!status"
+      class="text-sm txt-secondary flex items-start gap-1.5 py-4"
+      data-testid="state-admin-updates-unavailable"
+    >
+      <Icon
+        icon="mdi:information-outline"
+        class="w-4 h-4 flex-shrink-0 mt-0.5"
+        aria-hidden="true"
+      />
+      {{ $t('updates.panel.statusUnavailable') }}
+    </p>
 
     <div v-else class="space-y-5">
       <!-- Version tiles -->

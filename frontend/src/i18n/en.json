@@ -16,6 +16,7 @@
       "updateAvailable": "A newer version is available",
       "securityUpdate": "A security update is available",
       "unknownState": "No version check has run yet",
+      "statusUnavailable": "The version information could not be loaded. Select \"Check now\" to try again.",
       "openGuide": "How to update",
       "releaseNotes": "What's new",
       "dismiss": "Hide this notice",

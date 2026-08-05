@@ -16,6 +16,7 @@
       "updateAvailable": "Daha yeni bir sürüm mevcut",
       "securityUpdate": "Bir güvenlik güncellemesi mevcut",
       "unknownState": "Henüz sürüm kontrolü yapılmadı",
+      "statusUnavailable": "Sürüm bilgileri yüklenemedi. Yeniden denemek için \"Şimdi kontrol et\" seçeneğini kullanın.",
       "openGuide": "Nasıl güncellenir",
       "releaseNotes": "Yenilikler",
       "dismiss": "Bu bildirimi gizle",
