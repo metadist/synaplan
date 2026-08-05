@@ -12,6 +12,9 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
     request,
     credentials,
   }) => {
+    // Admin UI login + navigation + impersonate + a full chat stream (on the
+    // longTimeout tier) exceed the 60s default under CI load; give headroom.
+    test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     const chat = new ChatHelper(page)
     const adminCreds = CREDENTIALS.getAdminCredentials()
     let targetUserId: number
@@ -60,7 +63,7 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
 
       await page
         .locator(selectors.dialog.confirmBtn)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await page.locator(selectors.dialog.confirmBtn).click()
     })
 
@@ -76,7 +79,11 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
     await test.step('Act: send a message and receive TestProvider response', async () => {
       await chat.startNewChat()
       const previousCount = await chat.sendMessage(PROMPTS.CHAT_SMOKE)
-      const aiText = await chat.waitForAnswer(previousCount)
+      // The first turn runs right after an impersonation session swap
+      // (realtime teardown/resubscribe + config reload in startImpersonation),
+      // so the full stream to `message-done` legitimately needs the VERY_LONG
+      // tier, not LONG — otherwise it flakes on a 15s timeout under CI load.
+      const aiText = await chat.waitForAnswer(previousCount, true)
       expect(aiText.length).toBeGreaterThan(0)
     })
 
