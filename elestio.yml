@@ -14,6 +14,10 @@ config:
 environments:
   - key: "COMPOSE_PROJECT_NAME"
     value: "synaplan"
+  # Maintained by CI: publishing a release opens a pull request that raises this
+  # to the version whose image was just published and verified. Do not edit it by
+  # hand — scripts/set-release-version.mjs owns this line.
+  #
   # Elestio materialises these values into the deployment's .env automatically,
   # so this has to name a release that already exists in GHCR — there is no step
   # in which an operator could substitute a placeholder before the first deploy.
