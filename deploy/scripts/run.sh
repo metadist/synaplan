@@ -4,6 +4,11 @@ set -Eeuo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# Every start needs the stack's own credentials, and they are exported here rather
+# than read from a configuration file: the platform rewrites that file on every
+# deploy, and Compose prefers an exported variable over any --env-file entry.
+ensure_deployment_secrets
+
 # The platform's run command: validate on every start, then start the stack.
 #
 # The validation is deliberately repeated here and not only in build.sh, because

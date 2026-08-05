@@ -36,6 +36,13 @@ Set every other password and token marked as required in the template. Secrets
 must remain stable across container recreation, updates, backup, and restore.
 Never commit the populated environment file.
 
+`APP_SECRET`, `TOKEN_SECRET`, both MariaDB passwords and the four `REALTIME_*`
+secrets may also be left unset. The lifecycle scripts then generate an
+independent value for each on the first start and record the set in
+`deploy/data/secrets.env` (mode `0600`), which is authoritative from then on and
+never rewritten. A value you configure yourself is adopted unchanged. Details:
+[deploy/README.md](../deploy/README.md#generated-secrets-deploydatasecretsenv).
+
 See [Configuration Guide](CONFIGURATION.md) for all environment variables.
 
 ### Starting Services
@@ -139,11 +146,16 @@ See [Health Monitoring](HEALTH_MONITORING.md) for full setup: monitor user creat
 
 ## Backups
 
-For production, back up all three state classes together:
+For production, back up all four state classes together:
 
 - MariaDB data
 - uploaded files
 - Qdrant collections and snapshots
+- `deploy/data/secrets.env`, the deployment's generated secrets
+
+The secrets file is as critical as the data itself: it holds the MariaDB
+password the restored database expects, and it exists nowhere else. A recovery
+point without it yields a database the application cannot open.
 
 The portable lifecycle hooks under `deploy/scripts/` coordinate write
 processes and prepare consistent artifacts in the deployment data paths:

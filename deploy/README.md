@@ -34,6 +34,48 @@ secrets must remain stable across every redeploy and restore. Keep a configured
 administrator account, so a regenerated value would no longer match the password
 that account actually has.
 
+### Generated secrets: `deploy/data/secrets.env`
+
+Those eight secrets do not have to be configured at all. Every lifecycle script
+calls `ensure_deployment_secrets`, which resolves each of them once:
+
+- A value you configured — in `deploy/.env` or as an environment variable — is
+  adopted unchanged, so an installation that already runs keeps exactly the
+  credentials it has.
+- A secret with no value is generated with 32 bytes of randomness, independently
+  of every other secret, but only while the stack has never been initialised.
+- The resolved set is written to `deploy/data/secrets.env` with mode `0600`. From
+  then on that file is authoritative and is never rewritten, so a value once in
+  use stays in use, and exported before Compose runs, because Compose prefers a
+  real environment variable over any `--env-file` entry.
+- If a secret has no value and `deploy/data/mariadb` already holds a database,
+  the deployment stops and names the variable. Generating a new one is not an
+  option: the MariaDB user still authenticates with the old password, so a new
+  `MARIADB_PASSWORD` would lock the application out of its own data permanently.
+  Restore the variable in your configuration, or write the known value into
+  `deploy/data/secrets.env`.
+
+Because the file is authoritative and is exported before Compose runs, editing
+one of these eight variables in `deploy/.env` no longer changes the running
+deployment. To rotate one deliberately, change it in
+`deploy/data/secrets.env` — and only together with the state it belongs to:
+`MARIADB_PASSWORD` and `MARIADB_ROOT_PASSWORD` must be changed in MariaDB itself
+in the same step, and a new `APP_SECRET` makes the provider API keys stored in the
+database undecryptable (see
+[AI Providers](../docs/CONFIGURATION.md#ai-providers)).
+
+**`deploy/data/secrets.env` is part of this deployment's secret material and MUST
+be included in every backup and disaster-recovery record.** A database restored
+without it is a database nobody can open again — the password exists nowhere
+else. Keep it private, never commit it (`deploy/data/` is gitignored), and change
+a value in it only in the deliberate way described above.
+
+This is also why a managed platform's generated values are not used directly:
+Elestio's `random_password` placeholder is a single draw per deployment,
+substituted into every variable that names it, so the database password, the
+secret that signs every application token and the Centrifugo admin password were
+all the same string. See [`elestio/README.md`](elestio/README.md).
+
 Docker Compose reads `deploy/.env` with its own rules and would change a value
 containing `$`, surrounding quotes, ` #`, or leading and trailing spaces.
 Generate secrets with `openssl rand -hex 32`, or restrict a value you type
@@ -105,6 +147,8 @@ Persistent paths:
 - `data/uploads`: uploaded and generated files shared by web and worker
 - `data/ollama`, `data/whisper`: optional local models
 - `data/backups`: restricted MariaDB dumps and Qdrant collection snapshots
+- `data/secrets.env`: the deployment's generated secrets, mode `0600` — required
+  to open the restored database, so it must be in every backup
 
 `deploy/data/` must never be committed.
 
@@ -140,6 +184,10 @@ deploy/scripts/pre-backup.sh
 # Capture deploy/data with the platform backup system.
 deploy/scripts/post-backup.sh
 ```
+
+Whatever captures `deploy/data` must include `deploy/data/secrets.env`. It holds
+the database, realtime and application secrets, and without it the restored
+database cannot be authenticated against.
 
 `pre-backup.sh` first pauses web writers, the worker, and scheduler; while the
 data stores remain online it creates a single-transaction MariaDB dump, one

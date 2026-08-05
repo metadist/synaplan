@@ -4,6 +4,13 @@ set -Eeuo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# Before anything reaches Compose. compose.yaml declares the managed secrets as
+# `${VAR:?}`, so on a deployment whose platform no longer supplies them — which is
+# every new Elestio deployment, because one shared generated value for all of them
+# was worse than none — `compose config --quiet` below would abort here first, and
+# the deployment would never start.
+ensure_deployment_secrets
+
 prepare_data_directories
 
 # On a managed platform this is the first place that reveals WHICH configuration

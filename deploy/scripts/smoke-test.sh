@@ -4,6 +4,9 @@ set -Eeuo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# Documented as directly runnable, and every probe below is a Compose call.
+ensure_deployment_secrets
+
 assert_healthy() {
     local service="$1"
     local container_id status

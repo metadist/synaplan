@@ -4,6 +4,10 @@ set -Eeuo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# First, because everything below reaches Compose and the roundtrip guard resolves
+# the interpolation environment, which the managed secrets are part of.
+ensure_deployment_secrets
+
 # This script is also the install and deploy hook, so it is the only host-side
 # gate on those paths: validate-release.sh does not run before them. Tier 1 only
 # — the image contract, and with it the authoritative email probe, was already

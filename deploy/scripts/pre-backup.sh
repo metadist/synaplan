@@ -4,6 +4,11 @@ set -Eeuo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# The dump below authenticates against MariaDB with MARIADB_ROOT_PASSWORD, which
+# this deployment keeps in deploy/data/secrets.env rather than in the platform's
+# environment.
+ensure_deployment_secrets
+
 ACTIVE_BACKUP_FILE="$STATE_DIR/active-backup"
 
 prepare_data_directories

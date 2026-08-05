@@ -4,6 +4,11 @@ set -Eeuo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# Also here, and not only in prepare.sh below: that runs as a child process, so
+# the variables it exports never reach this shell, and the `compose pull` further
+# down resolves compose.yaml's `${VAR:?}` keys itself.
+ensure_deployment_secrets
+
 # The platform's build command: prepare the checkout, fetch the pinned image,
 # then verify it.
 #
