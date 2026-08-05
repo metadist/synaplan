@@ -1,0 +1,276 @@
+name: "${COMPOSE_PROJECT_NAME:-synaplan}"
+
+x-app-image: &app-image "${SYNAPLAN_IMAGE:-ghcr.io/metadist/synaplan}:${SYNAPLAN_VERSION:?Set SYNAPLAN_VERSION to a published compatible immutable SemVer release}"
+x-app-command: &app-command
+  - |
+    if [[ "$${COMPOSE_PROFILES:-}" == "local-ai" ]]; then
+      export OLLAMA_BASE_URL=http://ollama:11434
+      export AUTO_DOWNLOAD_MODELS=true
+      export WHISPER_ENABLED=true
+    else
+      export OLLAMA_BASE_URL=
+      export AUTO_DOWNLOAD_MODELS=false
+      export WHISPER_ENABLED=false
+    fi
+    exec /usr/local/bin/docker-entrypoint.sh
+x-app-environment: &app-environment
+  APP_ENV: prod
+  APP_DEBUG: "0"
+  APP_URL: "${APP_URL:?Set APP_URL to the public HTTPS URL}"
+  FRONTEND_URL: "${FRONTEND_URL:?Set FRONTEND_URL to the public HTTPS URL}"
+  APP_SECRET: "${APP_SECRET:?Set a stable APP_SECRET}"
+  TOKEN_SECRET: "${TOKEN_SECRET:?Set a stable TOKEN_SECRET}"
+  BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
+  BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_NAME: "${MARIADB_DATABASE:-synaplan}"
+  DB_USER: "${MARIADB_USER:-synaplan}"
+  DB_PASSWORD: "${MARIADB_PASSWORD:?Set a stable MariaDB application password}"
+  DB_SERVER_VERSION: mariadb-12.3.2
+  REDIS_DSN: redis://redis:6379
+  LOCK_DSN: redis://redis:6379
+  REALTIME_ENABLED: "true"
+  REALTIME_API_URL: http://centrifugo:8000/api
+  REALTIME_API_KEY: "${REALTIME_API_KEY:?Set a stable Centrifugo API key}"
+  REALTIME_TOKEN_SECRET: "${REALTIME_TOKEN_SECRET:?Set a stable Centrifugo token secret}"
+  REALTIME_PUBLIC_WS_URL: ""
+  REALTIME_ALLOWED_ORIGINS: "${REALTIME_ALLOWED_ORIGINS:-${APP_URL}}"
+  QDRANT_URL: http://qdrant:6333
+  TIKA_BASE_URL: http://tika:9998
+  COMPOSE_PROFILES: "${COMPOSE_PROFILES:-}"
+  OLLAMA_BASE_URL: ""
+  AUTO_DOWNLOAD_MODELS: "false"
+  ENABLE_LOCAL_GPT_OSS: "${ENABLE_LOCAL_GPT_OSS:-false}"
+  AI_DEFAULT_PROVIDER: "${AI_DEFAULT_PROVIDER:-groq}"
+  WHISPER_BINARY: /usr/local/bin/whisper
+  WHISPER_MODELS_PATH: /var/www/backend/var/whisper
+  WHISPER_DEFAULT_MODEL: "${WHISPER_DEFAULT_MODEL:-tiny}"
+  WHISPER_ENABLED: "false"
+  FFMPEG_BINARY: /usr/bin/ffmpeg
+  MAILER_DSN: "${MAILER_DSN:-null://null}"
+  APP_SENDER_EMAIL: "${APP_SENDER_EMAIL:-}"
+  APP_SENDER_NAME: "${APP_SENDER_NAME:-Synaplan}"
+  PHP_MAX_FILE_UPLOADS: "${PHP_MAX_FILE_UPLOADS:-100}"
+  LOG_FORMAT: "${LOG_FORMAT:-json}"
+  OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+  ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+  GROQ_API_KEY: "${GROQ_API_KEY:-}"
+  GOOGLE_GEMINI_API_KEY: "${GOOGLE_GEMINI_API_KEY:-}"
+  MISTRAL_API_KEY: "${MISTRAL_API_KEY:-}"
+  XAI_API_KEY: "${XAI_API_KEY:-}"
+
+x-app-volumes: &app-volumes
+  - ./data/uploads:/var/www/backend/var/uploads
+  - ./data/whisper:/var/www/backend/var/whisper:ro
+  - ./data/backups:/var/www/backup
+
+services:
+  backend:
+    image: *app-image
+    pull_policy: "${SYNAPLAN_PULL_POLICY:-always}"
+    entrypoint: ["/bin/bash", "-ec"]
+    command: *app-command
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: web
+    volumes: *app-volumes
+    ports:
+      - "${SYNAPLAN_HTTP_BIND:-127.0.0.1}:${SYNAPLAN_HTTP_PORT:-8000}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      centrifugo:
+        condition: service_healthy
+      tika:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    restart: unless-stopped
+    networks: [internal]
+
+  worker:
+    image: *app-image
+    pull_policy: "${SYNAPLAN_PULL_POLICY:-always}"
+    entrypoint: ["/bin/bash", "-ec"]
+    command: *app-command
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: worker
+    volumes: *app-volumes
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    networks: [internal]
+
+  scheduler:
+    image: *app-image
+    pull_policy: "${SYNAPLAN_PULL_POLICY:-always}"
+    entrypoint: ["/bin/bash", "-ec"]
+    command: *app-command
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: scheduler
+    volumes: *app-volumes
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    networks: [internal]
+
+  db:
+    image: mariadb:12.3.2@sha256:628f228f0fd5913a220438693576b29b6fe4dc1fa0a1298c0e98579fae28635f
+    command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
+    environment:
+      MARIADB_DATABASE: "${MARIADB_DATABASE:-synaplan}"
+      MARIADB_USER: "${MARIADB_USER:-synaplan}"
+      MARIADB_PASSWORD: "${MARIADB_PASSWORD:?Set a stable MariaDB application password}"
+      MARIADB_ROOT_PASSWORD: "${MARIADB_ROOT_PASSWORD:?Set a stable MariaDB root password}"
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
+    healthcheck:
+      # The password is expanded by the container's shell, so it MUST stay
+      # quoted: an unquoted expansion splits a password containing whitespace
+      # into several arguments, mariadb-admin never authenticates, db never turns
+      # healthy, and backend, worker and scheduler wait on it forever.
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p\"$$MARIADB_ROOT_PASSWORD\" --silent"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+    networks: [internal]
+
+  redis:
+    image: redis:7.4-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks: [internal]
+
+  centrifugo:
+    image: centrifugo/centrifugo:v6.9.1@sha256:8ba0c9443dadedc21b20254b3fc76f35c1998b29acc7cdec877ea0c3636c237e
+    command: ["centrifugo", "-c", "/centrifugo/config.json"]
+    environment:
+      CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: "${REALTIME_TOKEN_SECRET:?Set a stable Centrifugo token secret}"
+      CENTRIFUGO_HTTP_API_KEY: "${REALTIME_API_KEY:?Set a stable Centrifugo API key}"
+      CENTRIFUGO_ADMIN_PASSWORD: "${REALTIME_ADMIN_PASSWORD:?Set a stable Centrifugo admin password}"
+      CENTRIFUGO_ADMIN_SECRET: "${REALTIME_ADMIN_SECRET:?Set a stable Centrifugo admin secret}"
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: "${REALTIME_ALLOWED_ORIGINS:-${APP_URL}}"
+      CENTRIFUGO_ENGINE_REDIS_ADDRESS: redis://redis:6379/3
+    volumes:
+      - ../_docker/centrifugo/config.json:/centrifugo/config.json:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "centrifugo", "checkconfig", "-c", "/centrifugo/config.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks: [internal]
+
+  tika:
+    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
+    command: -h 0.0.0.0 -p 9998
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/9998 && printf 'GET /version HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    networks: [internal]
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.3@sha256:0bd98fa7977f1e75694779359ca4e212822e5a71334e28421182f72f209d5286
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/6333 && printf 'GET /readyz HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks: [internal]
+
+  ollama:
+    image: ollama/ollama:latest@sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131
+    profiles: [local-ai]
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+    volumes:
+      - ./data/ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/11434 && printf 'GET /api/tags HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    networks: [internal]
+
+  whisper-models:
+    image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    profiles: [local-ai]
+    # The model name is passed as an environment variable and expanded by the
+    # container's shell inside quotes, instead of being interpolated by Compose
+    # into the script text. A Compose-interpolated value would become part of the
+    # program: a name containing whitespace would split the arguments of `test`
+    # and `curl`, and a name containing shell metacharacters would run as code.
+    environment:
+      WHISPER_DEFAULT_MODEL: "${WHISPER_DEFAULT_MODEL:-tiny}"
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        apk add --no-cache curl ca-certificates
+        mkdir -p /models
+        model="ggml-$$WHISPER_DEFAULT_MODEL.bin"
+        test -s "/models/$$model" || curl -fL --retry 3 --max-time 900 \
+          -o "/models/$$model" \
+          "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$$model"
+        chmod 0644 /models/*.bin
+    volumes:
+      - ./data/whisper:/models
+    restart: "no"
+    networks: [internal]
+
+networks:
+  internal:
+    driver: bridge

@@ -21,6 +21,8 @@
 # architecture.
 FROM ghcr.io/metadist/synaplan-base-php:1.2.0@sha256:1c3381bce4673afb2eb96a163c301100584ce98af4e86cbd3158b5bb694d79ef AS dev
 
+ARG APP_VERSION=dev
+
 WORKDIR /var/www/backend
 
 # iOS HDR "tmap"/gain-map HEIC photos (newer iPhones) require libheif >= 1.18 to
@@ -48,6 +50,7 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/s
 # Set default environment variables for paths and constants
 # These are baked into the image since they reference local filesystem paths
 ENV BRAVE_SEARCH_API_URL=https://api.search.brave.com/res/v1 \
+    APP_VERSION=${APP_VERSION} \
     BRAVE_SEARCH_ENABLED=false \
     BRAVE_SEARCH_COUNT=10 \
     BRAVE_SEARCH_COUNTRY=us \
@@ -59,7 +62,8 @@ ENV BRAVE_SEARCH_API_URL=https://api.search.brave.com/res/v1 \
     TIKA_MIN_ENTROPY=3.0 \
     RASTERIZE_DPI=150 \
     RASTERIZE_PAGE_CAP=10 \
-    RASTERIZE_TIMEOUT_MS=30000
+    RASTERIZE_TIMEOUT_MS=30000 \
+    SYNAPLAN_ROLE=web
 
 # Entrypoint scripts (entrypoint + sourced migrations-bootstrap library).
 # These MUST live in the `dev` stage: the dev/worker compose services bind-mount
@@ -68,13 +72,16 @@ ENV BRAVE_SEARCH_API_URL=https://api.search.brave.com/res/v1 \
 # it the container inherits the base image's default and only launches FrankenPHP,
 # leaving vendor/ unpopulated (which then breaks the worker's bin/console).
 COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/
+COPY _docker/backend/container-healthcheck.sh /usr/local/bin/container-healthcheck
 COPY _docker/backend/lib/ /usr/local/bin/lib/
 COPY _docker/backend/synaplan /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/synaplan
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/container-healthcheck /usr/local/bin/synaplan
 
 EXPOSE 80
 
 ENTRYPOINT ["docker-entrypoint.sh"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
+    CMD ["/usr/local/bin/container-healthcheck"]
 
 # ---------------------------------------------------------------------------
 # `dev` target ends here: base image (phpredis included) + ENV defaults + entrypoint.

@@ -39,6 +39,10 @@ class XaiProviderTest extends TestCase
             array_map('unlink', $files);
             rmdir($this->tempDir);
         }
+
+        // generateVideo() re-arms the process-wide execution budget while
+        // polling. Restore unlimited CLI time so later tests cannot inherit it.
+        set_time_limit(0);
     }
 
     // ==================== METADATA ====================

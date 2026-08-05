@@ -37,7 +37,7 @@ test-stack-build: ## Build frontend + widget + test Docker image + start test st
 		docker run --rm -v "$(CURDIR)/frontend:/t" alpine:3.20 sh -c 'rm -rf /t/dist /t/dist-widget' )
 	cd frontend && npm run build && npm run build:widget
 	docker compose -f docker-compose.test.yml build
-	docker compose -f docker-compose.test.yml up -d
+	docker compose -f docker-compose.test.yml up -d --wait --wait-timeout 600
 
 audit: ## Run security audit (backend)
 	$(MAKE) -C backend audit

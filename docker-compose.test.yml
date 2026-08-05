@@ -45,6 +45,7 @@ services:
       AI_DEFAULT_PROVIDER: test
       MAILER_DSN: smtp://mailhog_test:1025
       AUTO_DOWNLOAD_MODELS: "false"
+      RECAPTCHA_ENABLED: "false"
       TOKEN_SECRET: "test_token_secret"
       # OIDC defaults match the Keycloak setup script (_docker/keycloak/setup.sh)
       # These work with --profile oidc; without it, Keycloak is not running but the provider shows as enabled (harmless)

@@ -77,7 +77,9 @@ cache-clear: ## Clear Symfony cache
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console cache:clear
 
 test: ## Run all PHPUnit tests
-	docker compose -f ../docker-compose.yml exec -T backend php bin/phpunit
+	# The backend's HTTP timeout also applies to CLI in the container. The full
+	# suite legitimately exceeds it, so disable only the CLI execution limit.
+	docker compose -f ../docker-compose.yml exec -T backend php -d max_execution_time=0 bin/phpunit
 
 plan-eval: ## Evaluate the multitask planner against the golden corpus (LIVE model — not part of the CI gate)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:multitask:plan-eval
