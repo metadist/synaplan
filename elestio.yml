@@ -25,8 +25,13 @@ environments:
   # updates itself.
   - key: "SYNAPLAN_PLATFORM"
     value: "elestio"
+  # The Docker bridge gateway, which is exactly the `targetIP` the reverse-proxy
+  # route below connects to — and the binding Elestio's own compose examples
+  # use. Binding 0.0.0.0 instead published the app as plain HTTP on every host
+  # interface: Docker writes its own iptables rules, so a host firewall does not
+  # close that port, and the HTTPS proxy in front of it could simply be bypassed.
   - key: "SYNAPLAN_HTTP_BIND"
-    value: "0.0.0.0"
+    value: "172.17.0.1"
   - key: "SYNAPLAN_HTTP_PORT"
     value: "8000"
   - key: "APP_URL"

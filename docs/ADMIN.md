@@ -259,7 +259,7 @@ Always run behind a reverse proxy (nginx, Caddy, Traefik) with TLS termination. 
 
 ## User Management
 
-User levels: `NEW`, `PRO`, `ADMIN`.
+User levels: `NEW`, `PRO`, `TEAM`, `BUSINESS`, `ADMIN`.
 
 ### Running These Statements
 

@@ -3,15 +3,23 @@ name: "${COMPOSE_PROJECT_NAME:-synaplan}"
 x-app-image: &app-image "${SYNAPLAN_IMAGE:-ghcr.io/metadist/synaplan}:${SYNAPLAN_VERSION:?Set SYNAPLAN_VERSION to a published compatible immutable SemVer release}"
 x-app-command: &app-command
   - |
-    if [[ "$${COMPOSE_PROFILES:-}" == "local-ai" ]]; then
-      export OLLAMA_BASE_URL=http://ollama:11434
-      export AUTO_DOWNLOAD_MODELS=true
-      export WHISPER_ENABLED=true
-    else
-      export OLLAMA_BASE_URL=
-      export AUTO_DOWNLOAD_MODELS=false
-      export WHISPER_ENABLED=false
-    fi
+    # COMPOSE_PROFILES is a comma-separated list, so the profile is matched as a
+    # list ELEMENT. An equality test against the whole value made
+    # "local-ai,anything" start Ollama — Compose does read the list — while
+    # leaving the app roles pointed at no local AI at all: a stack that looks
+    # enabled and silently answers from the cloud provider instead.
+    case ",$${COMPOSE_PROFILES:-}," in
+      *,local-ai,*)
+        export OLLAMA_BASE_URL=http://ollama:11434
+        export AUTO_DOWNLOAD_MODELS=true
+        export WHISPER_ENABLED=true
+        ;;
+      *)
+        export OLLAMA_BASE_URL=
+        export AUTO_DOWNLOAD_MODELS=false
+        export WHISPER_ENABLED=false
+        ;;
+    esac
     exec /usr/local/bin/docker-entrypoint.sh
 x-app-environment: &app-environment
   APP_ENV: prod
@@ -67,7 +75,14 @@ x-app-environment: &app-environment
 x-app-volumes: &app-volumes
   - ./data/uploads:/var/www/backend/var/uploads
   - ./data/whisper:/var/www/backend/var/whisper:ro
-  - ./data/backups:/var/www/backup
+  # Read-only: this directory holds every MariaDB dump and Qdrant snapshot, so
+  # it carries all user data, password hashes and encrypted provider keys. The
+  # backup artifacts are written by the HOST (pre-backup.sh redirects the dump
+  # and each snapshot into it), and the only container-side access is
+  # post-restore.sh reading one snapshot file back for upload. Mounting it
+  # writable gave the internet-facing PHP container the ability to read, alter
+  # or destroy the entire backup history for no functional gain.
+  - ./data/backups:/var/www/backup:ro
 
 services:
   backend:
