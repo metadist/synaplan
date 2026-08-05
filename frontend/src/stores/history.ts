@@ -297,6 +297,73 @@ function messageHasRenderableContent(message: Message): boolean {
   )
 }
 
+/** Concatenated text content of a message, used for duplicate detection. */
+function messageTextContent(message: Message): string {
+  return message.parts
+    .filter((part) => part.type === 'text')
+    .map((part) => (part.content ?? '').trim())
+    .join('\n')
+}
+
+/**
+ * Merge a freshly hydrated history snapshot with the live message list when a
+ * foreground load resolves while a streaming exchange is in flight (see
+ * `loadMessages`). The snapshot replaces everything EXCEPT the in-flight
+ * tail: the streaming message(s) plus the locally added user message(s) of
+ * that exchange directly preceding them (added by `addMessage` with a local
+ * uuid and no backend id yet).
+ *
+ * Trailing snapshot rows that duplicate the tail are dropped — the live copy
+ * wins, because ChatView still references it by its local id (error status,
+ * post-stream reconciliation) and it carries the newest streamed content:
+ *  - same local id or same persisted backend id (turn row persisted mid-stream),
+ *  - the synthetic in-progress bubble (the live stream already renders it),
+ *  - a user row with the same text as a not-yet-acknowledged local user
+ *    message (the send was persisted before the response was built).
+ * Only the trailing overlap is scanned, so older history rows with
+ * coincidentally identical text are never dropped.
+ */
+export function mergeHydrationWithStreamingTail(
+  snapshot: Message[],
+  current: Message[]
+): Message[] {
+  const firstStreamingIndex = current.findIndex((message) => message.isStreaming)
+  if (firstStreamingIndex === -1) return snapshot
+
+  let tailStart = firstStreamingIndex
+  while (
+    tailStart > 0 &&
+    current[tailStart - 1].role === 'user' &&
+    current[tailStart - 1].backendMessageId === undefined
+  ) {
+    tailStart--
+  }
+  const tail = current.slice(tailStart)
+
+  const tailIds = new Set(tail.map((message) => message.id))
+  const tailBackendIds = new Set(
+    tail.map((message) => message.backendMessageId).filter((id): id is number => id !== undefined)
+  )
+  const tailUserTexts = new Set(
+    tail
+      .filter((message) => message.role === 'user' && message.backendMessageId === undefined)
+      .map(messageTextContent)
+  )
+
+  const duplicatesTail = (message: Message): boolean =>
+    tailIds.has(message.id) ||
+    message.id === IN_PROGRESS_TURN_ID ||
+    (message.backendMessageId !== undefined && tailBackendIds.has(message.backendMessageId)) ||
+    (message.role === 'user' && tailUserTexts.has(messageTextContent(message)))
+
+  let snapshotEnd = snapshot.length
+  while (snapshotEnd > 0 && duplicatesTail(snapshot[snapshotEnd - 1])) {
+    snapshotEnd--
+  }
+
+  return [...snapshot.slice(0, snapshotEnd), ...tail]
+}
+
 export const useHistoryStore = defineStore('history', () => {
   const messages = ref<Message[]>([])
   const isLoadingMessages = ref(false)
@@ -531,11 +598,15 @@ export const useHistoryStore = defineStore('history', () => {
         if (offset === 0) {
           // A foreground hydration may have started just before the user sent
           // a message. The live stream is newer than that response and must not
-          // be replaced by its stale snapshot.
+          // be replaced by its stale snapshot — but the snapshot still carries
+          // the chat's prior history, so merge it in front of the in-flight
+          // exchange instead of dropping it (and fall through to the pagination
+          // update, which was reset before the fetch).
           if (!silent && messages.value.some((message) => message.isStreaming)) {
-            return
+            messages.value = mergeHydrationWithStreamingTail(loadedMessages, messages.value)
+          } else {
+            messages.value = loadedMessages
           }
-          messages.value = loadedMessages
         } else {
           messages.value = [...loadedMessages, ...messages.value]
         }

@@ -135,6 +135,116 @@ describe('History Store', () => {
   })
 
   /**
+   * PR #1437 review: a foreground hydration that resolves while a live
+   * stream is in flight must MERGE its snapshot in front of the streaming
+   * tail instead of dropping it — otherwise the chat shows no prior history
+   * and the pagination state (reset before the fetch) stays exhausted.
+   */
+  describe('loadMessages — hydration racing a live stream (PR #1437)', () => {
+    const startDeferredLoad = async (extraResponses = false) => {
+      vi.resetModules()
+      let resolveLoad!: (value: unknown) => void
+      const getChatMessages = extraResponses
+        ? vi
+            .fn()
+            .mockImplementationOnce(
+              () =>
+                new Promise<unknown>((resolve) => {
+                  resolveLoad = resolve
+                })
+            )
+            .mockResolvedValue({ success: true, messages: [], pagination: { hasMore: false } })
+        : vi.fn(
+            () =>
+              new Promise<unknown>((resolve) => {
+                resolveLoad = resolve
+              })
+          )
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      const loading = store.loadMessages(42)
+      await vi.waitFor(() => expect(getChatMessages).toHaveBeenCalledOnce())
+
+      return { store, loading, getChatMessages, resolve: (value: unknown) => resolveLoad(value) }
+    }
+
+    it('prepends the hydrated history in front of the streaming exchange', async () => {
+      const { store, loading, resolve } = await startDeferredLoad()
+
+      store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+      const assistantId = store.addStreamingMessage('assistant')
+      store.updateStreamingMessage(assistantId, 'Partial reply')
+      resolve({
+        success: true,
+        messages: [
+          { id: 1, direction: 'IN', text: 'Old question', timestamp: 1700000000 },
+          { id: 2, direction: 'OUT', text: 'Old answer', timestamp: 1700000001 },
+        ],
+        pagination: { hasMore: false },
+      })
+      await loading
+
+      expect(store.messages.map((m) => m.parts[0].content)).toEqual([
+        'Old question',
+        'Old answer',
+        'Hello',
+        'Partial reply',
+      ])
+      expect(store.messages.at(-1)?.id).toBe(assistantId)
+      expect(store.messages.at(-1)?.isStreaming).toBe(true)
+    })
+
+    it('does not duplicate the just-sent user message already persisted in the snapshot', async () => {
+      const { store, loading, resolve } = await startDeferredLoad()
+
+      store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+      const localUserId = store.messages[0].id
+      const assistantId = store.addStreamingMessage('assistant')
+      resolve({
+        success: true,
+        messages: [
+          // An OLDER prompt with the same text — must never be dropped.
+          { id: 1, direction: 'IN', text: 'Hello', timestamp: 1700000000 },
+          { id: 2, direction: 'OUT', text: 'Hi there', timestamp: 1700000001 },
+          // The just-sent message, persisted before the response was built.
+          { id: 3, direction: 'IN', text: 'Hello', timestamp: 1700000002 },
+        ],
+        pagination: { hasMore: false },
+      })
+      await loading
+
+      expect(store.messages.map((m) => m.id)).toEqual([
+        'backend-1',
+        'backend-2',
+        localUserId,
+        assistantId,
+      ])
+    })
+
+    it('updates pagination in the merge path so older history stays reachable', async () => {
+      const { store, loading, getChatMessages, resolve } = await startDeferredLoad(true)
+
+      store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+      store.addStreamingMessage('assistant')
+      resolve({
+        success: true,
+        messages: [
+          { id: 1, direction: 'IN', text: 'Old question', timestamp: 1700000000 },
+          { id: 2, direction: 'OUT', text: 'Old answer', timestamp: 1700000001 },
+        ],
+        pagination: { hasMore: true },
+      })
+      await loading
+
+      expect(store.hasMoreMessages).toBe(true)
+      await store.loadMoreMessages(42)
+      expect(getChatMessages).toHaveBeenLastCalledWith(42, 2, 50)
+    })
+  })
+
+  /**
    * Issue #955 regression coverage. The chat API ships uploaded voice
    * notes and TTS audio in two shapes:
    *
