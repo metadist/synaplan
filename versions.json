@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "stable": {
+    "version": "4.0.13",
+    "releasedAt": "2026-08-05T13:26:18Z",
+    "notesUrl": "https://github.com/metadist/synaplan/releases/tag/v4.0.13",
+    "severity": "normal"
+  },
+  "yanked": []
+}
