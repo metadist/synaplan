@@ -7,8 +7,10 @@ schema. These files only translate lifecycle events to the portable scripts in
 ## Import and first deployment
 
 1. Create a custom Docker Compose CI/CD pipeline from this repository and branch.
-2. Replace `REPLACE_WITH_PUBLISHED_COMPATIBLE_VERSION` with an immutable SemVer
-   tag that already exists in GHCR and passes `deploy/scripts/validate-release.sh`.
+2. Leave `SYNAPLAN_VERSION` as it is to install the release this branch ships.
+   Any other value must be an immutable SemVer version that already exists in
+   GHCR; `deploy/scripts/validate-release.sh` rejects everything else before a
+   container starts. Later version changes follow [docs/UPDATE_ELESTIO.md](../../docs/UPDATE_ELESTIO.md).
 3. Keep `COMPOSE_PROFILES` empty for the initial Cloud-AI installation.
 4. Confirm that HTTPS 443 proxies to host port 8000 without Basic Auth.
 5. Open the Synaplan web UI shortcut and sign in with the generated bootstrap
