@@ -4,6 +4,12 @@ set -Eeuo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# The restored deploy/data carries the deployment's secrets.env, so this is also
+# the point at which a restore that did NOT include that file fails — with a
+# message naming the variable, instead of a database nobody can authenticate
+# against.
+ensure_deployment_secrets
+
 # Runs before the recovery trap below is installed, on purpose: that trap brings
 # the backend back up, so a failure after it exists would start a container with
 # the rejected configuration — the crash loop this preflight prevents. The

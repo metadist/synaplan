@@ -592,6 +592,309 @@ PROBE
     return "$status"
 }
 
+# The secrets this deployment gives its own, independent value to.
+#
+# Why the deployment has to do this at all: a managed platform's password
+# generator is ONE draw per deployment. Elestio substitutes its `random_password`
+# placeholder into every variable that names it, so a real installation came up
+# with APP_SECRET, TOKEN_SECRET, both MariaDB passwords and all four REALTIME_*
+# values set to the same string — the password of the database was also the
+# secret that signs every application token, and the Centrifugo admin password.
+# One leaked value is then every credential the deployment has. Elestio offers no
+# second generator (their own catalog templates, elestio-examples/glpi among
+# them, carry the same defect), so the split has to happen on this side.
+#
+# BOOTSTRAP_ADMIN_PASSWORD is deliberately NOT managed here. The platform DISPLAYS
+# that value as the login for the web UI shortcut, and the bootstrap never resets
+# an existing administrator, so it has to stay exactly the value the platform
+# generated — rotating it would leave the operator with a password that does not
+# open their own instance.
+SYNAPLAN_MANAGED_SECRET_KEYS=(
+    APP_SECRET
+    TOKEN_SECRET
+    MARIADB_PASSWORD
+    MARIADB_ROOT_PASSWORD
+    REALTIME_API_KEY
+    REALTIME_TOKEN_SECRET
+    REALTIME_ADMIN_PASSWORD
+    REALTIME_ADMIN_SECRET
+)
+
+# Give every managed secret its own value, once, and export all of them.
+#
+# The values are recorded in $DATA_DIR/secrets.env, which is the only place they
+# CAN live: Elestio rewrites the deployment's .env from the pipeline's configured
+# environment on every deploy, so a value written back into that file is gone on
+# the next one. The bind-mounted data directory is the one part of the deployment
+# that survives a redeploy — and it is what the platform backup captures, which is
+# why that file is backup-critical: a database restored without it is a database
+# nobody can open again.
+#
+# Resolution per key, in this order:
+#
+#   1. secrets.env, when it exists. It is authoritative and is never rewritten,
+#      because it records what the running stack was BUILT with.
+#   2. the value the deployment already resolves to — an exported host
+#      environment variable, or the configuration file Compose reads. Adopted
+#      verbatim, which is what guarantees that an installation which already runs
+#      keeps exactly the credentials it has: a self-hosted deploy/.env, or a
+#      platform deployment whose one shared value is already in use everywhere.
+#   3. a fresh, independent draw, but only while the stack has never been
+#      initialised and no secrets.env exists yet.
+#   4. otherwise the deployment is refused, see the two messages below.
+#
+# Exporting is not cosmetic. Compose prefers a real host environment variable
+# over every --env-file entry, so exporting is the only way these values reliably
+# win however the platform delivered the originals — and the only way a generated
+# value reaches a `compose` call at all, because it appears in no configuration
+# file the platform would pass with --env-file.
+ensure_deployment_secrets() {
+    local secrets_file="$DATA_DIR/secrets.env"
+    local env_file secrets_file_existed=false
+    local index key value
+    local values=() assignments=()
+    local generated_count=0 adopted_count=0
+    # Collected instead of reported one at a time: an operator who has to run the
+    # deployment once per missing variable gives up on the third one. This is the
+    # same reason validate_secret_roundtrip() names every altered key at once.
+    local unresolved_keys="" unadoptable_keys=""
+
+    # The data root has to exist before the file can be written, and this runs on
+    # paths that have not called prepare_data_directories() yet. 0700 for the same
+    # reason it applies there: everything below this directory is either data or,
+    # now, credentials.
+    mkdir -p "$DATA_DIR"
+    chmod 0700 "$DATA_DIR"
+
+    [[ -f "$secrets_file" ]] && secrets_file_existed=true
+    env_file="$(resolve_compose_env_file)"
+
+    for ((index = 0; index < ${#SYNAPLAN_MANAGED_SECRET_KEYS[@]}; index++)); do
+        key="${SYNAPLAN_MANAGED_SECRET_KEYS[$index]}"
+        value=""
+        values[$index]=""
+        assignments[$index]="$key="
+
+        if [[ "$secrets_file_existed" == true ]]; then
+            value="$(env_file_raw_value "$secrets_file" "$key")" || value=""
+        fi
+
+        # Compose's precedence, so the value adopted here is the value the
+        # containers are running with: an exported host variable beats every
+        # --env-file entry, and the file only decides what the environment does
+        # not. An exported variable that is EMPTY is not a value — compose.yaml's
+        # `${VAR:?}` rejects it exactly like an unset one — so the file still
+        # decides in that case.
+        if [[ -z "$value" ]]; then
+            if host_environment_defines "$key" && [[ -n "${!key-}" ]]; then
+                value="${!key-}"
+            elif [[ -n "$env_file" ]]; then
+                value="$(env_file_raw_value "$env_file" "$key")" || value=""
+                if [[ -n "$value" ]] && ! deployment_secret_is_adoptable "$value"; then
+                    unadoptable_keys="${unadoptable_keys}${unadoptable_keys:+ }$key"
+                    continue
+                fi
+            fi
+            [[ -z "$value" ]] || adopted_count=$((adopted_count + 1))
+        fi
+
+        if [[ -z "$value" ]]; then
+            # Nothing may be generated for a key that cannot be recorded, and
+            # nothing may be generated for a stack that already exists:
+            #
+            #   an EXISTING secrets.env is never rewritten, so a value generated
+            #     here would be a different one on every single start — APP_SECRET
+            #     alone would invalidate every session on each deploy;
+            #   an INITIALISED stack keeps credentials that cannot be
+            #     reconstructed from its data. MariaDB created its user with the
+            #     old password, so a new MARIADB_PASSWORD locks the application
+            #     out of its own database permanently.
+            if [[ "$secrets_file_existed" == true ]] || deployment_stack_is_initialised; then
+                unresolved_keys="${unresolved_keys}${unresolved_keys:+ }$key"
+                continue
+            fi
+            value="$(generate_deployment_secret)" || return 1
+            generated_count=$((generated_count + 1))
+        fi
+
+        values[$index]="$value"
+        assignments[$index]="$key=$value"
+    done
+
+    if [[ -n "$unadoptable_keys" ]]; then
+        echo "Docker Compose does not read these values back unchanged from $env_file, so they cannot be adopted as the deployment's secrets: $unadoptable_keys" >&2
+        echo "This deployment exports the value it adopts, and Compose never rewrites a host environment variable — so adopting one of these as written would change the credential the containers have been using until now, and a changed MARIADB_PASSWORD locks the application out of its own database." >&2
+        echo "Fix: write each listed value without surrounding quotes, without whitespace around the '=' or around the value, without an inline ' #' comment and without a dollar sign; or pass it as a host environment variable, which Compose never rewrites. 'openssl rand -hex 32' always satisfies this. No value is printed here, because these keys are secrets." >&2
+        return 1
+    fi
+
+    if [[ -n "$unresolved_keys" ]]; then
+        if [[ "$secrets_file_existed" == true ]]; then
+            echo "$secrets_file exists but does not assign these secrets, and neither the host environment nor the deployment configuration provides them: $unresolved_keys" >&2
+            echo "That file is authoritative and is never rewritten, because it records the values this stack was built with; generating new ones here would produce a different set on every start." >&2
+            echo "Fix: add a '<VARIABLE>=<the value this deployment was installed with>' line per listed secret to $secrets_file, or set them in the platform's environment editor, then run the deployment again." >&2
+        else
+            echo "These secrets have no value, and this deployment is already initialised — $DATA_DIR/mariadb holds a database that was created with the previous ones: $unresolved_keys" >&2
+            echo "Refusing to generate replacements: a generated credential cannot match an initialised stack. A new MARIADB_PASSWORD locks the application out of its own database permanently, because the MariaDB user still authenticates with the old one, and no secret can be reconstructed from the stored data." >&2
+            echo "Fix: restore the listed variables in the platform's environment editor or in the deployment configuration file, or write their known values into $secrets_file as '<VARIABLE>=<value>' lines, then run the deployment again." >&2
+        fi
+        return 1
+    fi
+
+    if [[ "$secrets_file_existed" == false ]]; then
+        write_deployment_secrets_file "$secrets_file" "${assignments[@]}" || return 1
+        printf 'Recorded %s deployment secrets in %s (%s generated independently, %s adopted from the existing configuration). This file is secret material and belongs in every backup.\n' \
+            "${#SYNAPLAN_MANAGED_SECRET_KEYS[@]}" "$secrets_file" "$generated_count" "$adopted_count"
+    else
+        printf 'Using the %s deployment secrets recorded in %s.\n' \
+            "${#SYNAPLAN_MANAGED_SECRET_KEYS[@]}" "$secrets_file"
+    fi
+
+    for ((index = 0; index < ${#SYNAPLAN_MANAGED_SECRET_KEYS[@]}; index++)); do
+        export "${SYNAPLAN_MANAGED_SECRET_KEYS[$index]}=${values[$index]}"
+    done
+}
+
+# Whether the stack has already been initialised, which decides whether a missing
+# credential may be generated or has to be refused.
+#
+# The mere EXISTENCE of data/mariadb is not the signal: prepare_data_directories()
+# creates that directory empty on the very first start, and every lifecycle script
+# calls it, so an existence check would report a brand-new deployment as
+# initialised and refuse it with advice about a credential that never existed.
+# MariaDB populating the directory is what makes the old password unrecoverable.
+deployment_stack_is_initialised() {
+    [[ -d "$DATA_DIR/mariadb" ]] || return 1
+    find "$DATA_DIR/mariadb" -mindepth 1 -print -quit 2>/dev/null | grep -q .
+}
+
+# Whether Compose's .env parser returns this raw spelling unchanged, and only
+# relevant for a value read from the configuration FILE.
+#
+# The adopted value is EXPORTED afterwards, and Compose never rewrites a host
+# environment variable — so adopting a spelling Compose alters would change the
+# credential the containers have used until now: `MARIADB_PASSWORD="abc"` reaches
+# the database as `abc` today and would reach it as `"abc"` from here on, which is
+# the single outcome the adoption rule exists to prevent.
+#
+# validate_secret_roundtrip() rejects exactly these spellings, for these keys,
+# with the same advice — but it resolves its comparison through
+# `compose config --environment`, which cannot run before these variables have a
+# value at all (compose.yaml declares them as `${VAR:?}`). So the alterations that
+# parser performs are named here instead, and a value carrying one is refused
+# rather than adopted: an unescaped `$` starts an interpolation, `$$` collapses to
+# `$`, surrounding quotes are stripped (with backslash escapes inside them
+# expanded), surrounding whitespace is trimmed, and ` #` starts a comment.
+# Anything else is returned byte for byte, which is why every value is also read
+# back from the file after it is written.
+deployment_secret_is_adoptable() {
+    local value="$1"
+
+    [[ "$value" != *'$'* ]] || return 1
+    [[ "$value" != *' #'* && "$value" != *$'\t#'* ]] || return 1
+    [[ "$value" == "${value#[[:space:]]}" && "$value" == "${value%[[:space:]]}" ]] || return 1
+    case "$value" in
+        '"'*'"' | "'"*"'") return 1 ;;
+    esac
+}
+
+# 32 bytes of randomness rendered as 64 hexadecimal characters.
+#
+# Hexadecimal only, deliberately: Compose interpolation, a .env parser and the
+# container shell that expands MARIADB_ROOT_PASSWORD inside the db healthcheck
+# each rewrite or split a value containing `$`, quotes, whitespace or ` #`.
+# validate_secret_roundtrip() guards that class of bug for a CONFIGURED value; a
+# generated one must not be able to cause it in the first place.
+#
+# openssl is present in every image this deployment runs, but not guaranteed on a
+# minimal host, so /dev/urandom is read directly as a fallback. Either way the
+# result is length-checked: a short read would silently weaken every secret it
+# produced, and nothing downstream would notice.
+generate_deployment_secret() {
+    local value=""
+
+    if command -v openssl >/dev/null 2>&1; then
+        value="$(openssl rand -hex 32)"
+    else
+        value="$(LC_ALL=C od -vAn -N 32 -tx1 < /dev/urandom | LC_ALL=C tr -d ' \n')"
+    fi
+
+    [[ "$value" =~ ^[0-9a-f]{64}$ ]] || {
+        echo "Could not generate a 32-byte random secret; install openssl, or make /dev/urandom readable for this deployment." >&2
+        return 1
+    }
+    printf '%s' "$value"
+}
+
+# Create the secrets file, as a whole set, verified — and only ever create it.
+#
+# umask 077 rather than a chmod after the fact: between creating a world-readable
+# file and tightening it there is a window in which every credential of the
+# deployment is readable by any local account. The previous umask is restored,
+# because this library is sourced by scripts that write other files afterwards.
+#
+# Every value is read back with env_file_raw_value(), the same reader
+# ensure_deployment_secrets() and validate_secret_roundtrip() use, and compared
+# byte for byte. A value adopted from the host environment can contain anything —
+# a newline, a carriage return — and this file format cannot represent all of it.
+# Refusing to install a file that does not read back is what keeps "adopted
+# verbatim" true; the alternative is a deployment configured with a silently
+# truncated credential.
+#
+# The write goes to a temporary file next to the target and is moved into place,
+# so an interrupted or rejected run never leaves a half-written authoritative
+# file behind. Values are passed as function arguments, which stay inside this
+# shell: no external command receives them, so none appears in a process list.
+write_deployment_secrets_file() {
+    local secrets_file="$1"
+    shift
+    local assignment key value temporary_file previous_umask status=0
+
+    previous_umask="$(umask)"
+    umask 077
+    temporary_file="$(mktemp "$(dirname "$secrets_file")/.secrets.env.XXXXXX")" || status=$?
+    if ((status == 0)); then
+        {
+            printf '# Synaplan deployment secrets, generated once on the first start.\n'
+            printf '#\n'
+            printf '# Each value is an independent random draw, or the value this deployment was\n'
+            printf '# already configured with. Together they are the credentials of the database,\n'
+            printf '# of the realtime service and of the application token signing, so this file is\n'
+            printf '# secret material:\n'
+            printf '#\n'
+            printf '#   - it MUST be part of every backup. A database restored without it cannot be\n'
+            printf '#     opened again, because the MariaDB user still expects the password recorded\n'
+            printf '#     here and it exists nowhere else.\n'
+            printf '#   - it must never be committed, and never be readable by anyone else.\n'
+            printf '#   - a value in use must not be edited. The deployment reads this file as\n'
+            printf '#     authoritative and never rewrites it.\n'
+            printf '\n'
+            for assignment in "$@"; do
+                printf '%s\n' "$assignment"
+            done
+        } > "$temporary_file" || status=$?
+    fi
+    umask "$previous_umask"
+    ((status == 0)) || {
+        echo "Could not write the deployment secrets next to $secrets_file; check that the deployment data directory is writable." >&2
+        return 1
+    }
+
+    for assignment in "$@"; do
+        key="${assignment%%=*}"
+        value="${assignment#*=}"
+        [[ "$(env_file_raw_value "$temporary_file" "$key")" == "$value" ]] || {
+            rm -f "$temporary_file"
+            echo "The value configured for $key cannot be recorded in $secrets_file unchanged, so this deployment refuses to store an altered credential for it." >&2
+            echo "Fix: give $key a value without line breaks or carriage returns — 'openssl rand -hex 32' always works — or clear it and let the deployment generate one. No value is printed here, because this key is a secret." >&2
+            return 1
+        }
+    done
+
+    chmod 0600 "$temporary_file"
+    mv "$temporary_file" "$secrets_file"
+}
+
 prepare_data_directories() {
     mkdir -p \
         "$STATE_DIR" \

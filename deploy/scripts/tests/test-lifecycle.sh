@@ -1064,6 +1064,416 @@ assert_reports_configuration_source run.sh
 assert_roundtrip_precedes_value_rules post-update.sh
 assert_roundtrip_precedes_value_rules post-restore.sh
 
+# One independent value per secret, recorded where a redeploy cannot erase it.
+#
+# The defect these cases exist for: a managed platform's password generator is ONE
+# draw per deployment. Elestio substitutes its `random_password` placeholder into
+# every variable that names it, so a real installation came up with APP_SECRET,
+# TOKEN_SECRET, both MariaDB passwords and all four REALTIME_* values set to the
+# same string — the database password was also the secret signing every
+# application token. Nothing in the stack noticed, because every side used the
+# same wrong value consistently.
+#
+# Every case runs in a subshell. ensure_deployment_secrets EXPORTS its result, and
+# a leaked export would silently decide the next case — and would make the
+# roundtrip section above skip the very keys it covers.
+secrets_tree="$temporary_dir/secrets"
+secrets_case_index=0
+secrets_deploy_dir=""
+secrets_data_dir=""
+secrets_file=""
+secrets_messages=""
+
+# A deployment tree per case: resolve_compose_env_file() looks for deploy/.env and
+# <checkout>/.env, and the secrets file lives in deploy/data, so no two cases may
+# share a root.
+new_secrets_case() {
+    secrets_case_index=$((secrets_case_index + 1))
+    secrets_deploy_dir="$secrets_tree/case-$secrets_case_index/deploy"
+    secrets_data_dir="$secrets_deploy_dir/data"
+    secrets_file="$secrets_data_dir/secrets.env"
+    secrets_messages="$secrets_tree/case-$secrets_case_index/messages.log"
+    mkdir -p "$secrets_deploy_dir"
+}
+
+# Runs ensure_deployment_secrets for the current case and prints the RESOLVED
+# environment it exported, one `KEY=value` line per managed secret, so a case can
+# assert on values that only exist inside that subshell. Arguments are `KEY=value`
+# assignments exported before the call, which is how the "already configured"
+# cases are set up. The function's own messages go to a file instead of stdout, so
+# they can be asserted separately — several cases require that no value appears in
+# them.
+run_ensure_secrets() {
+    local status=0
+    (
+        # Both are read indirectly, by the sourced library.
+        # shellcheck disable=SC2030,SC2034
+        DEPLOY_DIR="$secrets_deploy_dir"
+        # shellcheck disable=SC2030,SC2034
+        DATA_DIR="$secrets_data_dir"
+        if (($# > 0)); then
+            export "$@"
+        fi
+        ensure_deployment_secrets > "$secrets_messages" 2>&1 || exit $?
+        for secrets_key in "${SYNAPLAN_MANAGED_SECRET_KEYS[@]}"; do
+            printf '%s=%s\n' "$secrets_key" "${!secrets_key-}"
+        done
+    ) || status=$?
+    return "$status"
+}
+
+# The permission bits, spelled differently by GNU and BSD stat. The mode is a
+# guarantee of this file, not a detail: it holds every credential of the
+# deployment.
+#
+# GNU is asked first, and its output is captured rather than tested in place:
+# `stat -f` means --file-system there, so it reads "%Lp" as a FILE NAME, prints a
+# filesystem report for the real argument on STDOUT and exits non-zero. A
+# BSD-first probe would therefore pass that report on as the mode on every Linux
+# host, CI included. BSD rejects `-c` as an illegal option with nothing on stdout,
+# so this order is unambiguous on both.
+file_mode() {
+    local mode
+    mode="$(stat -c '%a' "$1" 2>/dev/null)" || mode="$(stat -f '%Lp' "$1")"
+    printf '%s\n' "$mode"
+}
+
+assert_secret_value() {
+    local description="$1"
+    local resolved="$2"
+    local key="$3"
+    local expected="$4"
+    local actual
+    actual="$(compose_environment_value "$resolved" "$key")"
+    [[ "$actual" == "$expected" ]] || {
+        printf 'Secret case "%s": %s resolved to %s bytes, expected the configured %s bytes\n' \
+            "$description" "$key" "${#actual}" "${#expected}" >&2
+        exit 1
+    }
+}
+
+# A fresh deployment: nothing configured, nothing initialised. Every secret must
+# get its OWN 32-byte draw — the whole point — and the generated shape must be one
+# that no later parser can rewrite.
+new_secrets_case
+secrets_resolved="$(run_ensure_secrets)"
+for secrets_key in "${SYNAPLAN_MANAGED_SECRET_KEYS[@]}"; do
+    secrets_generated="$(compose_environment_value "$secrets_resolved" "$secrets_key")"
+    [[ "$secrets_generated" =~ ^[0-9a-f]{64}$ ]] || {
+        printf 'A fresh deployment did not generate 64 hexadecimal characters for %s; it produced %s bytes\n' \
+            "$secrets_key" "${#secrets_generated}" >&2
+        exit 1
+    }
+done
+
+# THE defect. Eight identical values is exactly what the platform produced, and a
+# suite that only checked the shape above would have passed on it.
+secrets_distinct="$(printf '%s\n' "$secrets_resolved" | awk -F= '{ print $2 }' | sort -u | wc -l | tr -d ' ')"
+[[ "$secrets_distinct" == "${#SYNAPLAN_MANAGED_SECRET_KEYS[@]}" ]] || {
+    printf 'A fresh deployment produced %s distinct values for %s secrets; each one must be an independent draw\n' \
+        "$secrets_distinct" "${#SYNAPLAN_MANAGED_SECRET_KEYS[@]}" >&2
+    exit 1
+}
+
+# HARD CONSTRAINT: a deployment log is not a place for credentials, and these
+# lines are printed on every start.
+while IFS= read -r secrets_line; do
+    secrets_generated="${secrets_line#*=}"
+    [[ "$(<"$secrets_messages")" != *"$secrets_generated"* ]] || {
+        printf 'ensure_deployment_secrets prints the value it generated for %s\n' \
+            "${secrets_line%%=*}" >&2
+        exit 1
+    }
+done <<< "$secrets_resolved"
+
+# The file the values live in. deploy/data is the only part of the deployment that
+# survives an Elestio redeploy, because the platform rewrites the deployment's
+# .env from its own configuration every time.
+[[ -f "$secrets_file" ]] || {
+    printf 'A fresh deployment did not record its secrets in %s\n' "$secrets_file" >&2
+    exit 1
+}
+[[ "$(file_mode "$secrets_file")" == "600" ]] || {
+    printf 'The deployment secrets file has mode %s, expected 600\n' \
+        "$(file_mode "$secrets_file")" >&2
+    exit 1
+}
+secrets_assignment_count="$(LC_ALL=C awk '/^[A-Z]/ { count++ } END { print count + 0 }' "$secrets_file")"
+[[ "$secrets_assignment_count" == "${#SYNAPLAN_MANAGED_SECRET_KEYS[@]}" ]] || {
+    printf 'The deployment secrets file assigns %s keys, expected %s\n' \
+        "$secrets_assignment_count" "${#SYNAPLAN_MANAGED_SECRET_KEYS[@]}" >&2
+    exit 1
+}
+# The file itself has to say that losing it loses the database: whoever finds it
+# during a disaster recovery has nothing else to go by.
+grep -Fq 'backup' "$secrets_file" || {
+    printf '%s does not tell the reader that it belongs in a backup\n' "$secrets_file" >&2
+    exit 1
+}
+
+# A host without openssl. The portable /dev/urandom fallback has to produce the
+# same shape, because nothing downstream would notice a short or empty draw — it
+# would simply become the deployment's permanent database password.
+(
+    command() { return 1; }
+    secrets_fallback="$(generate_deployment_secret)"
+    [[ "$secrets_fallback" =~ ^[0-9a-f]{64}$ ]]
+) || {
+    echo "The /dev/urandom fallback does not produce 64 hexadecimal characters on a host without openssl" >&2
+    exit 1
+}
+
+# An installation that already runs must not change at all. Its credentials come
+# from the host environment or from the configuration file Compose reads, and both
+# are adopted BYTE FOR BYTE — a "normalised" MariaDB password would be a database
+# the application can no longer open.
+new_secrets_case
+printf 'APP_SECRET=configured-in-the-deployment-file\n' > "$secrets_deploy_dir/.env"
+printf 'UNRELATED_KEY=x\n' > "$(dirname "$secrets_deploy_dir")/.env"
+secrets_adopted_password='already in use #7'
+secrets_resolved="$(run_ensure_secrets "MARIADB_PASSWORD=$secrets_adopted_password")"
+assert_secret_value "adoption" "$secrets_resolved" MARIADB_PASSWORD "$secrets_adopted_password"
+assert_secret_value "adoption" "$secrets_resolved" APP_SECRET configured-in-the-deployment-file
+[[ "$(compose_environment_value "$secrets_resolved" TOKEN_SECRET)" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "A secret that nothing configured was not generated alongside the adopted ones" >&2
+    exit 1
+}
+[[ "$(<"$secrets_messages")" != *"$secrets_adopted_password"* ]] || {
+    echo "ensure_deployment_secrets prints an adopted secret" >&2
+    exit 1
+}
+# Adopted values are recorded too, so the next start no longer depends on a
+# platform that may not deliver them again.
+[[ "$(env_file_raw_value "$secrets_file" MARIADB_PASSWORD)" == "$secrets_adopted_password" ]] || {
+    echo "The adopted MariaDB password was not recorded verbatim in the secrets file" >&2
+    exit 1
+}
+
+# Idempotence, and the reason the file exists: once a value is in use it is fixed.
+# A second start must resolve the recorded set even when the environment now says
+# something else — a platform that rotates its generated value on every deploy is
+# exactly the situation this deployment is protecting itself from.
+secrets_recorded="$(<"$secrets_file")"
+secrets_resolved_again="$(run_ensure_secrets MARIADB_PASSWORD=a-rotated-value APP_SECRET=another-rotated-value)"
+[[ "$(<"$secrets_file")" == "$secrets_recorded" ]] || {
+    echo "A second run rewrote the deployment secrets file" >&2
+    exit 1
+}
+[[ "$secrets_resolved_again" == "$secrets_resolved" ]] || {
+    echo "A second run resolved different secrets than the recorded ones" >&2
+    exit 1
+}
+[[ "$(<"$secrets_messages")" != *a-rotated-value* ]] || {
+    echo "ensure_deployment_secrets prints a value from the environment" >&2
+    exit 1
+}
+
+# The abort. An initialised stack whose credential is unknown must NOT be given a
+# new one: MariaDB created its user with the old password, so a generated
+# MARIADB_PASSWORD locks the application out of its own data permanently, with no
+# way back. The message has to name the variable, because that is the only thing
+# the operator can act on.
+new_secrets_case
+mkdir -p "$secrets_data_dir/mariadb"
+# What "initialised" means here: a POPULATED data directory. The directory itself
+# exists on every deployment from the first start onwards, because
+# prepare_data_directories() creates it empty — treating that as initialised would
+# abort every fresh installation with advice about a credential that never was.
+printf 'x' > "$secrets_data_dir/mariadb/ibdata1"
+secrets_status=0
+run_ensure_secrets \
+    APP_SECRET=known TOKEN_SECRET=known MARIADB_ROOT_PASSWORD=known \
+    REALTIME_API_KEY=known REALTIME_TOKEN_SECRET=known \
+    REALTIME_ADMIN_PASSWORD=known REALTIME_ADMIN_SECRET=known \
+    > /dev/null || secrets_status=$?
+((secrets_status != 0)) || {
+    echo "An initialised deployment with an unknown MariaDB password was allowed to generate a new one" >&2
+    exit 1
+}
+grep -Fq MARIADB_PASSWORD "$secrets_messages" || {
+    printf 'The refusal does not name the missing variable:\n%s\n' "$(<"$secrets_messages")" >&2
+    exit 1
+}
+[[ ! -f "$secrets_file" ]] || {
+    echo "A refused deployment left a secrets file behind" >&2
+    exit 1
+}
+
+# And every missing variable in ONE message: an operator who has to run the
+# deployment once per missing value gives up on the third one.
+new_secrets_case
+mkdir -p "$secrets_data_dir/mariadb"
+printf 'x' > "$secrets_data_dir/mariadb/ibdata1"
+secrets_status=0
+run_ensure_secrets \
+    APP_SECRET=known TOKEN_SECRET=known MARIADB_ROOT_PASSWORD=known \
+    REALTIME_TOKEN_SECRET=known REALTIME_ADMIN_PASSWORD=known \
+    REALTIME_ADMIN_SECRET=known \
+    > /dev/null || secrets_status=$?
+((secrets_status != 0)) || {
+    echo "An initialised deployment with two unknown secrets was allowed to generate them" >&2
+    exit 1
+}
+grep -Fq MARIADB_PASSWORD "$secrets_messages" && grep -Fq REALTIME_API_KEY "$secrets_messages" || {
+    printf 'The refusal does not name every missing variable:\n%s\n' "$(<"$secrets_messages")" >&2
+    exit 1
+}
+
+# The same directory, empty, is a fresh deployment and must generate. This is the
+# state prepare_data_directories() leaves behind on every single start.
+new_secrets_case
+mkdir -p "$secrets_data_dir/mariadb"
+secrets_resolved="$(run_ensure_secrets)"
+[[ "$(compose_environment_value "$secrets_resolved" MARIADB_PASSWORD)" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "An empty data/mariadb directory was mistaken for an initialised deployment" >&2
+    exit 1
+}
+
+# A spelling Compose does not read back unchanged must not be adopted from the
+# configuration FILE. The adopted value is exported afterwards, and Compose never
+# rewrites a host environment variable — so `MARIADB_PASSWORD="abc"`, which
+# reaches the database as `abc` today, would reach it as `"abc"` from then on and
+# break exactly the installation this rule protects. validate_secret_roundtrip()
+# rejects the same spellings, but it cannot run this early: it resolves its
+# comparison through `compose config --environment`, which fails while these
+# `${VAR:?}` keys have no value at all.
+assert_secret_not_adoptable() {
+    local description="$1"
+    local raw="$2"
+    local status=0
+
+    new_secrets_case
+    printf 'APP_SECRET=%s\n' "$raw" > "$secrets_deploy_dir/.env"
+    run_ensure_secrets > /dev/null || status=$?
+    ((status != 0)) || {
+        printf 'Adoption case "%s": a value Compose rewrites was adopted and exported as written\n' \
+            "$description" >&2
+        exit 1
+    }
+    grep -Fq APP_SECRET "$secrets_messages" || {
+        printf 'Adoption case "%s" does not name the affected key:\n%s\n' \
+            "$description" "$(<"$secrets_messages")" >&2
+        exit 1
+    }
+}
+
+assert_secret_not_adoptable "surrounding double quotes" '"abcdefgh"'
+assert_secret_not_adoptable "surrounding single quotes" "'abcdefgh'"
+assert_secret_not_adoptable "an unescaped dollar sign" 'ab$cdefgh'
+assert_secret_not_adoptable "surrounding whitespace" '  abcdefgh  '
+assert_secret_not_adoptable "an inline comment" 'abcdefgh #x'
+
+# Spellings Compose returns unchanged stay adoptable: refusing them would fail a
+# deployment that is configured perfectly well.
+assert_secret_adoptable() {
+    local description="$1"
+    local raw="$2"
+
+    new_secrets_case
+    printf 'APP_SECRET=%s\n' "$raw" > "$secrets_deploy_dir/.env"
+    assert_secret_value "$description" "$(run_ensure_secrets)" APP_SECRET "$raw"
+}
+
+assert_secret_adoptable "a generated hexadecimal secret" 2f6b8c1d4e9a0b7c
+assert_secret_adoptable "an interior space" 'has space'
+assert_secret_adoptable "a hash that does not start a comment" 'a#b'
+assert_secret_adoptable "an unbalanced trailing quote" "abcdefgh'"
+
+# CONTRACT with the roundtrip guard: a generated value must be one Docker Compose
+# reads back byte for byte, or the deployment would reject its own secrets on the
+# next start.
+#
+# The property is asserted directly — none of the five spellings Compose's .env
+# parser rewrites can occur in 64 hexadecimal characters — and then fed through
+# validate_secret_roundtrip() itself. Its `compose config --environment` is
+# stubbed to return the value unchanged, which is what Compose does for a value
+# with no dollar sign, no quotes, no surrounding whitespace and no ` #`; the shape
+# assertion above is what makes that stub legitimate in a suite that must run
+# without Docker.
+new_secrets_case
+secrets_resolved="$(run_ensure_secrets)"
+(
+    roundtrip_tree="$secrets_tree/roundtrip"
+    mkdir -p "$roundtrip_tree/deploy"
+    # Read indirectly, by resolve_compose_env_file() from the sourced library.
+    # shellcheck disable=SC2030,SC2034
+    DEPLOY_DIR="$roundtrip_tree/deploy"
+    : > "$roundtrip_tree/deploy/.env"
+    while IFS= read -r secrets_line; do
+        secrets_key="${secrets_line%%=*}"
+        secrets_generated="${secrets_line#*=}"
+        [[ "$secrets_generated" != *'$'* && "$secrets_generated" != *'"'* &&
+            "$secrets_generated" != *"'"* && "$secrets_generated" != *' '* &&
+            "$secrets_generated" != *'#'* ]] || {
+            printf 'The value generated for %s contains a character Compose rewrites in a .env file\n' \
+                "$secrets_key" >&2
+            exit 1
+        }
+        printf '%s\n' "$secrets_line" >> "$roundtrip_tree/deploy/.env"
+    done <<< "$secrets_resolved"
+
+    compose() {
+        [[ "$*" == "config --environment" ]] || return 1
+        printf '%s\n' "PATH=/usr/bin" "$secrets_resolved"
+    }
+
+    validate_secret_roundtrip
+) || {
+    echo "Generated secrets do not survive the roundtrip guard" >&2
+    exit 1
+}
+
+# Every lifecycle script has to resolve the secrets before it touches the stack.
+# compose.yaml declares them as `${VAR:?}`, so a script that reaches Compose
+# without them aborts on the first interpolation — and one that reaches it with
+# only SOME of them configured would start a container against the wrong
+# credentials. build.sh and pre-update.sh are the subtle ones: they call sibling
+# scripts as CHILD processes, whose exports never come back to them, and then run
+# a `compose pull` of their own.
+assert_resolves_secrets_before_compose() {
+    local script="$SCRIPT_DIR/$1"
+    local ensure_line stack_line
+    ensure_line="$(awk '/^ensure_deployment_secrets$/ { print NR; exit }' "$script")"
+    stack_line="$(awk '/^(compose |app_tool |begin_service_pause|pause_services|resume_paused_services|wait_for_service_health|validate_|"\$DEPLOY_DIR)/ { print NR; exit }' "$script")"
+
+    [[ -n "$ensure_line" ]] || {
+        printf '%s reaches the stack without resolving the deployment secrets first\n' "$1" >&2
+        exit 1
+    }
+    [[ -z "$stack_line" ]] || ((ensure_line < stack_line)) || {
+        printf '%s calls ensure_deployment_secrets at line %s, after reaching the stack at line %s\n' \
+            "$1" "$ensure_line" "$stack_line" >&2
+        exit 1
+    }
+}
+
+for script in "$SCRIPT_DIR"/*.sh; do
+    [[ "$script" == */lib.sh ]] && continue
+    assert_resolves_secrets_before_compose "$(basename "$script")"
+done
+
+# The platform manifest must no longer declare the managed secrets. Elestio would
+# generate ONE value for all of them and display it, which is the defect; leaving
+# a single key in place would silently reintroduce a shared credential for it.
+for secrets_key in "${SYNAPLAN_MANAGED_SECRET_KEYS[@]}"; do
+    grep -Eq "^  - key: \"$secrets_key\"" "$ELESTIO_MANIFEST" && {
+        printf 'elestio.yml still declares %s, so the platform generates one shared value for it again\n' \
+            "$secrets_key" >&2
+        exit 1
+    }
+done
+# BOOTSTRAP_ADMIN_PASSWORD is deliberately NOT managed: the platform displays it as
+# the login for the web UI shortcut, so it has to stay exactly what the platform
+# generated.
+grep -Eq '^  - key: "BOOTSTRAP_ADMIN_PASSWORD"' "$ELESTIO_MANIFEST" || {
+    echo "elestio.yml no longer declares BOOTSTRAP_ADMIN_PASSWORD, which the platform displays as the administrator login" >&2
+    exit 1
+}
+[[ " ${SYNAPLAN_MANAGED_SECRET_KEYS[*]} " != *" BOOTSTRAP_ADMIN_PASSWORD "* ]] || {
+    echo "BOOTSTRAP_ADMIN_PASSWORD must not be a managed secret; the platform displays it as the administrator login" >&2
+    exit 1
+}
+
 # CONTRACT: tier 1 (the pure-shell rules above) must agree with the authority,
 # App\Service\Admin\BootstrapAdminConfiguration, on every case below — the class
 # tier 2 calls inside the application image. The absence of this test is what let

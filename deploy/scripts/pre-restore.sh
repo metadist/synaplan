@@ -4,6 +4,11 @@ set -Eeuo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# Stopping the stack is a Compose call as well, and it happens before the platform
+# replaces deploy/data — so this reads the secrets file that is still the current
+# deployment's.
+ensure_deployment_secrets
+
 RESTORE_MARKER="$STATE_DIR/restore-ready"
 
 prepare_data_directories

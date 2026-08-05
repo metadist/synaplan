@@ -25,6 +25,38 @@ your external disaster-recovery records. The administrator credentials are the
 critical case: see
 [First administrator credentials](#first-administrator-credentials).
 
+## Application secrets are generated per deployment
+
+`random_password` is a single draw per deployment: Elestio substitutes the same
+generated value into every variable that names it. A real installation therefore
+came up with `APP_SECRET`, `TOKEN_SECRET`, `MARIADB_PASSWORD`,
+`MARIADB_ROOT_PASSWORD` and all four `REALTIME_*` values set to one identical
+string — the database password was also the secret that signs every application
+token and the Centrifugo admin password, so a single leak was every credential
+the deployment had. Elestio has no second generator, and their own catalog
+templates share the defect.
+
+Those eight variables are therefore no longer declared in `elestio.yml`. The
+lifecycle scripts resolve them instead, on every start:
+
+- a value that is already in use — from the pipeline environment of an existing
+  deployment — is adopted unchanged, so an upgrade changes nothing;
+- anything still missing on a stack that was never initialised is generated with
+  32 bytes of randomness, independently per secret;
+- the resolved set is recorded once in `deploy/data/secrets.env`, mode `0600`.
+  Elestio rewrites the deployment's `.env` on every deploy, so the bind-mounted
+  data directory is the only location a generated value can survive in.
+
+`BOOTSTRAP_ADMIN_PASSWORD` is not part of this. Elestio displays it as the login
+for the Synaplan shortcut, so it stays exactly the value the platform generated.
+
+> **`deploy/data/secrets.env` must be in your backups.** It is created on the
+> first start and is the only copy of the database password. A backup that
+> restores `deploy/data/mariadb` without it produces a database the application
+> cannot authenticate against; the deployment then stops with a message naming the
+> missing variable instead of starting into that state. Do not commit the file,
+> and do not edit a value the running stack was built with.
+
 The public template documentation does not define a separate schema property
 that marks an environment variable as editable. `COMPOSE_PROFILES` is therefore
 declared as a normal environment value. Change it to `local-ai` in Elestio's
@@ -80,7 +112,9 @@ deployment is ever rejected because of the password.
 
 Elestio lifecycle hooks call the portable backup, restore, update, and smoke
 logic. The platform backup must include the repository's `deploy/data/`
-directory. Run a restore into an isolated pipeline and verify login, uploads,
+directory, `deploy/data/secrets.env` included — that file carries the database,
+realtime and application secrets. Run a restore into an isolated pipeline and
+verify login, uploads,
 Qdrant search, worker processing, scheduler cleanup, and WebSocket delivery.
 
 For upgrades, follow [Update on Elestio](../../docs/UPDATE_ELESTIO.md). Never use

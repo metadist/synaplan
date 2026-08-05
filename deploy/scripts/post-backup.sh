@@ -4,6 +4,11 @@ set -Eeuo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# Resuming the paused services goes through Compose, so this path needs the
+# stack's credentials too — a backup that ends without its services back up is
+# an outage.
+ensure_deployment_secrets
+
 ACTIVE_BACKUP_FILE="$STATE_DIR/active-backup"
 
 resume_on_exit() {

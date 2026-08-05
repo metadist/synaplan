@@ -4,6 +4,11 @@ set -Eeuo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# Every check below resolves the Compose configuration, and the managed secrets are
+# `${VAR:?}` keys in it. This script is also documented as directly runnable, so it
+# cannot rely on a caller having exported them.
+ensure_deployment_secrets
+
 validate_release_pin
 # elestio.yml runs this script again as its run command, on every start, so the
 # roundtrip guard also covers a configuration file that changed after the

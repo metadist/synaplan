@@ -113,7 +113,7 @@
         data-testid="link-sidebar-v2-update"
       >
         <ArrowUpCircleIcon class="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
-        <span class="truncate">{{ updatesStore.latestVersion }}</span>
+        <span class="truncate">{{ versionLabel }}</span>
       </a>
       <span
         v-else
@@ -669,6 +669,7 @@ import { useNavItems, type NavChild, type NavItem } from '../composables/useNavI
 import { useTheme } from '../composables/useTheme'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useUpdatesStore } from '../stores/updates'
+import { formatRunningVersion } from '@/utils/formatRunningVersion'
 import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
@@ -798,15 +799,10 @@ const initials = computed(() => {
 
 /**
  * Running release from the public runtime config, so every user sees it. Empty
- * while the config is still loading (or unavailable), which hides the footer
- * rather than showing a placeholder.
+ * while the config is still loading (or unavailable), and when the image only
+ * knows a mutable tag such as `latest` — that word must never appear here.
  */
-const versionLabel = computed(() => {
-  const version = configStore.build.version
-  if (!version || version === 'unknown') return ''
-
-  return /^\d/.test(version) ? `v${version}` : version
-})
+const versionLabel = computed(() => formatRunningVersion(configStore.build.version))
 
 const showUpdateLink = computed(() => updatesStore.showBadge && !!updatesStore.guideUrl)
 const isSecurityUpdate = computed(() => updatesStore.severity === 'security')
