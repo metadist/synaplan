@@ -318,10 +318,12 @@ function messageTextContent(message: Message): string {
  * post-stream reconciliation) and it carries the newest streamed content:
  *  - same local id or same persisted backend id (turn row persisted mid-stream),
  *  - the synthetic in-progress bubble (the live stream already renders it),
- *  - a user row with the same text as a not-yet-acknowledged local user
- *    message (the send was persisted before the response was built).
+ *  - a user row with the same NON-EMPTY text as a not-yet-acknowledged local
+ *    user message (the send was persisted before the response was built).
  * Only the trailing overlap is scanned, so older history rows with
- * coincidentally identical text are never dropped.
+ * coincidentally identical text are never dropped. Empty text is excluded from
+ * that last rule: a file-only send carries no text, and matching on "" would
+ * make every attachment-only prompt look like a duplicate of every other one.
  */
 export function mergeHydrationWithStreamingTail(
   snapshot: Message[],
@@ -348,6 +350,7 @@ export function mergeHydrationWithStreamingTail(
     tail
       .filter((message) => message.role === 'user' && message.backendMessageId === undefined)
       .map(messageTextContent)
+      .filter((text) => text !== '')
   )
 
   const duplicatesTail = (message: Message): boolean =>

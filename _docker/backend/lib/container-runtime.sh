@@ -26,10 +26,12 @@ runtime_warn() {
     runtime_log "⚠️  $*" >&2
 }
 
+# The `|| return 64` is not decoration: the entrypoint runs under `set -e`, where
+# runtime_fatal's own non-zero status would end the shell before this function
+# reaches its return statement — with exit code 1 instead of the documented 64.
 require_console() {
     if [ ! -f bin/console ]; then
-        runtime_fatal "bin/console is missing under $(pwd); the application code is not mounted or copied correctly."
-        return 64
+        runtime_fatal "bin/console is missing under $(pwd); the application code is not mounted or copied correctly." || return 64
     fi
 }
 
@@ -216,7 +218,13 @@ wait_for_database() {
             return 66
         fi
         if [ $((attempt % 10)) -eq 1 ]; then
-            runtime_log "Database is not ready (attempt ${attempt}${max_attempts:+/${max_attempts}})."
+            if [ "$max_attempts" -gt 0 ]; then
+                runtime_log "Database is not ready (attempt ${attempt}/${max_attempts})."
+            else
+                # The web role waits without a limit, so there is no denominator
+                # to show. "attempt 1/0" read like a broken counter.
+                runtime_log "Database is not ready (attempt ${attempt}, waiting indefinitely)."
+            fi
         fi
         sleep "$delay"
     done

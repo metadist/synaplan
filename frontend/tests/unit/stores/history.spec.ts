@@ -135,12 +135,12 @@ describe('History Store', () => {
   })
 
   /**
-   * PR #1437 review: a foreground hydration that resolves while a live
-   * stream is in flight must MERGE its snapshot in front of the streaming
-   * tail instead of dropping it — otherwise the chat shows no prior history
-   * and the pagination state (reset before the fetch) stays exhausted.
+   * A foreground hydration that resolves while a live stream is in flight must
+   * MERGE its snapshot in front of the streaming tail instead of dropping it —
+   * otherwise the chat shows no prior history and the pagination state (reset
+   * before the fetch) stays exhausted.
    */
-  describe('loadMessages — hydration racing a live stream (PR #1437)', () => {
+  describe('loadMessages — hydration racing a live stream', () => {
     const startDeferredLoad = async (extraResponses = false) => {
       vi.resetModules()
       let resolveLoad!: (value: unknown) => void
@@ -219,6 +219,32 @@ describe('History Store', () => {
         'backend-1',
         'backend-2',
         localUserId,
+        assistantId,
+      ])
+    })
+
+    it('keeps older attachment-only prompts when the live send carries no text', async () => {
+      const { store, loading, resolve } = await startDeferredLoad()
+
+      store.addMessage('user', [{ type: 'image', content: 'photo.png' }])
+      const assistantId = store.addStreamingMessage('assistant')
+      resolve({
+        success: true,
+        messages: [
+          { id: 1, direction: 'IN', text: '', timestamp: 1700000000 },
+          { id: 2, direction: 'OUT', text: 'Old answer', timestamp: 1700000001 },
+          // Also text-less, and equally not the message being sent right now.
+          { id: 3, direction: 'IN', text: '', timestamp: 1700000002 },
+        ],
+        pagination: { hasMore: false },
+      })
+      await loading
+
+      expect(store.messages.map((m) => m.id)).toEqual([
+        'backend-1',
+        'backend-2',
+        'backend-3',
+        store.messages[3].id,
         assistantId,
       ])
     })

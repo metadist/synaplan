@@ -13,10 +13,10 @@ treated as the production deployment contract.
 
 ### Environment and Secrets
 
-Generate a unique application secret first:
+Generate a separate value for every secret, never the same one twice:
 
 ```bash
-openssl rand -hex 16
+openssl rand -hex 32
 ```
 
 Copy `deploy/selfhost.env.example` to `deploy/.env`, restrict access to
@@ -24,12 +24,13 @@ it, and set all required production variables:
 
 ```bash
 SYNAPLAN_VERSION=<released-version>
-APP_ENV=prod
 APP_SECRET=<output from above>
 APP_URL=https://your-domain.com
 FRONTEND_URL=https://your-domain.com
-CORS_ALLOW_ORIGIN=https://your-domain.com
 ```
+
+`deploy/compose.yaml` sets `APP_ENV=prod` itself, so the production stack needs
+no entry for it.
 
 Set every other password and token marked as required in the template. Secrets
 must remain stable across container recreation, updates, backup, and restore.

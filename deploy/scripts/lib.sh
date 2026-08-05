@@ -602,7 +602,12 @@ prepare_data_directories() {
         "$DATA_DIR/uploads" \
         "$DATA_DIR/ollama" \
         "$DATA_DIR/whisper"
-    chmod 0700 "$STATE_DIR" "$BACKUP_DIR"
+    # 0700 on the data root as well, not only on the two directories that hold
+    # dumps and lifecycle state: below it sit the raw MariaDB files, the Redis
+    # append-only file and every uploaded document. post-restore.sh already
+    # tightens it, so a restored instance was stricter than a freshly installed
+    # one — the same deployment, two different permissions.
+    chmod 0700 "$DATA_DIR" "$STATE_DIR" "$BACKUP_DIR"
 }
 
 running_service() {

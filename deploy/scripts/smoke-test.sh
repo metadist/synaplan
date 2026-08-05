@@ -29,7 +29,10 @@ assert_healthy backend
 assert_healthy worker
 assert_healthy scheduler
 
-[[ "$(compose exec -T redis redis-cli ping)" == "PONG" ]]
+[[ "$(compose exec -T redis redis-cli ping)" == "PONG" ]] || {
+    echo "redis did not answer PING with PONG" >&2
+    exit 1
+}
 printf 'ok: redis\n'
 
 app_tool "curl -fsS http://qdrant:6333/readyz >/dev/null"

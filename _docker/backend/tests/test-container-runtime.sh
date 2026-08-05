@@ -463,6 +463,34 @@ assert_contains "Doctrine still reports pending migrations" "$TIMEOUT_LOG" \
 assert_contains "docker compose logs backend" "$TIMEOUT_LOG" \
     "the timeout points at the web container's log"
 
+echo "Case 11: the documented exit codes survive the entrypoint's 'set -e'"
+
+# This suite runs with `set -u` only, but the entrypoint that calls these
+# functions runs with `set -euo pipefail` — and under `set -e` a helper whose own
+# non-zero status is not guarded ends the shell right there, with ITS status
+# instead of the code the function was about to return. That is how the
+# documented 64 silently became a 1. Each guard is therefore exercised in a
+# subshell with the entrypoint's options.
+runtime_status_under_set_e() {
+    local status=0
+    bash -c "
+        set -euo pipefail
+        . '$RUNTIME_LIB'
+        cd '$1'
+        $2
+    " >/dev/null 2>&1 || status=$?
+
+    printf '%s\n' "$status"
+}
+
+assert_eq 64 "$(runtime_status_under_set_e "$TMP_DIR" require_console)" \
+    "a missing bin/console keeps exit code 64 under set -e"
+assert_eq 0 "$(runtime_status_under_set_e "$TMP_DIR/app" require_console)" \
+    "an existing bin/console is accepted under set -e"
+assert_eq 78 "$(BOOTSTRAP_ADMIN_EMAIL=admin@example.com BOOTSTRAP_ADMIN_PASSWORD= \
+    runtime_status_under_set_e "$TMP_DIR/app" require_bootstrap_admin_pair)" \
+    "a half-configured bootstrap pair keeps exit code 78 under set -e"
+
 TOTAL=$((PASS + FAIL))
 echo "${PASS}/${TOTAL} assertions passed"
 [ "$FAIL" -eq 0 ]
