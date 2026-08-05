@@ -175,8 +175,9 @@ Test `local-ai` only when the selected machine and remaining trial credit are
 sufficient. Do not publish credentials, deployment logs containing secrets, or
 private endpoint details.
 
-See [Administration Guide](ADMIN.md) for production updates, backups, restore,
-and cleanup.
+See [Administration Guide](ADMIN.md) for backups, restore, and cleanup, and
+[Update a Self-Hosted Deployment](UPDATE_SELFHOST.md) or
+[Update on Elestio](UPDATE_ELESTIO.md) for version upgrades.
 
 ---
 

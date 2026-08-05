@@ -81,9 +81,13 @@ logic. The platform backup must include the repository's `deploy/data/`
 directory. Run a restore into an isolated pipeline and verify login, uploads,
 Qdrant search, worker processing, scheduler cleanup, and WebSocket delivery.
 
-For upgrades, change `SYNAPLAN_VERSION` to a tested SemVer tag. Never use
-`latest`. The pre-update hook creates a backup gate before the new image is
-started.
+For upgrades, follow [Update on Elestio](../../docs/UPDATE_ELESTIO.md). Never use
+`latest`: `validate_release_pin` accepts immutable SemVer tags only.
+`preUpdateCommand` maps to `deploy/scripts/pre-update.sh`, which creates a backup
+gate before the new image is started — but Elestio runs that hook only for its
+own update operation. A redeploy after an environment change takes the deploy
+path (`prepare.sh`, `build.sh`, `run.sh`, then `post-update.sh`) and has no
+backup gate, so a version change must be preceded by a manual backup.
 
 The checked-in Elestio value intentionally makes deployment fail before any old
 or incompatible app image can start. Replace it only after the release pipeline

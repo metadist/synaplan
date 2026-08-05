@@ -339,8 +339,10 @@ run_scheduler_role() {
     local env="${APP_ENV:-prod}"
     local tick_seconds="${SYNAPLAN_SCHEDULER_TICK_SECONDS:-60}"
     local hourly_seconds="${SYNAPLAN_SCHEDULER_HOURLY_SECONDS:-3600}"
+    local daily_seconds="${SYNAPLAN_SCHEDULER_DAILY_SECONDS:-86400}"
     local now
     local next_hourly=0
+    local next_daily=0
     local cycles=0
     local max_cycles="${SYNAPLAN_SCHEDULER_MAX_CYCLES:-0}"
 
@@ -350,7 +352,7 @@ run_scheduler_role() {
     mkdir -p "$SYNAPLAN_RUNTIME_DIR"
     trap stop_scheduler TERM INT
 
-    runtime_log "Starting scheduler (media reaper every ${tick_seconds}s, ephemeral-file reaper every ${hourly_seconds}s)."
+    runtime_log "Starting scheduler (media reaper every ${tick_seconds}s, ephemeral-file reaper every ${hourly_seconds}s, update check every ${daily_seconds}s)."
     while [ "$_scheduler_stopping" -eq 0 ]; do
         now="$(date +%s)"
         printf '%s\n' "$now" > "${SYNAPLAN_RUNTIME_DIR}/scheduler.heartbeat"
@@ -364,6 +366,17 @@ run_scheduler_role() {
                 runtime_log "Ephemeral-file reaper failed; it will be retried next hour." >&2
             fi
             next_hourly=$((now + hourly_seconds))
+        fi
+
+        # Release-notice detection. Detection only: it stores the published
+        # version in BCONFIG and never touches the installation, so a failure
+        # (offline instance, unreachable manifest) is expected and is simply
+        # retried on the next interval.
+        if [ "$now" -ge "$next_daily" ]; then
+            if ! run_scheduler_command bin/console --env="$env" app:updates:check --no-interaction; then
+                runtime_log "Update check failed; it will be retried on the next daily interval." >&2
+            fi
+            next_daily=$((now + daily_seconds))
         fi
 
         cycles=$((cycles + 1))

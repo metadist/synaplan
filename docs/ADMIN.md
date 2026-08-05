@@ -184,31 +184,20 @@ succeeded on a fresh, separate stack.
 
 ## Updates
 
+Follow the step-by-step guide for your platform:
+
+- [Update a Self-Hosted Deployment](UPDATE_SELFHOST.md)
+- [Update on Elestio](UPDATE_ELESTIO.md)
+
 Production images must use a released, pinned `SYNAPLAN_VERSION`; never update
-a production deployment by following `latest`.
-
-Before each update:
-
-1. Read the release notes and [migration guidance](MIGRATIONS.md).
-2. Run `deploy/scripts/pre-update.sh`. Do not continue if its backup gate fails.
-3. Change `SYNAPLAN_VERSION` to the intended release.
-4. Pull and redeploy the production stack.
-5. Run `deploy/scripts/post-update.sh` and verify the reported version and
-   health.
-
-```bash
-docker compose --env-file deploy/.env -f deploy/compose.yaml pull
-docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
-```
+a production deployment by following `latest`. Read the release notes and the
+[migration guidance](MIGRATIONS.md) before you start.
 
 The web container applies migrations through its production startup contract.
 Do not run `doctrine:schema:update --force`. Keep the pre-update recovery point
 until login, chat, uploads/RAG, worker processing, scheduler execution, and
-realtime connections have been verified.
-
-On Elestio, use the pipeline update operation; its lifecycle mapping invokes the
-same portable hooks. If verification fails, restore the complete pre-update
-recovery point rather than restoring only the database.
+realtime connections have been verified. If verification fails, restore the
+complete pre-update recovery point rather than restoring only the database.
 
 ---
 
@@ -270,7 +259,7 @@ Always run behind a reverse proxy (nginx, Caddy, Traefik) with TLS termination. 
 
 ## User Management
 
-User levels: `NEW`, `PRO`, `ADMIN`.
+User levels: `NEW`, `PRO`, `TEAM`, `BUSINESS`, `ADMIN`.
 
 ### Running These Statements
 

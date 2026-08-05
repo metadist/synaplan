@@ -1,4 +1,40 @@
 {
+  "updates": {
+    "runningVersion": "Versión {version}",
+    "badge": {
+      "availableHint": "La versión {version} está disponible: abre la guía de actualización en una pestaña nueva",
+      "securityHint": "La actualización de seguridad {version} está disponible: abre la guía de actualización en una pestaña nueva"
+    },
+    "panel": {
+      "title": "Versión del software",
+      "description": "Synaplan te avisa cuando hay una versión más reciente. Nunca instala nada por su cuenta: tú decides cuándo y cómo actualizar.",
+      "currentVersion": "Versión instalada",
+      "latestVersion": "Versión más reciente",
+      "unknownVersion": "Aún no se sabe",
+      "releasedOn": "Publicada el {date}",
+      "upToDate": "Tienes la versión más reciente",
+      "updateAvailable": "Hay una versión más reciente disponible",
+      "securityUpdate": "Hay una actualización de seguridad disponible",
+      "unknownState": "Todavía no se ha buscado ninguna versión",
+      "statusUnavailable": "No se ha podido cargar la información de versión. Seleccione «Buscar ahora» para volver a intentarlo.",
+      "openGuide": "Cómo actualizar",
+      "releaseNotes": "Novedades",
+      "dismiss": "Ocultar este aviso",
+      "dismissDone": "Aviso oculto hasta que aparezca una versión más reciente.",
+      "noticeHidden": "Aviso oculto",
+      "checkNow": "Buscar ahora",
+      "checkDone": "Comprobación de versión finalizada.",
+      "checkError": "No se ha podido iniciar la comprobación de versión en este momento.",
+      "checkFailedHint": "La última comprobación no llegó a completarse: normalmente solo falta la conexión a internet.",
+      "lastChecked": "Última comprobación {time}",
+      "neverChecked": "Nunca se ha comprobado",
+      "autoCheck": "Buscar nuevas versiones automáticamente",
+      "autoCheckHint": "Una vez al día Synaplan consulta si se ha publicado una versión más reciente. No se envía ningún dato tuyo.",
+      "autoCheckOffHint": "La comprobación automática está desactivada.",
+      "saved": "Ajuste guardado.",
+      "saveError": "No se ha podido guardar el ajuste."
+    }
+  },
   "incognito": {
     "toggleStart": "Iniciar chat de incógnito",
     "toggleEnd": "Finalizar chat de incógnito",

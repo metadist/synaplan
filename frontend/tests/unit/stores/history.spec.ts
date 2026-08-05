@@ -268,6 +268,79 @@ describe('History Store', () => {
       await store.loadMoreMessages(42)
       expect(getChatMessages).toHaveBeenLastCalledWith(42, 2, 50)
     })
+
+    /**
+     * The response that triggers the merge also schedules the 2s in-progress
+     * poll (#1142), and that poll loads silently. Guarding only the foreground
+     * path let the poll replace the whole list two seconds later, so a
+     * multitask turn visibly stopped streaming mid-answer.
+     */
+    it('keeps the live stream when the in-progress poll reloads the chat', async () => {
+      vi.useFakeTimers()
+      try {
+        const { store, loading, getChatMessages, resolve } = await startDeferredLoad(true)
+
+        store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+        const assistantId = store.addStreamingMessage('assistant')
+        store.updateStreamingMessage(assistantId, 'Partial reply')
+        resolve({
+          success: true,
+          messages: [{ id: 1, direction: 'IN', text: 'Hello', timestamp: 1700000000 }],
+          pagination: { hasMore: false },
+          inProgressTurn: { reply_node: 'reply', cards: [] },
+        })
+        await loading
+
+        // The poll scheduled by the response above fires and reloads silently.
+        await vi.advanceTimersByTimeAsync(2000)
+
+        expect(getChatMessages).toHaveBeenCalledTimes(2)
+        expect(store.messages.at(-1)?.id).toBe(assistantId)
+        expect(store.messages.at(-1)?.parts[0].content).toBe('Partial reply')
+        store.clear()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    /**
+     * The in-progress bubble carries `isStreaming` itself. Treating it as a
+     * live stream would preserve the stale copy and drop the freshly loaded
+     * one, freezing the task cards the reload exists to refresh.
+     */
+    it('replaces the in-progress bubble instead of preserving the stale one', async () => {
+      vi.useFakeTimers()
+      try {
+        vi.resetModules()
+        const turnResponse = (state: string) => ({
+          success: true,
+          messages: [{ id: 1, direction: 'IN', text: 'Render a video', timestamp: 1700000000 }],
+          pagination: { hasMore: false },
+          inProgressTurn: {
+            reply_node: 'reply',
+            cards: [{ nodeId: 'n1', capability: 'video', kind: 'video', state }],
+          },
+        })
+        const getChatMessages = vi
+          .fn()
+          .mockResolvedValueOnce(turnResponse('running'))
+          .mockResolvedValue(turnResponse('done'))
+        vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+        const { useHistoryStore: useStore } = await import('@/stores/history')
+        const store = useStore()
+
+        await store.loadMessages(42)
+        expect(store.messages.at(-1)?.taskPlan?.cards[0].state).toBe('running')
+
+        await store.loadMessages(42)
+
+        expect(store.messages.at(-1)?.taskPlan?.cards[0].state).toBe('done')
+        store.clear()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 
   /**

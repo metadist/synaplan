@@ -89,8 +89,13 @@ files remain in `deploy/data/` until deliberately removed.
 
 Only the web service binds a host port. MariaDB, Redis, Centrifugo, Tika, Qdrant,
 Ollama, and Whisper remain on the Compose network. The default bind is
-`127.0.0.1:8000`; managed platforms may set `SYNAPLAN_HTTP_BIND=0.0.0.0` while
-restricting exposure with their firewall and HTTPS proxy.
+`127.0.0.1:8000`. A managed platform whose HTTPS proxy runs in its own container
+cannot reach that address and needs `SYNAPLAN_HTTP_BIND` set to the host
+interface the proxy connects to — the Docker bridge gateway, usually
+`172.17.0.1`, which is what `elestio.yml` uses. Do not use `0.0.0.0`: Docker
+publishes ports through its own iptables rules, which a host firewall such as
+ufw does not close, so the app would be reachable as plain HTTP from the
+internet and the HTTPS proxy could be bypassed.
 
 Persistent paths:
 
@@ -171,14 +176,10 @@ RESTORE_PORTABLE_BACKUP=true deploy/scripts/post-restore.sh
 
 ## Update
 
-Set a tested, concrete `SYNAPLAN_VERSION`, then run:
-
-```bash
-deploy/scripts/pre-update.sh
-# Redeploy through the platform, or:
-docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
-deploy/scripts/post-update.sh
-```
+Step-by-step instructions:
+[Update a Self-Hosted Deployment](../docs/UPDATE_SELFHOST.md), or
+[Update on Elestio](../docs/UPDATE_ELESTIO.md) for a pipeline on that platform.
+Only a tested, concrete `SYNAPLAN_VERSION` may be deployed.
 
 The pre hook enforces a successful backup and pulls the pin. The post hook waits
 for every role and dependency, then verifies health and reports the running image

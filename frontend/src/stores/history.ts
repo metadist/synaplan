@@ -297,6 +297,18 @@ function messageHasRenderableContent(message: Message): boolean {
   )
 }
 
+/**
+ * Whether a message is a live, client-owned stream.
+ *
+ * The synthetic in-progress bubble carries `isStreaming` too, but it is not
+ * live state the client owns — it is re-rendered from the server on every
+ * in-progress poll. Treating it as a stream to preserve would keep the stale
+ * copy and drop the fresh one, freezing the task cards it exists to update.
+ */
+function isLiveStream(message: Message): boolean {
+  return true === message.isStreaming && message.id !== IN_PROGRESS_TURN_ID
+}
+
 /** Concatenated text content of a message, used for duplicate detection. */
 function messageTextContent(message: Message): string {
   return message.parts
@@ -307,11 +319,11 @@ function messageTextContent(message: Message): string {
 
 /**
  * Merge a freshly hydrated history snapshot with the live message list when a
- * foreground load resolves while a streaming exchange is in flight (see
- * `loadMessages`). The snapshot replaces everything EXCEPT the in-flight
- * tail: the streaming message(s) plus the locally added user message(s) of
- * that exchange directly preceding them (added by `addMessage` with a local
- * uuid and no backend id yet).
+ * load resolves while a streaming exchange is in flight (see `loadMessages`).
+ * The snapshot replaces everything EXCEPT the in-flight tail: the streaming
+ * message(s) plus the locally added user message(s) of that exchange directly
+ * preceding them (added by `addMessage` with a local uuid and no backend id
+ * yet).
  *
  * Trailing snapshot rows that duplicate the tail are dropped — the live copy
  * wins, because ChatView still references it by its local id (error status,
@@ -329,7 +341,7 @@ export function mergeHydrationWithStreamingTail(
   snapshot: Message[],
   current: Message[]
 ): Message[] {
-  const firstStreamingIndex = current.findIndex((message) => message.isStreaming)
+  const firstStreamingIndex = current.findIndex(isLiveStream)
   if (firstStreamingIndex === -1) return snapshot
 
   let tailStart = firstStreamingIndex
@@ -599,13 +611,21 @@ export const useHistoryStore = defineStore('history', () => {
 
         // If offset is 0, replace messages; otherwise, prepend (for infinite scroll)
         if (offset === 0) {
-          // A foreground hydration may have started just before the user sent
-          // a message. The live stream is newer than that response and must not
-          // be replaced by its stale snapshot — but the snapshot still carries
-          // the chat's prior history, so merge it in front of the in-flight
-          // exchange instead of dropping it (and fall through to the pagination
-          // update, which was reset before the fetch).
-          if (!silent && messages.value.some((message) => message.isStreaming)) {
+          // A hydration may have started just before the user sent a message.
+          // The live stream is newer than that response and must not be replaced
+          // by its stale snapshot — but the snapshot still carries the chat's
+          // prior history, so merge it in front of the in-flight exchange
+          // instead of dropping it (and fall through to the pagination update,
+          // which was reset before the fetch).
+          //
+          // Silent loads need the same protection: the very response that
+          // triggers the merge also schedules the 2s in-progress poll above, and
+          // that poll is silent — guarding only the foreground path let it
+          // replace the streaming bubble two seconds later, so a multitask turn
+          // visibly stopped streaming mid-answer. Drop recovery is unaffected:
+          // ChatView calls finishStreamingMessage() before recoverInterruptedTurn(),
+          // so its silent reloads never see an active stream to preserve.
+          if (messages.value.some(isLiveStream)) {
             messages.value = mergeHydrationWithStreamingTail(loadedMessages, messages.value)
           } else {
             messages.value = loadedMessages
