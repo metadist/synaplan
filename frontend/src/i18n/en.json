@@ -1,4 +1,39 @@
 {
+  "updates": {
+    "runningVersion": "Version {version}",
+    "badge": {
+      "availableHint": "Version {version} is available — opens the update guide in a new tab",
+      "securityHint": "Security update {version} is available — opens the update guide in a new tab"
+    },
+    "panel": {
+      "title": "Software version",
+      "description": "Synaplan tells you when a newer version is available. It never installs anything on its own — you decide when and how to update.",
+      "currentVersion": "Installed version",
+      "latestVersion": "Newest version",
+      "unknownVersion": "Not known yet",
+      "releasedOn": "Released {date}",
+      "upToDate": "You have the newest version",
+      "updateAvailable": "A newer version is available",
+      "securityUpdate": "A security update is available",
+      "unknownState": "No version check has run yet",
+      "openGuide": "How to update",
+      "releaseNotes": "What's new",
+      "dismiss": "Hide this notice",
+      "dismissDone": "Notice hidden until a newer version appears.",
+      "noticeHidden": "Notice hidden",
+      "checkNow": "Check now",
+      "checkDone": "Version check finished.",
+      "checkError": "The version check could not be started right now.",
+      "checkFailedHint": "The last check did not get through — usually there is simply no internet connection.",
+      "lastChecked": "Last checked {time}",
+      "neverChecked": "Never checked",
+      "autoCheck": "Check for new versions automatically",
+      "autoCheckHint": "Once a day Synaplan asks whether a newer version has been published. Nothing about your data is sent.",
+      "autoCheckOffHint": "Automatic checking is switched off.",
+      "saved": "Setting saved.",
+      "saveError": "The setting could not be saved."
+    }
+  },
   "incognito": {
     "toggleStart": "Start incognito chat",
     "toggleEnd": "End incognito chat",

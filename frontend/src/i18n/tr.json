@@ -1,4 +1,39 @@
 {
+  "updates": {
+    "runningVersion": "Sürüm {version}",
+    "badge": {
+      "availableHint": "{version} sürümü mevcut — güncelleme kılavuzunu yeni sekmede açar",
+      "securityHint": "{version} güvenlik güncellemesi mevcut — güncelleme kılavuzunu yeni sekmede açar"
+    },
+    "panel": {
+      "title": "Yazılım sürümü",
+      "description": "Daha yeni bir sürüm çıktığında Synaplan sizi bilgilendirir. Kendi kendine hiçbir şey kurmaz — ne zaman ve nasıl güncelleyeceğinize siz karar verirsiniz.",
+      "currentVersion": "Kurulu sürüm",
+      "latestVersion": "En yeni sürüm",
+      "unknownVersion": "Henüz bilinmiyor",
+      "releasedOn": "{date} tarihinde yayınlandı",
+      "upToDate": "En yeni sürümü kullanıyorsunuz",
+      "updateAvailable": "Daha yeni bir sürüm mevcut",
+      "securityUpdate": "Bir güvenlik güncellemesi mevcut",
+      "unknownState": "Henüz sürüm kontrolü yapılmadı",
+      "openGuide": "Nasıl güncellenir",
+      "releaseNotes": "Yenilikler",
+      "dismiss": "Bu bildirimi gizle",
+      "dismissDone": "Daha yeni bir sürüm çıkana kadar bildirim gizlendi.",
+      "noticeHidden": "Bildirim gizlendi",
+      "checkNow": "Şimdi kontrol et",
+      "checkDone": "Sürüm kontrolü tamamlandı.",
+      "checkError": "Sürüm kontrolü şu anda başlatılamadı.",
+      "checkFailedHint": "Son kontrol tamamlanamadı — genellikle sadece internet bağlantısı yoktur.",
+      "lastChecked": "Son kontrol {time}",
+      "neverChecked": "Hiç kontrol edilmedi",
+      "autoCheck": "Yeni sürümleri otomatik olarak kontrol et",
+      "autoCheckHint": "Synaplan günde bir kez daha yeni bir sürüm yayınlanıp yayınlanmadığını sorar. Verilerinizle ilgili hiçbir bilgi gönderilmez.",
+      "autoCheckOffHint": "Otomatik kontrol kapalı.",
+      "saved": "Ayar kaydedildi.",
+      "saveError": "Ayar kaydedilemedi."
+    }
+  },
   "incognito": {
     "toggleStart": "Gizli sohbeti başlat",
     "toggleEnd": "Gizli sohbeti bitir",

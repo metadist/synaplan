@@ -1,4 +1,39 @@
 {
+  "updates": {
+    "runningVersion": "Version {version}",
+    "badge": {
+      "availableHint": "Version {version} ist verfügbar — öffnet die Update-Anleitung in einem neuen Tab",
+      "securityHint": "Sicherheitsupdate {version} ist verfügbar — öffnet die Update-Anleitung in einem neuen Tab"
+    },
+    "panel": {
+      "title": "Software-Version",
+      "description": "Synaplan sagt Ihnen, wenn eine neuere Version verfügbar ist. Es installiert nie etwas von selbst — Sie entscheiden, wann und wie Sie aktualisieren.",
+      "currentVersion": "Installierte Version",
+      "latestVersion": "Neueste Version",
+      "unknownVersion": "Noch nicht bekannt",
+      "releasedOn": "Veröffentlicht am {date}",
+      "upToDate": "Sie haben die neueste Version",
+      "updateAvailable": "Eine neuere Version ist verfügbar",
+      "securityUpdate": "Ein Sicherheitsupdate ist verfügbar",
+      "unknownState": "Es wurde noch nicht nach Versionen gesucht",
+      "openGuide": "So aktualisieren Sie",
+      "releaseNotes": "Was ist neu",
+      "dismiss": "Hinweis ausblenden",
+      "dismissDone": "Hinweis ausgeblendet, bis eine neuere Version erscheint.",
+      "noticeHidden": "Hinweis ausgeblendet",
+      "checkNow": "Jetzt prüfen",
+      "checkDone": "Versionsprüfung abgeschlossen.",
+      "checkError": "Die Versionsprüfung konnte gerade nicht gestartet werden.",
+      "checkFailedHint": "Die letzte Prüfung kam nicht durch — meist fehlt einfach die Internetverbindung.",
+      "lastChecked": "Zuletzt geprüft {time}",
+      "neverChecked": "Noch nie geprüft",
+      "autoCheck": "Automatisch nach neuen Versionen suchen",
+      "autoCheckHint": "Einmal täglich fragt Synaplan, ob eine neuere Version veröffentlicht wurde. Es werden keine Daten über Sie übertragen.",
+      "autoCheckOffHint": "Die automatische Prüfung ist ausgeschaltet.",
+      "saved": "Einstellung gespeichert.",
+      "saveError": "Die Einstellung konnte nicht gespeichert werden."
+    }
+  },
   "incognito": {
     "toggleStart": "Inkognito-Chat starten",
     "toggleEnd": "Inkognito-Chat beenden",

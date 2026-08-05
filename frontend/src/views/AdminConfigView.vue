@@ -5,7 +5,9 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
+import UpdatePanel from '@/components/admin/UpdatePanel.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useUpdatesStore } from '@/stores/updates'
 import { useNotification } from '@/composables/useNotification'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { useTheme } from '@/composables/useTheme'
@@ -21,6 +23,7 @@ import {
 const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
+const updatesStore = useUpdatesStore()
 const { success, error: showError } = useNotification()
 const { isDark } = useTheme()
 
@@ -363,6 +366,9 @@ onBeforeUnmount(() => {
           </div>
           <p class="txt-secondary">{{ $t('admin.config.description') }}</p>
         </div>
+
+        <!-- Release notice: informs and links to the guide, never updates anything -->
+        <UpdatePanel v-if="updatesStore.canRead" class="mb-6" />
 
         <!-- Loading State -->
         <div v-if="loading" class="flex items-center justify-center py-20">

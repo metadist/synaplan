@@ -106,6 +106,44 @@
         </span>
       </button>
     </div>
+
+    <!--
+      Running release, for every user. Admins with a pending release get a link
+      to the manual-update guide instead — Synaplan never updates itself, the
+      operator does, so this is a pointer to documentation and nothing else.
+    -->
+    <div
+      v-if="versionLabel"
+      class="flex items-center justify-center pb-3 flex-shrink-0"
+      data-testid="section-sidebar-v2-version"
+    >
+      <a
+        v-if="showUpdateLink"
+        :href="updatesStore.guideUrl ?? undefined"
+        target="_blank"
+        rel="noopener noreferrer"
+        :class="[
+          'inline-flex items-center gap-1 max-w-[72px] px-2 py-0.5 rounded-full text-[10px] font-semibold transition-opacity hover:opacity-80',
+          isSecurityUpdate
+            ? 'bg-[var(--status-error-muted)] text-[var(--status-error-text)]'
+            : 'bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]',
+        ]"
+        :title="updateHint"
+        :aria-label="updateHint"
+        data-testid="link-sidebar-v2-update"
+      >
+        <ArrowUpCircleIcon class="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+        <span class="truncate">{{ updatesStore.latestVersion }}</span>
+      </a>
+      <span
+        v-else
+        class="text-[10px] txt-secondary"
+        :title="$t('updates.runningVersion', { version: versionLabel })"
+        data-testid="text-sidebar-v2-version"
+      >
+        {{ versionLabel }}
+      </span>
+    </div>
   </aside>
 
   <!-- User Dropdown (teleported to #app to escape local stacking context) -->
@@ -610,6 +648,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  ArrowUpCircleIcon,
   ChatBubbleLeftRightIcon,
   CreditCardIcon,
   PlusIcon,
@@ -629,6 +668,7 @@ import { useAuth } from '../composables/useAuth'
 import { useNavItems, type NavChild, type NavItem } from '../composables/useNavItems'
 import { useTheme } from '../composables/useTheme'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
+import { useUpdatesStore } from '../stores/updates'
 import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
@@ -645,6 +685,7 @@ const configStore = useConfigStore()
 // No purchase path on a custom server in the native app (store IAP only).
 const purchaseAllowed = isPurchaseAllowed()
 const chatsStore = useChatsStore()
+const updatesStore = useUpdatesStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
 const { navItems, isItemActive, isGuestMode, loadFeatureStatus } = useNavItems()
@@ -754,6 +795,37 @@ const initials = computed(() => {
   const email = authStore.user?.email || 'G'
   return email.charAt(0).toUpperCase()
 })
+
+/**
+ * Running release from the public runtime config, so every user sees it. Empty
+ * while the config is still loading (or unavailable), which hides the footer
+ * rather than showing a placeholder.
+ */
+const versionLabel = computed(() => {
+  const version = configStore.build.version
+  if (!version || version === 'unknown') return ''
+
+  return /^\d/.test(version) ? `v${version}` : version
+})
+
+const showUpdateLink = computed(() => updatesStore.showBadge && !!updatesStore.guideUrl)
+const isSecurityUpdate = computed(() => updatesStore.severity === 'security')
+const updateHint = computed(() =>
+  t(isSecurityUpdate.value ? 'updates.badge.securityHint' : 'updates.badge.availableHint', {
+    version: updatesStore.latestVersion ?? '',
+  })
+)
+
+// Admins only, once per session (the store caches, so navigating never refetches).
+// Watched rather than read on mount because `isAdmin` only becomes true once
+// /auth/me has resolved, which can be after the rail is already rendered.
+watch(
+  () => updatesStore.canRead,
+  (canRead) => {
+    if (canRead) updatesStore.ensureLoaded()
+  },
+  { immediate: true }
+)
 
 const groupedChildren = computed(() => {
   if (!activeFlyoutItem.value?.children) return []
