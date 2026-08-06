@@ -18,9 +18,26 @@ Synaplan marks its auth cookies `Secure` whenever `APP_ENV=prod`. A browser
 never sends those back over HTTP, so the user logs in successfully and is
 anonymous again on the next request. `AuthCookieFactory` derives the flag from
 the `APP_URL` scheme instead; the first release containing it is the first
-release that can be offered here. The pin in `docker-compose.yml` still points
-at 4.0.13 and has to be raised — together with its digest — before the store PR
-is opened.
+release that can be offered here.
+
+The release number appears in three places that have to move together:
+
+- `docker-compose.yml` — the `x-app-image` tag **and** its `@sha256:` digest.
+- `docker-compose.yml` — `APP_VERSION`, which is what the admin UI displays.
+- `umbrel-app.yml` — `version`.
+
+Three manifest fields are still placeholders and have to be filled in as well:
+`releaseNotes`, `gallery` (the store expects screenshots) and `submission`, which
+currently reads `.../pull/PENDING`.
+
+Nothing raises these for you. `scripts/set-release-version.mjs`, which the
+release workflow runs on every tag, only knows `elestio.yml` and
+`deploy/selfhost.env.example` — it cannot pin a digest, and the store copy has to
+go through a `getumbrel/umbrel-apps` pull request anyway. Assume the numbers below
+are stale and check them against the latest release before every submission.
+
+Re-run the login check from *Testing* below against the raised pin: it is the
+one thing that cannot be verified on 4.0.13.
 
 ## What umbrelOS changes
 
@@ -87,6 +104,13 @@ exists, so a changed value cannot lock anyone out.
 - **Widget embedding is LAN-bound.** `REALTIME_ALLOWED_ORIGINS` points at the
   Umbrel origin, so a widget on a public website cannot open its realtime
   connection.
+- **Realtime needs the `.local` origin.** `REALTIME_ALLOWED_ORIGINS` is derived
+  from `DEVICE_DOMAIN_NAME`, so reaching the app by IP address or through a
+  Tailscale hostname instead makes Centrifugo refuse the WebSocket upgrade.
+  Everything served over plain HTTP keeps working — CORS is open and the session
+  cookie is host-scoped — only the realtime channel stays closed. Widening the
+  allowed origins would trade a real CSWSH guard for that convenience, so the
+  package keeps the single canonical origin.
 - **A cross-device restore shows the wrong password.** Umbrel derives the
   password it displays from the new device's seed, while the account keeps the
   one it was created with. The data is intact; the displayed credential is not.

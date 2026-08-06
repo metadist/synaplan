@@ -327,8 +327,9 @@ that is served over HTTPS.
 
 Set `AUTH_COOKIE_SECURE` only when the detection cannot work: `true` when TLS is
 terminated by a proxy that `APP_URL` does not reveal, `false` to serve an
-HTTPS-configured deployment over plain HTTP anyway. Leave it empty otherwise. If
-`APP_URL` is unset, production falls back to `Secure` cookies.
+HTTPS-configured deployment over plain HTTP anyway. Leave it empty otherwise.
+Only an explicit `http://` or `https://` scheme decides — if `APP_URL` is unset
+or carries no scheme, production falls back to `Secure` cookies.
 
 ```bash
 AUTH_COOKIE_SECURE=

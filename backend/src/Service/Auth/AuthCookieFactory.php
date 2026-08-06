@@ -20,9 +20,11 @@ use Symfony\Component\HttpFoundation\Cookie;
  * `AUTH_COOKIE_SECURE` overrides the detection for deployments whose TLS is
  * terminated somewhere the application cannot see in `APP_URL`.
  *
- * When the public URL is unknown, the environment decides and production fails
- * secure: an unconfigured `APP_URL` must never silently downgrade a real
- * internet-facing deployment to non-`Secure` cookies.
+ * Only an explicit `http`/`https` scheme is treated as an answer. When the
+ * public URL is unknown or carries no scheme, the environment decides and
+ * production fails secure: neither an unconfigured `APP_URL` nor a schemeless
+ * one such as `app.example.com` may silently downgrade a real internet-facing
+ * deployment to non-`Secure` cookies.
  */
 final readonly class AuthCookieFactory
 {
@@ -63,11 +65,13 @@ final readonly class AuthCookieFactory
             }
         }
 
-        $appUrl = trim($this->appUrl);
-        if ('' === $appUrl) {
-            return 'prod' === $this->appEnv;
-        }
+        $scheme = parse_url(trim($this->appUrl), PHP_URL_SCHEME);
 
-        return str_starts_with(strtolower($appUrl), 'https://');
+        return match (strtolower(\is_string($scheme) ? $scheme : '')) {
+            'https' => true,
+            'http' => false,
+            // No scheme means the URL says nothing about the transport.
+            default => 'prod' === $this->appEnv,
+        };
     }
 }

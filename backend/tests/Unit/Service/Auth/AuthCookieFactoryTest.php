@@ -32,6 +32,13 @@ final class AuthCookieFactoryTest extends TestCase
         yield 'unknown url fails secure in prod' => ['prod', '', '', true];
         yield 'unknown url stays open in dev' => ['dev', '', '', false];
 
+        // A host without a scheme is not evidence of plain HTTP, so it must not
+        // strip the flag off an HTTPS deployment that was configured sloppily.
+        yield 'schemeless url fails secure in prod' => ['prod', 'app.example.com', '', true];
+        yield 'schemeless url stays open in dev' => ['dev', 'localhost:8000', '', false];
+        yield 'protocol-relative url fails secure in prod' => ['prod', '//app.example.com', '', true];
+        yield 'uppercase http is still http' => ['prod', 'HTTP://umbrel.local:8300', '', false];
+
         yield 'override forces secure on http' => ['prod', 'http://app.example.com', 'true', true];
         yield 'override disables secure on https' => ['prod', 'https://app.example.com', 'false', false];
         yield 'override accepts 1' => ['dev', 'http://localhost:8000', '1', true];

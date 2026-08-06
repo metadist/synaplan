@@ -785,11 +785,9 @@ services:
             $appUrl: '%env(APP_URL)%'
             $forceSecure: '%env(string:default::AUTH_COOKIE_SECURE)%'
 
-    # Token Service (Access/Refresh Tokens)
-    App\Service\TokenService: ~
-
-    # Impersonation Service (admin → user cookie-stash session swap)
-    App\Service\ImpersonationService: ~
+    # TokenService and ImpersonationService have no definition of their own any
+    # more: their cookie flags come from AuthCookieFactory, and everything else
+    # they need is autowired.
 
     # reCAPTCHA Service
     App\Service\RecaptchaService:
