@@ -169,7 +169,13 @@ jobs:
 
       - name: Security audit
         working-directory: backend
-        run: composer audit || true
+        # Blocking gate: fail the PR on high/critical advisories in production
+        # (require) dependencies. Dev-only tools (--no-dev) and lower severities
+        # are excluded to avoid blocking on issues that never ship to prod or
+        # have no fix yet. Abandoned packages are reported, not failed.
+        run: >-
+          composer audit --no-dev --abandoned=report
+          --ignore-severity=low --ignore-severity=medium --ignore-severity=moderate
 
       - name: Run PHPStan
         working-directory: backend
@@ -384,6 +390,13 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Security audit
+        working-directory: frontend
+        # Blocking gate: fail on high/critical advisories in production
+        # dependencies only (--omit=dev). Dev tooling and lower severities do
+        # not ship to users and would otherwise block PRs without fixes.
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Download OpenAPI spec artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
