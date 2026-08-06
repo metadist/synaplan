@@ -19,6 +19,7 @@
 
 import type { App } from 'vue'
 import { detectApiUrl } from './widget-utils'
+import { adaptStylesForShadowDom } from './utils/widgetShadowStyles'
 
 interface WidgetRealtimeConfig {
   /** Master kill-switch echoed by the backend. Defaults to true. */
@@ -81,6 +82,8 @@ interface WidgetConfig {
   poweredByLabel?: string
   poweredByUrl?: string
 }
+
+const DEFAULT_ICON_COLOR = '#ffffff'
 
 class SynaplanWidget {
   private config: WidgetConfig | null = null
@@ -258,13 +261,31 @@ class SynaplanWidget {
     })
   }
 
-  private getIconContent(): string {
-    const iconColor = this.config?.iconColor || '#ffffff'
-
-    // Only show custom icon if buttonIcon is explicitly set to 'custom'
+  /**
+   * Renders the launcher icon into `target`.
+   *
+   * A custom icon URL is operator data the backend only prefix-checks
+   * (`http(s)://`, `data:image/`), so it must never reach markup: interpolating
+   * it into `<img src="...">` let a value like `https://x.png" onerror="…`
+   * execute script on every embedding page. Assigning `img.src` keeps the whole
+   * value a URL. The built-in icons below are static markup whose only
+   * interpolated value is a hex color validated by the backend.
+   */
+  private renderIcon(target: HTMLElement): void {
     if (this.config?.buttonIcon === 'custom' && this.config?.buttonIconUrl) {
-      return `<img src="${this.config.buttonIconUrl}" alt="Chat" style="width: 32px; height: 32px; object-fit: contain;" />`
+      const icon = document.createElement('img')
+      icon.src = this.config.buttonIconUrl
+      icon.alt = 'Chat'
+      icon.setAttribute('style', 'width: 32px; height: 32px; object-fit: contain;')
+      target.replaceChildren(icon)
+      return
     }
+
+    target.innerHTML = this.getIconContent()
+  }
+
+  private getIconContent(): string {
+    const iconColor = this.config?.iconColor || DEFAULT_ICON_COLOR
 
     const icons: Record<string, string> = {
       chat: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -333,7 +354,7 @@ class SynaplanWidget {
     `
     )
 
-    this.button.innerHTML = this.getIconContent()
+    this.renderIcon(this.button)
 
     this.button.addEventListener('mouseenter', () => {
       this.button!.style.transform = 'scale(1.1)'
@@ -368,7 +389,7 @@ class SynaplanWidget {
     // Show loading indicator on button
     if (this.button) {
       this.button.innerHTML = `
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${this.config?.iconColor}" stroke-width="2">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${this.config?.iconColor || DEFAULT_ICON_COLOR}" stroke-width="2">
           <circle cx="12" cy="12" r="10" opacity="0.25"></circle>
           <path d="M12 2 A10 10 0 0 1 22 12" opacity="1">
             <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
@@ -429,12 +450,7 @@ class SynaplanWidget {
       // Inject styles into Shadow DOM (not document.head!)
       const styleEl = document.createElement('style')
       styleEl.id = 'synaplan-widget-styles'
-      // Adapt global selectors (:root, body) for Shadow DOM context
-      // In Shadow DOM, :root and body don't exist - use :host instead
-      const adaptedCss = widgetStyles.default
-        .replace(/:root\b/g, ':host')
-        .replace(/\bbody\b/g, ':host')
-      styleEl.textContent = adaptedCss
+      styleEl.textContent = adaptStylesForShadowDom(widgetStyles.default)
       shadow.appendChild(styleEl)
 
       // Inject markdown-specific styles for tables, code blocks, etc.
@@ -454,6 +470,8 @@ class SynaplanWidget {
         font-size: 16px;
         line-height: 1.5;
         box-sizing: border-box;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       `
           .replace(/\s+/g, ' ')
           .trim()
@@ -509,7 +527,7 @@ class SynaplanWidget {
         const handleClose = () => {
           if (this.button) {
             this.button.style.display = 'flex'
-            this.button.innerHTML = this.getIconContent()
+            this.renderIcon(this.button)
             this.shouldOpenImmediately = false
           }
         }
@@ -523,7 +541,7 @@ class SynaplanWidget {
 
       // Restore button on error
       if (this.button) {
-        this.button.innerHTML = this.getIconContent()
+        this.renderIcon(this.button)
       } else if (this.config?.lazy) {
         this.createButton()
       }
