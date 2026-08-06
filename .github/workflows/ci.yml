@@ -73,7 +73,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
 
       # The impact classifier decides whether a change may reach an installed app
       # over the air, so its own tests are a release gate, not a nicety.
@@ -169,7 +169,13 @@ jobs:
 
       - name: Security audit
         working-directory: backend
-        run: composer audit || true
+        # Blocking gate: fail the PR on high/critical advisories in production
+        # (require) dependencies. Dev-only tools (--no-dev) and lower severities
+        # are excluded to avoid blocking on issues that never ship to prod or
+        # have no fix yet. Abandoned packages are reported, not failed.
+        run: >-
+          composer audit --no-dev --abandoned=report
+          --ignore-severity=low --ignore-severity=medium --ignore-severity=moderate
 
       - name: Run PHPStan
         working-directory: backend
@@ -309,7 +315,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .nvmrc
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -377,13 +383,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .nvmrc
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Security audit
+        working-directory: frontend
+        # Blocking gate: fail on high/critical advisories in production
+        # dependencies only (--omit=dev). Dev tooling and lower severities do
+        # not ship to users and would otherwise block PRs without fixes.
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Download OpenAPI spec artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -615,7 +628,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .nvmrc
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -855,7 +868,7 @@ jobs:
         if: steps.baselines.outputs.exists == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .nvmrc
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -1354,7 +1367,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version-file: .nvmrc
 
       - name: Install dependencies
         working-directory: cloudflare
