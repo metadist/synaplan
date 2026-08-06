@@ -19,6 +19,7 @@
 
 import type { App } from 'vue'
 import { detectApiUrl } from './widget-utils'
+import { adaptStylesForShadowDom } from './utils/widgetShadowStyles'
 
 interface WidgetRealtimeConfig {
   /** Master kill-switch echoed by the backend. Defaults to true. */
@@ -429,12 +430,7 @@ class SynaplanWidget {
       // Inject styles into Shadow DOM (not document.head!)
       const styleEl = document.createElement('style')
       styleEl.id = 'synaplan-widget-styles'
-      // Adapt global selectors (:root, body) for Shadow DOM context
-      // In Shadow DOM, :root and body don't exist - use :host instead
-      const adaptedCss = widgetStyles.default
-        .replace(/:root\b/g, ':host')
-        .replace(/\bbody\b/g, ':host')
-      styleEl.textContent = adaptedCss
+      styleEl.textContent = adaptStylesForShadowDom(widgetStyles.default)
       shadow.appendChild(styleEl)
 
       // Inject markdown-specific styles for tables, code blocks, etc.
@@ -454,6 +450,8 @@ class SynaplanWidget {
         font-size: 16px;
         line-height: 1.5;
         box-sizing: border-box;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       `
           .replace(/\s+/g, ' ')
           .trim()
