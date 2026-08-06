@@ -262,9 +262,11 @@ Dry-run baseline 2026-07-13: **70 unchanged (per-token + same-mode media, no dri
 
 ### Automated weekly drift check (CI)
 
-`.github/workflows/price-drift.yml` runs every Monday (and on manual dispatch): it seeds the catalog and runs `app:sync-model-prices --dry-run --fail-on-drift`. The flag exits with code **2** when any per-token model **or** any same-mode non-per-token model (whisper/tts/veo/imagen) differs from LiteLLM. Mode-mismatch and unmatched rows never trip it (no false alarms). On drift the workflow opens — or comments on an existing — GitHub issue titled "Price drift detected …" with the dry-run report, so a human verifies against the official page and updates `ModelCatalog.php`. It lives outside the PR CI on purpose: it depends on the external LiteLLM source, which must never turn a code PR red.
+`.github/workflows/price-drift.yml` runs every Monday (and on manual dispatch): it seeds the catalog and runs `app:sync-model-prices --dry-run --fail-on-drift`. The flag exits with code **2** when any per-token model **or** any same-mode non-per-token model (whisper/tts/veo/imagen) differs from LiteLLM. Mode-mismatch and unmatched rows never trip it (no false alarms). On drift the workflow opens — or comments on an existing — GitHub issue titled "Price drift detected …" with the dry-run report, so a human verifies against the official page and updates `ModelCatalog.php`. It lives outside the PR CI on purpose: it depends on the external LiteLLM source, which must never turn a code PR red. The report file is written under `backend/` (the check step's `working-directory`), so the issue-opening step must also run with `working-directory: backend` — otherwise `cat drift-report.txt` fails with `No such file or directory` and the step dies under `bash -e` before the issue is created.
 
 You can run the same check locally: `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run --fail-on-drift; echo $?` (0 = no drift, 2 = drift).
+
+> Resolved drift (2026-08-03): the weekly check flagged `gpt-5.6-terra` and `gpt-5.6-luna` (each twice — chat + vision row). Verified against the [official OpenAI pricing](https://developers.openai.com/api/docs/pricing): OpenAI cut GPT-5.6 prices on 2026-07-30 — Terra 2.50/15 → **2.00/12** (−20%), Luna 1.00/6 → **0.20/1.20** (−80%), Sol unchanged. Not a LiteLLM error; keeping the old (higher) rate overcharged every Terra/Luna call. Applied to `ModelCatalog.php` (base rows + `CONTEXT_PRICING` long-context tiers: Terra 4.00/18, Luna 0.40/1.80) and rolled out to existing installs by `Version20260803120000`.
 
 > History (2026-07-13): an earlier draft claimed whisper's `0.111 perhour` was "the same price" as the sync's per-second value. That was wrong at the time — `perhour` fell through `normaliseToPerUnit()` unchanged and whisper carried no `pricing_mode`. #1314 fixed both: whisper/Voxtral now carry `pricing_mode: per_second` and `normaliseToPerUnit()` converts `perhour`/`permin` down to per-second, and `AiFacade::transcribe()` records the provider-reported audio duration (see below).
 
@@ -342,10 +344,11 @@ Some providers charge a higher per-token rate for the **whole request** once the
 
 | Model | Threshold | Base in/out (per 1M) | Above in/out (per 1M) |
 | ----- | --------- | -------------------- | --------------------- |
-| gpt-5.4 / gpt-5.6-terra | 272k | 2.50 / 15 | 5.00 / 22.50 |
+| gpt-5.4 | 272k | 2.50 / 15 | 5.00 / 22.50 |
+| gpt-5.6-terra | 272k | 2.00 / 12 | 4.00 / 18 |
 | gpt-5.5 / gpt-5.6-sol | 272k | 5.00 / 30 | 10.00 / 45 |
 | gpt-5.5-pro | 272k | 30 / 180 | 60 / 270 |
-| gpt-5.6-luna | 272k | 1.00 / 6 | 2.00 / 9 |
+| gpt-5.6-luna | 272k | 0.20 / 1.20 | 0.40 / 1.80 |
 | gemini-2.5-pro | 200k | 1.25 / 10 | 2.50 / 15 |
 | gemini-3.1-pro-preview | 200k | 2.00 / 12 | 4.00 / 18 |
 
