@@ -315,6 +315,25 @@ FRONTEND_URL=https://your-domain.com
 CORS_ALLOW_ORIGIN=https://your-domain.com
 ```
 
+### Authentication cookies over plain HTTP
+
+The `access_token`, `refresh_token`, and OIDC cookies are marked `Secure` when
+`APP_URL` uses `https://`. A browser never sends a `Secure` cookie back over
+plain HTTP, so a deployment that is reachable only over HTTP — a LAN appliance
+such as umbrelOS, which serves every app from `http://<device>.local:<port>` —
+would log in successfully and lose the session on the next request. Deriving the
+flag from `APP_URL` keeps those deployments usable without weakening anything
+that is served over HTTPS.
+
+Set `AUTH_COOKIE_SECURE` only when the detection cannot work: `true` when TLS is
+terminated by a proxy that `APP_URL` does not reveal, `false` to serve an
+HTTPS-configured deployment over plain HTTP anyway. Leave it empty otherwise. If
+`APP_URL` is unset, production falls back to `Secure` cookies.
+
+```bash
+AUTH_COOKIE_SECURE=
+```
+
 ---
 
 ## All Environment Variables

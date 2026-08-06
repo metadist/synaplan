@@ -110,9 +110,18 @@
 	# REALTIME_API_URL (http://centrifugo:8000/api), and operators reach
 	# the admin UI through the internal network only (e.g. an SSH tunnel
 	# or a docker port mapping bound to localhost) — see docs/REALTIME.md.
+	#
+	# The upstream address is overridable because `centrifugo` is not always
+	# an unambiguous name. Compose registers both the service name and the
+	# container name as DNS aliases, and a platform that puts every app of a
+	# host on ONE shared network (umbrelOS does) therefore has one `centrifugo`
+	# alias per app that happens to use that service name — Docker would answer
+	# with whichever it likes. Such a deployment addresses the container by its
+	# unique name instead. The default keeps the Compose deployments in this
+	# repository unchanged.
 	# ------------------------------------------------------------------
 	handle /connection/* {
-		reverse_proxy centrifugo:8000
+		reverse_proxy {$REALTIME_UPSTREAM_ADDR:centrifugo:8000}
 	}
 
 	# Widgets first (to catch widget.js, chunks/*, etc.)

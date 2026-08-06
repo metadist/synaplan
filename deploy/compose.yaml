@@ -37,6 +37,10 @@ x-app-environment: &app-environment
   FRONTEND_URL: "${FRONTEND_URL:?Set FRONTEND_URL to the public HTTPS URL}"
   APP_SECRET: "${APP_SECRET:?Set a stable APP_SECRET}"
   TOKEN_SECRET: "${TOKEN_SECRET:?Set a stable TOKEN_SECRET}"
+  # Empty means the Secure flag follows the APP_URL scheme, which is what every
+  # deployment following selfhost.env.example wants. Only a deployment whose TLS
+  # terminates where APP_URL cannot show it needs an explicit value.
+  AUTH_COOKIE_SECURE: "${AUTH_COOKIE_SECURE:-}"
   BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
   BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
   DB_HOST: db

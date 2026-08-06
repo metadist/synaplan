@@ -655,7 +655,6 @@ services:
     # OIDC Token Service for Keycloak integration
     App\Service\OidcTokenService:
         arguments:
-            $appEnv: '%env(APP_ENV)%'
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
@@ -774,15 +773,23 @@ services:
             $frontendUrl: '%env(FRONTEND_URL)%'
             $nativeDeepLinkScheme: '%env(NATIVE_DEEPLINK_SCHEME)%'
 
-    # Token Service (Access/Refresh Tokens)
-    App\Service\TokenService:
+    # Single source of truth for the auth cookie flags. `Secure` follows the
+    # scheme of APP_URL, so a deployment that is legitimately HTTP-only (an
+    # umbrelOS-style LAN appliance) keeps its session instead of having the
+    # browser drop every cookie. AUTH_COOKIE_SECURE overrides the detection
+    # when TLS terminates somewhere APP_URL does not reveal; empty means
+    # "not configured".
+    App\Service\Auth\AuthCookieFactory:
         arguments:
             $appEnv: '%kernel.environment%'
+            $appUrl: '%env(APP_URL)%'
+            $forceSecure: '%env(string:default::AUTH_COOKIE_SECURE)%'
+
+    # Token Service (Access/Refresh Tokens)
+    App\Service\TokenService: ~
 
     # Impersonation Service (admin → user cookie-stash session swap)
-    App\Service\ImpersonationService:
-        arguments:
-            $appEnv: '%kernel.environment%'
+    App\Service\ImpersonationService: ~
 
     # reCAPTCHA Service
     App\Service\RecaptchaService:

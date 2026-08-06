@@ -6,6 +6,7 @@ use App\Entity\Token;
 use App\Entity\User;
 use App\Repository\TokenRepository;
 use App\Repository\UserRepository;
+use App\Service\Auth\AuthCookieFactory;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,7 +35,7 @@ final readonly class TokenService
         private TokenRepository $tokenRepository,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
-        private string $appEnv,
+        private AuthCookieFactory $authCookieFactory,
     ) {
     }
 
@@ -250,7 +251,7 @@ final readonly class TokenService
      */
     public function createAccessCookie(string $token): Cookie
     {
-        return $this->createSecureCookie(
+        return $this->authCookieFactory->create(
             self::ACCESS_COOKIE,
             $token,
             time() + self::ACCESS_TOKEN_TTL
@@ -262,7 +263,7 @@ final readonly class TokenService
      */
     public function createRefreshCookie(string $token): Cookie
     {
-        return $this->createSecureCookie(
+        return $this->authCookieFactory->create(
             self::REFRESH_COOKIE,
             $token,
             time() + self::REFRESH_TOKEN_TTL
@@ -274,7 +275,7 @@ final readonly class TokenService
      */
     public function createClearAccessCookie(): Cookie
     {
-        return $this->createSecureCookie(self::ACCESS_COOKIE, '', 1);
+        return $this->authCookieFactory->create(self::ACCESS_COOKIE, '', 1);
     }
 
     /**
@@ -282,7 +283,7 @@ final readonly class TokenService
      */
     public function createClearRefreshCookie(): Cookie
     {
-        return $this->createSecureCookie(self::REFRESH_COOKIE, '', 1);
+        return $this->authCookieFactory->create(self::REFRESH_COOKIE, '', 1);
     }
 
     /**
@@ -317,22 +318,6 @@ final readonly class TokenService
         }
 
         return $this->userRepository->find($payload['user_id']);
-    }
-
-    /**
-     * Create a secure HttpOnly cookie.
-     */
-    private function createSecureCookie(string $name, string $value, int $expire): Cookie
-    {
-        $isProduction = 'prod' === $this->appEnv;
-
-        return Cookie::create($name)
-            ->withValue($value)
-            ->withExpires($expire)
-            ->withPath('/')
-            ->withSecure($isProduction)  // HTTPS only in production
-            ->withHttpOnly(true)         // Not accessible via JavaScript
-            ->withSameSite($isProduction ? Cookie::SAMESITE_STRICT : Cookie::SAMESITE_LAX);
     }
 
     /**
