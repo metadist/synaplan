@@ -128,6 +128,30 @@ test.describe('@ci @smoke Widget', () => {
     })
   })
 
+  test('keeps the host page visible while open', async ({ page, request, credentials }) => {
+    const widgetName = WIDGET_NAMES.unique('Widget Host Transparency')
+    const widgetInfo = await createWidgetViaApi(request, credentials, widgetName, {
+      websiteUrl: URLS.TEST_PAGE_URL,
+    })
+
+    const apiUrl = getApiUrl()
+    await test.step('Arrange: open widget on test page', async () => {
+      await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+    })
+
+    await test.step('Assert: the full-viewport host layer paints nothing', async () => {
+      // The host spans the whole viewport, so any background on it hides the
+      // embedding page. Only the chat chrome inside the Shadow DOM may paint.
+      const hostSurface = await page.locator(selectors.widget.host).evaluate((element) => {
+        const style = getComputedStyle(element)
+        return { color: style.backgroundColor, image: style.backgroundImage }
+      })
+
+      expect(hostSurface.color).toBe('rgba(0, 0, 0, 0)')
+      expect(hostSurface.image).toBe('none')
+    })
+  })
+
   test('embedded chat receives response', async ({ page, request, credentials }) => {
     const widgetName = WIDGET_NAMES.unique('Embedded Widget Flow')
     const widgetInfo = await createWidgetViaApi(request, credentials, widgetName, {
