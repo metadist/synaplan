@@ -36,3 +36,7 @@ version already changed the database, also restore the backup from step 1.
 A redeploy on its own never installs a newer version — the version only changes
 when you change it. Always use a released version number; `latest` is rejected
 before anything starts.
+
+Your pipeline may restart by itself when the Synaplan repository receives a new
+commit. That is a restart, not an update: it reuses the version and the settings
+your pipeline already has.

@@ -19,10 +19,9 @@ schema. These files only translate lifecycle events to the portable scripts in
    enabling email-dependent features.
 
 Elestio documents `random_password`, `[EMAIL]`, and `[CI_CD_DOMAIN]`
-substitution. Treat every generated password as a persistent pipeline secret:
-do not regenerate it on redeploy, and include the environment configuration in
-your external disaster-recovery records. The administrator credentials are the
-critical case: see
+substitution. Every generated password is a persistent pipeline secret: it is
+drawn once, at creation, and belongs in your external disaster-recovery records.
+The administrator credentials are the critical case: see
 [First administrator credentials](#first-administrator-credentials).
 
 ## Application secrets are generated per deployment
@@ -60,8 +59,31 @@ for the Synaplan shortcut, so it stays exactly the value the platform generated.
 The public template documentation does not define a separate schema property
 that marks an environment variable as editable. `COMPOSE_PROFILES` is therefore
 declared as a normal environment value. Change it to `local-ai` in Elestio's
-pipeline environment editor and redeploy. Confirm the exact dashboard editing
-and secret-retention behavior with Elestio before catalog submission.
+pipeline environment editor and redeploy.
+
+## How this manifest reaches a pipeline
+
+Measured on a live pipeline, because the published documentation does not state
+it and the behaviour decides whether a release can move a running deployment:
+
+- **A pipeline's environment is materialised once, when the pipeline is
+  created.** Afterwards it belongs to the pipeline, not to this file.
+- **Changing a value here does not reach a pipeline that already exists.** A
+  probe key was deployed as `probe-1`, changed to `probe-2` in this manifest, and
+  the pipeline still reported `probe-1` after the redeploy that commit triggered.
+  Raising `SYNAPLAN_VERSION` therefore only decides what a NEW deployment
+  installs; a running one stays on the release its operator deployed until that
+  operator changes it. That is the guarantee
+  [docs/UPDATE_ELESTIO.md](../../docs/UPDATE_ELESTIO.md) makes, and it holds.
+- **`random_password` is drawn once, at creation**, not on every deploy. The
+  generated administrator password stays valid for the life of the pipeline.
+- **A commit on the tracked branch deploys automatically.** Merging anything into
+  the default branch restarts every pipeline that tracks it — with its own stored
+  configuration, so nothing is upgraded, but the restart itself is not optional.
+  This is why the release automation opens a pull request instead of pushing.
+
+Deleting and recreating a pipeline is a new pipeline: it re-reads this file and
+draws fresh passwords. Do not mistake that for a redeploy.
 
 The documentation also does not publish catalog-only metadata fields or asset
 requirements. No undocumented fields are included. Icon, screenshot, benchmark,
@@ -74,13 +96,17 @@ Elestio replaces `[EMAIL]` with your Elestio account address and
 `random_password` with a generated value, then shows both as the login for the
 Synaplan shortcut. Store them in a password manager during the first deployment.
 
-> **After a redeploy, the password Elestio displays no longer works.** Elestio
-> generates a new value and shows it, while Synaplan keeps the administrator that
-> was created on the very first start — the bootstrap never resets an existing
-> administrator, deliberately, because otherwise a deployment variable would be a
-> permanent password-reset backdoor. Nothing is broken. Sign in with the
-> **original** credentials from the first deployment, which is why they belong in
-> a password manager. If they are lost, recover as described in
+A redeploy keeps that password: the value is drawn once, when the pipeline is
+created, and the pipeline's stored environment is authoritative from then on.
+
+> **Recreating the pipeline is the case to watch.** A new pipeline draws a new
+> password and displays it, while Synaplan keeps the administrator created on the
+> very first start — the bootstrap never resets an existing administrator,
+> deliberately, because otherwise a deployment variable would be a permanent
+> password-reset backdoor. Nothing is broken, but the newly displayed password
+> does not work if the data directory survived. Sign in with the **original**
+> credentials, which is why they belong in a password manager. If they are lost,
+> recover as described in
 > [Lost Administrator Password](../../docs/ADMIN.md#lost-administrator-password):
 > a password reset by email once SMTP is configured, otherwise through the
 > database.
