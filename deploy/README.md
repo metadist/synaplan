@@ -240,3 +240,12 @@ Platform-specific adapters must call the scripts in this directory rather than
 reimplementing operations. `deploy/elestio/` is the first thin adapter. Future
 Coolify, CapRover, or Railway definitions should preserve the same role,
 persistence, backup, restore, and health contracts.
+
+`deploy/umbrel/` is the Umbrel App Store package and the one adapter that cannot
+call these scripts: umbrelOS installs an app from a self-contained directory and
+offers no lifecycle hook to run them from. It reproduces the role, persistence
+and health contracts in its own `docker-compose.yml`, and keeps its secrets in
+the app's data directory for the same reason this deployment does — a database
+restored without its password cannot be opened. Its deviations, including the
+absent local-AI services and the missing consistent-backup hook, are listed in
+[`umbrel/README.md`](umbrel/README.md).

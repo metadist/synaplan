@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\Service\Auth\AuthCookieFactory;
 use App\Service\JwtValidator;
 use App\Service\OidcTokenService;
 use Doctrine\DBAL\Connection;
@@ -23,7 +24,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(Connection::class),
             $this->createMock(LoggerInterface::class),
             $this->createMock(JwtValidator::class),
-            'test',
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
@@ -59,7 +60,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(Connection::class),
             $logger ?? $this->createMock(LoggerInterface::class),
             $jwtValidator,
-            'test',
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
             $oidcClientId,
             'test-client-secret',
             'https://keycloak.example.com/realms/test',
@@ -228,7 +229,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(Connection::class),
             $logger,
             $this->createMock(JwtValidator::class),
-            'test',
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
@@ -261,7 +262,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(Connection::class),
             $logger,
             $this->createMock(JwtValidator::class),
-            'test',
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
@@ -338,7 +339,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(Connection::class),
             $logger,
             $this->createMock(JwtValidator::class),
-            'test',
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
@@ -437,7 +438,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(Connection::class),
             $logger,
             $this->createMock(JwtValidator::class),
-            'test',
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
@@ -473,7 +474,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(Connection::class),
             $logger,
             $this->createMock(JwtValidator::class),
-            'test',
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'

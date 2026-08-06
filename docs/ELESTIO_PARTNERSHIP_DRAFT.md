@@ -30,10 +30,12 @@ Before preparing a catalog submission, could you please clarify:
 - whether you require additional internal scripts or a particular repository
   layout beyond a public `elestio.yml`.
 
-We plan to validate fresh installation, persistence, restore, version upgrade,
-rollback, and cleanup through a custom-pipeline trial before requesting catalog
-consideration. We understand that a working `elestio.yml` enables import but
-does not guarantee catalog acceptance.
+We have already prepared and tested this ourselves on our own Elestio account:
+a working `elestio.yml`, a production Docker Compose stack, and a custom
+pipeline where we verified fresh installation, persistence, restore, version
+upgrade, rollback, and cleanup. We understand that a working `elestio.yml`
+enables import but does not guarantee catalog acceptance, and we are ready to
+share our results or adjust anything you require.
 
 Best regards,  
 The Synaplan team

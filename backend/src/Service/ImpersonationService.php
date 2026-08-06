@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Auth\AuthCookieFactory;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Request;
@@ -67,7 +68,7 @@ final readonly class ImpersonationService
         private TokenService $tokenService,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
-        private string $appEnv,
+        private AuthCookieFactory $authCookieFactory,
     ) {
     }
 
@@ -336,15 +337,10 @@ final readonly class ImpersonationService
 
     private function buildStashCookie(string $value, ?int $expire = null): Cookie
     {
-        $isProduction = 'prod' === $this->appEnv;
-        $expiresAt = $expire ?? (time() + self::STASH_TTL_SECONDS);
-
-        return Cookie::create(self::ADMIN_REFRESH_STASH_COOKIE)
-            ->withValue($value)
-            ->withExpires($expiresAt)
-            ->withPath('/')
-            ->withSecure($isProduction)
-            ->withHttpOnly(true)
-            ->withSameSite($isProduction ? Cookie::SAMESITE_STRICT : Cookie::SAMESITE_LAX);
+        return $this->authCookieFactory->create(
+            self::ADMIN_REFRESH_STASH_COOKIE,
+            $value,
+            $expire ?? (time() + self::STASH_TTL_SECONDS)
+        );
     }
 }

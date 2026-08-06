@@ -202,6 +202,7 @@ running Centrifugo to be testable.
 | `REALTIME_PUBLIC_WS_URL` | Public WebSocket URL the browser dials (empty = same-origin via `/connection/websocket`). |
 | `REALTIME_ALLOWED_ORIGINS` | Comma/space-separated origins Centrifugo accepts WS upgrades from. `*` in dev only; set explicit `https://…` origins in production. |
 | `REALTIME_REDIS_ADDRESS` | Redis address for the Centrifugo engine (maps to `CENTRIFUGO_ENGINE_REDIS_ADDRESS`). Defaults to the local Redis on logical DB `/3`. |
+| `REALTIME_UPSTREAM_ADDR` | `host:port` Caddy proxies `/connection/*` to, default `centrifugo:8000`. Only needed where the service name does not resolve — a platform that puts every app of a host on one shared Docker network addresses containers by their full name instead. |
 | `REALTIME_ADMIN_PASSWORD` / `REALTIME_ADMIN_SECRET` | Credentials for the Centrifugo admin UI. The admin UI is **not** proxied publicly — reach it via the internal network only (SSH tunnel / localhost-bound port mapping). |
 
 `REDIS_DSN` is required for cross-node Centrifugo fan-out and Symfony

@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Auth\AuthCookieFactory;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -36,7 +37,7 @@ final class OidcTokenService
         private Connection $connection,
         private LoggerInterface $logger,
         private JwtValidator $jwtValidator,
-        private string $appEnv,
+        private AuthCookieFactory $authCookieFactory,
         private string $oidcClientId,
         private string $oidcClientSecret,
         private string $oidcDiscoveryUrl,
@@ -496,14 +497,6 @@ final class OidcTokenService
      */
     private function createCookie(string $name, string $value, int $expire): Cookie
     {
-        $isProduction = 'prod' === $this->appEnv;
-
-        return Cookie::create($name)
-            ->withValue($value)
-            ->withExpires($expire)
-            ->withPath('/')
-            ->withSecure($isProduction)
-            ->withHttpOnly(true)
-            ->withSameSite($isProduction ? Cookie::SAMESITE_STRICT : Cookie::SAMESITE_LAX);
+        return $this->authCookieFactory->create($name, $value, $expire);
     }
 }

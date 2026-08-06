@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Auth\AuthCookieFactory;
 use App\Service\ImpersonationService;
 use App\Service\TokenService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -47,7 +48,7 @@ final class ImpersonationServiceTest extends TestCase
             $this->tokenService,
             $this->userRepository,
             new NullLogger(),
-            'test',
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
         );
     }
 
