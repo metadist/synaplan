@@ -38,6 +38,11 @@ const IMAGE_DIGEST = /^sha256:[a-f0-9]{64}$/
 
 const UMBREL_IMAGE_REPOSITORY = 'ghcr.io/metadist/synaplan'
 
+// Full regex-metacharacter escape, not just the dots this one constant happens
+// to contain today — a partial escape would silently stop being safe the day
+// the repository name changes to include any other special character.
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 export const parseReleaseVersion = (value) => {
   const version = String(value ?? '').trim().replace(/^v/, '')
   return RELEASE_VERSION.test(version) ? version : null
@@ -206,7 +211,7 @@ export const readUmbrelComposePin = (text) => {
   }
 
   const match = new RegExp(
-    `^${UMBREL_IMAGE_REPOSITORY.replace(/\./g, '\\.')}:([^@]+)@(sha256:[a-f0-9]{64})$`
+    `^${escapeRegExp(UMBREL_IMAGE_REPOSITORY)}:([^@]+)@(sha256:[a-f0-9]{64})$`
   ).exec(image)
 
   return {

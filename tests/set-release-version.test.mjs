@@ -205,6 +205,22 @@ test('fails when either Umbrel compose anchor is missing', () => {
   )
 })
 
+// readUmbrelComposePin builds a regex from the repository name. A partial
+// escape (dots only) would still work for `ghcr.io/metadist/synaplan` today,
+// but would misparse — or throw on — a line whose image differs by even one
+// regex metacharacter, silently or loudly breaking the release automation.
+test('the image-pin regex is not confused by a similar but different repository', () => {
+  const before = UMBREL_COMPOSE_SAMPLE.replace(
+    'ghcr.io/metadist/synaplan',
+    'ghcr.io/metadistXsynaplan'
+  )
+
+  const result = readUmbrelComposePin(before)
+
+  assert.equal(result.version, null)
+  assert.equal(result.digest, null)
+})
+
 // The guard against the failure that prompted this automation: a deployment
 // once aborted because the shipped manifest still carried a placeholder instead
 // of a published version.
