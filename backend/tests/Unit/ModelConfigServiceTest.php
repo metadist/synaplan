@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit;
 
+use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\Model;
@@ -208,6 +209,131 @@ class ModelConfigServiceTest extends TestCase
         $result = $this->service->getDefaultModel($capability, $userId);
 
         $this->assertNull($result);
+    }
+
+    /**
+     * The failure this guards against: an install whose first API key arrives
+     * AFTER the first account was created. resetUserDefaults() has already
+     * written the code-recommended per-user bindings, the key-save path repairs
+     * only the global row, and the user is left pointed at a provider they
+     * never configured — chat fails and the setup banner keeps asking for a
+     * provider that is plainly connected.
+     */
+    public function testGetDefaultModelSkipsAUserOverrideWhoseProviderHasNoKey(): void
+    {
+        $this->givenModels([249 => 'Anthropic', 9 => 'Groq']);
+        $this->givenUsableProviders(['groq']);
+        $this->givenDefaultModelRows([1 => 249, 0 => 9]);
+
+        self::assertSame(9, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    public function testGetDefaultModelKeepsAUserOverrideWhoseProviderHasAKey(): void
+    {
+        $this->givenModels([249 => 'Anthropic', 9 => 'Groq']);
+        $this->givenUsableProviders(['anthropic', 'groq']);
+        $this->givenDefaultModelRows([1 => 249, 0 => 9]);
+
+        self::assertSame(249, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * Nothing is usable, so the global default is no better than the user's own
+     * binding. Keep the configured one rather than shuffling to an equally
+     * dead alternative.
+     */
+    public function testGetDefaultModelKeepsTheUserOverrideWhenTheGlobalDefaultIsAlsoUnusable(): void
+    {
+        $this->givenModels([249 => 'Anthropic', 255 => 'OpenAI']);
+        $this->givenUsableProviders(['groq']);
+        $this->givenDefaultModelRows([1 => 249, 0 => 255]);
+
+        self::assertSame(249, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * An empty registry means "cannot tell", not "nothing works" — a bare
+     * ProviderRegistry must never be the reason a configured default is
+     * replaced.
+     */
+    public function testGetDefaultModelKeepsTheUserOverrideWhenNoProviderIsRegistered(): void
+    {
+        $this->givenModels([249 => 'Anthropic', 9 => 'Groq']);
+        $this->givenUsableProviders([]);
+        $this->givenDefaultModelRows([1 => 249, 0 => 9]);
+
+        self::assertSame(249, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * The test catalog binds capabilities to negative placeholder BIDs that
+     * have no BMODELS row. Those must resolve unchanged.
+     */
+    public function testGetDefaultModelKeepsAnOverridePointingAtAnUnknownModel(): void
+    {
+        $this->givenModels([]);
+        $this->givenDefaultModelRows([1 => -1, 0 => 9]);
+
+        self::assertSame(-1, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * @param array<int, string> $servicesByModelId
+     */
+    private function givenModels(array $servicesByModelId): void
+    {
+        $this->modelRepository
+            ->method('find')
+            ->willReturnCallback(function (int $modelId) use ($servicesByModelId): ?Model {
+                if (!isset($servicesByModelId[$modelId])) {
+                    return null;
+                }
+
+                $model = $this->createMock(Model::class);
+                $model->method('getService')->willReturn($servicesByModelId[$modelId]);
+
+                return $model;
+            });
+    }
+
+    /**
+     * @param list<string> $names
+     */
+    private function givenUsableProviders(array $names): void
+    {
+        $providers = [];
+        foreach ($names as $name) {
+            $provider = $this->createMock(ProviderMetadataInterface::class);
+            $provider->method('getName')->willReturn($name);
+            $provider->method('isAvailable')->willReturn(true);
+            $providers[$name] = $provider;
+        }
+
+        $this->providerRegistry->method('getUniqueProviders')->willReturn($providers);
+
+        // The snapshot is cached; these tests want it computed every time.
+        $this->cacheItem->method('isHit')->willReturn(false);
+        $this->cache->method('getItem')->willReturn($this->cacheItem);
+    }
+
+    /**
+     * @param array<int, int> $modelIdByOwnerId
+     */
+    private function givenDefaultModelRows(array $modelIdByOwnerId): void
+    {
+        $this->configRepository
+            ->method('findOneBy')
+            ->willReturnCallback(function (array $criteria) use ($modelIdByOwnerId): ?Config {
+                $modelId = $modelIdByOwnerId[$criteria['ownerId']] ?? null;
+                if (null === $modelId) {
+                    return null;
+                }
+
+                $config = $this->createMock(Config::class);
+                $config->method('getValue')->willReturn((string) $modelId);
+
+                return $config;
+            });
     }
 
     public function testGetProviderForModel(): void

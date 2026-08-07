@@ -159,10 +159,16 @@ final class ChatReadinessService
     /**
      * Drop the cached snapshot — call after a key was saved or removed so the
      * setup banner reacts to the change immediately.
+     *
+     * Model resolution keeps its own snapshot of which providers have
+     * credentials, for the same reason and with the same lifetime. Clearing it
+     * from here keeps "a key changed" a single call for every caller instead of
+     * something each one has to remember twice.
      */
     public function invalidate(): void
     {
         $this->cache->deleteItem(self::CACHE_KEY);
+        $this->modelConfigService->invalidateUsableProviders();
     }
 
     /**
