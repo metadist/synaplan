@@ -15,7 +15,11 @@ x-app-environment: &app-environment
   # self-hosted guide, which is close enough: Umbrel updates arrive through the
   # App Store, not through a manual pull.
   SYNAPLAN_PLATFORM: umbrel
-  APP_VERSION: "4.0.13"
+  # Maintained by CI: publishing a release opens a pull request that raises this
+  # (together with the image pin below and umbrel-app.yml) to the version whose
+  # image was just published. Do not edit by hand —
+  # scripts/set-release-version.mjs owns these three lines.
+  APP_VERSION: "4.0.14"
 
   # umbrelOS serves apps over plain HTTP on the device's .local domain. Synaplan
   # derives the auth cookies' Secure flag from this scheme, so the session
@@ -79,7 +83,9 @@ x-app-environment: &app-environment
 # The three app roles share one image and differ only by SYNAPLAN_ROLE. It runs
 # as root because its entrypoint repairs ownership of the upload directory and
 # then hands over to Caddy/FrankenPHP, which binds port 80 inside the container.
-x-app-image: &app-image ghcr.io/metadist/synaplan:4.0.13@sha256:0f8037576f93ab7458c344b1023973046501fa473d9a1b2ff58c2854e2e0d0f2
+# Tag and digest are maintained by CI together with APP_VERSION above —
+# scripts/set-release-version.mjs owns this line.
+x-app-image: &app-image ghcr.io/metadist/synaplan:4.0.14@sha256:40489bf5db1a3f34727b715045b6d7c157bc86e5a85c85f4c31a2c26b32a7423
 
 # Uploaded and generated files. The web role writes them, the worker reads them
 # back while processing a job, so all three app roles share the directory.

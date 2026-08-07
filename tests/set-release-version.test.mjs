@@ -7,9 +7,14 @@ import { fileURLToPath } from 'node:url'
 import {
   applyElestioVersion,
   applyEnvExampleVersion,
+  applyUmbrelAppVersion,
+  applyUmbrelComposeVersion,
+  parseImageDigest,
   parseReleaseVersion,
   readElestioVersion,
   readEnvExampleVersion,
+  readUmbrelAppVersion,
+  readUmbrelComposePin,
 } from '../scripts/set-release-version.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -25,6 +30,22 @@ const ELESTIO_SAMPLE = [
   '    value: "elestio"',
 ].join('\n')
 
+const UMBREL_COMPOSE_SAMPLE = [
+  'x-app-environment: &app-environment',
+  '  SYNAPLAN_PLATFORM: umbrel',
+  '  APP_VERSION: "4.0.12"',
+  '  APP_URL: "http://example.local:8300"',
+  '',
+  'x-app-image: &app-image ghcr.io/metadist/synaplan:4.0.12@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  '',
+  'services:',
+  '  web:',
+  '    image: *app-image',
+].join('\n')
+
+const DIGEST_A = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+const DIGEST_B = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+
 test('accepts a released version and rejects anything mutable', () => {
   assert.equal(parseReleaseVersion('4.0.13'), '4.0.13')
   assert.equal(parseReleaseVersion('v4.0.13'), '4.0.13')
@@ -39,6 +60,19 @@ test('accepts a released version and rejects anything mutable', () => {
   assert.equal(parseReleaseVersion('REPLACE_WITH_PUBLISHED_COMPATIBLE_VERSION'), null)
   assert.equal(parseReleaseVersion(''), null)
   assert.equal(parseReleaseVersion(undefined), null)
+})
+
+test('accepts a published digest and rejects anything that is not one', () => {
+  assert.equal(parseImageDigest(DIGEST_A), DIGEST_A)
+  assert.equal(
+    parseImageDigest('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+    DIGEST_A
+  )
+
+  assert.equal(parseImageDigest('sha256:short'), null)
+  assert.equal(parseImageDigest('latest'), null)
+  assert.equal(parseImageDigest(''), null)
+  assert.equal(parseImageDigest(undefined), null)
 })
 
 test('rewrites only the release pin, not a neighbouring variable', () => {
@@ -114,6 +148,79 @@ test('fails when the example configuration has no or several assignments', () =>
   )
 })
 
+test('rewrites the Umbrel store version without touching manifestVersion', () => {
+  const before = [
+    'manifestVersion: 1',
+    'id: synaplan',
+    'version: "4.0.12"',
+    'name: Synaplan',
+  ].join('\n')
+
+  const result = applyUmbrelAppVersion(before, '4.0.14')
+
+  assert.ok(result.includes('manifestVersion: 1'))
+  assert.ok(result.includes('version: "4.0.14"'))
+  assert.ok(!result.includes('version: "4.0.12"'))
+})
+
+test('fails when the Umbrel store version field is missing or duplicated', () => {
+  assert.throws(
+    () => applyUmbrelAppVersion('manifestVersion: 1\nid: synaplan\n', '4.0.14'),
+    /found 0/
+  )
+
+  assert.throws(
+    () => applyUmbrelAppVersion('version: "1"\nversion: "2"\n', '4.0.14'),
+    /found 2/
+  )
+})
+
+test('rewrites Umbrel APP_VERSION and the image pin together', () => {
+  const result = applyUmbrelComposeVersion(UMBREL_COMPOSE_SAMPLE, '4.0.14', DIGEST_B)
+
+  assert.ok(result.includes('  APP_VERSION: "4.0.14"'))
+  assert.ok(
+    result.includes(
+      `x-app-image: &app-image ghcr.io/metadist/synaplan:4.0.14@${DIGEST_B}`
+    )
+  )
+  assert.ok(result.includes('SYNAPLAN_PLATFORM: umbrel'))
+  assert.ok(!result.includes('4.0.12'))
+})
+
+test('fails when either Umbrel compose anchor is missing', () => {
+  assert.throws(
+    () =>
+      applyUmbrelComposeVersion(
+        'x-app-image: &app-image ghcr.io/metadist/synaplan:4.0.12@' + DIGEST_A,
+        '4.0.14',
+        DIGEST_B
+      ),
+    /APP_VERSION/
+  )
+
+  assert.throws(
+    () => applyUmbrelComposeVersion('  APP_VERSION: "4.0.12"\n', '4.0.14', DIGEST_B),
+    /x-app-image/
+  )
+})
+
+// readUmbrelComposePin builds a regex from the repository name. A partial
+// escape (dots only) would still work for `ghcr.io/metadist/synaplan` today,
+// but would misparse — or throw on — a line whose image differs by even one
+// regex metacharacter, silently or loudly breaking the release automation.
+test('the image-pin regex is not confused by a similar but different repository', () => {
+  const before = UMBREL_COMPOSE_SAMPLE.replace(
+    'ghcr.io/metadist/synaplan',
+    'ghcr.io/metadistXsynaplan'
+  )
+
+  const result = readUmbrelComposePin(before)
+
+  assert.equal(result.version, null)
+  assert.equal(result.digest, null)
+})
+
 // The guard against the failure that prompted this automation: a deployment
 // once aborted because the shipped manifest still carried a placeholder instead
 // of a published version.
@@ -121,6 +228,12 @@ test('the shipped files name one and the same released version', () => {
   const elestio = readElestioVersion(readFileSync(join(ROOT, 'elestio.yml'), 'utf8'))
   const example = readEnvExampleVersion(
     readFileSync(join(ROOT, 'deploy', 'selfhost.env.example'), 'utf8')
+  )
+  const umbrelApp = readUmbrelAppVersion(
+    readFileSync(join(ROOT, 'deploy', 'umbrel', 'synaplan', 'umbrel-app.yml'), 'utf8')
+  )
+  const umbrelCompose = readUmbrelComposePin(
+    readFileSync(join(ROOT, 'deploy', 'umbrel', 'synaplan', 'docker-compose.yml'), 'utf8')
   )
 
   assert.equal(
@@ -133,7 +246,31 @@ test('the shipped files name one and the same released version', () => {
     example,
     `deploy/selfhost.env.example must pin a released version, found ${JSON.stringify(example)}`
   )
-  assert.equal(elestio, example, 'both files must install the same version')
+  assert.equal(
+    parseReleaseVersion(umbrelApp),
+    umbrelApp,
+    `umbrel-app.yml must pin a released version, found ${JSON.stringify(umbrelApp)}`
+  )
+  assert.equal(
+    parseReleaseVersion(umbrelCompose.appVersion),
+    umbrelCompose.appVersion,
+    `umbrel docker-compose APP_VERSION must be a released version, found ${JSON.stringify(umbrelCompose.appVersion)}`
+  )
+  assert.equal(
+    parseReleaseVersion(umbrelCompose.version),
+    umbrelCompose.version,
+    `umbrel docker-compose image tag must be a released version, found ${JSON.stringify(umbrelCompose.version)}`
+  )
+  assert.equal(
+    parseImageDigest(umbrelCompose.digest),
+    umbrelCompose.digest,
+    `umbrel docker-compose image must pin a digest, found ${JSON.stringify(umbrelCompose.digest)}`
+  )
+
+  assert.equal(elestio, example, 'Elestio and self-host must install the same version')
+  assert.equal(elestio, umbrelApp, 'Umbrel store version must match Elestio')
+  assert.equal(elestio, umbrelCompose.appVersion, 'Umbrel APP_VERSION must match Elestio')
+  assert.equal(elestio, umbrelCompose.version, 'Umbrel image tag must match Elestio')
 })
 
 test('a comment mentioning the variable is not treated as an assignment', () => {
