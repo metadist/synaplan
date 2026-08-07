@@ -50,4 +50,4 @@ defaultUsername: "admin@umbrel.local"
 defaultPassword: ""
 deterministicPassword: true
 submitter: Metadist
-submission: https://github.com/getumbrel/umbrel-apps/pull/PENDING
+submission: https://github.com/getumbrel/umbrel-apps/pull/5962
