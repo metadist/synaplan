@@ -11,14 +11,18 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
- * Anthropic Claude Provider.
+ * Anthropic Claude Provider (used by Synaplan's internal chat pipeline).
  *
  * Supports:
  * - Chat (streaming and non-streaming)
  * - Vision/Image Analysis
  * - Extended Thinking (reasoning)
  * - System messages
- * - Tool use (function calling)
+ *
+ * Tool use / function calling is NOT implemented here. Claude Code and other
+ * Anthropic-protocol clients that need tools should use the Messages gateway
+ * at POST /v1/messages (AnthropicPassthroughTranslator), which forwards the
+ * request body verbatim — including tools — to the upstream Anthropic API.
  */
 class AnthropicProvider implements ChatProviderInterface, VisionProviderInterface
 {

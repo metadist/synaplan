@@ -120,7 +120,8 @@
     "addinConnect": "Outlook-Add-in verbinden",
     "accountDeletion": "Konto löschen",
     "onboarding": "Willkommen",
-    "mcpServers": "MCP-Server"
+    "mcpServers": "MCP-Server",
+    "aiAgents": "KI-Agenten"
   },
   "addinConnect": {
     "title": "Mit Synaplan verbinden",
@@ -554,7 +555,8 @@
     "adminProviderSetup": "KI-Anbieter",
     "more": "Mehr",
     "moreDescription": "Weitere Bereiche und Konto",
-    "menu": "Menü"
+    "menu": "Menü",
+    "aiAgents": "KI-Agenten"
   },
   "chatInput": {
     "attach": "Anhängen",
@@ -4387,5 +4389,51 @@
     "usageUpdateFailed": "Aufgabe konnte nicht aktualisiert werden",
     "usageAdvancedHint": "Weitere Optionen pro Aufgabe (Server-Einschränkungen, Anweisungen, Modelle):",
     "usageAdvancedLink": "KI-Anweisungen"
+  },
+  "messagesGateway": {
+    "title": "KI-Agenten",
+    "description": "Verbinden Sie Claude Code und andere Anthropic-kompatible Agenten-Tools mit Ihrem Synaplan-Arbeitsbereich. Anfragen gehen an POST /v1/messages und werden gegen Ihr Synaplan-Budget erfasst.",
+    "statusTitle": "Gateway-Status",
+    "statusEnabled": "Aktiviert",
+    "statusDisabled": "Deaktiviert",
+    "budgetLine": "Budget verbraucht: {percent}% ({used} von {budget})",
+    "setupTitle": "Claude-Code-Einrichtung",
+    "setupHint": "Richten Sie Claude Code auf diese Synaplan-Instanz. Verwenden Sie genau eine Credential-Variable — ANTHROPIC_API_KEY (x-api-key) oder ANTHROPIC_AUTH_TOKEN (Bearer).",
+    "copySetup": "Setup-Befehle kopieren",
+    "copySuccess": "Setup-Befehle kopiert",
+    "copyError": "Kopieren in die Zwischenablage fehlgeschlagen",
+    "keyTitle": "Anthropic-API-Schlüssel (eigener Schlüssel)",
+    "keyHint": "Verschlüsselt für Ihr Konto gespeichert. Wird verwendet, wenn das Gateway Anfragen an Anthropic weiterleitet.",
+    "keySource": "Aktiver Schlüssel",
+    "apiKeyLabel": "API-Schlüssel",
+    "saveKey": "Schlüssel speichern",
+    "clearKey": "Schlüssel entfernen",
+    "clearKeyConfirmTitle": "Anthropic-Schlüssel entfernen?",
+    "clearKeyConfirm": "Ihr persönlicher Anthropic-Schlüssel wird entfernt. Das Gateway funktioniert nur noch, wenn ein Operator-Schlüssel erlaubt und konfiguriert ist.",
+    "saveKeySuccess": "API-Schlüssel gespeichert",
+    "saveKeyError": "API-Schlüssel konnte nicht gespeichert werden",
+    "clearKeySuccess": "API-Schlüssel entfernt",
+    "clearKeyError": "API-Schlüssel konnte nicht entfernt werden",
+    "adminTitle": "Admin-Einstellungen",
+    "enableLabel": "Messages-Gateway für diese Instanz aktivieren",
+    "allowOperatorKeyLabel": "Operator-Anthropic-Schlüssel als Fallback erlauben (mit Vorsicht nutzen)",
+    "upstreamLabel": "Upstream-Anthropic-URL",
+    "upstreamWarning": "Alle Anbieter-Schlüssel werden an diesen Host gesendet. Nur ändern, wenn Sie das Risiko verstehen.",
+    "saveUpstream": "Upstream-URL speichern",
+    "upstreamSaved": "Upstream-URL gespeichert",
+    "upstreamError": "Upstream-URL konnte nicht gespeichert werden",
+    "aliasesLabel": "Modell-Aliase (JSON)",
+    "aliasesHint": "Mappt Claude-Code-Modell-IDs auf Synaplan-Katalog-IDs, z. B. {\"claude-sonnet-4-6\": \"claude-sonnet-4-5-20250929\"}.",
+    "saveAliases": "Aliase speichern",
+    "aliasesSaved": "Aliase gespeichert",
+    "aliasesError": "Aliase konnten nicht gespeichert werden (JSON prüfen)",
+    "flagsSaved": "Einstellungen gespeichert",
+    "flagsError": "Einstellungen konnten nicht gespeichert werden",
+    "loadError": "KI-Agenten-Einstellungen konnten nicht geladen werden",
+    "source": {
+      "user": "Ihr Schlüssel",
+      "operator": "Operator-Schlüssel",
+      "none": "Nicht konfiguriert"
+    }
   }
 }

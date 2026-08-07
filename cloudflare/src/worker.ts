@@ -16,6 +16,7 @@ const NO_CACHE_PATHS = ['/sw.js', '/site.webmanifest', '/widget.js']
 const SSE_PATH_PREFIXES = [
   '/api/v1/messages/stream',
   '/api/v1/notifications/stream',
+  '/v1/messages',
 ] as const
 const SSE_PATH_PATTERNS = [
   /^\/api\/v1\/widget\/[^/]+\/message$/,
