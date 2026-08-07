@@ -305,6 +305,7 @@
                     ? 'bg-[var(--brand)]/10 shadow-sm'
                     : 'hover:bg-white/5 dark:hover:bg-white/5',
                 ]"
+                data-testid="item-widget-session"
                 @click="viewSession(session)"
               >
                 <div class="flex items-start gap-3">
