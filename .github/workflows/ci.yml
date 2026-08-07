@@ -1370,12 +1370,30 @@ jobs:
           and verified.
           EOF
 
-          url="$(gh pr create \
+          # The branch above already carries the change, so the release itself is
+          # complete and verified at this point. Opening the proposal needs
+          # `Pull requests: write` on top of that, which the token does not
+          # necessarily carry: the release App is scoped to Contents, and
+          # GITHUB_TOKEN cannot open pull requests while the organization
+          # forbids it. Report the branch instead of marking a published release
+          # as failed — this step proposes a convenience, it does not gate.
+          error_file="$(mktemp)"
+          if url="$(gh pr create \
             --base "$BASE" \
             --head "$BRANCH" \
             --title "chore(release): install ${VERSION} in new deployments" \
-            --body-file "$body_file")"
-          echo "Opened ${url}" | tee -a "$GITHUB_STEP_SUMMARY"
+            --body-file "$body_file" 2>"$error_file")"; then
+            echo "Opened ${url}" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "::warning::Could not open the default-version pull request: $(tr '\n' ' ' < "$error_file")"
+          {
+            echo "Branch \`${BRANCH}\` was updated to \`${VERSION}\`, but its pull request could not be opened automatically."
+            echo ""
+            echo "Open it from [this comparison](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${BASE}...${BRANCH}?expand=1)," \
+              "or grant the release App \`Pull requests: write\` so the proposal opens by itself."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   cloudflare-deploy:
     name: Deploy Cloudflare Worker
