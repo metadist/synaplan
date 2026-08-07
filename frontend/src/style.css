@@ -442,8 +442,10 @@
     box-shadow: none;
   }
 
-  .bubble-user .markdown-content .code-block code,
-  .bubble-user .markdown-content pre code {
+  /* Plain (non-highlighted) code stays white on the dark bubble surface.
+     Syntax-highlighted blocks (.hljs) are owned by highlight-theme.css. */
+  .bubble-user .markdown-content .code-block code:not(.hljs),
+  .bubble-user .markdown-content pre code:not(.hljs) {
     color: #ffffff !important;
   }
 
@@ -1212,16 +1214,12 @@
     animation: fadeSlideIn 0.3s ease-out;
   }
 
-  /* Code Block — theme-aware surface; syntax colors live in highlight-theme.css */
+  /* Code Block — theme-aware surface; syntax colors live in highlight-theme.css.
+     Markup is <pre class="code-block"><code class="hljs">…</code></pre>. */
   .code-block {
     background: var(--bg-chip, rgba(0, 0, 0, 0.05)) !important;
     color: #383a42 !important;
     border-radius: 0.5rem;
-  }
-  .code-block pre {
-    margin: 0;
-    color: inherit !important;
-    background: transparent !important;
   }
   .dark .code-block {
     background: rgba(0, 0, 0, 0.5) !important;

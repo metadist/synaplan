@@ -97,9 +97,13 @@ code.hljs {
   text-decoration: underline;
 }
 
-/* ——— Dark mode + user-bubble code (dark translucent surface) ——— */
+/* ——— Dark mode + user-bubble code (dark translucent surface) ———
+   `.bubble-user .markdown-content code.hljs` matches the bubble code
+   specificity so non-token text keeps the dark palette. Token spans inherit
+   via the rules below; style.css leaves `.hljs` out of the forced-white rule. */
 .dark .hljs,
-.bubble-user .hljs {
+.bubble-user .hljs,
+.bubble-user .markdown-content code.hljs {
   color: #abb2bf;
   background: transparent;
 }
