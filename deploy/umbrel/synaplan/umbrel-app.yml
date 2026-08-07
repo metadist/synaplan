@@ -2,7 +2,7 @@ manifestVersion: 1
 id: synaplan
 category: ai
 name: Synaplan
-version: "4.0.13"
+version: "4.0.14"
 tagline: Private AI workspace with chat, document search and embeddable widgets
 description: >-
   Synaplan is a self-hosted AI workspace. Chat with the model of your choice,

@@ -17,10 +17,11 @@ over plain `http://<device>.local:<port>`, and up to and including 4.0.13
 Synaplan marks its auth cookies `Secure` whenever `APP_ENV=prod`. A browser
 never sends those back over HTTP, so the user logs in successfully and is
 anonymous again on the next request. `AuthCookieFactory` derives the flag from
-the `APP_URL` scheme instead; the first release containing it is the first
-release that can be offered here.
+the `APP_URL` scheme instead; **4.0.14 is the first release that can be offered
+here**, and the package is pinned to it.
 
-The release number appears in three places that have to move together:
+The release number appears in three places that have to move together on every
+later bump:
 
 - `docker-compose.yml` — the `x-app-image` tag **and** its `@sha256:` digest.
 - `docker-compose.yml` — `APP_VERSION`, which is what the admin UI displays.
@@ -36,8 +37,8 @@ release workflow runs on every tag, only knows `elestio.yml` and
 go through a `getumbrel/umbrel-apps` pull request anyway. Assume the numbers below
 are stale and check them against the latest release before every submission.
 
-Re-run the login check from *Testing* below against the raised pin: it is the
-one thing that cannot be verified on 4.0.13.
+Re-run the login check from *Testing* below against every raised pin: cookies
+must be issued without `Secure` over plain HTTP.
 
 ## What umbrelOS changes
 
