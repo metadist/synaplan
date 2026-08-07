@@ -1,12 +1,16 @@
 name: Mobile Release Artifacts
 
+# Publishing a GitHub release is the deliberate signal that a state should reach
+# the mobile apps. Tags alone (platform versioning, Docker images) no longer
+# start the chain: this workflow runs only on `release: published`, classifies
+# everything merged since the previously published release, and dispatches the
+# apps synchronization when the classification reaches the app.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  release:
+    types: [published]
 
 concurrency:
-  group: mobile-release-${{ github.event.workflow_run.head_sha }}
+  group: mobile-release-${{ github.event.release.tag_name }}
   cancel-in-progress: false
 
 permissions:
@@ -18,36 +22,51 @@ permissions:
 jobs:
   publish:
     name: Publish mobile manifest
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      startsWith(github.event.workflow_run.head_branch, 'v')
+    # Pre-releases are reserved for future canary work and never reach the apps.
+    if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     env:
-      RELEASE_TAG: ${{ github.event.workflow_run.head_branch }}
-      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
     steps:
-      - name: Checkout the tested release
+      - name: Checkout the released tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
-          # This workflow_run job checks out the release commit (privileged
-          # context) and runs tooling from it, so never leave the base-repo
-          # token in .git/config. All git use here is read-only; authenticated
-          # calls use an explicit token via `gh api`.
+          # This job checks out the release commit (privileged context) and runs
+          # tooling from it, so never leave the base-repo token in .git/config.
+          # All git use here is read-only; authenticated calls use an explicit
+          # token via `gh api`.
           persist-credentials: false
 
-      - name: Verify the immutable release tag
+      - name: Resolve and verify the release tag
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9]+){1,2}([+-][0-9A-Za-z.-]+)?$ ]]
-          test "$(git rev-list -n 1 "$RELEASE_TAG")" = "$RELEASE_SHA"
+          echo "RELEASE_SHA=$(git rev-list -n 1 "$RELEASE_TAG")" >> "$GITHUB_ENV"
+
+      - name: Require a green CI run for the release commit
+        id: ci-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # A release can be published on any tag, so nothing guarantees the
+          # commit passed CI. Refuse to ship an unverified commit, and reuse the
+          # successful run as the source of the commit-matching OpenAPI artifact.
+          run_id="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${RELEASE_SHA}&status=success&per_page=50" \
+            --jq '[.workflow_runs[] | select(.name == "CI" and .event == "push")] | first | .id // empty')"
+          if [ -z "$run_id" ]; then
+            echo "::error::No successful CI run exists for ${RELEASE_SHA} — refusing to release an unverified commit."
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
 
       - name: Download commit-matching OpenAPI artifact
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ID: ${{ steps.ci-run.outputs.run_id }}
         run: |
           set -euo pipefail
           mkdir -p mobile-release
@@ -56,23 +75,50 @@ jobs:
               --jq '.artifacts[] | select(.name == "openapi-spec" and .expired == false) | .id' |
               head -n 1
           )"
-          test -n "$artifact_id"
+          if [ -z "$artifact_id" ]; then
+            echo "::error::The CI run for ${RELEASE_SHA} carries no unexpired openapi-spec artifact. Re-run CI for this commit and publish the release again."
+            exit 1
+          fi
           gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > /tmp/openapi.zip
           unzip -q /tmp/openapi.zip -d mobile-release
           test -s mobile-release/openapi-spec.json
 
-      - name: Generate mobile release manifest
-        id: manifest
+      - name: Resolve the previously published release
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          previous_tag=''
+          # The classification aggregates everything since the last release that
+          # actually reached this chain, so the diff base is the newest published
+          # (non-draft, non-prerelease) release whose commit is an ancestor —
+          # not just the newest tag, because tags alone no longer ship.
+          base_ref=''
           while IFS= read -r candidate; do
-            previous_tag="$candidate"
-            break
-          done < <(git tag --merged "${RELEASE_SHA}^" --list 'v*' --sort=-version:refname)
-          base_ref="${previous_tag:-$(git rev-list --max-parents=0 "$RELEASE_SHA")}"
+            [ "$candidate" = "$RELEASE_TAG" ] && continue
+            candidate_sha="$(git rev-list -n 1 "$candidate" 2>/dev/null || true)"
+            [ -z "$candidate_sha" ] && continue
+            [ "$candidate_sha" = "$RELEASE_SHA" ] && continue
+            if git merge-base --is-ancestor "$candidate_sha" "$RELEASE_SHA"; then
+              base_ref="$candidate"
+              break
+            fi
+          done < <(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')
+          if [ -z "$base_ref" ]; then
+            base_ref="$(git rev-list --max-parents=0 "$RELEASE_SHA")"
+          fi
+          echo "base_ref=$base_ref" >> "$GITHUB_OUTPUT"
+          echo "Classifying ${RELEASE_TAG} against ${base_ref}." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate mobile release manifest
+        id: manifest
+        env:
+          BASE_REF: ${{ steps.previous.outputs.base_ref }}
+        run: |
+          set -euo pipefail
           node scripts/mobile-impact.mjs \
-            --base "$base_ref" \
+            --base "$BASE_REF" \
             --head "$RELEASE_SHA" \
             --tag "$RELEASE_TAG" \
             --api-contract mobile-release/openapi-spec.json \
