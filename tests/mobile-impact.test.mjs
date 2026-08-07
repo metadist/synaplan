@@ -34,29 +34,40 @@ test('classifies allow-listed internal backend files as backend-only', () => {
   )
 })
 
-test('classifies styling, translations, assets, and presentational icons as ota-candidate', () => {
-  const result = classifyFiles([
-    entry('frontend/src/views/ChatView.styles.css'),
-    entry('frontend/src/i18n/de.json'),
-    entry('frontend/src/assets/logo.svg'),
-    entry('frontend/src/components/icons/ProviderIcon.vue')
-  ], policy)
+test('classifies web-layer application code and assets as ota-candidate', () => {
+  const paths = [
+    'frontend/src/views/ChatView.styles.css',
+    'frontend/src/i18n/de.json',
+    'frontend/src/assets/logo.svg',
+    'frontend/src/components/icons/ProviderIcon.vue',
+    'frontend/src/components/ChatComposer.vue',
+    'frontend/src/composables/useNewFeature.ts',
+    'frontend/src/router/index.ts',
+    'frontend/src/generated/api-schemas.ts',
+    'frontend/index.html',
+    'frontend/package.json',
+    'frontend/package-lock.json',
+    'frontend/vite.config.ts',
+    'frontend/tailwind.config.js'
+  ]
 
-  assert.equal(result.classification, 'ota-candidate')
+  for (const path of paths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'ota-candidate', path)
+  }
 })
 
-test('classifies mobile contracts and dependencies as store-required', () => {
+test('classifies mobile contracts and native seams as store-required', () => {
   const paths = [
     'frontend/src/services/nativeIap.ts',
+    'frontend/src/services/iapPostAuthRedemption.ts',
     'frontend/src/stores/auth.ts',
-    'frontend/src/router/index.ts',
     'frontend/src/stores/config.ts',
     'frontend/src/services/api/nativeRuntime.ts',
-    'frontend/src/generated/api-schemas.ts',
     'frontend/public/sw.js',
-    'frontend/package.json',
-    'backend/src/Service/Client/MobileVersionService.php',
-    'backend/src/Controller/ConfigController.php'
+    'package.json',
+    'package-lock.json',
+    'capacitor.config.ts',
+    'backend/src/Service/Client/MobileVersionService.php'
   ]
 
   for (const path of paths) {
@@ -64,28 +75,30 @@ test('classifies mobile contracts and dependencies as store-required', () => {
   }
 })
 
-test('classifies the four release-critical categories as store-required', () => {
+test('classifies the release-critical categories as store-required', () => {
   const categories = {
-    'in-app purchases': [
+    'in-app purchases and payments': [
       'frontend/src/services/purchases.ts',
       'frontend/src/components/subscription/PaywallModal.vue',
-      'backend/src/Service/SubscriptionService.php',
-      'backend/src/Service/StripeCheckoutService.php'
+      'frontend/src/composables/useSubscriptionPurchase.ts',
+      'frontend/src/views/SubscriptionView.vue',
+      'frontend/src/components/StripeCheckoutButton.vue'
     ],
-    'device permissions': [
-      'frontend/src/composables/useCameraCapture.ts',
+    'native projects': [
       'android/app/src/main/AndroidManifest.xml',
-      'ios/App/App/Info.plist'
+      'ios/App/App/Info.plist',
+      'ios/App/App/PrivacyInfo.xcprivacy'
     ],
     'authentication transport': [
       'frontend/src/services/authService.ts',
       'frontend/src/utils/pendingAuthRedirect.ts',
-      'backend/config/packages/security.yaml'
+      'frontend/src/components/auth/OAuthCallback.vue',
+      'frontend/src/composables/useSocialAuth.ts'
     ],
-    privacy: [
-      'ios/App/App/PrivacyInfo.xcprivacy',
+    'update mechanism': [
       'frontend/public/site.webmanifest',
-      'frontend/src/services/otaUpdates.ts'
+      'frontend/src/services/otaUpdates.ts',
+      'frontend/src/registerServiceWorker.ts'
     ]
   }
 
@@ -98,31 +111,6 @@ test('classifies the four release-critical categories as store-required', () => 
       )
     }
   }
-})
-
-test('executable code never qualifies as an over-the-air asset', () => {
-  const executableAssets = [
-    'frontend/src/assets/tracking.ts',
-    'frontend/src/assets/vendor/analytics.js',
-    'frontend/src/components/icons/iconRegistry.ts',
-    'frontend/src/assets/embed.html'
-  ]
-
-  for (const path of executableAssets) {
-    const result = classifyFiles([entry(path, 'A')], policy)
-    assert.equal(result.classification, 'store-required', path)
-    // The manifest must name the exclusion rather than claim the path was
-    // never allow-listed — it is, and is held back for being executable.
-    assert.equal(result.reasons[0].reason, policy.otaCandidate.excludedReason, path)
-  }
-
-  assert.equal(
-    classifyFiles([
-      entry('frontend/src/assets/logo.svg'),
-      entry('frontend/src/components/icons/ProviderIcon.vue')
-    ], policy).classification,
-    'ota-candidate'
-  )
 })
 
 test('release and classification tooling does not trigger an app release', () => {
@@ -139,7 +127,7 @@ test('release and classification tooling does not trigger an app release', () =>
   }
 })
 
-test('local development, container, and test tooling does not trigger an app release', () => {
+test('local development, deployment, and test tooling does not trigger an app release', () => {
   const toolingPaths = [
     '_docker/backend/Dockerfile',
     '_docker/backend/docker-entrypoint.sh',
@@ -148,11 +136,22 @@ test('local development, container, and test tooling does not trigger an app rel
     '_1st_install_linux.sh',
     'docker-compose.yml',
     'docker-compose.test.yml',
-    'backend/.env.example',
-    'backend/phpstan-baseline.neon',
-    'backend/phpunit.xml.dist',
+    'deploy/compose.yaml',
+    'deploy/scripts/selfhost.sh',
+    'cloudflare/src/index.ts',
+    'elestio.yml',
+    'server.json',
+    'renovate.json5',
+    'LICENSE',
+    'Makefile',
+    '.editorconfig',
+    '.vscode/settings.json',
+    'scripts/resolve-app-version.mjs',
+    'tests/mobile-impact.test.mjs',
     'frontend/tests/unit/setup.ts',
-    'frontend/tests/e2e/tests/memories.spec.ts'
+    'frontend/tests/e2e/tests/memories.spec.ts',
+    'frontend/eslint.config.js',
+    'frontend/.prettierrc'
   ]
 
   for (const path of toolingPaths) {
@@ -160,37 +159,28 @@ test('local development, container, and test tooling does not trigger an app rel
   }
 })
 
-test('classifies server-side configuration, migrations, and providers as backend-only', () => {
+test('classifies all server-side code and server-delivered plugins as backend-only', () => {
   const backendPaths = [
     'backend/config/packages/messenger.yaml',
+    'backend/config/packages/security.yaml',
     'backend/config/services.yaml',
     'backend/migrations/Version20260729120000.php',
     'backend/src/AI/Provider/OpenAIProvider.php',
+    'backend/src/Controller/ConfigController.php',
+    'backend/src/Controller/OpenApiController.php',
     'backend/src/DTO/UserMemoryDTO.php',
     'backend/src/Model/ModelCatalog.php',
-    'backend/src/Prompt/PromptCatalog.php'
+    'backend/src/Prompt/PromptCatalog.php',
+    'backend/src/Service/SubscriptionService.php',
+    'backend/src/Service/StripeCheckoutService.php',
+    'backend/composer.json',
+    'backend/.env.example',
+    'plugins/synamail/frontend/index.js',
+    'plugins/synamail/backend/Controller/ProfileController.php'
   ]
 
   for (const path of backendPaths) {
     assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'backend-only', path)
-  }
-})
-
-test('security, mobile, and payment implementations stay store-required by an explicit rule', () => {
-  const guardedPaths = [
-    'backend/config/packages/security.yaml',
-    'backend/src/Service/MobilePurchaseService.php',
-    'backend/src/AI/Service/StripeBillingBridge.php',
-    'frontend/package.json',
-    'frontend/package-lock.json'
-  ]
-
-  for (const path of guardedPaths) {
-    const result = classifyFiles([entry(path, 'M')], policy)
-    assert.equal(result.classification, 'store-required', path)
-    // A named rule must catch these, otherwise the manifest only reports that
-    // the path was never allow-listed and hides why the release is gated.
-    assert.equal(result.reasons[0].reason, policy.storeRequired.reason, path)
   }
 })
 
@@ -207,17 +197,17 @@ test('uses the highest classification for mixed changes', () => {
 
   assert.equal(classifyFiles([
     entry('frontend/src/style.css'),
-    entry('frontend/src/router/index.ts')
+    entry('frontend/src/services/nativeIap.ts')
   ], policy).classification, 'store-required')
 })
 
-test('fails closed for unknown frontend and repository paths', () => {
+test('fails closed for unknown repository paths', () => {
   assert.equal(
-    classifyFiles([entry('frontend/src/composables/useNewFeature.ts')], policy).classification,
+    classifyFiles([entry('new-tool/config.json', 'A')], policy).classification,
     'store-required'
   )
   assert.equal(
-    classifyFiles([entry('new-tool/config.json', 'A')], policy).classification,
+    classifyFiles([entry('sdk/index.ts', 'A')], policy).classification,
     'store-required'
   )
 })

@@ -113,14 +113,24 @@ mobile support a narrow, reviewable compatibility layer:
   mobile client or explicit configuration. API and runtime-config changes are additive, optional,
   and have safe defaults.
 - Classify every change before release:
-  - **backend-only** — no bundled SPA/native-shell effect; deploy through the normal platform path.
-  - **ota-candidate** — web-asset-only fix within already reviewed behavior; release only from
-    `synaplan-apps` under its OTA policy.
-  - **store-required** — native code, plugins, permissions, privacy declarations, IAP/entitlements,
-    authentication transport, or material behavior changes.
-- Treat these as mobile-risk paths: runtime config/OpenAPI, auth/OAuth and Bearer handling,
-  SSE/WebSocket setup, subscription/IAP and entitlement logic, native guards/bootstrap,
-  onboarding/routing, forced updates, and Capacitor-facing services.
+  - **backend-only** — server-side code and server-delivered plugins (`backend/**`, `plugins/**`);
+    deploy through the normal platform path, no app delivery.
+  - **ota-candidate** — web-layer changes in `frontend/**` (application code, styles, i18n, assets,
+    generated schemas, web dependencies); ships over the air from `synaplan-apps` under its OTA
+    policy (Apple ADPLA 3.3.2 permits interpreted WebView code).
+  - **store-required** — native projects, plugins, permissions, privacy declarations,
+    IAP/payments/entitlements, authentication transport, native seams, forced-update logic, or the
+    update mechanism itself.
+- **Ship as little as possible through Apple**: prefer `ota-candidate`/`backend-only`;
+  `store-required` is reserved for the categories above, never for ordinary frontend or backend work.
+- **Classify new files and paths in the same PR**: add them to the matching allow-list in
+  `.github/mobile-impact-policy.json` (unlisted paths fail closed to `store-required`), extend
+  `tests/mobile-impact.test.mjs`, and verify with
+  `node scripts/mobile-impact.mjs --base <base> --head <head>`.
+- The app release chain starts only when a GitHub release is **published**
+  (`mobile-release-artifacts.yml`); tags alone feed the platform release jobs.
+- Treat these as mobile-risk paths: auth/OAuth and Bearer handling, subscription/IAP and
+  entitlement logic, native guards/bootstrap, forced updates, and Capacitor-facing services.
 - Run the complete backend/frontend gate for every affected area. For OpenAPI changes, regenerate
   schemas, run `vue-tsc`, and verify that the app build consumes the same generated contract.
 - This public repository never publishes OTA bundles and must not contain private app-signing,

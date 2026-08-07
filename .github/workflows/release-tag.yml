@@ -1,14 +1,15 @@
-name: Tag Mobile Release
+name: Cut Release Tag
 
-# Cuts a release tag for `main` on request, which starts the mobile release
-# chain in metadist/synaplan-apps. Everything after the tag runs unattended:
-# the pin update, its pull request, and the over-the-air or store delivery.
+# Cuts a release tag for `main` on request and prepares a DRAFT GitHub release
+# with generated notes. The tag alone only feeds the platform release jobs
+# (Docker images, version pins); the mobile release chain in
+# metadist/synaplan-apps starts when the draft release is PUBLISHED, which is
+# the deliberate "release" decision (`mobile-release-artifacts.yml`).
 #
-# Releasing is deliberate rather than per-merge. The classifier is fail-closed,
-# so a large share of merges lands on the store path, and tagging each one would
-# produce a stream of review candidates and burn a patch version per merge. One
-# tag collects everything merged since the previous release, because the
-# classification is computed against the last release tag, not the last commit.
+# The mobile classification is computed here purely as information for the
+# summary — it no longer gates the tag, because the authoritative
+# classification happens at publish time against the previously published
+# release.
 #
 # By default the tip of the default branch is released. The `commit` input
 # selects an earlier commit on that branch, for when the tip carries work that
@@ -16,7 +17,7 @@ name: Tag Mobile Release
 #
 # The tag is created through a GitHub App installation token on purpose. Refs
 # created with the default GITHUB_TOKEN do not start new workflow runs, so the
-# tag would never reach CI and `mobile-release-artifacts.yml` would not publish.
+# tag would never reach CI and the platform release jobs would not run.
 
 on:
   workflow_dispatch:
@@ -119,10 +120,14 @@ jobs:
           set -euo pipefail
           # The previous workflow_run trigger guaranteed this implicitly. Started
           # by hand, nothing stops a release from a red commit, so verify that
-          # this exact commit passed CI on a branch push.
-          green="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&status=success" \
-            --jq '[.workflow_runs[] | select(.name == "CI" and .event == "push")] | length')"
+          # this exact commit passed CI on a branch push. The API filters on
+          # head_sha, but it ignores an unknown query parameter silently, so the
+          # commit is matched again on the returned runs.
+          green="$(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&status=success&per_page=100" |
+              jq --arg sha "$HEAD_SHA" \
+                '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .head_sha == $sha)] | length'
+          )"
           if [ "$green" -eq 0 ]; then
             echo "::error::No successful CI run exists for ${HEAD_SHA} — refusing to release an unverified commit."
             exit 1
@@ -153,6 +158,10 @@ jobs:
             break
           done < <(git tag --merged "$HEAD_SHA" --list 'v*' --sort=-version:refname)
           base_ref="${previous_tag:-$(git rev-list --max-parents=0 "$HEAD_SHA")}"
+          # The classification is informational only: it previews the mobile
+          # route, but the tag is always created. The binding classification is
+          # computed by mobile-release-artifacts.yml when the release is
+          # published, against the previously PUBLISHED release.
           node scripts/mobile-impact.mjs \
             --base "$base_ref" \
             --head "$HEAD_SHA" \
@@ -160,13 +169,8 @@ jobs:
           classification="$(jq -r '.classification' mobile-impact-manifest.json)"
           echo "classification=$classification" >> "$GITHUB_OUTPUT"
           echo "previous=${previous_tag:-none}" >> "$GITHUB_OUTPUT"
-          if [[ "$classification" == "ota-candidate" || "$classification" == "store-required" ]]; then
-            echo "needs_tag=true" >> "$GITHUB_OUTPUT"
-            echo "tag=$(node scripts/next-release-tag.mjs)" >> "$GITHUB_OUTPUT"
-          else
-            echo "needs_tag=false" >> "$GITHUB_OUTPUT"
-            echo "reason=Classification \`${classification}\` does not reach the app." >> "$GITHUB_OUTPUT"
-          fi
+          echo "needs_tag=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$(node scripts/next-release-tag.mjs)" >> "$GITHUB_OUTPUT"
 
       - name: Report the plan
         if: steps.classify.outputs.needs_tag == 'true'
@@ -178,8 +182,12 @@ jobs:
           {
             echo "Release \`$RELEASE_TAG\` tags \`${HEAD_SHA}\` and collects everything since \`$PREVIOUS\`."
             echo ""
-            echo "Classification: \`$CLASSIFICATION\` —" \
-              "$([ "$CLASSIFICATION" = 'ota-candidate' ] && echo 'ships over the air' || echo 'needs a store review')."
+            case "$CLASSIFICATION" in
+              ota-candidate) route='ships over the air once the draft release is published' ;;
+              store-required) route='builds a store release candidate once the draft release is published' ;;
+              *) route='does not reach the app; publishing the draft release only records the platform version' ;;
+            esac
+            echo "Mobile classification preview since the last tag: \`$CLASSIFICATION\` — ${route}."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create tagging token
@@ -203,9 +211,28 @@ jobs:
             -f "sha=${HEAD_SHA}"
           echo "Tagged \`${HEAD_SHA}\` as \`${RELEASE_TAG}\`." | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Create the draft release
+        if: steps.classify.outputs.needs_tag == 'true' && !inputs.dry_run
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_TAG: ${{ steps.classify.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Publishing this draft is the deliberate release decision: it starts
+          # mobile-release-artifacts.yml, which classifies everything since the
+          # previously published release and routes it (OTA, store, or nothing).
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --verify-tag \
+            --generate-notes \
+            --title "Synaplan ${RELEASE_TAG}"
+          echo "Draft release \`${RELEASE_TAG}\` created — publish it to start the mobile release chain." |
+            tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Report a dry run
         if: steps.classify.outputs.needs_tag == 'true' && inputs.dry_run
-        run: echo "Dry run — no tag was created." | tee -a "$GITHUB_STEP_SUMMARY"
+        run: echo "Dry run — no tag and no draft release were created." | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Report skipped tag
         if: steps.classify.outputs.needs_tag == 'false'
