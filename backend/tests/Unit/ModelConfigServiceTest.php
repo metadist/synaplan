@@ -3,6 +3,7 @@
 namespace App\Tests\Unit;
 
 use App\AI\Interface\ProviderMetadataInterface;
+use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\Model;
@@ -26,6 +27,7 @@ class ModelConfigServiceTest extends TestCase
     private UserRepository&MockObject $userRepository;
     private CacheItemPoolInterface&MockObject $cache;
     private ProviderRegistry&MockObject $providerRegistry;
+    private OllamaModelInventory&MockObject $ollamaModelInventory;
     private ModelConfigService $service;
     private CacheItemInterface&MockObject $cacheItem;
 
@@ -42,12 +44,15 @@ class ModelConfigServiceTest extends TestCase
         $this->providerRegistry->method('getAvailableProviders')
             ->willReturn(['openai', 'groq']);
 
+        $this->ollamaModelInventory = $this->createMock(OllamaModelInventory::class);
+
         $this->service = new ModelConfigService(
             $this->configRepository,
             $this->modelRepository,
             $this->userRepository,
             $this->cache,
-            $this->providerRegistry
+            $this->providerRegistry,
+            $this->ollamaModelInventory
         );
     }
 
@@ -278,19 +283,64 @@ class ModelConfigServiceTest extends TestCase
     }
 
     /**
-     * @param array<int, string> $servicesByModelId
+     * Ollama reports itself available as soon as the server answers, which a
+     * stock install does while holding nothing but the embedding model. Falling
+     * back to a local model nobody downloaded would trade one dead binding for
+     * another — and discard the user's choice on the way.
      */
-    private function givenModels(array $servicesByModelId): void
+    public function testGetDefaultModelKeepsTheUserOverrideWhenTheGlobalOllamaModelIsNotPulled(): void
+    {
+        $this->givenModels([249 => 'Anthropic', 77 => 'Ollama'], [77 => 'llama3']);
+        $this->givenUsableProviders(['ollama']);
+        $this->givenDefaultModelRows([1 => 249, 0 => 77]);
+
+        $this->ollamaModelInventory->method('isPulled')->with('llama3')->willReturn(false);
+
+        self::assertSame(249, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    public function testGetDefaultModelFallsBackToAnOllamaModelThatIsPulled(): void
+    {
+        $this->givenModels([249 => 'Anthropic', 77 => 'Ollama'], [77 => 'llama3']);
+        $this->givenUsableProviders(['ollama']);
+        $this->givenDefaultModelRows([1 => 249, 0 => 77]);
+
+        $this->ollamaModelInventory->method('isPulled')->with('llama3')->willReturn(true);
+
+        self::assertSame(77, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * The mirror image: a user who deliberately bound chat to a local model
+     * keeps it, and only loses it while that model is absent.
+     */
+    public function testGetDefaultModelSkipsAUserOverrideWhoseOllamaModelIsNotPulled(): void
+    {
+        $this->givenModels([77 => 'Ollama', 9 => 'Groq'], [77 => 'llama3']);
+        $this->givenUsableProviders(['ollama', 'groq']);
+        $this->givenDefaultModelRows([1 => 77, 0 => 9]);
+
+        $this->ollamaModelInventory->method('isPulled')->with('llama3')->willReturn(false);
+
+        self::assertSame(9, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * @param array<int, string> $servicesByModelId
+     * @param array<int, string> $providerIdsByModelId
+     */
+    private function givenModels(array $servicesByModelId, array $providerIdsByModelId = []): void
     {
         $this->modelRepository
             ->method('find')
-            ->willReturnCallback(function (int $modelId) use ($servicesByModelId): ?Model {
+            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId): ?Model {
                 if (!isset($servicesByModelId[$modelId])) {
                     return null;
                 }
 
                 $model = $this->createMock(Model::class);
                 $model->method('getService')->willReturn($servicesByModelId[$modelId]);
+                $model->method('getProviderId')->willReturn($providerIdsByModelId[$modelId] ?? '');
 
                 return $model;
             });

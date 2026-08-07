@@ -589,6 +589,13 @@ services:
         arguments:
             $cache: '@cache.model_config'
 
+    # Same pool again: readiness reporting and model resolution both decide
+    # whether a local model can serve a request from this inventory, so it must
+    # be dropped by the same clear that drops their other cached lookups.
+    App\AI\Service\OllamaModelInventory:
+        arguments:
+            $cache: '@cache.model_config'
+
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\InternalEmailService: ~
 

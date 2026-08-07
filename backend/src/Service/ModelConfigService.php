@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Message;
 use App\Entity\User;
@@ -27,6 +28,7 @@ final readonly class ModelConfigService
         private UserRepository $userRepository,
         private CacheItemPoolInterface $cache,
         private ProviderRegistry $providerRegistry,
+        private OllamaModelInventory $ollamaModelInventory,
         private string $environment = 'prod',
     ) {
     }
@@ -401,13 +403,18 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Can the provider behind this model be used right now?
+     * Can this model actually serve a request right now?
      *
-     * Deliberately answers the provider-level question ("are there working
-     * credentials") rather than "does it serve this capability": the capability
-     * is already encoded in the binding, and a per-capability mapping of the
-     * DEFAULTMODEL settings onto registry capabilities would be one more thing
-     * to keep in sync for no gain.
+     * Answers the provider-level question ("are there working credentials")
+     * rather than "does it serve this capability": the capability is already
+     * encoded in the binding, and a per-capability mapping of the DEFAULTMODEL
+     * settings onto registry capabilities would be one more thing to keep in
+     * sync for no gain.
+     *
+     * Ollama is the exception that has to be model-aware. Its provider reports
+     * itself available as soon as the server answers, which a stock install
+     * does while holding nothing but the embedding model — so a provider-level
+     * answer would happily route chat at a model nobody downloaded.
      *
      * Unknown models — the negative placeholder BIDs of the test catalog, or a
      * binding left behind by a catalog reshuffle — count as usable so this
@@ -429,7 +436,13 @@ final readonly class ModelConfigService
             return true;
         }
 
-        return in_array(strtolower($model->getService()), $usable, true);
+        $service = strtolower($model->getService());
+
+        if (!in_array($service, $usable, true)) {
+            return false;
+        }
+
+        return 'ollama' !== $service || $this->ollamaModelInventory->isPulled($model->getProviderId());
     }
 
     /**

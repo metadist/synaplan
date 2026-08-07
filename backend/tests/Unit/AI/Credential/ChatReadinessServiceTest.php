@@ -6,6 +6,7 @@ namespace App\Tests\Unit\AI\Credential;
 
 use App\AI\Credential\ChatReadinessService;
 use App\AI\Credential\ProviderDefaultsService;
+use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\Model;
@@ -49,12 +50,15 @@ class ChatReadinessServiceTest extends TestCase
 
     private function service(): ChatReadinessService
     {
+        $ollamaModelInventory = new OllamaModelInventory($this->providerRegistry, new ArrayAdapter());
+
         $modelConfigService = new ModelConfigService(
             $this->configRepository,
             $this->modelRepository,
             $this->createMock(UserRepository::class),
             new ArrayAdapter(),
             $this->providerRegistry,
+            $ollamaModelInventory,
             'test',
         );
 
@@ -63,6 +67,7 @@ class ChatReadinessServiceTest extends TestCase
             new ProviderDefaultsService($this->configRepository, new ArrayAdapter(), new NullLogger()),
             $modelConfigService,
             $this->modelRepository,
+            $ollamaModelInventory,
             new ArrayAdapter(),
             new NullLogger(),
         );
