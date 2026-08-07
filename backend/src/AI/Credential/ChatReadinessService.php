@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Credential;
 
-use App\AI\Provider\OllamaProvider;
+use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
 use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
@@ -31,6 +31,7 @@ final class ChatReadinessService
         private readonly ProviderDefaultsService $defaults,
         private readonly ModelConfigService $modelConfigService,
         private readonly ModelRepository $modelRepository,
+        private readonly OllamaModelInventory $ollamaModelInventory,
         private readonly CacheItemPoolInterface $cache,
         private readonly LoggerInterface $logger,
     ) {
@@ -119,16 +120,10 @@ final class ChatReadinessService
 
     /**
      * Whether a concrete model is pulled on the local Ollama server.
-     *
-     * OllamaProvider::isAvailable() only proves the server answers — a stock
-     * install has a reachable Ollama holding nothing but the embedding model, so
-     * anything that may route work there must check the concrete model.
      */
     public function isOllamaModelPulled(string $model): bool
     {
-        $provider = $this->ollamaProvider();
-
-        return null !== $provider && $provider->hasModel($model);
+        return $this->ollamaModelInventory->isPulled($model);
     }
 
     /**
@@ -159,10 +154,16 @@ final class ChatReadinessService
     /**
      * Drop the cached snapshot — call after a key was saved or removed so the
      * setup banner reacts to the change immediately.
+     *
+     * Model resolution keeps its own snapshot of which providers have
+     * credentials, for the same reason and with the same lifetime. Clearing it
+     * from here keeps "a key changed" a single call for every caller instead of
+     * something each one has to remember twice.
      */
     public function invalidate(): void
     {
         $this->cache->deleteItem(self::CACHE_KEY);
+        $this->modelConfigService->invalidateUsableProviders();
     }
 
     /**
@@ -242,16 +243,5 @@ final class ChatReadinessService
         $model = $this->modelRepository->find($bid);
 
         return null !== $model && $this->isOllamaModelPulled($model->getProviderId());
-    }
-
-    private function ollamaProvider(): ?OllamaProvider
-    {
-        foreach ($this->providerRegistry->getUniqueProviders() as $name => $provider) {
-            if ('ollama' === strtolower((string) $name) && $provider instanceof OllamaProvider) {
-                return $provider;
-            }
-        }
-
-        return null;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Message;
 use App\Entity\User;
@@ -18,12 +19,16 @@ use Psr\Cache\CacheItemPoolInterface;
  */
 final readonly class ModelConfigService
 {
+    private const USABLE_PROVIDERS_CACHE_KEY = 'model_config.usable_providers';
+    private const USABLE_PROVIDERS_CACHE_TTL_SECONDS = 60;
+
     public function __construct(
         private ConfigRepository $configRepository,
         private ModelRepository $modelRepository,
         private UserRepository $userRepository,
         private CacheItemPoolInterface $cache,
         private ProviderRegistry $providerRegistry,
+        private OllamaModelInventory $ollamaModelInventory,
         private string $environment = 'prod',
     ) {
     }
@@ -351,34 +356,138 @@ final readonly class ModelConfigService
      *
      * Priority: User Config > Global Config > null.
      * In test env, ConfigFixtures seeds global defaults pointing to TestProvider models.
+     *
+     * A per-user binding whose provider currently has no credentials is skipped
+     * in favour of the global default. {@see resetUserDefaults()} writes the
+     * code-recommended bindings when an account is created, without knowing
+     * which providers this install can actually reach, while the key-save path
+     * only ever repairs the global row. Installs that receive their first API
+     * key AFTER the first account exists — every App Store or appliance
+     * install, where the operator logs in before configuring anything — would
+     * otherwise keep routing that user at a provider they never configured.
+     * The override stays stored and takes effect again as soon as its provider
+     * has credentials.
      */
     public function getDefaultModel(string $capability, ?int $userId = null): ?int
     {
-        // Try user-specific config first
-        if ($userId) {
-            $config = $this->configRepository->findOneBy([
-                'ownerId' => $userId,
-                'group' => 'DEFAULTMODEL',
-                'setting' => strtoupper($capability),
-            ]);
+        $setting = strtoupper($capability);
 
-            if ($config) {
-                return (int) $config->getValue();
+        if ($userId) {
+            $userModelId = $this->readDefaultModel($userId, $setting);
+
+            if (null !== $userModelId) {
+                if ($this->isModelProviderUsable($userModelId)) {
+                    return $userModelId;
+                }
+
+                $globalModelId = $this->readDefaultModel(0, $setting);
+
+                return null !== $globalModelId && $this->isModelProviderUsable($globalModelId)
+                    ? $globalModelId
+                    : $userModelId;
             }
         }
 
-        // Fall back to global config
+        return $this->readDefaultModel(0, $setting);
+    }
+
+    private function readDefaultModel(int $ownerId, string $setting): ?int
+    {
         $config = $this->configRepository->findOneBy([
-            'ownerId' => 0,
+            'ownerId' => $ownerId,
             'group' => 'DEFAULTMODEL',
-            'setting' => strtoupper($capability),
+            'setting' => $setting,
         ]);
 
-        if ($config) {
-            return (int) $config->getValue();
+        return $config ? (int) $config->getValue() : null;
+    }
+
+    /**
+     * Can this model actually serve a request right now?
+     *
+     * Answers the provider-level question ("are there working credentials")
+     * rather than "does it serve this capability": the capability is already
+     * encoded in the binding, and a per-capability mapping of the DEFAULTMODEL
+     * settings onto registry capabilities would be one more thing to keep in
+     * sync for no gain.
+     *
+     * Ollama is the exception that has to be model-aware. Its provider reports
+     * itself available as soon as the server answers, which a stock install
+     * does while holding nothing but the embedding model — so a provider-level
+     * answer would happily route chat at a model nobody downloaded.
+     *
+     * Unknown models — the negative placeholder BIDs of the test catalog, or a
+     * binding left behind by a catalog reshuffle — count as usable so this
+     * check never becomes the reason a configured default is dropped.
+     */
+    private function isModelProviderUsable(int $modelId): bool
+    {
+        $model = $this->modelRepository->find($modelId);
+        if (!$model) {
+            return true;
         }
 
-        return null;
+        $usable = $this->usableProviders();
+
+        // An empty set means "cannot tell" (no providers registered at all),
+        // never "nothing works" — falling back on that basis would replace a
+        // configured binding with an equally unusable one.
+        if ([] === $usable) {
+            return true;
+        }
+
+        $service = strtolower($model->getService());
+
+        if (!in_array($service, $usable, true)) {
+            return false;
+        }
+
+        return 'ollama' !== $service || $this->ollamaModelInventory->isPulled($model->getProviderId());
+    }
+
+    /**
+     * Drop the cached provider snapshot so a key that was just saved or removed
+     * takes effect on the very next model resolution. The admin UI promises the
+     * change applies without a restart, and a stale snapshot would keep routing
+     * at the old provider for up to the cache lifetime.
+     */
+    public function invalidateUsableProviders(): void
+    {
+        $this->cache->deleteItem(self::USABLE_PROVIDERS_CACHE_KEY);
+    }
+
+    /**
+     * Lowercased names of the providers that currently have credentials.
+     *
+     * Cached briefly because this sits on the model-resolution path, which runs
+     * several times per message, while the underlying probe decrypts a stored
+     * key per cloud provider and talks HTTP to a local Ollama.
+     *
+     * @return list<string>
+     */
+    private function usableProviders(): array
+    {
+        $item = $this->cache->getItem(self::USABLE_PROVIDERS_CACHE_KEY);
+
+        if ($item->isHit()) {
+            /** @var list<string> $cached */
+            $cached = $item->get();
+
+            return $cached;
+        }
+
+        $usable = [];
+        foreach ($this->providerRegistry->getUniqueProviders() as $provider) {
+            if ($provider->isAvailable()) {
+                $usable[] = strtolower($provider->getName());
+            }
+        }
+
+        $item->set($usable);
+        $item->expiresAfter(self::USABLE_PROVIDERS_CACHE_TTL_SECONDS);
+        $this->cache->save($item);
+
+        return $usable;
     }
 
     /**
