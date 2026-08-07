@@ -2,6 +2,8 @@ manifestVersion: 1
 id: synaplan
 category: ai
 name: Synaplan
+# Maintained by CI together with APP_VERSION and the image pin in
+# docker-compose.yml — scripts/set-release-version.mjs owns this field.
 version: "4.0.14"
 tagline: Private AI workspace with chat, document search and embeddable widgets
 description: >-
