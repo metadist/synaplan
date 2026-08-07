@@ -55,16 +55,25 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
     await test.step('Act: search for the worker user and impersonate', async () => {
       await page.locator(selectors.admin.userSearch).fill(credentials.user)
 
-      await page
-        .locator(selectors.admin.impersonateUser(targetUserId))
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      const impersonateBtn = page.locator(selectors.admin.impersonateUser(targetUserId))
+      const confirmBtn = page.locator(selectors.dialog.confirmBtn)
 
-      await page.locator(selectors.admin.impersonateUser(targetUserId)).click()
+      await impersonateBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
-      await page
-        .locator(selectors.dialog.confirmBtn)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-      await page.locator(selectors.dialog.confirmBtn).click()
+      // The email search is debounced and re-renders the users table. A click
+      // that lands during that re-render hits a detaching row button, so
+      // confirmImpersonate() never fires and the dialog never opens (observed
+      // CI flake: btn-dialog-confirm absent after 10s). Retry the click until
+      // the dialog actually appears; skip re-clicking once it is open so we
+      // never click behind the modal overlay.
+      await expect(async () => {
+        if (!(await confirmBtn.isVisible())) {
+          await impersonateBtn.click()
+        }
+        await expect(confirmBtn).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      }).toPass({ timeout: TIMEOUTS.STANDARD })
+
+      await confirmBtn.click()
     })
 
     await test.step('Assert: impersonation banner is visible', async () => {

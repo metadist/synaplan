@@ -513,8 +513,9 @@ jobs:
     name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }}${{ matrix.shard && format(' [{0}]', matrix.shard) || '' }})
     # E2E jobs run on free ubuntu-latest runners (unlimited capacity for public
     # repos) to avoid queue contention from the limited ubuntu-latest-m pool.
-    # Chromium and Firefox are sharded (--shard=N/M) so each half finishes in
-    # ~50% of the time; the free runner pool ensures all shards start instantly.
+    # Chromium runs the full @ci suite sharded (--shard=N/M) so each half
+    # finishes in ~50% of the time; the free runner pool ensures all shards
+    # start instantly. Firefox is a single unsharded @crossbrowser smoke.
     runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
@@ -536,21 +537,17 @@ jobs:
             npm_script: "test:e2e"
             grep_filter: "@ci"
             shard: "2/2"
-          # Standard password auth — firefox sharded into 2 parallel jobs
+          # Firefox cross-browser SMOKE — a single unsharded job. The firefox
+          # project only runs @crossbrowser-tagged tests (engine-divergent flows:
+          # SSE, widget Shadow DOM, upload), so the lean set needs no sharding.
+          # See frontend/tests/e2e/playwright.config.ts and docs/E2E_TESTING.md §0.
           - browser: firefox
             variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e:firefox"
             grep_filter: "@ci"
-            shard: "1/2"
-          - browser: firefox
-            variant: ""
-            auth_method: password
-            compose_profiles: ""
-            npm_script: "test:e2e:firefox"
-            grep_filter: "@ci"
-            shard: "2/2"
+            shard: ""
           # Mobile viewport layout guard (chromium device emulation; runs the
           # @layout suite only — see frontend/tests/e2e/playwright.config.ts)
           - browser: chromium
