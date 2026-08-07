@@ -58,19 +58,36 @@ test.describe('@ci File Management', () => {
     })
 
     await test.step('Assert: the folder contains the uploaded file', async () => {
+      // A freshly created folder is a client-only "pending" card; it becomes a
+      // real folder only once the upload+vectorize round-trip finishes and
+      // loadFileGroups() refreshes it — at which point its "Use in chat"
+      // affordance renders (v-if="!folder.pending"). Wait for that BEFORE
+      // entering, otherwise the async post-upload refresh races enterFolder()
+      // and bounces the view back to root, so btn-back-to-root never appears.
+      await expect(page.locator(FILES.btnUseInChat(folderName))).toBeVisible({
+        timeout: TIMEOUTS.VERY_LONG,
+      })
+
       await page.locator(FILES.folderCard(folderName)).click()
-      await page.locator(FILES.table).waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+      // Confirm we actually entered the folder view — btn-back-to-root exists
+      // only inside a folder. The file is also listed at root, so asserting the
+      // row alone would pass even if navigation silently stayed at root.
+      await page
+        .locator(FILES.btnBackToRoot)
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      await page.locator(FILES.table).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       // Each file renders twice (mobile card + desktop table row, one hidden
-      // via CSS) — count only the visible representation. VERY_LONG because the
-      // row only appears once the upload+vectorize round-trip finishes, which
-      // can lag well past STANDARD under CI load.
+      // via CSS) — count only the visible representation.
       await expect(
         page.locator(FILES.fileRow).filter({ hasText: fixtureName }).filter({ visible: true })
-      ).toHaveCount(1, { timeout: TIMEOUTS.VERY_LONG })
+      ).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
     })
 
     await test.step('Act: "Use in chat" opens a chat scoped to the folder', async () => {
-      await page.locator(FILES.btnBackToRoot).click()
+      // Return to the root grid deterministically instead of depending on the
+      // in-folder back button (which is absent if a refresh bounced us to root).
+      await page.goto('/files')
+      await page.locator(FILES.page).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       const card = page.locator(FILES.folderCard(folderName))
       await card.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await card.hover()
