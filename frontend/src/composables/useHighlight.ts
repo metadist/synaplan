@@ -20,12 +20,12 @@
  */
 
 import type { HLJSApi } from 'highlight.js'
-// Static import so Rolldown (Vite 8) emits it as a plain CSS asset.
-// A dynamic import() causes Rolldown to generate an undeclared
-// `atom_one_dark_exports` binding that crashes at runtime.
-// This file is only imported by lazy-loaded components, so the CSS
-// still stays out of the initial bundle.
-import 'highlight.js/styles/atom-one-dark.css'
+// Static import so Rolldown (Vite 8) emits the theme as a plain CSS asset.
+// A dynamic import() of highlight.js theme CSS caused Rolldown to generate an
+// undeclared binding that crashed at runtime. highlight.js JS is still loaded
+// on demand via doLoad(); this CSS ships with any chunk that imports
+// useHighlight (e.g. chat MessageCode / useMarkdown).
+import '@/assets/highlight-theme.css'
 
 let hljsInstance: HLJSApi | null = null
 let loadPromise: Promise<HLJSApi> | null = null

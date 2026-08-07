@@ -1,0 +1,200 @@
+/*
+ * Theme-aware highlight.js colors for chat code blocks.
+ *
+ * Light mode uses a WCAG-AA-oriented One Light variant (dark ink on pale
+ * surfaces). Dark mode keeps Atom One Dark. Backgrounds stay transparent so
+ * MessageCode / markdown containers own the surface.
+ *
+ * User bubbles keep a dark translucent code surface, so they always use the
+ * dark token palette (same as `.dark`).
+ *
+ * Contrast targets on white / near-white: ≥ 4.5:1 for normal text tokens.
+ */
+
+pre code.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+}
+
+code.hljs {
+  padding: 3px 5px;
+}
+
+/* ——— Light mode (default) ——— */
+.hljs {
+  color: #383a42;
+  background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #5c6370;
+  font-style: italic;
+}
+
+.hljs-doctag,
+.hljs-keyword,
+.hljs-formula {
+  color: #a626a4;
+}
+
+.hljs-section,
+.hljs-name,
+.hljs-selector-tag,
+.hljs-deletion,
+.hljs-subst {
+  color: #c73d32;
+}
+
+.hljs-literal {
+  color: #0070a8;
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: #2f6f2f;
+}
+
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-type,
+.hljs-selector-class,
+.hljs-selector-attr,
+.hljs-selector-pseudo,
+.hljs-number {
+  color: #8a5b00;
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-meta,
+.hljs-selector-id,
+.hljs-title {
+  color: #275dc5;
+}
+
+.hljs-built_in,
+.hljs-title.class_,
+.hljs-class .hljs-title {
+  color: #9a6700;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}
+
+.hljs-link {
+  text-decoration: underline;
+}
+
+/* ——— Dark mode + user-bubble code (dark translucent surface) ———
+   `.bubble-user .markdown-content code.hljs` matches the bubble code
+   specificity so non-token text keeps the dark palette. Token spans inherit
+   via the rules below; style.css leaves `.hljs` out of the forced-white rule. */
+.dark .hljs,
+.bubble-user .hljs,
+.bubble-user .markdown-content code.hljs {
+  color: #abb2bf;
+  background: transparent;
+}
+
+.dark .hljs-comment,
+.dark .hljs-quote,
+.bubble-user .hljs-comment,
+.bubble-user .hljs-quote {
+  color: #7d8491;
+  font-style: italic;
+}
+
+.dark .hljs-doctag,
+.dark .hljs-keyword,
+.dark .hljs-formula,
+.bubble-user .hljs-doctag,
+.bubble-user .hljs-keyword,
+.bubble-user .hljs-formula {
+  color: #c678dd;
+}
+
+.dark .hljs-section,
+.dark .hljs-name,
+.dark .hljs-selector-tag,
+.dark .hljs-deletion,
+.dark .hljs-subst,
+.bubble-user .hljs-section,
+.bubble-user .hljs-name,
+.bubble-user .hljs-selector-tag,
+.bubble-user .hljs-deletion,
+.bubble-user .hljs-subst {
+  color: #e06c75;
+}
+
+.dark .hljs-literal,
+.bubble-user .hljs-literal {
+  color: #56b6c2;
+}
+
+.dark .hljs-string,
+.dark .hljs-regexp,
+.dark .hljs-addition,
+.dark .hljs-attribute,
+.dark .hljs-meta .hljs-string,
+.bubble-user .hljs-string,
+.bubble-user .hljs-regexp,
+.bubble-user .hljs-addition,
+.bubble-user .hljs-attribute,
+.bubble-user .hljs-meta .hljs-string {
+  color: #98c379;
+}
+
+.dark .hljs-attr,
+.dark .hljs-variable,
+.dark .hljs-template-variable,
+.dark .hljs-type,
+.dark .hljs-selector-class,
+.dark .hljs-selector-attr,
+.dark .hljs-selector-pseudo,
+.dark .hljs-number,
+.bubble-user .hljs-attr,
+.bubble-user .hljs-variable,
+.bubble-user .hljs-template-variable,
+.bubble-user .hljs-type,
+.bubble-user .hljs-selector-class,
+.bubble-user .hljs-selector-attr,
+.bubble-user .hljs-selector-pseudo,
+.bubble-user .hljs-number {
+  color: #d19a66;
+}
+
+.dark .hljs-symbol,
+.dark .hljs-bullet,
+.dark .hljs-link,
+.dark .hljs-meta,
+.dark .hljs-selector-id,
+.dark .hljs-title,
+.bubble-user .hljs-symbol,
+.bubble-user .hljs-bullet,
+.bubble-user .hljs-link,
+.bubble-user .hljs-meta,
+.bubble-user .hljs-selector-id,
+.bubble-user .hljs-title {
+  color: #61aeee;
+}
+
+.dark .hljs-built_in,
+.dark .hljs-title.class_,
+.dark .hljs-class .hljs-title,
+.bubble-user .hljs-built_in,
+.bubble-user .hljs-title.class_,
+.bubble-user .hljs-class .hljs-title {
+  color: #e6c07b;
+}
