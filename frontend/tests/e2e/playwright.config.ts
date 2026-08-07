@@ -57,9 +57,14 @@ export default defineConfig({
         ...devices['Desktop Firefox'],
         ...(process.env.CI ? {} : { launchOptions: { args: ['--start-maximized'] } }),
       },
-      // Layout guard runs in chromium (desktop) + chromium-mobile only —
-      // geometry contracts are browser-agnostic, firefox stays functional.
-      grepInvert: /@oidc-redirect|@noci|@visual|@layout/,
+      // Firefox is a focused cross-browser SMOKE, not a second full suite.
+      // Only tests tagged @crossbrowser run here — the engine-divergent flows
+      // (SSE streaming, widget Shadow DOM, upload/clipboard APIs). Everything
+      // else is browser-agnostic app logic already covered by chromium, so
+      // running it twice adds flake + gate coupling without real signal.
+      // In CI this is further AND-ed with --grep @ci, so only stable
+      // @crossbrowser tests execute. See docs/E2E_TESTING.md §0.
+      grep: /@crossbrowser/,
     },
     {
       name: 'chromium-oidc-redirect',

@@ -13,7 +13,10 @@ const e2eDir = path.join(__dirname, '..')
 const VISION_FIXTURE = readFileSync(path.join(e2eDir, FIXTURE_PATHS.VISION_PATTERN_64))
 
 test.describe('@ci @smoke Chat', () => {
-  test('standard model generates answer', async ({ page }) => {
+  // @crossbrowser: SSE streaming (EventSource) is the core chat mechanism and
+  // Gecko has its own implementation — a firefox-only stream regression here
+  // would otherwise only surface in production.
+  test('@crossbrowser standard model generates answer', async ({ page }) => {
     await openApp(page)
     const chat = new ChatHelper(page)
 

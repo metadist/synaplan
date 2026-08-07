@@ -152,7 +152,10 @@ test.describe('@ci @smoke Widget', () => {
     })
   })
 
-  test('embedded chat receives response', async ({ page, request, credentials }) => {
+  // @crossbrowser: the embeddable widget runs on unknown customer sites in
+  // whatever browser their visitors use. This exercises Shadow DOM mount +
+  // cross-origin SSE response — the highest-value Gecko path in the product.
+  test('@crossbrowser embedded chat receives response', async ({ page, request, credentials }) => {
     const widgetName = WIDGET_NAMES.unique('Embedded Widget Flow')
     const widgetInfo = await createWidgetViaApi(request, credentials, widgetName, {
       websiteUrl: URLS.TEST_PAGE_URL,

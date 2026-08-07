@@ -21,7 +21,9 @@ const CHAT = selectors.chat
  * management actions.
  */
 test.describe('@ci File Management', () => {
-  test('user can create a folder, upload into it, use it in chat and delete the file', async ({
+  // @crossbrowser: file input / upload handling is a classic browser-API
+  // divergence (setInputFiles, multipart, drag targets) worth a Gecko check.
+  test('@crossbrowser user can create a folder, upload into it, use it in chat and delete the file', async ({
     page,
   }) => {
     // Upload + vectorization plus create/open/use-in-chat/delete navigations

@@ -59,19 +59,42 @@ backend reaches it container-to-container either way.
 ## 0. Tags & CI Matrix
 
 **`@ci` is the only authoritative tag.** The CI workflow runs `--grep "@ci"`
-(chromium 2 shards, firefox 2 shards, chromium-mobile) — a test without
-`@ci` in its title chain does not run in CI, period. Other tags:
+(chromium 2 shards, one firefox cross-browser smoke, chromium-mobile) — a test
+without `@ci` in its title chain does not run in CI, period. Other tags:
 
 | Tag | Meaning |
 |-----|---------|
 | `@noci` | Excluded via project `grepInvert` even when the surrounding describe is `@ci`. Local/nightly only. |
-| `@layout` | Layout guard — runs in chromium desktop + chromium-mobile, excluded from firefox. |
+| `@crossbrowser` | Also runs in the **firefox** project. Firefox only runs `@crossbrowser` tests (AND-ed with `@ci` in CI) — see convention below. |
+| `@layout` | Layout guard — runs in chromium desktop + chromium-mobile only. |
 | `@visual` | Snapshot tests — separate CI-only project (baselines from the ubuntu runner). |
 | `@oidc`, `@oidc-redirect` | OIDC jobs only (dedicated matrix entries with Keycloak). |
 | `@smoke`, `@auth`, `@api`, … | Informational grouping — no CI effect, historically inconsistent. Don't rely on them for filtering. |
 
 When adding a test, decide explicitly: `@ci` (stable, deterministic, runs on
 every PR) or `@noci` (needs real providers/keys or is nightly-grade).
+
+### Cross-browser (firefox) — opt-in via `@crossbrowser`
+
+Firefox is a **focused cross-browser smoke, not a second full suite.** The
+firefox project (`playwright.config.ts`) runs `grep: /@crossbrowser/`; in CI
+that is AND-ed with `--grep "@ci"`, so **only stable `@crossbrowser` tests run
+in firefox.** Everything else is browser-agnostic app logic already covered by
+chromium — running it twice only adds flake and couples every merge to a
+firefox-only flake, without new signal.
+
+**Tag a test `@crossbrowser` only when it exercises a genuine engine
+(Gecko-vs-Blink) divergence**, e.g.:
+
+- **SSE streaming** (`EventSource`) — the core chat/stream path.
+- **Embeddable widget** — Shadow DOM mount + cross-origin behavior (runs on
+  unknown customer browsers).
+- **Upload / clipboard / WebSpeech** and other browser-API-heavy flows.
+- **Auth / session cookies** — the gate to everything, with real cookie edges.
+
+Do NOT tag browser-agnostic logic (chat rename/delete, memories, task prompts,
+profile, settings CRUD, …) — chromium already covers it. Keep the
+`@crossbrowser` set small and high-value; it is a required gate.
 
 ---
 

@@ -8,7 +8,9 @@ import { TIMEOUTS } from '../config/config'
 test.use(LOGGED_OUT)
 
 test.describe('@ci @auth Authentication', () => {
-  test('@smoke should successfully login', async ({ page, credentials }) => {
+  // @crossbrowser: form submit + session cookie handling has real
+  // Gecko-vs-Blink cookie/security edges; login is the gate to everything.
+  test('@crossbrowser @smoke should successfully login', async ({ page, credentials }) => {
     await test.step('Act: login with credentials', async () => {
       await login(page, credentials)
     })
