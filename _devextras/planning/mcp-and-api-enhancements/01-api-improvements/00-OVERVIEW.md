@@ -10,6 +10,7 @@ Synaplan exposes an **OpenAI-compatible API** so any developer using an OpenAI S
 | 2 | [02-API-CUSTOM-PROMPTS.md](./02-API-CUSTOM-PROMPTS.md) | `promptTopic` / `promptId` params on stream endpoint | Done |
 | 3 | [03-URL-SCREENSHOT-FIX.md](./03-URL-SCREENSHOT-FIX.md) | URL content extraction tool (naming fix + backend + pipeline) | Done |
 | 4 | [04-TEST-STRATEGY.md](./04-TEST-STRATEGY.md) | Test matrix | Reference |
+| 5 | [05-ANTHROPIC-COMPATIBLE.md](./05-ANTHROPIC-COMPATIBLE.md) | `POST /v1/messages` (Anthropic Messages API) for Claude Code, MCP as the shared tool layer, multi-provider translators | Plan |
 
 ## Reference
 
@@ -20,3 +21,10 @@ Synaplan exposes an **OpenAI-compatible API** so any developer using an OpenAI S
 - **No regressions.** Existing `/api/v1/` endpoints are untouched.
 - **Additive.** New `/v1/` endpoints are a thin translation layer over existing services.
 - **Minimal.** Reuse `AiFacade`, `ModelConfigService`, `ApiKeyAuthenticator` — no new services.
+
+> **Exception, deliberate:** [05-ANTHROPIC-COMPATIBLE.md](./05-ANTHROPIC-COMPATIBLE.md)
+> cannot honour the "reuse `AiFacade`" principle. `ChatProviderInterface` has no
+> `tools` parameter and its return shape is text-only, so no provider can express
+> tool calling — and an agent CLI is useless without it. That plan therefore adds a
+> dedicated protocol layer (`App\AI\Messages`) alongside `AiFacade` rather than on
+> top of it. `ApiKeyAuthenticator` reuse is unaffected.
