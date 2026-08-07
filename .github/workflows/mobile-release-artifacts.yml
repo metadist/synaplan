@@ -54,9 +54,16 @@ jobs:
           # A release can be published on any tag, so nothing guarantees the
           # commit passed CI. Refuse to ship an unverified commit, and reuse the
           # successful run as the source of the commit-matching OpenAPI artifact.
-          run_id="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${RELEASE_SHA}&status=success&per_page=50" \
-            --jq '[.workflow_runs[] | select(.name == "CI" and .event == "push")] | first | .id // empty')"
+          #
+          # The API filters on head_sha, but it ignores an unknown query
+          # parameter silently, which would widen this to "any green CI run".
+          # The commit is therefore matched again on the returned run.
+          run_id="$(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${RELEASE_SHA}&status=success&per_page=100" |
+              jq -r --arg sha "$RELEASE_SHA" \
+                '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .head_sha == $sha)]
+                  | first | .id // empty'
+          )"
           if [ -z "$run_id" ]; then
             echo "::error::No successful CI run exists for ${RELEASE_SHA} — refusing to release an unverified commit."
             exit 1

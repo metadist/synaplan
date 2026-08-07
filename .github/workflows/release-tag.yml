@@ -120,10 +120,14 @@ jobs:
           set -euo pipefail
           # The previous workflow_run trigger guaranteed this implicitly. Started
           # by hand, nothing stops a release from a red commit, so verify that
-          # this exact commit passed CI on a branch push.
-          green="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&status=success" \
-            --jq '[.workflow_runs[] | select(.name == "CI" and .event == "push")] | length')"
+          # this exact commit passed CI on a branch push. The API filters on
+          # head_sha, but it ignores an unknown query parameter silently, so the
+          # commit is matched again on the returned runs.
+          green="$(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&status=success&per_page=100" |
+              jq --arg sha "$HEAD_SHA" \
+                '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .head_sha == $sha)] | length'
+          )"
           if [ "$green" -eq 0 ]; then
             echo "::error::No successful CI run exists for ${HEAD_SHA} — refusing to release an unverified commit."
             exit 1
