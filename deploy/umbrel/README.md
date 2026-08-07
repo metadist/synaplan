@@ -20,22 +20,26 @@ anonymous again on the next request. `AuthCookieFactory` derives the flag from
 the `APP_URL` scheme instead; **4.0.14 is the first release that can be offered
 here**, and the package is pinned to it.
 
-The release number appears in three places that have to move together on every
-later bump:
+### How the pin is raised
 
-- `docker-compose.yml` — the `x-app-image` tag **and** its `@sha256:` digest.
-- `docker-compose.yml` — `APP_VERSION`, which is what the admin UI displays.
-- `umbrel-app.yml` — `version`.
+Publishing a release tag opens one pull request
+(`automation/default-release-version`) that bumps every catalog pin together:
 
-Three manifest fields are still placeholders and have to be filled in as well:
-`releaseNotes`, `gallery` (the store expects screenshots) and `submission`, which
-currently reads `.../pull/PENDING`.
+- `elestio.yml` and `deploy/selfhost.env.example`
+- this package: `umbrel-app.yml` (`version`), `docker-compose.yml`
+  (`APP_VERSION` and the `tag@sha256:…` image pin)
 
-Nothing raises these for you. `scripts/set-release-version.mjs`, which the
-release workflow runs on every tag, only knows `elestio.yml` and
-`deploy/selfhost.env.example` — it cannot pin a digest, and the store copy has to
-go through a `getumbrel/umbrel-apps` pull request anyway. Assume the numbers below
-are stale and check them against the latest release before every submission.
+`scripts/set-release-version.mjs` owns those lines. The digest comes from the
+multi-arch manifest the release workflow just published, so the PR never invents
+one. Do not edit them by hand.
+
+Merging that PR updates **this** repository only. Submitting the raised package
+to [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps) remains a
+separate, manual pull request — Umbrel cannot pull from our repo on its own.
+
+Three other manifest fields are still placeholders and have to be filled in for
+a store submission: `releaseNotes`, `gallery` (the store expects screenshots)
+and `submission`, which currently reads `.../pull/PENDING`.
 
 Re-run the login check from *Testing* below against every raised pin: cookies
 must be issued without `Secure` over plain HTTP.

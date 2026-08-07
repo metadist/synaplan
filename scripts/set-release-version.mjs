@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 
-// Writes a published release version into the two files that decide which
-// version a NEW deployment installs: the Elestio manifest and the self-hosting
-// example configuration.
+// Writes a published release version into the files that decide which version a
+// NEW deployment installs: the Elestio manifest, the self-hosting example
+// configuration, and the Umbrel App Store package.
 //
 // Existing deployments are untouched by design. They keep the version their
-// operator pinned, and change it only by following docs/UPDATE_ELESTIO.md or
-// docs/UPDATE_SELFHOST.md — a redeploy never moves a running installation to a
-// different version.
+// operator pinned, and change it only by following docs/UPDATE_ELESTIO.md,
+// docs/UPDATE_SELFHOST.md, or the Umbrel App Store update flow — a redeploy never
+// moves a running installation to a different version.
+//
+// Umbrel also pins the image digest. Umbrel's linter and store policy require
+// `tag@sha256:…`, so the digest has to move with the version. The release
+// workflow passes the digest of the multi-arch manifest it just published and
+// verified; inventing or guessing one here would pin a digest that does not
+// exist, or the wrong one.
 //
 // Every replacement is anchored on the exact line it owns and fails loudly when
 // that anchor is missing. A silent no-op would be the worst outcome here: the
@@ -26,9 +32,29 @@ const DEFAULT_ROOT = resolve(SCRIPT_DIR, '..')
 // deployment silently installs.
 const RELEASE_VERSION = /^\d+\.\d+\.\d+$/
 
+// Manifest-list digests as published by docker-push. Anything shorter, longer,
+// or without the sha256: prefix is not a digest this script may pin.
+const IMAGE_DIGEST = /^sha256:[a-f0-9]{64}$/
+
+const UMBREL_IMAGE_REPOSITORY = 'ghcr.io/metadist/synaplan'
+
 export const parseReleaseVersion = (value) => {
   const version = String(value ?? '').trim().replace(/^v/, '')
   return RELEASE_VERSION.test(version) ? version : null
+}
+
+export const parseImageDigest = (value) => {
+  const digest = String(value ?? '').trim()
+  if (IMAGE_DIGEST.test(digest)) {
+    return digest
+  }
+
+  // Allow callers to pass the bare hex; normalize to the form Compose pins use.
+  if (/^[a-f0-9]{64}$/.test(digest)) {
+    return `sha256:${digest}`
+  }
+
+  return null
 }
 
 // The manifest lists environment variables as `- key:` / `value:` pairs, so the
@@ -104,9 +130,108 @@ export const applyEnvExampleVersion = (text, version) => {
   return result
 }
 
+// Only the top-level `version:` field. `manifestVersion:` must stay untouched —
+// Umbrel's store rejects an unexpected manifestVersion.
+export const applyUmbrelAppVersion = (text, version) => {
+  let replaced = 0
+  const result = text
+    .split('\n')
+    .map((line) => {
+      if (!/^version:\s*.*$/.test(line)) return line
+      replaced += 1
+      return `version: "${version}"`
+    })
+    .join('\n')
+
+  if (replaced !== 1) {
+    throw new Error(
+      `deploy/umbrel/synaplan/umbrel-app.yml: expected exactly one top-level version field, found ${replaced}`
+    )
+  }
+
+  return result
+}
+
+export const readUmbrelAppVersion = (text) => {
+  const match = /^version:\s*"?([^"\n]*)"?\s*$/m.exec(text)
+  return match ? match[1].trim() : null
+}
+
+export const applyUmbrelComposeVersion = (text, version, digest) => {
+  let appVersionReplaced = 0
+  let imageReplaced = 0
+  const imageLine = `x-app-image: &app-image ${UMBREL_IMAGE_REPOSITORY}:${version}@${digest}`
+
+  const result = text
+    .split('\n')
+    .map((line) => {
+      if (/^(\s*)APP_VERSION:\s*.*$/.test(line)) {
+        appVersionReplaced += 1
+        const indent = /^(\s*)/.exec(line)[1]
+        return `${indent}APP_VERSION: "${version}"`
+      }
+
+      if (/^x-app-image:\s*&app-image\s+ghcr\.io\/metadist\/synaplan:.+$/.test(line)) {
+        imageReplaced += 1
+        return imageLine
+      }
+
+      return line
+    })
+    .join('\n')
+
+  if (appVersionReplaced !== 1) {
+    throw new Error(
+      `deploy/umbrel/synaplan/docker-compose.yml: expected exactly one APP_VERSION assignment, found ${appVersionReplaced}`
+    )
+  }
+
+  if (imageReplaced !== 1) {
+    throw new Error(
+      `deploy/umbrel/synaplan/docker-compose.yml: expected exactly one x-app-image pin, found ${imageReplaced}`
+    )
+  }
+
+  return result
+}
+
+export const readUmbrelComposePin = (text) => {
+  const appVersion = /^\s*APP_VERSION:\s*"?([^"\n]*)"?\s*$/m.exec(text)?.[1]?.trim() ?? null
+  const image = /^x-app-image:\s*&app-image\s+(ghcr\.io\/metadist\/synaplan:[^\s]+)\s*$/m.exec(
+    text
+  )?.[1] ?? null
+
+  if (!image) {
+    return { appVersion, version: null, digest: null, image: null }
+  }
+
+  const match = new RegExp(
+    `^${UMBREL_IMAGE_REPOSITORY.replace(/\./g, '\\.')}:([^@]+)@(sha256:[a-f0-9]{64})$`
+  ).exec(image)
+
+  return {
+    appVersion,
+    image,
+    version: match?.[1] ?? null,
+    digest: match?.[2] ?? null,
+  }
+}
+
 const TARGETS = [
-  { path: 'elestio.yml', apply: applyElestioVersion },
-  { path: join('deploy', 'selfhost.env.example'), apply: applyEnvExampleVersion },
+  { path: 'elestio.yml', apply: (text, version) => applyElestioVersion(text, version) },
+  {
+    path: join('deploy', 'selfhost.env.example'),
+    apply: (text, version) => applyEnvExampleVersion(text, version),
+  },
+  {
+    path: join('deploy', 'umbrel', 'synaplan', 'umbrel-app.yml'),
+    apply: (text, version) => applyUmbrelAppVersion(text, version),
+  },
+  {
+    path: join('deploy', 'umbrel', 'synaplan', 'docker-compose.yml'),
+    apply: (text, version, digest) => applyUmbrelComposeVersion(text, version, digest),
+    needsDigest: true,
+  },
 ]
 
 export const runCli = (arguments_) => {
@@ -120,6 +245,13 @@ export const runCli = (arguments_) => {
     throw new Error('--version must be a released MAJOR.MINOR.PATCH version')
   }
 
+  const digest = parseImageDigest(readOption('--digest'))
+  if (!digest) {
+    throw new Error(
+      '--digest must be the published multi-arch manifest digest (sha256:…); Umbrel pins tag@digest'
+    )
+  }
+
   const rootOption = readOption('--root')
   const root = rootOption ? resolve(rootOption) : DEFAULT_ROOT
 
@@ -127,7 +259,9 @@ export const runCli = (arguments_) => {
   for (const target of TARGETS) {
     const file = join(root, target.path)
     const before = readFileSync(file, 'utf8')
-    const after = target.apply(before, version)
+    const after = target.needsDigest
+      ? target.apply(before, version, digest)
+      : target.apply(before, version)
     if (after !== before) {
       writeFileSync(file, after)
       changed.push(target.path)
@@ -136,8 +270,8 @@ export const runCli = (arguments_) => {
 
   process.stdout.write(
     changed.length > 0
-      ? `Set ${version} in ${changed.join(', ')}\n`
-      : `Already at ${version}\n`
+      ? `Set ${version} (${digest}) in ${changed.join(', ')}\n`
+      : `Already at ${version} (${digest})\n`
   )
 }
 

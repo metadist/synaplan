@@ -249,3 +249,9 @@ the app's data directory for the same reason this deployment does — a database
 restored without its password cannot be opened. Its deviations, including the
 absent local-AI services and the missing consistent-backup hook, are listed in
 [`umbrel/README.md`](umbrel/README.md).
+
+The release pin for that package (store `version`, `APP_VERSION`, and the
+`tag@sha256:…` image) is raised automatically together with `elestio.yml` and
+`deploy/selfhost.env.example` by `scripts/set-release-version.mjs` after every
+published release. Submitting the raised package to the Umbrel App Store remains
+a separate, manual pull request against `getumbrel/umbrel-apps`.

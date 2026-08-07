@@ -924,6 +924,11 @@ jobs:
       # bakes APP_VERSION into the image, so the manifest can only ever name a
       # SemVer this job actually published — never the mutable `latest` tag.
       version: ${{ steps.app-version.outputs.version }}
+      # Multi-arch manifest digest of the tags that were just published and
+      # verified. The Umbrel package pins tag@digest; the release-version-pin
+      # job writes this value into deploy/umbrel/ so a new store submission
+      # never invents a digest of its own.
+      digest: ${{ steps.release.outputs.digest }}
 
     steps:
       - name: Checkout
@@ -1231,9 +1236,10 @@ jobs:
   release-version-pin:
     name: Update the Default Release Version
     runs-on: ubuntu-latest
-    # elestio.yml and deploy/selfhost.env.example decide which version a NEW
-    # deployment installs, so they may only ever name a release whose image is
-    # published and verified — which is what docker-push guarantees.
+    # elestio.yml, deploy/selfhost.env.example and deploy/umbrel/synaplan/
+    # decide which version a NEW deployment installs, so they may only ever
+    # name a release whose image is published and verified — which is what
+    # docker-push guarantees. Umbrel also needs the digest of that image.
     needs: [docker-push]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -1244,7 +1250,10 @@ jobs:
       # A pull request, deliberately, rather than a push to main. Elestio
       # pipelines redeploy on every commit to the branch they track, so pushing
       # here would restart every managed instance at an unpredictable moment.
-      # Merging is the maintainer's choice of when that happens.
+      # Merging is the maintainer's choice of when that happens. The Umbrel
+      # package lives in this same PR so a release bumps every catalog pin
+      # together; the getumbrel/umbrel-apps store submission stays a separate,
+      # manual step because it targets a foreign repository.
       - name: Checkout the default branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -1282,6 +1291,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.docker-push.outputs.version }}
+          DIGEST: ${{ needs.docker-push.outputs.digest }}
           BRANCH: automation/default-release-version
           BASE: ${{ github.event.repository.default_branch }}
         run: |
@@ -1302,7 +1312,12 @@ jobs:
             exit 0
           fi
 
-          node scripts/set-release-version.mjs --version "$VERSION"
+          if [ -z "$DIGEST" ]; then
+            echo "::error::docker-push did not provide the multi-arch manifest digest; Umbrel cannot be pinned without it"
+            exit 1
+          fi
+
+          node scripts/set-release-version.mjs --version "$VERSION" --digest "$DIGEST"
 
           if git diff --quiet; then
             echo "The default version is already \`${VERSION}\`; nothing to propose." |
@@ -1331,8 +1346,13 @@ jobs:
 
           body_file="$(mktemp)"
           cat > "$body_file" <<EOF
-          Installs \`${VERSION}\` in **new** deployments: \`elestio.yml\` for the one-click
-          path and \`deploy/selfhost.env.example\` for self-hosting.
+          Installs \`${VERSION}\` in **new** deployments:
+
+          - \`elestio.yml\` for the one-click path
+          - \`deploy/selfhost.env.example\` for self-hosting
+          - \`deploy/umbrel/synaplan/\` for the Umbrel App Store package
+            (version, \`APP_VERSION\`, and the published image digest
+            \`${DIGEST}\`)
 
           Existing deployments are unaffected. They keep the version their operator
           pinned and change it only by following the update guide, so a redeploy never
@@ -1341,6 +1361,10 @@ jobs:
           Merging this restarts every Elestio instance that tracks \`${BASE}\`, because
           Elestio redeploys on each commit to the branch it tracks. Merge when that is
           convenient.
+
+          The Umbrel pin lives in this repository only. Submitting the raised package
+          to [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps) remains
+          a separate, manual pull request.
 
           Opened automatically after the image for \`${GITHUB_REF_NAME}\` was published
           and verified.
