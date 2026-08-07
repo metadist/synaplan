@@ -67,13 +67,28 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
             // Emit the upstream error body unmodified (Claude Code recovery
             // matches on error wording) then return empty usage.
             $errorBody = $response->getContent(false);
-            $emit($errorBody);
+            if (!empty($context['parsed_events'])) {
+                $decoded = json_decode($errorBody, true);
+                $emit([
+                    'event' => 'error',
+                    'data' => \is_array($decoded) ? $decoded : [
+                        'type' => 'error',
+                        'error' => ['type' => 'api_error', 'message' => $errorBody],
+                    ],
+                ]);
+            } else {
+                $emit($errorBody);
+            }
 
             $this->logger->warning('MessagesGateway: upstream Anthropic stream error', [
                 'status' => $status,
             ]);
 
             return new MessagesUsage();
+        }
+
+        if (!empty($context['parsed_events'])) {
+            return $this->relayParsedEvents($response, $emit);
         }
 
         return $this->relayAndTee($response, $emit);
@@ -87,7 +102,8 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
      *     anthropic_version?: string|null,
      *     anthropic_beta?: string|null,
      *     x_fixture?: string|null,
-     *     raw_body?: string|null
+     *     raw_body?: string|null,
+     *     parsed_events?: bool
      * } $context
      */
     private function request(array $requestBody, array $context, bool $stream): ResponseInterface
@@ -199,6 +215,89 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
                             $stopReason = $delta['stop_reason'];
                         }
                     }
+                }
+            }
+        }
+
+        return new MessagesUsage(
+            inputTokens: $inputTokens,
+            outputTokens: $outputTokens,
+            cacheCreationTokens: $cacheCreation,
+            cacheReadTokens: $cacheRead,
+            stopReason: $stopReason,
+        );
+    }
+
+    /**
+     * Parse upstream SSE into Anthropic-shaped event arrays for the MCP tool
+     * loop (which needs structured events to remap indices / suppress stops).
+     *
+     * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
+     */
+    private function relayParsedEvents(ResponseInterface $response, callable $emit): MessagesUsage
+    {
+        $inputTokens = 0;
+        $outputTokens = 0;
+        $cacheCreation = 0;
+        $cacheRead = 0;
+        $stopReason = null;
+        $eventName = null;
+        $dataBuffer = '';
+
+        foreach ($this->httpClient->stream($response) as $chunk) {
+            set_time_limit(0);
+
+            if ($chunk->isTimeout()) {
+                continue;
+            }
+
+            $content = $chunk->getContent();
+            if ('' === $content) {
+                continue;
+            }
+
+            $dataBuffer .= $content;
+            while (false !== ($pos = strpos($dataBuffer, "\n"))) {
+                $line = substr($dataBuffer, 0, $pos);
+                $dataBuffer = substr($dataBuffer, $pos + 1);
+                $line = rtrim($line, "\r");
+
+                if (str_starts_with($line, 'event:')) {
+                    $eventName = trim(substr($line, 6));
+                    continue;
+                }
+
+                if (str_starts_with($line, 'data:')) {
+                    $payload = trim(substr($line, 5));
+                    if ('' === $payload || '[DONE]' === $payload) {
+                        continue;
+                    }
+                    $decoded = json_decode($payload, true);
+                    if (!\is_array($decoded)) {
+                        continue;
+                    }
+
+                    $type = (string) ($decoded['type'] ?? $eventName ?? 'message');
+                    $emit([
+                        'event' => $eventName ?? $type,
+                        'data' => $decoded,
+                    ]);
+
+                    if ('message_start' === $type) {
+                        $usage = $decoded['message']['usage'] ?? [];
+                        $inputTokens = (int) ($usage['input_tokens'] ?? $inputTokens);
+                        $cacheCreation = (int) ($usage['cache_creation_input_tokens'] ?? $cacheCreation);
+                        $cacheRead = (int) ($usage['cache_read_input_tokens'] ?? $cacheRead);
+                    } elseif ('message_delta' === $type) {
+                        $usage = $decoded['usage'] ?? [];
+                        $outputTokens = (int) ($usage['output_tokens'] ?? $outputTokens);
+                        $delta = $decoded['delta'] ?? [];
+                        if (isset($delta['stop_reason']) && \is_string($delta['stop_reason'])) {
+                            $stopReason = $delta['stop_reason'];
+                        }
+                    }
+
+                    $eventName = null;
                 }
             }
         }

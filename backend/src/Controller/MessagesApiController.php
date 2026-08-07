@@ -122,6 +122,10 @@ final class MessagesApiController extends AbstractController
             $response->headers->set($name, $value);
         }
 
+        if (!empty($prepared['debug']) && !empty($prepared['context_hash'])) {
+            $response->headers->set('x-synaplan-context-hash', (string) $prepared['context_hash']);
+        }
+
         return $response;
     }
 
@@ -222,7 +226,11 @@ final class MessagesApiController extends AbstractController
      *     translator_context: array<string, mixed>,
      *     status: int,
      *     body: array<string, mixed>|string|null,
-     *     usage: MessagesUsage
+     *     usage: MessagesUsage,
+     *     mcp_loop: bool,
+     *     mcp_catalog: array<string, mixed>|null,
+     *     context_hash: string|null,
+     *     debug: bool
      * } $prepared
      */
     private function streamResponse(array $prepared, User $user): StreamedResponse
@@ -234,6 +242,9 @@ final class MessagesApiController extends AbstractController
         $response->headers->set('Connection', 'keep-alive');
         foreach ($prepared['headers'] as $name => $value) {
             $response->headers->set($name, $value);
+        }
+        if (!empty($prepared['debug']) && !empty($prepared['context_hash'])) {
+            $response->headers->set('x-synaplan-context-hash', (string) $prepared['context_hash']);
         }
 
         $response->setCallback(function () use ($prepared, $user): void {

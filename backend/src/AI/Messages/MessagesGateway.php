@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\AI\Messages;
 
 use App\AI\Credential\UserProviderKeyResolver;
+use App\AI\Messages\Mcp\McpToolLoop;
+use App\AI\Messages\MessagesContextInjector;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\Entity\User;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
@@ -18,9 +20,8 @@ use Symfony\Component\HttpFoundation\Request;
  * Orchestrates a Messages API request: feature flag, budget, model resolve,
  * credential resolve, optional body mutation, translator dispatch, metering.
  *
- * Phase 1 ships Anthropic passthrough only. MCP tool loop and context
- * injection hook in via config flags (default off) and are no-ops until
- * their phases land.
+ * MCP tool loop (§ Phase 2) and context injection (§ Phase 3) are gated by
+ * config flags (default off).
  *
  * @phpstan-type GatewaySuccess array{
  *     ok: true,
@@ -43,7 +44,14 @@ use Symfony\Component\HttpFoundation\Request;
  *     session_id: string|null,
  *     body_mutated: bool,
  *     request_body: array<string, mixed>,
- *     translator_context: array<string, mixed>
+ *     translator_context: array<string, mixed>,
+ *     mcp_loop: bool,
+ *     mcp_catalog: array{
+ *         tools: list<array{name: string, description: string, input_schema: array<string, mixed>}>,
+ *         dispatch: array<string, array{serverId: int, tool: string, annotations: array<string, mixed>}>
+ *     }|null,
+ *     context_hash: string|null,
+ *     debug: bool
  * }
  * @phpstan-type GatewayError array{
  *     ok: false,
@@ -67,6 +75,8 @@ final readonly class MessagesGateway
         private UserProviderKeyResolver $keyResolver,
         private RateLimitService $rateLimitService,
         private AnthropicPassthroughTranslator $anthropicPassthrough,
+        private McpToolLoop $mcpToolLoop,
+        private MessagesContextInjector $contextInjector,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
         #[AutowireIterator('app.messages.translator')]
@@ -160,7 +170,7 @@ final readonly class MessagesGateway
                 400,
                 'invalid_request_error',
                 sprintf(
-                    'Provider `%s` is not supported by the Messages gateway yet. Use an Anthropic model or configure a MODEL_ALIASES entry that resolves to Anthropic.',
+                    'Provider `%s` is not supported by the Messages gateway. Use Anthropic, OpenAI, or Google (Gemini), or add a MODEL_ALIASES entry.',
                     $resolved['provider'],
                 ),
             );
@@ -177,17 +187,46 @@ final readonly class MessagesGateway
             $bodyMutated = true;
         }
 
-        // Phase 2/3 hooks (default off) — reserved; no-op in Phase 1.
+        $sessionId = $request->headers->get('x-claude-code-session-id');
+        $sessionKey = $this->sessionKey($sessionId, $user, $requestBody);
+
+        $mcpLoop = false;
+        $mcpCatalog = null;
         if ($this->config->isMcpToolsEnabled($user->getId())) {
-            // Mixed-turn policy: refuse injection when the client already sent tools.
             $clientHasTools = isset($requestBody['tools']) && \is_array($requestBody['tools']) && [] !== $requestBody['tools'];
             if ($clientHasTools && !$this->config->allowMcpToolsWithClientTools($user->getId())) {
                 $this->logger->debug('MessagesGateway: MCP tools skipped (client supplied tools)');
+            } else {
+                $mcpCatalog = $this->mcpToolLoop->pinnedCatalog($user, $sessionKey);
+                if ([] !== $mcpCatalog['tools']) {
+                    // Injection happens inside McpToolLoop so the catalog is
+                    // applied once per upstream call; mark body mutated so the
+                    // raw-body fast path is disabled.
+                    $bodyMutated = true;
+                    $mcpLoop = true;
+                }
             }
-            // Full McpToolLoop lands in Phase 2.
         }
 
-        $sessionId = $request->headers->get('x-claude-code-session-id');
+        $contextHash = null;
+        $contextOverride = $request->headers->get('x-synaplan-context');
+        $injectContext = $this->config->isContextInjectionEnabled($user->getId());
+        if ('on' === strtolower((string) $contextOverride)) {
+            $injectContext = true;
+        }
+        if ($injectContext) {
+            $injected = $this->contextInjector->inject(
+                $requestBody,
+                $user,
+                $sessionKey,
+                $contextOverride,
+            );
+            $requestBody = $injected['body'];
+            if ($injected['injected']) {
+                $bodyMutated = true;
+                $contextHash = $injected['hash'];
+            }
+        }
 
         $translatorContext = [
             'api_key' => $credential['key'],
@@ -209,7 +248,7 @@ final readonly class MessagesGateway
             'status' => 200,
             'headers' => $headers,
             'body' => null,
-            'raw_stream' => $translator instanceof AnthropicPassthroughTranslator,
+            'raw_stream' => $translator instanceof AnthropicPassthroughTranslator && !$mcpLoop,
             'usage' => new MessagesUsage(),
             'key_source' => $credential['source'],
             'resolved' => $resolved,
@@ -218,6 +257,10 @@ final readonly class MessagesGateway
             'body_mutated' => $bodyMutated,
             'request_body' => $requestBody,
             'translator_context' => $translatorContext,
+            'mcp_loop' => $mcpLoop,
+            'mcp_catalog' => $mcpCatalog,
+            'context_hash' => $contextHash,
+            'debug' => '1' === $request->headers->get('x-synaplan-debug'),
         ];
     }
 
@@ -236,7 +279,17 @@ final readonly class MessagesGateway
         }
 
         try {
-            $result = $translator->complete($prepared['request_body'], $prepared['translator_context']);
+            if ($prepared['mcp_loop'] && null !== $prepared['mcp_catalog']) {
+                $result = $this->mcpToolLoop->runComplete(
+                    $prepared['request_body'],
+                    $prepared['translator_context'],
+                    $translator,
+                    $user,
+                    $prepared['mcp_catalog'],
+                );
+            } else {
+                $result = $translator->complete($prepared['request_body'], $prepared['translator_context']);
+            }
         } catch (\Throwable $e) {
             $this->logger->error('MessagesGateway: complete failed', [
                 'error' => $e->getMessage(),
@@ -288,13 +341,48 @@ final readonly class MessagesGateway
             return new MessagesUsage();
         }
 
-        $usage = $translator->stream($prepared['request_body'], $prepared['translator_context'], $emit);
+        if ($prepared['mcp_loop'] && null !== $prepared['mcp_catalog']) {
+            $usage = $this->mcpToolLoop->runStream(
+                $prepared['request_body'],
+                $prepared['translator_context'],
+                $translator,
+                $user,
+                $prepared['mcp_catalog'],
+                $emit,
+            );
+        } else {
+            $usage = $translator->stream($prepared['request_body'], $prepared['translator_context'], $emit);
+        }
 
         if ($usage->outputTokens > 0 || $usage->inputTokens > 0) {
             $this->recordUsage($user, $prepared, $usage, null);
         }
 
         return $usage;
+    }
+
+    /**
+     * @param array<string, mixed> $requestBody
+     */
+    private function sessionKey(?string $sessionId, User $user, array $requestBody): string
+    {
+        if (null !== $sessionId && '' !== $sessionId) {
+            return $sessionId;
+        }
+
+        $firstUser = '';
+        foreach ($requestBody['messages'] ?? [] as $msg) {
+            if (!\is_array($msg) || 'user' !== ($msg['role'] ?? '')) {
+                continue;
+            }
+            $content = $msg['content'] ?? '';
+            $firstUser = \is_string($content)
+                ? $content
+                : (json_encode($content, \JSON_INVALID_UTF8_SUBSTITUTE) ?: '');
+            break;
+        }
+
+        return hash('sha256', (string) $user->getId().'|'.$firstUser);
     }
 
     /**

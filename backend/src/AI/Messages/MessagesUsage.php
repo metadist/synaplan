@@ -61,4 +61,15 @@ final readonly class MessagesUsage
             stopReason: $stopReason,
         );
     }
+
+    public function withStopReason(?string $stopReason): self
+    {
+        return new self(
+            inputTokens: $this->inputTokens,
+            outputTokens: $this->outputTokens,
+            cacheCreationTokens: $this->cacheCreationTokens,
+            cacheReadTokens: $this->cacheReadTokens,
+            stopReason: $stopReason,
+        );
+    }
 }

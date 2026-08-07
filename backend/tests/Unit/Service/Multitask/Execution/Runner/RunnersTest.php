@@ -116,7 +116,7 @@ final class RunnersTest extends TestCase
             return ['provider' => 'groq', 'model' => 'gpt-oss-120b'];
         });
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n2', Capability::Summarize, ['n1'], ['text' => 'long input text']);
 
         $result = $runner->run($node, $this->context($this->message()));
@@ -146,7 +146,7 @@ final class RunnersTest extends TestCase
             return [];
         });
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n2', Capability::Chat, [], ['text' => 'wie wird das Wetter heute?']);
 
         $context = $this->context($this->message('wie wird das Wetter heute?'));
@@ -185,7 +185,7 @@ final class RunnersTest extends TestCase
         $modelConfig->expects(self::once())->method('getProviderForModel')->with(999)->willReturn('ollama');
         $modelConfig->expects(self::once())->method('getModelName')->with(999)->willReturn('nemotron-3-nano');
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'Was ist die Hauptstadt von Frankreich']);
 
         $context = new NodeContext(
@@ -202,7 +202,7 @@ final class RunnersTest extends TestCase
 
     public function testChatRunnerFailsOnEmptyInput(): void
     {
-        $runner = new ChatRunner($this->createMock(AiFacade::class), $this->createMock(ModelConfigService::class), $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($this->createMock(AiFacade::class), $this->createMock(ModelConfigService::class), $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => '']);
 
         $result = $runner->run($node, $this->context($this->message()));
@@ -232,7 +232,7 @@ final class RunnersTest extends TestCase
             return [];
         });
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $vectorSearch, $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $vectorSearch, new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::RagQuery, [], ['text' => 'what does our contract say about notice periods?']);
 
         $context = new NodeContext(
@@ -261,7 +261,7 @@ final class RunnersTest extends TestCase
         $vectorSearch = $this->createMock(VectorSearchService::class);
         $vectorSearch->method('semanticSearch')->willThrowException(new \RuntimeException('qdrant down'));
 
-        $runner = new ChatRunner($aiFacade, $this->createMock(ModelConfigService::class), $vectorSearch, $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $this->createMock(ModelConfigService::class), $vectorSearch, new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::RagQuery, [], ['text' => 'question']);
 
         $result = $runner->run($node, $this->context($this->message('question')));
@@ -277,7 +277,7 @@ final class RunnersTest extends TestCase
         $aiFacade->method('chatStream')->willThrowException(new \RuntimeException('groq 500'));
         $modelConfig = $this->createMock(ModelConfigService::class);
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n2', Capability::Summarize, [], ['text' => 'input']);
 
         $result = $runner->run($node, $this->context($this->message()));

@@ -48,15 +48,41 @@ Defaults are **off** except budget notices:
 | `UPSTREAM_URL` | `https://api.anthropic.com` | Admin-set global upstream (HTTPS; http only for loopback/private) |
 | `MODEL_ALIASES` | `{}` | Map Claude Code model IDs → catalog IDs |
 | `BUDGET_NOTICE_ENABLED` | `1` | One-time ≥90% budget notice in the response |
+| `MCP_TOOLS_ENABLED` | `0` | Inject the user’s MCP catalog and run a server-side tool loop |
+| `MCP_TOOLS_WITH_CLIENT_TOOLS` | `0` | Also inject when the client already sent `tools` (off — Claude Code brings its own) |
+| `MCP_MAX_ITERATIONS` | `8` | Max LLM↔tool rounds per request |
+| `CONTEXT_INJECTION_ENABLED` | `0` | Append session-stable RAG/memory system block |
 
 Env fallback for local smoke tests: `MESSAGES_GATEWAY_UPSTREAM_URL` (DB value wins in production).
 
+Per-request overrides:
+
+- `X-Synaplan-Context: on|off` — force context injection on/off for one request
+- `X-Synaplan-Debug: 1` — response header `x-synaplan-context-hash` (SHA-256 of the injected block)
+
+For Claude Code, prefer native MCP over server-side injection:
+
+```bash
+claude mcp add --transport http synaplan https://your-synaplan-host/mcp \
+  --header "Authorization: Bearer sk_your_synaplan_api_key"
+```
+
 ## Metering
 
-Usage is recorded as `API_CHAT` with `source: MESSAGES_API`, including Anthropic cache token fields. Rate limits use the `MESSAGES` action. Cost budget is enforced before the request; concurrent streams may slightly overshoot (documented limitation).
+Usage is recorded as `API_CHAT` with `source: MESSAGES_API`, including Anthropic cache token fields. Outbound MCP tool calls record `source: MCP_TOOL`. Rate limits use the `MESSAGES` action. Cost budget is enforced before the request; concurrent streams may slightly overshoot (documented limitation).
+
+## Multi-provider aliases
+
+`MODEL_ALIASES` can point Claude Code model IDs at OpenAI or Gemini catalog models. The gateway translates the Anthropic wire format:
+
+- **OpenAI** — Chat Completions (`/v1/chat/completions`), not the Responses API
+- **Google/Gemini** — `generateContent` / `streamGenerateContent` with `parametersJsonSchema` for tools
+
+Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped before the upstream call. This routing works technically; Anthropic does not officially support Claude Code against non-Claude models through a gateway.
 
 ## Related
 
 - User docs: [docs.synaplan.com — Claude Code](https://docs.synaplan.com/) (page `claude-code`)
 - OpenAI-compatible sibling: [OPENAI_COMPATIBLE_API.md](./OPENAI_COMPATIBLE_API.md)
 - UI: **Channels → AI Agents**
+- Smoke scripts: `_devextras/testing/messages-gateway/`

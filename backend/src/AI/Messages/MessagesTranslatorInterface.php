@@ -27,7 +27,8 @@ interface MessagesTranslatorInterface
      *     anthropic_version?: string|null,
      *     anthropic_beta?: string|null,
      *     x_fixture?: string|null,
-     *     raw_body?: string|null
+     *     raw_body?: string|null,
+     *     parsed_events?: bool
      * } $context
      *
      * @return array{status: int, headers: array<string, list<string>>, body: array<string, mixed>|string, usage: MessagesUsage}
@@ -46,7 +47,8 @@ interface MessagesTranslatorInterface
      *     anthropic_version?: string|null,
      *     anthropic_beta?: string|null,
      *     x_fixture?: string|null,
-     *     raw_body?: string|null
+     *     raw_body?: string|null,
+     *     parsed_events?: bool
      * } $context
      * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
      */
