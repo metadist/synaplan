@@ -205,7 +205,7 @@
 
           <div class="space-y-3">
             <div
-              v-for="(data, source) in stats.breakdown.by_source"
+              v-for="(data, source) in channelBreakdown"
               :key="source"
               class="flex items-center justify-between p-3 surface-chip rounded-lg"
               data-testid="item-source"
@@ -229,7 +229,7 @@
             </div>
 
             <div
-              v-if="Object.keys(stats.breakdown.by_source).length === 0"
+              v-if="Object.keys(channelBreakdown).length === 0"
               class="text-center py-8 txt-secondary text-sm"
             >
               {{ $t('config.usage.noData') }}
@@ -292,6 +292,7 @@
           >
             <option value="">{{ $t('config.usage.activity.allActions') }}</option>
             <option value="MESSAGES">{{ $t('config.usage.actions.messages') }}</option>
+            <option value="API_CHAT">{{ $t('config.usage.actions.api_chat') }}</option>
             <option value="IMAGES">{{ $t('config.usage.actions.images') }}</option>
             <option value="VIDEOS">{{ $t('config.usage.actions.videos') }}</option>
             <option value="AUDIOS">{{ $t('config.usage.actions.audios') }}</option>
@@ -349,6 +350,7 @@
               <tr>
                 <th class="px-3 py-3 text-left">{{ $t('config.usage.time') }}</th>
                 <th class="px-3 py-3 text-left">{{ $t('config.usage.action') }}</th>
+                <th class="px-3 py-3 text-left">{{ $t('config.usage.channel') }}</th>
                 <th class="px-3 py-3 text-left">{{ $t('config.usage.model') }}</th>
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.promptTokens') }}</th>
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.completionTokens') }}</th>
@@ -370,6 +372,16 @@
                 <td class="px-3 py-3">
                   <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
                     {{ getActionLabel(entry.action) }}
+                  </span>
+                </td>
+                <td class="px-3 py-3 whitespace-nowrap">
+                  <span class="flex items-center gap-1.5 text-xs txt-secondary">
+                    <Icon
+                      :icon="getSourceIcon(entry.channel || 'WEB')"
+                      class="w-4 h-4"
+                      :class="getSourceIconColor(entry.channel || 'WEB')"
+                    />
+                    {{ getSourceLabel(entry.channel || 'WEB') }}
                   </span>
                 </td>
                 <td
@@ -407,7 +419,7 @@
               </tr>
 
               <tr v-if="activityItems.length === 0" data-testid="row-empty">
-                <td colspan="8" class="px-4 py-8 text-center txt-secondary text-sm">
+                <td colspan="9" class="px-4 py-8 text-center txt-secondary text-sm">
                   {{ $t('config.usage.noRecentActivity') }}
                 </td>
               </tr>
@@ -650,6 +662,15 @@ const totalMessages = computed(() => {
   return s.total_messages ?? s.usage?.MESSAGES?.used ?? 0
 })
 
+// Communication-channel breakdown (WEB, WIDGET, WHATSAPP, MESSAGES_API for
+// Claude Code, OPENAI_API, MCP, …). Older backends only return `by_source`
+// (grouped by AI provider) — fall back to it so the card never goes blank.
+const channelBreakdown = computed(() => {
+  const byChannel = stats.value?.breakdown.by_channel
+  if (byChannel && Object.keys(byChannel).length > 0) return byChannel
+  return stats.value?.breakdown.by_source ?? {}
+})
+
 const getSubscriptionStatusLabel = (status: SubscriptionStatus) => {
   return t(`config.usage.subscriptionStatus.${status}`)
 }
@@ -690,7 +711,18 @@ const getSourceIcon = (source: string) => {
     case 'EMAIL':
       return 'heroicons:envelope'
     case 'WEB':
+    case 'WEB_ASYNC':
+    case 'WEB_DESCRIBE':
       return 'heroicons:globe-alt'
+    case 'WIDGET':
+      return 'mdi:widgets-outline'
+    case 'MESSAGES_API':
+    case 'OPENAI_API':
+    case 'API_SUMMARY':
+      return 'mdi:console'
+    case 'MCP':
+    case 'MCP_TOOL':
+      return 'mdi:tools'
     default:
       return 'heroicons:device-phone-mobile'
   }
@@ -703,7 +735,18 @@ const getSourceIconBg = (source: string) => {
     case 'EMAIL':
       return 'bg-blue-500/10'
     case 'WEB':
+    case 'WEB_ASYNC':
+    case 'WEB_DESCRIBE':
       return 'bg-brand/10'
+    case 'WIDGET':
+      return 'bg-purple-500/10'
+    case 'MESSAGES_API':
+    case 'OPENAI_API':
+    case 'API_SUMMARY':
+      return 'bg-orange-500/10'
+    case 'MCP':
+    case 'MCP_TOOL':
+      return 'bg-teal-500/10'
     default:
       return 'bg-gray-500/10'
   }
@@ -716,7 +759,18 @@ const getSourceIconColor = (source: string) => {
     case 'EMAIL':
       return 'text-blue-500'
     case 'WEB':
+    case 'WEB_ASYNC':
+    case 'WEB_DESCRIBE':
       return 'txt-brand'
+    case 'WIDGET':
+      return 'text-purple-500'
+    case 'MESSAGES_API':
+    case 'OPENAI_API':
+    case 'API_SUMMARY':
+      return 'text-orange-500'
+    case 'MCP':
+    case 'MCP_TOOL':
+      return 'text-teal-500'
     default:
       return 'txt-secondary'
   }

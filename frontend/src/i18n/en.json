@@ -120,7 +120,8 @@
     "addinConnect": "Connect Outlook Add-in",
     "accountDeletion": "Account Deletion",
     "onboarding": "Welcome",
-    "mcpServers": "MCP Servers"
+    "mcpServers": "MCP Servers",
+    "aiAgents": "AI Agents"
   },
   "addinConnect": {
     "title": "Connect to Synaplan",
@@ -558,7 +559,8 @@
     "adminProviderSetup": "AI Providers",
     "more": "More",
     "moreDescription": "More sections and account",
-    "menu": "Menu"
+    "menu": "Menu",
+    "aiAgents": "AI Agents"
   },
   "chatInput": {
     "placeholder": "Type your message...",
@@ -1912,6 +1914,7 @@
       "time": "Time",
       "action": "Action",
       "source": "Source",
+      "channel": "Channel",
       "tokens": "Tokens",
       "latency": "Latency",
       "model": "Model",
@@ -1949,12 +1952,23 @@
         "file_analysis": "File Analysis",
         "sorting": "Classification",
         "search_query": "Search Query",
-        "embeddings": "Embeddings"
+        "embeddings": "Embeddings",
+        "api_chat": "API Chat"
       },
       "sources": {
         "whatsapp": "WhatsApp",
         "email": "Email",
-        "web": "Web"
+        "web": "Web",
+        "web_async": "Web",
+        "web_describe": "Web",
+        "widget": "Chat Widget",
+        "guest": "Guest",
+        "webhook": "Webhook",
+        "messages_api": "Claude Code (API)",
+        "openai_api": "API (OpenAI-compatible)",
+        "api_summary": "API Session Summary",
+        "mcp": "MCP",
+        "mcp_tool": "MCP Tools"
       },
       "periods": {
         "today": "Today",
@@ -4453,5 +4467,51 @@
     "usageUpdateFailed": "Could not update the task",
     "usageAdvancedHint": "More options per task (server restrictions, instructions, models):",
     "usageAdvancedLink": "AI Instructions"
+  },
+  "messagesGateway": {
+    "title": "AI Agents",
+    "description": "Connect Claude Code and other Anthropic-compatible agent tools to your Synaplan workspace. Requests go to POST /v1/messages and are metered against your Synaplan budget.",
+    "statusTitle": "Gateway status",
+    "statusEnabled": "Enabled",
+    "statusDisabled": "Disabled",
+    "budgetLine": "Budget used: {percent}% ({used} of {budget})",
+    "setupTitle": "Claude Code setup",
+    "setupHint": "Point Claude Code at this Synaplan instance. Use exactly one credential variable — ANTHROPIC_API_KEY (x-api-key) or ANTHROPIC_AUTH_TOKEN (Bearer).",
+    "copySetup": "Copy setup commands",
+    "copySuccess": "Setup commands copied",
+    "copyError": "Could not copy to clipboard",
+    "keyTitle": "Anthropic API key (bring your own)",
+    "keyHint": "Stored encrypted for your account. Used when the gateway forwards requests to Anthropic.",
+    "keySource": "Active key",
+    "apiKeyLabel": "API key",
+    "saveKey": "Save key",
+    "clearKey": "Remove key",
+    "clearKeyConfirmTitle": "Remove Anthropic key?",
+    "clearKeyConfirm": "Your personal Anthropic key will be removed. The gateway will only work if an operator key is allowed and configured.",
+    "saveKeySuccess": "API key saved",
+    "saveKeyError": "Could not save API key",
+    "clearKeySuccess": "API key removed",
+    "clearKeyError": "Could not remove API key",
+    "adminTitle": "Admin settings",
+    "enableLabel": "Enable Messages gateway for this instance",
+    "allowOperatorKeyLabel": "Allow operator Anthropic key as fallback (use with care)",
+    "upstreamLabel": "Upstream Anthropic URL",
+    "upstreamWarning": "All provider keys are sent to this host. Change only if you understand the risk.",
+    "saveUpstream": "Save upstream URL",
+    "upstreamSaved": "Upstream URL saved",
+    "upstreamError": "Could not save upstream URL",
+    "aliasesLabel": "Model aliases (JSON)",
+    "aliasesHint": "Map Claude Code model IDs to Synaplan catalog IDs, e.g. {\"claude-sonnet-4-6\": \"claude-sonnet-4-5-20250929\"}.",
+    "saveAliases": "Save aliases",
+    "aliasesSaved": "Aliases saved",
+    "aliasesError": "Could not save aliases (check JSON)",
+    "flagsSaved": "Settings saved",
+    "flagsError": "Could not save settings",
+    "loadError": "Could not load AI Agents settings",
+    "source": {
+      "user": "Your key",
+      "operator": "Operator key",
+      "none": "None configured"
+    }
   }
 }

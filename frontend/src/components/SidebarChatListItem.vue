@@ -67,7 +67,7 @@ interface Chat {
   id: string
   title: string
   timestamp: string
-  source?: 'web' | 'whatsapp' | 'email' | 'widget'
+  source?: 'web' | 'whatsapp' | 'email' | 'widget' | 'api'
 }
 
 const props = defineProps<{
@@ -83,6 +83,8 @@ const channelIcon = computed(() => {
       return 'mdi:email-outline'
     case 'widget':
       return 'mdi:widgets-outline'
+    case 'api':
+      return 'mdi:console'
     default:
       return null // web chats don't need an icon
   }
@@ -96,6 +98,8 @@ const channelIconClass = computed(() => {
       return 'text-blue-500'
     case 'widget':
       return 'text-purple-500'
+    case 'api':
+      return 'text-orange-500'
     default:
       return ''
   }

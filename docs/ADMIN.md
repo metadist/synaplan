@@ -337,6 +337,7 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 | WhatsApp | [WHATSAPP.md](WHATSAPP.md) |
 | Widget / Embed | [WIDGET.md](WIDGET.md) |
 | OpenAI-compatible API | [OPENAI_COMPATIBLE_API.md](OPENAI_COMPATIBLE_API.md) |
+| Anthropic-compatible API (Claude Code) | [ANTHROPIC_COMPATIBLE_API.md](ANTHROPIC_COMPATIBLE_API.md) |
 
 ---
 

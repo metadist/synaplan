@@ -9,6 +9,7 @@ use App\Controller\OpenAICompatibleController;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ModelRepository;
+use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -16,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 class OpenAICompatibleControllerTest extends TestCase
 {
@@ -26,6 +28,8 @@ class OpenAICompatibleControllerTest extends TestCase
     private ModelRepository&MockObject $modelRepository;
     private ModelConfigService&MockObject $modelConfigService;
     private RateLimitService&MockObject $rateLimitService;
+    private MessagesGatewayConfig&MockObject $messagesGatewayConfig;
+    private MessageBusInterface&MockObject $messageBus;
     private LoggerInterface&MockObject $logger;
     private OpenAICompatibleController $controller;
 
@@ -35,6 +39,8 @@ class OpenAICompatibleControllerTest extends TestCase
         $this->modelRepository = $this->createMock(ModelRepository::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->messagesGatewayConfig = $this->createMock(MessagesGatewayConfig::class);
+        $this->messageBus = $this->createMock(MessageBusInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->controller = new OpenAICompatibleController(
@@ -42,6 +48,8 @@ class OpenAICompatibleControllerTest extends TestCase
             $this->modelRepository,
             $this->modelConfigService,
             $this->rateLimitService,
+            $this->messagesGatewayConfig,
+            $this->messageBus,
             $this->logger,
         );
     }

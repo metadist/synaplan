@@ -70,6 +70,18 @@ export interface UsageStats {
         actions: Record<string, number>
       }
     >
+    /**
+     * Breakdown by communication channel (WEB, WIDGET, WHATSAPP, EMAIL,
+     * MESSAGES_API for Claude Code, OPENAI_API, API_SUMMARY, …) extracted
+     * from BUSELOG metadata. Optional — older backends may not return it.
+     */
+    by_channel?: Record<
+      string,
+      {
+        total: number
+        actions: Record<string, number>
+      }
+    >
     by_time: Record<
       string,
       {
@@ -83,6 +95,8 @@ export interface UsageStats {
     datetime: string
     action: string
     source: string
+    /** Communication channel (WEB, MESSAGES_API, OPENAI_API, …). Optional on older backends. */
+    channel?: string
     model: string
     tokens: number
     prompt_tokens: number
@@ -169,6 +183,8 @@ export interface ActivityEntry {
   datetime: string
   action: string
   source: string
+  /** Communication channel (WEB, MESSAGES_API, OPENAI_API, …). Optional on older backends. */
+  channel?: string
   model: string
   tokens: number
   prompt_tokens: number

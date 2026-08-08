@@ -22,7 +22,9 @@
 	# SSE/poll routes were removed in the realtime/Centrifugo migration,
 	# so only the AI streaming endpoints stay on this exclusion list.
 	@not_streaming {
-		not path /api/v1/messages/stream /api/v1/widget/*/message
+		# /v1/messages is the Anthropic-compatible gateway (Claude Code SSE).
+		# Exclude it from gzip/zstd or Caddy buffers the stream into one chunk.
+		not path /api/v1/messages/stream /api/v1/widget/*/message /v1/messages
 	}
 	encode @not_streaming zstd gzip
 
