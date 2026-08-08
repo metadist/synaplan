@@ -27,6 +27,7 @@ final readonly class MessagesGatewayConfig
     public const KEY_MCP_MAX_ITERATIONS = 'MCP_MAX_ITERATIONS';
     public const KEY_CONTEXT_INJECTION_ENABLED = 'CONTEXT_INJECTION_ENABLED';
     public const KEY_BUDGET_NOTICE_ENABLED = 'BUDGET_NOTICE_ENABLED';
+    public const KEY_SESSION_SUMMARY_ENABLED = 'SESSION_SUMMARY_ENABLED';
     public const KEY_MODEL_ALIASES = 'MODEL_ALIASES';
     public const KEY_UPSTREAM_URL = 'UPSTREAM_URL';
 
@@ -39,6 +40,7 @@ final readonly class MessagesGatewayConfig
     private const DEFAULT_MCP_MAX_ITERATIONS = 8;
     private const DEFAULT_CONTEXT_INJECTION_ENABLED = false;
     private const DEFAULT_BUDGET_NOTICE_ENABLED = true;
+    private const DEFAULT_SESSION_SUMMARY_ENABLED = true;
 
     private string $envUpstreamUrl;
 
@@ -99,6 +101,19 @@ final readonly class MessagesGatewayConfig
             self::KEY_BUDGET_NOTICE_ENABLED,
             $userId,
             self::DEFAULT_BUDGET_NOTICE_ENABLED,
+        );
+    }
+
+    /**
+     * Rolling per-session summary chat (default ON — the gateway itself is
+     * opt-in, and the summary is the user-visible activity trail).
+     */
+    public function isSessionSummaryEnabled(?int $userId): bool
+    {
+        return $this->resolveBool(
+            self::KEY_SESSION_SUMMARY_ENABLED,
+            $userId,
+            self::DEFAULT_SESSION_SUMMARY_ENABLED,
         );
     }
 

@@ -605,6 +605,8 @@ const getChannelIcon = (chat: StoreChat): string | null => {
       return 'mdi:email-outline'
     case 'widget':
       return 'mdi:widgets-outline'
+    case 'api':
+      return 'mdi:console'
     default:
       return null
   }
@@ -618,6 +620,8 @@ const getChannelIconClass = (chat: StoreChat): string => {
       return 'text-blue-500'
     case 'widget':
       return 'text-purple-500'
+    case 'api':
+      return 'text-orange-500'
     default:
       return ''
   }

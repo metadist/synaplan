@@ -2567,6 +2567,7 @@
       "time": "Zaman",
       "action": "Eylem",
       "source": "Kaynak",
+      "channel": "Kanal",
       "tokens": "Token",
       "latency": "Gecikme",
       "noRecentActivity": "Son aktivite yok",
@@ -2577,12 +2578,23 @@
         "audios": "Ses Dosyaları",
         "file_analysis": "Dosya Analizi",
         "sorting": "Sınıflandırma",
-        "search_query": "Arama Sorgusu"
+        "search_query": "Arama Sorgusu",
+        "api_chat": "API Sohbeti"
       },
       "sources": {
         "whatsapp": "WhatsApp",
         "email": "E-posta",
-        "web": "Web"
+        "web": "Web",
+        "web_async": "Web",
+        "web_describe": "Web",
+        "widget": "Sohbet widget'ı",
+        "guest": "Misafir",
+        "webhook": "Webhook",
+        "messages_api": "Claude Code (API)",
+        "openai_api": "API (OpenAI uyumlu)",
+        "api_summary": "API oturum özeti",
+        "mcp": "MCP",
+        "mcp_tool": "MCP Araçları"
       },
       "periods": {
         "today": "Bugün",

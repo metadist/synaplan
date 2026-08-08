@@ -34,6 +34,7 @@ final class Version20260807120000 extends AbstractMigration
                 (0, 'MESSAGES_GATEWAY', 'MCP_MAX_ITERATIONS', '8'),
                 (0, 'MESSAGES_GATEWAY', 'CONTEXT_INJECTION_ENABLED', '0'),
                 (0, 'MESSAGES_GATEWAY', 'BUDGET_NOTICE_ENABLED', '1'),
+                (0, 'MESSAGES_GATEWAY', 'SESSION_SUMMARY_ENABLED', '1'),
                 (0, 'MESSAGES_GATEWAY', 'MODEL_ALIASES', '{}'),
                 (0, 'MESSAGES_GATEWAY', 'UPSTREAM_URL', 'https://api.anthropic.com')
         SQL);

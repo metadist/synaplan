@@ -2566,6 +2566,7 @@
       "time": "Tiempo",
       "action": "Acción",
       "source": "Fuente",
+      "channel": "Canal",
       "tokens": "Tokens",
       "latency": "Latencia",
       "noRecentActivity": "Sin actividad reciente",
@@ -2576,12 +2577,23 @@
         "audios": "Archivos de Audio",
         "file_analysis": "Análisis de Archivos",
         "sorting": "Clasificación",
-        "search_query": "Consulta de búsqueda"
+        "search_query": "Consulta de búsqueda",
+        "api_chat": "Chat de API"
       },
       "sources": {
         "whatsapp": "WhatsApp",
         "email": "Email",
-        "web": "Web"
+        "web": "Web",
+        "web_async": "Web",
+        "web_describe": "Web",
+        "widget": "Widget de chat",
+        "guest": "Invitado",
+        "webhook": "Webhook",
+        "messages_api": "Claude Code (API)",
+        "openai_api": "API (compatible con OpenAI)",
+        "api_summary": "Resumen de sesión de API",
+        "mcp": "MCP",
+        "mcp_tool": "Herramientas MCP"
       },
       "periods": {
         "today": "Hoy",

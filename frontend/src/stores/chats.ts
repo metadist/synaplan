@@ -36,7 +36,7 @@ export interface Chat {
   updatedAt: string
   messageCount?: number
   isShared?: boolean
-  source?: 'web' | 'whatsapp' | 'email' | 'widget'
+  source?: 'web' | 'whatsapp' | 'email' | 'widget' | 'api'
   widgetSession?: WidgetSessionInfo | null
   firstMessagePreview?: string | null
 }

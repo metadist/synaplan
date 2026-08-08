@@ -43,6 +43,7 @@ final class MessagesContextInjectorTest extends TestCase
             ['id' => 5, 'chunk_text' => 'kb hit'],
         ]);
 
+        /** @var mixed $stored written by reference in the set() stub below */
         $stored = null;
         $item = $this->createMock(CacheItemInterface::class);
         $item->method('isHit')->willReturnCallback(function () use (&$stored): bool {

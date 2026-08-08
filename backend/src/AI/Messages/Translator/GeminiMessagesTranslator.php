@@ -436,7 +436,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
     }
 
     /**
-     * @param array<string, mixed> $requestBody
+     * @param array<string, mixed>                                                    $requestBody
      * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
      */
     private function streamGeminiToAnthropic(ResponseInterface $response, array $requestBody, callable $emit): MessagesUsage

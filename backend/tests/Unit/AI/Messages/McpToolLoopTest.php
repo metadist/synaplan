@@ -32,7 +32,7 @@ final class McpToolLoopTest extends TestCase
         $ref->setValue($server, 1);
 
         $servers = $this->createMock(McpServerConfigRepository::class);
-        $servers->method('findByIdAndUser')->with(1, 5)->willReturn($server);
+        $servers->method('findByIdAndUser')->willReturnMap([[1, 5, $server]]);
 
         $client = $this->createMock(McpClient::class);
         $client->expects($this->once())->method('callTool')->with($server, 'rag_search', ['query' => 'test'])->willReturn([

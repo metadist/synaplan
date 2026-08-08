@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\MessagesUsage;
 use App\Entity\User;
+use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -221,6 +222,7 @@ final class MessagesApiController extends AbstractController
      *     resolved: array{provider: string, providerModelId: string, displayModel: string, model_id: int, requested: string, aliased_from: string|null},
      *     budget: array<string, mixed>,
      *     session_id: string|null,
+     *     session_key: string,
      *     body_mutated: bool,
      *     request_body: array<string, mixed>,
      *     translator_context: array<string, mixed>,
@@ -258,14 +260,32 @@ final class MessagesApiController extends AbstractController
             $buffer = '';
             $highestBlockIndex = -1;
             $noticeEmitted = false;
+            // Tee of streamed text deltas for the async session summary —
+            // capped so a long response never bloats memory or the queue.
+            $responseTextTee = '';
+            $teeCap = ApiSessionSummaryService::EXCERPT_MAX_CHARS;
+            $collectText = function (array $decoded) use (&$responseTextTee, $teeCap): void {
+                if (mb_strlen($responseTextTee) >= $teeCap) {
+                    return;
+                }
+                if ('content_block_delta' === ($decoded['type'] ?? '')
+                    && 'text_delta' === ($decoded['delta']['type'] ?? '')
+                    && \is_string($decoded['delta']['text'] ?? null)
+                ) {
+                    $responseTextTee .= $decoded['delta']['text'];
+                }
+            };
 
-            $emit = function (string|array $chunk) use (&$buffer, &$highestBlockIndex, &$noticeEmitted, $prepared, $user): void {
+            $emit = function (string|array $chunk) use (&$buffer, &$highestBlockIndex, &$noticeEmitted, $collectText, $prepared, $user): void {
                 set_time_limit(0);
 
                 if (\is_array($chunk)) {
                     // Synthesized event path (Phase 2+); Phase 1 passthrough uses strings.
                     $event = $chunk['event'] ?? 'message';
                     $data = $chunk['data'] ?? [];
+                    if (\is_array($data)) {
+                        $collectText($data);
+                    }
                     echo 'event: '.$event."\n";
                     echo 'data: '.json_encode($data, \JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
                     if (ob_get_level()) {
@@ -290,6 +310,7 @@ final class MessagesApiController extends AbstractController
                         $payload = trim(substr($line, 5));
                         $decoded = json_decode($payload, true);
                         if (\is_array($decoded)) {
+                            $collectText($decoded);
                             $type = $decoded['type'] ?? '';
                             if ('content_block_start' === $type && isset($decoded['index'])) {
                                 $highestBlockIndex = max($highestBlockIndex, (int) $decoded['index']);
@@ -338,7 +359,7 @@ final class MessagesApiController extends AbstractController
             };
 
             try {
-                $this->gateway->executeStream($prepared, $user, $emit);
+                $usage = $this->gateway->executeStream($prepared, $user, $emit);
                 // Flush any remaining buffer (incomplete trailing line).
                 if ('' !== $buffer) {
                     echo $buffer;
@@ -346,6 +367,11 @@ final class MessagesApiController extends AbstractController
                         ob_flush();
                     }
                     flush();
+                }
+                // Queue the debounced session summary — only for streams that
+                // actually produced billable output (mirrors recordUsage).
+                if ($usage->outputTokens > 0 || $usage->inputTokens > 0) {
+                    $this->gateway->dispatchSessionSummary($prepared, $user, $responseTextTee);
                 }
             } catch (\Throwable $e) {
                 $this->logger->error('MessagesGateway: stream failed', [

@@ -69,7 +69,7 @@ final readonly class McpToolLoop
         if ($item->isHit()) {
             $cached = $item->get();
             if (\is_array($cached) && isset($cached['tools'], $cached['dispatch'])) {
-                /** @var CatalogSnapshot $cached */
+                /* @var CatalogSnapshot $cached */
                 return $cached;
             }
         }
@@ -221,9 +221,9 @@ final readonly class McpToolLoop
      * Streaming tool loop — one client-visible message, server-side MCP rounds
      * suppressed from the wire, keep-alive pings during tool execution.
      *
-     * @param array<string, mixed>                                              $requestBody
-     * @param array<string, mixed>                                              $translatorContext
-     * @param CatalogSnapshot                                                   $snapshot
+     * @param array<string, mixed>                                                    $requestBody
+     * @param array<string, mixed>                                                    $translatorContext
+     * @param CatalogSnapshot                                                         $snapshot
      * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
      */
     public function runStream(
@@ -510,9 +510,9 @@ final readonly class McpToolLoop
     }
 
     /**
-     * @param list<array<string, mixed>>                                                                 $toolUses
+     * @param list<array<string, mixed>>                                                           $toolUses
      * @param array<string, array{serverId: int, tool: string, annotations: array<string, mixed>}> $dispatch
-     * @param (callable(): void)|null                                                                     $ping
+     * @param (callable(): void)|null                                                              $ping
      *
      * @return list<array<string, mixed>> tool_result content blocks
      */
@@ -612,9 +612,9 @@ final readonly class McpToolLoop
     }
 
     /**
-     * @param array<string, mixed>           $requestBody
-     * @param list<array<string, mixed>>     $assistantContent
-     * @param list<array<string, mixed>>     $toolResults
+     * @param array<string, mixed>       $requestBody
+     * @param list<array<string, mixed>> $assistantContent
+     * @param list<array<string, mixed>> $toolResults
      *
      * @return array<string, mixed>
      */

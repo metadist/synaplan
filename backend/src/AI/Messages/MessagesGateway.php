@@ -6,15 +6,17 @@ namespace App\AI\Messages;
 
 use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\Mcp\McpToolLoop;
-use App\AI\Messages\MessagesContextInjector;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\Entity\User;
+use App\Message\SummarizeApiSessionCommand;
+use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Orchestrates a Messages API request: feature flag, budget, model resolve,
@@ -42,6 +44,7 @@ use Symfony\Component\HttpFoundation\Request;
  *     },
  *     budget: array<string, mixed>,
  *     session_id: string|null,
+ *     session_key: string,
  *     body_mutated: bool,
  *     request_body: array<string, mixed>,
  *     translator_context: array<string, mixed>,
@@ -78,6 +81,7 @@ final readonly class MessagesGateway
         private McpToolLoop $mcpToolLoop,
         private MessagesContextInjector $contextInjector,
         private CacheItemPoolInterface $cache,
+        private MessageBusInterface $messageBus,
         private LoggerInterface $logger,
         #[AutowireIterator('app.messages.translator')]
         private iterable $translators = [],
@@ -254,6 +258,7 @@ final readonly class MessagesGateway
             'resolved' => $resolved,
             'budget' => $budget,
             'session_id' => $sessionId,
+            'session_key' => $sessionKey,
             'body_mutated' => $bodyMutated,
             'request_body' => $requestBody,
             'translator_context' => $translatorContext,
@@ -305,6 +310,7 @@ final readonly class MessagesGateway
 
         if ($status < 400 && \is_array($body)) {
             $this->recordUsage($user, $prepared, $usage, $body);
+            $this->dispatchSessionSummary($prepared, $user, $this->extractResponseText($body));
             $body = $this->maybeAppendBudgetNoticeNonStream($prepared, $body, $usage);
         }
 
@@ -462,24 +468,8 @@ final readonly class MessagesGateway
      */
     private function recordUsage(User $user, array $prepared, MessagesUsage $usage, ?array $responseBody): void
     {
-        $inputText = '';
-        foreach (array_reverse($prepared['request_body']['messages'] ?? []) as $msg) {
-            if (!\is_array($msg) || 'user' !== ($msg['role'] ?? '')) {
-                continue;
-            }
-            $content = $msg['content'] ?? '';
-            $inputText = \is_string($content) ? $content : (json_encode($content, \JSON_INVALID_UTF8_SUBSTITUTE) ?: '');
-            break;
-        }
-
-        $responseText = '';
-        if (null !== $responseBody && isset($responseBody['content']) && \is_array($responseBody['content'])) {
-            foreach ($responseBody['content'] as $block) {
-                if (\is_array($block) && 'text' === ($block['type'] ?? '') && isset($block['text'])) {
-                    $responseText .= (string) $block['text'];
-                }
-            }
-        }
+        $inputText = $this->lastUserText($prepared['request_body']);
+        $responseText = null !== $responseBody ? $this->extractResponseText($responseBody) : '';
 
         try {
             $this->rateLimitService->recordUsage($user, 'API_CHAT', [
@@ -497,6 +487,81 @@ final readonly class MessagesGateway
                 'user_id' => $user->getId(),
             ]);
         }
+    }
+
+    /**
+     * Queue the debounced per-session summary refresh (Channels → chat list
+     * "what happened over the API" trail). Never blocks or fails the request
+     * path; excerpts are capped before entering the queue payload.
+     *
+     * @param GatewaySuccess $prepared
+     */
+    public function dispatchSessionSummary(array $prepared, User $user, string $responseText): void
+    {
+        if (!$this->config->isSessionSummaryEnabled($user->getId())) {
+            return;
+        }
+
+        $cap = ApiSessionSummaryService::EXCERPT_MAX_CHARS;
+
+        try {
+            $this->messageBus->dispatch(new SummarizeApiSessionCommand(
+                userId: (int) $user->getId(),
+                sessionKey: $prepared['session_key'],
+                client: 'claude-code',
+                model: $prepared['resolved']['displayModel'],
+                requestExcerpt: mb_substr($this->lastUserText($prepared['request_body']), 0, $cap),
+                responseExcerpt: mb_substr($responseText, 0, $cap),
+            ));
+        } catch (\Throwable $e) {
+            $this->logger->warning('MessagesGateway: session summary dispatch failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $user->getId(),
+            ]);
+        }
+    }
+
+    /**
+     * Last user-turn text of an Anthropic-shaped request body.
+     *
+     * @param array<string, mixed> $requestBody
+     */
+    private function lastUserText(array $requestBody): string
+    {
+        $messages = $requestBody['messages'] ?? [];
+        if (!\is_array($messages)) {
+            return '';
+        }
+
+        foreach (array_reverse($messages) as $msg) {
+            if (!\is_array($msg) || 'user' !== ($msg['role'] ?? '')) {
+                continue;
+            }
+            $content = $msg['content'] ?? '';
+
+            return \is_string($content) ? $content : (json_encode($content, \JSON_INVALID_UTF8_SUBSTITUTE) ?: '');
+        }
+
+        return '';
+    }
+
+    /**
+     * Concatenated text blocks of an Anthropic-shaped response body.
+     *
+     * @param array<string, mixed> $responseBody
+     */
+    private function extractResponseText(array $responseBody): string
+    {
+        $responseText = '';
+        if (isset($responseBody['content']) && \is_array($responseBody['content'])) {
+            foreach ($responseBody['content'] as $block) {
+                if (\is_array($block) && 'text' === ($block['type'] ?? '') && isset($block['text'])) {
+                    $responseText .= (string) $block['text'];
+                }
+            }
+        }
+
+        return $responseText;
     }
 
     /**

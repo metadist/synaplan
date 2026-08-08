@@ -73,8 +73,7 @@
         <pre
           class="p-4 rounded-lg surface-chip txt-primary text-xs font-mono overflow-x-auto whitespace-pre-wrap"
           data-testid="text-setup-snippet"
-          >{{ setupSnippet }}</pre
-        >
+          >{{ setupSnippet }}</pre>
         <button
           type="button"
           class="btn-primary mt-3 px-4 py-2 rounded-lg text-sm font-medium"
@@ -97,16 +96,15 @@
             {{ $t('messagesGateway.keySource') }}:
             <strong class="txt-primary">{{ anthropicSourceLabel }}</strong>
           </span>
-          <code
-            v-if="status.keys.anthropic?.has_user_key"
-            class="font-mono text-xs txt-secondary"
-          >
+          <code v-if="status.keys.anthropic?.has_user_key" class="font-mono text-xs txt-secondary">
             {{ status.keys.anthropic.user_key_masked }}
           </code>
         </div>
 
         <label class="block mb-4">
-          <span class="text-sm font-medium txt-primary">{{ $t('messagesGateway.apiKeyLabel') }}</span>
+          <span class="text-sm font-medium txt-primary">{{
+            $t('messagesGateway.apiKeyLabel')
+          }}</span>
           <input
             v-model="apiKey"
             type="password"

@@ -10,8 +10,9 @@ use Doctrine\DBAL\Connection;
 /**
  * Idempotent seeder for the Anthropic Messages gateway flags (BCONFIG, ownerId=0).
  *
- * All feature flags default OFF except BUDGET_NOTICE_ENABLED. Existing operator
- * rows are never overwritten (INSERT IGNORE).
+ * All feature flags default OFF except BUDGET_NOTICE_ENABLED and
+ * SESSION_SUMMARY_ENABLED (both only take effect once the gateway itself is
+ * enabled). Existing operator rows are never overwritten (INSERT IGNORE).
  */
 final readonly class MessagesGatewayConfigSeeder
 {
@@ -30,6 +31,7 @@ final readonly class MessagesGatewayConfigSeeder
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_MCP_MAX_ITERATIONS, 'value' => '8'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_CONTEXT_INJECTION_ENABLED, 'value' => '0'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_BUDGET_NOTICE_ENABLED, 'value' => '1'],
+            ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_SESSION_SUMMARY_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_MODEL_ALIASES, 'value' => '{}'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_UPSTREAM_URL, 'value' => MessagesGatewayConfig::DEFAULT_UPSTREAM_URL],
         ];

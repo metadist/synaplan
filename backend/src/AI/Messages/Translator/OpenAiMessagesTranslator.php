@@ -238,7 +238,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
                 'input_tokens' => (int) ($usageIn['prompt_tokens'] ?? 0),
                 'output_tokens' => (int) ($usageIn['completion_tokens'] ?? 0),
                 'cache_creation_input_tokens' => 0,
-                'cache_read_input_tokens' => (int) (($usageIn['prompt_tokens_details']['cached_tokens'] ?? 0)),
+                'cache_read_input_tokens' => (int) ($usageIn['prompt_tokens_details']['cached_tokens'] ?? 0),
             ],
         ];
     }
@@ -395,7 +395,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
     }
 
     /**
-     * @param array<string, mixed>                                              $requestBody
+     * @param array<string, mixed>                                                    $requestBody
      * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
      */
     private function streamOpenAiToAnthropic(ResponseInterface $response, array $requestBody, callable $emit): MessagesUsage
