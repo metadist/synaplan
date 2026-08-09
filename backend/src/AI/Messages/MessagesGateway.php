@@ -8,11 +8,14 @@ use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
+use App\Entity\Model;
 use App\Entity\User;
 use App\Message\SummarizeApiSessionCommand;
+use App\Repository\ModelRepository;
 use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
+use App\Service\Vision\VisionModelResolver;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
@@ -57,6 +60,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *     }|null,
  *     replaced_server_tools: list<string>,
  *     web_search: string,
+ *     vision: string,
  *     context_hash: string|null,
  *     debug: bool
  * }
@@ -80,12 +84,17 @@ final readonly class MessagesGateway
      */
     public const BYO_ALLOWED_LEVELS = ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
 
+    /** Providers the Messages gateway can translate to. */
+    private const GATEWAY_PROVIDERS = ['anthropic', 'openai', 'google', 'gemini'];
+
     /**
      * @param iterable<MessagesTranslatorInterface> $translators
      */
     public function __construct(
         private MessagesGatewayConfig $config,
         private MessagesModelResolver $modelResolver,
+        private ModelRepository $modelRepository,
+        private VisionModelResolver $visionModelResolver,
         private UserProviderKeyResolver $keyResolver,
         private RateLimitService $rateLimitService,
         private AnthropicPassthroughTranslator $anthropicPassthrough,
@@ -154,6 +163,19 @@ final readonly class MessagesGateway
             );
         }
 
+        $requestBody = $decoded;
+        $bodyMutated = false;
+        $visionHandling = GatewayToolCatalog::VISION_NONE;
+        $visionRewrite = $this->maybeRewriteForVision($user, $resolved, $decoded);
+        if (null !== $visionRewrite) {
+            $resolved = $visionRewrite['resolved'];
+            $visionHandling = $visionRewrite['vision'];
+            if ($visionRewrite['mutated']) {
+                $requestBody['model'] = $resolved['providerModelId'];
+                $bodyMutated = true;
+            }
+        }
+
         $allowOperator = $this->config->allowOperatorKey($user->getId());
         $credential = $this->keyResolver->resolve($resolved['provider'], $user->getId(), $allowOperator);
         if (null === $credential) {
@@ -206,8 +228,6 @@ final readonly class MessagesGateway
         }
 
         $stream = (bool) ($decoded['stream'] ?? false);
-        $bodyMutated = false;
-        $requestBody = $decoded;
 
         // Alias rewrite: if the resolved provider model id differs from the
         // requested string, rewrite `model` so the upstream receives a real id.
@@ -293,6 +313,7 @@ final readonly class MessagesGateway
             'tool_catalog' => $toolCatalog,
             'replaced_server_tools' => $replacedServerTools,
             'web_search' => $webSearch,
+            'vision' => $visionHandling,
             'context_hash' => $contextHash,
             'debug' => '1' === $request->headers->get('x-synaplan-debug'),
         ];
@@ -473,6 +494,153 @@ final readonly class MessagesGateway
             (float) ($budget['used_cost'] ?? 0),
             (float) ($budget['budget'] ?? 0),
         );
+    }
+
+    /**
+     * When the turn carries images, either rewrite onto Synaplan's PIC2TEXT /
+     * catalog vision model or leave the Anthropic-shaped request on the wire.
+     *
+     * @param array{
+     *     provider: string,
+     *     providerModelId: string,
+     *     displayModel: string,
+     *     model_id: int,
+     *     requested: string,
+     *     aliased_from: string|null
+     * } $resolved
+     * @param array<string, mixed> $decoded
+     *
+     * @return array{
+     *     resolved: array{
+     *         provider: string,
+     *         providerModelId: string,
+     *         displayModel: string,
+     *         model_id: int,
+     *         requested: string,
+     *         aliased_from: string|null
+     *     },
+     *     vision: string,
+     *     mutated: bool
+     * }|null
+     */
+    private function maybeRewriteForVision(User $user, array $resolved, array $decoded): ?array
+    {
+        if (!$this->requestHasImages($decoded)) {
+            return [
+                'resolved' => $resolved,
+                'vision' => GatewayToolCatalog::VISION_NONE,
+                'mutated' => false,
+            ];
+        }
+
+        $mode = $this->config->visionMode($user->getId());
+        if (\in_array($mode, [MessagesGatewayConfig::VISION_PASSTHROUGH, MessagesGatewayConfig::VISION_OFF], true)) {
+            return [
+                'resolved' => $resolved,
+                'vision' => GatewayToolCatalog::VISION_PASSTHROUGH,
+                'mutated' => false,
+            ];
+        }
+
+        $current = $this->modelRepository->find($resolved['model_id']);
+        $supportsVision = $current instanceof Model && $current->hasFeature('vision');
+        $wantSynaplan = MessagesGatewayConfig::VISION_SYNAPLAN === $mode
+            || (MessagesGatewayConfig::VISION_AUTO === $mode && !$supportsVision);
+
+        if (!$wantSynaplan) {
+            return [
+                'resolved' => $resolved,
+                'vision' => GatewayToolCatalog::VISION_PASSTHROUGH,
+                'mutated' => false,
+            ];
+        }
+
+        $visionModel = $this->visionModelResolver->resolve($user->getId());
+        if (!$visionModel instanceof Model) {
+            $this->logger->info('MessagesGateway: no Synaplan vision model available, funneling images upstream', [
+                'user_id' => $user->getId(),
+                'mode' => $mode,
+            ]);
+
+            return [
+                'resolved' => $resolved,
+                'vision' => GatewayToolCatalog::VISION_PASSTHROUGH,
+                'mutated' => false,
+            ];
+        }
+
+        $provider = strtolower($visionModel->getService());
+        if (!\in_array($provider, self::GATEWAY_PROVIDERS, true)) {
+            $this->logger->info('MessagesGateway: vision model provider not supported by gateway, funneling images upstream', [
+                'user_id' => $user->getId(),
+                'provider' => $provider,
+                'model_id' => $visionModel->getId(),
+            ]);
+
+            return [
+                'resolved' => $resolved,
+                'vision' => GatewayToolCatalog::VISION_PASSTHROUGH,
+                'mutated' => false,
+            ];
+        }
+
+        if ((int) $visionModel->getId() === $resolved['model_id']) {
+            return [
+                'resolved' => $resolved,
+                'vision' => GatewayToolCatalog::VISION_PASSTHROUGH,
+                'mutated' => false,
+            ];
+        }
+
+        $providerModelId = $visionModel->getProviderId() ?: $visionModel->getName();
+        $this->logger->info('MessagesGateway: rewriting image turn onto Synaplan vision model', [
+            'user_id' => $user->getId(),
+            'from_model_id' => $resolved['model_id'],
+            'to_model_id' => $visionModel->getId(),
+            'provider' => $provider,
+            'mode' => $mode,
+        ]);
+
+        return [
+            'resolved' => [
+                'provider' => $provider,
+                'providerModelId' => $providerModelId,
+                'displayModel' => $providerModelId,
+                'model_id' => (int) $visionModel->getId(),
+                'requested' => $resolved['requested'],
+                'aliased_from' => $resolved['aliased_from'],
+            ],
+            'vision' => GatewayToolCatalog::VISION_SYNAPLAN,
+            'mutated' => true,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $decoded
+     */
+    private function requestHasImages(array $decoded): bool
+    {
+        $messages = $decoded['messages'] ?? null;
+        if (!\is_array($messages)) {
+            return false;
+        }
+
+        foreach ($messages as $message) {
+            if (!\is_array($message)) {
+                continue;
+            }
+            $content = $message['content'] ?? null;
+            if (!\is_array($content)) {
+                continue;
+            }
+            foreach ($content as $block) {
+                if (\is_array($block) && 'image' === ($block['type'] ?? null)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function pickTranslator(string $provider): ?MessagesTranslatorInterface

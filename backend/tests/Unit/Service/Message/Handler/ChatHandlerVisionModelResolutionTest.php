@@ -21,6 +21,7 @@ use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
+use App\Service\Vision\VisionModelResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -120,6 +121,7 @@ class ChatHandlerVisionModelResolutionTest extends TestCase
             $this->createMock(DocumentImageCatalog::class),
             new TimeContextBuilder(),
             new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            new VisionModelResolver($modelConfig, $repo),
         );
     }
 }

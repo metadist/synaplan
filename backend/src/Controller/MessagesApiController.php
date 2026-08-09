@@ -125,6 +125,7 @@ final class MessagesApiController extends AbstractController
         }
 
         $this->addWebSearchHeader($response, $prepared);
+        $this->addVisionHeader($response, $prepared);
         if (!empty($prepared['debug']) && !empty($prepared['context_hash'])) {
             $response->headers->set('x-synaplan-context-hash', (string) $prepared['context_hash']);
         }
@@ -145,6 +146,20 @@ final class MessagesApiController extends AbstractController
         $mode = $prepared['web_search'] ?? null;
         if (\is_string($mode) && '' !== $mode && GatewayToolCatalog::WEB_SEARCH_NONE !== $mode) {
             $response->headers->set('x-synaplan-web-search', $mode);
+        }
+    }
+
+    /**
+     * Tell the caller how image turns were handled — `synaplan` (rewrote onto
+     * a Synaplan vision model) or `passthrough` (left on the wire).
+     *
+     * @param array<string, mixed> $prepared
+     */
+    private function addVisionHeader(Response $response, array $prepared): void
+    {
+        $mode = $prepared['vision'] ?? null;
+        if (\is_string($mode) && '' !== $mode && GatewayToolCatalog::VISION_NONE !== $mode) {
+            $response->headers->set('x-synaplan-vision', $mode);
         }
     }
 
@@ -266,6 +281,7 @@ final class MessagesApiController extends AbstractController
             $response->headers->set($name, $value);
         }
         $this->addWebSearchHeader($response, $prepared);
+        $this->addVisionHeader($response, $prepared);
         if (!empty($prepared['debug']) && !empty($prepared['context_hash'])) {
             $response->headers->set('x-synaplan-context-hash', (string) $prepared['context_hash']);
         }

@@ -26,6 +26,7 @@ final readonly class MessagesGatewayConfig
     public const KEY_MCP_TOOLS_WITH_CLIENT_TOOLS = 'MCP_TOOLS_WITH_CLIENT_TOOLS';
     public const KEY_MCP_MAX_ITERATIONS = 'MCP_MAX_ITERATIONS';
     public const KEY_WEB_SEARCH_MODE = 'WEB_SEARCH_MODE';
+    public const KEY_VISION_MODE = 'VISION_MODE';
     public const KEY_CONTEXT_INJECTION_ENABLED = 'CONTEXT_INJECTION_ENABLED';
     public const KEY_BUDGET_NOTICE_ENABLED = 'BUDGET_NOTICE_ENABLED';
     public const KEY_SESSION_SUMMARY_ENABLED = 'SESSION_SUMMARY_ENABLED';
@@ -50,12 +51,29 @@ final readonly class MessagesGatewayConfig
         self::WEB_SEARCH_OFF,
     ];
 
+    /** Synaplan vision when the resolved model cannot see images (or always, in synaplan mode); else funnel. */
+    public const VISION_AUTO = 'auto';
+    /** Prefer the account's PIC2TEXT / catalog vision model for every image turn. */
+    public const VISION_SYNAPLAN = 'synaplan';
+    /** Never rewrite the model; leave images on the wire for the upstream. */
+    public const VISION_PASSTHROUGH = 'passthrough';
+    /** Never rewrite and do not offer the analyze_image tool. */
+    public const VISION_OFF = 'off';
+
+    public const VISION_MODES = [
+        self::VISION_AUTO,
+        self::VISION_SYNAPLAN,
+        self::VISION_PASSTHROUGH,
+        self::VISION_OFF,
+    ];
+
     private const DEFAULT_ENABLED = false;
     private const DEFAULT_ALLOW_OPERATOR_KEY = false;
     private const DEFAULT_MCP_TOOLS_ENABLED = false;
     private const DEFAULT_MCP_TOOLS_WITH_CLIENT_TOOLS = false;
     private const DEFAULT_MCP_MAX_ITERATIONS = 8;
     private const DEFAULT_WEB_SEARCH_MODE = self::WEB_SEARCH_AUTO;
+    private const DEFAULT_VISION_MODE = self::VISION_AUTO;
     private const DEFAULT_CONTEXT_INJECTION_ENABLED = false;
     private const DEFAULT_BUDGET_NOTICE_ENABLED = true;
     private const DEFAULT_SESSION_SUMMARY_ENABLED = true;
@@ -126,6 +144,31 @@ final readonly class MessagesGatewayConfig
 
         if (!\in_array($raw, self::WEB_SEARCH_MODES, true)) {
             return self::DEFAULT_WEB_SEARCH_MODE;
+        }
+
+        return $raw;
+    }
+
+    /**
+     * How the gateway handles image turns for Claude Code compatibility.
+     *
+     * `auto` (default) rewrites to the user's PIC2TEXT / catalog vision model
+     * only when the resolved model lacks `vision`; otherwise images stay on the
+     * wire for Anthropic (or any vision-capable upstream). Unknown values fall
+     * back to the default so a typo cannot silently disable vision.
+     *
+     * @return self::VISION_AUTO|self::VISION_SYNAPLAN|self::VISION_PASSTHROUGH|self::VISION_OFF
+     */
+    public function visionMode(?int $userId): string
+    {
+        $raw = strtolower(trim((string) $this->resolveString(
+            self::KEY_VISION_MODE,
+            $userId,
+            self::DEFAULT_VISION_MODE,
+        )));
+
+        if (!\in_array($raw, self::VISION_MODES, true)) {
+            return self::DEFAULT_VISION_MODE;
         }
 
         return $raw;

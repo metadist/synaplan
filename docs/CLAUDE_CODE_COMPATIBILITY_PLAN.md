@@ -133,6 +133,23 @@ without the picture and answered plausibly and wrongly.
 This does not apply to the Anthropic passthrough route, where image blocks were
 already forwarded byte-for-byte.
 
+### Phase 1b — Synaplan vision funnel (done)
+
+Wire translation alone still ignored Synaplan’s PIC2TEXT defaults. The gateway
+now follows the same satisfy-or-passthrough contract as web search:
+
+- `VISION_MODE=auto` (default): if the turn has images and the resolved model
+  lacks `vision`, rewrite onto the user’s PIC2TEXT / catalog vision model when
+  that provider is Anthropic, OpenAI, or Google; otherwise leave images on the
+  wire for the upstream.
+- Explicit `synaplan` prefers PIC2TEXT for every image turn; `passthrough` /
+  `off` never rewrite (`off` also skips the native tool).
+- Shared `VisionModelResolver` (also used by `ChatHandler`) owns the PIC2TEXT →
+  catalog fallback.
+- When Synaplan vision is available, `AnalyzeImageTool` (`analyze_image`) is
+  offered in `GatewayToolCatalog` for on-demand OCR/describe via `AiFacade`.
+- Applied handling is echoed as `x-synaplan-vision`.
+
 ### Phase 2 — web search through the funnel (done)
 
 - `AnthropicServerTools` — classifies a declaration as server-side or
@@ -197,11 +214,12 @@ Ordered by value, with the reason each one is not in this branch.
    through the citation API. Clients that *render* citations structurally would
    need the richer block shape. Worth doing only once we know a client depends
    on it — the block shape is versioned and would tie us to one revision.
-2. **More native tools in the same catalog.** The funnel is now generic; a
-   `fetch_url` (read a page the search found) and a RAG/`knowledge_search` tool
-   are the obvious next entries. Each is a `declaration()` + `execute()` pair
-   plus a catalog entry, no loop changes. `fetch_url` needs SSRF protection
-   before it can ship, which is why it is not bundled here.
+2. **More native tools in the same catalog.** The funnel is now generic;
+   `analyze_image` shipped with the vision funnel. A `fetch_url` (read a page
+   the search found) and a RAG/`knowledge_search` tool are the obvious next
+   entries. Each is a `declaration()` + `execute()` pair plus a catalog entry,
+   no loop changes. `fetch_url` needs SSRF protection before it can ship, which
+   is why it is not bundled here.
 3. **Per-user opt-in.** The mode is currently set instance-wide.
    `MessagesGatewayConfig` already resolves per-user overrides, so this is a UI
    and seeding question rather than a backend one.

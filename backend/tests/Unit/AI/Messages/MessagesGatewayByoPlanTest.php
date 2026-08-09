@@ -12,8 +12,10 @@ use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\Entity\User;
+use App\Repository\ModelRepository;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
+use App\Service\Vision\VisionModelResolver;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemPoolInterface;
@@ -41,6 +43,7 @@ class MessagesGatewayByoPlanTest extends TestCase
         $this->config->method('allowOperatorKey')->willReturn(true);
         $this->config->method('isMcpToolsEnabled')->willReturn(false);
         $this->config->method('isContextInjectionEnabled')->willReturn(false);
+        $this->config->method('visionMode')->willReturn(MessagesGatewayConfig::VISION_AUTO);
         $this->config->method('upstreamUrl')->willReturn('https://api.anthropic.com');
 
         $modelResolver = $this->createMock(MessagesModelResolver::class);
@@ -67,11 +70,18 @@ class MessagesGatewayByoPlanTest extends TestCase
         $passthrough->method('supports')->willReturn(true);
 
         $toolCatalog = $this->createMock(GatewayToolCatalog::class);
-        $toolCatalog->method('build')->willReturn(['tools' => [], 'dispatch' => []]);
+        $toolCatalog->method('build')->willReturn([
+            'tools' => [],
+            'dispatch' => [],
+            'web_search' => GatewayToolCatalog::WEB_SEARCH_NONE,
+        ]);
+        $toolCatalog->method('replacedServerTools')->willReturn([]);
 
         $this->gateway = new MessagesGateway(
             $this->config,
             $modelResolver,
+            $this->createMock(ModelRepository::class),
+            $this->createMock(VisionModelResolver::class),
             $this->keyResolver,
             $this->rateLimitService,
             $passthrough,

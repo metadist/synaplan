@@ -549,6 +549,10 @@ services:
         tags:
             - { name: 'app.message.handler' }
 
+    App\AI\Messages\Tools\AnalyzeImageTool:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     App\Service\Message\Handler\MediaGenerationHandler:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'

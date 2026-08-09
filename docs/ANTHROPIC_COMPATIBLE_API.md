@@ -40,8 +40,9 @@ Same Synaplan API keys as the OpenAI-compatible API:
 ## Feature flags (`BCONFIG` group `MESSAGES_GATEWAY`)
 
 Defaults are **off** except budget notices, session summaries (both only take
-effect once the gateway itself is enabled), and `WEB_SEARCH_MODE` which defaults
-to `auto` so Claude Code web search never silently becomes “I cannot search”:
+effect once the gateway itself is enabled), and `WEB_SEARCH_MODE` /
+`VISION_MODE` which default to `auto` so Claude Code never silently loses web
+search or vision:
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
@@ -55,6 +56,7 @@ to `auto` so Claude Code web search never silently becomes “I cannot search”
 | `MCP_TOOLS_WITH_CLIENT_TOOLS` | `0` | Also inject when the client already sent `tools` (off — Claude Code brings its own) |
 | `MCP_MAX_ITERATIONS` | `8` | Max LLM↔tool rounds per request (applies to every server-side tool) |
 | `WEB_SEARCH_MODE` | `auto` | How to answer Anthropic’s `web_search_*` server tool — `auto`, `synaplan`, `passthrough` or `off` (see [Web search](#web-search)) |
+| `VISION_MODE` | `auto` | How to handle image turns: `auto` (Synaplan PIC2TEXT when the resolved model lacks vision, otherwise passthrough), `synaplan`, `passthrough`, or `off` |
 | `CONTEXT_INJECTION_ENABLED` | `0` | Append session-stable RAG/memory system block |
 
 Env fallback for local smoke tests: `MESSAGES_GATEWAY_UPSTREAM_URL` (DB value wins in production).
@@ -101,13 +103,22 @@ Every response to a request that declared web search carries `x-synaplan-web-sea
 
 Image blocks are forwarded on every route: unchanged on the Anthropic passthrough, as `image_url` (data URI or URL) for OpenAI, and as `inlineData` / `fileData` for Gemini.
 
+Default `VISION_MODE=auto` also mixes in Synaplan’s own vision models:
+
+- If the resolved chat model already has `vision`, images stay on the wire (Anthropic keeps its eyes).
+- If it does not, Synaplan rewrites the turn onto the user’s PIC2TEXT / catalog vision model when that model’s provider is Anthropic, OpenAI, or Google — same fallback order as normal chat.
+- If Synaplan has no usable vision model, images are still forwarded upstream (`x-synaplan-vision: passthrough`).
+- When Synaplan vision is available, the gateway also offers an `analyze_image` tool (OCR/describe via PIC2TEXT) in the same server-side tool loop as `web_search`. Explicit `off` skips both the rewrite and the tool.
+
+Applied handling is reported in the `x-synaplan-vision` response header (`synaplan` / `passthrough`).
+
 ## Errors
 
 Provider rejections keep their status instead of collapsing into `500`: an unreadable image stays `400`, a bad provider key `401`, a provider rate limit `429`. This applies to the Messages gateway and the OpenAI-compatible endpoint alike, so clients can tell a retryable failure from a request that can never succeed.
 
 ## Metering
 
-Usage is recorded as `API_CHAT` with `source: MESSAGES_API`, including Anthropic cache token fields. Outbound MCP tool calls record `source: MCP_TOOL` and Synaplan’s own search records `source: WEB_SEARCH`. Rate limits use the `MESSAGES` action. Metering never fails a completed request.
+Usage is recorded as `API_CHAT` with `source: MESSAGES_API`, including Anthropic cache token fields. Outbound MCP tool calls record `source: MCP_TOOL`, Synaplan’s own search records `source: WEB_SEARCH`, and Synaplan vision tool calls record `source: VISION`. Rate limits use the `MESSAGES` action. Metering never fails a completed request.
 
 Cost depends on whose key serves the request:
 

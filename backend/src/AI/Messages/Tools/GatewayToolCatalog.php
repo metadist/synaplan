@@ -28,12 +28,19 @@ final readonly class GatewayToolCatalog
 
     /** Synaplan executed the search itself. */
     public const WEB_SEARCH_SYNAPLAN = 'synaplan';
-    /** The declaration was forwarded untouched for the upstream to honour. */
+    /** The declaration was forwarded untouched for the upstream to run. */
     public const WEB_SEARCH_PASSTHROUGH = 'passthrough';
     /** The declaration was dropped before reaching the upstream. */
     public const WEB_SEARCH_OFF = 'off';
     /** The client never asked for web search. */
     public const WEB_SEARCH_NONE = 'none';
+
+    /** Synaplan rewrote the turn onto a vision-capable catalog model. */
+    public const VISION_SYNAPLAN = 'synaplan';
+    /** Images left on the wire for the upstream. */
+    public const VISION_PASSTHROUGH = 'passthrough';
+    /** No image blocks in the request. */
+    public const VISION_NONE = 'none';
 
     private const MCP_CACHE_PREFIX = 'messages_gateway_mcp_catalog_';
     private const MCP_CACHE_TTL = 7200;
@@ -41,6 +48,7 @@ final readonly class GatewayToolCatalog
     public function __construct(
         private McpToolCatalogAdapter $mcpCatalogAdapter,
         private WebSearchTool $webSearchTool,
+        private AnalyzeImageTool $analyzeImageTool,
         private MessagesGatewayConfig $config,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
@@ -135,12 +143,8 @@ final readonly class GatewayToolCatalog
     }
 
     /**
-     * Resolve the configured web search mode against what this request and this
-     * install can actually do.
-     *
-     * `auto` only acts when the client asked for web search — injecting a tool
-     * nobody requested would change the prompt of every gateway request. The
-     * explicit `synaplan` mode is the way to offer search unconditionally.
+     * Resolve configured web search + vision native tools against what this
+     * request and this install can actually do.
      *
      * @param array<string, mixed> $requestBody
      *
@@ -149,61 +153,104 @@ final readonly class GatewayToolCatalog
     private function nativeTools(User $user, array $requestBody): array
     {
         $snapshot = $this->empty();
-        $mode = $this->config->webSearchMode((int) $user->getId());
+        $userId = (int) $user->getId();
+
+        $this->appendWebSearch($snapshot, $userId, $requestBody);
+        $this->appendAnalyzeImage($snapshot, $userId, $requestBody);
+
+        return $snapshot;
+    }
+
+    /**
+     * @param CatalogSnapshot      $snapshot
+     * @param array<string, mixed> $requestBody
+     */
+    private function appendWebSearch(array &$snapshot, int $userId, array $requestBody): void
+    {
+        $mode = $this->config->webSearchMode($userId);
         $requested = $this->hasServerWebSearchDeclaration($requestBody);
 
-        // A client shipping its own runnable tool under this name owns it —
-        // a second, identically named tool would make the model's call ambiguous.
         if ($this->hasClientToolNamed($requestBody, WebSearchTool::NAME)) {
-            return $snapshot;
+            return;
         }
 
         if (MessagesGatewayConfig::WEB_SEARCH_OFF === $mode) {
             $snapshot['web_search'] = $requested ? self::WEB_SEARCH_OFF : self::WEB_SEARCH_NONE;
 
-            return $snapshot;
+            return;
         }
 
         if (MessagesGatewayConfig::WEB_SEARCH_PASSTHROUGH === $mode) {
             $snapshot['web_search'] = $requested ? self::WEB_SEARCH_PASSTHROUGH : self::WEB_SEARCH_NONE;
 
-            return $snapshot;
+            return;
         }
 
         $wantSynaplanSearch = MessagesGatewayConfig::WEB_SEARCH_SYNAPLAN === $mode || $requested;
         if (!$wantSynaplanSearch) {
             $snapshot['web_search'] = self::WEB_SEARCH_NONE;
 
-            return $snapshot;
+            return;
         }
 
         if (!$this->webSearchTool->isAvailable()) {
-            // Nothing to run. Forwarding the declaration is still the best
-            // available outcome: api.anthropic.com can honour it, and any other
-            // upstream ignores a tool type it does not know.
             $this->logger->info('GatewayToolCatalog: no search provider configured, forwarding web search to the upstream', [
                 'mode' => $mode,
             ]);
             $snapshot['web_search'] = $requested ? self::WEB_SEARCH_PASSTHROUGH : self::WEB_SEARCH_NONE;
 
-            return $snapshot;
+            return;
         }
 
-        $snapshot['tools'][] = $this->webSearchTool->declaration();
-        $snapshot['dispatch'][WebSearchTool::NAME] = [
-            'kind' => self::KIND_NATIVE,
-            'serverId' => 0,
-            'tool' => WebSearchTool::NAME,
-            'annotations' => ['readOnlyHint' => true],
-        ];
+        $this->addNativeTool($snapshot, $this->webSearchTool->declaration(), WebSearchTool::NAME);
         $snapshot['web_search'] = self::WEB_SEARCH_SYNAPLAN;
-
-        return $snapshot;
     }
 
     /**
-     * Did the client ask the API side to search, Anthropic-style?
+     * Offer Synaplan OCR/describe whenever vision is available and the mode is
+     * not `off`. Passthrough still offers the tool — it only refuses model rewrite.
      *
+     * @param CatalogSnapshot      $snapshot
+     * @param array<string, mixed> $requestBody
+     */
+    private function appendAnalyzeImage(array &$snapshot, int $userId, array $requestBody): void
+    {
+        $mode = $this->config->visionMode($userId);
+        if (MessagesGatewayConfig::VISION_OFF === $mode) {
+            return;
+        }
+
+        if ($this->hasClientToolNamed($requestBody, AnalyzeImageTool::NAME)) {
+            return;
+        }
+
+        if (!$this->analyzeImageTool->isAvailable($userId)) {
+            return;
+        }
+
+        $this->addNativeTool($snapshot, $this->analyzeImageTool->declaration(), AnalyzeImageTool::NAME);
+    }
+
+    /**
+     * @param CatalogSnapshot                                                              $snapshot
+     * @param array{name: string, description: string, input_schema: array<string, mixed>} $declaration
+     */
+    private function addNativeTool(array &$snapshot, array $declaration, string $name): void
+    {
+        if (isset($snapshot['dispatch'][$name])) {
+            return;
+        }
+
+        $snapshot['tools'][] = $declaration;
+        $snapshot['dispatch'][$name] = [
+            'kind' => self::KIND_NATIVE,
+            'serverId' => 0,
+            'tool' => $name,
+            'annotations' => ['readOnlyHint' => true],
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $requestBody
      */
     private function hasServerWebSearchDeclaration(array $requestBody): bool
@@ -218,9 +265,6 @@ final readonly class GatewayToolCatalog
     }
 
     /**
-     * Client tools, excluding server-tool declarations — those are capability
-     * requests aimed at the API side, not tools the client can execute.
-     *
      * @param array<string, mixed> $requestBody
      */
     private function hasClientTools(array $requestBody): bool

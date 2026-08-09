@@ -7,6 +7,7 @@ namespace App\Tests\Unit\AI\Messages;
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
+use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Tools\WebSearchTool;
@@ -54,6 +55,7 @@ final class GatewayToolLoopTest extends TestCase
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
             $this->createMock(WebSearchTool::class),
+            $this->createMock(AnalyzeImageTool::class),
             $client,
             $servers,
             $config,
@@ -178,6 +180,7 @@ final class GatewayToolLoopTest extends TestCase
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
             $webSearch,
+            $this->createMock(AnalyzeImageTool::class),
             $this->createMock(McpClient::class),
             $this->createMock(McpServerConfigRepository::class),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
@@ -280,6 +283,7 @@ final class GatewayToolLoopTest extends TestCase
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
             $this->createMock(WebSearchTool::class),
+            $this->createMock(AnalyzeImageTool::class),
             $client,
             $this->createMock(McpServerConfigRepository::class),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),

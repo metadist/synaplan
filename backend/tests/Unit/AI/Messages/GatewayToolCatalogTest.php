@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Messages;
 
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
+use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
@@ -111,11 +112,42 @@ final class GatewayToolCatalogTest extends TestCase
         self::assertSame([], $snapshot['tools']);
     }
 
-    private function catalog(string $mode, bool $searchConfigured): GatewayToolCatalog
+    public function testAutoOffersAnalyzeImageWhenVisionIsAvailable(): void
     {
+        $snapshot = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_AUTO,
+            searchConfigured: false,
+            visionMode: MessagesGatewayConfig::VISION_AUTO,
+            visionConfigured: true,
+        )->build($this->user(), 'session-1', []);
+
+        self::assertCount(1, $snapshot['tools']);
+        self::assertSame(AnalyzeImageTool::NAME, $snapshot['tools'][0]['name']);
+        self::assertSame(GatewayToolCatalog::KIND_NATIVE, $snapshot['dispatch'][AnalyzeImageTool::NAME]['kind']);
+    }
+
+    public function testOffVisionModeDoesNotOfferAnalyzeImage(): void
+    {
+        $snapshot = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_AUTO,
+            searchConfigured: false,
+            visionMode: MessagesGatewayConfig::VISION_OFF,
+            visionConfigured: true,
+        )->build($this->user(), 'session-1', []);
+
+        self::assertSame([], $snapshot['tools']);
+    }
+
+    private function catalog(
+        string $mode,
+        bool $searchConfigured,
+        string $visionMode = MessagesGatewayConfig::VISION_OFF,
+        bool $visionConfigured = false,
+    ): GatewayToolCatalog {
         $config = $this->createMock(MessagesGatewayConfig::class);
         $config->method('isMcpToolsEnabled')->willReturn(false);
         $config->method('webSearchMode')->willReturn($mode);
+        $config->method('visionMode')->willReturn($visionMode);
 
         $webSearch = $this->createMock(WebSearchTool::class);
         $webSearch->method('isAvailable')->willReturn($searchConfigured);
@@ -125,9 +157,18 @@ final class GatewayToolCatalogTest extends TestCase
             'input_schema' => ['type' => 'object', 'properties' => ['query' => ['type' => 'string']]],
         ]);
 
+        $analyzeImage = $this->createMock(AnalyzeImageTool::class);
+        $analyzeImage->method('isAvailable')->willReturn($visionConfigured);
+        $analyzeImage->method('declaration')->willReturn([
+            'name' => AnalyzeImageTool::NAME,
+            'description' => 'Analyse an image',
+            'input_schema' => ['type' => 'object'],
+        ]);
+
         return new GatewayToolCatalog(
             new McpToolCatalogAdapter($this->createMock(McpToolRegistry::class)),
             $webSearch,
+            $analyzeImage,
             $config,
             $this->createMock(CacheItemPoolInterface::class),
             new NullLogger(),

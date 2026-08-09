@@ -51,6 +51,7 @@ final readonly class GatewayToolLoop
     public function __construct(
         private McpToolCatalogAdapter $catalogAdapter,
         private WebSearchTool $webSearchTool,
+        private AnalyzeImageTool $analyzeImageTool,
         private McpClient $mcpClient,
         private McpServerConfigRepository $servers,
         private MessagesGatewayConfig $config,
@@ -659,14 +660,21 @@ final readonly class GatewayToolLoop
      */
     private function executeNative(string $tool, array $arguments, string $toolUseId, User $user): array
     {
-        if (WebSearchTool::NAME !== $tool) {
-            return $this->toolResultBlock($toolUseId, sprintf('Unknown Synaplan tool `%s`.', $tool), isError: true);
+        if (WebSearchTool::NAME === $tool) {
+            $result = $this->webSearchTool->execute($arguments);
+            $this->recordNativeUsage($user, 'WEB_SEARCH', $tool, $result['query'], $result['isError']);
+
+            return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
         }
 
-        $result = $this->webSearchTool->execute($arguments);
-        $this->recordNativeUsage($user, $tool, $result['query'], $result['isError']);
+        if (AnalyzeImageTool::NAME === $tool) {
+            $result = $this->analyzeImageTool->execute($arguments, $user->getId());
+            $this->recordNativeUsage($user, 'VISION', $tool, $result['summary'], $result['isError']);
 
-        return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
+            return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
+        }
+
+        return $this->toolResultBlock($toolUseId, sprintf('Unknown Synaplan tool `%s`.', $tool), isError: true);
     }
 
     /**
@@ -751,9 +759,9 @@ final readonly class GatewayToolLoop
         $this->recordToolUsage($user, 'MCP_TOOL', 'mcp', sprintf('server:%d/%s', $serverId, $tool), $tool, $error);
     }
 
-    private function recordNativeUsage(User $user, string $tool, string $query, bool $error): void
+    private function recordNativeUsage(User $user, string $source, string $tool, string $query, bool $error): void
     {
-        $this->recordToolUsage($user, 'WEB_SEARCH', 'synaplan', 'tool:'.$tool, $query, $error);
+        $this->recordToolUsage($user, $source, 'synaplan', 'tool:'.$tool, $query, $error);
     }
 
     private function recordToolUsage(
