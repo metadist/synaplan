@@ -21,6 +21,7 @@ use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\FileHelper;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
@@ -79,6 +80,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private DocumentImageReferenceResolver $documentImageReferenceResolver,
         private DocumentImageCatalog $documentImageCatalog,
         private TimeContextBuilder $timeContextBuilder,
+        private KnowledgeContextFormatter $knowledgeContextFormatter,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -743,16 +745,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 }
 
                 if (!empty($ragResults)) {
-                    $ragContext = "\n\n## Knowledge Base Context (relevant to your task):\n";
-                    foreach ($ragResults as $idx => $result) {
-                        $ragContext .= sprintf(
-                            "[Source %d] %s\n",
-                            $idx + 1,
-                            trim($result['chunk_text'])
-                        );
-                        error_log('🔍 ChatHandler: RAG chunk '.($idx + 1).': '.substr($result['chunk_text'], 0, 100).'...');
-                    }
-                    $ragContext .= "\nUse this context to provide accurate and specific answers.\n";
+                    $ragContext = $this->knowledgeContextFormatter->formatRagContext($ragResults);
                     $ragResultsCount = count($ragResults);
 
                     error_log('🔍 ChatHandler: RAG context loaded, total length: '.strlen($ragContext));
@@ -1574,16 +1567,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 return '';
             }
 
-            $ragContext = "\n\n## Knowledge Base Context (relevant to your task):\n";
-            foreach ($ragResults as $idx => $result) {
-                $ragContext .= sprintf(
-                    "[Source %d] %s\n",
-                    $idx + 1,
-                    trim($result['chunk_text'])
-                );
-                error_log('🔍 ChatHandler: RAG chunk '.($idx + 1).': '.substr($result['chunk_text'], 0, 100).'...');
-            }
-            $ragContext .= "\nUse this context to provide accurate and specific answers.\n";
+            $ragContext = $this->knowledgeContextFormatter->formatRagContext($ragResults);
 
             $this->logger->info('ChatHandler: RAG context loaded', [
                 'topic' => $topic,
@@ -2678,19 +2662,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $memoriesContext = '';
         if (!empty($loadedMemories)) {
-            $memoriesContext = "\n\n## User Memories (relevant to this conversation):\n";
-            foreach ($loadedMemories as $memory) {
-                $memoriesContext .= sprintf(
-                    "[ID: %d] %s: %s\n",
-                    $memory['id'],
-                    $memory['key'],
-                    $memory['value']
-                );
-            }
-            $memoriesContext .= "\nOnly use memories that are directly relevant to the user's current question. Ignore memories that are not clearly related.\n";
-            $memoriesContext .= "REFERENCES: Use [Memory:ID] (clickable). Rules:\n";
-            $memoriesContext .= "- ONE ID per bracket. Good: [Memory:42] and [Memory:15]. Bad: [Memory:42, 15].\n";
-            $memoriesContext .= "- Only use IDs from the list above. Never invent IDs.\n";
+            $memoriesContext = $this->knowledgeContextFormatter->formatMemoriesContext($loadedMemories);
 
             $this->logger->info('ChatHandler: User memories loaded', [
                 'user_id' => $message->getUserId(),

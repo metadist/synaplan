@@ -354,6 +354,16 @@ services:
             $platformApiKey: '%env(HIGGSFIELD_API_KEY)%'
             $platformApiSecret: '%env(HIGGSFIELD_API_SECRET)%'
 
+    # Anthropic Messages gateway: admin-set UPSTREAM_URL in BCONFIG wins;
+    # MESSAGES_GATEWAY_UPSTREAM_URL is the env fallback for the local smoke harness.
+    App\Service\MessagesGateway\MessagesGatewayConfig:
+        arguments:
+            $envUpstreamUrl: '%env(default::MESSAGES_GATEWAY_UPSTREAM_URL)%'
+
+    App\AI\Messages\Translator\AnthropicPassthroughTranslator:
+        tags:
+            - { name: 'app.messages.translator' }
+
     App\AI\Provider\HiggsfieldProvider:
         arguments:
             $platformApiKey: '%env(HIGGSFIELD_API_KEY)%'

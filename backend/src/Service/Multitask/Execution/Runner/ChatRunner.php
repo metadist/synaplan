@@ -6,6 +6,7 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
+use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -41,6 +42,7 @@ final readonly class ChatRunner implements TaskRunner
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private VectorSearchService $vectorSearchService,
+        private KnowledgeContextFormatter $knowledgeContextFormatter,
         private LoggerInterface $logger,
     ) {
     }
@@ -211,12 +213,8 @@ final readonly class ChatRunner implements TaskRunner
         }
 
         $chunks = count($results);
-        $block = "\n\n## Knowledge Base Context (relevant to your task):\n";
-        foreach ($results as $idx => $result) {
-            $block .= sprintf("[Source %d] %s\n", $idx + 1, trim((string) ($result['chunk_text'] ?? '')));
-        }
 
-        return $block."\nUse this context to provide accurate and specific answers.\n";
+        return $this->knowledgeContextFormatter->formatRagContext($results);
     }
 
     private function systemPrompt(TaskNode $node, string $language, NodeContext $context): string

@@ -92,6 +92,11 @@ final readonly class UsageStatsService
         // Get usage breakdown by source (WhatsApp, Email, Web)
         $sourceBreakdown = $this->getUsageBySource($userId);
 
+        // Breakdown by channel (WEB, WIDGET, WHATSAPP, EMAIL, MESSAGES_API, …)
+        // from the `source` field recordUsage() stores in BMETADATA. by_source
+        // above groups by BPROVIDER (the AI provider) and is kept for back-compat.
+        $channelBreakdown = $this->getUsageByChannel($userId);
+
         // Get usage breakdown by time period
         $timeBreakdown = $this->getUsageByTimePeriod($userId);
 
@@ -113,6 +118,7 @@ final readonly class UsageStatsService
             'remaining' => $remaining,
             'breakdown' => [
                 'by_source' => $sourceBreakdown,
+                'by_channel' => $channelBreakdown,
                 'by_time' => $timeBreakdown,
             ],
             'recent_usage' => $recentUsage,
@@ -170,6 +176,77 @@ final readonly class UsageStatsService
         }
 
         return $breakdown;
+    }
+
+    /**
+     * Get usage breakdown by channel (WEB, WIDGET, WHATSAPP, EMAIL,
+     * MESSAGES_API, OPENAI_API, MCP, …) from the `source` metadata field.
+     *
+     * Legacy rows without a stored source fall back to 'WEB'. Any DB error
+     * (e.g. a malformed BMETADATA row breaking JSON_EXTRACT) degrades to an
+     * empty map — the UI then falls back to by_source.
+     */
+    private function getUsageByChannel(int $userId): array
+    {
+        $conn = $this->em->getConnection();
+
+        $sql = "
+            SELECT
+                UPPER(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(BMETADATA, '$.source')), 'null'), 'WEB')) as channel,
+                BACTION as action,
+                COUNT(*) as count
+            FROM BUSELOG
+            WHERE BUSERID = :user_id
+            GROUP BY channel, BACTION
+            ORDER BY count DESC
+        ";
+
+        try {
+            $results = $conn->fetchAllAssociative($sql, ['user_id' => $userId]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('UsageStatsService: channel breakdown failed', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+
+        $breakdown = [];
+        foreach ($results as $row) {
+            $channel = $row['channel'] ?: 'WEB';
+            if (!isset($breakdown[$channel])) {
+                $breakdown[$channel] = [
+                    'total' => 0,
+                    'actions' => [],
+                ];
+            }
+
+            $breakdown[$channel]['actions'][$row['action']] = (int) $row['count'];
+            $breakdown[$channel]['total'] += (int) $row['count'];
+        }
+
+        return $breakdown;
+    }
+
+    /**
+     * Extract the channel from a BMETADATA JSON string (the `source` field
+     * recordUsage() stores). Falls back to 'WEB' for legacy rows.
+     */
+    private function channelFromMetadata(?string $metadataJson): string
+    {
+        if (null === $metadataJson || '' === $metadataJson) {
+            return 'WEB';
+        }
+
+        $decoded = json_decode($metadataJson, true);
+        if (!is_array($decoded)) {
+            return 'WEB';
+        }
+
+        $source = $decoded['source'] ?? null;
+
+        return is_string($source) && '' !== $source ? strtoupper($source) : 'WEB';
     }
 
     /**
@@ -245,7 +322,8 @@ final readonly class UsageStatsService
                 BESTIMATED as estimated,
                 BCOST as cost,
                 BLATENCY as latency,
-                BSTATUS as status
+                BSTATUS as status,
+                BMETADATA as metadata
             FROM BUSELOG
             WHERE BUSERID = :user_id
             ORDER BY BUNIXTIMES DESC
@@ -262,6 +340,7 @@ final readonly class UsageStatsService
                 'datetime' => date('Y-m-d H:i:s', $row['timestamp']),
                 'action' => $row['action'],
                 'source' => $row['source'] ?: 'WEB',
+                'channel' => $this->channelFromMetadata($row['metadata'] ?? null),
                 'model' => $row['model'],
                 'tokens' => (int) $row['tokens'],
                 'prompt_tokens' => (int) ($row['prompt_tokens'] ?? 0),
@@ -725,7 +804,8 @@ final readonly class UsageStatsService
                 BESTIMATED as estimated,
                 BCOST as cost,
                 BLATENCY as latency,
-                BSTATUS as status
+                BSTATUS as status,
+                BMETADATA as metadata
              FROM BUSELOG
              WHERE {$whereClause}
              ORDER BY BUNIXTIMES DESC
@@ -733,11 +813,12 @@ final readonly class UsageStatsService
             $params,
         );
 
-        $items = array_map(static fn (array $row) => [
+        $items = array_map(fn (array $row) => [
             'timestamp' => (int) $row['timestamp'],
             'datetime' => date('Y-m-d H:i:s', (int) $row['timestamp']),
             'action' => $row['action'],
             'source' => $row['source'] ?: 'WEB',
+            'channel' => $this->channelFromMetadata($row['metadata'] ?? null),
             'model' => $row['model'],
             'tokens' => (int) $row['tokens'],
             'prompt_tokens' => (int) ($row['prompt_tokens'] ?? 0),
@@ -781,7 +862,8 @@ final readonly class UsageStatsService
                 BESTIMATED as estimated,
                 BCOST as cost,
                 BLATENCY as latency,
-                BSTATUS as status
+                BSTATUS as status,
+                BMETADATA as metadata
             FROM BUSELOG
             WHERE BUSERID = :user_id
         ';
@@ -797,14 +879,15 @@ final readonly class UsageStatsService
 
         $results = $conn->fetchAllAssociative($sql, $params);
 
-        $csv = "Timestamp,Date,Action,Source,Model,Tokens,Prompt Tokens,Completion Tokens,Cached Tokens,Cache Creation Tokens,Estimated,Cost,Latency,Status\n";
+        $csv = "Timestamp,Date,Action,Channel,Source,Model,Tokens,Prompt Tokens,Completion Tokens,Cached Tokens,Cache Creation Tokens,Estimated,Cost,Latency,Status\n";
 
         foreach ($results as $row) {
             $csv .= sprintf(
-                "%d,%s,%s,%s,%s,%d,%d,%d,%d,%d,%s,%.6f,%.2f,%s\n",
+                "%d,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%s,%.6f,%.2f,%s\n",
                 $row['timestamp'],
                 date('Y-m-d H:i:s', $row['timestamp']),
                 $row['action'],
+                $this->channelFromMetadata($row['metadata'] ?? null),
                 $row['source'] ?: 'WEB',
                 $row['model'],
                 $row['tokens'],

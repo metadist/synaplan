@@ -10,6 +10,7 @@ use App\Seed\DemoWidgetConfigSeeder;
 use App\Seed\MarketingNewsConfigSeeder;
 use App\Seed\McpConfigSeeder;
 use App\Seed\MediaJobConfigSeeder;
+use App\Seed\MessagesGatewayConfigSeeder;
 use App\Seed\MobileConfigSeeder;
 use App\Seed\ModelSeeder;
 use App\Seed\MultitaskConfigSeeder;
@@ -42,7 +43,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  11. marketing-news (BCONFIG: MARKETING_NEWS guest-landing flags, master switch OFF)
  *  12. usage-taximeter (BCONFIG: USAGE_TAXIMETER display switch, ownerId=0 — default ON)
  *  13. updates       (BCONFIG: UPDATES release-notice switch + manifest URL, ownerId=0 — default ON)
- *  14. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *  14. messages-gateway (BCONFIG: MESSAGES_GATEWAY Anthropic-compatible API flags, ownerId=0 — default OFF)
+ *  15. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -68,6 +70,7 @@ final class SeedAllCommand extends Command
         private readonly MarketingNewsConfigSeeder $marketingNewsConfigSeeder,
         private readonly UsageTaximeterConfigSeeder $usageTaximeterConfigSeeder,
         private readonly UpdateConfigSeeder $updateConfigSeeder,
+        private readonly MessagesGatewayConfigSeeder $messagesGatewayConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -89,7 +92,8 @@ final class SeedAllCommand extends Command
             "  11. marketing news flags       (BCONFIG, group=MARKETING_NEWS, ownerId=0 — master switch OFF)\n".
             "  12. usage taximeter switch      (BCONFIG, group=USAGE_TAXIMETER, ownerId=0 — default ON)\n".
             "  13. update notice config       (BCONFIG, group=UPDATES, ownerId=0 — default ON)\n".
-            "  14. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  14. messages gateway flags     (BCONFIG, group=MESSAGES_GATEWAY, ownerId=0 — default OFF)\n".
+            "  15. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }
@@ -113,6 +117,7 @@ final class SeedAllCommand extends Command
             ['marketing-news', fn (): SeedResult => $this->marketingNewsConfigSeeder->seed()],
             ['usage-taximeter', fn (): SeedResult => $this->usageTaximeterConfigSeeder->seed()],
             ['updates',      fn (): SeedResult => $this->updateConfigSeeder->seed()],
+            ['messages-gateway', fn (): SeedResult => $this->messagesGatewayConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 

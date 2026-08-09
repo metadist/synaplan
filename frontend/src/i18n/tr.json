@@ -119,7 +119,8 @@
     "addinConnect": "Outlook eklentisini bağla",
     "accountDeletion": "Hesap Silme",
     "onboarding": "Hoş geldin",
-    "mcpServers": "MCP Sunucuları"
+    "mcpServers": "MCP Sunucuları",
+    "aiAgents": "Yapay zeka ajanları"
   },
   "addinConnect": {
     "title": "Synaplan'a bağlan",
@@ -547,7 +548,8 @@
     "profile": "Profil",
     "more": "Daha fazla",
     "moreDescription": "Diğer bölümler ve hesap",
-    "menu": "Menü"
+    "menu": "Menü",
+    "aiAgents": "Yapay zeka ajanları"
   },
   "guest": {
     "featureGate": {
@@ -2565,6 +2567,7 @@
       "time": "Zaman",
       "action": "Eylem",
       "source": "Kaynak",
+      "channel": "Kanal",
       "tokens": "Token",
       "latency": "Gecikme",
       "noRecentActivity": "Son aktivite yok",
@@ -2575,12 +2578,23 @@
         "audios": "Ses Dosyaları",
         "file_analysis": "Dosya Analizi",
         "sorting": "Sınıflandırma",
-        "search_query": "Arama Sorgusu"
+        "search_query": "Arama Sorgusu",
+        "api_chat": "API Sohbeti"
       },
       "sources": {
         "whatsapp": "WhatsApp",
         "email": "E-posta",
-        "web": "Web"
+        "web": "Web",
+        "web_async": "Web",
+        "web_describe": "Web",
+        "widget": "Sohbet widget'ı",
+        "guest": "Misafir",
+        "webhook": "Webhook",
+        "messages_api": "Claude Code (API)",
+        "openai_api": "API (OpenAI uyumlu)",
+        "api_summary": "API oturum özeti",
+        "mcp": "MCP",
+        "mcp_tool": "MCP Araçları"
       },
       "periods": {
         "today": "Bugün",
@@ -3406,5 +3420,52 @@
     "usageUpdateFailed": "Görev güncellenemedi",
     "usageAdvancedHint": "Görev başına daha fazla seçenek (sunucu kısıtlamaları, talimatlar, modeller):",
     "usageAdvancedLink": "AI Talimatları"
+  },
+  "messagesGateway": {
+    "title": "Yapay zeka ajanları",
+    "description": "Claude Code ve diğer Anthropic uyumlu ajan araçlarını Synaplan çalışma alanınıza bağlayın. İstekler POST /v1/messages üzerinden gider ve Synaplan bütçenize yazılır.",
+    "statusTitle": "Ağ geçidi durumu",
+    "statusEnabled": "Etkin",
+    "statusDisabled": "Devre dışı",
+    "budgetLine": "Kullanılan bütçe: %{percent} ({used} / {budget})",
+    "budgetLineUnlimited": "Kullanılan bütçe: {used} (aylık bütçe limiti yok)",
+    "setupTitle": "Claude Code kurulumu",
+    "setupHint": "Claude Code'u bu Synaplan örneğine yönlendirin. Tam olarak bir kimlik bilgisi değişkeni kullanın — ANTHROPIC_API_KEY (x-api-key) veya ANTHROPIC_AUTH_TOKEN (Bearer).",
+    "copySetup": "Kurulum komutlarını kopyala",
+    "copySuccess": "Kurulum komutları kopyalandı",
+    "copyError": "Panoya kopyalanamadı",
+    "keyTitle": "Anthropic API anahtarı (kendi anahtarınız)",
+    "keyHint": "Hesabınız için şifreli saklanır. Ağ geçidi istekleri Anthropic'e iletirken kullanılır.",
+    "keySource": "Aktif anahtar",
+    "apiKeyLabel": "API anahtarı",
+    "saveKey": "Anahtarı kaydet",
+    "clearKey": "Anahtarı kaldır",
+    "clearKeyConfirmTitle": "Anthropic anahtarı kaldırılsın mı?",
+    "clearKeyConfirm": "Kişisel Anthropic anahtarınız kaldırılacak. Ağ geçidi yalnızca operatör anahtarına izin verildiğinde ve yapılandırıldığında çalışır.",
+    "saveKeySuccess": "API anahtarı kaydedildi",
+    "saveKeyError": "API anahtarı kaydedilemedi",
+    "clearKeySuccess": "API anahtarı kaldırıldı",
+    "clearKeyError": "API anahtarı kaldırılamadı",
+    "adminTitle": "Yönetici ayarları",
+    "enableLabel": "Bu örnekte Messages ağ geçidini etkinleştir",
+    "allowOperatorKeyLabel": "Operatör Anthropic anahtarına yedek olarak izin ver (dikkatli kullanın)",
+    "upstreamLabel": "Upstream Anthropic URL'si",
+    "upstreamWarning": "Tüm sağlayıcı anahtarları bu ana bilgisayara gönderilir. Riski anlıyorsanız değiştirin.",
+    "saveUpstream": "Upstream URL'sini kaydet",
+    "upstreamSaved": "Upstream URL'si kaydedildi",
+    "upstreamError": "Upstream URL'si kaydedilemedi",
+    "aliasesLabel": "Model takma adları (JSON)",
+    "aliasesHint": "Claude Code model kimliklerini Synaplan katalog kimliklerine eşler, örn. {\"claude-sonnet-4-6\": \"claude-sonnet-4-5-20250929\"}.",
+    "saveAliases": "Takma adları kaydet",
+    "aliasesSaved": "Takma adlar kaydedildi",
+    "aliasesError": "Takma adlar kaydedilemedi (JSON'u kontrol edin)",
+    "flagsSaved": "Ayarlar kaydedildi",
+    "flagsError": "Ayarlar kaydedilemedi",
+    "loadError": "Yapay zeka ajanları ayarları yüklenemedi",
+    "source": {
+      "user": "Sizin anahtarınız",
+      "operator": "Operatör anahtarı",
+      "none": "Yapılandırılmadı"
+    }
   }
 }

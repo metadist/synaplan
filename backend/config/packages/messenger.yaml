@@ -105,6 +105,9 @@ framework:
             # stored summary after the chat turn is persisted, so the hot path
             # never waits on the summarizer.
             'App\Message\RefreshConversationSummaryCommand': async_ai_high
+            # API-session summary — folds gateway request excerpts into a
+            # rolling per-session summary chat, off the SSE hot path.
+            'App\Message\SummarizeApiSessionCommand': async_ai_high
             'App\Message\ProvisionDefaultUserPluginsMessage': async_index
             'App\Message\CrawlWidgetUrlMessage': async_index
             'App\Message\ReVectorizeMessage': async_index

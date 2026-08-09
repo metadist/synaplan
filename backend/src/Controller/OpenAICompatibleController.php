@@ -7,7 +7,10 @@ namespace App\Controller;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\Entity\User;
+use App\Message\SummarizeApiSessionCommand;
 use App\Repository\ModelRepository;
+use App\Service\MessagesGateway\ApiSessionSummaryService;
+use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use OpenApi\Attributes as OA;
@@ -17,6 +20,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -34,6 +38,8 @@ class OpenAICompatibleController extends AbstractController
         private ModelRepository $modelRepository,
         private ModelConfigService $modelConfigService,
         private RateLimitService $rateLimitService,
+        private MessagesGatewayConfig $messagesGatewayConfig,
+        private MessageBusInterface $messageBus,
         private LoggerInterface $logger,
     ) {
     }
@@ -257,6 +263,8 @@ class OpenAICompatibleController extends AbstractController
                 'source' => 'OPENAI_API',
             ]);
 
+            $this->dispatchSessionSummary($user, $messages, $displayModel, (string) ($result['content'] ?? ''));
+
             $usage = $result['usage'] ?? [];
 
             return new JsonResponse([
@@ -400,6 +408,8 @@ class OpenAICompatibleController extends AbstractController
                     'input_text' => $lastUserMessage,
                     'response_text' => $accumulatedContent,
                 ]);
+
+                $this->dispatchSessionSummary($user, $messages, $displayModel, $accumulatedContent);
             } catch (\Throwable $e) {
                 $errorPayload = [
                     'error' => [
@@ -418,6 +428,62 @@ class OpenAICompatibleController extends AbstractController
         });
 
         return $response;
+    }
+
+    /**
+     * Queue the debounced per-session summary (rolling summary chat + usage
+     * trail). OpenAI clients resend the full history each call, so the first
+     * user message fingerprints the conversation as the session key — the
+     * same fallback the Anthropic gateway uses when no session header exists.
+     *
+     * Shares MESSAGES_GATEWAY.SESSION_SUMMARY_ENABLED with the Anthropic
+     * gateway: one switch governs "summarize my API traffic".
+     *
+     * @param list<array<string, mixed>> $messages
+     */
+    private function dispatchSessionSummary(User $user, array $messages, string $displayModel, string $responseText): void
+    {
+        if (!$this->messagesGatewayConfig->isSessionSummaryEnabled($user->getId())) {
+            return;
+        }
+
+        $firstUserMessage = '';
+        $lastUserMessage = '';
+        foreach ($messages as $msg) {
+            if ('user' !== ($msg['role'] ?? '')) {
+                continue;
+            }
+            $content = $msg['content'] ?? '';
+            $text = is_string($content) ? $content : (json_encode($content, JSON_INVALID_UTF8_SUBSTITUTE) ?: '');
+            if ('' === $firstUserMessage) {
+                $firstUserMessage = $text;
+            }
+            $lastUserMessage = $text;
+        }
+
+        // Without any user content the session key would degenerate to a
+        // constant per-user hash and merge unrelated sessions — skip instead.
+        if ('' === $firstUserMessage) {
+            return;
+        }
+
+        $cap = ApiSessionSummaryService::EXCERPT_MAX_CHARS;
+
+        try {
+            $this->messageBus->dispatch(new SummarizeApiSessionCommand(
+                userId: (int) $user->getId(),
+                sessionKey: hash('sha256', $user->getId().'|'.$firstUserMessage),
+                client: 'openai-api',
+                model: $displayModel,
+                requestExcerpt: mb_substr($lastUserMessage, 0, $cap),
+                responseExcerpt: mb_substr($responseText, 0, $cap),
+            ));
+        } catch (\Throwable $e) {
+            $this->logger->warning('OpenAI-compatible: session summary dispatch failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $user->getId(),
+            ]);
+        }
     }
 
     /**

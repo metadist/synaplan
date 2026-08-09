@@ -119,6 +119,7 @@ class ChatHandlerVisionModelResolutionTest extends TestCase
             $this->createMock(DocumentImageReferenceResolver::class),
             $this->createMock(DocumentImageCatalog::class),
             new TimeContextBuilder(),
+            new \App\Service\Knowledge\KnowledgeContextFormatter(),
         );
     }
 }
