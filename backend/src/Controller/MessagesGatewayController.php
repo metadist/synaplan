@@ -529,6 +529,15 @@ final class MessagesGatewayController extends AbstractController
                     Response::HTTP_BAD_REQUEST,
                 );
             }
+            if (
+                MessagesGatewayConfig::WEB_SEARCH_SYNAPLAN === $webSearchMode
+                && !$this->webSearchTool->isAvailable()
+            ) {
+                return $this->json(
+                    ['error' => 'web_search_mode=synaplan requires a configured web search provider on this instance'],
+                    Response::HTTP_BAD_REQUEST,
+                );
+            }
             $this->configRepository->setValue(
                 0,
                 MessagesGatewayConfig::CONFIG_GROUP,
@@ -545,6 +554,15 @@ final class MessagesGatewayController extends AbstractController
             if (!\in_array($visionMode, MessagesGatewayConfig::VISION_MODES, true)) {
                 return $this->json(
                     ['error' => 'vision_mode must be one of: '.implode(', ', MessagesGatewayConfig::VISION_MODES)],
+                    Response::HTTP_BAD_REQUEST,
+                );
+            }
+            if (
+                MessagesGatewayConfig::VISION_SYNAPLAN === $visionMode
+                && !$this->analyzeImageTool->isAvailable((int) $user->getId())
+            ) {
+                return $this->json(
+                    ['error' => 'vision_mode=synaplan requires a configured Synaplan vision (PIC2TEXT) model'],
                     Response::HTTP_BAD_REQUEST,
                 );
             }

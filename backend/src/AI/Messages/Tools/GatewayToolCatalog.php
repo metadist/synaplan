@@ -194,6 +194,10 @@ final readonly class GatewayToolCatalog
         }
 
         if (!$this->webSearchTool->isAvailable()) {
+            // No provider to run the search. Leave the Anthropic declaration on
+            // the wire so api.anthropic.com can honour it. OpenAI/Gemini
+            // translators drop server-tool declarations rather than forwarding
+            // an unknown tool shape the provider would reject.
             $this->logger->info('GatewayToolCatalog: no search provider configured, forwarding web search to the upstream', [
                 'mode' => $mode,
             ]);

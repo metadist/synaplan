@@ -139,7 +139,7 @@ final class MessagesGatewayVisionTest extends TestCase
         ]);
 
         $models = $this->createMock(ModelRepository::class);
-        $models->method('find')->with((int) $current->getId())->willReturn($current);
+        $models->expects($this->any())->method('find')->with((int) $current->getId())->willReturn($current);
 
         if (null === $visionResolver) {
             $visionResolver = $this->createMock(VisionModelResolver::class);
@@ -147,7 +147,7 @@ final class MessagesGatewayVisionTest extends TestCase
         }
 
         $keys = $this->createMock(UserProviderKeyResolver::class);
-        $keys->method('resolve')->with($expectedProvider, 7, true)->willReturn([
+        $keys->expects($this->any())->method('resolve')->with($expectedProvider, 7, true)->willReturn([
             'key' => 'sk-test',
             'source' => 'operator',
         ]);
@@ -202,7 +202,7 @@ final class MessagesGatewayVisionTest extends TestCase
         $model->method('getService')->willReturn($service);
         $model->method('getProviderId')->willReturn($providerId);
         $model->method('getName')->willReturn($providerId);
-        $model->method('hasFeature')->with('vision')->willReturn($vision);
+        $model->expects($this->any())->method('hasFeature')->with('vision')->willReturn($vision);
 
         return $model;
     }

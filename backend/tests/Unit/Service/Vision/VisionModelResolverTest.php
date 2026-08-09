@@ -15,13 +15,13 @@ final class VisionModelResolverTest extends TestCase
     public function testPrefersConfiguredPic2TextWhenVisionCapable(): void
     {
         $configured = $this->createMock(Model::class);
-        $configured->method('hasFeature')->with('vision')->willReturn(true);
+        $configured->expects($this->any())->method('hasFeature')->with('vision')->willReturn(true);
 
         $modelConfig = $this->createMock(ModelConfigService::class);
-        $modelConfig->method('getDefaultModel')->with('PIC2TEXT', 7)->willReturn(11);
+        $modelConfig->expects($this->any())->method('getDefaultModel')->with('PIC2TEXT', 7)->willReturn(11);
 
         $models = $this->createMock(ModelRepository::class);
-        $models->method('find')->with(11)->willReturn($configured);
+        $models->expects($this->any())->method('find')->with(11)->willReturn($configured);
         $models->expects($this->never())->method('findByFeature');
 
         $resolver = new VisionModelResolver($modelConfig, $models);
@@ -38,7 +38,7 @@ final class VisionModelResolverTest extends TestCase
         $modelConfig->method('getDefaultModel')->willReturn(null);
 
         $models = $this->createMock(ModelRepository::class);
-        $models->method('findByFeature')->with('vision', 'chat', true)->willReturn($catalog);
+        $models->expects($this->any())->method('findByFeature')->with('vision', 'chat', true)->willReturn($catalog);
 
         $resolver = new VisionModelResolver($modelConfig, $models);
 

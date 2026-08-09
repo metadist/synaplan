@@ -185,7 +185,9 @@
             @change="onChangeWebSearchMode"
           >
             <option value="auto">{{ $t('messagesGateway.webSearchModeAuto') }}</option>
-            <option value="synaplan">{{ $t('messagesGateway.webSearchModeSynaplan') }}</option>
+            <option value="synaplan" :disabled="!status.web_search_available">
+              {{ $t('messagesGateway.webSearchModeSynaplan') }}
+            </option>
             <option value="passthrough">
               {{ $t('messagesGateway.webSearchModePassthrough') }}
             </option>
@@ -211,7 +213,9 @@
             @change="onChangeVisionMode"
           >
             <option value="auto">{{ $t('messagesGateway.visionModeAuto') }}</option>
-            <option value="synaplan">{{ $t('messagesGateway.visionModeSynaplan') }}</option>
+            <option value="synaplan" :disabled="!status.vision_available">
+              {{ $t('messagesGateway.visionModeSynaplan') }}
+            </option>
             <option value="passthrough">
               {{ $t('messagesGateway.visionModePassthrough') }}
             </option>
@@ -337,14 +341,65 @@ async function load() {
     status.value = await getMessagesGatewayStatus()
     enabledFlag.value = status.value.enabled
     allowOperatorFlag.value = status.value.allow_operator_key ?? false
-    webSearchMode.value = (status.value.web_search_mode as WebSearchMode | undefined) ?? 'auto'
-    visionMode.value = (status.value.vision_mode as VisionMode | undefined) ?? 'auto'
+    webSearchMode.value = resolveWebSearchMode(
+      (status.value.web_search_mode as WebSearchMode | undefined) ?? 'auto',
+      Boolean(status.value.web_search_available)
+    )
+    visionMode.value = resolveVisionMode(
+      (status.value.vision_mode as VisionMode | undefined) ?? 'auto',
+      Boolean(status.value.vision_available)
+    )
     upstreamUrl.value = status.value.upstream_url
     aliasesJson.value = JSON.stringify(status.value.model_aliases ?? {}, null, 2)
+    await persistUnavailableModeFallbacks()
   } catch (err) {
     error((err as Error).message || t('messagesGateway.loadError'))
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * `synaplan` needs a configured provider. If the DB still has that mode after
+ * the provider disappeared, show (and persist) `auto` so the control cannot
+ * leave the instance in a state that silently does nothing useful.
+ */
+function resolveWebSearchMode(mode: WebSearchMode, available: boolean): WebSearchMode {
+  return !available && mode === 'synaplan' ? 'auto' : mode
+}
+
+function resolveVisionMode(mode: VisionMode, available: boolean): VisionMode {
+  return !available && mode === 'synaplan' ? 'auto' : mode
+}
+
+async function persistUnavailableModeFallbacks(): Promise<void> {
+  if (!status.value) return
+
+  const patch: Partial<{ web_search_mode: WebSearchMode; vision_mode: VisionMode }> = {}
+  if (
+    status.value.web_search_mode === 'synaplan' &&
+    !status.value.web_search_available &&
+    webSearchMode.value === 'auto'
+  ) {
+    patch.web_search_mode = 'auto'
+  }
+  if (
+    status.value.vision_mode === 'synaplan' &&
+    !status.value.vision_available &&
+    visionMode.value === 'auto'
+  ) {
+    patch.vision_mode = 'auto'
+  }
+  if (Object.keys(patch).length === 0) return
+
+  try {
+    await saveMessagesGatewayFlags(patch)
+    status.value = {
+      ...status.value,
+      ...patch,
+    }
+  } catch {
+    // Leave the coerced UI value; the next successful save will catch up.
   }
 }
 
@@ -421,7 +476,10 @@ async function onChangeWebSearchMode() {
     await load()
   } catch (err) {
     error((err as Error).message || t('messagesGateway.flagsError'))
-    webSearchMode.value = (status.value?.web_search_mode as WebSearchMode | undefined) ?? 'auto'
+    webSearchMode.value = resolveWebSearchMode(
+      (status.value?.web_search_mode as WebSearchMode | undefined) ?? 'auto',
+      Boolean(status.value?.web_search_available)
+    )
   }
 }
 
@@ -432,7 +490,10 @@ async function onChangeVisionMode() {
     await load()
   } catch (err) {
     error((err as Error).message || t('messagesGateway.flagsError'))
-    visionMode.value = (status.value?.vision_mode as VisionMode | undefined) ?? 'auto'
+    visionMode.value = resolveVisionMode(
+      (status.value?.vision_mode as VisionMode | undefined) ?? 'auto',
+      Boolean(status.value?.vision_available)
+    )
   }
 }
 
