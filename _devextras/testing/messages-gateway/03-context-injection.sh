@@ -5,6 +5,7 @@ set -euo pipefail
 
 BASE="${SYNAPLAN_BASE_URL:-http://localhost:8000}"
 KEY="${SYNAPLAN_API_KEY:?Set SYNAPLAN_API_KEY}"
+MODEL="${SYNAPLAN_TEST_MODEL:-claude-sonnet-5}"
 FAIL=0
 SID="smoke-session-$RANDOM"
 
@@ -20,7 +21,7 @@ H1=$(curl -sS -D /tmp/mg-ctx1.hdr -o /tmp/mg-ctx1.json -X POST "$BASE/v1/message
   -H "x-synaplan-debug: 1" \
   -H "x-fixture: complete" \
   -d '{
-    "model":"claude-sonnet-4-6",
+    "model":"'"$MODEL"'",
     "max_tokens":32,
     "stream":false,
     "messages":[{"role":"user","content":"what do you know about me?"}]
@@ -37,7 +38,7 @@ H2=$(curl -sS -D /tmp/mg-ctx2.hdr -o /tmp/mg-ctx2.json -X POST "$BASE/v1/message
   -H "x-synaplan-debug: 1" \
   -H "x-fixture: complete" \
   -d '{
-    "model":"claude-sonnet-4-6",
+    "model":"'"$MODEL"'",
     "max_tokens":32,
     "stream":false,
     "messages":[
@@ -65,7 +66,7 @@ curl -sS -D /tmp/mg-ctx3.hdr -o /tmp/mg-ctx3.json -X POST "$BASE/v1/messages?bet
   -H "x-synaplan-debug: 1" \
   -H "x-fixture: complete" \
   -d '{
-    "model":"claude-sonnet-4-6",
+    "model":"'"$MODEL"'",
     "max_tokens":32,
     "stream":false,
     "messages":[{"role":"user","content":"completely different first turn"}]
