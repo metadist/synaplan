@@ -3428,6 +3428,7 @@
     "statusEnabled": "Etkin",
     "statusDisabled": "Devre dışı",
     "budgetLine": "Kullanılan bütçe: %{percent} ({used} / {budget})",
+    "budgetLineUnlimited": "Kullanılan bütçe: {used} (aylık bütçe limiti yok)",
     "setupTitle": "Claude Code kurulumu",
     "setupHint": "Claude Code'u bu Synaplan örneğine yönlendirin. Tam olarak bir kimlik bilgisi değişkeni kullanın — ANTHROPIC_API_KEY (x-api-key) veya ANTHROPIC_AUTH_TOKEN (Bearer).",
     "copySetup": "Kurulum komutlarını kopyala",

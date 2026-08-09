@@ -4409,6 +4409,7 @@
     "statusEnabled": "Aktiviert",
     "statusDisabled": "Deaktiviert",
     "budgetLine": "Budget verbraucht: {percent}% ({used} von {budget})",
+    "budgetLineUnlimited": "Budget verbraucht: {used} (kein monatliches Budgetlimit)",
     "setupTitle": "Claude-Code-Einrichtung",
     "setupHint": "Richten Sie Claude Code auf diese Synaplan-Instanz. Verwenden Sie genau eine Credential-Variable — ANTHROPIC_API_KEY (x-api-key) oder ANTHROPIC_AUTH_TOKEN (Bearer).",
     "copySetup": "Setup-Befehle kopieren",

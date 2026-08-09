@@ -3427,6 +3427,7 @@
     "statusEnabled": "Activada",
     "statusDisabled": "Desactivada",
     "budgetLine": "Presupuesto usado: {percent}% ({used} de {budget})",
+    "budgetLineUnlimited": "Presupuesto usado: {used} (sin límite de presupuesto mensual)",
     "setupTitle": "Configuración de Claude Code",
     "setupHint": "Apunte Claude Code a esta instancia de Synaplan. Use exactamente una variable de credencial: ANTHROPIC_API_KEY (x-api-key) o ANTHROPIC_AUTH_TOKEN (Bearer).",
     "copySetup": "Copiar comandos de configuración",

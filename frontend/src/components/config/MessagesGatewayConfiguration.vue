@@ -55,11 +55,15 @@
         </div>
         <p class="txt-secondary text-sm mt-3">
           {{
-            $t('messagesGateway.budgetLine', {
-              percent: status.budget.percent ?? 0,
-              used: status.budget.used_cost ?? '0',
-              budget: status.budget.budget ?? '0',
-            })
+            budgetUnlimited
+              ? $t('messagesGateway.budgetLineUnlimited', {
+                  used: status.budget.used_cost ?? '0',
+                })
+              : $t('messagesGateway.budgetLine', {
+                  percent: status.budget.percent ?? 0,
+                  used: status.budget.used_cost ?? '0',
+                  budget: status.budget.budget ?? '0',
+                })
           }}
         </p>
       </div>
@@ -251,6 +255,9 @@ const enabledFlag = ref(false)
 const allowOperatorFlag = ref(false)
 const upstreamUrl = ref('')
 const aliasesJson = ref('{}')
+
+// A budget of 0 means "no monthly budget configured" (unlimited), not "exhausted".
+const budgetUnlimited = computed(() => Number(status.value?.budget?.budget ?? 0) <= 0)
 
 const anthropicSourceLabel = computed(() => {
   const source = status.value?.keys?.anthropic?.effective_source ?? 'none'
