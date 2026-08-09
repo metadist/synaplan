@@ -44,7 +44,6 @@ RESP=$(curl -sS -D /tmp/mgw-headers.txt -o /tmp/mgw-body.json \
   -d "{\"model\":\"$MODEL\",\"max_tokens\":64,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}")
 
 STATUS=$(head -n1 /tmp/mgw-headers.txt | awk '{print $2}')
-BODY=$(cat /tmp/mgw-body.json)
 
 assert "non-stream HTTP 200 (or expected gateway status)" "[[ \"$STATUS\" == \"200\" || \"$STATUS\" == \"403\" || \"$STATUS\" == \"401\" || \"$STATUS\" == \"404\" ]]"
 
@@ -54,7 +53,9 @@ if [[ "$STATUS" == "403" ]]; then
 fi
 
 if [[ "$STATUS" == "200" ]]; then
-  assert "non-stream Anthropic shape" "echo \"$BODY\" | grep -q '\"type\":\"message\"'"
+  # Grep the file, not an expanded variable: the body's own quotes break the
+  # eval'd condition and the assertion fails on a perfectly good response.
+  assert "non-stream Anthropic shape" "grep -q '\"type\":\"message\"' /tmp/mgw-body.json"
   assert "budget header present" "grep -qi 'x-synaplan-budget-percent' /tmp/mgw-headers.txt"
 fi
 

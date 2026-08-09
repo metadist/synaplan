@@ -7,6 +7,8 @@ namespace App\Controller;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\MessagesGateway;
+use App\AI\Messages\Tools\AnalyzeImageTool;
+use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
@@ -35,6 +37,8 @@ final class MessagesGatewayController extends AbstractController
         private readonly ProviderKeyStore $providerKeyStore,
         private readonly ConfigRepository $configRepository,
         private readonly RateLimitService $rateLimitService,
+        private readonly WebSearchTool $webSearchTool,
+        private readonly AnalyzeImageTool $analyzeImageTool,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -55,6 +59,22 @@ final class MessagesGatewayController extends AbstractController
                 new OA\Property(property: 'enabled', type: 'boolean', example: false),
                 new OA\Property(property: 'allow_operator_key', type: 'boolean', example: false),
                 new OA\Property(property: 'mcp_tools_enabled', type: 'boolean', example: false),
+                new OA\Property(
+                    property: 'web_search_mode',
+                    description: 'How the gateway answers Anthropic web_search declarations: auto (Synaplan search when configured, otherwise passthrough), synaplan, passthrough, or off.',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::WEB_SEARCH_MODES,
+                    example: MessagesGatewayConfig::WEB_SEARCH_AUTO,
+                ),
+                new OA\Property(property: 'web_search_available', type: 'boolean', example: false, description: 'Whether a web search provider is configured on this instance.'),
+                new OA\Property(
+                    property: 'vision_mode',
+                    description: 'How the gateway handles image turns: auto (Synaplan vision when the resolved model lacks vision, otherwise passthrough), synaplan, passthrough, or off.',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::VISION_MODES,
+                    example: MessagesGatewayConfig::VISION_AUTO,
+                ),
+                new OA\Property(property: 'vision_available', type: 'boolean', example: true, description: 'Whether a Synaplan PIC2TEXT / catalog vision model is available.'),
                 new OA\Property(property: 'context_injection_enabled', type: 'boolean', example: false),
                 new OA\Property(property: 'budget_notice_enabled', type: 'boolean', example: true),
                 new OA\Property(property: 'upstream_url', type: 'string', example: 'https://api.anthropic.com'),
@@ -133,6 +153,10 @@ final class MessagesGatewayController extends AbstractController
             'enabled' => $this->config->isEnabled($userId),
             'allow_operator_key' => $this->config->allowOperatorKey($userId),
             'mcp_tools_enabled' => $this->config->isMcpToolsEnabled($userId),
+            'web_search_mode' => $this->config->webSearchMode($userId),
+            'web_search_available' => $this->webSearchTool->isAvailable(),
+            'vision_mode' => $this->config->visionMode($userId),
+            'vision_available' => $this->analyzeImageTool->isAvailable($userId),
             'context_injection_enabled' => $this->config->isContextInjectionEnabled($userId),
             'budget_notice_enabled' => $this->config->isBudgetNoticeEnabled($userId),
             'upstream_url' => $this->config->upstreamUrl(),
@@ -415,6 +439,16 @@ final class MessagesGatewayController extends AbstractController
                 new OA\Property(property: 'mcp_tools_enabled', type: 'boolean'),
                 new OA\Property(property: 'context_injection_enabled', type: 'boolean'),
                 new OA\Property(property: 'budget_notice_enabled', type: 'boolean'),
+                new OA\Property(
+                    property: 'web_search_mode',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::WEB_SEARCH_MODES,
+                ),
+                new OA\Property(
+                    property: 'vision_mode',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::VISION_MODES,
+                ),
             ],
         ),
     )]
@@ -429,6 +463,16 @@ final class MessagesGatewayController extends AbstractController
                     property: 'updated',
                     type: 'object',
                     additionalProperties: new OA\AdditionalProperties(type: 'boolean'),
+                ),
+                new OA\Property(
+                    property: 'web_search_mode',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::WEB_SEARCH_MODES,
+                ),
+                new OA\Property(
+                    property: 'vision_mode',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::VISION_MODES,
                 ),
             ],
         ),
@@ -476,11 +520,77 @@ final class MessagesGatewayController extends AbstractController
             $updated[$jsonKey] = $bool;
         }
 
+        $webSearchMode = $decoded['web_search_mode'] ?? null;
+        if (\is_string($webSearchMode)) {
+            $webSearchMode = strtolower(trim($webSearchMode));
+            if (!\in_array($webSearchMode, MessagesGatewayConfig::WEB_SEARCH_MODES, true)) {
+                return $this->json(
+                    ['error' => 'web_search_mode must be one of: '.implode(', ', MessagesGatewayConfig::WEB_SEARCH_MODES)],
+                    Response::HTTP_BAD_REQUEST,
+                );
+            }
+            if (
+                MessagesGatewayConfig::WEB_SEARCH_SYNAPLAN === $webSearchMode
+                && !$this->webSearchTool->isAvailable()
+            ) {
+                return $this->json(
+                    ['error' => 'web_search_mode=synaplan requires a configured web search provider on this instance'],
+                    Response::HTTP_BAD_REQUEST,
+                );
+            }
+            $this->configRepository->setValue(
+                0,
+                MessagesGatewayConfig::CONFIG_GROUP,
+                MessagesGatewayConfig::KEY_WEB_SEARCH_MODE,
+                $webSearchMode,
+            );
+        } else {
+            $webSearchMode = null;
+        }
+
+        $visionMode = $decoded['vision_mode'] ?? null;
+        if (\is_string($visionMode)) {
+            $visionMode = strtolower(trim($visionMode));
+            if (!\in_array($visionMode, MessagesGatewayConfig::VISION_MODES, true)) {
+                return $this->json(
+                    ['error' => 'vision_mode must be one of: '.implode(', ', MessagesGatewayConfig::VISION_MODES)],
+                    Response::HTTP_BAD_REQUEST,
+                );
+            }
+            if (
+                MessagesGatewayConfig::VISION_SYNAPLAN === $visionMode
+                && !$this->analyzeImageTool->isAvailable((int) $user->getId())
+            ) {
+                return $this->json(
+                    ['error' => 'vision_mode=synaplan requires a configured Synaplan vision (PIC2TEXT) model'],
+                    Response::HTTP_BAD_REQUEST,
+                );
+            }
+            $this->configRepository->setValue(
+                0,
+                MessagesGatewayConfig::CONFIG_GROUP,
+                MessagesGatewayConfig::KEY_VISION_MODE,
+                $visionMode,
+            );
+        } else {
+            $visionMode = null;
+        }
+
         $this->logger->warning('MessagesGateway: flags updated (audit)', [
             'acting_user_id' => $user->getId(),
             'updated' => $updated,
+            'web_search_mode' => $webSearchMode,
+            'vision_mode' => $visionMode,
         ]);
 
-        return $this->json(['success' => true, 'updated' => $updated]);
+        $response = ['success' => true, 'updated' => $updated];
+        if (null !== $webSearchMode) {
+            $response['web_search_mode'] = $webSearchMode;
+        }
+        if (null !== $visionMode) {
+            $response['vision_mode'] = $visionMode;
+        }
+
+        return $this->json($response);
     }
 }

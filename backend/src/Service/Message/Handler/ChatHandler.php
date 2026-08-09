@@ -33,6 +33,7 @@ use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
+use App\Service\Vision\VisionModelResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -81,6 +82,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private DocumentImageCatalog $documentImageCatalog,
         private TimeContextBuilder $timeContextBuilder,
         private KnowledgeContextFormatter $knowledgeContextFormatter,
+        private VisionModelResolver $visionModelResolver,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -1775,32 +1777,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
     /**
      * Resolve the vision-capable model to use when the active chat model cannot
-     * see images.
-     *
-     * Order of preference:
-     *   1. The account's CONFIGURED image-recognition model
-     *      (DEFAULTMODEL.PIC2TEXT), when it exists and is vision-capable.
-     *   2. The global catalog fallback (highest-quality selectable vision chat
-     *      model) — used only when the account has no usable configured model.
-     *
-     * Before this, the vision fallback always used the global catalog pick, so
-     * an account whose chat model lacks vision got answers from whichever
-     * provider happened to rank highest (Anthropic Claude), even though the
-     * account never configured that provider — e.g. a WhatsApp image reply
-     * arriving as an Anthropic answer. Honouring PIC2TEXT keeps image turns on
-     * the standard configured multimodal model.
+     * see images. Delegates to {@see VisionModelResolver} so ChatHandler and the
+     * Messages gateway share the same PIC2TEXT → catalog fallback.
      */
     private function resolveVisionFallbackModel(?int $effectiveUserId): ?Model
     {
-        $configuredId = $this->modelConfigService->getDefaultModel('PIC2TEXT', $effectiveUserId);
-        if ($configuredId) {
-            $configured = $this->modelRepository->find($configuredId);
-            if ($configured instanceof Model && $configured->hasFeature('vision')) {
-                return $configured;
-            }
-        }
-
-        return $this->modelRepository->findByFeature('vision', 'chat', true);
+        return $this->visionModelResolver->resolve($effectiveUserId);
     }
 
     /**

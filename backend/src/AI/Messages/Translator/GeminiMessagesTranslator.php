@@ -6,6 +6,7 @@ namespace App\AI\Messages\Translator;
 
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
+use App\AI\Messages\Tools\AnthropicServerTools;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -15,7 +16,8 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  *
  * Uses `parametersJsonSchema` for tool declarations (Gemini 2026 surface) so
  * MCP `input_schema` passes through with light guardrails. Strips Anthropic
- * `thinking` / beta body fields that Claude Code sends to aliases.
+ * `thinking` / beta body fields that Claude Code sends to aliases. Image
+ * blocks map to `inlineData` / `fileData` so vision survives the alias route.
  */
 #[AutoconfigureTag('app.messages.translator')]
 final readonly class GeminiMessagesTranslator implements MessagesTranslatorInterface
@@ -160,7 +162,11 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
         if (isset($requestBody['tools']) && \is_array($requestBody['tools']) && [] !== $requestBody['tools']) {
             $declarations = [];
             foreach ($requestBody['tools'] as $tool) {
-                if (!\is_array($tool)) {
+                if (!\is_array($tool) || AnthropicServerTools::isServerToolDeclaration($tool)) {
+                    // Server tools (`web_search_*`, `code_execution_*`, …) are
+                    // executed by the API side, not by the model, and carry no
+                    // input schema. Mapping one to a function declaration would
+                    // hand the model a tool nobody can answer.
                     continue;
                 }
                 $name = $this->sanitizeName((string) ($tool['name'] ?? 'tool'));
@@ -293,6 +299,11 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                 $type = (string) ($block['type'] ?? '');
                 if ('text' === $type) {
                     $parts[] = ['text' => (string) ($block['text'] ?? '')];
+                } elseif ('image' === $type) {
+                    $part = $this->imageBlockToPart($block);
+                    if (null !== $part) {
+                        $parts[] = $part;
+                    }
                 } elseif ('tool_use' === $type) {
                     $parts[] = [
                         'functionCall' => [
@@ -323,6 +334,43 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
         }
 
         return ['role' => $geminiRole, 'parts' => $parts];
+    }
+
+    /**
+     * Anthropic `image` block → Gemini part.
+     *
+     * Base64 sources become `inlineData`, URL sources `fileData`. Anything the
+     * shape does not cover returns null so the turn is still sent without it,
+     * rather than failing the whole request.
+     *
+     * @param array<string, mixed> $block
+     *
+     * @return array<string, mixed>|null
+     */
+    private function imageBlockToPart(array $block): ?array
+    {
+        $source = $block['source'] ?? null;
+        if (!\is_array($source)) {
+            return null;
+        }
+
+        $sourceType = (string) ($source['type'] ?? '');
+        $mimeType = \is_string($source['media_type'] ?? null) ? $source['media_type'] : 'image/png';
+
+        if ('base64' === $sourceType) {
+            $data = $source['data'] ?? null;
+            if (!\is_string($data) || '' === $data) {
+                return null;
+            }
+
+            return ['inlineData' => ['mimeType' => $mimeType, 'data' => $data]];
+        }
+
+        if ('url' === $sourceType && \is_string($source['url'] ?? null) && '' !== $source['url']) {
+            return ['fileData' => ['mimeType' => $mimeType, 'fileUri' => $source['url']]];
+        }
+
+        return null;
     }
 
     /**

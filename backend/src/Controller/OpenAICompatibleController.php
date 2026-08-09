@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\Entity\User;
@@ -23,6 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 
 /**
  * OpenAI-compatible API endpoints.
@@ -245,21 +247,13 @@ class OpenAICompatibleController extends AbstractController
         try {
             $result = $this->aiFacade->chat($messages, $user->getId(), $options);
 
-            $lastUserMessage = '';
-            foreach (array_reverse($messages) as $msg) {
-                if ('user' === ($msg['role'] ?? '')) {
-                    $lastUserMessage = $msg['content'] ?? '';
-                    break;
-                }
-            }
-
-            $this->rateLimitService->recordUsage($user, 'API_CHAT', [
+            $this->recordChatUsage($user, [
                 'provider' => $result['provider'] ?? 'unknown',
                 'model' => $result['model'] ?? 'unknown',
                 'model_id' => $dbModelId,
                 'usage' => $result['usage'] ?? [],
                 'response_text' => $result['content'] ?? '',
-                'input_text' => $lastUserMessage,
+                'input_text' => $this->lastUserText($messages),
                 'source' => 'OPENAI_API',
             ]);
 
@@ -289,13 +283,57 @@ class OpenAICompatibleController extends AbstractController
                 ],
             ]);
         } catch (\Throwable $e) {
+            ['status' => $status, 'type' => $type, 'code' => $code] = $this->describeFailure($e);
+
             $this->logger->error('OpenAI-compatible chat failed', [
                 'error' => $e->getMessage(),
                 'user_id' => $user->getId(),
+                'status' => $status,
             ]);
 
-            return $this->openAiError($e->getMessage(), 'server_error', 'internal_error', 500);
+            return $this->openAiError($e->getMessage(), $type, $code, $status);
         }
+    }
+
+    /**
+     * Turn a failed completion into an OpenAI-shaped error.
+     *
+     * A provider rejecting the request (unreadable image, bad key, rate limit)
+     * is not an internal error: answering 500 hides the cause and invites
+     * clients to retry a request that can never succeed. Relay the upstream
+     * status and the error type OpenAI clients branch on.
+     *
+     * @return array{status: int, type: string, code: string}
+     */
+    private function describeFailure(\Throwable $e): array
+    {
+        $status = 500;
+        for ($current = $e; null !== $current; $current = $current->getPrevious()) {
+            if ($current instanceof ProviderException && null !== $current->getUpstreamStatus()) {
+                $status = $current->getUpstreamStatus();
+                break;
+            }
+
+            if ($current instanceof HttpExceptionInterface) {
+                $status = $current->getResponse()->getStatusCode();
+                break;
+            }
+        }
+
+        return match (true) {
+            Response::HTTP_UNAUTHORIZED === $status, Response::HTTP_FORBIDDEN === $status => [
+                'status' => $status, 'type' => 'authentication_error', 'code' => 'invalid_api_key',
+            ],
+            Response::HTTP_TOO_MANY_REQUESTS === $status => [
+                'status' => $status, 'type' => 'rate_limit_error', 'code' => 'rate_limit_exceeded',
+            ],
+            $status < 500 => [
+                'status' => $status, 'type' => 'invalid_request_error', 'code' => 'upstream_error',
+            ],
+            default => [
+                'status' => $status, 'type' => 'server_error', 'code' => 'internal_error',
+            ],
+        };
     }
 
     private function handleStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel, ?int $dbModelId): StreamedResponse
@@ -391,21 +429,13 @@ class OpenAICompatibleController extends AbstractController
                 }
                 flush();
 
-                $lastUserMessage = '';
-                foreach (array_reverse($messages) as $msg) {
-                    if ('user' === ($msg['role'] ?? '')) {
-                        $lastUserMessage = $msg['content'] ?? '';
-                        break;
-                    }
-                }
-
-                $this->rateLimitService->recordUsage($user, 'API_CHAT', [
+                $this->recordChatUsage($user, [
                     'provider' => $streamMetadata['provider'] ?? 'unknown',
                     'model' => $streamMetadata['model'] ?? 'unknown',
                     'model_id' => $dbModelId,
                     'usage' => $streamMetadata['usage'] ?? [],
                     'source' => 'OPENAI_API',
-                    'input_text' => $lastUserMessage,
+                    'input_text' => $this->lastUserText($messages),
                     'response_text' => $accumulatedContent,
                 ]);
 
@@ -453,8 +483,7 @@ class OpenAICompatibleController extends AbstractController
             if ('user' !== ($msg['role'] ?? '')) {
                 continue;
             }
-            $content = $msg['content'] ?? '';
-            $text = is_string($content) ? $content : (json_encode($content, JSON_INVALID_UTF8_SUBSTITUTE) ?: '');
+            $text = $this->contentToText($msg['content'] ?? '');
             if ('' === $firstUserMessage) {
                 $firstUserMessage = $text;
             }
@@ -484,6 +513,86 @@ class OpenAICompatibleController extends AbstractController
                 'user_id' => $user->getId(),
             ]);
         }
+    }
+
+    /**
+     * Meter a completed chat call. Metering runs after the answer is produced
+     * (and, when streaming, after it has already been written to the wire), so
+     * a bookkeeping failure must never turn a successful completion into a 500.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    private function recordChatUsage(User $user, array $metadata): void
+    {
+        try {
+            $this->rateLimitService->recordUsage($user, 'API_CHAT', $metadata);
+        } catch (\Throwable $e) {
+            $this->logger->error('OpenAI-compatible: recordUsage failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $user->getId(),
+            ]);
+        }
+    }
+
+    /**
+     * Text of the last user turn, for metering and the session summary.
+     *
+     * @param list<array<string, mixed>> $messages
+     */
+    private function lastUserText(array $messages): string
+    {
+        foreach (array_reverse($messages) as $msg) {
+            if ('user' !== ($msg['role'] ?? '')) {
+                continue;
+            }
+
+            return $this->contentToText($msg['content'] ?? '');
+        }
+
+        return '';
+    }
+
+    /**
+     * Readable text of an OpenAI-shaped `content` field.
+     *
+     * Content is a plain string for text-only turns and a list of content parts
+     * as soon as the turn carries an image or audio. Metering, the session
+     * summary and the activity trail all want the text a human would read, not
+     * the base64 payload of the attachment.
+     */
+    private function contentToText(mixed $content): string
+    {
+        if (is_string($content)) {
+            return $content;
+        }
+
+        if (!is_array($content)) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ($content as $part) {
+            if (is_string($part)) {
+                $parts[] = $part;
+                continue;
+            }
+            if (!is_array($part)) {
+                continue;
+            }
+
+            $text = match ((string) ($part['type'] ?? '')) {
+                'text' => is_string($part['text'] ?? null) ? $part['text'] : '',
+                'image_url' => '[image]',
+                'input_audio' => '[audio]',
+                'file' => '[file]',
+                default => '',
+            };
+            if ('' !== $text) {
+                $parts[] = $text;
+            }
+        }
+
+        return implode("\n", $parts);
     }
 
     /**

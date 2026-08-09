@@ -147,6 +147,34 @@ final class RateLimitService
     }
 
     /**
+     * Byte length of a metering text field that may not be a plain string.
+     *
+     * The compatible API surfaces (`/v1/chat/completions`, `/v1/messages`) hand
+     * message content straight through, and that content is an array of content
+     * parts as soon as the turn carries an image, a `tool_use` or a
+     * `tool_result`. Metering is a side effect of an already successful
+     * completion, so it must measure those instead of fataling on them.
+     */
+    private static function textByteLength(mixed $value): int
+    {
+        if (is_string($value)) {
+            return strlen($value);
+        }
+
+        if (is_array($value)) {
+            $encoded = json_encode($value, JSON_INVALID_UTF8_SUBSTITUTE);
+
+            return false === $encoded ? 0 : strlen($encoded);
+        }
+
+        if (is_scalar($value)) {
+            return strlen((string) $value);
+        }
+
+        return 0;
+    }
+
+    /**
      * Record FILE_ANALYSIS usage exactly once per (user, file).
      *
      * The chat upload, the RAG `processSingleUpload` path and the async
@@ -283,10 +311,11 @@ final class RateLimitService
             $estimated = true;
         }
 
-        // Resolve input byte count: prefer precomputed input_bytes over strlen(input_text)
+        // Resolve input byte count: prefer precomputed input_bytes over the
+        // byte length of input_text
         $inputBytes = !empty($metadata['input_bytes']) ? (int) $metadata['input_bytes'] : 0;
         if (0 === $inputBytes && !empty($metadata['input_text'])) {
-            $inputBytes = strlen($metadata['input_text']);
+            $inputBytes = self::textByteLength($metadata['input_text']);
         }
 
         // Auto-estimate if no token data at all
@@ -294,7 +323,7 @@ final class RateLimitService
             $totalBytes = $inputBytes;
 
             if (!empty($metadata['response_text'])) {
-                $totalBytes += strlen($metadata['response_text']);
+                $totalBytes += self::textByteLength($metadata['response_text']);
             }
             if (!empty($metadata['response_bytes'])) {
                 $totalBytes += (int) $metadata['response_bytes'];
@@ -307,7 +336,7 @@ final class RateLimitService
         }
 
         if ($totalTokens > 0 && 0 === $promptTokens && 0 === $completionTokens) {
-            $outputBytes = (!empty($metadata['response_text']) ? strlen($metadata['response_text']) : 0)
+            $outputBytes = (!empty($metadata['response_text']) ? self::textByteLength($metadata['response_text']) : 0)
                          + (!empty($metadata['response_bytes']) ? (int) $metadata['response_bytes'] : 0);
 
             if ($inputBytes > 0 && $outputBytes > 0) {

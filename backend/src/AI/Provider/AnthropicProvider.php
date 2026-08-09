@@ -262,10 +262,13 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             ];
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
+            $upstreamStatus = 0;
 
             if (method_exists($e, 'getResponse')) {
                 try {
-                    $errorBody = $e->getResponse()->toArray(false);
+                    $errorResponse = $e->getResponse();
+                    $upstreamStatus = $errorResponse->getStatusCode();
+                    $errorBody = $errorResponse->toArray(false);
                     if (isset($errorBody['error'])) {
                         $errorMessage = sprintf(
                             'Anthropic API Error: %s (type: %s)',
@@ -281,9 +284,10 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $this->logger->error('Anthropic chat error', [
                 'error' => $errorMessage,
                 'model' => $options['model'] ?? 'unknown',
+                'status_code' => $upstreamStatus,
             ]);
 
-            throw new ProviderException($errorMessage, 'anthropic');
+            throw new ProviderException($errorMessage, 'anthropic', null, $upstreamStatus, $e);
         }
     }
 
@@ -358,7 +362,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             // stream has not been consumed yet.
             $statusCode = $response->getStatusCode();
             if ($statusCode >= 400) {
-                throw new ProviderException($this->formatStreamHttpError($response, $model, $statusCode), 'anthropic');
+                throw new ProviderException($this->formatStreamHttpError($response, $model, $statusCode), 'anthropic', null, $statusCode);
             }
 
             // Parse SSE stream and collect usage
@@ -373,6 +377,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             throw $e;
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
+            $upstreamStatus = 0;
 
             // Extract Anthropic error details from the response body.
             // For streaming requests (buffer: false), toArray() may fail,
@@ -380,6 +385,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             if (method_exists($e, 'getResponse')) {
                 try {
                     $errorResponse = $e->getResponse();
+                    $upstreamStatus = $errorResponse->getStatusCode();
                     $errorBody = null;
 
                     try {
@@ -414,9 +420,10 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $this->logger->error('Anthropic streaming error', [
                 'error' => $errorMessage,
                 'model' => $options['model'] ?? 'unknown',
+                'status_code' => $upstreamStatus,
             ]);
 
-            throw new ProviderException($errorMessage, 'anthropic');
+            throw new ProviderException($errorMessage, 'anthropic', null, $upstreamStatus, $e);
         }
     }
 

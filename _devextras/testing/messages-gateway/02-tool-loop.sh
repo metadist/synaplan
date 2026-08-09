@@ -6,6 +6,7 @@ set -euo pipefail
 
 BASE="${SYNAPLAN_BASE_URL:-http://localhost:8000}"
 KEY="${SYNAPLAN_API_KEY:?Set SYNAPLAN_API_KEY}"
+MODEL="${SYNAPLAN_TEST_MODEL:-claude-sonnet-5}"
 FAIL=0
 
 pass() { echo "PASS: $*"; }
@@ -21,7 +22,7 @@ CODE=$(curl -sS -o /tmp/mg-mixed.json -w '%{http_code}' -X POST "$BASE/v1/messag
   -H "content-type: application/json" \
   -H "x-fixture: complete" \
   -d '{
-    "model":"claude-sonnet-4-6",
+    "model":"'"$MODEL"'",
     "max_tokens":32,
     "stream":false,
     "tools":[{"name":"Bash","description":"shell","input_schema":{"type":"object"}}],
@@ -42,7 +43,7 @@ if [[ "${RUN_MCP_LOOP:-0}" == "1" ]]; then
     -H "content-type: application/json" \
     -H "x-fixture: tool-use" \
     -d '{
-      "model":"claude-sonnet-4-6",
+      "model":"'"$MODEL"'",
       "max_tokens":64,
       "stream":false,
       "messages":[{"role":"user","content":"search my knowledge base for test"}]

@@ -67,6 +67,12 @@ export async function saveMessagesGatewayAliases(
   })
 }
 
+/** How the gateway answers a client's Anthropic `web_search` declaration. */
+export type WebSearchMode = 'auto' | 'synaplan' | 'passthrough' | 'off'
+
+/** How the gateway handles image turns for Claude Code. */
+export type VisionMode = 'auto' | 'synaplan' | 'passthrough' | 'off'
+
 export async function saveMessagesGatewayFlags(
   flags: Partial<{
     enabled: boolean
@@ -74,6 +80,8 @@ export async function saveMessagesGatewayFlags(
     mcp_tools_enabled: boolean
     context_injection_enabled: boolean
     budget_notice_enabled: boolean
+    web_search_mode: WebSearchMode
+    vision_mode: VisionMode
   }>
 ): Promise<z.infer<typeof PutApiMessagesGatewayPutFlagsResponseSchema>> {
   return httpClient(`${BASE}/flags`, {

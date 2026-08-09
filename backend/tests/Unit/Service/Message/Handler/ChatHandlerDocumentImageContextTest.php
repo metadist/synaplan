@@ -123,6 +123,7 @@ class ChatHandlerDocumentImageContextTest extends TestCase
             $catalog,
             new TimeContextBuilder(),
             new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            $this->createMock(\App\Service\Vision\VisionModelResolver::class),
         );
     }
 

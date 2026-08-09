@@ -4,6 +4,14 @@ namespace App\AI\Exception;
 
 class ProviderException extends \RuntimeException
 {
+    private const HTTP_STATUS_MIN = 400;
+    private const HTTP_STATUS_MAX = 599;
+
+    /**
+     * @param int $code the upstream HTTP status when the provider rejected the
+     *                  request, so callers can relay it instead of flattening
+     *                  every provider error into a 500
+     */
     public function __construct(
         string $message,
         private string $providerName = 'unknown',
@@ -17,6 +25,17 @@ class ProviderException extends \RuntimeException
     public function getProviderName(): string
     {
         return $this->providerName;
+    }
+
+    /**
+     * The upstream HTTP status, when this exception came from a provider
+     * response rather than from a local failure.
+     */
+    public function getUpstreamStatus(): ?int
+    {
+        $code = $this->getCode();
+
+        return $code >= self::HTTP_STATUS_MIN && $code <= self::HTTP_STATUS_MAX ? $code : null;
     }
 
     public function getContext(): ?array

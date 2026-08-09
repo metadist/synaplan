@@ -176,6 +176,62 @@
 
         <div>
           <label class="block text-sm font-medium txt-primary mb-1">
+            {{ $t('messagesGateway.webSearchLabel') }}
+          </label>
+          <select
+            v-model="webSearchMode"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="select-agents-web-search"
+            @change="onChangeWebSearchMode"
+          >
+            <option value="auto">{{ $t('messagesGateway.webSearchModeAuto') }}</option>
+            <option value="synaplan" :disabled="!status.web_search_available">
+              {{ $t('messagesGateway.webSearchModeSynaplan') }}
+            </option>
+            <option value="passthrough">
+              {{ $t('messagesGateway.webSearchModePassthrough') }}
+            </option>
+            <option value="off">{{ $t('messagesGateway.webSearchModeOff') }}</option>
+          </select>
+          <p class="txt-secondary text-xs mt-1">
+            {{
+              status.web_search_available
+                ? $t('messagesGateway.webSearchHint')
+                : $t('messagesGateway.webSearchUnavailable')
+            }}
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium txt-primary mb-1">
+            {{ $t('messagesGateway.visionLabel') }}
+          </label>
+          <select
+            v-model="visionMode"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="select-agents-vision"
+            @change="onChangeVisionMode"
+          >
+            <option value="auto">{{ $t('messagesGateway.visionModeAuto') }}</option>
+            <option value="synaplan" :disabled="!status.vision_available">
+              {{ $t('messagesGateway.visionModeSynaplan') }}
+            </option>
+            <option value="passthrough">
+              {{ $t('messagesGateway.visionModePassthrough') }}
+            </option>
+            <option value="off">{{ $t('messagesGateway.visionModeOff') }}</option>
+          </select>
+          <p class="txt-secondary text-xs mt-1">
+            {{
+              status.vision_available
+                ? $t('messagesGateway.visionHint')
+                : $t('messagesGateway.visionUnavailable')
+            }}
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium txt-primary mb-1">
             {{ $t('messagesGateway.upstreamLabel') }}
           </label>
           <p class="txt-secondary text-xs mb-2">{{ $t('messagesGateway.upstreamWarning') }}</p>
@@ -238,6 +294,8 @@ import {
   saveMessagesGatewayKey,
   saveMessagesGatewayUpstream,
   type MessagesGatewayStatus,
+  type VisionMode,
+  type WebSearchMode,
 } from '@/services/api/messagesGatewayApi'
 
 const { t } = useI18n()
@@ -253,6 +311,8 @@ const savingUpstream = ref(false)
 const savingAliases = ref(false)
 const enabledFlag = ref(false)
 const allowOperatorFlag = ref(false)
+const webSearchMode = ref<WebSearchMode>('auto')
+const visionMode = ref<VisionMode>('auto')
 const upstreamUrl = ref('')
 const aliasesJson = ref('{}')
 
@@ -281,12 +341,65 @@ async function load() {
     status.value = await getMessagesGatewayStatus()
     enabledFlag.value = status.value.enabled
     allowOperatorFlag.value = status.value.allow_operator_key ?? false
+    webSearchMode.value = resolveWebSearchMode(
+      (status.value.web_search_mode as WebSearchMode | undefined) ?? 'auto',
+      Boolean(status.value.web_search_available)
+    )
+    visionMode.value = resolveVisionMode(
+      (status.value.vision_mode as VisionMode | undefined) ?? 'auto',
+      Boolean(status.value.vision_available)
+    )
     upstreamUrl.value = status.value.upstream_url
     aliasesJson.value = JSON.stringify(status.value.model_aliases ?? {}, null, 2)
+    await persistUnavailableModeFallbacks()
   } catch (err) {
     error((err as Error).message || t('messagesGateway.loadError'))
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * `synaplan` needs a configured provider. If the DB still has that mode after
+ * the provider disappeared, show (and persist) `auto` so the control cannot
+ * leave the instance in a state that silently does nothing useful.
+ */
+function resolveWebSearchMode(mode: WebSearchMode, available: boolean): WebSearchMode {
+  return !available && mode === 'synaplan' ? 'auto' : mode
+}
+
+function resolveVisionMode(mode: VisionMode, available: boolean): VisionMode {
+  return !available && mode === 'synaplan' ? 'auto' : mode
+}
+
+async function persistUnavailableModeFallbacks(): Promise<void> {
+  if (!status.value) return
+
+  const patch: Partial<{ web_search_mode: WebSearchMode; vision_mode: VisionMode }> = {}
+  if (
+    status.value.web_search_mode === 'synaplan' &&
+    !status.value.web_search_available &&
+    webSearchMode.value === 'auto'
+  ) {
+    patch.web_search_mode = 'auto'
+  }
+  if (
+    status.value.vision_mode === 'synaplan' &&
+    !status.value.vision_available &&
+    visionMode.value === 'auto'
+  ) {
+    patch.vision_mode = 'auto'
+  }
+  if (Object.keys(patch).length === 0) return
+
+  try {
+    await saveMessagesGatewayFlags(patch)
+    status.value = {
+      ...status.value,
+      ...patch,
+    }
+  } catch {
+    // Leave the coerced UI value; the next successful save will catch up.
   }
 }
 
@@ -353,6 +466,34 @@ async function onToggleOperatorKey() {
   } catch (err) {
     error((err as Error).message || t('messagesGateway.flagsError'))
     allowOperatorFlag.value = status.value?.allow_operator_key ?? false
+  }
+}
+
+async function onChangeWebSearchMode() {
+  try {
+    await saveMessagesGatewayFlags({ web_search_mode: webSearchMode.value })
+    success(t('messagesGateway.flagsSaved'))
+    await load()
+  } catch (err) {
+    error((err as Error).message || t('messagesGateway.flagsError'))
+    webSearchMode.value = resolveWebSearchMode(
+      (status.value?.web_search_mode as WebSearchMode | undefined) ?? 'auto',
+      Boolean(status.value?.web_search_available)
+    )
+  }
+}
+
+async function onChangeVisionMode() {
+  try {
+    await saveMessagesGatewayFlags({ vision_mode: visionMode.value })
+    success(t('messagesGateway.flagsSaved'))
+    await load()
+  } catch (err) {
+    error((err as Error).message || t('messagesGateway.flagsError'))
+    visionMode.value = resolveVisionMode(
+      (status.value?.vision_mode as VisionMode | undefined) ?? 'auto',
+      Boolean(status.value?.vision_available)
+    )
   }
 }
 
