@@ -8,6 +8,7 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\Tools\AnalyzeImageTool;
+use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
@@ -40,6 +41,7 @@ final class MessagesGatewayController extends AbstractController
         private readonly RateLimitService $rateLimitService,
         private readonly WebSearchTool $webSearchTool,
         private readonly AnalyzeImageTool $analyzeImageTool,
+        private readonly GatewayToolCatalog $toolCatalog,
         private readonly McpServerConfigRepository $mcpServers,
         private readonly LoggerInterface $logger,
     ) {
@@ -64,6 +66,13 @@ final class MessagesGatewayController extends AbstractController
                 new OA\Property(property: 'mcp_tools_with_client_tools', type: 'boolean', example: false, description: 'Whether Synaplan MCP tools are also offered when the client already sent its own tools.'),
                 new OA\Property(property: 'mcp_max_iterations', type: 'integer', example: 8, description: 'Maximum server-side tool rounds per request.'),
                 new OA\Property(property: 'mcp_servers_configured', type: 'integer', example: 0, description: 'Number of enabled MCP servers the signed-in user has.'),
+                new OA\Property(
+                    property: 'server_tools',
+                    description: 'Built-in tools the gateway would run server-side under the current settings. A single request can still drop one of them.',
+                    type: 'array',
+                    items: new OA\Items(type: 'string'),
+                    example: ['web_search', 'analyze_image'],
+                ),
                 new OA\Property(
                     property: 'web_search_mode',
                     description: 'How the gateway answers Anthropic web_search declarations: auto (Synaplan search when configured, otherwise passthrough), synaplan, passthrough, or off.',
@@ -170,6 +179,7 @@ final class MessagesGatewayController extends AbstractController
             'mcp_tools_with_client_tools' => $this->config->allowMcpToolsWithClientTools($userId),
             'mcp_max_iterations' => $this->config->mcpMaxIterations($userId),
             'mcp_servers_configured' => \count($this->mcpServers->findEnabledByUser($userId)),
+            'server_tools' => $this->toolCatalog->nativeToolNames($userId),
             'web_search_mode' => $this->config->webSearchMode($userId),
             'web_search_available' => $this->webSearchTool->isAvailable(),
             'vision_mode' => $this->config->visionMode($userId),

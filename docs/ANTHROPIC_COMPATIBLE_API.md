@@ -63,7 +63,10 @@ search or vision:
 
 Every one of these is editable in the UI under **Channels → AI Agents** (admins
 only), grouped by what it controls: access, tool calling, images, context and
-session, connection.
+session, connection. Because several of them read `auto`, the tool calling
+section also lists what the gateway actually runs server-side right now
+(`server_tools` in the status response) — a mode is policy, that list is the
+outcome.
 
 Env fallback for local smoke tests: `MESSAGES_GATEWAY_UPSTREAM_URL` (DB value wins in production).
 

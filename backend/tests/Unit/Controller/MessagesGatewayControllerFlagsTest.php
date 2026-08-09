@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Controller;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\Tools\AnalyzeImageTool;
+use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Controller\MessagesGatewayController;
 use App\Entity\Config;
@@ -50,6 +51,7 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
             $this->createStub(RateLimitService::class),
             $this->webSearchTool,
             $this->analyzeImageTool,
+            $this->createStub(GatewayToolCatalog::class),
             $this->createStub(McpServerConfigRepository::class),
             new NullLogger(),
         );
