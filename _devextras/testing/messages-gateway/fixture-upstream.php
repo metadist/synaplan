@@ -9,11 +9,16 @@ declare(strict_types=1);
  *   php -S 127.0.0.1:8099 _devextras/testing/messages-gateway/fixture-upstream.php
  *
  * Select a transcript with the X-Fixture request header:
- *   complete (default) | stream | tool-use | error-429 | error-401 | echo
+ *   complete (default) | stream | tool-use | web-search | error-429 | error-401 | echo
  *
  * For tool-use: the first request returns a tool_use turn targeting the first
  * mcp__* tool in the request's tools[] (or mcp__1__rag_search). A follow-up
  * request that already contains tool_result blocks returns end_turn.
+ *
+ * For web-search: the first request calls Synaplan's native `web_search` tool
+ * (and reports an error turn if the gateway did not inject it). The follow-up
+ * answers with the tool result verbatim, so a caller can prove the search
+ * output actually reached the model.
  */
 
 $fixturesDir = __DIR__.'/fixtures';
@@ -75,6 +80,7 @@ if ('error-401' === $fixture) {
 }
 
 $hasToolResult = false;
+$toolResultText = '';
 if (\is_array($decoded) && isset($decoded['messages']) && \is_array($decoded['messages'])) {
     foreach ($decoded['messages'] as $msg) {
         if (!\is_array($msg) || !isset($msg['content']) || !\is_array($msg['content'])) {
@@ -83,6 +89,16 @@ if (\is_array($decoded) && isset($decoded['messages']) && \is_array($decoded['me
         foreach ($msg['content'] as $block) {
             if (\is_array($block) && 'tool_result' === ($block['type'] ?? '')) {
                 $hasToolResult = true;
+                $content = $block['content'] ?? '';
+                if (\is_string($content)) {
+                    $toolResultText = $content;
+                } elseif (\is_array($content)) {
+                    foreach ($content as $part) {
+                        if (\is_array($part) && \is_string($part['text'] ?? null)) {
+                            $toolResultText .= $part['text'];
+                        }
+                    }
+                }
                 break 2;
             }
         }
@@ -101,6 +117,127 @@ $pickMcpToolName = static function (?array $body): string {
 
     return 'mcp__1__rag_search';
 };
+
+if ('web-search' === $fixture) {
+    $emitSse = static function (array $events): void {
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        foreach ($events as $event) {
+            echo 'event: '.$event['type']."\n";
+            echo 'data: '.json_encode($event, JSON_THROW_ON_ERROR)."\n\n";
+            if (function_exists('ob_flush')) {
+                @ob_flush();
+            }
+            flush();
+            usleep(80_000);
+        }
+    };
+
+    $reply = static function (array $content, string $stopReason) use ($wantStream, $emitSse): void {
+        if (!$wantStream) {
+            echo json_encode([
+                'id' => 'msg_fixture_web_search',
+                'type' => 'message',
+                'role' => 'assistant',
+                'model' => 'claude-sonnet-4-6',
+                'content' => $content,
+                'stop_reason' => $stopReason,
+                'usage' => ['input_tokens' => 30, 'output_tokens' => 12],
+            ], JSON_THROW_ON_ERROR);
+
+            return;
+        }
+
+        $events = [[
+            'type' => 'message_start',
+            'message' => [
+                'id' => 'msg_fixture_web_search',
+                'type' => 'message',
+                'role' => 'assistant',
+                'model' => 'claude-sonnet-4-6',
+                'content' => [],
+                'stop_reason' => null,
+                'stop_sequence' => null,
+                'usage' => ['input_tokens' => 30, 'output_tokens' => 0],
+            ],
+        ]];
+
+        foreach ($content as $index => $block) {
+            if ('tool_use' === ($block['type'] ?? '')) {
+                $events[] = [
+                    'type' => 'content_block_start',
+                    'index' => $index,
+                    'content_block' => [
+                        'type' => 'tool_use',
+                        'id' => $block['id'],
+                        'name' => $block['name'],
+                        'input' => new stdClass(),
+                    ],
+                ];
+                $events[] = [
+                    'type' => 'content_block_delta',
+                    'index' => $index,
+                    'delta' => [
+                        'type' => 'input_json_delta',
+                        'partial_json' => json_encode($block['input'], JSON_THROW_ON_ERROR),
+                    ],
+                ];
+            } else {
+                $events[] = [
+                    'type' => 'content_block_start',
+                    'index' => $index,
+                    'content_block' => ['type' => 'text', 'text' => ''],
+                ];
+                $events[] = [
+                    'type' => 'content_block_delta',
+                    'index' => $index,
+                    'delta' => ['type' => 'text_delta', 'text' => $block['text']],
+                ];
+            }
+            $events[] = ['type' => 'content_block_stop', 'index' => $index];
+        }
+
+        $events[] = [
+            'type' => 'message_delta',
+            'delta' => ['stop_reason' => $stopReason, 'stop_sequence' => null],
+            'usage' => ['output_tokens' => 12],
+        ];
+        $events[] = ['type' => 'message_stop'];
+
+        $emitSse($events);
+    };
+
+    if ($hasToolResult) {
+        // Answer with the search output verbatim: proof that Synaplan ran the
+        // search and fed the results back into the same turn.
+        $reply([['type' => 'text', 'text' => 'ANSWER_FROM_SEARCH: '.$toolResultText]], 'end_turn');
+        exit;
+    }
+
+    $tools = (\is_array($decoded) && \is_array($decoded['tools'] ?? null)) ? $decoded['tools'] : [];
+    $executable = null;
+    foreach ($tools as $tool) {
+        if (\is_array($tool) && 'web_search' === ($tool['name'] ?? null) && isset($tool['input_schema'])) {
+            $executable = $tool;
+            break;
+        }
+    }
+
+    if (null === $executable) {
+        // Exactly the failure mode this fixture guards against: the model is
+        // offered no runnable search tool and can only answer from training data.
+        $reply([['type' => 'text', 'text' => 'NO_WEB_SEARCH_TOOL_OFFERED']], 'end_turn');
+        exit;
+    }
+
+    $reply([[
+        'type' => 'tool_use',
+        'id' => 'toolu_fixture_web_search',
+        'name' => 'web_search',
+        'input' => ['query' => 'synaplan release notes', 'max_results' => 3],
+    ]], 'tool_use');
+    exit;
+}
 
 if ('tool-use' === $fixture) {
     if ($hasToolResult) {
