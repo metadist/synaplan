@@ -245,21 +245,13 @@ class OpenAICompatibleController extends AbstractController
         try {
             $result = $this->aiFacade->chat($messages, $user->getId(), $options);
 
-            $lastUserMessage = '';
-            foreach (array_reverse($messages) as $msg) {
-                if ('user' === ($msg['role'] ?? '')) {
-                    $lastUserMessage = $msg['content'] ?? '';
-                    break;
-                }
-            }
-
-            $this->rateLimitService->recordUsage($user, 'API_CHAT', [
+            $this->recordChatUsage($user, [
                 'provider' => $result['provider'] ?? 'unknown',
                 'model' => $result['model'] ?? 'unknown',
                 'model_id' => $dbModelId,
                 'usage' => $result['usage'] ?? [],
                 'response_text' => $result['content'] ?? '',
-                'input_text' => $lastUserMessage,
+                'input_text' => $this->lastUserText($messages),
                 'source' => 'OPENAI_API',
             ]);
 
@@ -391,21 +383,13 @@ class OpenAICompatibleController extends AbstractController
                 }
                 flush();
 
-                $lastUserMessage = '';
-                foreach (array_reverse($messages) as $msg) {
-                    if ('user' === ($msg['role'] ?? '')) {
-                        $lastUserMessage = $msg['content'] ?? '';
-                        break;
-                    }
-                }
-
-                $this->rateLimitService->recordUsage($user, 'API_CHAT', [
+                $this->recordChatUsage($user, [
                     'provider' => $streamMetadata['provider'] ?? 'unknown',
                     'model' => $streamMetadata['model'] ?? 'unknown',
                     'model_id' => $dbModelId,
                     'usage' => $streamMetadata['usage'] ?? [],
                     'source' => 'OPENAI_API',
-                    'input_text' => $lastUserMessage,
+                    'input_text' => $this->lastUserText($messages),
                     'response_text' => $accumulatedContent,
                 ]);
 
@@ -453,8 +437,7 @@ class OpenAICompatibleController extends AbstractController
             if ('user' !== ($msg['role'] ?? '')) {
                 continue;
             }
-            $content = $msg['content'] ?? '';
-            $text = is_string($content) ? $content : (json_encode($content, JSON_INVALID_UTF8_SUBSTITUTE) ?: '');
+            $text = $this->contentToText($msg['content'] ?? '');
             if ('' === $firstUserMessage) {
                 $firstUserMessage = $text;
             }
@@ -484,6 +467,86 @@ class OpenAICompatibleController extends AbstractController
                 'user_id' => $user->getId(),
             ]);
         }
+    }
+
+    /**
+     * Meter a completed chat call. Metering runs after the answer is produced
+     * (and, when streaming, after it has already been written to the wire), so
+     * a bookkeeping failure must never turn a successful completion into a 500.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    private function recordChatUsage(User $user, array $metadata): void
+    {
+        try {
+            $this->rateLimitService->recordUsage($user, 'API_CHAT', $metadata);
+        } catch (\Throwable $e) {
+            $this->logger->error('OpenAI-compatible: recordUsage failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $user->getId(),
+            ]);
+        }
+    }
+
+    /**
+     * Text of the last user turn, for metering and the session summary.
+     *
+     * @param list<array<string, mixed>> $messages
+     */
+    private function lastUserText(array $messages): string
+    {
+        foreach (array_reverse($messages) as $msg) {
+            if ('user' !== ($msg['role'] ?? '')) {
+                continue;
+            }
+
+            return $this->contentToText($msg['content'] ?? '');
+        }
+
+        return '';
+    }
+
+    /**
+     * Readable text of an OpenAI-shaped `content` field.
+     *
+     * Content is a plain string for text-only turns and a list of content parts
+     * as soon as the turn carries an image or audio. Metering, the session
+     * summary and the activity trail all want the text a human would read, not
+     * the base64 payload of the attachment.
+     */
+    private function contentToText(mixed $content): string
+    {
+        if (is_string($content)) {
+            return $content;
+        }
+
+        if (!is_array($content)) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ($content as $part) {
+            if (is_string($part)) {
+                $parts[] = $part;
+                continue;
+            }
+            if (!is_array($part)) {
+                continue;
+            }
+
+            $text = match ((string) ($part['type'] ?? '')) {
+                'text' => is_string($part['text'] ?? null) ? $part['text'] : '',
+                'image_url' => '[image]',
+                'input_audio' => '[audio]',
+                'file' => '[file]',
+                default => '',
+            };
+            if ('' !== $text) {
+                $parts[] = $text;
+            }
+        }
+
+        return implode("\n", $parts);
     }
 
     /**
