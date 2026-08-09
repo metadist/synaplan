@@ -165,15 +165,12 @@ final readonly class MessagesGateway
 
         $requestBody = $decoded;
         $bodyMutated = false;
-        $visionHandling = GatewayToolCatalog::VISION_NONE;
         $visionRewrite = $this->maybeRewriteForVision($user, $resolved, $decoded);
-        if (null !== $visionRewrite) {
-            $resolved = $visionRewrite['resolved'];
-            $visionHandling = $visionRewrite['vision'];
-            if ($visionRewrite['mutated']) {
-                $requestBody['model'] = $resolved['providerModelId'];
-                $bodyMutated = true;
-            }
+        $resolved = $visionRewrite['resolved'];
+        $visionHandling = $visionRewrite['vision'];
+        if ($visionRewrite['mutated']) {
+            $requestBody['model'] = $resolved['providerModelId'];
+            $bodyMutated = true;
         }
 
         $allowOperator = $this->config->allowOperatorKey($user->getId());
@@ -521,9 +518,9 @@ final readonly class MessagesGateway
      *     },
      *     vision: string,
      *     mutated: bool
-     * }|null
+     * }
      */
-    private function maybeRewriteForVision(User $user, array $resolved, array $decoded): ?array
+    private function maybeRewriteForVision(User $user, array $resolved, array $decoded): array
     {
         if (!$this->requestHasImages($decoded)) {
             return [
@@ -544,8 +541,10 @@ final readonly class MessagesGateway
 
         $current = $this->modelRepository->find($resolved['model_id']);
         $supportsVision = $current instanceof Model && $current->hasFeature('vision');
-        $wantSynaplan = MessagesGatewayConfig::VISION_SYNAPLAN === $mode
-            || (MessagesGatewayConfig::VISION_AUTO === $mode && !$supportsVision);
+        $wantSynaplan = match ($mode) {
+            MessagesGatewayConfig::VISION_SYNAPLAN => true,
+            MessagesGatewayConfig::VISION_AUTO => !$supportsVision,
+        };
 
         if (!$wantSynaplan) {
             return [

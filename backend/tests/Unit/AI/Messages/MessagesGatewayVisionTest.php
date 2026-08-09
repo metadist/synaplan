@@ -113,9 +113,6 @@ final class MessagesGatewayVisionTest extends TestCase
         self::assertSame(GatewayToolCatalog::VISION_NONE, $result['vision']);
     }
 
-    /**
-     * @param Model|null $visionFallback
-     */
     private function gateway(
         string $visionMode,
         Model $current,

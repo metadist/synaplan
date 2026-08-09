@@ -266,6 +266,7 @@ final class MessagesApiController extends AbstractController
      *     tool_catalog: array<string, mixed>|null,
      *     replaced_server_tools: list<string>,
      *     web_search: string,
+     *     vision: string,
      *     context_hash: string|null,
      *     debug: bool
      * } $prepared
