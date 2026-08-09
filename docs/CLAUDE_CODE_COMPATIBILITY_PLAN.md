@@ -1,6 +1,6 @@
 # Claude Code compatibility, round 2 — tools, web search and vision
 
-Status of the plan: **phases 0–2 are implemented on this branch**, phase 3 is
+Status of the plan: **phases 0–2b are implemented on this branch**, phase 3 is
 scoped but not built. Each item below states what it fixes, how it is verified,
 and what is deliberately left out.
 
@@ -10,7 +10,8 @@ documentation for the gateway itself).
 ## 1. What a Claude Code user sees today
 
 The first release made `/v1/messages` work for plain text. Everything that is
-not plain text was reported back as broken, with three distinct symptoms:
+not plain text was reported back as broken. The reports fall into four cases,
+and they fail for different reasons:
 
 | Reported symptom | Verdict | Where it is answered |
 | ---------------- | ------- | -------------------- |
@@ -53,13 +54,14 @@ function with no parameters, which is a malformed function declaration.
 ## 2. Design decision
 
 > A server tool is a **capability request**. Synaplan owns the server side of
-> this API, so Synaplan should satisfy it — with its own web search — and where
-> it cannot, forward the request untouched rather than swallowing it.
+> this API, so it should either **satisfy** the request with its own
+> implementation or **forward** the declaration to an upstream that can — never
+> leave the model holding a tool nobody will answer.
 
-The second half matters as much as the first. An install with no search provider
-still has one thing it can do: hand the declaration to the AI provider, which on
-`api.anthropic.com` is exactly what the client wanted. Doing nothing is never
-the right answer.
+The second half matters as much as the first. For web search that means: run
+Synaplan’s search when a provider is configured, otherwise leave the Anthropic
+`web_search_*` declaration on the wire so `api.anthropic.com` can honour it.
+Only an explicit `off` drops it. Doing nothing is never the right answer.
 
 Three consequences follow, and they shape the whole implementation:
 
@@ -84,10 +86,11 @@ client request
   ▼
 GatewayToolCatalog          builds one session-pinned snapshot:
   ├─ MCP tools              (mcp__<server>__<tool>, if MCP_TOOLS_ENABLED)
-  └─ native tools           (web_search, per WEB_SEARCH_MODE + provider present)
+  └─ native tools           (web_search, if WEB_SEARCH_MODE allows + provider present;
+                            otherwise leave the Anthropic declaration for passthrough)
   ▼
 GatewayToolLoop.injectTools  snapshot tools first (stable cache prefix),
-  │                          client tools after, replaced declarations dropped
+  │                          client tools after; only replaced declarations are dropped
   ▼
 translator (Anthropic passthrough | OpenAI | Gemini)
   ▼
@@ -145,14 +148,15 @@ already forwarded byte-for-byte.
   `native`), so both kinds run in the same loop on both the complete and the
   streaming path.
 - `MESSAGES_GATEWAY.WEB_SEARCH_MODE` — admin-visible under **Channels → AI
-  Agents**, four values, and the default needs no attention:
+  Agents** (the UI explains when no search provider is configured), four values,
+  and the default needs no attention:
 
   | Mode | Behaviour |
   | ---- | --------- |
-  | `auto` (default) | Synaplan searches when a provider is configured, otherwise forwards the declaration untouched. |
+  | `auto` (default) | Synaplan searches when a provider is configured, otherwise forwards the Anthropic declaration untouched. |
   | `synaplan` | Always offer Synaplan's search, even unrequested. |
   | `passthrough` | Never intervene — the plain passthrough, for orgs that want Anthropic's own search and its citations. |
-  | `off` | Strip the declaration entirely. |
+  | `off` | Drop the declaration entirely. |
 
   An unrecognised value falls back to `auto` rather than to “no search”, so a
   typo cannot silently break a working install.
@@ -162,10 +166,12 @@ already forwarded byte-for-byte.
   indistinguishable from a misconfigured gateway, which is what made the
   original report hard to act on.
 
-Guard rails: search is skipped when the client ships its own tool named
+Guard rails: Synaplan search is skipped when the client ships its own tool named
 `web_search` (the client owns that name), usage is metered as `WEB_SEARCH`, the
 tool result is clamped to 12 000 characters, and the existing loop bounds
 (`MCP_MAX_ITERATIONS`, 240 s wall clock, 16 tools per turn) apply unchanged.
+Other Anthropic server tools (e.g. `code_execution_*`) stay on the wire for the
+Anthropic passthrough and are never mapped to OpenAI/Gemini functions.
 
 ### Phase 2b — honest errors, and proof for the rest (done)
 
@@ -235,11 +241,12 @@ their status.
 ## 5. Rollout
 
 Everything is backend-only plus one admin setting, and nothing has to be
-switched on: a fresh install answers a `web_search` declaration either with
-Synaplan's own search (search provider configured) or by passing it to the AI
-provider (no search provider). Configuring `BRAVE_SEARCH_API_KEY` in
-`backend/.env` is what upgrades the second case to the first, and it is the only
-step that makes web search work for non-Anthropic models.
+switched on. Web search works out of the box for Anthropic-backed Claude Code
+sessions: default `auto` either runs Synaplan’s search or forwards the
+declaration upstream. To use Synaplan’s own search results (and to serve search
+on aliased OpenAI/Gemini routes), configure a search provider
+(`BRAVE_SEARCH_API_KEY` in `backend/.env`). Admins can force `synaplan`,
+`passthrough` or `off` under **Channels → AI Agents**.
 
 The metering, vision and error-relay fixes are unconditional, because all three
 are bug fixes with no configurable behaviour.
