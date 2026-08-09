@@ -9,11 +9,16 @@ declare(strict_types=1);
  *   php -S 127.0.0.1:8099 _devextras/testing/messages-gateway/fixture-upstream.php
  *
  * Select a transcript with the X-Fixture request header:
- *   complete (default) | stream | tool-use | web-search | error-429 | error-401 | echo
+ *   complete (default) | stream | tool-use | client-tool | web-search |
+ *   error-429 | error-401 | echo
  *
  * For tool-use: the first request returns a tool_use turn targeting the first
  * mcp__* tool in the request's tools[] (or mcp__1__rag_search). A follow-up
  * request that already contains tool_result blocks returns end_turn.
+ *
+ * For client-tool: the same shape, but targeting the first tool the *client*
+ * declared. The gateway must relay that turn to the client instead of trying to
+ * run it, so a caller can prove Claude-Code-style tool calling round-trips.
  *
  * For web-search: the first request calls Synaplan's native `web_search` tool
  * (and reports an error turn if the gateway did not inject it). The follow-up
@@ -236,6 +241,103 @@ if ('web-search' === $fixture) {
         'name' => 'web_search',
         'input' => ['query' => 'synaplan release notes', 'max_results' => 3],
     ]], 'tool_use');
+    exit;
+}
+
+if ('client-tool' === $fixture) {
+    $clientTool = 'get_weather';
+    if (\is_array($decoded) && \is_array($decoded['tools'] ?? null)) {
+        foreach ($decoded['tools'] as $tool) {
+            if (\is_array($tool)
+                && \is_string($tool['name'] ?? null)
+                && isset($tool['input_schema'])
+                && !str_starts_with($tool['name'], 'mcp__')
+            ) {
+                $clientTool = $tool['name'];
+                break;
+            }
+        }
+    }
+
+    if ($hasToolResult) {
+        // The client executed the tool and sent the result back — answer with
+        // it verbatim so the caller can prove the round-trip closed.
+        $body = [
+            'id' => 'msg_fixture_client_tool_done',
+            'type' => 'message',
+            'role' => 'assistant',
+            'model' => 'claude-sonnet-4-6',
+            'content' => [['type' => 'text', 'text' => 'ANSWER_FROM_CLIENT_TOOL: '.$toolResultText]],
+            'stop_reason' => 'end_turn',
+            'usage' => ['input_tokens' => 40, 'output_tokens' => 8],
+        ];
+
+        if (!$wantStream) {
+            echo json_encode($body, JSON_THROW_ON_ERROR);
+            exit;
+        }
+
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        $events = [
+            ['type' => 'message_start', 'message' => ['id' => $body['id'], 'type' => 'message', 'role' => 'assistant', 'model' => 'claude-sonnet-4-6', 'content' => [], 'stop_reason' => null, 'stop_sequence' => null, 'usage' => ['input_tokens' => 40, 'output_tokens' => 0]]],
+            ['type' => 'content_block_start', 'index' => 0, 'content_block' => ['type' => 'text', 'text' => '']],
+            ['type' => 'content_block_delta', 'index' => 0, 'delta' => ['type' => 'text_delta', 'text' => $body['content'][0]['text']]],
+            ['type' => 'content_block_stop', 'index' => 0],
+            ['type' => 'message_delta', 'delta' => ['stop_reason' => 'end_turn', 'stop_sequence' => null], 'usage' => ['output_tokens' => 8]],
+            ['type' => 'message_stop'],
+        ];
+        foreach ($events as $event) {
+            echo 'event: '.$event['type']."\n";
+            echo 'data: '.json_encode($event, JSON_THROW_ON_ERROR)."\n\n";
+            if (function_exists('ob_flush')) {
+                @ob_flush();
+            }
+            flush();
+            usleep(80_000);
+        }
+        exit;
+    }
+
+    $toolUse = [
+        'type' => 'tool_use',
+        'id' => 'toolu_fixture_client',
+        'name' => $clientTool,
+        'input' => ['location' => 'Bremen'],
+    ];
+
+    if (!$wantStream) {
+        echo json_encode([
+            'id' => 'msg_fixture_client_tool',
+            'type' => 'message',
+            'role' => 'assistant',
+            'model' => 'claude-sonnet-4-6',
+            'content' => [$toolUse],
+            'stop_reason' => 'tool_use',
+            'usage' => ['input_tokens' => 20, 'output_tokens' => 15],
+        ], JSON_THROW_ON_ERROR);
+        exit;
+    }
+
+    header('Content-Type: text/event-stream');
+    header('Cache-Control: no-cache');
+    $events = [
+        ['type' => 'message_start', 'message' => ['id' => 'msg_fixture_client_tool', 'type' => 'message', 'role' => 'assistant', 'model' => 'claude-sonnet-4-6', 'content' => [], 'stop_reason' => null, 'stop_sequence' => null, 'usage' => ['input_tokens' => 20, 'output_tokens' => 0]]],
+        ['type' => 'content_block_start', 'index' => 0, 'content_block' => ['type' => 'tool_use', 'id' => $toolUse['id'], 'name' => $toolUse['name'], 'input' => new stdClass()]],
+        ['type' => 'content_block_delta', 'index' => 0, 'delta' => ['type' => 'input_json_delta', 'partial_json' => json_encode($toolUse['input'], JSON_THROW_ON_ERROR)]],
+        ['type' => 'content_block_stop', 'index' => 0],
+        ['type' => 'message_delta', 'delta' => ['stop_reason' => 'tool_use', 'stop_sequence' => null], 'usage' => ['output_tokens' => 15]],
+        ['type' => 'message_stop'],
+    ];
+    foreach ($events as $event) {
+        echo 'event: '.$event['type']."\n";
+        echo 'data: '.json_encode($event, JSON_THROW_ON_ERROR)."\n\n";
+        if (function_exists('ob_flush')) {
+            @ob_flush();
+        }
+        flush();
+        usleep(80_000);
+    }
     exit;
 }
 

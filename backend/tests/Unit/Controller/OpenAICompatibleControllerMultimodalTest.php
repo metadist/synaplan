@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Controller;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Controller\OpenAICompatibleController;
 use App\Entity\User;
@@ -12,6 +13,7 @@ use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -89,6 +91,65 @@ final class OpenAICompatibleControllerMultimodalTest extends TestCase
         $body = json_decode((string) $response->getContent(), true);
         self::assertIsArray($body);
         self::assertSame('A handwritten maths exercise.', $body['choices'][0]['message']['content']);
+    }
+
+    /**
+     * The other half of the report: a valid image the provider itself refused
+     * came back as `HTTP 500: Anthropic API Error: Could not process image`.
+     * A provider rejecting the request is not an internal error — relaying 500
+     * hides the cause and invites clients to retry something that cannot work.
+     *
+     * @param array{status: int, type: string, code: string} $expected
+     */
+    #[DataProvider('upstreamFailures')]
+    public function testProviderRejectionsKeepTheirStatus(int $upstreamStatus, array $expected): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chat')->willThrowException(new ProviderException(
+            'Anthropic API Error: Could not process image (type: invalid_request_error)',
+            'anthropic',
+            null,
+            $upstreamStatus,
+        ));
+
+        $response = $this->invokeNonStream(
+            $this->controller($aiFacade, $this->createMock(RateLimitService::class)),
+            $this->makeUser(),
+        );
+
+        self::assertSame($expected['status'], $response->getStatusCode());
+
+        $body = json_decode((string) $response->getContent(), true);
+        self::assertIsArray($body);
+        self::assertSame($expected['type'], $body['error']['type']);
+        self::assertSame($expected['code'], $body['error']['code']);
+        self::assertStringContainsString('Could not process image', (string) $body['error']['message']);
+    }
+
+    /**
+     * @return array<string, array{int, array{status: int, type: string, code: string}}>
+     */
+    public static function upstreamFailures(): array
+    {
+        return [
+            'unreadable image' => [400, ['status' => 400, 'type' => 'invalid_request_error', 'code' => 'upstream_error']],
+            'bad provider key' => [401, ['status' => 401, 'type' => 'authentication_error', 'code' => 'invalid_api_key']],
+            'provider rate limit' => [429, ['status' => 429, 'type' => 'rate_limit_error', 'code' => 'rate_limit_exceeded']],
+            'provider outage' => [503, ['status' => 503, 'type' => 'server_error', 'code' => 'internal_error']],
+        ];
+    }
+
+    public function testLocalFailuresRemainInternalErrors(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chat')->willThrowException(new \RuntimeException('database is gone'));
+
+        $response = $this->invokeNonStream(
+            $this->controller($aiFacade, $this->createMock(RateLimitService::class)),
+            $this->makeUser(),
+        );
+
+        self::assertSame(500, $response->getStatusCode());
     }
 
     private function controller(AiFacade $aiFacade, RateLimitService $rateLimits): OpenAICompatibleController

@@ -15,7 +15,8 @@
 #        BRAVE_SEARCH_ENABLED=true
 #        BRAVE_SEARCH_API_KEY=fixture-token
 #        BRAVE_SEARCH_API_URL=http://127.0.0.1:8098/res/v1
-#   5. BCONFIG MESSAGES_GATEWAY: ENABLED=1, ALLOW_OPERATOR_KEY=1, WEB_SEARCH_ENABLED=1
+#   5. BCONFIG MESSAGES_GATEWAY: ENABLED=1, ALLOW_OPERATOR_KEY=1
+#      (WEB_SEARCH_MODE is set by this script; it defaults to `auto`.)
 #
 # Usage:
 #   SYNAPLAN_API_KEY=sk_... ./_devextras/testing/messages-gateway/04-web-search.sh
@@ -44,29 +45,56 @@ assert() {
   fi
 }
 
+# Set MESSAGES_GATEWAY.WEB_SEARCH_MODE globally. Empty value clears the row, so
+# the code default (`auto`) applies — the state a fresh install is in.
+set_mode() {
+  local mode="${1:-}"
+  local sql="DELETE FROM BCONFIG WHERE BGROUP='MESSAGES_GATEWAY' AND BSETTING='WEB_SEARCH_MODE';"
+  if [[ -n "$mode" ]]; then
+    sql="$sql INSERT INTO BCONFIG (BOWNERID,BGROUP,BSETTING,BVALUE) VALUES (0,'MESSAGES_GATEWAY','WEB_SEARCH_MODE','$mode');"
+  fi
+  docker compose exec -T db \
+    mariadb -usynaplan_user -psynaplan_password synaplan -e "$sql" 2>/dev/null
+}
+
+# What the gateway forwarded upstream, as JSON.
+forwarded_tools() {
+  python3 -c '
+import json,sys
+body = json.load(open(sys.argv[1])).get("fixture_received_body") or {}
+json.dump(body.get("tools", []), sys.stdout)
+' "$1" 2>/dev/null || echo '[]'
+}
+
+echo_request() {
+  curl -sS -o "$1" -w '%{http_code}' \
+    -D "$1.headers" \
+    -X POST "$BASE/v1/messages?beta=true" \
+    -H "x-api-key: $KEY" \
+    -H "anthropic-version: 2023-06-01" \
+    -H "content-type: application/json" \
+    -H "X-Fixture: echo" \
+    -d "{\"model\":\"$MODEL\",\"max_tokens\":64,\"tools\":[$SERVER_TOOL],\"messages\":[{\"role\":\"user\",\"content\":\"what is new in synaplan?\"}]}"
+}
+
+# A fresh install has no WEB_SEARCH_MODE row at all.
+set_mode ''
+
 echo "== Messages gateway web search smoke =="
 echo "BASE=$BASE MODEL=$MODEL"
 echo
 
-# --- 1. What actually leaves the gateway -------------------------------------
-CODE=$(curl -sS -o /tmp/mgw-ws-echo.json -w '%{http_code}' \
-  -X POST "$BASE/v1/messages?beta=true" \
-  -H "x-api-key: $KEY" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "content-type: application/json" \
-  -H "X-Fixture: echo" \
-  -d "{\"model\":\"$MODEL\",\"max_tokens\":64,\"tools\":[$SERVER_TOOL],\"messages\":[{\"role\":\"user\",\"content\":\"what is new in synaplan?\"}]}")
+# --- 1. Default install: what actually leaves the gateway --------------------
+CODE=$(echo_request /tmp/mgw-ws-echo.json)
 
 # Guard the negative assertions below: on an error response they would pass for
 # the wrong reason.
 assert "echo request reached the upstream (HTTP 200)" "[[ '$CODE' == '200' ]]"
 
-FORWARDED=$(python3 -c '
-import json,sys
-body = json.load(open("/tmp/mgw-ws-echo.json")).get("fixture_received_body") or {}
-json.dump(body.get("tools", []), sys.stdout)
-' 2>/dev/null || echo '[]')
+FORWARDED=$(forwarded_tools /tmp/mgw-ws-echo.json)
 
+assert "default install needs no flag flipped to answer web search" \
+  "grep -qi 'x-synaplan-web-search: synaplan' /tmp/mgw-ws-echo.json.headers"
 assert "server-tool declaration is not forwarded upstream" \
   "! echo '$FORWARDED' | grep -q 'web_search_20250305'"
 assert "an executable web_search tool is forwarded instead" \
@@ -108,6 +136,34 @@ assert "stream: client never sees the internal tool_use round" \
   "! grep -q 'toolu_fixture_web_search' /tmp/mgw-ws-stream.log"
 assert "stream: terminates with message_stop" \
   "grep -q 'message_stop' /tmp/mgw-ws-stream.log"
+
+# --- 4. passthrough: hand the declaration to the AI provider untouched -------
+# The plain-passthrough escape hatch: Synaplan stays out of the way so an
+# Anthropic org can use its own (citation-carrying) web search.
+set_mode passthrough
+CODE=$(echo_request /tmp/mgw-ws-passthrough.json)
+FORWARDED=$(forwarded_tools /tmp/mgw-ws-passthrough.json)
+
+assert "passthrough: HTTP 200" "[[ '$CODE' == '200' ]]"
+assert "passthrough: the client's declaration reaches the provider untouched" \
+  "echo '$FORWARDED' | grep -q 'web_search_20250305'"
+assert "passthrough: Synaplan does not inject a search tool of its own" \
+  "! echo '$FORWARDED' | grep -q 'input_schema'"
+assert "passthrough: the response says so" \
+  "grep -qi 'x-synaplan-web-search: passthrough' /tmp/mgw-ws-passthrough.json.headers"
+
+# --- 5. off: no search reaches the provider at all ---------------------------
+set_mode off
+CODE=$(echo_request /tmp/mgw-ws-off.json)
+FORWARDED=$(forwarded_tools /tmp/mgw-ws-off.json)
+
+assert "off: HTTP 200" "[[ '$CODE' == '200' ]]"
+assert "off: the declaration is stripped before the provider sees it" \
+  "! echo '$FORWARDED' | grep -q 'web_search'"
+assert "off: the response says so" \
+  "grep -qi 'x-synaplan-web-search: off' /tmp/mgw-ws-off.json.headers"
+
+set_mode ''
 
 echo
 echo "Result: $PASS passed, $FAIL failed"

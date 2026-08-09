@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\Entity\User;
@@ -23,6 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 
 /**
  * OpenAI-compatible API endpoints.
@@ -281,13 +283,57 @@ class OpenAICompatibleController extends AbstractController
                 ],
             ]);
         } catch (\Throwable $e) {
+            ['status' => $status, 'type' => $type, 'code' => $code] = $this->describeFailure($e);
+
             $this->logger->error('OpenAI-compatible chat failed', [
                 'error' => $e->getMessage(),
                 'user_id' => $user->getId(),
+                'status' => $status,
             ]);
 
-            return $this->openAiError($e->getMessage(), 'server_error', 'internal_error', 500);
+            return $this->openAiError($e->getMessage(), $type, $code, $status);
         }
+    }
+
+    /**
+     * Turn a failed completion into an OpenAI-shaped error.
+     *
+     * A provider rejecting the request (unreadable image, bad key, rate limit)
+     * is not an internal error: answering 500 hides the cause and invites
+     * clients to retry a request that can never succeed. Relay the upstream
+     * status and the error type OpenAI clients branch on.
+     *
+     * @return array{status: int, type: string, code: string}
+     */
+    private function describeFailure(\Throwable $e): array
+    {
+        $status = 500;
+        for ($current = $e; null !== $current; $current = $current->getPrevious()) {
+            if ($current instanceof ProviderException && null !== $current->getUpstreamStatus()) {
+                $status = $current->getUpstreamStatus();
+                break;
+            }
+
+            if ($current instanceof HttpExceptionInterface) {
+                $status = $current->getResponse()->getStatusCode();
+                break;
+            }
+        }
+
+        return match (true) {
+            Response::HTTP_UNAUTHORIZED === $status, Response::HTTP_FORBIDDEN === $status => [
+                'status' => $status, 'type' => 'authentication_error', 'code' => 'invalid_api_key',
+            ],
+            Response::HTTP_TOO_MANY_REQUESTS === $status => [
+                'status' => $status, 'type' => 'rate_limit_error', 'code' => 'rate_limit_exceeded',
+            ],
+            $status < 500 => [
+                'status' => $status, 'type' => 'invalid_request_error', 'code' => 'upstream_error',
+            ],
+            default => [
+                'status' => $status, 'type' => 'server_error', 'code' => 'internal_error',
+            ],
+        };
     }
 
     private function handleStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel, ?int $dbModelId): StreamedResponse
