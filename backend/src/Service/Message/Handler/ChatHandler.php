@@ -745,9 +745,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 }
 
                 if (!empty($ragResults)) {
-                    foreach ($ragResults as $idx => $result) {
-                        error_log('🔍 ChatHandler: RAG chunk '.($idx + 1).': '.substr((string) $result['chunk_text'], 0, 100).'...');
-                    }
                     $ragContext = $this->knowledgeContextFormatter->formatRagContext($ragResults);
                     $ragResultsCount = count($ragResults);
 
@@ -1568,10 +1565,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
             if (empty($ragResults)) {
                 return '';
-            }
-
-            foreach ($ragResults as $idx => $result) {
-                error_log('🔍 ChatHandler: RAG chunk '.($idx + 1).': '.substr((string) $result['chunk_text'], 0, 100).'...');
             }
 
             $ragContext = $this->knowledgeContextFormatter->formatRagContext($ragResults);

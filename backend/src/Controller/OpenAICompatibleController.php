@@ -461,6 +461,12 @@ class OpenAICompatibleController extends AbstractController
             $lastUserMessage = $text;
         }
 
+        // Without any user content the session key would degenerate to a
+        // constant per-user hash and merge unrelated sessions — skip instead.
+        if ('' === $firstUserMessage) {
+            return;
+        }
+
         $cap = ApiSessionSummaryService::EXCERPT_MAX_CHARS;
 
         try {
