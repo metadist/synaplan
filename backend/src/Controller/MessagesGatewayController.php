@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\MessagesGateway;
+use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
@@ -35,6 +36,7 @@ final class MessagesGatewayController extends AbstractController
         private readonly ProviderKeyStore $providerKeyStore,
         private readonly ConfigRepository $configRepository,
         private readonly RateLimitService $rateLimitService,
+        private readonly WebSearchTool $webSearchTool,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -55,6 +57,8 @@ final class MessagesGatewayController extends AbstractController
                 new OA\Property(property: 'enabled', type: 'boolean', example: false),
                 new OA\Property(property: 'allow_operator_key', type: 'boolean', example: false),
                 new OA\Property(property: 'mcp_tools_enabled', type: 'boolean', example: false),
+                new OA\Property(property: 'web_search_enabled', type: 'boolean', example: false),
+                new OA\Property(property: 'web_search_available', type: 'boolean', example: false, description: 'Whether a web search provider is configured on this instance.'),
                 new OA\Property(property: 'context_injection_enabled', type: 'boolean', example: false),
                 new OA\Property(property: 'budget_notice_enabled', type: 'boolean', example: true),
                 new OA\Property(property: 'upstream_url', type: 'string', example: 'https://api.anthropic.com'),
@@ -133,6 +137,8 @@ final class MessagesGatewayController extends AbstractController
             'enabled' => $this->config->isEnabled($userId),
             'allow_operator_key' => $this->config->allowOperatorKey($userId),
             'mcp_tools_enabled' => $this->config->isMcpToolsEnabled($userId),
+            'web_search_enabled' => $this->config->isWebSearchEnabled($userId),
+            'web_search_available' => $this->webSearchTool->isAvailable(),
             'context_injection_enabled' => $this->config->isContextInjectionEnabled($userId),
             'budget_notice_enabled' => $this->config->isBudgetNoticeEnabled($userId),
             'upstream_url' => $this->config->upstreamUrl(),
@@ -413,6 +419,7 @@ final class MessagesGatewayController extends AbstractController
                 new OA\Property(property: 'enabled', type: 'boolean'),
                 new OA\Property(property: 'allow_operator_key', type: 'boolean'),
                 new OA\Property(property: 'mcp_tools_enabled', type: 'boolean'),
+                new OA\Property(property: 'web_search_enabled', type: 'boolean'),
                 new OA\Property(property: 'context_injection_enabled', type: 'boolean'),
                 new OA\Property(property: 'budget_notice_enabled', type: 'boolean'),
             ],
@@ -452,6 +459,7 @@ final class MessagesGatewayController extends AbstractController
             MessagesGatewayConfig::KEY_ENABLED,
             MessagesGatewayConfig::KEY_ALLOW_OPERATOR_KEY,
             MessagesGatewayConfig::KEY_MCP_TOOLS_ENABLED,
+            MessagesGatewayConfig::KEY_WEB_SEARCH_ENABLED,
             MessagesGatewayConfig::KEY_CONTEXT_INJECTION_ENABLED,
             MessagesGatewayConfig::KEY_BUDGET_NOTICE_ENABLED,
         ];

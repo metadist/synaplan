@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\AI\Messages;
 
 use App\AI\Credential\UserProviderKeyResolver;
-use App\AI\Messages\Mcp\McpToolLoop;
+use App\AI\Messages\Tools\GatewayToolCatalog;
+use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\Entity\User;
 use App\Message\SummarizeApiSessionCommand;
@@ -22,8 +23,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * Orchestrates a Messages API request: feature flag, budget, model resolve,
  * credential resolve, optional body mutation, translator dispatch, metering.
  *
- * MCP tool loop (§ Phase 2) and context injection (§ Phase 3) are gated by
- * config flags (default off).
+ * The server-side tool loop (MCP tools plus Synaplan's built-in web search) and
+ * context injection are gated by config flags (default off).
  *
  * @phpstan-type GatewaySuccess array{
  *     ok: true,
@@ -48,11 +49,12 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *     body_mutated: bool,
  *     request_body: array<string, mixed>,
  *     translator_context: array<string, mixed>,
- *     mcp_loop: bool,
- *     mcp_catalog: array{
+ *     tool_loop: bool,
+ *     tool_catalog: array{
  *         tools: list<array{name: string, description: string, input_schema: array<string, mixed>}>,
- *         dispatch: array<string, array{serverId: int, tool: string, annotations: array<string, mixed>}>
+ *         dispatch: array<string, array{kind: string, serverId: int, tool: string, annotations: array<string, mixed>}>
  *     }|null,
+ *     replaced_server_tools: list<string>,
  *     context_hash: string|null,
  *     debug: bool
  * }
@@ -85,7 +87,8 @@ final readonly class MessagesGateway
         private UserProviderKeyResolver $keyResolver,
         private RateLimitService $rateLimitService,
         private AnthropicPassthroughTranslator $anthropicPassthrough,
-        private McpToolLoop $mcpToolLoop,
+        private GatewayToolCatalog $toolCatalog,
+        private GatewayToolLoop $toolLoop,
         private MessagesContextInjector $contextInjector,
         private CacheItemPoolInterface $cache,
         private MessageBusInterface $messageBus,
@@ -214,22 +217,16 @@ final readonly class MessagesGateway
         $sessionId = $request->headers->get('x-claude-code-session-id');
         $sessionKey = $this->sessionKey($sessionId, $user, $requestBody);
 
-        $mcpLoop = false;
-        $mcpCatalog = null;
-        if ($this->config->isMcpToolsEnabled($user->getId())) {
-            $clientHasTools = isset($requestBody['tools']) && \is_array($requestBody['tools']) && [] !== $requestBody['tools'];
-            if ($clientHasTools && !$this->config->allowMcpToolsWithClientTools($user->getId())) {
-                $this->logger->debug('MessagesGateway: MCP tools skipped (client supplied tools)');
-            } else {
-                $mcpCatalog = $this->mcpToolLoop->pinnedCatalog($user, $sessionKey);
-                if ([] !== $mcpCatalog['tools']) {
-                    // Injection happens inside McpToolLoop so the catalog is
-                    // applied once per upstream call; mark body mutated so the
-                    // raw-body fast path is disabled.
-                    $bodyMutated = true;
-                    $mcpLoop = true;
-                }
-            }
+        $toolCatalog = $this->toolCatalog->build($user, $sessionKey, $requestBody);
+        $toolLoop = [] !== $toolCatalog['tools'];
+        $replacedServerTools = $toolLoop ? $this->toolCatalog->replacedServerTools($toolCatalog) : [];
+        if ($toolLoop) {
+            // Injection happens inside GatewayToolLoop so the catalog is
+            // applied once per upstream call; mark body mutated so the
+            // raw-body fast path is disabled.
+            $bodyMutated = true;
+        } else {
+            $toolCatalog = null;
         }
 
         $contextHash = null;
@@ -272,7 +269,7 @@ final readonly class MessagesGateway
             'status' => 200,
             'headers' => $headers,
             'body' => null,
-            'raw_stream' => $translator instanceof AnthropicPassthroughTranslator && !$mcpLoop,
+            'raw_stream' => $translator instanceof AnthropicPassthroughTranslator && !$toolLoop,
             'usage' => new MessagesUsage(),
             'key_source' => $credential['source'],
             'resolved' => $resolved,
@@ -282,8 +279,9 @@ final readonly class MessagesGateway
             'body_mutated' => $bodyMutated,
             'request_body' => $requestBody,
             'translator_context' => $translatorContext,
-            'mcp_loop' => $mcpLoop,
-            'mcp_catalog' => $mcpCatalog,
+            'tool_loop' => $toolLoop,
+            'tool_catalog' => $toolCatalog,
+            'replaced_server_tools' => $replacedServerTools,
             'context_hash' => $contextHash,
             'debug' => '1' === $request->headers->get('x-synaplan-debug'),
         ];
@@ -304,13 +302,14 @@ final readonly class MessagesGateway
         }
 
         try {
-            if ($prepared['mcp_loop'] && null !== $prepared['mcp_catalog']) {
-                $result = $this->mcpToolLoop->runComplete(
+            if ($prepared['tool_loop'] && null !== $prepared['tool_catalog']) {
+                $result = $this->toolLoop->runComplete(
                     $prepared['request_body'],
                     $prepared['translator_context'],
                     $translator,
                     $user,
-                    $prepared['mcp_catalog'],
+                    $prepared['tool_catalog'],
+                    $prepared['replaced_server_tools'],
                 );
             } else {
                 $result = $translator->complete($prepared['request_body'], $prepared['translator_context']);
@@ -367,14 +366,15 @@ final readonly class MessagesGateway
             return new MessagesUsage();
         }
 
-        if ($prepared['mcp_loop'] && null !== $prepared['mcp_catalog']) {
-            $usage = $this->mcpToolLoop->runStream(
+        if ($prepared['tool_loop'] && null !== $prepared['tool_catalog']) {
+            $usage = $this->toolLoop->runStream(
                 $prepared['request_body'],
                 $prepared['translator_context'],
                 $translator,
                 $user,
-                $prepared['mcp_catalog'],
+                $prepared['tool_catalog'],
                 $emit,
+                $prepared['replaced_server_tools'],
             );
         } else {
             $usage = $translator->stream($prepared['request_body'], $prepared['translator_context'], $emit);

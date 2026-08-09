@@ -229,8 +229,9 @@ final class MessagesApiController extends AbstractController
      *     status: int,
      *     body: array<string, mixed>|string|null,
      *     usage: MessagesUsage,
-     *     mcp_loop: bool,
-     *     mcp_catalog: array<string, mixed>|null,
+     *     tool_loop: bool,
+     *     tool_catalog: array<string, mixed>|null,
+     *     replaced_server_tools: list<string>,
      *     context_hash: string|null,
      *     debug: bool
      * } $prepared

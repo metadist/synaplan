@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Messages;
 
 use App\AI\Credential\UserProviderKeyResolver;
-use App\AI\Messages\Mcp\McpToolLoop;
 use App\AI\Messages\MessagesContextInjector;
 use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\MessagesModelResolver;
+use App\AI\Messages\Tools\GatewayToolCatalog;
+use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\Entity\User;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
@@ -65,13 +66,17 @@ class MessagesGatewayByoPlanTest extends TestCase
         $passthrough = $this->createMock(AnthropicPassthroughTranslator::class);
         $passthrough->method('supports')->willReturn(true);
 
+        $toolCatalog = $this->createMock(GatewayToolCatalog::class);
+        $toolCatalog->method('build')->willReturn(['tools' => [], 'dispatch' => []]);
+
         $this->gateway = new MessagesGateway(
             $this->config,
             $modelResolver,
             $this->keyResolver,
             $this->rateLimitService,
             $passthrough,
-            $this->createMock(McpToolLoop::class),
+            $toolCatalog,
+            $this->createMock(GatewayToolLoop::class),
             $this->createMock(MessagesContextInjector::class),
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(MessageBusInterface::class),

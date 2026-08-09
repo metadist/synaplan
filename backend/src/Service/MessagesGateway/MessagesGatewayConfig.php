@@ -25,6 +25,7 @@ final readonly class MessagesGatewayConfig
     public const KEY_MCP_TOOLS_ENABLED = 'MCP_TOOLS_ENABLED';
     public const KEY_MCP_TOOLS_WITH_CLIENT_TOOLS = 'MCP_TOOLS_WITH_CLIENT_TOOLS';
     public const KEY_MCP_MAX_ITERATIONS = 'MCP_MAX_ITERATIONS';
+    public const KEY_WEB_SEARCH_ENABLED = 'WEB_SEARCH_ENABLED';
     public const KEY_CONTEXT_INJECTION_ENABLED = 'CONTEXT_INJECTION_ENABLED';
     public const KEY_BUDGET_NOTICE_ENABLED = 'BUDGET_NOTICE_ENABLED';
     public const KEY_SESSION_SUMMARY_ENABLED = 'SESSION_SUMMARY_ENABLED';
@@ -38,6 +39,7 @@ final readonly class MessagesGatewayConfig
     private const DEFAULT_MCP_TOOLS_ENABLED = false;
     private const DEFAULT_MCP_TOOLS_WITH_CLIENT_TOOLS = false;
     private const DEFAULT_MCP_MAX_ITERATIONS = 8;
+    private const DEFAULT_WEB_SEARCH_ENABLED = false;
     private const DEFAULT_CONTEXT_INJECTION_ENABLED = false;
     private const DEFAULT_BUDGET_NOTICE_ENABLED = true;
     private const DEFAULT_SESSION_SUMMARY_ENABLED = true;
@@ -84,6 +86,17 @@ final readonly class MessagesGatewayConfig
         $n = (int) $raw;
 
         return max(1, min(32, $n > 0 ? $n : self::DEFAULT_MCP_MAX_ITERATIONS));
+    }
+
+    /**
+     * Offer Synaplan's own web search as a server-side tool on gateway
+     * requests. Requires a configured search provider; when the client
+     * declares Anthropic's `web_search_*` server tool, Synaplan answers it
+     * instead of the upstream.
+     */
+    public function isWebSearchEnabled(?int $userId): bool
+    {
+        return $this->resolveBool(self::KEY_WEB_SEARCH_ENABLED, $userId, self::DEFAULT_WEB_SEARCH_ENABLED);
     }
 
     public function isContextInjectionEnabled(?int $userId): bool

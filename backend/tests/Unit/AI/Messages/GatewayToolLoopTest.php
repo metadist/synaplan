@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Messages;
 
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
-use App\AI\Messages\Mcp\McpToolLoop;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
+use App\AI\Messages\Tools\GatewayToolCatalog;
+use App\AI\Messages\Tools\GatewayToolLoop;
+use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\McpServerConfig;
 use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
@@ -15,11 +17,9 @@ use App\Service\Mcp\McpClient;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
 use PHPUnit\Framework\TestCase;
-use Psr\Cache\CacheItemInterface;
-use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\NullLogger;
 
-final class McpToolLoopTest extends TestCase
+final class GatewayToolLoopTest extends TestCase
 {
     public function testCompleteLoopExecutesToolAndRePrompts(): void
     {
@@ -51,19 +51,13 @@ final class McpToolLoopTest extends TestCase
         $config = $this->createMock(MessagesGatewayConfig::class);
         $config->method('mcpMaxIterations')->willReturn(8);
 
-        $cacheItem = $this->createMock(CacheItemInterface::class);
-        $cacheItem->method('isHit')->willReturn(false);
-        $cacheItem->method('set')->willReturnSelf();
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willReturn($cacheItem);
-
-        $loop = new McpToolLoop(
+        $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
+            $this->createMock(WebSearchTool::class),
             $client,
             $servers,
             $config,
             $rateLimits,
-            $cache,
             new NullLogger(),
         );
 
@@ -75,6 +69,7 @@ final class McpToolLoopTest extends TestCase
             ]],
             'dispatch' => [
                 'mcp__1__rag_search' => [
+                    'kind' => GatewayToolCatalog::KIND_MCP,
                     'serverId' => 1,
                     'tool' => 'rag_search',
                     'annotations' => ['readOnlyHint' => true],
@@ -155,6 +150,123 @@ final class McpToolLoopTest extends TestCase
         $this->assertSame('done', $result['body']['content'][0]['text']);
     }
 
+    public function testWebSearchIsExecutedAndReplacesTheAnthropicServerToolDeclaration(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $webSearch = $this->createMock(WebSearchTool::class);
+        $webSearch->expects($this->once())
+            ->method('execute')
+            ->with(['query' => 'euro dollar rate'])
+            ->willReturn([
+                'text' => "Web Search Results for: \"euro dollar rate\"\n\n[1] ECB reference rates",
+                'isError' => false,
+                'query' => 'euro dollar rate',
+                'resultCount' => 1,
+            ]);
+
+        $rateLimits = $this->createMock(RateLimitService::class);
+        $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
+        $rateLimits->expects($this->once())->method('recordUsage')->with(
+            $user,
+            'MESSAGES',
+            $this->callback(static fn (array $m): bool => 'WEB_SEARCH' === ($m['source'] ?? '')),
+        );
+
+        $loop = new GatewayToolLoop(
+            new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
+            $webSearch,
+            $this->createMock(McpClient::class),
+            $this->createMock(McpServerConfigRepository::class),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $rateLimits,
+            new NullLogger(),
+        );
+
+        $snapshot = [
+            'tools' => [[
+                'name' => 'web_search',
+                'description' => 'Search the live web',
+                'input_schema' => ['type' => 'object'],
+            ]],
+            'dispatch' => [
+                'web_search' => [
+                    'kind' => GatewayToolCatalog::KIND_NATIVE,
+                    'serverId' => 0,
+                    'tool' => 'web_search',
+                    'annotations' => ['readOnlyHint' => true],
+                ],
+            ],
+        ];
+
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                if (1 === $calls) {
+                    // The `web_search_20250305` declaration is replaced by the
+                    // executable tool, not forwarded alongside it.
+                    $this->assertCount(1, $body['tools']);
+                    $this->assertSame('web_search', $body['tools'][0]['name']);
+                    $this->assertArrayHasKey('input_schema', $body['tools'][0]);
+
+                    return [
+                        'status' => 200,
+                        'headers' => [],
+                        'body' => [
+                            'content' => [[
+                                'type' => 'tool_use',
+                                'id' => 'toolu_search',
+                                'name' => 'web_search',
+                                'input' => ['query' => 'euro dollar rate'],
+                            ]],
+                            'stop_reason' => 'tool_use',
+                            'usage' => ['input_tokens' => 8, 'output_tokens' => 4],
+                        ],
+                        'usage' => new MessagesUsage(8, 4, 0, 0, 'tool_use'),
+                    ];
+                }
+
+                $toolTurn = $body['messages'][2];
+                $this->assertSame('tool_result', $toolTurn['content'][0]['type']);
+                $this->assertStringContainsString('ECB reference rates', $toolTurn['content'][0]['content']);
+                $this->assertArrayNotHasKey('is_error', $toolTurn['content'][0]);
+
+                return [
+                    'status' => 200,
+                    'headers' => [],
+                    'body' => [
+                        'content' => [['type' => 'text', 'text' => 'The current rate is …']],
+                        'stop_reason' => 'end_turn',
+                        'usage' => ['input_tokens' => 30, 'output_tokens' => 9],
+                    ],
+                    'usage' => new MessagesUsage(30, 9, 0, 0, 'end_turn'),
+                ];
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'gpt-5',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'What is the euro/dollar rate today?']],
+                'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $snapshot,
+            ['web_search'],
+        );
+
+        $this->assertSame(2, $calls);
+        $this->assertSame('end_turn', $result['usage']->stopReason);
+        $this->assertIsArray($result['body']);
+        $this->assertSame('The current rate is …', $result['body']['content'][0]['text']);
+    }
+
     public function testClientOwnedToolsStopsWithoutExecuting(): void
     {
         $user = $this->createMock(User::class);
@@ -163,15 +275,15 @@ final class McpToolLoopTest extends TestCase
         $client = $this->createMock(McpClient::class);
         $client->expects($this->never())->method('callTool');
 
-        $loop = new McpToolLoop(
+        $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
+            $this->createMock(WebSearchTool::class),
             $client,
             $this->createMock(McpServerConfigRepository::class),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
             $this->createConfiguredMock(RateLimitService::class, [
                 'checkLimit' => ['allowed' => true],
             ]),
-            $this->createMock(CacheItemPoolInterface::class),
             new NullLogger(),
         );
 

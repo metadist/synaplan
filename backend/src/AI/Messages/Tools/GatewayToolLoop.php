@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\AI\Messages\Mcp;
+namespace App\AI\Messages\Tools;
 
+use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\MessagesEventEmitter;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
@@ -13,16 +14,19 @@ use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientException;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
-use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Agentic MCP tool loop for the Messages gateway.
+ * Agentic server-side tool loop for the Messages gateway.
  *
- * Injects a session-pinned tool catalog, calls the translator, and on
- * `stop_reason === tool_use` executes our `mcp__*` tools via {@see McpClient},
- * appends `tool_result` turns, and re-prompts — until end_turn, client-owned
- * tools appear, or bounds are hit.
+ * Injects the session-pinned catalog built by {@see GatewayToolCatalog}, calls
+ * the translator, and on `stop_reason === tool_use` executes the tools Synaplan
+ * owns — the user's MCP tools via {@see McpClient} and Synaplan's built-ins such
+ * as {@see WebSearchTool} — appends `tool_result` turns, and re-prompts until
+ * end_turn, client-owned tools appear, or bounds are hit.
+ *
+ * Tools the client owns are never executed here: they are relayed verbatim so
+ * the client keeps driving its own loop.
  *
  * @phpstan-type LoopResult array{
  *     status: int,
@@ -31,15 +35,14 @@ use Psr\Log\LoggerInterface;
  *     usage: MessagesUsage,
  *     iterations: int
  * }
+ * @phpstan-type DispatchEntry array{kind: string, serverId: int, tool: string, annotations: array<string, mixed>}
  * @phpstan-type CatalogSnapshot array{
  *     tools: list<array{name: string, description: string, input_schema: array<string, mixed>}>,
- *     dispatch: array<string, array{serverId: int, tool: string, annotations: array<string, mixed>}>
+ *     dispatch: array<string, DispatchEntry>
  * }
  */
-final readonly class McpToolLoop
+final readonly class GatewayToolLoop
 {
-    private const CATALOG_CACHE_PREFIX = 'messages_gateway_mcp_catalog_';
-    private const CATALOG_TTL = 7200;
     private const MAX_TOOL_RESULT_CHARS = 12000;
     private const MAX_TOOLS_PER_TURN = 16;
     private const WALL_CLOCK_SECONDS = 240;
@@ -47,61 +50,48 @@ final readonly class McpToolLoop
 
     public function __construct(
         private McpToolCatalogAdapter $catalogAdapter,
+        private WebSearchTool $webSearchTool,
         private McpClient $mcpClient,
         private McpServerConfigRepository $servers,
         private MessagesGatewayConfig $config,
         private RateLimitService $rateLimitService,
-        private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
     ) {
     }
 
     /**
-     * Session-pinned catalog snapshot (deterministic tool list for cache safety).
+     * Inject our tools at the front of `tools[]` (cache-prefix position 0) and
+     * drop the client declarations we take over.
      *
-     * @return CatalogSnapshot
-     */
-    public function pinnedCatalog(User $user, string $sessionKey): array
-    {
-        $userId = (int) $user->getId();
-        $cacheKey = self::CATALOG_CACHE_PREFIX.hash('sha256', $sessionKey.':'.$userId);
-        $item = $this->cache->getItem($cacheKey);
-        if ($item->isHit()) {
-            $cached = $item->get();
-            if (\is_array($cached) && isset($cached['tools'], $cached['dispatch'])) {
-                /* @var CatalogSnapshot $cached */
-                return $cached;
-            }
-        }
-
-        $snapshot = $this->catalogAdapter->toAnthropicTools($userId, includeMutating: false);
-        $item->set($snapshot);
-        $item->expiresAfter(self::CATALOG_TTL);
-        $this->cache->save($item);
-
-        return $snapshot;
-    }
-
-    /**
-     * Inject our tools at the front of `tools[]` (cache-prefix position 0).
+     * A `web_search_*` entry is a request for the *API side* to search. When
+     * Synaplan serves that request itself, forwarding the declaration as well
+     * would either make the upstream run a second, duplicate search (Anthropic)
+     * or be rejected as an unknown tool type (every other provider).
      *
      * @param array<string, mixed> $requestBody
      * @param CatalogSnapshot      $snapshot
+     * @param list<string>         $replacedServerTools dispatch names that stand in for a server tool
      *
      * @return array<string, mixed>
      */
-    public function injectTools(array $requestBody, array $snapshot): array
+    public function injectTools(array $requestBody, array $snapshot, array $replacedServerTools = []): array
     {
         if ([] === $snapshot['tools']) {
             return $requestBody;
         }
 
+        $dropWebSearch = \in_array(WebSearchTool::NAME, $replacedServerTools, true);
+
         $clientTools = [];
         if (isset($requestBody['tools']) && \is_array($requestBody['tools'])) {
             foreach ($requestBody['tools'] as $tool) {
-                if (\is_array($tool)) {
-                    $clientTools[] = $tool;
+                if (!\is_array($tool)) {
+                    continue;
                 }
+                if ($dropWebSearch && AnthropicServerTools::isWebSearch($tool)) {
+                    continue;
+                }
+                $clientTools[] = $tool;
             }
         }
 
@@ -116,6 +106,7 @@ final readonly class McpToolLoop
      * @param array<string, mixed> $requestBody
      * @param array<string, mixed> $translatorContext
      * @param CatalogSnapshot      $snapshot
+     * @param list<string>         $replacedServerTools
      *
      * @return LoopResult
      */
@@ -125,8 +116,9 @@ final readonly class McpToolLoop
         MessagesTranslatorInterface $translator,
         User $user,
         array $snapshot,
+        array $replacedServerTools = [],
     ): array {
-        $body = $this->injectTools($requestBody, $snapshot);
+        $body = $this->injectTools($requestBody, $snapshot, $replacedServerTools);
         // Body is mutated — never forward a stale raw_body.
         $context = $translatorContext;
         unset($context['raw_body']);
@@ -177,7 +169,7 @@ final readonly class McpToolLoop
                 break;
             }
 
-            $partition = $this->partitionToolUses($content);
+            $partition = $this->partitionToolUses($content, $snapshot['dispatch']);
             if ([] !== $partition['client']) {
                 // Mixed or client-owned — return verbatim; client owns the loop.
                 return [
@@ -225,6 +217,7 @@ final readonly class McpToolLoop
      * @param array<string, mixed>                                                    $translatorContext
      * @param CatalogSnapshot                                                         $snapshot
      * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
+     * @param list<string>                                                            $replacedServerTools
      */
     public function runStream(
         array $requestBody,
@@ -233,8 +226,9 @@ final readonly class McpToolLoop
         User $user,
         array $snapshot,
         callable $emit,
+        array $replacedServerTools = [],
     ): MessagesUsage {
-        $body = $this->injectTools($requestBody, $snapshot);
+        $body = $this->injectTools($requestBody, $snapshot, $replacedServerTools);
         $context = $translatorContext;
         unset($context['raw_body']);
         $context['parsed_events'] = true;
@@ -251,7 +245,7 @@ final readonly class McpToolLoop
             }
 
             $emitter->resetTurnMapping();
-            $turn = $this->collectStreamedTurn($translator, $body, $context, $emitter, $suppressNames);
+            $turn = $this->collectStreamedTurn($translator, $body, $context, $emitter, $suppressNames, $snapshot['dispatch']);
             $totalUsage = $this->sumUsage($totalUsage, $turn['usage']);
 
             if ($turn['error']) {
@@ -268,7 +262,7 @@ final readonly class McpToolLoop
                 return $totalUsage->withStopReason($turn['stop_reason']);
             }
 
-            $partition = $this->partitionToolUses($turn['content']);
+            $partition = $this->partitionToolUses($turn['content'], $snapshot['dispatch']);
             if ([] !== $partition['client'] || [] === $partition['ours']) {
                 // Client owns remaining tools — already streamed (suppress list
                 // only hides ours). Close the message.
@@ -298,9 +292,10 @@ final readonly class McpToolLoop
      * tool_use blocks suppressed). message_delta / message_stop are held until
      * stop_reason is known so intermediate MCP rounds stay invisible.
      *
-     * @param array<string, mixed> $requestBody
-     * @param array<string, mixed> $context
-     * @param list<string>         $suppressNames
+     * @param array<string, mixed>         $requestBody
+     * @param array<string, mixed>         $context
+     * @param list<string>                 $suppressNames
+     * @param array<string, DispatchEntry> $dispatch
      *
      * @return array{
      *     content: list<array<string, mixed>>,
@@ -315,6 +310,7 @@ final readonly class McpToolLoop
         array $context,
         MessagesEventEmitter $emitter,
         array $suppressNames,
+        array $dispatch,
     ): array {
         /** @var list<array{event: string, data: array<string, mixed>}> $tail */
         $tail = [];
@@ -456,7 +452,7 @@ final readonly class McpToolLoop
 
         $isFinal = 'tool_use' !== $stopReason || $error;
         if (!$isFinal) {
-            $partition = $this->partitionToolUses($content);
+            $partition = $this->partitionToolUses($content, $dispatch);
             if ([] !== $partition['client'] || [] === $partition['ours']) {
                 $isFinal = true;
             }
@@ -486,11 +482,17 @@ final readonly class McpToolLoop
     }
 
     /**
-     * @param list<array<string, mixed>> $content
+     * A tool call is ours when it is in the catalog we injected, or when it
+     * carries the `mcp__` prefix — a stale namespaced call from an earlier
+     * catalog belongs to us too and is answered with an error tool_result
+     * instead of being handed to a client that cannot execute it.
+     *
+     * @param list<array<string, mixed>>   $content
+     * @param array<string, DispatchEntry> $dispatch
      *
      * @return array{ours: list<array<string, mixed>>, client: list<array<string, mixed>>}
      */
-    private function partitionToolUses(array $content): array
+    private function partitionToolUses(array $content, array $dispatch): array
     {
         $ours = [];
         $client = [];
@@ -499,7 +501,7 @@ final readonly class McpToolLoop
                 continue;
             }
             $name = (string) ($block['name'] ?? '');
-            if ($this->catalogAdapter->isOurs($name)) {
+            if (isset($dispatch[$name]) || $this->catalogAdapter->isOurs($name)) {
                 $ours[] = $block;
             } else {
                 $client[] = $block;
@@ -510,9 +512,9 @@ final readonly class McpToolLoop
     }
 
     /**
-     * @param list<array<string, mixed>>                                                           $toolUses
-     * @param array<string, array{serverId: int, tool: string, annotations: array<string, mixed>}> $dispatch
-     * @param (callable(): void)|null                                                              $ping
+     * @param list<array<string, mixed>>   $toolUses
+     * @param array<string, DispatchEntry> $dispatch
+     * @param (callable(): void)|null      $ping
      *
      * @return list<array<string, mixed>> tool_result content blocks
      */
@@ -561,6 +563,15 @@ final readonly class McpToolLoop
                 continue;
             }
 
+            if (GatewayToolCatalog::KIND_NATIVE === $entry['kind']) {
+                $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user);
+                if (null !== $ping) {
+                    $ping();
+                    $lastPing = microtime(true);
+                }
+                continue;
+            }
+
             if ($this->catalogAdapter->isMutatingTool($entry['annotations'])) {
                 $results[] = $this->toolResultBlock(
                     $toolUseId,
@@ -589,7 +600,7 @@ final readonly class McpToolLoop
                 $results[] = $this->toolResultBlock($toolUseId, $text, $isError);
                 $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: $isError);
             } catch (McpClientException $e) {
-                $this->logger->warning('McpToolLoop: tool call failed', [
+                $this->logger->warning('GatewayToolLoop: MCP tool call failed', [
                     'server_id' => $entry['serverId'],
                     'tool' => $entry['tool'],
                     'error' => $e->getMessage(),
@@ -609,6 +620,25 @@ final readonly class McpToolLoop
         }
 
         return $results;
+    }
+
+    /**
+     * Execute one of Synaplan's built-in tools.
+     *
+     * @param array<string, mixed> $arguments
+     *
+     * @return array<string, mixed> tool_result content block
+     */
+    private function executeNative(string $tool, array $arguments, string $toolUseId, User $user): array
+    {
+        if (WebSearchTool::NAME !== $tool) {
+            return $this->toolResultBlock($toolUseId, sprintf('Unknown Synaplan tool `%s`.', $tool), isError: true);
+        }
+
+        $result = $this->webSearchTool->execute($arguments);
+        $this->recordNativeUsage($user, $tool, $result['query'], $result['isError']);
+
+        return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
     }
 
     /**
@@ -676,7 +706,11 @@ final readonly class McpToolLoop
             }
         }
 
-        $text = trim(implode("\n\n", $parts));
+        return $this->clampToolText(trim(implode("\n\n", $parts)));
+    }
+
+    private function clampToolText(string $text): string
+    {
         if (mb_strlen($text) > self::MAX_TOOL_RESULT_CHARS) {
             $text = mb_substr($text, 0, self::MAX_TOOL_RESULT_CHARS).'…';
         }
@@ -686,12 +720,28 @@ final readonly class McpToolLoop
 
     private function recordMcpUsage(User $user, int $serverId, string $tool, bool $error): void
     {
+        $this->recordToolUsage($user, 'MCP_TOOL', 'mcp', sprintf('server:%d/%s', $serverId, $tool), $tool, $error);
+    }
+
+    private function recordNativeUsage(User $user, string $tool, string $query, bool $error): void
+    {
+        $this->recordToolUsage($user, 'WEB_SEARCH', 'synaplan', 'tool:'.$tool, $query, $error);
+    }
+
+    private function recordToolUsage(
+        User $user,
+        string $source,
+        string $provider,
+        string $model,
+        string $inputText,
+        bool $error,
+    ): void {
         try {
             $this->rateLimitService->recordUsage($user, 'MESSAGES', [
-                'source' => 'MCP_TOOL',
-                'provider' => 'mcp',
-                'model' => sprintf('server:%d/%s', $serverId, $tool),
-                'input_text' => $tool,
+                'source' => $source,
+                'provider' => $provider,
+                'model' => $model,
+                'input_text' => $inputText,
                 'response_text' => $error ? 'error' : 'ok',
                 'usage' => [
                     'prompt_tokens' => 0,
@@ -702,7 +752,7 @@ final readonly class McpToolLoop
                 ],
             ]);
         } catch (\Throwable $e) {
-            $this->logger->error('McpToolLoop: recordUsage failed', [
+            $this->logger->error('GatewayToolLoop: recordUsage failed', [
                 'error' => $e->getMessage(),
                 'user_id' => $user->getId(),
             ]);

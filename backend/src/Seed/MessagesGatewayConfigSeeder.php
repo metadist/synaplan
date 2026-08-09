@@ -29,6 +29,7 @@ final readonly class MessagesGatewayConfigSeeder
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_MCP_TOOLS_ENABLED, 'value' => '0'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_MCP_TOOLS_WITH_CLIENT_TOOLS, 'value' => '0'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_MCP_MAX_ITERATIONS, 'value' => '8'],
+            ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_WEB_SEARCH_ENABLED, 'value' => '0'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_CONTEXT_INJECTION_ENABLED, 'value' => '0'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_BUDGET_NOTICE_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_SESSION_SUMMARY_ENABLED, 'value' => '1'],
