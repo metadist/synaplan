@@ -36,6 +36,47 @@ final class GeminiMessagesTranslatorTest extends TestCase
         $this->assertSame('user', $payload['contents'][0]['role']);
     }
 
+    public function testImageBlocksSurviveAsInlineAndFileData(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toGeminiRequest([
+            'model' => 'gemini-2.0-flash',
+            'max_tokens' => 32,
+            'messages' => [['role' => 'user', 'content' => [
+                ['type' => 'text', 'text' => 'What is on this page?'],
+                ['type' => 'image', 'source' => [
+                    'type' => 'base64',
+                    'media_type' => 'image/png',
+                    'data' => 'iVBORw0KGgo=',
+                ]],
+                ['type' => 'image', 'source' => [
+                    'type' => 'url',
+                    'media_type' => 'image/jpeg',
+                    'url' => 'https://example.test/page.jpg',
+                ]],
+            ]]],
+        ]);
+
+        $parts = $payload['contents'][0]['parts'];
+        $this->assertSame('What is on this page?', $parts[0]['text']);
+        $this->assertSame('image/png', $parts[1]['inlineData']['mimeType']);
+        $this->assertSame('iVBORw0KGgo=', $parts[1]['inlineData']['data']);
+        $this->assertSame('https://example.test/page.jpg', $parts[2]['fileData']['fileUri']);
+    }
+
+    public function testServerToolDeclarationsAreNotMappedToFunctionDeclarations(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toGeminiRequest([
+            'model' => 'gemini-2.0-flash',
+            'max_tokens' => 32,
+            'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
+            'messages' => [['role' => 'user', 'content' => 'hello']],
+        ]);
+
+        $this->assertArrayNotHasKey('tools', $payload);
+    }
+
     public function testFromGeminiMapsFunctionCall(): void
     {
         $t = new GeminiMessagesTranslator(new MockHttpClient());

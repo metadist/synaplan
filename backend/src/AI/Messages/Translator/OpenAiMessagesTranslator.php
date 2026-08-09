@@ -6,6 +6,7 @@ namespace App\AI\Messages\Translator;
 
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
+use App\AI\Messages\Tools\AnthropicServerTools;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -14,7 +15,8 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * Anthropic Messages ↔ OpenAI Chat Completions translator.
  *
  * Strips Anthropic-only fields (`thinking`, beta body keys) that Claude Code
- * sends to gateway aliases. Tool schemas map `input_schema` → `parameters`.
+ * sends to gateway aliases. Tool schemas map `input_schema` → `parameters`;
+ * image blocks map to `image_url` parts so vision survives the alias route.
  */
 #[AutoconfigureTag('app.messages.translator')]
 final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInterface
@@ -156,7 +158,11 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         if (isset($requestBody['tools']) && \is_array($requestBody['tools'])) {
             $tools = [];
             foreach ($requestBody['tools'] as $tool) {
-                if (!\is_array($tool)) {
+                if (!\is_array($tool) || AnthropicServerTools::isServerToolDeclaration($tool)) {
+                    // Server tools (`web_search_*`, `code_execution_*`, …) are
+                    // executed by the API side, not by the model, and carry no
+                    // input schema. Mapping one to a function declaration would
+                    // hand the model a tool nobody can answer.
                     continue;
                 }
                 $tools[] = [
@@ -263,6 +269,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
 
         $out = [];
         $textParts = [];
+        $mediaParts = [];
         $toolCalls = [];
 
         foreach ($content as $block) {
@@ -273,6 +280,11 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
 
             if ('text' === $type) {
                 $textParts[] = (string) ($block['text'] ?? '');
+            } elseif ('image' === $type) {
+                $url = $this->imageBlockToUrl($block);
+                if (null !== $url) {
+                    $mediaParts[] = ['type' => 'image_url', 'image_url' => ['url' => $url]];
+                }
             } elseif ('tool_use' === $type) {
                 $toolCalls[] = [
                     'id' => (string) ($block['id'] ?? uniqid('call_', true)),
@@ -301,11 +313,56 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
                 $assistant['tool_calls'] = $toolCalls;
             }
             array_unshift($out, $assistant);
-        } elseif ('user' === $role && [] !== $textParts) {
-            array_unshift($out, ['role' => 'user', 'content' => implode("\n", $textParts)]);
+        } elseif ('user' === $role && ([] !== $textParts || [] !== $mediaParts)) {
+            if ([] === $mediaParts) {
+                array_unshift($out, ['role' => 'user', 'content' => implode("\n", $textParts)]);
+            } else {
+                // Multimodal turns must stay a content-part array; collapsing
+                // them to a string would drop the attachment.
+                $parts = [];
+                if ([] !== $textParts) {
+                    $parts[] = ['type' => 'text', 'text' => implode("\n", $textParts)];
+                }
+                array_unshift($out, ['role' => 'user', 'content' => array_merge($parts, $mediaParts)]);
+            }
         }
 
         return $out;
+    }
+
+    /**
+     * Anthropic `image` block → OpenAI `image_url` value.
+     *
+     * Base64 sources become a data URL; URL sources pass through. Anything the
+     * shape does not cover returns null so the turn is still sent without it,
+     * rather than failing the whole request.
+     *
+     * @param array<string, mixed> $block
+     */
+    private function imageBlockToUrl(array $block): ?string
+    {
+        $source = $block['source'] ?? null;
+        if (!\is_array($source)) {
+            return null;
+        }
+
+        $sourceType = (string) ($source['type'] ?? '');
+
+        if ('base64' === $sourceType) {
+            $data = $source['data'] ?? null;
+            if (!\is_string($data) || '' === $data) {
+                return null;
+            }
+            $mediaType = \is_string($source['media_type'] ?? null) ? $source['media_type'] : 'image/png';
+
+            return 'data:'.$mediaType.';base64,'.$data;
+        }
+
+        if ('url' === $sourceType && \is_string($source['url'] ?? null) && '' !== $source['url']) {
+            return $source['url'];
+        }
+
+        return null;
     }
 
     /**

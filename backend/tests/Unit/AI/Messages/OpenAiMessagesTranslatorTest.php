@@ -49,6 +49,58 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertSame('hit', $payload['messages'][3]['content']);
     }
 
+    public function testImageBlocksSurviveAsImageUrlParts(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        $payload = $t->toOpenAiRequest([
+            'model' => 'gpt-4o',
+            'max_tokens' => 64,
+            'messages' => [['role' => 'user', 'content' => [
+                ['type' => 'text', 'text' => 'What is on this page?'],
+                ['type' => 'image', 'source' => [
+                    'type' => 'base64',
+                    'media_type' => 'image/png',
+                    'data' => 'iVBORw0KGgo=',
+                ]],
+                ['type' => 'image', 'source' => ['type' => 'url', 'url' => 'https://example.test/page.png']],
+            ]]],
+        ], stream: false);
+
+        $content = $payload['messages'][0]['content'];
+        $this->assertIsArray($content);
+        $this->assertSame('What is on this page?', $content[0]['text']);
+        $this->assertSame('data:image/png;base64,iVBORw0KGgo=', $content[1]['image_url']['url']);
+        $this->assertSame('https://example.test/page.png', $content[2]['image_url']['url']);
+    }
+
+    public function testTextOnlyTurnsStayPlainStrings(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        $payload = $t->toOpenAiRequest([
+            'model' => 'gpt-4o',
+            'max_tokens' => 64,
+            'messages' => [['role' => 'user', 'content' => [['type' => 'text', 'text' => 'hi']]]],
+        ], stream: false);
+
+        $this->assertSame('hi', $payload['messages'][0]['content']);
+    }
+
+    public function testServerToolDeclarationsAreNotMappedToFunctions(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        $payload = $t->toOpenAiRequest([
+            'model' => 'gpt-4o',
+            'max_tokens' => 64,
+            'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
+            'messages' => [['role' => 'user', 'content' => 'hi']],
+        ], stream: false);
+
+        $this->assertArrayNotHasKey('tools', $payload);
+    }
+
     public function testFromOpenAiMapsToolCalls(): void
     {
         $t = new OpenAiMessagesTranslator(new MockHttpClient());
