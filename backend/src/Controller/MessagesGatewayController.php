@@ -133,7 +133,8 @@ final class MessagesGatewayController extends AbstractController
             'context_injection_enabled' => $this->config->isContextInjectionEnabled($userId),
             'budget_notice_enabled' => $this->config->isBudgetNoticeEnabled($userId),
             'upstream_url' => $this->config->upstreamUrl(),
-            'model_aliases' => $this->config->modelAliases(),
+            // Cast so an empty alias map JSON-encodes as {} (Zod record), not [].
+            'model_aliases' => (object) $this->config->modelAliases(),
             'keys' => $keys,
             'budget' => [
                 'percent' => $budget['percent'],
@@ -372,10 +373,11 @@ final class MessagesGatewayController extends AbstractController
             0,
             MessagesGatewayConfig::CONFIG_GROUP,
             MessagesGatewayConfig::KEY_MODEL_ALIASES,
-            json_encode($clean, \JSON_THROW_ON_ERROR),
+            // Force object encoding so {} stays {} (never []) in BCONFIG.
+            json_encode((object) $clean, \JSON_THROW_ON_ERROR),
         );
 
-        return $this->json(['success' => true, 'model_aliases' => $clean]);
+        return $this->json(['success' => true, 'model_aliases' => (object) $clean]);
     }
 
     #[Route('/flags', name: 'put_flags', methods: ['PUT'])]
