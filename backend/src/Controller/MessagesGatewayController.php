@@ -126,14 +126,15 @@ final class MessagesGatewayController extends AbstractController
             ];
         }
 
-        return $this->json([
+        // Use JsonResponse (not $this->json): the Symfony serializer normalizes
+        // an empty stdClass to [], which breaks the frontend Zod record schema.
+        return new JsonResponse([
             'enabled' => $this->config->isEnabled($userId),
             'allow_operator_key' => $this->config->allowOperatorKey($userId),
             'mcp_tools_enabled' => $this->config->isMcpToolsEnabled($userId),
             'context_injection_enabled' => $this->config->isContextInjectionEnabled($userId),
             'budget_notice_enabled' => $this->config->isBudgetNoticeEnabled($userId),
             'upstream_url' => $this->config->upstreamUrl(),
-            // Cast so an empty alias map JSON-encodes as {} (Zod record), not [].
             'model_aliases' => (object) $this->config->modelAliases(),
             'keys' => $keys,
             'budget' => [
@@ -377,7 +378,7 @@ final class MessagesGatewayController extends AbstractController
             json_encode((object) $clean, \JSON_THROW_ON_ERROR),
         );
 
-        return $this->json(['success' => true, 'model_aliases' => (object) $clean]);
+        return new JsonResponse(['success' => true, 'model_aliases' => (object) $clean]);
     }
 
     #[Route('/flags', name: 'put_flags', methods: ['PUT'])]
