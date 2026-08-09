@@ -194,7 +194,7 @@ final readonly class GatewayToolLoop
                 'type' => 'error',
                 'error' => [
                     'type' => 'api_error',
-                    'message' => 'MCP tool loop exceeded iteration or wall-clock limits.',
+                    'message' => 'Server-side tool loop exceeded iteration or wall-clock limits.',
                 ],
             ];
             $lastStatus = 502;

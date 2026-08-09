@@ -51,7 +51,8 @@ Defaults are **off** except budget notices and session summaries (both only take
 | `SESSION_SUMMARY_ENABLED` | `1` | Debounced AI summary chat per API session (uses the sorting model, shared with the OpenAI-compatible API) |
 | `MCP_TOOLS_ENABLED` | `0` | Inject the user’s MCP catalog and run a server-side tool loop |
 | `MCP_TOOLS_WITH_CLIENT_TOOLS` | `0` | Also inject when the client already sent `tools` (off — Claude Code brings its own) |
-| `MCP_MAX_ITERATIONS` | `8` | Max LLM↔tool rounds per request |
+| `MCP_MAX_ITERATIONS` | `8` | Max LLM↔tool rounds per request (applies to every server-side tool) |
+| `WEB_SEARCH_ENABLED` | `0` | Serve Anthropic’s `web_search` server tool with Synaplan’s own search |
 | `CONTEXT_INJECTION_ENABLED` | `0` | Append session-stable RAG/memory system block |
 
 Env fallback for local smoke tests: `MESSAGES_GATEWAY_UPSTREAM_URL` (DB value wins in production).
@@ -68,9 +69,24 @@ claude mcp add --transport http synaplan https://your-synaplan-host/mcp \
   --header "Authorization: Bearer sk_your_synaplan_api_key"
 ```
 
+## Tools
+
+Anthropic has two kinds of tool entry and the gateway treats them differently:
+
+- **Client tools** (they carry an `input_schema`) are relayed verbatim — Claude Code’s `Bash`, `Read`, `Edit` and friends. The client keeps driving its own loop, and a turn containing even one client tool call is never executed server-side. For aliased models the translators map them to OpenAI `tool_calls` / Gemini `functionDeclarations` and back.
+- **Server tools** (a versioned `type`, no `input_schema`) are capability requests aimed at the API side. Only `api.anthropic.com` can honour them, so they are never mapped to a function declaration for another provider.
+
+With `WEB_SEARCH_ENABLED=1`, a `web_search_*` server-tool declaration is replaced by an executable `web_search` tool backed by Synaplan’s own search (`BraveSearchService`), and Synaplan runs the search in the same server-side loop as MCP tools. The client sees one continuous message; intermediate tool rounds are suppressed from the SSE stream, with keep-alive pings while a tool runs.
+
+Search is skipped when no search provider is configured, or when the client ships its own tool named `web_search`.
+
+## Vision
+
+Image blocks are forwarded on every route: unchanged on the Anthropic passthrough, as `image_url` (data URI or URL) for OpenAI, and as `inlineData` / `fileData` for Gemini.
+
 ## Metering
 
-Usage is recorded as `API_CHAT` with `source: MESSAGES_API`, including Anthropic cache token fields. Outbound MCP tool calls record `source: MCP_TOOL`. Rate limits use the `MESSAGES` action.
+Usage is recorded as `API_CHAT` with `source: MESSAGES_API`, including Anthropic cache token fields. Outbound MCP tool calls record `source: MCP_TOOL` and Synaplan’s own search records `source: WEB_SEARCH`. Rate limits use the `MESSAGES` action. Metering never fails a completed request.
 
 Cost depends on whose key serves the request:
 
@@ -88,6 +104,7 @@ Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped befor
 
 ## Related
 
+- Tool/web search/vision integration plan: [CLAUDE_CODE_COMPATIBILITY_PLAN.md](./CLAUDE_CODE_COMPATIBILITY_PLAN.md)
 - User docs: [docs.synaplan.com — Claude Code](https://docs.synaplan.com/) (page `claude-code`)
 - OpenAI-compatible sibling: [OPENAI_COMPATIBLE_API.md](./OPENAI_COMPATIBLE_API.md)
 - UI: **Channels → AI Agents**
