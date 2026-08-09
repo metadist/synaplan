@@ -72,6 +72,7 @@ export async function saveMessagesGatewayFlags(
     enabled: boolean
     allow_operator_key: boolean
     mcp_tools_enabled: boolean
+    web_search_enabled: boolean
     context_injection_enabled: boolean
     budget_notice_enabled: boolean
   }>

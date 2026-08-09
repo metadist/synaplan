@@ -175,6 +175,27 @@
         </label>
 
         <div>
+          <label class="flex items-center gap-3 text-sm txt-primary">
+            <input
+              v-model="webSearchFlag"
+              type="checkbox"
+              class="rounded border-light-border disabled:opacity-50"
+              :disabled="!status.web_search_available"
+              data-testid="checkbox-agents-web-search"
+              @change="onToggleWebSearch"
+            />
+            {{ $t('messagesGateway.webSearchLabel') }}
+          </label>
+          <p class="txt-secondary text-xs mt-1 ms-7">
+            {{
+              status.web_search_available
+                ? $t('messagesGateway.webSearchHint')
+                : $t('messagesGateway.webSearchUnavailable')
+            }}
+          </p>
+        </div>
+
+        <div>
           <label class="block text-sm font-medium txt-primary mb-1">
             {{ $t('messagesGateway.upstreamLabel') }}
           </label>
@@ -253,6 +274,7 @@ const savingUpstream = ref(false)
 const savingAliases = ref(false)
 const enabledFlag = ref(false)
 const allowOperatorFlag = ref(false)
+const webSearchFlag = ref(false)
 const upstreamUrl = ref('')
 const aliasesJson = ref('{}')
 
@@ -281,6 +303,7 @@ async function load() {
     status.value = await getMessagesGatewayStatus()
     enabledFlag.value = status.value.enabled
     allowOperatorFlag.value = status.value.allow_operator_key ?? false
+    webSearchFlag.value = status.value.web_search_enabled ?? false
     upstreamUrl.value = status.value.upstream_url
     aliasesJson.value = JSON.stringify(status.value.model_aliases ?? {}, null, 2)
   } catch (err) {
@@ -353,6 +376,17 @@ async function onToggleOperatorKey() {
   } catch (err) {
     error((err as Error).message || t('messagesGateway.flagsError'))
     allowOperatorFlag.value = status.value?.allow_operator_key ?? false
+  }
+}
+
+async function onToggleWebSearch() {
+  try {
+    await saveMessagesGatewayFlags({ web_search_enabled: webSearchFlag.value })
+    success(t('messagesGateway.flagsSaved'))
+    await load()
+  } catch (err) {
+    error((err as Error).message || t('messagesGateway.flagsError'))
+    webSearchFlag.value = status.value?.web_search_enabled ?? false
   }
 }
 
