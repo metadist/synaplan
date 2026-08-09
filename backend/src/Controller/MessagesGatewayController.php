@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\UserProviderKeyResolver;
+use App\AI\Messages\MessagesGateway;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
@@ -183,10 +184,27 @@ final class MessagesGatewayController extends AbstractController
             ],
         ),
     )]
+    #[OA\Response(
+        response: 403,
+        description: 'BYO keys require at least the Pro plan',
+        content: new OA\JsonContent(
+            required: ['error'],
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Using your own provider API key requires at least the Pro plan.'),
+            ],
+        ),
+    )]
     public function putKey(string $provider, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!\in_array($user->getRateLimitLevel(), MessagesGateway::BYO_ALLOWED_LEVELS, true)) {
+            return $this->json(
+                ['error' => 'Using your own provider API key requires at least the Pro plan. Upgrade your Synaplan subscription to save a BYO key.'],
+                Response::HTTP_FORBIDDEN,
+            );
         }
 
         $provider = strtolower($provider);

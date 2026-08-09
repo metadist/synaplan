@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\DTO\CostResult;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
@@ -327,7 +328,18 @@ final class RateLimitService
         // price snapshot and the BUNIXTIMES column on BUSELOG all line up.
         $timestamp = time();
 
-        if ('per_token' !== $pricingMode && !empty($mediaUsage)) {
+        if (!empty($metadata['zero_cost'])) {
+            // BYO provider key: the user pays the provider directly, so tokens
+            // are metered for statistics but the Synaplan budget is not charged.
+            $costResult = new CostResult(
+                totalCost: '0.000000',
+                inputCost: '0.000000',
+                outputCost: '0.000000',
+                cacheSavings: '0.000000',
+                priceSnapshot: [],
+                billedInputTokens: (int) $promptTokens,
+            );
+        } elseif ('per_token' !== $pricingMode && !empty($mediaUsage)) {
             $inputQty = match ($pricingMode) {
                 'per_character' => (float) ($mediaUsage['characters'] ?? 0),
                 'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),

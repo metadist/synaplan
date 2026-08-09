@@ -70,7 +70,12 @@ claude mcp add --transport http synaplan https://your-synaplan-host/mcp \
 
 ## Metering
 
-Usage is recorded as `API_CHAT` with `source: MESSAGES_API`, including Anthropic cache token fields. Outbound MCP tool calls record `source: MCP_TOOL`. Rate limits use the `MESSAGES` action. Cost budget is enforced before the request; concurrent streams may slightly overshoot (documented limitation).
+Usage is recorded as `API_CHAT` with `source: MESSAGES_API`, including Anthropic cache token fields. Outbound MCP tool calls record `source: MCP_TOOL`. Rate limits use the `MESSAGES` action.
+
+Cost depends on whose key serves the request:
+
+- **Operator key** — the install pays the provider, so the user's Synaplan cost budget is enforced before the request (429 once exhausted; concurrent streams may slightly overshoot — documented limitation).
+- **BYO key** — the user pays the provider directly, so tokens are metered at **zero cost** (statistics only, no budget consumption). BYO keys require at least the **Pro plan**; saving a key and using it through the gateway are both refused below that level.
 
 ## Multi-provider aliases
 

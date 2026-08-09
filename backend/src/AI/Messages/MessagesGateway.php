@@ -70,6 +70,13 @@ final readonly class MessagesGateway
     private const BUDGET_NOTICE_TTL = 7200;
 
     /**
+     * Plans allowed to use a BYO provider key through the gateway. BYO calls
+     * are metered at zero cost (the user pays the provider directly), so a
+     * paid plan is the entry requirement instead of the cost budget.
+     */
+    public const BYO_ALLOWED_LEVELS = ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
+
+    /**
      * @param iterable<MessagesTranslatorInterface> $translators
      */
     public function __construct(
@@ -122,18 +129,6 @@ final readonly class MessagesGateway
         }
 
         $budget = $this->rateLimitService->checkCostBudget($user);
-        if (!$budget['allowed']) {
-            return $this->err(
-                429,
-                'rate_limit_error',
-                sprintf(
-                    'Synaplan cost budget exceeded (%.2f of %.2f used). Top up or wait for the next billing period.',
-                    (float) $budget['used_cost'],
-                    (float) $budget['budget'],
-                ),
-                $this->budgetHeaders($budget),
-            );
-        }
 
         $modelString = isset($decoded['model']) && \is_string($decoded['model']) ? $decoded['model'] : null;
         $resolved = $this->modelResolver->resolve($modelString);
@@ -165,6 +160,31 @@ final readonly class MessagesGateway
                     $resolved['provider'],
                     $allowOperator ? '' : ' (operator-key fallback is disabled)',
                 ),
+            );
+        }
+
+        if ('user' === $credential['source']) {
+            // BYO key: metered at zero cost (the user pays the provider), so
+            // the Synaplan budget does not apply — a paid plan is required instead.
+            if (!\in_array($user->getRateLimitLevel(), self::BYO_ALLOWED_LEVELS, true)) {
+                return $this->err(
+                    403,
+                    'permission_error',
+                    'Using your own provider API key requires at least the Pro plan. Upgrade your Synaplan subscription to keep using BYO keys.',
+                );
+            }
+        } elseif (!$budget['allowed']) {
+            // Operator key: the install pays the provider, so the user's
+            // Synaplan cost budget gates the request.
+            return $this->err(
+                429,
+                'rate_limit_error',
+                sprintf(
+                    'Synaplan cost budget exceeded (%.2f of %.2f used). Top up or wait for the next billing period.',
+                    (float) $budget['used_cost'],
+                    (float) $budget['budget'],
+                ),
+                $this->budgetHeaders($budget),
             );
         }
 
@@ -471,16 +491,24 @@ final readonly class MessagesGateway
         $inputText = $this->lastUserText($prepared['request_body']);
         $responseText = null !== $responseBody ? $this->extractResponseText($responseBody) : '';
 
+        $metadata = [
+            'provider' => $prepared['resolved']['provider'],
+            'model' => $prepared['resolved']['providerModelId'],
+            'model_id' => $prepared['resolved']['model_id'],
+            'usage' => $usage->toRateLimitUsage(),
+            'response_text' => $responseText,
+            'input_text' => $inputText,
+            'source' => 'MESSAGES_API',
+            'key_source' => $prepared['key_source'],
+        ];
+        if ('user' === $prepared['key_source']) {
+            // BYO key: the user pays the provider directly — meter tokens for
+            // statistics but never charge the Synaplan budget.
+            $metadata['zero_cost'] = true;
+        }
+
         try {
-            $this->rateLimitService->recordUsage($user, 'API_CHAT', [
-                'provider' => $prepared['resolved']['provider'],
-                'model' => $prepared['resolved']['providerModelId'],
-                'model_id' => $prepared['resolved']['model_id'],
-                'usage' => $usage->toRateLimitUsage(),
-                'response_text' => $responseText,
-                'input_text' => $inputText,
-                'source' => 'MESSAGES_API',
-            ]);
+            $this->rateLimitService->recordUsage($user, 'API_CHAT', $metadata);
         } catch (\Throwable $e) {
             $this->logger->error('MessagesGateway: recordUsage failed', [
                 'error' => $e->getMessage(),
