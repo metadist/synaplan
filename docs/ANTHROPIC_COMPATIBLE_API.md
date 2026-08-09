@@ -39,7 +39,7 @@ Same Synaplan API keys as the OpenAI-compatible API:
 
 ## Feature flags (`BCONFIG` group `MESSAGES_GATEWAY`)
 
-Defaults are **off** except budget notices:
+Defaults are **off** except budget notices and session summaries (both only take effect once the gateway itself is enabled):
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
@@ -48,6 +48,7 @@ Defaults are **off** except budget notices:
 | `UPSTREAM_URL` | `https://api.anthropic.com` | Admin-set global upstream (HTTPS; http only for loopback/private) |
 | `MODEL_ALIASES` | `{}` | Map Claude Code model IDs → catalog IDs |
 | `BUDGET_NOTICE_ENABLED` | `1` | One-time ≥90% budget notice in the response |
+| `SESSION_SUMMARY_ENABLED` | `1` | Debounced AI summary chat per API session (uses the sorting model, shared with the OpenAI-compatible API) |
 | `MCP_TOOLS_ENABLED` | `0` | Inject the user’s MCP catalog and run a server-side tool loop |
 | `MCP_TOOLS_WITH_CLIENT_TOOLS` | `0` | Also inject when the client already sent `tools` (off — Claude Code brings its own) |
 | `MCP_MAX_ITERATIONS` | `8` | Max LLM↔tool rounds per request |
