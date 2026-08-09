@@ -4479,6 +4479,16 @@
           "description": "Wohin Anfragen gehen und wie Modellnamen übersetzt werden."
         }
       },
+      "activeTools": {
+        "title": "Läuft gerade in Ihrem Auftrag",
+        "empty": "Synaplan führt keine eigenen Tools aus. Verbundene KI-Assistenten erhalten nur die Tools, die ihr eigenes Programm mitbringt.",
+        "hint": "Eine einzelne Nachricht kann eines davon trotzdem auslassen: Bringt ein Programm ein eigenes Tool mit demselben Namen mit, behält es dieses, und die Websuche läuft nur, wenn der Assistent danach fragt.",
+        "mcpServers": "dazu die Tools von 1 verbundenen Tool-Server | dazu die Tools von {count} verbundenen Tool-Servern",
+        "tools": {
+          "web_search": "Websuche",
+          "analyze_image": "Bildanalyse"
+        }
+      },
       "enabled": {
         "label": "Gateway aktivieren",
         "description": "Solange dies aus ist, erhalten verbundene Tools eine klare Fehlermeldung statt einer Antwort."

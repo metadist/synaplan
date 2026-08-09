@@ -4545,6 +4545,16 @@
           "description": "Where requests are sent and how model names are translated."
         }
       },
+      "activeTools": {
+        "title": "Running on your behalf right now",
+        "empty": "Synaplan runs no tools of its own. Connected AI assistants only get the tools their own program brings along.",
+        "hint": "A single message can still skip one of these: a program that brings its own tool of the same name keeps it, and web search only runs when the assistant asks for it.",
+        "mcpServers": "plus the tools of 1 connected tool server | plus the tools of {count} connected tool servers",
+        "tools": {
+          "web_search": "Web search",
+          "analyze_image": "Image analysis"
+        }
+      },
       "enabled": {
         "label": "Enable the gateway",
         "description": "While this is off, connected tools get a clear error instead of an answer."

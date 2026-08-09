@@ -3498,6 +3498,16 @@
           "description": "İsteklerin nereye gönderildiği ve model adlarının nasıl çevrildiği."
         }
       },
+      "activeTools": {
+        "title": "Şu anda sizin adınıza çalışıyor",
+        "empty": "Synaplan kendi araçlarından hiçbirini çalıştırmıyor. Bağlı AI asistanları yalnızca kendi programlarının sunduğu araçları alır.",
+        "hint": "Tek bir mesaj bunlardan birini yine de atlayabilir: kendi programı aynı adda bir araç getiriyorsa onu kullanır ve web araması yalnızca asistan istediğinde çalışır.",
+        "mcpServers": "ayrıca 1 bağlı araç sunucusunun araçları | ayrıca {count} bağlı araç sunucusunun araçları",
+        "tools": {
+          "web_search": "Web araması",
+          "analyze_image": "Görüntü analizi"
+        }
+      },
       "enabled": {
         "label": "Ağ geçidini etkinleştir",
         "description": "Bu kapalıyken bağlı araçlar yanıt yerine açık bir hata alır."

@@ -32,6 +32,7 @@ const baseStatus = (overrides: Partial<MessagesGatewayStatus> = {}): MessagesGat
     mcp_tools_with_client_tools: false,
     mcp_max_iterations: 8,
     mcp_servers_configured: 0,
+    server_tools: [],
     web_search_mode: 'auto',
     web_search_available: true,
     vision_mode: 'auto',
@@ -158,5 +159,38 @@ describe('MessagesGatewayAdminSettings', () => {
     const wrapper = mountPanel(baseStatus({ enabled: false }))
 
     expect(wrapper.find('[data-testid="notice-agents-disabled"]').exists()).toBe(true)
+  })
+
+  it('names the tools the gateway runs server-side', () => {
+    const wrapper = mountPanel(baseStatus({ server_tools: ['web_search', 'analyze_image'] }))
+    const readout = wrapper.find('[data-testid="agents-active-tools"]')
+
+    expect(readout.text()).toContain('Web search')
+    expect(readout.text()).toContain('Image analysis')
+  })
+
+  it('falls back to the raw name for a tool this page does not know', () => {
+    const wrapper = mountPanel(baseStatus({ server_tools: ['some_future_tool'] }))
+
+    expect(wrapper.find('[data-testid="agents-active-tool-some_future_tool"]').text()).toContain(
+      'some_future_tool'
+    )
+  })
+
+  it('says so when the gateway runs nothing of its own', () => {
+    const wrapper = mountPanel(baseStatus({ mcp_servers_configured: 2 }))
+
+    // MCP servers exist but the switch is off, so they are not running either.
+    expect(wrapper.find('[data-testid="agents-active-tools"]').text()).toContain(
+      'runs no tools of its own'
+    )
+  })
+
+  it('counts the connected tool servers once MCP tools are on', () => {
+    const wrapper = mountPanel(baseStatus({ mcp_tools_enabled: true, mcp_servers_configured: 2 }))
+
+    expect(wrapper.find('[data-testid="agents-active-tools"]').text()).toContain(
+      '2 connected tool servers'
+    )
   })
 })

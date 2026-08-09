@@ -3497,6 +3497,16 @@
           "description": "A dónde se envían las peticiones y cómo se traducen los nombres de modelo."
         }
       },
+      "activeTools": {
+        "title": "Ejecutándose en su nombre ahora mismo",
+        "empty": "Synaplan no ejecuta ninguna herramienta propia. Los asistentes de IA conectados solo reciben las herramientas que aporta su propio programa.",
+        "hint": "Un mensaje concreto puede omitir alguna de ellas: si un programa aporta su propia herramienta con el mismo nombre, se queda con la suya, y la búsqueda web solo se ejecuta cuando el asistente la pide.",
+        "mcpServers": "más las herramientas de 1 servidor de herramientas conectado | más las herramientas de {count} servidores de herramientas conectados",
+        "tools": {
+          "web_search": "Búsqueda web",
+          "analyze_image": "Análisis de imágenes"
+        }
+      },
       "enabled": {
         "label": "Activar la puerta de enlace",
         "description": "Mientras esté desactivada, las herramientas conectadas reciben un error claro en lugar de una respuesta."
