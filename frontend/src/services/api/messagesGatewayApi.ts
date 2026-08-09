@@ -67,14 +67,17 @@ export async function saveMessagesGatewayAliases(
   })
 }
 
+/** How the gateway answers a client's Anthropic `web_search` declaration. */
+export type WebSearchMode = 'auto' | 'synaplan' | 'passthrough' | 'off'
+
 export async function saveMessagesGatewayFlags(
   flags: Partial<{
     enabled: boolean
     allow_operator_key: boolean
     mcp_tools_enabled: boolean
-    web_search_enabled: boolean
     context_injection_enabled: boolean
     budget_notice_enabled: boolean
+    web_search_mode: WebSearchMode
   }>
 ): Promise<z.infer<typeof PutApiMessagesGatewayPutFlagsResponseSchema>> {
   return httpClient(`${BASE}/flags`, {

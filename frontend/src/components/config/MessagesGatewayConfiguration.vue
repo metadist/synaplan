@@ -175,18 +175,23 @@
         </label>
 
         <div>
-          <label class="flex items-center gap-3 text-sm txt-primary">
-            <input
-              v-model="webSearchFlag"
-              type="checkbox"
-              class="rounded border-light-border disabled:opacity-50"
-              :disabled="!status.web_search_available"
-              data-testid="checkbox-agents-web-search"
-              @change="onToggleWebSearch"
-            />
+          <label class="block text-sm font-medium txt-primary mb-1">
             {{ $t('messagesGateway.webSearchLabel') }}
           </label>
-          <p class="txt-secondary text-xs mt-1 ms-7">
+          <select
+            v-model="webSearchMode"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="select-agents-web-search"
+            @change="onChangeWebSearchMode"
+          >
+            <option value="auto">{{ $t('messagesGateway.webSearchModeAuto') }}</option>
+            <option value="synaplan">{{ $t('messagesGateway.webSearchModeSynaplan') }}</option>
+            <option value="passthrough">
+              {{ $t('messagesGateway.webSearchModePassthrough') }}
+            </option>
+            <option value="off">{{ $t('messagesGateway.webSearchModeOff') }}</option>
+          </select>
+          <p class="txt-secondary text-xs mt-1">
             {{
               status.web_search_available
                 ? $t('messagesGateway.webSearchHint')
@@ -259,6 +264,7 @@ import {
   saveMessagesGatewayKey,
   saveMessagesGatewayUpstream,
   type MessagesGatewayStatus,
+  type WebSearchMode,
 } from '@/services/api/messagesGatewayApi'
 
 const { t } = useI18n()
@@ -274,7 +280,7 @@ const savingUpstream = ref(false)
 const savingAliases = ref(false)
 const enabledFlag = ref(false)
 const allowOperatorFlag = ref(false)
-const webSearchFlag = ref(false)
+const webSearchMode = ref<WebSearchMode>('auto')
 const upstreamUrl = ref('')
 const aliasesJson = ref('{}')
 
@@ -303,7 +309,7 @@ async function load() {
     status.value = await getMessagesGatewayStatus()
     enabledFlag.value = status.value.enabled
     allowOperatorFlag.value = status.value.allow_operator_key ?? false
-    webSearchFlag.value = status.value.web_search_enabled ?? false
+    webSearchMode.value = (status.value.web_search_mode as WebSearchMode | undefined) ?? 'auto'
     upstreamUrl.value = status.value.upstream_url
     aliasesJson.value = JSON.stringify(status.value.model_aliases ?? {}, null, 2)
   } catch (err) {
@@ -379,14 +385,14 @@ async function onToggleOperatorKey() {
   }
 }
 
-async function onToggleWebSearch() {
+async function onChangeWebSearchMode() {
   try {
-    await saveMessagesGatewayFlags({ web_search_enabled: webSearchFlag.value })
+    await saveMessagesGatewayFlags({ web_search_mode: webSearchMode.value })
     success(t('messagesGateway.flagsSaved'))
     await load()
   } catch (err) {
     error((err as Error).message || t('messagesGateway.flagsError'))
-    webSearchFlag.value = status.value?.web_search_enabled ?? false
+    webSearchMode.value = (status.value?.web_search_mode as WebSearchMode | undefined) ?? 'auto'
   }
 }
 

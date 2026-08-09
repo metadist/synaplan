@@ -19,12 +19,21 @@ use Psr\Log\LoggerInterface;
  *
  * @phpstan-type GatewayTool array{name: string, description: string, input_schema: array<string, mixed>}
  * @phpstan-type DispatchEntry array{kind: string, serverId: int, tool: string, annotations: array<string, mixed>}
- * @phpstan-type CatalogSnapshot array{tools: list<GatewayTool>, dispatch: array<string, DispatchEntry>}
+ * @phpstan-type CatalogSnapshot array{tools: list<GatewayTool>, dispatch: array<string, DispatchEntry>, web_search: string}
  */
 final readonly class GatewayToolCatalog
 {
     public const KIND_MCP = 'mcp';
     public const KIND_NATIVE = 'native';
+
+    /** Synaplan executed the search itself. */
+    public const WEB_SEARCH_SYNAPLAN = 'synaplan';
+    /** The declaration was forwarded untouched for the upstream to honour. */
+    public const WEB_SEARCH_PASSTHROUGH = 'passthrough';
+    /** The declaration was dropped before reaching the upstream. */
+    public const WEB_SEARCH_OFF = 'off';
+    /** The client never asked for web search. */
+    public const WEB_SEARCH_NONE = 'none';
 
     private const MCP_CACHE_PREFIX = 'messages_gateway_mcp_catalog_';
     private const MCP_CACHE_TTL = 7200;
@@ -45,10 +54,11 @@ final readonly class GatewayToolCatalog
      */
     public function build(User $user, string $sessionKey, array $requestBody): array
     {
+        $native = $this->nativeTools($user, $requestBody);
         $tools = [];
         $dispatch = [];
 
-        foreach ([$this->mcpTools($user, $sessionKey, $requestBody), $this->nativeTools($user, $requestBody)] as $part) {
+        foreach ([$this->mcpTools($user, $sessionKey, $requestBody), $native] as $part) {
             foreach ($part['tools'] as $tool) {
                 if (isset($dispatch[$tool['name']])) {
                     continue;
@@ -58,13 +68,13 @@ final readonly class GatewayToolCatalog
             }
         }
 
-        return ['tools' => $tools, 'dispatch' => $dispatch];
+        return ['tools' => $tools, 'dispatch' => $dispatch, 'web_search' => $native['web_search']];
     }
 
     /**
-     * Client-declared tool entries the gateway takes over and must therefore
-     * not forward upstream — currently the Anthropic `web_search_*` server
-     * tool, which only api.anthropic.com could execute.
+     * Client-declared tool entries the gateway must not forward as-is: the
+     * Anthropic `web_search_*` server tool, either because Synaplan answers it
+     * itself or because it was explicitly turned off.
      *
      * @param CatalogSnapshot $snapshot
      *
@@ -72,7 +82,7 @@ final readonly class GatewayToolCatalog
      */
     public function replacedServerTools(array $snapshot): array
     {
-        return isset($snapshot['dispatch'][WebSearchTool::NAME])
+        return \in_array($snapshot['web_search'], [self::WEB_SEARCH_SYNAPLAN, self::WEB_SEARCH_OFF], true)
             ? [WebSearchTool::NAME]
             : [];
     }
@@ -99,7 +109,7 @@ final readonly class GatewayToolCatalog
         $item = $this->cache->getItem($cacheKey);
         if ($item->isHit()) {
             $cached = $item->get();
-            if (\is_array($cached) && isset($cached['tools'], $cached['dispatch'])) {
+            if (\is_array($cached) && isset($cached['tools'], $cached['dispatch'], $cached['web_search'])) {
                 /* @var CatalogSnapshot $cached */
                 return $cached;
             }
@@ -125,6 +135,13 @@ final readonly class GatewayToolCatalog
     }
 
     /**
+     * Resolve the configured web search mode against what this request and this
+     * install can actually do.
+     *
+     * `auto` only acts when the client asked for web search — injecting a tool
+     * nobody requested would change the prompt of every gateway request. The
+     * explicit `synaplan` mode is the way to offer search unconditionally.
+     *
      * @param array<string, mixed> $requestBody
      *
      * @return CatalogSnapshot
@@ -132,20 +149,43 @@ final readonly class GatewayToolCatalog
     private function nativeTools(User $user, array $requestBody): array
     {
         $snapshot = $this->empty();
+        $mode = $this->config->webSearchMode((int) $user->getId());
+        $requested = $this->hasServerWebSearchDeclaration($requestBody);
 
-        if (!$this->config->isWebSearchEnabled((int) $user->getId())) {
+        // A client shipping its own runnable tool under this name owns it —
+        // a second, identically named tool would make the model's call ambiguous.
+        if ($this->hasClientToolNamed($requestBody, WebSearchTool::NAME)) {
+            return $snapshot;
+        }
+
+        if (MessagesGatewayConfig::WEB_SEARCH_OFF === $mode) {
+            $snapshot['web_search'] = $requested ? self::WEB_SEARCH_OFF : self::WEB_SEARCH_NONE;
+
+            return $snapshot;
+        }
+
+        if (MessagesGatewayConfig::WEB_SEARCH_PASSTHROUGH === $mode) {
+            $snapshot['web_search'] = $requested ? self::WEB_SEARCH_PASSTHROUGH : self::WEB_SEARCH_NONE;
+
+            return $snapshot;
+        }
+
+        $wantSynaplanSearch = MessagesGatewayConfig::WEB_SEARCH_SYNAPLAN === $mode || $requested;
+        if (!$wantSynaplanSearch) {
+            $snapshot['web_search'] = self::WEB_SEARCH_NONE;
+
             return $snapshot;
         }
 
         if (!$this->webSearchTool->isAvailable()) {
-            $this->logger->info('GatewayToolCatalog: web search enabled but no search provider is configured');
+            // Nothing to run. Forwarding the declaration is still the best
+            // available outcome: api.anthropic.com can honour it, and any other
+            // upstream ignores a tool type it does not know.
+            $this->logger->info('GatewayToolCatalog: no search provider configured, forwarding web search to the upstream', [
+                'mode' => $mode,
+            ]);
+            $snapshot['web_search'] = $requested ? self::WEB_SEARCH_PASSTHROUGH : self::WEB_SEARCH_NONE;
 
-            return $snapshot;
-        }
-
-        // A client that ships its own tool under this name owns it — offering a
-        // second, identically named tool would make the model's call ambiguous.
-        if ($this->hasClientToolNamed($requestBody, WebSearchTool::NAME)) {
             return $snapshot;
         }
 
@@ -156,8 +196,25 @@ final readonly class GatewayToolCatalog
             'tool' => WebSearchTool::NAME,
             'annotations' => ['readOnlyHint' => true],
         ];
+        $snapshot['web_search'] = self::WEB_SEARCH_SYNAPLAN;
 
         return $snapshot;
+    }
+
+    /**
+     * Did the client ask the API side to search, Anthropic-style?
+     *
+     * @param array<string, mixed> $requestBody
+     */
+    private function hasServerWebSearchDeclaration(array $requestBody): bool
+    {
+        foreach ($this->clientTools($requestBody) as $tool) {
+            if (AnthropicServerTools::isWebSearch($tool)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -217,6 +274,6 @@ final readonly class GatewayToolCatalog
      */
     private function empty(): array
     {
-        return ['tools' => [], 'dispatch' => []];
+        return ['tools' => [], 'dispatch' => [], 'web_search' => self::WEB_SEARCH_NONE];
     }
 }

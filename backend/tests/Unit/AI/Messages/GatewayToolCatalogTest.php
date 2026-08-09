@@ -16,62 +16,88 @@ use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\NullLogger;
 
 /**
- * Which tools Synaplan offers on a Messages gateway request.
+ * How a Claude Code style `web_search` declaration is answered.
  *
- * The rules pinned here decide whether a Claude Code style client that asks for
- * web search gets a real search or an apology from the model's training data.
+ * The rules pinned here decide whether the client gets a real search, a plain
+ * passthrough that only api.anthropic.com can honour, or nothing at all — the
+ * difference between a working answer and an apology from training data.
  */
 final class GatewayToolCatalogTest extends TestCase
 {
     private const WEB_SEARCH_SERVER_TOOL = ['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5];
 
-    public function testWebSearchIsOfferedWhenEnabledAndAvailable(): void
+    public function testAutoRunsTheSearchWhenAProviderIsConfigured(): void
     {
-        $snapshot = $this->catalog(webSearchEnabled: true, webSearchAvailable: true)
+        $snapshot = $this->catalog(MessagesGatewayConfig::WEB_SEARCH_AUTO, searchConfigured: true)
             ->build($this->user(), 'session-1', ['tools' => [self::WEB_SEARCH_SERVER_TOOL]]);
 
+        self::assertSame(GatewayToolCatalog::WEB_SEARCH_SYNAPLAN, $snapshot['web_search']);
         self::assertCount(1, $snapshot['tools']);
         self::assertSame(WebSearchTool::NAME, $snapshot['tools'][0]['name']);
         self::assertSame(GatewayToolCatalog::KIND_NATIVE, $snapshot['dispatch'][WebSearchTool::NAME]['kind']);
     }
 
-    public function testWebSearchServerToolIsReportedAsReplaced(): void
+    public function testAutoFallsBackToPassthroughWithoutASearchProvider(): void
     {
-        $catalog = $this->catalog(webSearchEnabled: true, webSearchAvailable: true);
+        // No provider to run the search with, so the declaration is forwarded:
+        // api.anthropic.com can still honour it, and nothing is lost elsewhere.
+        $catalog = $this->catalog(MessagesGatewayConfig::WEB_SEARCH_AUTO, searchConfigured: false);
+        $snapshot = $catalog->build($this->user(), 'session-1', ['tools' => [self::WEB_SEARCH_SERVER_TOOL]]);
+
+        self::assertSame(GatewayToolCatalog::WEB_SEARCH_PASSTHROUGH, $snapshot['web_search']);
+        self::assertSame([], $snapshot['tools']);
+        self::assertSame([], $catalog->replacedServerTools($snapshot));
+    }
+
+    public function testAutoDoesNotOfferSearchToAClientThatNeverAskedForIt(): void
+    {
+        $snapshot = $this->catalog(MessagesGatewayConfig::WEB_SEARCH_AUTO, searchConfigured: true)
+            ->build($this->user(), 'session-1', []);
+
+        self::assertSame(GatewayToolCatalog::WEB_SEARCH_NONE, $snapshot['web_search']);
+        self::assertSame([], $snapshot['tools']);
+    }
+
+    public function testSynaplanModeOffersSearchEvenWithoutADeclaration(): void
+    {
+        $snapshot = $this->catalog(MessagesGatewayConfig::WEB_SEARCH_SYNAPLAN, searchConfigured: true)
+            ->build($this->user(), 'session-1', []);
+
+        self::assertSame(GatewayToolCatalog::WEB_SEARCH_SYNAPLAN, $snapshot['web_search']);
+        self::assertCount(1, $snapshot['tools']);
+    }
+
+    public function testPassthroughModeNeverReplacesTheDeclaration(): void
+    {
+        $catalog = $this->catalog(MessagesGatewayConfig::WEB_SEARCH_PASSTHROUGH, searchConfigured: true);
+        $snapshot = $catalog->build($this->user(), 'session-1', ['tools' => [self::WEB_SEARCH_SERVER_TOOL]]);
+
+        self::assertSame(GatewayToolCatalog::WEB_SEARCH_PASSTHROUGH, $snapshot['web_search']);
+        self::assertSame([], $snapshot['tools']);
+        self::assertSame([], $catalog->replacedServerTools($snapshot));
+    }
+
+    public function testOffModeStripsTheDeclaration(): void
+    {
+        $catalog = $this->catalog(MessagesGatewayConfig::WEB_SEARCH_OFF, searchConfigured: true);
+        $snapshot = $catalog->build($this->user(), 'session-1', ['tools' => [self::WEB_SEARCH_SERVER_TOOL]]);
+
+        self::assertSame(GatewayToolCatalog::WEB_SEARCH_OFF, $snapshot['web_search']);
+        self::assertSame([], $snapshot['tools']);
+        self::assertSame([WebSearchTool::NAME], $catalog->replacedServerTools($snapshot));
+    }
+
+    public function testSynaplanSearchReplacesTheServerToolDeclaration(): void
+    {
+        $catalog = $this->catalog(MessagesGatewayConfig::WEB_SEARCH_AUTO, searchConfigured: true);
         $snapshot = $catalog->build($this->user(), 'session-1', ['tools' => [self::WEB_SEARCH_SERVER_TOOL]]);
 
         self::assertSame([WebSearchTool::NAME], $catalog->replacedServerTools($snapshot));
     }
 
-    public function testWebSearchIsOfferedWithoutAnyClientDeclaration(): void
-    {
-        // Most clients never declare a search tool; the operator switch is what
-        // decides, so the model is offered search on a plain request too.
-        $snapshot = $this->catalog(webSearchEnabled: true, webSearchAvailable: true)
-            ->build($this->user(), 'session-1', []);
-
-        self::assertCount(1, $snapshot['tools']);
-    }
-
-    public function testWebSearchIsSkippedWhenNoSearchProviderIsConfigured(): void
-    {
-        $snapshot = $this->catalog(webSearchEnabled: true, webSearchAvailable: false)
-            ->build($this->user(), 'session-1', ['tools' => [self::WEB_SEARCH_SERVER_TOOL]]);
-
-        self::assertSame([], $snapshot['tools']);
-    }
-
-    public function testWebSearchIsSkippedWhenTheFlagIsOff(): void
-    {
-        $snapshot = $this->catalog(webSearchEnabled: false, webSearchAvailable: true)
-            ->build($this->user(), 'session-1', ['tools' => [self::WEB_SEARCH_SERVER_TOOL]]);
-
-        self::assertSame([], $snapshot['tools']);
-    }
-
     public function testClientToolOfTheSameNameWins(): void
     {
-        $snapshot = $this->catalog(webSearchEnabled: true, webSearchAvailable: true)->build(
+        $snapshot = $this->catalog(MessagesGatewayConfig::WEB_SEARCH_SYNAPLAN, searchConfigured: true)->build(
             $this->user(),
             'session-1',
             ['tools' => [[
@@ -81,17 +107,18 @@ final class GatewayToolCatalogTest extends TestCase
             ]]],
         );
 
+        self::assertSame(GatewayToolCatalog::WEB_SEARCH_NONE, $snapshot['web_search']);
         self::assertSame([], $snapshot['tools']);
     }
 
-    private function catalog(bool $webSearchEnabled, bool $webSearchAvailable): GatewayToolCatalog
+    private function catalog(string $mode, bool $searchConfigured): GatewayToolCatalog
     {
         $config = $this->createMock(MessagesGatewayConfig::class);
         $config->method('isMcpToolsEnabled')->willReturn(false);
-        $config->method('isWebSearchEnabled')->willReturn($webSearchEnabled);
+        $config->method('webSearchMode')->willReturn($mode);
 
         $webSearch = $this->createMock(WebSearchTool::class);
-        $webSearch->method('isAvailable')->willReturn($webSearchAvailable);
+        $webSearch->method('isAvailable')->willReturn($searchConfigured);
         $webSearch->method('declaration')->willReturn([
             'name' => WebSearchTool::NAME,
             'description' => 'Search the live web',

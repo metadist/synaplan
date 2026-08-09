@@ -80,22 +80,50 @@ final readonly class GatewayToolLoop
             return $requestBody;
         }
 
-        $dropWebSearch = \in_array(WebSearchTool::NAME, $replacedServerTools, true);
-
+        $requestBody = $this->stripServerTools($requestBody, $replacedServerTools);
         $clientTools = [];
         if (isset($requestBody['tools']) && \is_array($requestBody['tools'])) {
             foreach ($requestBody['tools'] as $tool) {
-                if (!\is_array($tool)) {
-                    continue;
+                if (\is_array($tool)) {
+                    $clientTools[] = $tool;
                 }
-                if ($dropWebSearch && AnthropicServerTools::isWebSearch($tool)) {
-                    continue;
-                }
-                $clientTools[] = $tool;
             }
         }
 
         $requestBody['tools'] = array_merge($snapshot['tools'], $clientTools);
+
+        return $requestBody;
+    }
+
+    /**
+     * Remove the client's server-tool declarations that Synaplan takes over, so
+     * they never reach the upstream. Also used without a loop, when web search
+     * is switched off entirely.
+     *
+     * @param array<string, mixed> $requestBody
+     * @param list<string>         $replacedServerTools
+     *
+     * @return array<string, mixed>
+     */
+    public function stripServerTools(array $requestBody, array $replacedServerTools): array
+    {
+        if ([] === $replacedServerTools
+            || !isset($requestBody['tools'])
+            || !\is_array($requestBody['tools'])
+        ) {
+            return $requestBody;
+        }
+
+        $dropWebSearch = \in_array(WebSearchTool::NAME, $replacedServerTools, true);
+        $kept = [];
+        foreach ($requestBody['tools'] as $tool) {
+            if (\is_array($tool) && $dropWebSearch && AnthropicServerTools::isWebSearch($tool)) {
+                continue;
+            }
+            $kept[] = $tool;
+        }
+
+        $requestBody['tools'] = $kept;
 
         return $requestBody;
     }

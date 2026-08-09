@@ -52,9 +52,11 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *     tool_loop: bool,
  *     tool_catalog: array{
  *         tools: list<array{name: string, description: string, input_schema: array<string, mixed>}>,
- *         dispatch: array<string, array{kind: string, serverId: int, tool: string, annotations: array<string, mixed>}>
+ *         dispatch: array<string, array{kind: string, serverId: int, tool: string, annotations: array<string, mixed>}>,
+ *         web_search: string
  *     }|null,
  *     replaced_server_tools: list<string>,
+ *     web_search: string,
  *     context_hash: string|null,
  *     debug: bool
  * }
@@ -218,8 +220,9 @@ final readonly class MessagesGateway
         $sessionKey = $this->sessionKey($sessionId, $user, $requestBody);
 
         $toolCatalog = $this->toolCatalog->build($user, $sessionKey, $requestBody);
+        $webSearch = $toolCatalog['web_search'];
         $toolLoop = [] !== $toolCatalog['tools'];
-        $replacedServerTools = $toolLoop ? $this->toolCatalog->replacedServerTools($toolCatalog) : [];
+        $replacedServerTools = $this->toolCatalog->replacedServerTools($toolCatalog);
         if ($toolLoop) {
             // Injection happens inside GatewayToolLoop so the catalog is
             // applied once per upstream call; mark body mutated so the
@@ -227,6 +230,13 @@ final readonly class MessagesGateway
             $bodyMutated = true;
         } else {
             $toolCatalog = null;
+            if ([] !== $replacedServerTools) {
+                // Web search turned off: there is no loop to run, but the
+                // declaration must still not reach the upstream.
+                $requestBody = $this->toolLoop->stripServerTools($requestBody, $replacedServerTools);
+                $bodyMutated = true;
+            }
+            $replacedServerTools = [];
         }
 
         $contextHash = null;
@@ -282,6 +292,7 @@ final readonly class MessagesGateway
             'tool_loop' => $toolLoop,
             'tool_catalog' => $toolCatalog,
             'replaced_server_tools' => $replacedServerTools,
+            'web_search' => $webSearch,
             'context_hash' => $contextHash,
             'debug' => '1' === $request->headers->get('x-synaplan-debug'),
         ];

@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\MessagesUsage;
+use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\Entity\User;
 use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
@@ -123,11 +124,28 @@ final class MessagesApiController extends AbstractController
             $response->headers->set($name, $value);
         }
 
+        $this->addWebSearchHeader($response, $prepared);
         if (!empty($prepared['debug']) && !empty($prepared['context_hash'])) {
             $response->headers->set('x-synaplan-context-hash', (string) $prepared['context_hash']);
         }
 
         return $response;
+    }
+
+    /**
+     * Tell the caller how its `web_search` declaration was handled — `synaplan`
+     * (we ran the search), `passthrough` (forwarded for the upstream to run) or
+     * `off`. Without this, a model answering "I cannot search the web" is
+     * indistinguishable from a misconfigured gateway.
+     *
+     * @param array<string, mixed> $prepared
+     */
+    private function addWebSearchHeader(Response $response, array $prepared): void
+    {
+        $mode = $prepared['web_search'] ?? null;
+        if (\is_string($mode) && '' !== $mode && GatewayToolCatalog::WEB_SEARCH_NONE !== $mode) {
+            $response->headers->set('x-synaplan-web-search', $mode);
+        }
     }
 
     #[Route('/v1/messages/count_tokens', name: 'anthropic_count_tokens', methods: ['POST'])]
@@ -232,6 +250,7 @@ final class MessagesApiController extends AbstractController
      *     tool_loop: bool,
      *     tool_catalog: array<string, mixed>|null,
      *     replaced_server_tools: list<string>,
+     *     web_search: string,
      *     context_hash: string|null,
      *     debug: bool
      * } $prepared
@@ -246,6 +265,7 @@ final class MessagesApiController extends AbstractController
         foreach ($prepared['headers'] as $name => $value) {
             $response->headers->set($name, $value);
         }
+        $this->addWebSearchHeader($response, $prepared);
         if (!empty($prepared['debug']) && !empty($prepared['context_hash'])) {
             $response->headers->set('x-synaplan-context-hash', (string) $prepared['context_hash']);
         }

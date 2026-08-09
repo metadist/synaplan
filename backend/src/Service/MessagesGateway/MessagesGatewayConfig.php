@@ -25,7 +25,7 @@ final readonly class MessagesGatewayConfig
     public const KEY_MCP_TOOLS_ENABLED = 'MCP_TOOLS_ENABLED';
     public const KEY_MCP_TOOLS_WITH_CLIENT_TOOLS = 'MCP_TOOLS_WITH_CLIENT_TOOLS';
     public const KEY_MCP_MAX_ITERATIONS = 'MCP_MAX_ITERATIONS';
-    public const KEY_WEB_SEARCH_ENABLED = 'WEB_SEARCH_ENABLED';
+    public const KEY_WEB_SEARCH_MODE = 'WEB_SEARCH_MODE';
     public const KEY_CONTEXT_INJECTION_ENABLED = 'CONTEXT_INJECTION_ENABLED';
     public const KEY_BUDGET_NOTICE_ENABLED = 'BUDGET_NOTICE_ENABLED';
     public const KEY_SESSION_SUMMARY_ENABLED = 'SESSION_SUMMARY_ENABLED';
@@ -34,12 +34,28 @@ final readonly class MessagesGatewayConfig
 
     public const DEFAULT_UPSTREAM_URL = 'https://api.anthropic.com';
 
+    /** Synaplan runs the search whenever a search provider is configured, otherwise {@see self::WEB_SEARCH_PASSTHROUGH}. */
+    public const WEB_SEARCH_AUTO = 'auto';
+    /** Always answer the client's `web_search` declaration with Synaplan's own search. */
+    public const WEB_SEARCH_SYNAPLAN = 'synaplan';
+    /** Forward the declaration untouched — only api.anthropic.com can honour it. */
+    public const WEB_SEARCH_PASSTHROUGH = 'passthrough';
+    /** Drop the declaration before it reaches the upstream. */
+    public const WEB_SEARCH_OFF = 'off';
+
+    public const WEB_SEARCH_MODES = [
+        self::WEB_SEARCH_AUTO,
+        self::WEB_SEARCH_SYNAPLAN,
+        self::WEB_SEARCH_PASSTHROUGH,
+        self::WEB_SEARCH_OFF,
+    ];
+
     private const DEFAULT_ENABLED = false;
     private const DEFAULT_ALLOW_OPERATOR_KEY = false;
     private const DEFAULT_MCP_TOOLS_ENABLED = false;
     private const DEFAULT_MCP_TOOLS_WITH_CLIENT_TOOLS = false;
     private const DEFAULT_MCP_MAX_ITERATIONS = 8;
-    private const DEFAULT_WEB_SEARCH_ENABLED = false;
+    private const DEFAULT_WEB_SEARCH_MODE = self::WEB_SEARCH_AUTO;
     private const DEFAULT_CONTEXT_INJECTION_ENABLED = false;
     private const DEFAULT_BUDGET_NOTICE_ENABLED = true;
     private const DEFAULT_SESSION_SUMMARY_ENABLED = true;
@@ -89,14 +105,30 @@ final readonly class MessagesGatewayConfig
     }
 
     /**
-     * Offer Synaplan's own web search as a server-side tool on gateway
-     * requests. Requires a configured search provider; when the client
-     * declares Anthropic's `web_search_*` server tool, Synaplan answers it
-     * instead of the upstream.
+     * How the gateway answers Anthropic's `web_search_*` server tool.
+     *
+     * Anthropic ships web search as a *server* tool: the client declares it and
+     * expects the API side to run the search. `auto` (the default) resolves that
+     * with whatever actually works — Synaplan's own search when a provider is
+     * configured, otherwise a plain passthrough that only api.anthropic.com can
+     * honour. Unknown values fall back to the default rather than disabling
+     * search, so a typo cannot silently break a working install.
+     *
+     * @return self::WEB_SEARCH_AUTO|self::WEB_SEARCH_SYNAPLAN|self::WEB_SEARCH_PASSTHROUGH|self::WEB_SEARCH_OFF
      */
-    public function isWebSearchEnabled(?int $userId): bool
+    public function webSearchMode(?int $userId): string
     {
-        return $this->resolveBool(self::KEY_WEB_SEARCH_ENABLED, $userId, self::DEFAULT_WEB_SEARCH_ENABLED);
+        $raw = strtolower(trim((string) $this->resolveString(
+            self::KEY_WEB_SEARCH_MODE,
+            $userId,
+            self::DEFAULT_WEB_SEARCH_MODE,
+        )));
+
+        if (!\in_array($raw, self::WEB_SEARCH_MODES, true)) {
+            return self::DEFAULT_WEB_SEARCH_MODE;
+        }
+
+        return $raw;
     }
 
     public function isContextInjectionEnabled(?int $userId): bool

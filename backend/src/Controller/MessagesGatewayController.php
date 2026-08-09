@@ -57,7 +57,13 @@ final class MessagesGatewayController extends AbstractController
                 new OA\Property(property: 'enabled', type: 'boolean', example: false),
                 new OA\Property(property: 'allow_operator_key', type: 'boolean', example: false),
                 new OA\Property(property: 'mcp_tools_enabled', type: 'boolean', example: false),
-                new OA\Property(property: 'web_search_enabled', type: 'boolean', example: false),
+                new OA\Property(
+                    property: 'web_search_mode',
+                    description: 'How the gateway answers Anthropic web_search declarations: auto (Synaplan search when configured, otherwise passthrough), synaplan, passthrough, or off.',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::WEB_SEARCH_MODES,
+                    example: MessagesGatewayConfig::WEB_SEARCH_AUTO,
+                ),
                 new OA\Property(property: 'web_search_available', type: 'boolean', example: false, description: 'Whether a web search provider is configured on this instance.'),
                 new OA\Property(property: 'context_injection_enabled', type: 'boolean', example: false),
                 new OA\Property(property: 'budget_notice_enabled', type: 'boolean', example: true),
@@ -137,7 +143,7 @@ final class MessagesGatewayController extends AbstractController
             'enabled' => $this->config->isEnabled($userId),
             'allow_operator_key' => $this->config->allowOperatorKey($userId),
             'mcp_tools_enabled' => $this->config->isMcpToolsEnabled($userId),
-            'web_search_enabled' => $this->config->isWebSearchEnabled($userId),
+            'web_search_mode' => $this->config->webSearchMode($userId),
             'web_search_available' => $this->webSearchTool->isAvailable(),
             'context_injection_enabled' => $this->config->isContextInjectionEnabled($userId),
             'budget_notice_enabled' => $this->config->isBudgetNoticeEnabled($userId),
@@ -419,9 +425,13 @@ final class MessagesGatewayController extends AbstractController
                 new OA\Property(property: 'enabled', type: 'boolean'),
                 new OA\Property(property: 'allow_operator_key', type: 'boolean'),
                 new OA\Property(property: 'mcp_tools_enabled', type: 'boolean'),
-                new OA\Property(property: 'web_search_enabled', type: 'boolean'),
                 new OA\Property(property: 'context_injection_enabled', type: 'boolean'),
                 new OA\Property(property: 'budget_notice_enabled', type: 'boolean'),
+                new OA\Property(
+                    property: 'web_search_mode',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::WEB_SEARCH_MODES,
+                ),
             ],
         ),
     )]
@@ -436,6 +446,11 @@ final class MessagesGatewayController extends AbstractController
                     property: 'updated',
                     type: 'object',
                     additionalProperties: new OA\AdditionalProperties(type: 'boolean'),
+                ),
+                new OA\Property(
+                    property: 'web_search_mode',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::WEB_SEARCH_MODES,
                 ),
             ],
         ),
@@ -459,7 +474,6 @@ final class MessagesGatewayController extends AbstractController
             MessagesGatewayConfig::KEY_ENABLED,
             MessagesGatewayConfig::KEY_ALLOW_OPERATOR_KEY,
             MessagesGatewayConfig::KEY_MCP_TOOLS_ENABLED,
-            MessagesGatewayConfig::KEY_WEB_SEARCH_ENABLED,
             MessagesGatewayConfig::KEY_CONTEXT_INJECTION_ENABLED,
             MessagesGatewayConfig::KEY_BUDGET_NOTICE_ENABLED,
         ];
@@ -484,11 +498,36 @@ final class MessagesGatewayController extends AbstractController
             $updated[$jsonKey] = $bool;
         }
 
+        $webSearchMode = $decoded['web_search_mode'] ?? null;
+        if (\is_string($webSearchMode)) {
+            $webSearchMode = strtolower(trim($webSearchMode));
+            if (!\in_array($webSearchMode, MessagesGatewayConfig::WEB_SEARCH_MODES, true)) {
+                return $this->json(
+                    ['error' => 'web_search_mode must be one of: '.implode(', ', MessagesGatewayConfig::WEB_SEARCH_MODES)],
+                    Response::HTTP_BAD_REQUEST,
+                );
+            }
+            $this->configRepository->setValue(
+                0,
+                MessagesGatewayConfig::CONFIG_GROUP,
+                MessagesGatewayConfig::KEY_WEB_SEARCH_MODE,
+                $webSearchMode,
+            );
+        } else {
+            $webSearchMode = null;
+        }
+
         $this->logger->warning('MessagesGateway: flags updated (audit)', [
             'acting_user_id' => $user->getId(),
             'updated' => $updated,
+            'web_search_mode' => $webSearchMode,
         ]);
 
-        return $this->json(['success' => true, 'updated' => $updated]);
+        $response = ['success' => true, 'updated' => $updated];
+        if (null !== $webSearchMode) {
+            $response['web_search_mode'] = $webSearchMode;
+        }
+
+        return $this->json($response);
     }
 }

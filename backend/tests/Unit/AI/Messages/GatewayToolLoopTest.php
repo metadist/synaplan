@@ -75,6 +75,7 @@ final class GatewayToolLoopTest extends TestCase
                     'annotations' => ['readOnlyHint' => true],
                 ],
             ],
+            'web_search' => GatewayToolCatalog::WEB_SEARCH_NONE,
         ];
 
         $calls = 0;
@@ -198,6 +199,7 @@ final class GatewayToolLoopTest extends TestCase
                     'annotations' => ['readOnlyHint' => true],
                 ],
             ],
+            'web_search' => GatewayToolCatalog::WEB_SEARCH_SYNAPLAN,
         ];
 
         $calls = 0;
@@ -309,7 +311,7 @@ final class GatewayToolLoopTest extends TestCase
             ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
             $translator,
             $user,
-            ['tools' => [], 'dispatch' => []],
+            ['tools' => [], 'dispatch' => [], 'web_search' => GatewayToolCatalog::WEB_SEARCH_NONE],
         );
 
         $this->assertSame(1, $result['iterations']);
