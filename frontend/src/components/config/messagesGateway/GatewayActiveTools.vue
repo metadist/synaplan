@@ -57,7 +57,7 @@ const isEmpty = computed(() => 0 === labelled.value.length && '' === mcpSummary.
         :data-testid="`agents-active-tool-${tool.name}`"
       >
         {{ tool.label }}
-        <code class="text-[0.65rem] txt-secondary">{{ tool.name }}</code>
+        <code class="text-[0.7rem] txt-secondary">{{ tool.name }}</code>
       </span>
       <span v-if="mcpSummary" class="text-xs txt-secondary">{{ mcpSummary }}</span>
     </div>
