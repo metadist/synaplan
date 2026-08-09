@@ -12,11 +12,16 @@ documentation for the gateway itself).
 The first release made `/v1/messages` work for plain text. Everything that is
 not plain text was reported back as broken, with three distinct symptoms:
 
-| Reported symptom | Verdict |
-| ---------------- | ------- |
-| “I cannot search the web — no access to the internet”, with both `web_search_20260209` and `web_search_20250305` | Real. The gateway had no way to serve a web search request. |
-| `HTTP 500: strlen(): Argument #1 ($string) must be of type string, array given` on an image request | Real, and a hard 500 **after** a successful completion. |
-| `Anthropic API Error: Could not process image` for a 1×1 PNG | Not ours. Anthropic rejects the image; the request reached it intact. |
+| Reported symptom | Verdict | Where it is answered |
+| ---------------- | ------- | -------------------- |
+| “I cannot search the web — no access to the internet”, with both `web_search_20260209` and `web_search_20250305` | Real. The gateway had no way to serve a web search request. | Phase 2 — Synaplan runs the search, or forwards the request when it cannot |
+| `HTTP 500: strlen(): Argument #1 ($string) must be of type string, array given` on an image request | Real, and a hard 500 **after** a successful completion. | Phase 0 |
+| `Anthropic API Error: Could not process image` for a 1×1 PNG | Half ours. Anthropic rejected the image, but Synaplan reported its `400` as a `500 internal_error`, which reads like a Synaplan bug and invites a pointless retry. | Phase 2b — the provider's status is relayed |
+| “Tools are not integrated” | Not reproducible. Client tool calling round-trips through the gateway; there was no coverage proving it, which is why it was easy to believe. | Phase 2b — end-to-end coverage |
+
+Every row now has a working path that needs no configuration. Where Synaplan
+cannot do better than the AI provider, it deliberately gets out of the way and
+passes the request straight through rather than failing.
 
 The reporter's conclusion — “Synaplan discards the tool on the way through” —
 was right about web search and wrong about ordinary tool calling. It is worth
@@ -48,8 +53,13 @@ function with no parameters, which is a malformed function declaration.
 ## 2. Design decision
 
 > A server tool is a **capability request**. Synaplan owns the server side of
-> this API, so Synaplan should satisfy it — with its own web search — instead of
-> forwarding a declaration nobody downstream can honour.
+> this API, so Synaplan should satisfy it — with its own web search — and where
+> it cannot, forward the request untouched rather than swallowing it.
+
+The second half matters as much as the first. An install with no search provider
+still has one thing it can do: hand the declaration to the AI provider, which on
+`api.anthropic.com` is exactly what the client wanted. Doing nothing is never
+the right answer.
 
 Three consequences follow, and they shape the whole implementation:
 
@@ -63,7 +73,8 @@ Three consequences follow, and they shape the whole implementation:
 3. **Replace, do not add.** When Synaplan serves the search, the original
    `web_search_*` declaration must be *removed* from the upstream request.
    Leaving it in would make Anthropic run a second, duplicate search and would
-   make every other provider reject an unknown tool type.
+   make every other provider reject an unknown tool type. When Synaplan does
+   *not* serve it, the declaration must survive byte-for-byte.
 
 ### The funnel
 
@@ -73,7 +84,7 @@ client request
   ▼
 GatewayToolCatalog          builds one session-pinned snapshot:
   ├─ MCP tools              (mcp__<server>__<tool>, if MCP_TOOLS_ENABLED)
-  └─ native tools           (web_search, if WEB_SEARCH_ENABLED + provider present)
+  └─ native tools           (web_search, per WEB_SEARCH_MODE + provider present)
   ▼
 GatewayToolLoop.injectTools  snapshot tools first (stable cache prefix),
   │                          client tools after, replaced declarations dropped
@@ -133,14 +144,42 @@ already forwarded byte-for-byte.
 - `GatewayToolLoop` (was `McpToolLoop`) — dispatches on `kind` (`mcp` /
   `native`), so both kinds run in the same loop on both the complete and the
   streaming path.
-- `MESSAGES_GATEWAY.WEB_SEARCH_ENABLED` — off by default, admin-visible under
-  **Channels → AI Agents**, disabled with an explanation when the instance has
-  no search provider configured.
+- `MESSAGES_GATEWAY.WEB_SEARCH_MODE` — admin-visible under **Channels → AI
+  Agents**, four values, and the default needs no attention:
+
+  | Mode | Behaviour |
+  | ---- | --------- |
+  | `auto` (default) | Synaplan searches when a provider is configured, otherwise forwards the declaration untouched. |
+  | `synaplan` | Always offer Synaplan's search, even unrequested. |
+  | `passthrough` | Never intervene — the plain passthrough, for orgs that want Anthropic's own search and its citations. |
+  | `off` | Strip the declaration entirely. |
+
+  An unrecognised value falls back to `auto` rather than to “no search”, so a
+  typo cannot silently break a working install.
+
+- `x-synaplan-web-search` response header — reports which of the above actually
+  happened. A model answering “I cannot search the web” is otherwise
+  indistinguishable from a misconfigured gateway, which is what made the
+  original report hard to act on.
 
 Guard rails: search is skipped when the client ships its own tool named
 `web_search` (the client owns that name), usage is metered as `WEB_SEARCH`, the
 tool result is clamped to 12 000 characters, and the existing loop bounds
 (`MCP_MAX_ITERATIONS`, 240 s wall clock, 16 tools per turn) apply unchanged.
+
+### Phase 2b — honest errors, and proof for the rest (done)
+
+`ProviderException` now carries the upstream HTTP status, and the
+OpenAI-compatible endpoint relays it with the error type OpenAI clients branch
+on (`authentication_error`, `rate_limit_error`, `invalid_request_error`) instead
+of answering `500 internal_error` for everything. A local failure with no
+upstream response is still a `500`. The Messages gateway already relayed status
+codes faithfully.
+
+Client tool calling and vision were reported as broken but turned out to work;
+what was missing was anything proving it. Both are now covered end-to-end
+(`05-tools-and-vision.sh`), so a regression shows up as a failing test rather
+than as another screenshot.
 
 ### Phase 3 — not built yet
 
@@ -157,9 +196,9 @@ Ordered by value, with the reason each one is not in this branch.
    are the obvious next entries. Each is a `declaration()` + `execute()` pair
    plus a catalog entry, no loop changes. `fetch_url` needs SSRF protection
    before it can ship, which is why it is not bundled here.
-3. **Per-user opt-in.** The flag is currently instance-wide. `MessagesGatewayConfig`
-   already resolves per-user overrides, so this is a UI and seeding question
-   rather than a backend one.
+3. **Per-user opt-in.** The mode is currently set instance-wide.
+   `MessagesGatewayConfig` already resolves per-user overrides, so this is a UI
+   and seeding question rather than a backend one.
 4. **Search result caching.** Repeated identical queries inside one session hit
    the provider every time. Cheap to add on `WebSearchTool` with the session key,
    but it changes the freshness guarantee, so it should be a conscious decision.
@@ -178,21 +217,29 @@ End-to-end against the running stack:
 php -S 127.0.0.1:8099 _devextras/testing/messages-gateway/fixture-upstream.php
 php -S 127.0.0.1:8098 _devextras/testing/messages-gateway/fixture-brave-search.php
 SYNAPLAN_API_KEY=sk_… ./_devextras/testing/messages-gateway/04-web-search.sh
+SYNAPLAN_API_KEY=sk_… ./_devextras/testing/messages-gateway/05-tools-and-vision.sh
 ```
 
-The search fixture marks its results `FIXTURE_SEARCH_HIT` and the upstream
-fixture answers `NO_WEB_SEARCH_TOOL_OFFERED` when nothing runnable was injected,
-so the suite can tell a real search result apart from a model that answered out
-of training data — which is precisely the failure being fixed.
+`04-web-search.sh` walks the whole mode matrix: default install, `passthrough`
+and `off`, asserting each time what actually left the gateway. The search
+fixture marks its results `FIXTURE_SEARCH_HIT` and the upstream fixture answers
+`NO_WEB_SEARCH_TOOL_OFFERED` when nothing runnable was injected, so the suite
+can tell a real search result apart from a model that answered out of training
+data — which is precisely the failure being fixed.
+
+`05-tools-and-vision.sh` covers the other two reports: a client tool round-trip
+(`tool_use` out, `tool_result` back in, streaming and not), image blocks
+arriving upstream byte-for-byte on both endpoints, and provider errors keeping
+their status.
 
 ## 5. Rollout
 
-Everything is backend-only plus one admin checkbox, and every new behaviour is
-off by default. Enabling it is two steps:
+Everything is backend-only plus one admin setting, and nothing has to be
+switched on: a fresh install answers a `web_search` declaration either with
+Synaplan's own search (search provider configured) or by passing it to the AI
+provider (no search provider). Configuring `BRAVE_SEARCH_API_KEY` in
+`backend/.env` is what upgrades the second case to the first, and it is the only
+step that makes web search work for non-Anthropic models.
 
-1. Configure a search provider (`BRAVE_SEARCH_API_KEY` in `backend/.env`).
-2. Turn on **Channels → AI Agents → “Let connected AI assistants search the web”**.
-
-With the flag off, requests behave exactly as they did before this branch. The
-metering and vision fixes in phases 0 and 1 are unconditional, because both are
-bug fixes with no configurable behaviour.
+The metering, vision and error-relay fixes are unconditional, because all three
+are bug fixes with no configurable behaviour.
