@@ -39,7 +39,9 @@ Same Synaplan API keys as the OpenAI-compatible API:
 
 ## Feature flags (`BCONFIG` group `MESSAGES_GATEWAY`)
 
-Defaults are **off** except budget notices and session summaries (both only take effect once the gateway itself is enabled):
+Defaults are **off** except budget notices, session summaries (both only take
+effect once the gateway itself is enabled), and `WEB_SEARCH_MODE` which defaults
+to `auto` so Claude Code web search never silently becomes “I cannot search”:
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
@@ -52,7 +54,7 @@ Defaults are **off** except budget notices and session summaries (both only take
 | `MCP_TOOLS_ENABLED` | `0` | Inject the user’s MCP catalog and run a server-side tool loop |
 | `MCP_TOOLS_WITH_CLIENT_TOOLS` | `0` | Also inject when the client already sent `tools` (off — Claude Code brings its own) |
 | `MCP_MAX_ITERATIONS` | `8` | Max LLM↔tool rounds per request (applies to every server-side tool) |
-| `WEB_SEARCH_ENABLED` | `0` | Serve Anthropic’s `web_search` server tool with Synaplan’s own search |
+| `WEB_SEARCH_MODE` | `auto` | How to answer Anthropic’s `web_search_*` server tool: `auto` (Synaplan search when a provider is configured, otherwise passthrough), `synaplan`, `passthrough`, or `off` |
 | `CONTEXT_INJECTION_ENABLED` | `0` | Append session-stable RAG/memory system block |
 
 Env fallback for local smoke tests: `MESSAGES_GATEWAY_UPSTREAM_URL` (DB value wins in production).
@@ -76,9 +78,9 @@ Anthropic has two kinds of tool entry and the gateway treats them differently:
 - **Client tools** (they carry an `input_schema`) are relayed verbatim — Claude Code’s `Bash`, `Read`, `Edit` and friends. The client keeps driving its own loop, and a turn containing even one client tool call is never executed server-side. For aliased models the translators map them to OpenAI `tool_calls` / Gemini `functionDeclarations` and back.
 - **Server tools** (a versioned `type`, no `input_schema`) are capability requests aimed at the API side. Only `api.anthropic.com` can honour them, so they are never mapped to a function declaration for another provider.
 
-With `WEB_SEARCH_ENABLED=1`, a `web_search_*` server-tool declaration is replaced by an executable `web_search` tool backed by Synaplan’s own search (`BraveSearchService`), and Synaplan runs the search in the same server-side loop as MCP tools. The client sees one continuous message; intermediate tool rounds are suppressed from the SSE stream, with keep-alive pings while a tool runs.
+Default `WEB_SEARCH_MODE=auto` replaces a `web_search_*` declaration with an executable `web_search` tool backed by Synaplan’s own search (`BraveSearchService`) when a provider is configured, and otherwise forwards the declaration untouched so `api.anthropic.com` can still honour it. Synaplan runs its own search in the same server-side loop as MCP tools; the client sees one continuous message, with intermediate tool rounds suppressed from the SSE stream and keep-alive pings while a tool runs. The applied handling is reported in the `x-synaplan-web-search` response header (`synaplan` / `passthrough` / `off`).
 
-Search is skipped when no search provider is configured, or when the client ships its own tool named `web_search`.
+Search is left alone when the client ships its own runnable tool named `web_search`. Explicit `off` drops the Anthropic declaration instead of forwarding it.
 
 ## Vision
 
