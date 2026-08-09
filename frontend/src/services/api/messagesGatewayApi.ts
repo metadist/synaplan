@@ -12,6 +12,7 @@ import {
   PutApiMessagesGatewayPutFlagsResponseSchema,
   PutApiMessagesGatewayPutKeyResponseSchema,
   PutApiMessagesGatewayPutUpstreamResponseSchema,
+  put_api_messages_gateway_put_flags_Body,
 } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
@@ -67,22 +68,18 @@ export async function saveMessagesGatewayAliases(
   })
 }
 
-/** How the gateway answers a client's Anthropic `web_search` declaration. */
-export type WebSearchMode = 'auto' | 'synaplan' | 'passthrough' | 'off'
+/** Any subset of the gateway settings; omitted ones keep their current value. */
+export type MessagesGatewaySettings = z.infer<typeof put_api_messages_gateway_put_flags_Body>
 
-/** How the gateway handles image turns for Claude Code. */
-export type VisionMode = 'auto' | 'synaplan' | 'passthrough' | 'off'
+/** How the gateway answers a client's Anthropic `web_search` declaration. */
+export type WebSearchMode = NonNullable<MessagesGatewaySettings['web_search_mode']>
+/** Which model reads an image turn that reaches the gateway. */
+export type VisionMode = NonNullable<MessagesGatewaySettings['vision_mode']>
+/** Resolution hint forwarded to upstreams that support it. */
+export type ImageDetail = NonNullable<MessagesGatewaySettings['vision_image_detail']>
 
 export async function saveMessagesGatewayFlags(
-  flags: Partial<{
-    enabled: boolean
-    allow_operator_key: boolean
-    mcp_tools_enabled: boolean
-    context_injection_enabled: boolean
-    budget_notice_enabled: boolean
-    web_search_mode: WebSearchMode
-    vision_mode: VisionMode
-  }>
+  flags: MessagesGatewaySettings
 ): Promise<z.infer<typeof PutApiMessagesGatewayPutFlagsResponseSchema>> {
   return httpClient(`${BASE}/flags`, {
     method: 'PUT',

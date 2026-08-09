@@ -204,6 +204,39 @@ what was missing was anything proving it. Both are now covered end-to-end
 (`05-tools-and-vision.sh`), so a regression shows up as a failing test rather
 than as another screenshot.
 
+### Phase 2c — every setting reachable, and image cost under control (done)
+
+Six settings that changed real gateway behaviour existed only as `BCONFIG` rows:
+MCP tools, MCP tools alongside client tools, the tool-round cap, context
+injection, budget notices and session summaries. An operator had to edit the
+database to reach any of them, so in practice the tool loop shipped off. All of
+them are now on the **Channels → AI Agents** page, grouped by what they control
+and each with an explanation of the consequence — plus the state that makes a
+setting inert (no tool server connected, no search provider, a parent switch
+off) shown next to the control rather than discovered afterwards.
+
+Image handling is now two independent layers, and the admin page presents them
+as such. `VISION_MODE` (Phase 1b) decides *which model reads* an image turn;
+`VisionPolicy` runs before it and decides *how much travels*:
+
+- `VISION_MAX_IMAGES=n` forwards only the newest `n` images and leaves a short
+  text placeholder behind for the rest, so a turn whose only block was an image
+  keeps non-empty content. Agent clients resend the whole image history on every
+  turn, so this is the difference between a bounded and an unbounded bill on a
+  long session.
+- `VISION_IMAGE_DETAIL` reaches OpenAI-compatible upstreams as
+  `image_url.detail`; `auto` omits the field entirely, which the stricter
+  OpenAI-compatible servers need.
+
+Both apply in every mode, because the cost of an image is the same whoever ends
+up reading it. The routing select refuses `synaplan` when no PIC2TEXT model is
+configured — the same guard the API enforces — and a stored mode whose provider
+has since disappeared falls back to `auto` instead of advertising a capability
+that never runs.
+
+`x-synaplan-vision: <handling>; omitted=<n>` reports both layers at once, so a
+text-only answer to a screenshot can be traced to policy rather than the model.
+
 ### Phase 3 — not built yet
 
 Ordered by value, with the reason each one is not in this branch.
@@ -233,7 +266,11 @@ Ordered by value, with the reason each one is not in this branch.
 
 Unit coverage: `WebSearchToolTest`, `GatewayToolCatalogTest`,
 `GatewayToolLoopTest`, `OpenAiMessagesTranslatorTest`,
-`GeminiMessagesTranslatorTest`, `OpenAICompatibleControllerMultimodalTest`.
+`GeminiMessagesTranslatorTest`, `OpenAICompatibleControllerMultimodalTest`,
+`AnalyzeImageToolTest`, `VisionModelResolverTest`, `MessagesGatewayVisionTest`,
+`VisionPolicyTest`, `MessagesGatewayConfigTest`,
+`MessagesGatewayControllerFlagsTest`, and the frontend
+`MessagesGatewayAdminSettings.spec.ts`.
 
 End-to-end against the running stack:
 
@@ -258,13 +295,16 @@ their status.
 
 ## 5. Rollout
 
-Everything is backend-only plus one admin setting, and nothing has to be
-switched on. Web search works out of the box for Anthropic-backed Claude Code
-sessions: default `auto` either runs Synaplan’s search or forwards the
-declaration upstream. To use Synaplan’s own search results (and to serve search
-on aliased OpenAI/Gemini routes), configure a search provider
-(`BRAVE_SEARCH_API_KEY` in `backend/.env`). Admins can force `synaplan`,
-`passthrough` or `off` under **Channels → AI Agents**.
+Nothing has to be switched on. Web search works out of the box for
+Anthropic-backed Claude Code sessions: default `auto` either runs Synaplan’s
+search or forwards the declaration upstream. To use Synaplan’s own search
+results (and to serve search on aliased OpenAI/Gemini routes), configure a
+search provider (`BRAVE_SEARCH_API_KEY` in `backend/.env`). Admins can force
+`synaplan`, `passthrough` or `off` under **Channels → AI Agents**.
+
+The image cost settings default to today’s behaviour — no cap, provider picks
+the detail — so an existing install sees no change until an admin decides
+otherwise. `VISION_MODE` keeps its own `auto` default from Phase 1b.
 
 The metering, vision and error-relay fixes are unconditional, because all three
 are bug fixes with no configurable behaviour.

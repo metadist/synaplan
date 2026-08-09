@@ -120,4 +120,63 @@ final class MessagesGatewayConfigTest extends TestCase
         $this->assertTrue($this->config->isEnabled(5));
         $this->assertFalse($this->config->isEnabled(99));
     }
+
+    public function testVisionDefaultsForwardEverything(): void
+    {
+        $this->configRepository->method('getValue')->willReturn(null);
+
+        $this->assertSame(MessagesGatewayConfig::VISION_AUTO, $this->config->visionMode(1));
+        $this->assertSame(MessagesGatewayConfig::IMAGE_DETAIL_AUTO, $this->config->visionImageDetail(1));
+        $this->assertSame(0, $this->config->visionMaxImages(1));
+    }
+
+    public function testVisionSettingsAreReadFromConfig(): void
+    {
+        $this->stubGlobalRows([
+            'VISION_MODE' => 'OFF',
+            'VISION_IMAGE_DETAIL' => ' Low ',
+            'VISION_MAX_IMAGES' => '4',
+        ]);
+
+        $this->assertSame(MessagesGatewayConfig::VISION_OFF, $this->config->visionMode(1));
+        $this->assertSame(MessagesGatewayConfig::IMAGE_DETAIL_LOW, $this->config->visionImageDetail(1));
+        $this->assertSame(4, $this->config->visionMaxImages(1));
+    }
+
+    public function testUnknownVisionValuesFallBackToDefaults(): void
+    {
+        $this->stubGlobalRows([
+            'VISION_MODE' => 'sometimes',
+            'VISION_IMAGE_DETAIL' => 'ultra',
+            'VISION_MAX_IMAGES' => 'many',
+        ]);
+
+        $this->assertSame(MessagesGatewayConfig::VISION_AUTO, $this->config->visionMode(1));
+        $this->assertSame(MessagesGatewayConfig::IMAGE_DETAIL_AUTO, $this->config->visionImageDetail(1));
+        $this->assertSame(0, $this->config->visionMaxImages(1));
+    }
+
+    public function testNumericSettingsAreClampedToTheirRange(): void
+    {
+        $this->stubGlobalRows([
+            'VISION_MAX_IMAGES' => '5000',
+            'MCP_MAX_ITERATIONS' => '999',
+        ]);
+
+        $this->assertSame(MessagesGatewayConfig::MAX_VISION_MAX_IMAGES, $this->config->visionMaxImages(1));
+        $this->assertSame(MessagesGatewayConfig::MAX_MCP_MAX_ITERATIONS, $this->config->mcpMaxIterations(1));
+    }
+
+    /**
+     * @param array<string, string> $rows setting name → stored global value
+     */
+    private function stubGlobalRows(array $rows): void
+    {
+        $this->configRepository->method('getValue')
+            ->willReturnCallback(
+                static fn (int $ownerId, string $group, string $setting): ?string => 0 === $ownerId
+                    ? ($rows[$setting] ?? null)
+                    : null,
+            );
+    }
 }

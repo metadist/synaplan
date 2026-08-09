@@ -11,6 +11,7 @@ use App\AI\Messages\MessagesModelResolver;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
+use App\AI\Messages\Vision\VisionPolicy;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ModelRepository;
@@ -44,7 +45,7 @@ final class MessagesGatewayVisionTest extends TestCase
         $result = $gateway->prepare($this->imageRequest('text-only'), $this->user());
 
         self::assertTrue($result['ok']);
-        self::assertSame(GatewayToolCatalog::VISION_SYNAPLAN, $result['vision']);
+        self::assertSame(GatewayToolCatalog::VISION_SYNAPLAN, $result['vision']['handling']);
         self::assertSame(99, $result['resolved']['model_id']);
         self::assertSame('gpt-4o', $result['request_body']['model']);
     }
@@ -67,7 +68,7 @@ final class MessagesGatewayVisionTest extends TestCase
         $result = $gateway->prepare($this->imageRequest('claude-sonnet-4-5'), $this->user());
 
         self::assertTrue($result['ok']);
-        self::assertSame(GatewayToolCatalog::VISION_PASSTHROUGH, $result['vision']);
+        self::assertSame(GatewayToolCatalog::VISION_PASSTHROUGH, $result['vision']['handling']);
         self::assertSame(42, $result['resolved']['model_id']);
     }
 
@@ -89,7 +90,7 @@ final class MessagesGatewayVisionTest extends TestCase
         $result = $gateway->prepare($this->imageRequest('text-only'), $this->user());
 
         self::assertTrue($result['ok']);
-        self::assertSame(GatewayToolCatalog::VISION_PASSTHROUGH, $result['vision']);
+        self::assertSame(GatewayToolCatalog::VISION_PASSTHROUGH, $result['vision']['handling']);
         self::assertSame(42, $result['resolved']['model_id']);
     }
 
@@ -110,7 +111,7 @@ final class MessagesGatewayVisionTest extends TestCase
         ])), $this->user());
 
         self::assertTrue($result['ok']);
-        self::assertSame(GatewayToolCatalog::VISION_NONE, $result['vision']);
+        self::assertSame(GatewayToolCatalog::VISION_NONE, $result['vision']['handling']);
     }
 
     private function gateway(
@@ -126,6 +127,8 @@ final class MessagesGatewayVisionTest extends TestCase
         $config->method('isMcpToolsEnabled')->willReturn(false);
         $config->method('isContextInjectionEnabled')->willReturn(false);
         $config->method('visionMode')->willReturn($visionMode);
+        $config->method('visionImageDetail')->willReturn(MessagesGatewayConfig::IMAGE_DETAIL_AUTO);
+        $config->method('visionMaxImages')->willReturn(0);
         $config->method('upstreamUrl')->willReturn('https://api.anthropic.com');
 
         $modelResolver = $this->createMock(MessagesModelResolver::class);
@@ -188,6 +191,7 @@ final class MessagesGatewayVisionTest extends TestCase
             $passthrough,
             $toolCatalog,
             $this->createMock(GatewayToolLoop::class),
+            new VisionPolicy($config, new NullLogger()),
             $this->createMock(MessagesContextInjector::class),
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(MessageBusInterface::class),

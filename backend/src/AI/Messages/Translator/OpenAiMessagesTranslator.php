@@ -47,7 +47,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
 
     public function complete(array $requestBody, array $context): array
     {
-        $payload = $this->toOpenAiRequest($requestBody, stream: false);
+        $payload = $this->toOpenAiRequest($requestBody, stream: false, imageDetail: $this->imageDetail($context));
         $response = $this->request($payload, $context, stream: false);
         $status = $response->getStatusCode();
         $headers = $response->getHeaders(false);
@@ -87,7 +87,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
 
     public function stream(array $requestBody, array $context, callable $emit): MessagesUsage
     {
-        $payload = $this->toOpenAiRequest($requestBody, stream: true);
+        $payload = $this->toOpenAiRequest($requestBody, stream: true, imageDetail: $this->imageDetail($context));
         $response = $this->request($payload, $context, stream: true);
         $status = $response->getStatusCode();
 
@@ -110,7 +110,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
      *
      * @return array<string, mixed>
      */
-    public function toOpenAiRequest(array $requestBody, bool $stream): array
+    public function toOpenAiRequest(array $requestBody, bool $stream, ?string $imageDetail = null): array
     {
         foreach (self::STRIP_KEYS as $key) {
             unset($requestBody[$key]);
@@ -131,7 +131,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             if (!\is_array($msg)) {
                 continue;
             }
-            foreach ($this->mapAnthropicMessage($msg) as $mapped) {
+            foreach ($this->mapAnthropicMessage($msg, $imageDetail) as $mapped) {
                 $messages[] = $mapped;
             }
         }
@@ -254,7 +254,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
      *
      * @return list<array<string, mixed>>
      */
-    private function mapAnthropicMessage(array $msg): array
+    private function mapAnthropicMessage(array $msg, ?string $imageDetail = null): array
     {
         $role = (string) ($msg['role'] ?? 'user');
         $content = $msg['content'] ?? '';
@@ -283,7 +283,14 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             } elseif ('image' === $type) {
                 $url = $this->imageBlockToUrl($block);
                 if (null !== $url) {
-                    $mediaParts[] = ['type' => 'image_url', 'image_url' => ['url' => $url]];
+                    $imageUrl = ['url' => $url];
+                    // `auto` is the provider's own default — leaving the field
+                    // out keeps the payload compatible with the stricter
+                    // OpenAI-compatible upstreams.
+                    if (null !== $imageDetail && 'auto' !== $imageDetail) {
+                        $imageUrl['detail'] = $imageDetail;
+                    }
+                    $mediaParts[] = ['type' => 'image_url', 'image_url' => $imageUrl];
                 }
             } elseif ('tool_use' === $type) {
                 $toolCalls[] = [
@@ -328,6 +335,16 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         }
 
         return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function imageDetail(array $context): ?string
+    {
+        $detail = $context['image_detail'] ?? null;
+
+        return \is_string($detail) && '' !== $detail ? $detail : null;
     }
 
     /**

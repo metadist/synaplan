@@ -4427,9 +4427,6 @@
     "saveKeyError": "API-Schlüssel konnte nicht gespeichert werden",
     "clearKeySuccess": "API-Schlüssel entfernt",
     "clearKeyError": "API-Schlüssel konnte nicht entfernt werden",
-    "adminTitle": "Admin-Einstellungen",
-    "enableLabel": "Messages-Gateway für diese Instanz aktivieren",
-    "allowOperatorKeyLabel": "Operator-Anthropic-Schlüssel als Fallback erlauben (mit Vorsicht nutzen)",
     "webSearchLabel": "Websuche für verbundene KI-Assistenten",
     "webSearchModeAuto": "Automatisch (empfohlen)",
     "webSearchModeSynaplan": "Immer die Websuche von Synaplan verwenden",
@@ -4450,12 +4447,86 @@
     "upstreamSaved": "Upstream-URL gespeichert",
     "upstreamError": "Upstream-URL konnte nicht gespeichert werden",
     "aliasesLabel": "Modell-Aliase (JSON)",
-    "aliasesHint": "Mappt Claude-Code-Modell-IDs auf Synaplan-Katalog-IDs, z. B. {\"claude-sonnet-4-6\": \"claude-sonnet-4-5-20250929\"}.",
+    "aliasesHint": "Ordnet die von Claude Code angefragten Modellnamen Modellen in Ihrem Synaplan-Katalog zu, zum Beispiel claude-sonnet-4-6 → claude-sonnet-4-5-20250929.",
     "saveAliases": "Aliase speichern",
     "aliasesSaved": "Aliase gespeichert",
     "aliasesError": "Aliase konnten nicht gespeichert werden (JSON prüfen)",
     "flagsSaved": "Einstellungen gespeichert",
     "flagsError": "Einstellungen konnten nicht gespeichert werden",
+    "settings": {
+      "title": "Gateway-Einstellungen",
+      "subtitle": "Diese Einstellungen gelten für jedes Agenten-Tool, das mit dieser Instanz verbunden ist.",
+      "disabledNotice": "Das Gateway ist derzeit aus. Die Einstellungen werden gespeichert und greifen, sobald Sie es einschalten.",
+      "sections": {
+        "access": {
+          "title": "Zugang",
+          "description": "Wer das Gateway nutzen darf und welcher API-Schlüssel die Anfragen bezahlt."
+        },
+        "tools": {
+          "title": "Werkzeugaufrufe",
+          "description": "Was verbundene KI-Assistenten außer Antworten noch dürfen: die Werkzeuge Ihres Arbeitsbereichs nutzen und im Web suchen."
+        },
+        "vision": {
+          "title": "Bilder",
+          "description": "Wie Screenshots und andere Bilder an den KI-Anbieter weitergegeben werden. Agenten-Tools schicken bei jeder Nachricht alle Bilder einer Sitzung erneut mit, deshalb wirken sich diese Einstellungen stark auf die Kosten aus."
+        },
+        "session": {
+          "title": "Kontext und Sitzung",
+          "description": "Was Synaplan einer Anfrage hinzufügt und was danach festgehalten wird."
+        },
+        "connection": {
+          "title": "Verbindung",
+          "description": "Wohin Anfragen gehen und wie Modellnamen übersetzt werden."
+        }
+      },
+      "enabled": {
+        "label": "Gateway aktivieren",
+        "description": "Solange dies aus ist, erhalten verbundene Tools eine klare Fehlermeldung statt einer Antwort."
+      },
+      "operatorKey": {
+        "label": "Instanz-Schlüssel als Rückfallebene erlauben",
+        "description": "Nutzerinnen und Nutzer ohne eigenen Anthropic-Schlüssel verwenden dann den Schlüssel dieser Instanz; die Kosten laufen gegen ihr Synaplan-Budget."
+      },
+      "mcpTools": {
+        "label": "KI-Assistenten Ihre Werkzeuge nutzen lassen",
+        "description": "Synaplan führt die Werkzeuge Ihrer verbundenen Werkzeug-Server selbst aus und gibt das Ergebnis an den Assistenten zurück.",
+        "noneConfigured": "Es ist noch kein Werkzeug-Server verbunden. Sie können einen unter Kanäle → MCP-Server hinzufügen."
+      },
+      "mcpWithClientTools": {
+        "label": "Eigene Werkzeuge auch anbieten, wenn das Agenten-Tool eigene mitbringt",
+        "description": "Claude Code bringt bereits einen vollständigen Satz Werkzeuge mit. Schalten Sie dies nur ein, wenn Ihre Werkzeuge zusätzlich angeboten werden sollen — eine sehr lange Werkzeugliste macht einen Assistenten ungenauer."
+      },
+      "toolRounds": {
+        "label": "Maximale Werkzeugrunden pro Nachricht",
+        "description": "Wie oft ein KI-Assistent ein Werkzeug nutzen und erneut nachdenken darf, bevor er antworten muss. Höhere Werte erlauben gründlicheres Arbeiten und kosten mehr."
+      },
+      "imageDetail": {
+        "label": "Bildqualität",
+        "description": "Wie genau das KI-Modell ein Bild ansehen soll. Niedrige Qualität kostet deutlich weniger und reicht meist aus, um Text von einem Screenshot zu lesen. Anbieter ohne diese Wahlmöglichkeit ignorieren die Einstellung.",
+        "optionAuto": "Anbieter entscheiden lassen (empfohlen)",
+        "optionLow": "Niedrig — am günstigsten",
+        "optionHigh": "Hoch — meiste Details"
+      },
+      "maxImages": {
+        "label": "Maximale Bilder pro Nachricht",
+        "description": "Es werden nur die neuesten Bilder gesendet, ältere durch einen Hinweis ersetzt. Das begrenzt die Kosten langer Sitzungen voller Screenshots.",
+        "unlimited": "Ohne Limit",
+        "limited": "Neueste {count}"
+      },
+      "contextInjection": {
+        "label": "Wissen aus Ihrem Arbeitsbereich ergänzen",
+        "description": "Synaplan fügt jeder Anfrage passende Informationen aus Ihrem Arbeitsbereich hinzu, damit der KI-Assistent Ihren Kontext kennt."
+      },
+      "budgetNotice": {
+        "label": "Warnen, wenn das Budget knapp wird",
+        "description": "Der KI-Assistent erhält einen kurzen Hinweis in seiner Antwort, sobald Ihr Synaplan-Budget fast aufgebraucht ist."
+      },
+      "sessionSummary": {
+        "label": "Zusammenfassung jeder Sitzung behalten",
+        "description": "Synaplan schreibt zu jeder Agenten-Sitzung eine kurze Zusammenfassung in Ihren Chat-Verlauf, damit Sie später sehen, woran gearbeitet wurde."
+      },
+      "requiresMcpTools": "Verfügbar, sobald Ihre Werkzeuge oben eingeschaltet sind."
+    },
     "loadError": "KI-Agenten-Einstellungen konnten nicht geladen werden",
     "source": {
       "user": "Ihr Schlüssel",

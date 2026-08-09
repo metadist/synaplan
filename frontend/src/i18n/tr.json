@@ -3446,9 +3446,6 @@
     "saveKeyError": "API anahtarı kaydedilemedi",
     "clearKeySuccess": "API anahtarı kaldırıldı",
     "clearKeyError": "API anahtarı kaldırılamadı",
-    "adminTitle": "Yönetici ayarları",
-    "enableLabel": "Bu örnekte Messages ağ geçidini etkinleştir",
-    "allowOperatorKeyLabel": "Operatör Anthropic anahtarına yedek olarak izin ver (dikkatli kullanın)",
     "webSearchLabel": "Bağlı AI asistanları için web araması",
     "webSearchModeAuto": "Otomatik (önerilen)",
     "webSearchModeSynaplan": "Her zaman Synaplan'ın web aramasını kullan",
@@ -3469,12 +3466,86 @@
     "upstreamSaved": "Upstream URL'si kaydedildi",
     "upstreamError": "Upstream URL'si kaydedilemedi",
     "aliasesLabel": "Model takma adları (JSON)",
-    "aliasesHint": "Claude Code model kimliklerini Synaplan katalog kimliklerine eşler, örn. {\"claude-sonnet-4-6\": \"claude-sonnet-4-5-20250929\"}.",
+    "aliasesHint": "Claude Code'un istediği model adlarını Synaplan kataloğunuzdaki modellere eşler, örneğin claude-sonnet-4-6 → claude-sonnet-4-5-20250929.",
     "saveAliases": "Takma adları kaydet",
     "aliasesSaved": "Takma adlar kaydedildi",
     "aliasesError": "Takma adlar kaydedilemedi (JSON'u kontrol edin)",
     "flagsSaved": "Ayarlar kaydedildi",
     "flagsError": "Ayarlar kaydedilemedi",
+    "settings": {
+      "title": "Ağ geçidi ayarları",
+      "subtitle": "Bu ayarlar, bu örneğe bağlı her aracı aracı için geçerlidir.",
+      "disabledNotice": "Ağ geçidi şu anda kapalı. Ayarlar kaydedilir ve açtığınız anda geçerli olur.",
+      "sections": {
+        "access": {
+          "title": "Erişim",
+          "description": "Ağ geçidini kimler kullanabilir ve istekleri hangi API anahtarı öder."
+        },
+        "tools": {
+          "title": "Araç çağrıları",
+          "description": "Bağlı AI asistanlarının yanıt vermenin dışında neler yapabileceği: çalışma alanınızın araçlarını kullanmak ve web'de arama yapmak."
+        },
+        "vision": {
+          "title": "Görseller",
+          "description": "Ekran görüntülerinin ve diğer görsellerin AI sağlayıcısına nasıl iletileceği. Aracı araçları her mesajda oturumdaki tüm görselleri yeniden gönderir, bu yüzden bu ayarlar maliyeti belirgin biçimde etkiler."
+        },
+        "session": {
+          "title": "Bağlam ve oturum",
+          "description": "Synaplan'ın bir isteğe ne eklediği ve sonrasında neyi sakladığı."
+        },
+        "connection": {
+          "title": "Bağlantı",
+          "description": "İsteklerin nereye gönderildiği ve model adlarının nasıl çevrildiği."
+        }
+      },
+      "enabled": {
+        "label": "Ağ geçidini etkinleştir",
+        "description": "Bu kapalıyken bağlı araçlar yanıt yerine açık bir hata alır."
+      },
+      "operatorKey": {
+        "label": "Yedek olarak örnek anahtarına izin ver",
+        "description": "Kendi Anthropic anahtarı olmayan kullanıcılar bu örneğin anahtarını kullanır ve maliyet Synaplan bütçelerinden düşülür."
+      },
+      "mcpTools": {
+        "label": "AI asistanlarının araçlarınızı kullanmasına izin ver",
+        "description": "Synaplan, bağlı araç sunucularınızın araçlarını kendisi çalıştırır ve sonucu asistana geri verir.",
+        "noneConfigured": "Henüz bağlı bir araç sunucusu yok. Kanallar → MCP sunucuları bölümünden ekleyebilirsiniz."
+      },
+      "mcpWithClientTools": {
+        "label": "Aracı aracının kendi araçları olsa da sizinkileri sun",
+        "description": "Claude Code zaten eksiksiz bir araç seti getirir. Bunu yalnızca kendi araçlarınız da sunulacaksa açın — çok uzun bir araç listesi asistanı daha az isabetli yapar."
+      },
+      "toolRounds": {
+        "label": "Mesaj başına en fazla araç turu",
+        "description": "Bir AI asistanının yanıt vermek zorunda kalmadan önce kaç kez araç kullanıp yeniden düşünebileceği. Yüksek değerler daha titiz çalışmaya izin verir ve daha pahalıdır."
+      },
+      "imageDetail": {
+        "label": "Görsel kalitesi",
+        "description": "AI modelinin bir görsele ne kadar ayrıntılı bakacağı. Düşük kalite belirgin biçimde daha ucuzdur ve ekran görüntüsündeki metni okumak için çoğunlukla yeterlidir. Bu seçeneği sunmayan sağlayıcılar ayarı yok sayar.",
+        "optionAuto": "Sağlayıcı karar versin (önerilir)",
+        "optionLow": "Düşük — en ucuz",
+        "optionHigh": "Yüksek — en fazla ayrıntı"
+      },
+      "maxImages": {
+        "label": "Mesaj başına en fazla görsel",
+        "description": "Yalnızca en yeni görseller gönderilir; eskiler bir notla değiştirilir. Bu, ekran görüntüsüyle dolu uzun oturumların maliyetini sınırlar.",
+        "unlimited": "Sınırsız",
+        "limited": "En yeni {count}"
+      },
+      "contextInjection": {
+        "label": "Çalışma alanınızdan bilgi ekle",
+        "description": "Synaplan her isteğe çalışma alanınızdan ilgili bilgileri ekler, böylece AI asistanı bağlamınızı bilir."
+      },
+      "budgetNotice": {
+        "label": "Bütçe azaldığında uyar",
+        "description": "Synaplan bütçeniz neredeyse tükendiğinde AI asistanı yanıtında kısa bir not alır."
+      },
+      "sessionSummary": {
+        "label": "Her oturumun özetini sakla",
+        "description": "Synaplan her aracı oturumunun kısa bir özetini sohbet geçmişinize yazar, böylece sonradan neyin üzerinde çalışıldığını görebilirsiniz."
+      },
+      "requiresMcpTools": "Yukarıda araçlarınızı açtığınızda kullanılabilir."
+    },
     "loadError": "Yapay zeka ajanları ayarları yüklenemedi",
     "source": {
       "user": "Sizin anahtarınız",

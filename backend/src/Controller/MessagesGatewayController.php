@@ -11,6 +11,7 @@ use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Repository\McpServerConfigRepository;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
 use OpenApi\Attributes as OA;
@@ -39,6 +40,7 @@ final class MessagesGatewayController extends AbstractController
         private readonly RateLimitService $rateLimitService,
         private readonly WebSearchTool $webSearchTool,
         private readonly AnalyzeImageTool $analyzeImageTool,
+        private readonly McpServerConfigRepository $mcpServers,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -59,6 +61,9 @@ final class MessagesGatewayController extends AbstractController
                 new OA\Property(property: 'enabled', type: 'boolean', example: false),
                 new OA\Property(property: 'allow_operator_key', type: 'boolean', example: false),
                 new OA\Property(property: 'mcp_tools_enabled', type: 'boolean', example: false),
+                new OA\Property(property: 'mcp_tools_with_client_tools', type: 'boolean', example: false, description: 'Whether Synaplan MCP tools are also offered when the client already sent its own tools.'),
+                new OA\Property(property: 'mcp_max_iterations', type: 'integer', example: 8, description: 'Maximum server-side tool rounds per request.'),
+                new OA\Property(property: 'mcp_servers_configured', type: 'integer', example: 0, description: 'Number of enabled MCP servers the signed-in user has.'),
                 new OA\Property(
                     property: 'web_search_mode',
                     description: 'How the gateway answers Anthropic web_search declarations: auto (Synaplan search when configured, otherwise passthrough), synaplan, passthrough, or off.',
@@ -75,8 +80,17 @@ final class MessagesGatewayController extends AbstractController
                     example: MessagesGatewayConfig::VISION_AUTO,
                 ),
                 new OA\Property(property: 'vision_available', type: 'boolean', example: true, description: 'Whether a Synaplan PIC2TEXT / catalog vision model is available.'),
+                new OA\Property(
+                    property: 'vision_image_detail',
+                    description: 'Resolution hint forwarded to upstreams that support it (OpenAI-compatible image_url.detail).',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::IMAGE_DETAILS,
+                    example: MessagesGatewayConfig::IMAGE_DETAIL_AUTO,
+                ),
+                new OA\Property(property: 'vision_max_images', type: 'integer', example: 0, description: 'Maximum image blocks forwarded per request; 0 means unlimited.'),
                 new OA\Property(property: 'context_injection_enabled', type: 'boolean', example: false),
                 new OA\Property(property: 'budget_notice_enabled', type: 'boolean', example: true),
+                new OA\Property(property: 'session_summary_enabled', type: 'boolean', example: true),
                 new OA\Property(property: 'upstream_url', type: 'string', example: 'https://api.anthropic.com'),
                 new OA\Property(
                     property: 'model_aliases',
@@ -153,12 +167,18 @@ final class MessagesGatewayController extends AbstractController
             'enabled' => $this->config->isEnabled($userId),
             'allow_operator_key' => $this->config->allowOperatorKey($userId),
             'mcp_tools_enabled' => $this->config->isMcpToolsEnabled($userId),
+            'mcp_tools_with_client_tools' => $this->config->allowMcpToolsWithClientTools($userId),
+            'mcp_max_iterations' => $this->config->mcpMaxIterations($userId),
+            'mcp_servers_configured' => \count($this->mcpServers->findEnabledByUser($userId)),
             'web_search_mode' => $this->config->webSearchMode($userId),
             'web_search_available' => $this->webSearchTool->isAvailable(),
             'vision_mode' => $this->config->visionMode($userId),
             'vision_available' => $this->analyzeImageTool->isAvailable($userId),
+            'vision_image_detail' => $this->config->visionImageDetail($userId),
+            'vision_max_images' => $this->config->visionMaxImages($userId),
             'context_injection_enabled' => $this->config->isContextInjectionEnabled($userId),
             'budget_notice_enabled' => $this->config->isBudgetNoticeEnabled($userId),
+            'session_summary_enabled' => $this->config->isSessionSummaryEnabled($userId),
             'upstream_url' => $this->config->upstreamUrl(),
             'model_aliases' => (object) $this->config->modelAliases(),
             'keys' => $keys,
@@ -432,13 +452,28 @@ final class MessagesGatewayController extends AbstractController
     )]
     #[OA\RequestBody(
         required: true,
+        description: 'Any subset of the gateway settings. Omitted settings keep their current value.',
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'enabled', type: 'boolean'),
                 new OA\Property(property: 'allow_operator_key', type: 'boolean'),
                 new OA\Property(property: 'mcp_tools_enabled', type: 'boolean'),
+                new OA\Property(property: 'mcp_tools_with_client_tools', type: 'boolean'),
                 new OA\Property(property: 'context_injection_enabled', type: 'boolean'),
                 new OA\Property(property: 'budget_notice_enabled', type: 'boolean'),
+                new OA\Property(property: 'session_summary_enabled', type: 'boolean'),
+                new OA\Property(
+                    property: 'mcp_max_iterations',
+                    type: 'integer',
+                    maximum: MessagesGatewayConfig::MAX_MCP_MAX_ITERATIONS,
+                    minimum: MessagesGatewayConfig::MIN_MCP_MAX_ITERATIONS,
+                ),
+                new OA\Property(
+                    property: 'vision_max_images',
+                    type: 'integer',
+                    maximum: MessagesGatewayConfig::MAX_VISION_MAX_IMAGES,
+                    minimum: MessagesGatewayConfig::MIN_VISION_MAX_IMAGES,
+                ),
                 new OA\Property(
                     property: 'web_search_mode',
                     type: 'string',
@@ -448,32 +483,45 @@ final class MessagesGatewayController extends AbstractController
                     property: 'vision_mode',
                     type: 'string',
                     enum: MessagesGatewayConfig::VISION_MODES,
+                ),
+                new OA\Property(
+                    property: 'vision_image_detail',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::IMAGE_DETAILS,
                 ),
             ],
         ),
     )]
     #[OA\Response(
         response: 200,
-        description: 'Flags updated',
+        description: 'Settings updated',
         content: new OA\JsonContent(
             required: ['success', 'updated'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(
                     property: 'updated',
+                    description: 'The settings this request actually changed, keyed exactly as sent.',
                     type: 'object',
-                    additionalProperties: new OA\AdditionalProperties(type: 'boolean'),
+                    additionalProperties: new OA\AdditionalProperties(
+                        oneOf: [
+                            new OA\Schema(type: 'boolean'),
+                            new OA\Schema(type: 'integer'),
+                            new OA\Schema(type: 'string'),
+                        ],
+                    ),
+                    example: ['mcp_tools_enabled' => true, 'vision_image_detail' => 'low'],
                 ),
-                new OA\Property(
-                    property: 'web_search_mode',
-                    type: 'string',
-                    enum: MessagesGatewayConfig::WEB_SEARCH_MODES,
-                ),
-                new OA\Property(
-                    property: 'vision_mode',
-                    type: 'string',
-                    enum: MessagesGatewayConfig::VISION_MODES,
-                ),
+            ],
+        ),
+    )]
+    #[OA\Response(
+        response: 400,
+        description: 'A setting carried an invalid value',
+        content: new OA\JsonContent(
+            required: ['error'],
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'vision_image_detail must be one of: auto, low, high'),
             ],
         ),
     )]
@@ -491,106 +539,146 @@ final class MessagesGatewayController extends AbstractController
         } catch (\JsonException) {
             return $this->json(['error' => 'Invalid JSON payload'], Response::HTTP_BAD_REQUEST);
         }
+        if (!\is_array($decoded)) {
+            return $this->json(['error' => 'Invalid JSON payload'], Response::HTTP_BAD_REQUEST);
+        }
 
-        $allowed = [
-            MessagesGatewayConfig::KEY_ENABLED,
-            MessagesGatewayConfig::KEY_ALLOW_OPERATOR_KEY,
-            MessagesGatewayConfig::KEY_MCP_TOOLS_ENABLED,
-            MessagesGatewayConfig::KEY_CONTEXT_INJECTION_ENABLED,
-            MessagesGatewayConfig::KEY_BUDGET_NOTICE_ENABLED,
-        ];
+        try {
+            $updated = $this->collectFlagUpdates($decoded, (int) $user->getId());
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
 
-        $updated = [];
-        foreach ($allowed as $key) {
-            $jsonKey = strtolower($key);
-            if (!\array_key_exists($jsonKey, $decoded) && !\array_key_exists($key, $decoded)) {
-                continue;
-            }
-            $value = $decoded[$jsonKey] ?? $decoded[$key];
-            $bool = filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
-            if (null === $bool) {
-                continue;
-            }
+        $response = [];
+        foreach ($updated as $key => $value) {
             $this->configRepository->setValue(
                 0,
                 MessagesGatewayConfig::CONFIG_GROUP,
                 $key,
-                $bool ? '1' : '0',
+                \is_bool($value) ? ($value ? '1' : '0') : (string) $value,
             );
-            $updated[$jsonKey] = $bool;
+            $response[strtolower($key)] = $value;
         }
 
-        $webSearchMode = $decoded['web_search_mode'] ?? null;
-        if (\is_string($webSearchMode)) {
-            $webSearchMode = strtolower(trim($webSearchMode));
-            if (!\in_array($webSearchMode, MessagesGatewayConfig::WEB_SEARCH_MODES, true)) {
-                return $this->json(
-                    ['error' => 'web_search_mode must be one of: '.implode(', ', MessagesGatewayConfig::WEB_SEARCH_MODES)],
-                    Response::HTTP_BAD_REQUEST,
-                );
-            }
-            if (
-                MessagesGatewayConfig::WEB_SEARCH_SYNAPLAN === $webSearchMode
-                && !$this->webSearchTool->isAvailable()
-            ) {
-                return $this->json(
-                    ['error' => 'web_search_mode=synaplan requires a configured web search provider on this instance'],
-                    Response::HTTP_BAD_REQUEST,
-                );
-            }
-            $this->configRepository->setValue(
-                0,
-                MessagesGatewayConfig::CONFIG_GROUP,
-                MessagesGatewayConfig::KEY_WEB_SEARCH_MODE,
-                $webSearchMode,
-            );
-        } else {
-            $webSearchMode = null;
-        }
-
-        $visionMode = $decoded['vision_mode'] ?? null;
-        if (\is_string($visionMode)) {
-            $visionMode = strtolower(trim($visionMode));
-            if (!\in_array($visionMode, MessagesGatewayConfig::VISION_MODES, true)) {
-                return $this->json(
-                    ['error' => 'vision_mode must be one of: '.implode(', ', MessagesGatewayConfig::VISION_MODES)],
-                    Response::HTTP_BAD_REQUEST,
-                );
-            }
-            if (
-                MessagesGatewayConfig::VISION_SYNAPLAN === $visionMode
-                && !$this->analyzeImageTool->isAvailable((int) $user->getId())
-            ) {
-                return $this->json(
-                    ['error' => 'vision_mode=synaplan requires a configured Synaplan vision (PIC2TEXT) model'],
-                    Response::HTTP_BAD_REQUEST,
-                );
-            }
-            $this->configRepository->setValue(
-                0,
-                MessagesGatewayConfig::CONFIG_GROUP,
-                MessagesGatewayConfig::KEY_VISION_MODE,
-                $visionMode,
-            );
-        } else {
-            $visionMode = null;
-        }
-
-        $this->logger->warning('MessagesGateway: flags updated (audit)', [
+        $this->logger->warning('MessagesGateway: settings updated (audit)', [
             'acting_user_id' => $user->getId(),
-            'updated' => $updated,
-            'web_search_mode' => $webSearchMode,
-            'vision_mode' => $visionMode,
+            'updated' => $response,
         ]);
 
-        $response = ['success' => true, 'updated' => $updated];
-        if (null !== $webSearchMode) {
-            $response['web_search_mode'] = $webSearchMode;
-        }
-        if (null !== $visionMode) {
-            $response['vision_mode'] = $visionMode;
+        return $this->json(['success' => true, 'updated' => $response]);
+    }
+
+    /**
+     * Validate the submitted subset of settings. Clients address a setting by
+     * its BCONFIG name in lower case, so one map per value kind is enough.
+     *
+     * @param array<mixed> $decoded
+     *
+     * @return array<string, bool|int|string> keyed by BCONFIG setting name
+     *
+     * @throws \InvalidArgumentException when a submitted value is out of range
+     */
+    private function collectFlagUpdates(array $decoded, int $userId): array
+    {
+        $booleans = [
+            MessagesGatewayConfig::KEY_ENABLED,
+            MessagesGatewayConfig::KEY_ALLOW_OPERATOR_KEY,
+            MessagesGatewayConfig::KEY_MCP_TOOLS_ENABLED,
+            MessagesGatewayConfig::KEY_MCP_TOOLS_WITH_CLIENT_TOOLS,
+            MessagesGatewayConfig::KEY_CONTEXT_INJECTION_ENABLED,
+            MessagesGatewayConfig::KEY_BUDGET_NOTICE_ENABLED,
+            MessagesGatewayConfig::KEY_SESSION_SUMMARY_ENABLED,
+        ];
+
+        $enums = [
+            MessagesGatewayConfig::KEY_WEB_SEARCH_MODE => MessagesGatewayConfig::WEB_SEARCH_MODES,
+            MessagesGatewayConfig::KEY_VISION_MODE => MessagesGatewayConfig::VISION_MODES,
+            MessagesGatewayConfig::KEY_VISION_IMAGE_DETAIL => MessagesGatewayConfig::IMAGE_DETAILS,
+        ];
+
+        $integers = [
+            MessagesGatewayConfig::KEY_MCP_MAX_ITERATIONS => [
+                MessagesGatewayConfig::MIN_MCP_MAX_ITERATIONS,
+                MessagesGatewayConfig::MAX_MCP_MAX_ITERATIONS,
+            ],
+            MessagesGatewayConfig::KEY_VISION_MAX_IMAGES => [
+                MessagesGatewayConfig::MIN_VISION_MAX_IMAGES,
+                MessagesGatewayConfig::MAX_VISION_MAX_IMAGES,
+            ],
+        ];
+
+        $updated = [];
+
+        foreach ($booleans as $key) {
+            $value = $this->submittedValue($decoded, $key);
+            if (null === $value) {
+                continue;
+            }
+            $bool = filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+            if (null === $bool) {
+                throw new \InvalidArgumentException(strtolower($key).' must be a boolean.');
+            }
+            $updated[$key] = $bool;
         }
 
-        return $this->json($response);
+        foreach ($enums as $key => $allowed) {
+            $value = $this->submittedValue($decoded, $key);
+            if (null === $value) {
+                continue;
+            }
+            $normalized = \is_string($value) ? strtolower(trim($value)) : '';
+            if (!\in_array($normalized, $allowed, true)) {
+                throw new \InvalidArgumentException(strtolower($key).' must be one of: '.implode(', ', $allowed));
+            }
+            $this->assertModeIsUsable($key, $normalized, $userId);
+            $updated[$key] = $normalized;
+        }
+
+        foreach ($integers as $key => [$min, $max]) {
+            $value = $this->submittedValue($decoded, $key);
+            if (null === $value) {
+                continue;
+            }
+            $int = filter_var($value, \FILTER_VALIDATE_INT);
+            if (false === $int || $int < $min || $int > $max) {
+                throw new \InvalidArgumentException(sprintf('%s must be an integer between %d and %d.', strtolower($key), $min, $max));
+            }
+            $updated[$key] = $int;
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Reject a `synaplan` mode the install cannot honour — silently accepting it
+     * would leave the admin page showing a capability that never runs.
+     *
+     * @throws \InvalidArgumentException
+     */
+    private function assertModeIsUsable(string $key, string $mode, int $userId): void
+    {
+        if (
+            MessagesGatewayConfig::KEY_WEB_SEARCH_MODE === $key
+            && MessagesGatewayConfig::WEB_SEARCH_SYNAPLAN === $mode
+            && !$this->webSearchTool->isAvailable()
+        ) {
+            throw new \InvalidArgumentException('web_search_mode=synaplan requires a configured web search provider on this instance');
+        }
+
+        if (
+            MessagesGatewayConfig::KEY_VISION_MODE === $key
+            && MessagesGatewayConfig::VISION_SYNAPLAN === $mode
+            && !$this->analyzeImageTool->isAvailable($userId)
+        ) {
+            throw new \InvalidArgumentException('vision_mode=synaplan requires a configured Synaplan vision (PIC2TEXT) model');
+        }
+    }
+
+    /**
+     * @param array<mixed> $decoded
+     */
+    private function submittedValue(array $decoded, string $key): mixed
+    {
+        return $decoded[strtolower($key)] ?? $decoded[$key] ?? null;
     }
 }
