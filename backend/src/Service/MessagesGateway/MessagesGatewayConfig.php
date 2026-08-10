@@ -27,6 +27,8 @@ final readonly class MessagesGatewayConfig
     public const KEY_MCP_MAX_ITERATIONS = 'MCP_MAX_ITERATIONS';
     public const KEY_WEB_SEARCH_MODE = 'WEB_SEARCH_MODE';
     public const KEY_VISION_MODE = 'VISION_MODE';
+    public const KEY_VISION_IMAGE_DETAIL = 'VISION_IMAGE_DETAIL';
+    public const KEY_VISION_MAX_IMAGES = 'VISION_MAX_IMAGES';
     public const KEY_CONTEXT_INJECTION_ENABLED = 'CONTEXT_INJECTION_ENABLED';
     public const KEY_BUDGET_NOTICE_ENABLED = 'BUDGET_NOTICE_ENABLED';
     public const KEY_SESSION_SUMMARY_ENABLED = 'SESSION_SUMMARY_ENABLED';
@@ -67,6 +69,24 @@ final readonly class MessagesGatewayConfig
         self::VISION_OFF,
     ];
 
+    /** Let the provider pick the resolution it reads the image at. */
+    public const IMAGE_DETAIL_AUTO = 'auto';
+    /** Cheap fixed-resolution read (fewest image tokens). */
+    public const IMAGE_DETAIL_LOW = 'low';
+    /** Full tiled read (most image tokens). */
+    public const IMAGE_DETAIL_HIGH = 'high';
+
+    public const IMAGE_DETAILS = [
+        self::IMAGE_DETAIL_AUTO,
+        self::IMAGE_DETAIL_LOW,
+        self::IMAGE_DETAIL_HIGH,
+    ];
+
+    public const MIN_MCP_MAX_ITERATIONS = 1;
+    public const MAX_MCP_MAX_ITERATIONS = 32;
+    public const MIN_VISION_MAX_IMAGES = 0;
+    public const MAX_VISION_MAX_IMAGES = 100;
+
     private const DEFAULT_ENABLED = false;
     private const DEFAULT_ALLOW_OPERATOR_KEY = false;
     private const DEFAULT_MCP_TOOLS_ENABLED = false;
@@ -74,6 +94,8 @@ final readonly class MessagesGatewayConfig
     private const DEFAULT_MCP_MAX_ITERATIONS = 8;
     private const DEFAULT_WEB_SEARCH_MODE = self::WEB_SEARCH_AUTO;
     private const DEFAULT_VISION_MODE = self::VISION_AUTO;
+    private const DEFAULT_VISION_IMAGE_DETAIL = self::IMAGE_DETAIL_AUTO;
+    private const DEFAULT_VISION_MAX_IMAGES = 0;
     private const DEFAULT_CONTEXT_INJECTION_ENABLED = false;
     private const DEFAULT_BUDGET_NOTICE_ENABLED = true;
     private const DEFAULT_SESSION_SUMMARY_ENABLED = true;
@@ -119,7 +141,10 @@ final readonly class MessagesGatewayConfig
         $raw = $this->resolveString(self::KEY_MCP_MAX_ITERATIONS, $userId, (string) self::DEFAULT_MCP_MAX_ITERATIONS);
         $n = (int) $raw;
 
-        return max(1, min(32, $n > 0 ? $n : self::DEFAULT_MCP_MAX_ITERATIONS));
+        return max(
+            self::MIN_MCP_MAX_ITERATIONS,
+            min(self::MAX_MCP_MAX_ITERATIONS, $n > 0 ? $n : self::DEFAULT_MCP_MAX_ITERATIONS),
+        );
     }
 
     /**
@@ -136,17 +161,9 @@ final readonly class MessagesGatewayConfig
      */
     public function webSearchMode(?int $userId): string
     {
-        $raw = strtolower(trim((string) $this->resolveString(
-            self::KEY_WEB_SEARCH_MODE,
-            $userId,
-            self::DEFAULT_WEB_SEARCH_MODE,
-        )));
+        $raw = $this->resolveToken(self::KEY_WEB_SEARCH_MODE, $userId, self::DEFAULT_WEB_SEARCH_MODE);
 
-        if (!\in_array($raw, self::WEB_SEARCH_MODES, true)) {
-            return self::DEFAULT_WEB_SEARCH_MODE;
-        }
-
-        return $raw;
+        return \in_array($raw, self::WEB_SEARCH_MODES, true) ? $raw : self::DEFAULT_WEB_SEARCH_MODE;
     }
 
     /**
@@ -161,17 +178,37 @@ final readonly class MessagesGatewayConfig
      */
     public function visionMode(?int $userId): string
     {
-        $raw = strtolower(trim((string) $this->resolveString(
-            self::KEY_VISION_MODE,
-            $userId,
-            self::DEFAULT_VISION_MODE,
-        )));
+        $raw = $this->resolveToken(self::KEY_VISION_MODE, $userId, self::DEFAULT_VISION_MODE);
 
-        if (!\in_array($raw, self::VISION_MODES, true)) {
-            return self::DEFAULT_VISION_MODE;
+        return \in_array($raw, self::VISION_MODES, true) ? $raw : self::DEFAULT_VISION_MODE;
+    }
+
+    /**
+     * Resolution the provider should read forwarded images at.
+     *
+     * Only routes that expose the knob apply it (OpenAI-compatible upstreams
+     * via `image_url.detail`); `auto` leaves the choice to the provider.
+     *
+     * @return self::IMAGE_DETAIL_AUTO|self::IMAGE_DETAIL_LOW|self::IMAGE_DETAIL_HIGH
+     */
+    public function visionImageDetail(?int $userId): string
+    {
+        $raw = $this->resolveToken(self::KEY_VISION_IMAGE_DETAIL, $userId, self::DEFAULT_VISION_IMAGE_DETAIL);
+
+        return \in_array($raw, self::IMAGE_DETAILS, true) ? $raw : self::DEFAULT_VISION_IMAGE_DETAIL;
+    }
+
+    /**
+     * Maximum image blocks forwarded per request; 0 means unlimited.
+     */
+    public function visionMaxImages(?int $userId): int
+    {
+        $raw = $this->resolveString(self::KEY_VISION_MAX_IMAGES, $userId, null);
+        if (null === $raw || '' === trim($raw) || !is_numeric(trim($raw))) {
+            return self::DEFAULT_VISION_MAX_IMAGES;
         }
 
-        return $raw;
+        return max(self::MIN_VISION_MAX_IMAGES, min(self::MAX_VISION_MAX_IMAGES, (int) trim($raw)));
     }
 
     public function isContextInjectionEnabled(?int $userId): bool
@@ -348,6 +385,16 @@ final readonly class MessagesGatewayConfig
         }
 
         return filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? $default;
+    }
+
+    /**
+     * Stored enum value, lowercased and trimmed. Callers match it against their
+     * own allow-list so an unknown value falls back to the code default — a typo
+     * in BCONFIG must never break a working install.
+     */
+    private function resolveToken(string $setting, ?int $userId, string $default): string
+    {
+        return strtolower(trim((string) $this->resolveString($setting, $userId, $default)));
     }
 
     private function resolveString(string $setting, ?int $userId, ?string $default): ?string

@@ -11,6 +11,7 @@ use App\AI\Messages\MessagesModelResolver;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
+use App\AI\Messages\Vision\VisionPolicy;
 use App\Entity\User;
 use App\Repository\ModelRepository;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
@@ -77,6 +78,18 @@ class MessagesGatewayByoPlanTest extends TestCase
         ]);
         $toolCatalog->method('replacedServerTools')->willReturn([]);
 
+        $visionPolicy = $this->createMock(VisionPolicy::class);
+        $visionPolicy->method('apply')->willReturnCallback(
+            static fn (array $body): array => [
+                'body' => $body,
+                'mutated' => false,
+                'mode' => MessagesGatewayConfig::VISION_AUTO,
+                'detail' => MessagesGatewayConfig::IMAGE_DETAIL_AUTO,
+                'images_forwarded' => 0,
+                'images_omitted' => 0,
+            ],
+        );
+
         $this->gateway = new MessagesGateway(
             $this->config,
             $modelResolver,
@@ -87,6 +100,7 @@ class MessagesGatewayByoPlanTest extends TestCase
             $passthrough,
             $toolCatalog,
             $this->createMock(GatewayToolLoop::class),
+            $visionPolicy,
             $this->createMock(MessagesContextInjector::class),
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(MessageBusInterface::class),

@@ -80,6 +80,32 @@ final readonly class GatewayToolCatalog
     }
 
     /**
+     * The built-in tools this install would run server-side, judged without a
+     * request in hand: current settings plus what is actually configured.
+     *
+     * This answers "what does Synaplan execute on my behalf?" for the settings
+     * page. A concrete request can still drop one of them — the client may ship
+     * a tool of the same name, and web search only runs for a turn that asks for
+     * it — so treat this as the ceiling, not a promise.
+     *
+     * @return list<string>
+     */
+    public function nativeToolNames(int $userId): array
+    {
+        $names = [];
+
+        if ($this->runsSynaplanWebSearch($userId)) {
+            $names[] = WebSearchTool::NAME;
+        }
+
+        if ($this->offersAnalyzeImage($userId)) {
+            $names[] = AnalyzeImageTool::NAME;
+        }
+
+        return $names;
+    }
+
+    /**
      * Client-declared tool entries the gateway must not forward as-is: the
      * Anthropic `web_search_*` server tool, either because Synaplan answers it
      * itself or because it was explicitly turned off.
@@ -193,7 +219,7 @@ final readonly class GatewayToolCatalog
             return;
         }
 
-        if (!$this->webSearchTool->isAvailable()) {
+        if (!$this->runsSynaplanWebSearch($userId)) {
             // No provider to run the search. Leave the Anthropic declaration on
             // the wire so api.anthropic.com can honour it. OpenAI/Gemini
             // translators drop server-tool declarations rather than forwarding
@@ -219,8 +245,7 @@ final readonly class GatewayToolCatalog
      */
     private function appendAnalyzeImage(array &$snapshot, int $userId, array $requestBody): void
     {
-        $mode = $this->config->visionMode($userId);
-        if (MessagesGatewayConfig::VISION_OFF === $mode) {
+        if (!$this->offersAnalyzeImage($userId)) {
             return;
         }
 
@@ -228,11 +253,28 @@ final readonly class GatewayToolCatalog
             return;
         }
 
-        if (!$this->analyzeImageTool->isAvailable($userId)) {
-            return;
-        }
-
         $this->addNativeTool($snapshot, $this->analyzeImageTool->declaration(), AnalyzeImageTool::NAME);
+    }
+
+    /**
+     * Synaplan answers the client's web search declaration itself: any mode that
+     * does not hand the search to the upstream, plus a provider to run it.
+     */
+    private function runsSynaplanWebSearch(int $userId): bool
+    {
+        $mode = $this->config->webSearchMode($userId);
+        $handledUpstream = [
+            MessagesGatewayConfig::WEB_SEARCH_OFF,
+            MessagesGatewayConfig::WEB_SEARCH_PASSTHROUGH,
+        ];
+
+        return !\in_array($mode, $handledUpstream, true) && $this->webSearchTool->isAvailable();
+    }
+
+    private function offersAnalyzeImage(int $userId): bool
+    {
+        return MessagesGatewayConfig::VISION_OFF !== $this->config->visionMode($userId)
+            && $this->analyzeImageTool->isAvailable($userId);
     }
 
     /**

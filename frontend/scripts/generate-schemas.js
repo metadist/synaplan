@@ -33,6 +33,8 @@ console.log('🔧 Fixing Zod v4 compatibility...')
 content = content.replace(/z\.record\(\s*\n/g, 'z.record(z.string(), \n')
 content = content.replace(/z\.record\(z\.object/g, 'z.record(z.string(), z.object')
 content = content.replace(/z\.record\((z\.[a-zA-Z]+\(\))\)/g, 'z.record(z.string(), $1)')
+// A value schema built from an OpenAPI oneOf, e.g. z.record(z.union([...]))
+content = content.replace(/z\.record\(z\.union\(/g, 'z.record(z.string(), z.union(')
 
 // Step 4: Add readable aliases
 console.log('✨ Creating readable aliases...')

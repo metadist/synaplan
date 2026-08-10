@@ -138,6 +138,47 @@ final class GatewayToolCatalogTest extends TestCase
         self::assertSame([], $snapshot['tools']);
     }
 
+    /**
+     * The settings page reads the same rules without a request in hand, so the
+     * operator is told what the gateway runs rather than what it was asked to.
+     */
+    public function testNativeToolNamesReportWhatTheInstallCanRun(): void
+    {
+        $both = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_AUTO,
+            searchConfigured: true,
+            visionMode: MessagesGatewayConfig::VISION_AUTO,
+            visionConfigured: true,
+        );
+
+        self::assertSame([WebSearchTool::NAME, AnalyzeImageTool::NAME], $both->nativeToolNames(5));
+    }
+
+    public function testNativeToolNamesDropWhatCannotRun(): void
+    {
+        // Passthrough hands the search to the upstream, and vision has no model.
+        $neither = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_PASSTHROUGH,
+            searchConfigured: true,
+            visionMode: MessagesGatewayConfig::VISION_AUTO,
+            visionConfigured: false,
+        );
+
+        self::assertSame([], $neither->nativeToolNames(5));
+    }
+
+    public function testNativeToolNamesDropSearchWithoutAProvider(): void
+    {
+        $catalog = $this->catalog(
+            MessagesGatewayConfig::WEB_SEARCH_AUTO,
+            searchConfigured: false,
+            visionMode: MessagesGatewayConfig::VISION_SYNAPLAN,
+            visionConfigured: true,
+        );
+
+        self::assertSame([AnalyzeImageTool::NAME], $catalog->nativeToolNames(5));
+    }
+
     private function catalog(
         string $mode,
         bool $searchConfigured,
