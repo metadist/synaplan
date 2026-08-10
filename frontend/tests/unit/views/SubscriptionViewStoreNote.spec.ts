@@ -126,11 +126,25 @@ describe('SubscriptionView — store note names one store only (App Review 2.3.1
     expect(note).not.toContain('App Store')
   })
 
-  it('keeps every locale free of the other platform on iOS', async () => {
-    for (const locale of ['de', 'es', 'tr'] as const) {
-      i18n.global.locale.value = locale
+  it('names the right store and only that one, in every locale', async () => {
+    // A translator could reintroduce the rejected wording in a single language,
+    // so every locale is checked on both platforms, not just the English one.
+    const expectations = {
+      ios: { present: 'App Store', absent: 'Google Play' },
+      android: { present: 'Google Play', absent: 'App Store' },
+    } as const
 
-      expect(await mountAndReadStoreNote()).not.toContain('Google Play')
+    for (const platform of ['ios', 'android'] as const) {
+      mockPlatform.mockReturnValue(platform)
+
+      for (const locale of ['de', 'en', 'es', 'tr'] as const) {
+        i18n.global.locale.value = locale
+
+        const note = await mountAndReadStoreNote()
+
+        expect(note, `${platform}/${locale}`).toContain(expectations[platform].present)
+        expect(note, `${platform}/${locale}`).not.toContain(expectations[platform].absent)
+      }
     }
   })
 })
