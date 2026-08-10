@@ -387,6 +387,26 @@ final class RealtimeTokenControllerTest extends TestCase
         $this->assertSame(403, $controller->issueWidgetToken($noOrigin, 'wdg_abc', 'sid_xyz')->getStatusCode());
     }
 
+    public function testExpiredSessionStillHonoursTheDomainAllowlist(): void
+    {
+        // Dropping the expiry gate (#1451) must not turn an expired session
+        // into an allowlist bypass — the origin check stays the outermost
+        // barrier for every session, fresh or resumed.
+        $widgetRepo = $this->createMock(WidgetRepository::class);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
+        $sessionRepo = $this->createMock(WidgetSessionRepository::class);
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession(expiresIn: -60));
+
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $widgetRepo,
+            sessionRepo: $sessionRepo,
+        );
+
+        $evilOrigin = new Request(server: ['HTTP_ORIGIN' => 'https://evil.test']);
+        $this->assertSame(403, $controller->issueWidgetToken($evilOrigin, 'wdg_abc', 'sid_xyz')->getStatusCode());
+    }
+
     public function testWidgetTokenRefusedWhenWidgetHasNoAllowedDomains(): void
     {
         $widgetRepo = $this->createMock(WidgetRepository::class);

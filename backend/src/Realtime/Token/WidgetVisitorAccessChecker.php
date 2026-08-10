@@ -64,15 +64,6 @@ final readonly class WidgetVisitorAccessChecker
             return WidgetVisitorAccess::NotFound;
         }
 
-        if ($session->isExpired()) {
-            // Not a rejection — see the class docblock. Logged at info level
-            // purely for observability of how often the widget resumes a
-            // session past its quota window via the realtime path.
-            $this->logger->info('Realtime widget token issued for expired session', [
-                'widget_id' => $widgetId,
-            ]);
-        }
-
         if (!$this->originValidator->isRequestAllowed($request, $widget->getAllowedDomains())) {
             $this->logger->warning('Realtime widget token blocked by domain allowlist', [
                 'widget_id' => $widgetId,
@@ -80,6 +71,17 @@ final readonly class WidgetVisitorAccessChecker
             ]);
 
             return WidgetVisitorAccess::OriginDenied;
+        }
+
+        if ($session->isExpired()) {
+            // Not a rejection — see the class docblock. Logged after the
+            // origin check so the message cannot claim an issuance that the
+            // allowlist then refused, and at debug level because the
+            // connection token lives 60s: an info line here would repeat
+            // every minute for every resumed visitor in production.
+            $this->logger->debug('Realtime widget token issued for expired session', [
+                'widget_id' => $widgetId,
+            ]);
         }
 
         return WidgetVisitorAccess::Granted;
