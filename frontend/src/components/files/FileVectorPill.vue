@@ -1,16 +1,20 @@
 <template>
   <!-- Nothing is shown when a file is not searchable — the absence of a pill is
        the "not searchable" state. Only searchable / processing / failed render. -->
+  <!-- `whitespace-nowrap` belongs on the label, not here: on the outer element
+       it kept the pill at its full text width, so the inner `truncate` never
+       took effect and a long folder name ran underneath the row's action
+       icons. -->
   <span
     v-if="visible"
-    class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
+    class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium min-w-0 max-w-full overflow-hidden"
     :class="variant.classes"
     :title="tooltip"
     :aria-label="label"
     data-testid="file-vector-pill"
   >
     <Icon :icon="variant.icon" class="w-3 h-3 shrink-0" :class="variant.spin && 'animate-spin'" />
-    <span class="truncate">{{ label }}</span>
+    <span class="truncate whitespace-nowrap">{{ label }}</span>
   </span>
 </template>
 

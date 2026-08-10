@@ -93,26 +93,34 @@
               :group-key="file.group_key ?? null"
             />
           </div>
-          <div class="flex items-center gap-1 mt-1.5">
+          <!--
+            Delete is meant to sit in the same spot on every card, but the
+            download button could not shrink below its label (German
+            "Herunterladen"), so on a narrow two-column tile it pushed the icon
+            buttons out of place — by a different amount depending on which of
+            the optional ones the file has. Now the label yields and the icons
+            hold their size, which keeps the trailing edge fixed.
+          -->
+          <div class="flex items-center gap-1 mt-1.5 min-w-0">
             <button
-              class="flex-1 px-2 py-1 rounded-md bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-[11px] font-medium flex items-center justify-center gap-1"
+              class="flex-1 min-w-0 px-2 py-1 rounded-md bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-[11px] font-medium flex items-center justify-center gap-1"
               :title="$t('files.generated.download')"
               :data-testid="`btn-generated-download-${file.id}`"
               @click="download(file)"
             >
-              <ArrowDownTrayIcon class="w-3.5 h-3.5" />
-              {{ $t('files.generated.download') }}
+              <ArrowDownTrayIcon class="w-3.5 h-3.5 shrink-0" />
+              <span class="truncate">{{ $t('files.generated.download') }}</span>
             </button>
             <button
               v-if="file.chat_id"
-              class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
+              class="shrink-0 px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
               :title="$t('files.generated.openInChat')"
               :data-testid="`btn-generated-open-${file.id}`"
               @click="openInChat(file)"
             >
               <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
             </button>
-            <div v-if="!file.is_vectorized" class="relative">
+            <div v-if="!file.is_vectorized" class="relative shrink-0">
               <button
                 class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:text-[var(--brand)] transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
                 :title="$t('files.indexPromptAction')"
@@ -177,7 +185,7 @@
               </Transition>
             </div>
             <button
-              class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 text-red-400/70 hover:text-red-500 hover:bg-red-500/10 transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
+              class="shrink-0 px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 text-red-400/70 hover:text-red-500 hover:bg-red-500/10 transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
               :title="$t('files.delete')"
               :disabled="isDeleting(file.id)"
               :data-testid="`btn-generated-delete-${file.id}`"

@@ -79,9 +79,9 @@
           <p class="text-sm font-medium txt-primary truncate" :title="file.filename">
             {{ file.display_name || file.original_name || file.filename }}
           </p>
-          <div class="flex items-center gap-2 mt-1 min-w-0 flex-wrap">
+          <div class="flex items-center gap-2 mt-1 min-w-0 flex-wrap overflow-hidden">
             <FileSourceBadge v-if="file.source" :source="file.source" />
-            <span class="text-[11px] txt-secondary">{{ provenance(file) }}</span>
+            <span class="text-[11px] txt-secondary truncate">{{ provenance(file) }}</span>
             <FileVectorPill
               :state="file.vector_state ?? (file.is_vectorized ? 'vectorized' : 'pending')"
               :chunk-count="file.chunk_count ?? file.chunks ?? 0"

@@ -27,6 +27,17 @@
         @touchstart.passive="onTouchStart"
         @touchend="onTouchEnd"
       >
+        <!--
+          Opaque band behind the OS status bar. The WebView runs edge-to-edge
+          (viewport-fit=cover, iOS contentInset: 'never') and the chat
+          deliberately scrolls its messages up behind the notch, which left them
+          colliding with the clock and battery. The band sits inside the content
+          layer, so it slides and clips with it when the drawer opens, and it
+          collapses to nothing wherever the inset is 0 — desktop, browser tabs,
+          Android without a cutout.
+        -->
+        <div class="v2-status-bar-band" aria-hidden="true" data-testid="section-status-bar-band" />
+
         <main
           class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
           data-testid="section-primary-content"
@@ -348,6 +359,25 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
+.v2-content-layer {
+  /* Containing block for the status-bar band, at both breakpoints. */
+  position: relative;
+}
+
+.v2-status-bar-band {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: env(safe-area-inset-top, 0px);
+  /* Same token the content layer paints itself with, so there is no seam in
+     either theme or in the V2 design, which redefines the token. */
+  background: var(--bg-app);
+  /* Below the floating header buttons (z-40), above the scrolling page. */
+  z-index: 30;
+  /* Purely decorative: the tap-to-top band and keyboard dismissal must keep
+     seeing the page underneath. */
+  pointer-events: none;
+}
+
 .v2-drawer-toggle,
 .v2-login-cta,
 .v2-incognito-toggle {
@@ -374,7 +404,6 @@ onBeforeUnmount(() => {
   }
 
   .v2-content-layer {
-    position: relative;
     z-index: 10;
     /* Opaque so the drawer underneath is fully hidden while closed. */
     background: var(--bg-app);

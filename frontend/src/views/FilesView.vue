@@ -818,7 +818,7 @@
                       <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
                         {{ displayName(file) }}
                       </p>
-                      <div class="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap">
+                      <div class="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap overflow-hidden">
                         <FileVectorPill
                           :state="vectorStateOf(file)"
                           :chunk-count="file.chunk_count ?? file.chunks ?? 0"
@@ -956,7 +956,7 @@
                             <span class="text-sm txt-primary truncate" :title="file.filename">{{
                               displayName(file)
                             }}</span>
-                            <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                            <div class="flex items-center gap-2 min-w-0 flex-wrap overflow-hidden">
                               <FileSourceBadge v-if="file.source" :source="file.source" />
                               <FileVectorPill
                                 :state="vectorStateOf(file)"
@@ -1223,7 +1223,7 @@
                     <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
                       {{ displayName(file) }}
                     </p>
-                    <div class="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap">
+                    <div class="flex items-center gap-1.5 mt-1 min-w-0 flex-wrap overflow-hidden">
                       <FileVectorPill
                         :state="vectorStateOf(file)"
                         :chunk-count="file.chunk_count ?? file.chunks ?? 0"
@@ -1355,7 +1355,7 @@
                           <span class="text-sm txt-primary truncate" :title="file.filename">{{
                             displayName(file)
                           }}</span>
-                          <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                          <div class="flex items-center gap-2 min-w-0 flex-wrap overflow-hidden">
                             <FileSourceBadge v-if="file.source" :source="file.source" />
                             <FileVectorPill
                               :state="vectorStateOf(file)"

@@ -1,11 +1,13 @@
 <template>
+  <!-- Same as FileVectorPill: nowrap on the outer element defeats the inner
+       truncate, so the badge could grow past its column. -->
   <span
-    class="inline-flex items-center gap-1 text-[11px] txt-secondary whitespace-nowrap"
+    class="inline-flex items-center gap-1 text-[11px] txt-secondary min-w-0 max-w-full overflow-hidden"
     :title="t('files.help.source')"
     data-testid="file-source-badge"
   >
     <Icon :icon="icon" class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-    <span class="truncate">{{ label }}</span>
+    <span class="truncate whitespace-nowrap">{{ label }}</span>
   </span>
 </template>
 
