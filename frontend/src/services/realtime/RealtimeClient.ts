@@ -17,6 +17,7 @@
 import {
   Centrifuge,
   UnauthorizedError,
+  disconnectedCodes,
   type PublicationContext,
   type SubscriptionErrorContext,
 } from 'centrifuge'
@@ -149,13 +150,20 @@ export class RealtimeClient {
     this.centrifuge.on('connecting', () => this.setState('connecting'))
     this.centrifuge.on('connected', () => this.setState('connected'))
     this.centrifuge.on('disconnected', (ctx) => {
-      // Centrifuge emits disconnected for both transient and terminal cases
-      // — `ctx.code` < 3500 is a normal close.
       if (this.destroyed) {
         this.setState('disconnected')
-      } else {
-        this.setState('reconnecting', `disconnect:${ctx?.code ?? 'unknown'}`)
+        return
       }
+      // `getToken()` throwing UnauthorizedError (see fetchConnectionToken())
+      // makes centrifuge-js disconnect with code `unauthorized` and give up
+      // reconnecting on its own — surface that as the terminal 'error' state
+      // rather than 'reconnecting' so callers (e.g. ChatWidget) can tell a
+      // permanently-refused visitor token apart from a transient drop (#1451).
+      if (ctx?.code === disconnectedCodes.unauthorized) {
+        this.setState('error', `disconnect:${ctx.code}`)
+        return
+      }
+      this.setState('reconnecting', `disconnect:${ctx?.code ?? 'unknown'}`)
     })
     this.centrifuge.on('error', (ctx) => {
       this.setState('error', ctx?.error?.message ?? 'unknown error')
@@ -169,12 +177,25 @@ export class RealtimeClient {
       const result = await fetchOperatorConnectionToken()
       return result.token
     }
-    const result = await fetchVisitorConnectionToken(
-      this.options.identity.widgetId,
-      this.options.identity.sessionId,
-      this.options.identity.apiBaseUrl
-    )
-    return result.token
+    try {
+      const result = await fetchVisitorConnectionToken(
+        this.options.identity.widgetId,
+        this.options.identity.sessionId,
+        this.options.identity.apiBaseUrl
+      )
+      return result.token
+    } catch (err) {
+      // A genuinely unknown (widgetId, sessionId) pair or a disallowed
+      // origin can never be fixed by retrying with the same identity —
+      // centrifuge-js would otherwise hammer this endpoint on every
+      // reconnect attempt forever. Same reasoning as the subscription-token
+      // path below (#1381); this closes the analogous gap for the
+      // connection token itself (#1451).
+      if (err instanceof ApiError && [401, 403, 404].includes(err.status)) {
+        throw new UnauthorizedError(err.message)
+      }
+      throw err
+    }
   }
 
   /** Open the WS upgrade if not already open. */

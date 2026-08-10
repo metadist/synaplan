@@ -17,9 +17,21 @@ use Symfony\Component\HttpFoundation\Request;
  * Checks, in order:
  *
  *   1. the widget exists,
- *   2. the session exists for that widget and is not expired,
+ *   2. the session exists for that widget,
  *   3. the request originates from a host on the widget's domain
  *      allowlist (same semantics as the widget chat endpoints).
+ *
+ * Deliberately NOT a gate: session expiry. {@see WidgetSession::isExpired()}
+ * only reflects the 24h *quota* window — the chat endpoints
+ * ({@see \App\Service\WidgetSessionService::getOrCreateSession()}) and
+ * history ({@see \App\Controller\WidgetPublicController::history()}) both
+ * treat an expired-but-existing session as resumable, and the subscribe-side
+ * {@see \App\Realtime\Authorizer\WidgetSessionAccessGuard} never checked
+ * expiry to begin with. Gating the connection token on expiry while every
+ * other consumer of the same session ignores it just breaks realtime for a
+ * resumed session (#1451) without adding real protection — a probe that
+ * already knows a valid (widgetId, sessionId) pair could ride along on the
+ * chat endpoints anyway.
  *
  * Detailed failure reasons are logged here; callers only see the coarse
  * {@see WidgetVisitorAccess} outcome, which keeps the HTTP responses
@@ -42,15 +54,23 @@ final readonly class WidgetVisitorAccessChecker
             ? $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId)
             : null;
 
-        if (null === $widget || null === $session || $session->isExpired()) {
+        if (null === $widget || null === $session) {
             $this->logger->info('Realtime widget token refused', [
                 'widget_id' => $widgetId,
                 'widget_found' => null !== $widget,
                 'session_found' => null !== $session,
-                'session_expired' => null !== $session && $session->isExpired(),
             ]);
 
             return WidgetVisitorAccess::NotFound;
+        }
+
+        if ($session->isExpired()) {
+            // Not a rejection — see the class docblock. Logged at info level
+            // purely for observability of how often the widget resumes a
+            // session past its quota window via the realtime path.
+            $this->logger->info('Realtime widget token issued for expired session', [
+                'widget_id' => $widgetId,
+            ]);
         }
 
         if (!$this->originValidator->isRequestAllowed($request, $widget->getAllowedDomains())) {
