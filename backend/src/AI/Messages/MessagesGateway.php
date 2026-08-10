@@ -7,6 +7,7 @@ namespace App\AI\Messages;
 use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
+use App\AI\Messages\Tools\WebFetchPolicy;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\AI\Messages\Vision\VisionPolicy;
 use App\Entity\Model;
@@ -63,6 +64,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *     }|null,
  *     replaced_server_tools: list<string>,
  *     web_search: string,
+ *     web_fetch: string,
  *     vision: array{
  *         handling: string,
  *         mode: string,
@@ -109,6 +111,7 @@ final readonly class MessagesGateway
         private AnthropicPassthroughTranslator $anthropicPassthrough,
         private GatewayToolCatalog $toolCatalog,
         private GatewayToolLoop $toolLoop,
+        private WebFetchPolicy $webFetchPolicy,
         private VisionPolicy $visionPolicy,
         private MessagesContextInjector $contextInjector,
         private CacheItemPoolInterface $cache,
@@ -252,6 +255,19 @@ final readonly class MessagesGateway
             $bodyMutated = true;
         }
 
+        // web_fetch is Anthropic-only: inject / keep the server tool on Anthropic
+        // routes, strip it elsewhere. Synaplan never executes the fetch itself.
+        $webFetch = $this->webFetchPolicy->apply(
+            $requestBody,
+            $resolved['provider'],
+            $this->config->webFetchMode($user->getId()),
+            $request->headers->get('anthropic-beta'),
+        );
+        $requestBody = $webFetch['body'];
+        if ($webFetch['mutated']) {
+            $bodyMutated = true;
+        }
+
         $sessionId = $request->headers->get('x-claude-code-session-id');
         $sessionKey = $this->sessionKey($sessionId, $user, $requestBody);
 
@@ -299,7 +315,7 @@ final readonly class MessagesGateway
             'api_key' => $credential['key'],
             'upstream_url' => $this->config->upstreamUrl(),
             'anthropic_version' => $request->headers->get('anthropic-version'),
-            'anthropic_beta' => $request->headers->get('anthropic-beta'),
+            'anthropic_beta' => $webFetch['anthropic_beta'],
             'x_fixture' => $request->headers->get('x-fixture'),
             'raw_body' => $bodyMutated ? null : $rawBody,
             'image_detail' => $imagePolicy['detail'],
@@ -330,6 +346,7 @@ final readonly class MessagesGateway
             'tool_catalog' => $toolCatalog,
             'replaced_server_tools' => $replacedServerTools,
             'web_search' => $webSearch,
+            'web_fetch' => $webFetch['handling'],
             'vision' => [
                 'handling' => $visionHandling,
                 'mode' => $imagePolicy['mode'],

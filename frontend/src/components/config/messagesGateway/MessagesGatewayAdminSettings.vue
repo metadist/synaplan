@@ -46,6 +46,7 @@ const form = ref<GatewayForm>({
   mcp_tools_with_client_tools: false,
   mcp_max_iterations: 8,
   web_search_mode: 'auto',
+  web_fetch_mode: 'auto',
   vision_mode: 'auto',
   vision_image_detail: 'auto',
   vision_max_images: 0,
@@ -77,6 +78,7 @@ function syncFromStatus() {
       status.web_search_mode ?? 'auto',
       Boolean(status.web_search_available)
     ),
+    web_fetch_mode: status.web_fetch_mode ?? 'auto',
     vision_mode: usableMode(status.vision_mode ?? 'auto', Boolean(status.vision_available)),
     vision_image_detail: status.vision_image_detail ?? 'auto',
     vision_max_images: status.vision_max_images ?? 0,

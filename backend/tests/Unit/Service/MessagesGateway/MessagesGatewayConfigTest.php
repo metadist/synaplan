@@ -37,6 +37,7 @@ final class MessagesGatewayConfigTest extends TestCase
         $this->assertFalse($this->config->allowOperatorKey(1));
         $this->assertTrue($this->config->isBudgetNoticeEnabled(1));
         $this->assertSame(MessagesGatewayConfig::WEB_SEARCH_AUTO, $this->config->webSearchMode(1));
+        $this->assertSame(MessagesGatewayConfig::WEB_FETCH_AUTO, $this->config->webFetchMode(1));
         $this->assertSame(MessagesGatewayConfig::VISION_AUTO, $this->config->visionMode(1));
         $this->assertSame(MessagesGatewayConfig::DEFAULT_UPSTREAM_URL, $this->config->upstreamUrl());
         $this->assertSame([], $this->config->modelAliases());

@@ -10,6 +10,7 @@ use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\MessagesModelResolver;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
+use App\AI\Messages\Tools\WebFetchPolicy;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\AI\Messages\Vision\VisionPolicy;
 use App\Entity\User;
@@ -45,6 +46,7 @@ class MessagesGatewayByoPlanTest extends TestCase
         $this->config->method('isMcpToolsEnabled')->willReturn(false);
         $this->config->method('isContextInjectionEnabled')->willReturn(false);
         $this->config->method('visionMode')->willReturn(MessagesGatewayConfig::VISION_AUTO);
+        $this->config->method('webFetchMode')->willReturn(MessagesGatewayConfig::WEB_FETCH_OFF);
         $this->config->method('upstreamUrl')->willReturn('https://api.anthropic.com');
 
         $modelResolver = $this->createMock(MessagesModelResolver::class);
@@ -100,6 +102,7 @@ class MessagesGatewayByoPlanTest extends TestCase
             $passthrough,
             $toolCatalog,
             $this->createMock(GatewayToolLoop::class),
+            new WebFetchPolicy(),
             $visionPolicy,
             $this->createMock(MessagesContextInjector::class),
             $this->createMock(CacheItemPoolInterface::class),
