@@ -4493,9 +4493,6 @@
     "saveKeyError": "Could not save API key",
     "clearKeySuccess": "API key removed",
     "clearKeyError": "Could not remove API key",
-    "adminTitle": "Admin settings",
-    "enableLabel": "Enable Messages gateway for this instance",
-    "allowOperatorKeyLabel": "Allow operator Anthropic key as fallback (use with care)",
     "webSearchLabel": "Web search for connected AI assistants",
     "webSearchModeAuto": "Automatic (recommended)",
     "webSearchModeSynaplan": "Always use Synaplan's web search",
@@ -4516,12 +4513,96 @@
     "upstreamSaved": "Upstream URL saved",
     "upstreamError": "Could not save upstream URL",
     "aliasesLabel": "Model aliases (JSON)",
-    "aliasesHint": "Map Claude Code model IDs to Synaplan catalog IDs, e.g. {\"claude-sonnet-4-6\": \"claude-sonnet-4-5-20250929\"}.",
+    "aliasesHint": "Map the model names Claude Code asks for to models in your Synaplan catalog, for example claude-sonnet-4-6 → claude-sonnet-4-5-20250929.",
     "saveAliases": "Save aliases",
     "aliasesSaved": "Aliases saved",
     "aliasesError": "Could not save aliases (check JSON)",
     "flagsSaved": "Settings saved",
     "flagsError": "Could not save settings",
+    "settings": {
+      "title": "Gateway settings",
+      "subtitle": "These settings apply to every agent tool connected to this instance.",
+      "disabledNotice": "The gateway is off right now. Settings are saved and take effect as soon as you turn it on.",
+      "sections": {
+        "access": {
+          "title": "Access",
+          "description": "Who can use the gateway, and which API key pays for the requests."
+        },
+        "tools": {
+          "title": "Tool calling",
+          "description": "What connected AI assistants may do besides answering: use the tools of your workspace and search the web."
+        },
+        "vision": {
+          "title": "Images",
+          "description": "How screenshots and other images are passed on to the AI provider. Agent tools resend every image of a session with each message, so these settings have a large effect on cost."
+        },
+        "session": {
+          "title": "Context and session",
+          "description": "What Synaplan adds to a request, and what it keeps afterwards."
+        },
+        "connection": {
+          "title": "Connection",
+          "description": "Where requests are sent and how model names are translated."
+        }
+      },
+      "activeTools": {
+        "title": "Running on your behalf right now",
+        "empty": "Synaplan runs no tools of its own. Connected AI assistants only get the tools their own program brings along.",
+        "hint": "A single message can still skip one of these: a program that brings its own tool of the same name keeps it, and web search only runs when the assistant asks for it.",
+        "mcpServers": "plus the tools of 1 connected tool server | plus the tools of {count} connected tool servers",
+        "tools": {
+          "web_search": "Web search",
+          "analyze_image": "Image analysis"
+        }
+      },
+      "enabled": {
+        "label": "Enable the gateway",
+        "description": "While this is off, connected tools get a clear error instead of an answer."
+      },
+      "operatorKey": {
+        "label": "Allow the instance key as fallback",
+        "description": "Users without their own Anthropic key then use the key of this instance, and the cost counts against their Synaplan budget."
+      },
+      "mcpTools": {
+        "label": "Let AI assistants use your tools",
+        "description": "Synaplan runs the tools of your connected tool servers itself and passes the result back to the assistant.",
+        "noneConfigured": "No tool server is connected yet. You can add one under Channels → MCP servers."
+      },
+      "mcpWithClientTools": {
+        "label": "Offer your tools even when the agent tool brings its own",
+        "description": "Claude Code already ships a full set of tools. Turn this on only if your own tools should be offered on top — a very long tool list makes an assistant less precise."
+      },
+      "toolRounds": {
+        "label": "Maximum tool rounds per message",
+        "description": "How often an AI assistant may use a tool and think again before it has to answer. Higher values allow more thorough work and cost more."
+      },
+      "imageDetail": {
+        "label": "Image quality",
+        "description": "How closely the AI model should look at an image. Low quality costs noticeably less and is usually enough to read text off a screenshot. Providers that do not offer this choice ignore it.",
+        "optionAuto": "Let the provider decide (recommended)",
+        "optionLow": "Low — cheapest",
+        "optionHigh": "High — most detail"
+      },
+      "maxImages": {
+        "label": "Maximum images per message",
+        "description": "Only the newest images are sent; older ones are replaced with a note. This caps the cost of long sessions full of screenshots.",
+        "unlimited": "No limit",
+        "limited": "Newest {count}"
+      },
+      "contextInjection": {
+        "label": "Add knowledge from your workspace",
+        "description": "Synaplan adds matching information from your workspace to each request, so the AI assistant knows your context."
+      },
+      "budgetNotice": {
+        "label": "Warn when the budget runs low",
+        "description": "The AI assistant receives a short note in its answer once your Synaplan budget is nearly used up."
+      },
+      "sessionSummary": {
+        "label": "Keep a summary of each session",
+        "description": "Synaplan writes a short summary of every agent session to your chat history, so you can see later what was worked on."
+      },
+      "requiresMcpTools": "Available once your tools are switched on above."
+    },
     "loadError": "Could not load AI Agents settings",
     "source": {
       "user": "Your key",

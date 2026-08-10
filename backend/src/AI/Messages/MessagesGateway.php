@@ -8,6 +8,7 @@ use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
+use App\AI\Messages\Vision\VisionPolicy;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Message\SummarizeApiSessionCommand;
@@ -27,7 +28,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * credential resolve, optional body mutation, translator dispatch, metering.
  *
  * The server-side tool loop (MCP tools plus Synaplan's built-in web search) and
- * context injection are gated by config flags (default off).
+ * context injection are gated by config flags (default off). Image blocks pass
+ * through {@see VisionPolicy} first, which enforces the operator's vision
+ * settings and resolves the image detail the translators forward.
  *
  * @phpstan-type GatewaySuccess array{
  *     ok: true,
@@ -60,7 +63,13 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *     }|null,
  *     replaced_server_tools: list<string>,
  *     web_search: string,
- *     vision: string,
+ *     vision: array{
+ *         handling: string,
+ *         mode: string,
+ *         detail: string,
+ *         images_forwarded: int,
+ *         images_omitted: int
+ *     },
  *     context_hash: string|null,
  *     debug: bool
  * }
@@ -100,6 +109,7 @@ final readonly class MessagesGateway
         private AnthropicPassthroughTranslator $anthropicPassthrough,
         private GatewayToolCatalog $toolCatalog,
         private GatewayToolLoop $toolLoop,
+        private VisionPolicy $visionPolicy,
         private MessagesContextInjector $contextInjector,
         private CacheItemPoolInterface $cache,
         private MessageBusInterface $messageBus,
@@ -165,7 +175,16 @@ final readonly class MessagesGateway
 
         $requestBody = $decoded;
         $bodyMutated = false;
-        $visionRewrite = $this->maybeRewriteForVision($user, $resolved, $decoded);
+
+        // Transport policy first (image cap, detail hint), so the routing
+        // decision below sees the images that actually reach the upstream.
+        $imagePolicy = $this->visionPolicy->apply($requestBody, $user->getId());
+        $requestBody = $imagePolicy['body'];
+        if ($imagePolicy['mutated']) {
+            $bodyMutated = true;
+        }
+
+        $visionRewrite = $this->maybeRewriteForVision($user, $resolved, $requestBody);
         $resolved = $visionRewrite['resolved'];
         $visionHandling = $visionRewrite['vision'];
         if ($visionRewrite['mutated']) {
@@ -283,6 +302,7 @@ final readonly class MessagesGateway
             'anthropic_beta' => $request->headers->get('anthropic-beta'),
             'x_fixture' => $request->headers->get('x-fixture'),
             'raw_body' => $bodyMutated ? null : $rawBody,
+            'image_detail' => $imagePolicy['detail'],
         ];
 
         $headers = array_merge(
@@ -310,7 +330,13 @@ final readonly class MessagesGateway
             'tool_catalog' => $toolCatalog,
             'replaced_server_tools' => $replacedServerTools,
             'web_search' => $webSearch,
-            'vision' => $visionHandling,
+            'vision' => [
+                'handling' => $visionHandling,
+                'mode' => $imagePolicy['mode'],
+                'detail' => $imagePolicy['detail'],
+                'images_forwarded' => $imagePolicy['images_forwarded'],
+                'images_omitted' => $imagePolicy['images_omitted'],
+            ],
             'context_hash' => $contextHash,
             'debug' => '1' === $request->headers->get('x-synaplan-debug'),
         ];

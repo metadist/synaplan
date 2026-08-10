@@ -56,8 +56,17 @@ search or vision:
 | `MCP_TOOLS_WITH_CLIENT_TOOLS` | `0` | Also inject when the client already sent `tools` (off — Claude Code brings its own) |
 | `MCP_MAX_ITERATIONS` | `8` | Max LLM↔tool rounds per request (applies to every server-side tool) |
 | `WEB_SEARCH_MODE` | `auto` | How to answer Anthropic’s `web_search_*` server tool — `auto`, `synaplan`, `passthrough` or `off` (see [Web search](#web-search)) |
-| `VISION_MODE` | `auto` | How to handle image turns: `auto` (Synaplan PIC2TEXT when the resolved model lacks vision, otherwise passthrough), `synaplan`, `passthrough`, or `off` |
+| `VISION_MODE` | `auto` | Which model reads an image turn: `auto` (Synaplan PIC2TEXT when the resolved model lacks vision, otherwise passthrough), `synaplan`, `passthrough`, or `off` (see [Vision](#vision)) |
+| `VISION_IMAGE_DETAIL` | `auto` | Resolution hint for upstreams that expose one — `auto`, `low` or `high` |
+| `VISION_MAX_IMAGES` | `0` | Max image blocks forwarded per request, newest kept; `0` means unlimited |
 | `CONTEXT_INJECTION_ENABLED` | `0` | Append session-stable RAG/memory system block |
+
+Every one of these is editable in the UI under **Channels → AI Agents** (admins
+only), grouped by what it controls: access, tool calling, images, context and
+session, connection. Because several of them read `auto`, the tool calling
+section also lists what the gateway actually runs server-side right now
+(`server_tools` in the status response) — a mode is policy, that list is the
+outcome.
 
 Env fallback for local smoke tests: `MESSAGES_GATEWAY_UPSTREAM_URL` (DB value wins in production).
 
@@ -103,14 +112,25 @@ Every response to a request that declared web search carries `x-synaplan-web-sea
 
 Image blocks are forwarded on every route: unchanged on the Anthropic passthrough, as `image_url` (data URI or URL) for OpenAI, and as `inlineData` / `fileData` for Gemini.
 
-Default `VISION_MODE=auto` also mixes in Synaplan’s own vision models:
+Two independent layers decide what an image turn costs and who reads it.
+
+**`VISION_MODE` — which model reads the images.** Default `auto` mixes in Synaplan’s own vision models:
 
 - If the resolved chat model already has `vision`, images stay on the wire (Anthropic keeps its eyes).
 - If it does not, Synaplan rewrites the turn onto the user’s PIC2TEXT / catalog vision model when that model’s provider is Anthropic, OpenAI, or Google — same fallback order as normal chat.
 - If Synaplan has no usable vision model, images are still forwarded upstream (`x-synaplan-vision: passthrough`).
 - When Synaplan vision is available, the gateway also offers an `analyze_image` tool (OCR/describe via PIC2TEXT) in the same server-side tool loop as `web_search`. Explicit `off` skips both the rewrite and the tool.
 
-Applied handling is reported in the `x-synaplan-vision` response header (`synaplan` / `passthrough`).
+**`VisionPolicy` — how many images travel and at which resolution.** It runs before the mode is applied, so the routing decision sees the images that actually reach the upstream. Agent clients resend every image of a session on every turn, so this is the cost side:
+
+| Setting | Effect |
+| ------- | ------ |
+| `VISION_MAX_IMAGES=n` | Only the newest `n` images are forwarded; older ones are replaced with a short text placeholder. A turn whose only block was an image keeps non-empty content, so the request still succeeds. `0` means unlimited. |
+| `VISION_IMAGE_DETAIL` | Forwarded as `image_url.detail` on OpenAI-compatible routes. `auto` omits the field and leaves the choice to the provider; Anthropic and Gemini have no equivalent and ignore the setting. |
+
+Images inside `tool_result` blocks (screenshot tools) count and are rewritten the same way.
+
+Applied handling is reported in the `x-synaplan-vision` response header: `synaplan` or `passthrough`, with an `; omitted=<n>` suffix when the cap dropped images. A text-only answer to a screenshot can therefore be traced to policy rather than to the model.
 
 ## Errors
 

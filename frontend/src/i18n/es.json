@@ -3445,9 +3445,6 @@
     "saveKeyError": "No se pudo guardar la clave API",
     "clearKeySuccess": "Clave API eliminada",
     "clearKeyError": "No se pudo eliminar la clave API",
-    "adminTitle": "Ajustes de administrador",
-    "enableLabel": "Activar la puerta de enlace Messages en esta instancia",
-    "allowOperatorKeyLabel": "Permitir la clave Anthropic del operador como respaldo (úselo con cuidado)",
     "webSearchLabel": "Búsqueda web para los asistentes de IA conectados",
     "webSearchModeAuto": "Automático (recomendado)",
     "webSearchModeSynaplan": "Usar siempre la búsqueda web de Synaplan",
@@ -3468,12 +3465,96 @@
     "upstreamSaved": "URL upstream guardada",
     "upstreamError": "No se pudo guardar la URL upstream",
     "aliasesLabel": "Alias de modelo (JSON)",
-    "aliasesHint": "Asigna IDs de modelo de Claude Code a IDs del catálogo Synaplan, p. ej. {\"claude-sonnet-4-6\": \"claude-sonnet-4-5-20250929\"}.",
+    "aliasesHint": "Asigna los nombres de modelo que pide Claude Code a modelos de su catálogo de Synaplan, por ejemplo claude-sonnet-4-6 → claude-sonnet-4-5-20250929.",
     "saveAliases": "Guardar alias",
     "aliasesSaved": "Alias guardados",
     "aliasesError": "No se pudieron guardar los alias (revise el JSON)",
     "flagsSaved": "Ajustes guardados",
     "flagsError": "No se pudieron guardar los ajustes",
+    "settings": {
+      "title": "Ajustes de la puerta de enlace",
+      "subtitle": "Estos ajustes se aplican a todas las herramientas de agente conectadas a esta instancia.",
+      "disabledNotice": "La puerta de enlace está desactivada. Los ajustes se guardan y se aplican en cuanto la active.",
+      "sections": {
+        "access": {
+          "title": "Acceso",
+          "description": "Quién puede usar la puerta de enlace y qué clave de API paga las peticiones."
+        },
+        "tools": {
+          "title": "Llamadas a herramientas",
+          "description": "Qué pueden hacer los asistentes de IA conectados además de responder: usar las herramientas de su espacio de trabajo y buscar en la web."
+        },
+        "vision": {
+          "title": "Imágenes",
+          "description": "Cómo se envían las capturas de pantalla y otras imágenes al proveedor de IA. Las herramientas de agente reenvían todas las imágenes de una sesión con cada mensaje, así que estos ajustes influyen mucho en el coste."
+        },
+        "session": {
+          "title": "Contexto y sesión",
+          "description": "Qué añade Synaplan a una petición y qué conserva después."
+        },
+        "connection": {
+          "title": "Conexión",
+          "description": "A dónde se envían las peticiones y cómo se traducen los nombres de modelo."
+        }
+      },
+      "activeTools": {
+        "title": "Ejecutándose en su nombre ahora mismo",
+        "empty": "Synaplan no ejecuta ninguna herramienta propia. Los asistentes de IA conectados solo reciben las herramientas que aporta su propio programa.",
+        "hint": "Un mensaje concreto puede omitir alguna de ellas: si un programa aporta su propia herramienta con el mismo nombre, se queda con la suya, y la búsqueda web solo se ejecuta cuando el asistente la pide.",
+        "mcpServers": "más las herramientas de 1 servidor de herramientas conectado | más las herramientas de {count} servidores de herramientas conectados",
+        "tools": {
+          "web_search": "Búsqueda web",
+          "analyze_image": "Análisis de imágenes"
+        }
+      },
+      "enabled": {
+        "label": "Activar la puerta de enlace",
+        "description": "Mientras esté desactivada, las herramientas conectadas reciben un error claro en lugar de una respuesta."
+      },
+      "operatorKey": {
+        "label": "Permitir la clave de la instancia como respaldo",
+        "description": "Quienes no tengan su propia clave de Anthropic usarán la clave de esta instancia, y el coste se descuenta de su presupuesto de Synaplan."
+      },
+      "mcpTools": {
+        "label": "Permitir que los asistentes de IA usen sus herramientas",
+        "description": "Synaplan ejecuta las herramientas de sus servidores conectados y devuelve el resultado al asistente.",
+        "noneConfigured": "Aún no hay ningún servidor de herramientas conectado. Puede añadir uno en Canales → Servidores MCP."
+      },
+      "mcpWithClientTools": {
+        "label": "Ofrecer sus herramientas aunque la herramienta de agente traiga las suyas",
+        "description": "Claude Code ya incluye un conjunto completo de herramientas. Active esto solo si sus herramientas deben ofrecerse además — una lista muy larga hace que el asistente sea menos preciso."
+      },
+      "toolRounds": {
+        "label": "Máximo de rondas de herramientas por mensaje",
+        "description": "Cuántas veces puede un asistente de IA usar una herramienta y volver a pensar antes de tener que responder. Valores más altos permiten un trabajo más minucioso y cuestan más."
+      },
+      "imageDetail": {
+        "label": "Calidad de imagen",
+        "description": "Con cuánto detalle debe mirar el modelo de IA una imagen. La calidad baja cuesta bastante menos y suele bastar para leer texto de una captura. Los proveedores que no ofrecen esta opción la ignoran.",
+        "optionAuto": "Que decida el proveedor (recomendado)",
+        "optionLow": "Baja — la más económica",
+        "optionHigh": "Alta — máximo detalle"
+      },
+      "maxImages": {
+        "label": "Máximo de imágenes por mensaje",
+        "description": "Solo se envían las imágenes más recientes; las anteriores se sustituyen por una nota. Así se limita el coste de sesiones largas llenas de capturas.",
+        "unlimited": "Sin límite",
+        "limited": "Las {count} más recientes"
+      },
+      "contextInjection": {
+        "label": "Añadir conocimiento de su espacio de trabajo",
+        "description": "Synaplan añade a cada petición la información pertinente de su espacio de trabajo para que el asistente de IA conozca su contexto."
+      },
+      "budgetNotice": {
+        "label": "Avisar cuando el presupuesto se agote",
+        "description": "El asistente de IA recibe una nota breve en su respuesta cuando su presupuesto de Synaplan está casi agotado."
+      },
+      "sessionSummary": {
+        "label": "Conservar un resumen de cada sesión",
+        "description": "Synaplan escribe un resumen breve de cada sesión de agente en su historial de chat para que después pueda ver en qué se trabajó."
+      },
+      "requiresMcpTools": "Disponible cuando active sus herramientas arriba."
+    },
     "loadError": "No se pudieron cargar los ajustes de Agentes de IA",
     "source": {
       "user": "Su clave",

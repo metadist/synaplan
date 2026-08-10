@@ -72,6 +72,37 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertSame('What is on this page?', $content[0]['text']);
         $this->assertSame('data:image/png;base64,iVBORw0KGgo=', $content[1]['image_url']['url']);
         $this->assertSame('https://example.test/page.png', $content[2]['image_url']['url']);
+        $this->assertArrayNotHasKey('detail', $content[1]['image_url']);
+    }
+
+    public function testConfiguredImageDetailReachesTheUpstream(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        $payload = $t->toOpenAiRequest([
+            'model' => 'gpt-4o',
+            'max_tokens' => 64,
+            'messages' => [['role' => 'user', 'content' => [
+                ['type' => 'image', 'source' => ['type' => 'url', 'url' => 'https://example.test/page.png']],
+            ]]],
+        ], stream: false, imageDetail: 'low');
+
+        $this->assertSame('low', $payload['messages'][0]['content'][0]['image_url']['detail']);
+    }
+
+    public function testAutoImageDetailIsLeftToTheProvider(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        $payload = $t->toOpenAiRequest([
+            'model' => 'gpt-4o',
+            'max_tokens' => 64,
+            'messages' => [['role' => 'user', 'content' => [
+                ['type' => 'image', 'source' => ['type' => 'url', 'url' => 'https://example.test/page.png']],
+            ]]],
+        ], stream: false, imageDetail: 'auto');
+
+        $this->assertArrayNotHasKey('detail', $payload['messages'][0]['content'][0]['image_url']);
     }
 
     public function testTextOnlyTurnsStayPlainStrings(): void

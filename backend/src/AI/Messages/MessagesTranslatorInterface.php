@@ -28,6 +28,7 @@ interface MessagesTranslatorInterface
      *     anthropic_beta?: string|null,
      *     x_fixture?: string|null,
      *     raw_body?: string|null,
+     *     image_detail?: string|null,
      *     parsed_events?: bool
      * } $context
      *
@@ -48,6 +49,7 @@ interface MessagesTranslatorInterface
      *     anthropic_beta?: string|null,
      *     x_fixture?: string|null,
      *     raw_body?: string|null,
+     *     image_detail?: string|null,
      *     parsed_events?: bool
      * } $context
      * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
