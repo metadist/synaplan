@@ -431,7 +431,9 @@ final readonly class FileProcessor
         ];
 
         foreach ($candidates as $path) {
-            if (is_file($path)) {
+            // NFS-aware: plain is_file() misses files just written on another
+            // web node until the attribute cache expires (actimeo≈1s).
+            if (FileHelper::fileExistsNfs($path)) {
                 return $path;
             }
         }
