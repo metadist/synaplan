@@ -31,7 +31,11 @@ const labelled = computed(() =>
 
 const mcpSummary = computed(() =>
   props.mcpEnabled && props.mcpServers > 0
-    ? t('messagesGateway.settings.activeTools.mcpServers', props.mcpServers)
+    ? t(
+        'messagesGateway.settings.activeTools.mcpServers',
+        { count: props.mcpServers },
+        props.mcpServers
+      )
     : ''
 )
 
