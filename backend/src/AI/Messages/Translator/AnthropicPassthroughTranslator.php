@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Messages\Translator;
 
+use App\AI\Messages\AnthropicJsonSchemaNormalizer;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use Psr\Log\LoggerInterface;
@@ -16,7 +17,9 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * Raw-body fast path: when context['raw_body'] is set and the body was not
  * mutated, the exact request bytes are forwarded (beta fields, attribution
  * block, cache_control markers stay byte-identical). Otherwise the decoded
- * $requestBody is re-encoded with JSON_THROW_ON_ERROR.
+ * $requestBody is re-encoded with JSON_THROW_ON_ERROR after
+ * {@see AnthropicJsonSchemaNormalizer} restores empty schema objects that PHP
+ * would otherwise emit as JSON arrays.
  *
  * Streaming emits raw SSE byte chunks via $emit(string) while teeing them
  * to extract usage from message_start / message_delta events.
@@ -29,6 +32,7 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
+        private AnthropicJsonSchemaNormalizer $schemaNormalizer,
     ) {
     }
 
@@ -130,7 +134,7 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
 
         $body = $context['raw_body'] ?? null;
         if (null === $body || '' === $body) {
-            $payload = $requestBody;
+            $payload = $this->schemaNormalizer->normalizeRequestBody($requestBody);
             $payload['stream'] = $stream;
             $body = json_encode($payload, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE);
         } elseif ($stream) {
@@ -140,6 +144,7 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
             $decoded = json_decode($body, true);
             if (\is_array($decoded) && true !== ($decoded['stream'] ?? false)) {
                 $decoded['stream'] = true;
+                $decoded = $this->schemaNormalizer->normalizeRequestBody($decoded);
                 $body = json_encode($decoded, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE);
             }
         }
