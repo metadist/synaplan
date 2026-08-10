@@ -30,6 +30,7 @@ final readonly class MessagesGatewayConfigSeeder
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_MCP_TOOLS_WITH_CLIENT_TOOLS, 'value' => '0'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_MCP_MAX_ITERATIONS, 'value' => '8'],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_WEB_SEARCH_MODE, 'value' => MessagesGatewayConfig::WEB_SEARCH_AUTO],
+            ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_WEB_FETCH_MODE, 'value' => MessagesGatewayConfig::WEB_FETCH_AUTO],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_VISION_MODE, 'value' => MessagesGatewayConfig::VISION_AUTO],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_VISION_IMAGE_DETAIL, 'value' => MessagesGatewayConfig::IMAGE_DETAIL_AUTO],
             ['ownerId' => 0, 'group' => MessagesGatewayConfig::CONFIG_GROUP, 'setting' => MessagesGatewayConfig::KEY_VISION_MAX_IMAGES, 'value' => '0'],

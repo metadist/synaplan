@@ -26,7 +26,9 @@ final readonly class MessagesGatewayConfig
     public const KEY_MCP_TOOLS_WITH_CLIENT_TOOLS = 'MCP_TOOLS_WITH_CLIENT_TOOLS';
     public const KEY_MCP_MAX_ITERATIONS = 'MCP_MAX_ITERATIONS';
     public const KEY_WEB_SEARCH_MODE = 'WEB_SEARCH_MODE';
+    public const KEY_WEB_FETCH_MODE = 'WEB_FETCH_MODE';
     public const KEY_VISION_MODE = 'VISION_MODE';
+
     public const KEY_VISION_IMAGE_DETAIL = 'VISION_IMAGE_DETAIL';
     public const KEY_VISION_MAX_IMAGES = 'VISION_MAX_IMAGES';
     public const KEY_CONTEXT_INJECTION_ENABLED = 'CONTEXT_INJECTION_ENABLED';
@@ -51,6 +53,22 @@ final readonly class MessagesGatewayConfig
         self::WEB_SEARCH_SYNAPLAN,
         self::WEB_SEARCH_PASSTHROUGH,
         self::WEB_SEARCH_OFF,
+    ];
+
+    /**
+     * Offer Anthropic's `web_fetch_*` server tool on Anthropic routes (inject if
+     * the client omitted it). Synaplan never executes the fetch itself.
+     */
+    public const WEB_FETCH_AUTO = 'auto';
+    /** Same as {@see self::WEB_FETCH_AUTO} — explicit "leave it to Anthropic" label. */
+    public const WEB_FETCH_PASSTHROUGH = 'passthrough';
+    /** Drop `web_fetch_*` declarations; do not inject. */
+    public const WEB_FETCH_OFF = 'off';
+
+    public const WEB_FETCH_MODES = [
+        self::WEB_FETCH_AUTO,
+        self::WEB_FETCH_PASSTHROUGH,
+        self::WEB_FETCH_OFF,
     ];
 
     /** Synaplan vision when the resolved model cannot see images (or always, in synaplan mode); else funnel. */
@@ -93,7 +111,9 @@ final readonly class MessagesGatewayConfig
     private const DEFAULT_MCP_TOOLS_WITH_CLIENT_TOOLS = false;
     private const DEFAULT_MCP_MAX_ITERATIONS = 8;
     private const DEFAULT_WEB_SEARCH_MODE = self::WEB_SEARCH_AUTO;
+    private const DEFAULT_WEB_FETCH_MODE = self::WEB_FETCH_AUTO;
     private const DEFAULT_VISION_MODE = self::VISION_AUTO;
+
     private const DEFAULT_VISION_IMAGE_DETAIL = self::IMAGE_DETAIL_AUTO;
     private const DEFAULT_VISION_MAX_IMAGES = 0;
     private const DEFAULT_CONTEXT_INJECTION_ENABLED = false;
@@ -164,6 +184,23 @@ final readonly class MessagesGatewayConfig
         $raw = $this->resolveToken(self::KEY_WEB_SEARCH_MODE, $userId, self::DEFAULT_WEB_SEARCH_MODE);
 
         return \in_array($raw, self::WEB_SEARCH_MODES, true) ? $raw : self::DEFAULT_WEB_SEARCH_MODE;
+    }
+
+    /**
+     * How the gateway handles Anthropic's `web_fetch_*` server tool.
+     *
+     * Synaplan never fetches pages itself — `auto` / `passthrough` keep (or
+     * inject) the declaration so api.anthropic.com can honour it. `off` drops
+     * the capability. Unknown values fall back to the default so a typo cannot
+     * silently disable page reading.
+     *
+     * @return self::WEB_FETCH_AUTO|self::WEB_FETCH_PASSTHROUGH|self::WEB_FETCH_OFF
+     */
+    public function webFetchMode(?int $userId): string
+    {
+        $raw = $this->resolveToken(self::KEY_WEB_FETCH_MODE, $userId, self::DEFAULT_WEB_FETCH_MODE);
+
+        return \in_array($raw, self::WEB_FETCH_MODES, true) ? $raw : self::DEFAULT_WEB_FETCH_MODE;
     }
 
     /**

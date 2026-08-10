@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\GatewayToolCatalog;
+use App\AI\Messages\Tools\WebFetchPolicy;
 use App\Entity\User;
 use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
@@ -149,6 +150,11 @@ final class MessagesApiController extends AbstractController
         $mode = $prepared['web_search'] ?? null;
         if (\is_string($mode) && '' !== $mode && GatewayToolCatalog::WEB_SEARCH_NONE !== $mode) {
             $response->headers->set('x-synaplan-web-search', $mode);
+        }
+
+        $webFetch = $prepared['web_fetch'] ?? null;
+        if (\is_string($webFetch) && '' !== $webFetch && WebFetchPolicy::HANDLING_NONE !== $webFetch) {
+            $response->headers->set('x-synaplan-web-fetch', $webFetch);
         }
 
         $this->addVisionHeader($response, $prepared);

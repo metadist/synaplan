@@ -10,6 +10,7 @@ use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\MessagesModelResolver;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
+use App\AI\Messages\Tools\WebFetchPolicy;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\AI\Messages\Vision\VisionPolicy;
 use App\Entity\Model;
@@ -127,6 +128,7 @@ final class MessagesGatewayVisionTest extends TestCase
         $config->method('isMcpToolsEnabled')->willReturn(false);
         $config->method('isContextInjectionEnabled')->willReturn(false);
         $config->method('visionMode')->willReturn($visionMode);
+        $config->method('webFetchMode')->willReturn(MessagesGatewayConfig::WEB_FETCH_OFF);
         $config->method('visionImageDetail')->willReturn(MessagesGatewayConfig::IMAGE_DETAIL_AUTO);
         $config->method('visionMaxImages')->willReturn(0);
         $config->method('upstreamUrl')->willReturn('https://api.anthropic.com');
@@ -191,6 +193,7 @@ final class MessagesGatewayVisionTest extends TestCase
             $passthrough,
             $toolCatalog,
             $this->createMock(GatewayToolLoop::class),
+            new WebFetchPolicy(),
             new VisionPolicy($config, new NullLogger()),
             $this->createMock(MessagesContextInjector::class),
             $this->createMock(CacheItemPoolInterface::class),

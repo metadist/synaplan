@@ -10,6 +10,7 @@ import { useI18n } from 'vue-i18n'
 import type {
   MessagesGatewaySettings,
   MessagesGatewayStatus,
+  WebFetchMode,
   WebSearchMode,
 } from '@/services/api/messagesGatewayApi'
 import type { GatewayForm } from './types'
@@ -58,6 +59,12 @@ const webSearchOptions = computed(() => [
   },
   { value: 'passthrough', label: t('messagesGateway.webSearchModePassthrough') },
   { value: 'off', label: t('messagesGateway.webSearchModeOff') },
+])
+
+const webFetchOptions = computed(() => [
+  { value: 'auto', label: t('messagesGateway.webFetchModeAuto') },
+  { value: 'passthrough', label: t('messagesGateway.webFetchModePassthrough') },
+  { value: 'off', label: t('messagesGateway.webFetchModeOff') },
 ])
 </script>
 
@@ -127,6 +134,18 @@ const webSearchOptions = computed(() => [
           :options="webSearchOptions"
           data-testid="select-agents-web-search"
           @update:model-value="emit('change', { web_search_mode: $event as WebSearchMode })"
+        />
+      </GatewaySettingRow>
+
+      <GatewaySettingRow
+        :label="$t('messagesGateway.webFetchLabel')"
+        :description="$t('messagesGateway.webFetchHint')"
+      >
+        <GatewaySettingSelect
+          :model-value="form.web_fetch_mode"
+          :options="webFetchOptions"
+          data-testid="select-agents-web-fetch"
+          @update:model-value="emit('change', { web_fetch_mode: $event as WebFetchMode })"
         />
       </GatewaySettingRow>
     </div>

@@ -82,6 +82,13 @@ final class MessagesGatewayController extends AbstractController
                 ),
                 new OA\Property(property: 'web_search_available', type: 'boolean', example: false, description: 'Whether a web search provider is configured on this instance.'),
                 new OA\Property(
+                    property: 'web_fetch_mode',
+                    description: 'How the gateway handles Anthropic web_fetch: auto/passthrough forward (and inject if missing) to api.anthropic.com; off drops the capability. Synaplan never fetches pages itself.',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::WEB_FETCH_MODES,
+                    example: MessagesGatewayConfig::WEB_FETCH_AUTO,
+                ),
+                new OA\Property(
                     property: 'vision_mode',
                     description: 'How the gateway handles image turns: auto (Synaplan vision when the resolved model lacks vision, otherwise passthrough), synaplan, passthrough, or off.',
                     type: 'string',
@@ -182,6 +189,7 @@ final class MessagesGatewayController extends AbstractController
             'server_tools' => $this->toolCatalog->nativeToolNames($userId),
             'web_search_mode' => $this->config->webSearchMode($userId),
             'web_search_available' => $this->webSearchTool->isAvailable(),
+            'web_fetch_mode' => $this->config->webFetchMode($userId),
             'vision_mode' => $this->config->visionMode($userId),
             'vision_available' => $this->analyzeImageTool->isAvailable($userId),
             'vision_image_detail' => $this->config->visionImageDetail($userId),
@@ -490,6 +498,11 @@ final class MessagesGatewayController extends AbstractController
                     enum: MessagesGatewayConfig::WEB_SEARCH_MODES,
                 ),
                 new OA\Property(
+                    property: 'web_fetch_mode',
+                    type: 'string',
+                    enum: MessagesGatewayConfig::WEB_FETCH_MODES,
+                ),
+                new OA\Property(
                     property: 'vision_mode',
                     type: 'string',
                     enum: MessagesGatewayConfig::VISION_MODES,
@@ -602,6 +615,7 @@ final class MessagesGatewayController extends AbstractController
 
         $enums = [
             MessagesGatewayConfig::KEY_WEB_SEARCH_MODE => MessagesGatewayConfig::WEB_SEARCH_MODES,
+            MessagesGatewayConfig::KEY_WEB_FETCH_MODE => MessagesGatewayConfig::WEB_FETCH_MODES,
             MessagesGatewayConfig::KEY_VISION_MODE => MessagesGatewayConfig::VISION_MODES,
             MessagesGatewayConfig::KEY_VISION_IMAGE_DETAIL => MessagesGatewayConfig::IMAGE_DETAILS,
         ];
