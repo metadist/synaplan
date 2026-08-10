@@ -4321,10 +4321,18 @@
     "welcome": {
       "title": "Willkommen bei",
       "subtitle": "Alle KIs, alle Funktionen an einem Platz",
-      "aiNotice": "Wenn du fortfährst, stimmst du zu, dass deine Eingaben — Nachrichten, Dateien, Bilder und Sprachaufnahmen — an externe KI-Anbieter weitergegeben werden, damit diese eine Antwort erzeugen können. Deine Kontodaten, etwa deine E-Mail-Adresse, sind nie Teil dieser Anfragen.",
+      "aiNotice": "Mit „Los geht's“ stimmst du zu, dass deine Nachrichten, Dateien, Bilder und Sprachaufnahmen an externe KI-Anbieter gesendet werden, damit diese antworten können.",
+      "aiNoticeDetails": "Details",
       "pillServer": "Eigener Server",
       "pillRag": "RAG",
       "pillWidget": "Chat-Widget"
+    },
+    "ai": {
+      "title": "Was mit deinen Eingaben passiert",
+      "body": "Synaplan erzeugt Antworten nicht selbst, sondern über KI-Modelle externer Anbieter. Deine Eingabe wird deshalb an den Anbieter des Modells weitergegeben, das gerade antwortet.",
+      "point1": "Weitergegeben wird nur, was du selbst schickst: Nachrichten, Dateien, Bilder und Sprachaufnahmen.",
+      "point2": "Deine Kontodaten, etwa deine E-Mail-Adresse, sind nie Teil dieser Anfragen.",
+      "point3": "Welcher Anbieter antwortet, hängt vom KI-Modell ab, das du im Chat auswählst."
     },
     "rag": {
       "title": "Antworten aus deinen Dokumenten",

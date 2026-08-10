@@ -3339,10 +3339,18 @@
     "welcome": {
       "title": "Bienvenido a",
       "subtitle": "Todas las IA, todas las funciones en un solo lugar",
-      "aiNotice": "Al continuar aceptas que lo que envíes — mensajes, archivos, imágenes y grabaciones de voz — se transmita a proveedores de IA externos para que generen una respuesta. Los datos de tu cuenta, como tu correo electrónico, nunca forman parte de esas solicitudes.",
+      "aiNotice": "Al tocar «Empezar» aceptas que tus mensajes, archivos, imágenes y grabaciones de voz se envíen a proveedores de IA externos para que puedan responder.",
+      "aiNoticeDetails": "Detalles",
       "pillServer": "Servidor propio",
       "pillRag": "RAG",
       "pillWidget": "Widget de chat"
+    },
+    "ai": {
+      "title": "Qué pasa con lo que envías",
+      "body": "Synaplan no redacta las respuestas por sí mismo: funciona con modelos de IA de proveedores externos. Por eso lo que envías se transmite al proveedor del modelo que responde.",
+      "point1": "Solo se transmite lo que tú envías: mensajes, archivos, imágenes y grabaciones de voz.",
+      "point2": "Los datos de tu cuenta, como tu correo electrónico, nunca forman parte de esas solicitudes.",
+      "point3": "Qué proveedor responde depende del modelo de IA que elijas en el chat."
     },
     "rag": {
       "title": "Respuestas de tus documentos",

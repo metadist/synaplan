@@ -2,11 +2,13 @@ import { describe, it, expect, vi, afterAll, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 
 /**
- * MOBILE-APP SEAM (App Review 2.1): Apple asked where users consent to their
- * input being processed by third-party AI providers. The answer is the first
- * onboarding screen — the notice sits above the CTA, so tapping "get started"
- * is the affirmative act. This spec pins that it is present, in every locale,
- * together with a working privacy-policy link.
+ * MOBILE-APP SEAM (App Review 2.1 / 5.1.2(i), Play "prominent disclosure"):
+ * Apple asked where users consent to their input being processed by third-party
+ * AI providers. The answer is the first onboarding screen — tapping "get
+ * started" is the affirmative act. Both stores accept fine print only while the
+ * substance stays on screen, so this spec pins what may never quietly move into
+ * the "details" modal: the sentence itself, in every locale, plus a working
+ * privacy-policy link.
  */
 
 vi.mock('@/services/api/nativeServer', () => ({
@@ -83,5 +85,29 @@ describe('OnboardingWelcomeStep — AI processing notice', () => {
       expect(notice.text()).not.toContain('onboarding.welcome.aiNotice')
       expect(notice.text().length).toBeGreaterThan(80)
     }
+  })
+
+  it('keeps the disclosure on the page rather than behind the details modal', () => {
+    const html = mountStep().html()
+
+    // Both stores require the disclosure itself to be visible during normal
+    // use. Only the elaboration may sit behind a tap, so the notice has to
+    // render outside the modal — and after the CTA it qualifies.
+    expect(html.indexOf('section-onboarding-ai-notice')).toBeGreaterThan(
+      html.indexOf('btn-welcome-next')
+    )
+  })
+
+  it('opens the processing details on demand', async () => {
+    const step = mountStep()
+    const modal = () => step.findComponent({ name: 'OnboardingInfoModal' })
+
+    expect(modal().props('isOpen')).toBe(false)
+
+    await step.find('[data-testid="btn-onboarding-ai-details"]').trigger('click')
+
+    expect(modal().props('isOpen')).toBe(true)
+    expect(modal().props('title')).toBe(i18n.global.t('onboarding.ai.title'))
+    expect(modal().props('linkUrl')).toBe('https://example.test/privacy')
   })
 })

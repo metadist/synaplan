@@ -4387,10 +4387,18 @@
     "welcome": {
       "title": "Welcome to",
       "subtitle": "Every AI, every feature in one place",
-      "aiNotice": "By continuing you agree that what you send — messages, files, images and voice recordings — is passed on to third-party AI providers so they can generate an answer. Your account information, such as your email address, is never part of those requests.",
+      "aiNotice": "By tapping “Get started” you agree that your messages, files, images and voice recordings are sent to third-party AI providers so they can answer.",
+      "aiNoticeDetails": "Details",
       "pillServer": "Own server",
       "pillRag": "RAG",
       "pillWidget": "Chat widget"
+    },
+    "ai": {
+      "title": "What happens to what you send",
+      "body": "Synaplan doesn't write the answers itself — it runs on AI models from external providers. What you send is therefore passed on to the provider of the model that is answering.",
+      "point1": "Only what you send is passed on: messages, files, images and voice recordings.",
+      "point2": "Your account information, such as your email address, is never part of those requests.",
+      "point3": "Which provider answers depends on the AI model you pick in the chat."
     },
     "rag": {
       "title": "Answers from your documents",

@@ -3340,10 +3340,18 @@
     "welcome": {
       "title": "Hoş geldin",
       "subtitle": "Tüm yapay zekâlar, tüm özellikler tek bir yerde",
-      "aiNotice": "Devam ederek gönderdiklerinin — mesajlar, dosyalar, görseller ve ses kayıtları — yanıt üretebilmeleri için üçüncü taraf yapay zekâ sağlayıcılarına iletilmesini kabul etmiş olursun. E-posta adresin gibi hesap bilgilerin bu isteklerin hiçbir zaman parçası olmaz.",
+      "aiNotice": "„Başlayalım“a dokunarak mesajlarının, dosyalarının, görsellerinin ve ses kayıtlarının yanıt verebilmeleri için üçüncü taraf yapay zekâ sağlayıcılarına gönderilmesini kabul edersin.",
+      "aiNoticeDetails": "Ayrıntılar",
       "pillServer": "Kendi sunucun",
       "pillRag": "RAG",
       "pillWidget": "Sohbet widget'ı"
+    },
+    "ai": {
+      "title": "Gönderdiklerine ne oluyor",
+      "body": "Synaplan yanıtları kendisi yazmaz; dış sağlayıcıların yapay zekâ modelleriyle çalışır. Bu nedenle gönderdiklerin, yanıtı veren modelin sağlayıcısına iletilir.",
+      "point1": "Yalnızca senin gönderdiklerin iletilir: mesajlar, dosyalar, görseller ve ses kayıtları.",
+      "point2": "E-posta adresin gibi hesap bilgilerin bu isteklerin hiçbir zaman parçası olmaz.",
+      "point3": "Hangi sağlayıcının yanıt vereceği, sohbette seçtiğin yapay zekâ modeline bağlıdır."
     },
     "rag": {
       "title": "Belgelerinden yanıtlar",
