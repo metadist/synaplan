@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\AI\Credential\ChatReadinessService;
 use App\AI\Credential\SecretValueGuard;
 use App\AI\Interface\ProviderMetadataInterface;
+use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\User;
@@ -63,6 +64,7 @@ class ConfigController extends AbstractController
         private UsageTaximeterConfig $usageTaximeterConfig,
         private RegistrationConfig $registrationConfig,
         private ChatReadinessService $chatReadiness,
+        private AiProviderDisclosure $aiProviderDisclosure,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
         private CapabilityService $capabilityService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
@@ -373,6 +375,12 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'aiProviders',
+                    type: 'array',
+                    description: 'Display names of the AI providers a user\'s input can reach on this instance, for the disclosure App Store Review Guideline 5.1.2(i) requires. Empty when none are configured.',
+                    items: new OA\Items(type: 'string', example: 'Anthropic')
+                ),
+                new OA\Property(
                     property: 'unavailableProviders',
                     type: 'array',
                     description: 'AI providers that are disabled due to missing API keys (only for authenticated users)',
@@ -555,6 +563,12 @@ class ConfigController extends AbstractController
             'realtime' => $realtimeConfig,
             'client' => $clientConfig,
             'mobile' => $mobileConfig,
+            // MOBILE-APP SEAM (App Review 5.1.2(i)): the app's first-run consent
+            // screen has to name the AI providers, and it runs before sign-in —
+            // so the list ships with the public config. Empty on an instance
+            // with no usable chat provider; the client then falls back to
+            // wording without names.
+            'aiProviders' => $this->aiProviderDisclosure->chatProviderNames(),
             'marketingNews' => [
                 'enabled' => $this->marketingNewsConfig->isEnabled(),
             ],

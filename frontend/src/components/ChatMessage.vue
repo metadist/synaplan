@@ -56,9 +56,13 @@
           briefly shifts when the button materialises.
           `pointer-events-none` while hidden keeps the streaming bubble
           fully click-through-able.
+          It stays mounted for the whole stream for that reason, and only drops
+          out once a finished turn turns out to have nothing to copy — otherwise
+          the icon floats alone in an empty bubble, which is most obvious on
+          touch layouts where it never fades out.
         -->
         <button
-          v-if="role === 'assistant'"
+          v-if="role === 'assistant' && (isStreaming || copyableText)"
           type="button"
           :class="[
             'absolute top-2 right-2 z-10 p-1.5 rounded-md txt-secondary bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 hover:txt-primary',
@@ -1228,12 +1232,23 @@ const usageBadge = computed<{ tokens: string; cost: string } | null>(() => {
 // Copy message text to clipboard
 const copied = ref(false)
 
-const copyMessageText = async () => {
-  const text = props.parts
+/**
+ * Exactly what the copy button would put on the clipboard, empty when there is
+ * nothing to copy. An assistant turn can legitimately end without visible text
+ * — a media-only turn, or a stream that finishes without a single chunk — and
+ * the button drives its own visibility off this, so it can never sit alone in
+ * an empty bubble offering an action that does nothing.
+ */
+const copyableText = computed(() =>
+  props.parts
     .filter((p) => p.type !== 'thinking')
     .map((p) => p.content ?? '')
     .join('\n')
     .trim()
+)
+
+const copyMessageText = async () => {
+  const text = copyableText.value
   if (!text) return
   try {
     await navigator.clipboard.writeText(text)

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Controller;
 
 use App\AI\Credential\ChatReadinessService;
+use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
 use App\Controller\ConfigController;
 use App\Entity\Config;
@@ -82,6 +83,7 @@ final class ConfigControllerSummaryModelTest extends TestCase
             $this->createStub(UsageTaximeterConfig::class),
             $this->createStub(RegistrationConfig::class),
             $this->createStub(ChatReadinessService::class),
+            $this->createStub(AiProviderDisclosure::class),
             $this->createStub(LocalAiDownloadStatusService::class),
             new CapabilityService(),
             'http://qdrant.example',

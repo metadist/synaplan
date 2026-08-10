@@ -80,6 +80,30 @@ class ModelRepository extends ServiceEntityRepository
     }
 
     /**
+     * Services behind the chat models a user can actually pick.
+     *
+     * Deliberately DB-only: this feeds the public runtime config, which must
+     * not depend on live provider probes (Ollama's availability check performs
+     * an HTTP request, which an unauthenticated endpoint cannot afford).
+     *
+     * @return string[] Service names as stored, e.g. ['Anthropic', 'OpenAI']
+     */
+    public function findSelectableChatServices(): array
+    {
+        $results = $this->createQueryBuilder('m')
+            ->select('DISTINCT m.service')
+            ->where('m.tag = :tag')
+            ->andWhere('m.selectable = 1')
+            ->andWhere('m.active = 1')
+            ->setParameter('tag', 'chat')
+            ->orderBy('m.service', 'ASC')
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_map(static fn (array $row): string => (string) $row['service'], $results);
+    }
+
+    /**
      * Get all unique provider-capability combinations from DB
      * Returns: ['openai' => ['chat', 'embedding'], 'ollama' => ['chat', 'vectorize'], ...].
      */

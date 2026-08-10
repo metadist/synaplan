@@ -262,7 +262,7 @@
             >
               {{ $t('subscription.native.restoreButton') }}
             </button>
-            <p class="txt-secondary text-xs">{{ $t('subscription.native.storeNote') }}</p>
+            <p class="txt-secondary text-xs">{{ $t(storeNoteKey) }}</p>
           </div>
 
           <!--
@@ -313,6 +313,7 @@ import { subscriptionApi, type SubscriptionStatus } from '@/services/api/subscri
 import { useConfigStore } from '@/stores/config'
 import { useDialog } from '@/composables/useDialog'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
+import { getNativePlatform } from '@/services/api/nativeRuntime'
 import { useSubscriptionPurchase } from '@/composables/useSubscriptionPurchase'
 import MainLayout from '@/components/MainLayout.vue'
 
@@ -371,6 +372,17 @@ const isHighestPlan = computed(() => {
 // subscription settings (Apple/Google), never the Stripe billing portal.
 const manageLabel = computed(() =>
   isNative ? t('subscription.native.manageInStore') : t('subscription.manage.openPortal')
+)
+
+/**
+ * MOBILE-APP SEAM (Apple 2.3.10): the note may only name the store the build
+ * actually sells through. Naming a competing platform inside an iOS binary is
+ * rejected as information that is irrelevant to App Store users.
+ */
+const storeNoteKey = computed(() =>
+  'android' === getNativePlatform()
+    ? 'subscription.native.storeNoteAndroid'
+    : 'subscription.native.storeNoteIos'
 )
 
 /**

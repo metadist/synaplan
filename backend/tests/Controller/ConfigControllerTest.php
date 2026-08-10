@@ -55,6 +55,35 @@ final class ConfigControllerTest extends WebTestCase
         $this->assertIsBool($data['features']['memoryService']);
     }
 
+    /**
+     * MOBILE-APP SEAM (App Review 5.1.2(i)): the app names its AI providers on
+     * a consent screen that runs before sign-in, so the list has to reach an
+     * anonymous client. Losing it here would leave the app disclosing nothing.
+     */
+    public function testRuntimeConfigNamesTheAiProvidersAnonymously(): void
+    {
+        $client = static::createClient();
+
+        $client->request('GET', '/api/v1/config/runtime');
+
+        $this->assertResponseIsSuccessful();
+
+        $data = json_decode($client->getResponse()->getContent(), true);
+
+        $this->assertArrayHasKey('aiProviders', $data);
+        $this->assertIsArray($data['aiProviders']);
+
+        foreach ($data['aiProviders'] as $provider) {
+            $this->assertIsString($provider);
+            $this->assertNotSame('', $provider);
+        }
+
+        // The test provider serves the default chat model in this environment.
+        // It is a fixture, not something a user's input can reach, so a
+        // disclosure naming it would be wrong.
+        $this->assertNotContains('test', array_map('strtolower', $data['aiProviders']));
+    }
+
     public function testRuntimeConfigIsPublicAndFast(): void
     {
         $client = static::createClient();
