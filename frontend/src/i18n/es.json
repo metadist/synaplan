@@ -3340,6 +3340,7 @@
       "title": "Bienvenido a",
       "subtitle": "Todas las IA, todas las funciones en un solo lugar",
       "aiNotice": "Al tocar «Empezar» aceptas que tus mensajes, archivos, imágenes y grabaciones de voz se envíen a proveedores de IA externos para que puedan responder.",
+      "aiNoticeProviders": "Proveedores en este servidor: {providers}.",
       "aiNoticeDetails": "Detalles",
       "pillServer": "Servidor propio",
       "pillRag": "RAG",

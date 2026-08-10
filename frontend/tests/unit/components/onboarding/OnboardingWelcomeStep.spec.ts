@@ -15,11 +15,18 @@ vi.mock('@/services/api/nativeServer', () => ({
   isNativeServerControlAvailable: () => true,
 }))
 
+const aiProviders = vi.hoisted(() => ({ value: [] as string[] }))
+
 vi.mock('@/stores/config', () => ({
   useConfigStore: () => ({
     branding: {
       name: 'Synaplan',
       privacyUrl: 'https://example.test/privacy',
+    },
+    aiDisclosure: {
+      get providers() {
+        return aiProviders.value
+      },
     },
   }),
 }))
@@ -59,6 +66,7 @@ describe('OnboardingWelcomeStep — AI processing notice', () => {
 
   beforeEach(() => {
     i18n.global.locale.value = 'en'
+    aiProviders.value = []
   })
 
   it('states that input goes to AI providers before anything can be sent', () => {
@@ -95,6 +103,27 @@ describe('OnboardingWelcomeStep — AI processing notice', () => {
     // render outside the modal — and after the CTA it qualifies.
     expect(html.indexOf('section-onboarding-ai-notice')).toBeGreaterThan(
       html.indexOf('btn-welcome-next')
+    )
+  })
+
+  it('names the providers the configured server reports', () => {
+    aiProviders.value = ['Anthropic', 'Google AI', 'OpenAI']
+
+    const line = mountStep().find('[data-testid="text-onboarding-ai-providers"]')
+
+    // 5.1.2(i) rejects generic wording, so every reported name has to be here.
+    expect(line.text()).toContain('Anthropic')
+    expect(line.text()).toContain('Google AI')
+    expect(line.text()).toContain('OpenAI')
+  })
+
+  it('drops the provider line when the server reports none', () => {
+    const step = mountStep()
+
+    expect(step.find('[data-testid="text-onboarding-ai-providers"]').exists()).toBe(false)
+    // The disclosure itself must survive an empty list.
+    expect(step.find('[data-testid="section-onboarding-ai-notice"]').text()).toContain(
+      'AI providers'
     )
   })
 

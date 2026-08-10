@@ -65,29 +65,32 @@
       must not live in a menu or in the privacy policy alone. So the sentence
       itself stays visible and only the elaboration moves behind "details".
     -->
-    <p
-      class="mt-8 text-[11px] leading-relaxed txt-secondary onb-enter-5"
+    <div
+      class="mt-8 space-y-0.5 text-[11px] leading-relaxed txt-secondary onb-enter-5"
       data-testid="section-onboarding-ai-notice"
     >
-      {{ $t('onboarding.welcome.aiNotice') }}
-      <button
-        type="button"
-        class="text-brand hover:underline underline-offset-2"
-        data-testid="btn-onboarding-ai-details"
-        @click="activeModal = 'ai'"
-      >
-        {{ $t('onboarding.welcome.aiNoticeDetails') }}
-      </button>
-      <span aria-hidden="true"> · </span>
-      <a
-        :href="config.branding.privacyUrl"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-brand hover:underline underline-offset-2"
-        data-testid="link-onboarding-privacy"
-        >{{ $t('auth.privacyPolicy') }}</a
-      >
-    </p>
+      <p>{{ $t('onboarding.welcome.aiNotice') }}</p>
+      <p v-if="aiProviders" data-testid="text-onboarding-ai-providers">{{ aiProviders }}</p>
+      <p>
+        <button
+          type="button"
+          class="text-brand hover:underline underline-offset-2"
+          data-testid="btn-onboarding-ai-details"
+          @click="activeModal = 'ai'"
+        >
+          {{ $t('onboarding.welcome.aiNoticeDetails') }}
+        </button>
+        <span aria-hidden="true"> · </span>
+        <a
+          :href="config.branding.privacyUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-brand hover:underline underline-offset-2"
+          data-testid="link-onboarding-privacy"
+          >{{ $t('auth.privacyPolicy') }}</a
+        >
+      </p>
+    </div>
 
     <!-- Own-server modal: URL entry replacing the standard server. -->
     <OnboardingServerModal
@@ -133,9 +136,29 @@ import OnboardingInfoModal from '@/components/onboarding/OnboardingInfoModal.vue
 
 const emit = defineEmits<{ next: [] }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const config = useConfigStore()
 const themeStore = useTheme()
+
+/**
+ * App Review 5.1.2(i) wants the providers named, not just "third-party AI".
+ * The names come from the server the app is pointed at, so a self-hosted
+ * instance discloses its own set — and an instance that reports none simply
+ * omits the line instead of showing an empty label.
+ *
+ * They sit on their own line rather than inside the sentence: an instance
+ * offering seven providers would otherwise bury the consent itself in a list.
+ */
+const aiProviders = computed(() => {
+  const providers = config.aiDisclosure.providers
+  if (0 === providers.length) {
+    return ''
+  }
+
+  return t('onboarding.welcome.aiNoticeProviders', {
+    providers: new Intl.ListFormat(locale.value, { style: 'long', type: 'unit' }).format(providers),
+  })
+})
 
 const isDark = computed(() => {
   if (themeStore.theme.value === 'dark') return true

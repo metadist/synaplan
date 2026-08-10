@@ -254,6 +254,25 @@ const config = {
   },
 
   /**
+   * MOBILE-APP SEAM (App Review 5.1.2(i)): the AI providers a user's input can
+   * reach on the configured server, by name. The native consent screen has to
+   * name them, and it runs before sign-in — so this comes from the public
+   * runtime config rather than a list baked into the bundle. Empty until the
+   * config loads or when the instance has no selectable chat models; callers
+   * then fall back to wording without names.
+   */
+  aiDisclosure: {
+    get providers(): string[] {
+      // Checked rather than cast: a server older than this field omits it, and
+      // the schema passes unknown keys through untyped (same reason
+      // `unavailableProviders` is read defensively in httpClient).
+      const providers = getConfigSync().aiProviders
+
+      return Array.isArray(providers) ? providers : []
+    },
+  },
+
+  /**
    * First-run setup status (authenticated users only).
    * chatReady is false when the provider serving the current user's effective
    * default chat model (per-user override, then global default) has no usable

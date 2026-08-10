@@ -4322,6 +4322,7 @@
       "title": "Willkommen bei",
       "subtitle": "Alle KIs, alle Funktionen an einem Platz",
       "aiNotice": "Mit „Los geht's“ stimmst du zu, dass deine Nachrichten, Dateien, Bilder und Sprachaufnahmen an externe KI-Anbieter gesendet werden, damit diese antworten können.",
+      "aiNoticeProviders": "Anbieter auf diesem Server: {providers}.",
       "aiNoticeDetails": "Details",
       "pillServer": "Eigener Server",
       "pillRag": "RAG",

@@ -4388,6 +4388,7 @@
       "title": "Welcome to",
       "subtitle": "Every AI, every feature in one place",
       "aiNotice": "By tapping “Get started” you agree that your messages, files, images and voice recordings are sent to third-party AI providers so they can answer.",
+      "aiNoticeProviders": "Providers on this server: {providers}.",
       "aiNoticeDetails": "Details",
       "pillServer": "Own server",
       "pillRag": "RAG",

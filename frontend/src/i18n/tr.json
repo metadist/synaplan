@@ -3341,6 +3341,7 @@
       "title": "Hoş geldin",
       "subtitle": "Tüm yapay zekâlar, tüm özellikler tek bir yerde",
       "aiNotice": "„Başlayalım“a dokunarak mesajlarının, dosyalarının, görsellerinin ve ses kayıtlarının yanıt verebilmeleri için üçüncü taraf yapay zekâ sağlayıcılarına gönderilmesini kabul edersin.",
+      "aiNoticeProviders": "Bu sunucudaki sağlayıcılar: {providers}.",
       "aiNoticeDetails": "Ayrıntılar",
       "pillServer": "Kendi sunucun",
       "pillRag": "RAG",
