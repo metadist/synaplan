@@ -260,14 +260,35 @@ describe('RealtimeClient', () => {
     await expect(getToken()).rejects.not.toBeInstanceOf(UnauthorizedError)
   })
 
-  it('reports errors via onStateChange', async () => {
+  it('reports a retrying centrifuge error as reconnecting, not as the terminal error state', async () => {
     const sink: { state?: ConnectionState; error?: string } = {}
     const client = buildClient(sink)
     await client.connect()
+
+    // centrifuge-js emits 'error' for conditions it recovers from by itself
+    // (failed token fetch, closed transport, temporary connect error). Calling
+    // those terminal would make ChatWidget tear the subscription down on an
+    // ordinary network hiccup (#1451).
+    instances[0].__emit('connecting')
     instances[0].__emit('error', { error: { message: 'boom' } })
 
-    expect(sink.state).toBe('error')
+    expect(sink.state).toBe('reconnecting')
     expect(sink.error).toBe('boom')
+  })
+
+  it('leaves a healthy connection alone when centrifuge reports a token-refresh error', async () => {
+    const sink: { state?: ConnectionState; error?: string } = {}
+    const client = buildClient(sink)
+    await client.connect()
+
+    instances[0].__emit('connected')
+    // The socket is still up — only the refresh hiccuped, and centrifuge-js
+    // emits nothing once its retry succeeds, so downgrading here would leave
+    // the badge stuck on "Reconnecting" for a live connection.
+    instances[0].__emit('error', { error: { message: 'refresh failed' } })
+
+    expect(sink.state).toBe('connected')
+    expect(client.getState()).toBe('connected')
   })
 
   it('subscribes lazily and dispatches publications via the envelope', async () => {

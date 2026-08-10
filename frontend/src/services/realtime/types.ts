@@ -25,7 +25,12 @@ export type ConnectionState =
   | 'connecting' // initial connect or reconnect attempt
   | 'connected' // healthy WS
   | 'reconnecting' // transient drop, retrying
-  | 'error' // unrecoverable (e.g. token refresh failed permanently)
+  // Terminal: centrifuge-js has stopped retrying on its own. Today the only
+  // way to get here is a refused connection token (RealtimeClient turns a
+  // 401/403/404 into UnauthorizedError). Consumers may treat this as "tear
+  // the connection down"; anything centrifuge-js still retries internally is
+  // reported as 'reconnecting' instead.
+  | 'error'
 
 export interface RealtimeRuntimeConfig {
   /**

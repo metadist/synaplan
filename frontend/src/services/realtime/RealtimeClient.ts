@@ -166,7 +166,22 @@ export class RealtimeClient {
       this.setState('reconnecting', `disconnect:${ctx?.code ?? 'unknown'}`)
     })
     this.centrifuge.on('error', (ctx) => {
-      this.setState('error', ctx?.error?.message ?? 'unknown error')
+      // Every client-level 'error' centrifuge-js emits is followed by an
+      // internal retry: a failed connection-token/connect-data fetch and a
+      // closed transport schedule a reconnect, a failed token refresh and a
+      // temporary connect/subscribe error schedule their own retry. None of
+      // them is terminal, so they must NOT surface as 'error' — consumers
+      // that act on that state (ChatWidget tears the subscription down)
+      // would give up on a connection the library is still nursing back to
+      // life. The unrecoverable case reaches us as the 'disconnected' event
+      // with the `unauthorized` code instead — see the handler above (#1451).
+      //
+      // While connected the socket is still healthy (only a token refresh
+      // hiccuped) and centrifuge-js emits no event once the retry succeeds,
+      // so downgrading the state here would leave the badge stuck on
+      // "Reconnecting" for a connection that never actually dropped.
+      if (this.destroyed || 'connected' === this.state) return
+      this.setState('reconnecting', ctx?.error?.message ?? 'unknown error')
     })
 
     return this.centrifuge

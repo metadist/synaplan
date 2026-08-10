@@ -2477,11 +2477,12 @@ function subscribeToEvents() {
  * Tear down a permanently-failed realtime connection instead of leaving a
  * dead Centrifuge instance wired up.
  *
- * `RealtimeClient` surfaces 'error' only for terminal failures (e.g. the
- * visitor token endpoint refusing an unknown widget/session pair or a
- * disallowed origin — see RealtimeClient's UnauthorizedError handling,
- * #1451/#1381); transient drops stay in 'reconnecting' and are retried
- * internally by centrifuge-js, so they must NOT trigger a teardown here.
+ * `RealtimeClient` surfaces 'error' only for terminal failures — in practice
+ * the visitor token endpoint refusing an unknown widget/session pair or a
+ * disallowed origin (see its UnauthorizedError handling, #1451/#1381).
+ * Anything centrifuge-js retries on its own, including its client-level
+ * 'error' events, is reported as 'reconnecting' and must NOT trigger a
+ * teardown here — that would abandon a connection which is about to recover.
  *
  * No resubscribe timer is started — the existing call site after a
  * successful `sendMessage()` (session guaranteed to exist server-side)
