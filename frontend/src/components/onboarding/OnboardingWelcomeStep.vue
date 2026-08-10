@@ -21,10 +21,12 @@
       chat without having read this either.
     -->
     <div class="mt-10 space-y-1.5 onb-enter-4" data-testid="section-onboarding-ai-notice">
-      <p class="text-xs txt-tertiary leading-relaxed">
+      <!-- txt-secondary, not the quieter txt-tertiary: this is the disclosure the
+           user consents to by tapping the CTA, so it has to clear WCAG AA. -->
+      <p class="text-xs txt-secondary leading-relaxed">
         {{ $t('onboarding.welcome.aiNotice') }}
       </p>
-      <p class="text-xs txt-tertiary">
+      <p class="text-xs txt-secondary">
         <a
           :href="config.branding.privacyUrl"
           target="_blank"
