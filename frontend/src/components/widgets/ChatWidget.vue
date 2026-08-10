@@ -676,6 +676,7 @@ import {
   type WidgetSubscription,
 } from '@/services/realtime/widgetSessionRealtime'
 import type { WidgetTypingHandle } from '@/services/realtime/widgetTypingChannel'
+import type { ConnectionState } from '@/services/realtime/types'
 
 interface WidgetRealtimeRuntime {
   enabled: boolean
@@ -2466,9 +2467,48 @@ function subscribeToEvents() {
         console.debug('[Widget] realtime error:', msg)
       }
     },
+    onState: handleRealtimeStateChange,
   })
 
   openVisitorTypingChannel()
+}
+
+/**
+ * Tear down a permanently-failed realtime connection instead of leaving a
+ * dead Centrifuge instance wired up.
+ *
+ * `RealtimeClient` surfaces 'error' only for terminal failures — in practice
+ * the visitor token endpoint refusing an unknown widget/session pair or a
+ * disallowed origin (see its UnauthorizedError handling, #1451/#1381).
+ * Anything centrifuge-js retries on its own, including its client-level
+ * 'error' events, is reported as 'reconnecting' and must NOT trigger a
+ * teardown here — that would abandon a connection which is about to recover.
+ *
+ * No resubscribe timer is started — the existing call site after a
+ * successful `sendMessage()` (session guaranteed to exist server-side)
+ * re-establishes the subscription the next time the visitor sends a
+ * message, which is the same trigger already used for the very first
+ * subscribe.
+ */
+function handleRealtimeStateChange(state: ConnectionState) {
+  if (state !== 'error') return
+
+  // We're called synchronously from inside centrifuge-js's own
+  // disconnect-event dispatch (via RealtimeClient.onStateChange), so
+  // tearing the same instance down here would reenter its dispatch loop.
+  // Defer to the next microtask, and re-check that this is still the
+  // active subscription — subscribeToEvents() could in principle have
+  // already replaced it by then.
+  const failed = eventSubscription
+  queueMicrotask(() => {
+    if (eventSubscription !== failed) return
+    if (typingChannel) {
+      typingChannel.close()
+      typingChannel = null
+    }
+    failed?.unsubscribe()
+    eventSubscription = null
+  })
 }
 
 const getChatStorageKey = () => {

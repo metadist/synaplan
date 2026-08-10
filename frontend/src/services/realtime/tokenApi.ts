@@ -18,7 +18,7 @@
  * still Zod-validated in both flavours.
  */
 
-import { httpClient, getApiBaseUrl } from '@/services/api/httpClient'
+import { httpClient, getApiBaseUrl, ApiError } from '@/services/api/httpClient'
 import {
   ConnectionTokenResponseSchema,
   SubscriptionTokenResponseSchema,
@@ -51,7 +51,14 @@ export async function fetchVisitorConnectionToken(
     }
   )
   if (!response.ok) {
-    throw new Error(`Failed to issue widget connection token: HTTP ${response.status}`)
+    // Preserve the HTTP status as `ApiError.status` (not a plain `Error`) so
+    // callers — RealtimeClient's connection-token refresh — can distinguish
+    // a terminal 404/403 (unknown widget/session pair, disallowed origin;
+    // retrying never helps) from a transient network/5xx failure. See #1381.
+    throw new ApiError(
+      response.status,
+      `Failed to issue widget connection token: HTTP ${response.status}`
+    )
   }
   return ConnectionTokenResponseSchema.parse(await response.json())
 }
@@ -76,7 +83,14 @@ export async function fetchSubscriptionToken(
       }),
     })
     if (!response.ok) {
-      throw new Error(`Failed to issue subscription token: HTTP ${response.status}`)
+      // Same reasoning as fetchVisitorConnectionToken(): a plain `Error`
+      // here loses the status code, so RealtimeClient's UnauthorizedError
+      // translation for anonymous visitors (#1381) never triggers — the
+      // visitor subscribe path would retry an unrecoverable 403/404 forever.
+      throw new ApiError(
+        response.status,
+        `Failed to issue subscription token: HTTP ${response.status}`
+      )
     }
     return SubscriptionTokenResponseSchema.parse(await response.json())
   }

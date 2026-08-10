@@ -290,7 +290,23 @@ final class RealtimeTokenControllerTest extends TestCase
         );
         $unknownSession = $controller->issueWidgetToken($this->widgetTokenRequest(), 'wdg_abc', 'sid_nope');
 
-        // Known widget, expired session.
+        foreach ([$unknownWidget, $unknownSession] as $response) {
+            $this->assertSame(404, $response->getStatusCode());
+        }
+
+        // Identical bodies — a probe must not be able to learn WHICH part of
+        // the (widgetId, sessionId) pair was wrong.
+        $this->assertSame((string) $unknownWidget->getContent(), (string) $unknownSession->getContent());
+    }
+
+    public function testWidgetTokenIssuedForExpiredButExistingSession(): void
+    {
+        // #1451: an expired session is resumable everywhere else (chat,
+        // history, the subscribe-side WidgetSessionAccessGuard) — the
+        // visitor connection token must not be the odd one out.
+        $widgetId = 'wdg_abc';
+        $sessionId = 'sid_xyz';
+
         $widgetRepo = $this->createMock(WidgetRepository::class);
         $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
         $sessionRepo = $this->createMock(WidgetSessionRepository::class);
@@ -301,16 +317,54 @@ final class RealtimeTokenControllerTest extends TestCase
             widgetRepo: $widgetRepo,
             sessionRepo: $sessionRepo,
         );
-        $expiredSession = $controller->issueWidgetToken($this->widgetTokenRequest(), 'wdg_abc', 'sid_xyz');
 
-        foreach ([$unknownWidget, $unknownSession, $expiredSession] as $response) {
-            $this->assertSame(404, $response->getStatusCode());
-        }
+        $response = $controller->issueWidgetToken($this->widgetTokenRequest(), $widgetId, $sessionId);
+        $this->assertSame(200, $response->getStatusCode());
 
-        // Identical bodies — a probe must not be able to learn WHICH part of
-        // the (widgetId, sessionId) pair was wrong.
-        $this->assertSame((string) $unknownWidget->getContent(), (string) $unknownSession->getContent());
-        $this->assertSame((string) $unknownWidget->getContent(), (string) $expiredSession->getContent());
+        $payload = json_decode((string) $response->getContent(), true);
+        $this->assertIsArray($payload);
+        $this->assertSame(sprintf('widget:%s:%s', $widgetId, $sessionId), $payload['subject']);
+    }
+
+    public function testExpiredSessionConnectionAndSubscriptionTokenSubMatch(): void
+    {
+        // Guards against the connection-token path and
+        // WidgetSessionAccessGuard (subscription tokens) drifting apart on
+        // expiry semantics again — a mismatch would let the visitor connect
+        // but never successfully subscribe to their own session channel.
+        $widgetId = 'wdg_abc';
+        $sessionId = 'sid_xyz';
+
+        $widgetRepo = $this->createMock(WidgetRepository::class);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
+        $sessionRepo = $this->createMock(WidgetSessionRepository::class);
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession(expiresIn: -60));
+
+        $tokenService = $this->buildTokenService();
+        $controller = $this->buildController(
+            tokenService: $tokenService,
+            widgetRepo: $widgetRepo,
+            sessionRepo: $sessionRepo,
+        );
+
+        $connectionResponse = $controller->issueWidgetToken($this->widgetTokenRequest(), $widgetId, $sessionId);
+        $connectionPayload = json_decode((string) $connectionResponse->getContent(), true);
+        $this->assertIsArray($connectionPayload);
+        $connectionDecoded = (array) JWT::decode((string) $connectionPayload['token'], new Key(self::SECRET, 'HS256'));
+
+        $subscribeRequest = new Request(content: (string) json_encode([
+            'channel' => sprintf('widget:session.%s.%s', $widgetId, $sessionId),
+            'widgetId' => $widgetId,
+            'sessionId' => $sessionId,
+        ]));
+        $subscribeResponse = $controller->issueSubscriptionToken($subscribeRequest, null);
+        $this->assertSame(200, $subscribeResponse->getStatusCode());
+
+        $subscribePayload = json_decode((string) $subscribeResponse->getContent(), true);
+        $this->assertIsArray($subscribePayload);
+        $subscribeDecoded = (array) JWT::decode((string) $subscribePayload['token'], new Key(self::SECRET, 'HS256'));
+
+        $this->assertSame($connectionDecoded['sub'], $subscribeDecoded['sub']);
     }
 
     public function testWidgetTokenRefusedForDisallowedOrigin(): void
@@ -331,6 +385,26 @@ final class RealtimeTokenControllerTest extends TestCase
 
         $noOrigin = new Request();
         $this->assertSame(403, $controller->issueWidgetToken($noOrigin, 'wdg_abc', 'sid_xyz')->getStatusCode());
+    }
+
+    public function testExpiredSessionStillHonoursTheDomainAllowlist(): void
+    {
+        // Dropping the expiry gate (#1451) must not turn an expired session
+        // into an allowlist bypass — the origin check stays the outermost
+        // barrier for every session, fresh or resumed.
+        $widgetRepo = $this->createMock(WidgetRepository::class);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
+        $sessionRepo = $this->createMock(WidgetSessionRepository::class);
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession(expiresIn: -60));
+
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $widgetRepo,
+            sessionRepo: $sessionRepo,
+        );
+
+        $evilOrigin = new Request(server: ['HTTP_ORIGIN' => 'https://evil.test']);
+        $this->assertSame(403, $controller->issueWidgetToken($evilOrigin, 'wdg_abc', 'sid_xyz')->getStatusCode());
     }
 
     public function testWidgetTokenRefusedWhenWidgetHasNoAllowedDomains(): void

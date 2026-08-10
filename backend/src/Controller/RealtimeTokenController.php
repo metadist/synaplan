@@ -49,7 +49,10 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  *   - the visitor token endpoint validates the request origin against the
  *     widget's domain allowlist (same semantics as the chat endpoints);
  *   - error responses are deliberately generic — a probe cannot tell a
- *     missing widget from a missing/expired session.
+ *     missing widget from a missing session.
+ *
+ * An expired-but-existing visitor session is intentionally NOT an error
+ * here — see {@see WidgetVisitorAccessChecker} for why (#1451).
  */
 #[OA\Tag(name: 'Realtime')]
 final class RealtimeTokenController extends AbstractController
@@ -114,13 +117,14 @@ final class RealtimeTokenController extends AbstractController
      * (`sess_{timestamp}_{~9 random chars}`, see ChatWidget.vue) — random
      * enough that guessing a live one is impractical under the per-IP rate
      * limit, but NOT a server-minted UUID and not cryptographically strong.
-     * The origin allowlist, rate limit, expiry check and generic errors
-     * below are therefore load-bearing, not belt-and-suspenders.
+     * The origin allowlist, rate limit and generic errors below are
+     * therefore load-bearing, not belt-and-suspenders.
      * (Future hardening: mint session ids server-side.)
      *
-     * Per-IP rate limit, origin allowlist check, session-expiry check, and
-     * a single generic 404 so probes cannot distinguish "widget exists"
-     * from "session exists".
+     * Per-IP rate limit, origin allowlist check, and a single generic 404
+     * so probes cannot distinguish "widget exists" from "session exists".
+     * Session expiry is deliberately NOT checked — see
+     * {@see WidgetVisitorAccessChecker} (#1451).
      */
     #[Route('/api/v1/realtime/widget/{widgetId}/sessions/{sessionId}/token', name: 'api_realtime_token_widget', methods: ['POST'])]
     #[OA\Post(
@@ -133,7 +137,7 @@ final class RealtimeTokenController extends AbstractController
     #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\Response(response: 200, description: 'Connection token (same shape as operator)')]
     #[OA\Response(response: 403, description: 'Request origin not on the widget domain allowlist')]
-    #[OA\Response(response: 404, description: 'Unknown widget/session pair (deliberately indistinguishable)')]
+    #[OA\Response(response: 404, description: 'Unknown widget/session pair (deliberately indistinguishable). An expired-but-existing session still returns 200.')]
     #[OA\Response(response: 429, description: 'Rate limit exceeded')]
     public function issueWidgetToken(Request $request, string $widgetId, string $sessionId): JsonResponse
     {
