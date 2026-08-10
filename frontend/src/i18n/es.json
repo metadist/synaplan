@@ -607,6 +607,16 @@
     "transcribed": "🎙️ Transcrito{language}: \"{preview}\"",
     "noSpeechDetected": "⚠️ No se detectó voz en la grabación",
     "transcriptionFailed": "Error de transcripción: {error}",
+    "mic": {
+      "permissionWeb": "El acceso al micrófono está bloqueado. Permítelo en la configuración de tu navegador e inténtalo de nuevo.",
+      "permissionIos": "El acceso al micrófono está desactivado. Abre los ajustes de iOS, selecciona esta app y activa «Micrófono».",
+      "permissionAndroid": "El acceso al micrófono está desactivado. Abre los ajustes de Android, selecciona esta app y concede el permiso «Micrófono».",
+      "noDevices": "No se encontró ningún micrófono. Conecta uno e inténtalo de nuevo.",
+      "inUse": "Otra aplicación está usando el micrófono. Ciérrala e inténtalo de nuevo.",
+      "aborted": "El acceso al micrófono se interrumpió. Inténtalo de nuevo.",
+      "notSupported": "La entrada de voz no está disponible aquí.",
+      "unknown": "No se pudo iniciar el micrófono. Inténtalo de nuevo."
+    },
     "dropFiles": "Suelta los archivos aquí",
     "dropFilesHint": "Imágenes, documentos, archivos de audio...",
     "filesPasted": "{count} archivo pegado | {count} archivos pegados",
@@ -1712,7 +1722,8 @@
       "restoreTitle": "Restaurar compras",
       "restoreDone": "Compras restauradas: tu suscripción está activa.",
       "restoreNone": "No se encontró ninguna suscripción activa para restaurar.",
-      "storeNote": "Las compras y suscripciones se procesan y gestionan a través de App Store o Google Play.",
+      "storeNoteIos": "Las compras y suscripciones se procesan y gestionan a través de App Store.",
+      "storeNoteAndroid": "Las compras y suscripciones se procesan y gestionan a través de Google Play.",
       "redeemBlockedExistingIos": "Esta cuenta ya tiene una suscripción activa, por lo que tu última compra en la tienda no se vinculó. Revisa las suscripciones de tu Apple ID y solicita allí un reembolso si es necesario, para evitar cargos duplicados.",
       "redeemBlockedExistingAndroid": "Esta cuenta ya tiene una suscripción activa, por lo que tu última compra en la tienda no se vinculó. Google Play reembolsa automáticamente las compras no confirmadas en unos días."
     },
@@ -3328,6 +3339,7 @@
     "welcome": {
       "title": "Bienvenido a",
       "subtitle": "Todas las IA, todas las funciones en un solo lugar",
+      "aiNotice": "Al continuar aceptas que lo que envíes — mensajes, archivos, imágenes y grabaciones de voz — se transmita a proveedores de IA externos para que generen una respuesta. Los datos de tu cuenta, como tu correo electrónico, nunca forman parte de esas solicitudes.",
       "pillServer": "Servidor propio",
       "pillRag": "RAG",
       "pillWidget": "Widget de chat"

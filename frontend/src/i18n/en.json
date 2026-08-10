@@ -599,6 +599,16 @@
     "transcribed": "🎙️ Transcribed{language}: \"{preview}\"",
     "noSpeechDetected": "⚠️ No speech detected in recording",
     "transcriptionFailed": "Transcription failed: {error}",
+    "mic": {
+      "permissionWeb": "Microphone access is blocked. Allow it in your browser settings and try again.",
+      "permissionIos": "Microphone access is turned off. Open the iOS Settings app, select this app, and turn on Microphone.",
+      "permissionAndroid": "Microphone access is turned off. Open the Android settings, select this app, and allow the Microphone permission.",
+      "noDevices": "No microphone was found. Connect one and try again.",
+      "inUse": "The microphone is in use by another app. Close it and try again.",
+      "aborted": "Microphone access was interrupted. Please try again.",
+      "notSupported": "Voice input is not available here.",
+      "unknown": "The microphone could not be started. Please try again."
+    },
     "dropFiles": "Drop files here",
     "dropFilesHint": "Images, documents, audio files...",
     "filesPasted": "{count} file pasted | {count} files pasted",
@@ -2193,7 +2203,8 @@
       "restoreTitle": "Restore purchases",
       "restoreDone": "Purchases restored — your subscription is active.",
       "restoreNone": "No active subscription was found to restore.",
-      "storeNote": "Purchases and subscriptions are processed and managed through the App Store or Google Play.",
+      "storeNoteIos": "Purchases and subscriptions are processed and managed through the App Store.",
+      "storeNoteAndroid": "Purchases and subscriptions are processed and managed through Google Play.",
       "redeemBlockedExistingIos": "This account already has an active subscription, so your recent store purchase was not linked. Please check your Apple ID subscriptions and request a refund there if needed, to avoid double charges.",
       "redeemBlockedExistingAndroid": "This account already has an active subscription, so your recent store purchase was not linked. Google Play automatically refunds unacknowledged purchases within a few days."
     },
@@ -4376,6 +4387,7 @@
     "welcome": {
       "title": "Welcome to",
       "subtitle": "Every AI, every feature in one place",
+      "aiNotice": "By continuing you agree that what you send — messages, files, images and voice recordings — is passed on to third-party AI providers so they can generate an answer. Your account information, such as your email address, is never part of those requests.",
       "pillServer": "Own server",
       "pillRag": "RAG",
       "pillWidget": "Chat widget"

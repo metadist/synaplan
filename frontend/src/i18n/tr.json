@@ -607,6 +607,16 @@
     "transcribed": "🎙️ Yazıya döküldü{language}: \"{preview}\"",
     "noSpeechDetected": "⚠️ Kayıtta konuşma algılanmadı",
     "transcriptionFailed": "Yazıya dökme başarısız: {error}",
+    "mic": {
+      "permissionWeb": "Mikrofon erişimi engellendi. Tarayıcı ayarlarından izin ver ve tekrar dene.",
+      "permissionIos": "Mikrofon erişimi kapalı. iOS Ayarlar uygulamasını aç, bu uygulamayı seç ve Mikrofon seçeneğini etkinleştir.",
+      "permissionAndroid": "Mikrofon erişimi kapalı. Android ayarlarını aç, bu uygulamayı seç ve Mikrofon iznini ver.",
+      "noDevices": "Mikrofon bulunamadı. Bir mikrofon bağla ve tekrar dene.",
+      "inUse": "Mikrofon başka bir uygulama tarafından kullanılıyor. O uygulamayı kapat ve tekrar dene.",
+      "aborted": "Mikrofon erişimi kesildi. Lütfen tekrar dene.",
+      "notSupported": "Sesli giriş burada kullanılamıyor.",
+      "unknown": "Mikrofon başlatılamadı. Lütfen tekrar dene."
+    },
     "dropFiles": "Dosyaları buraya bırakın",
     "dropFilesHint": "Resimler, belgeler, ses dosyaları...",
     "filesPasted": "{count} dosya yapıştırıldı",
@@ -1713,7 +1723,8 @@
       "restoreTitle": "Satın alımları geri yükle",
       "restoreDone": "Satın alımlar geri yüklendi — aboneliğiniz aktif.",
       "restoreNone": "Geri yüklenecek aktif bir abonelik bulunamadı.",
-      "storeNote": "Satın alımlar ve abonelikler App Store veya Google Play üzerinden işlenir ve yönetilir.",
+      "storeNoteIos": "Satın alımlar ve abonelikler App Store üzerinden işlenir ve yönetilir.",
+      "storeNoteAndroid": "Satın alımlar ve abonelikler Google Play üzerinden işlenir ve yönetilir.",
       "redeemBlockedExistingIos": "Bu hesabın zaten aktif bir aboneliği var, bu yüzden son mağaza satın alman bağlanmadı. Çifte ücretlendirmeyi önlemek için Apple ID aboneliklerini kontrol et ve gerekirse oradan iade talep et.",
       "redeemBlockedExistingAndroid": "Bu hesabın zaten aktif bir aboneliği var, bu yüzden son mağaza satın alman bağlanmadı. Google Play, onaylanmayan satın almaları birkaç gün içinde otomatik olarak iade eder."
     },
@@ -3329,6 +3340,7 @@
     "welcome": {
       "title": "Hoş geldin",
       "subtitle": "Tüm yapay zekâlar, tüm özellikler tek bir yerde",
+      "aiNotice": "Devam ederek gönderdiklerinin — mesajlar, dosyalar, görseller ve ses kayıtları — yanıt üretebilmeleri için üçüncü taraf yapay zekâ sağlayıcılarına iletilmesini kabul etmiş olursun. E-posta adresin gibi hesap bilgilerin bu isteklerin hiçbir zaman parçası olmaz.",
       "pillServer": "Kendi sunucun",
       "pillRag": "RAG",
       "pillWidget": "Sohbet widget'ı"

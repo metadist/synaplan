@@ -354,6 +354,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { chatApi } from '@/services/api/chatApi'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
+import { isNativeApp } from '@/services/api/nativeRuntime'
 import type { FileItem } from '@/services/filesService'
 import { getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
@@ -513,10 +514,14 @@ const speechLanguage = computed(() => {
  * Determine if microphone button should be shown.
  * Show when: Web Speech API is supported OR any backend speech-to-text is available.
  * Backend speech-to-text includes: local Whisper.cpp OR API models (Groq/OpenAI Whisper).
+ *
+ * MOBILE-APP SEAM: in the app the Web Speech API does not count (see
+ * `useWebSpeech`), so the button only appears when the server can transcribe.
+ * Offering it without a working path is what produced the review rejection.
  */
 const showMicrophoneButton = computed(() => {
   const speechToTextAvailable = configStore.speech.speechToTextAvailable
-  const webSpeechSupported = isWebSpeechSupported()
+  const webSpeechSupported = isWebSpeechSupported() && !isNativeApp()
 
   // Show if either browser API or backend transcription is available
   return webSpeechSupported || speechToTextAvailable
@@ -543,11 +548,17 @@ const textareaPaddingRightPx = computed(() => {
  *
  * - Web Speech API: Real-time streaming, works in Chrome/Edge/Safari
  * - Whisper backend: Record-then-transcribe, works everywhere
+ *
+ * MOBILE-APP SEAM: never in the app. `isWebSpeechSupported()` only checks that
+ * the constructor exists, and iOS WKWebView exposes `webkitSpeechRecognition`
+ * without a working recognition service behind it. The request fails with
+ * `not-allowed` before the system ever asks for the microphone, so the user
+ * sees a permission error for a permission that was never requested. Going
+ * straight to the recorder keeps `getUserMedia` in charge, which is what
+ * triggers the real iOS/Android permission prompt.
  */
 const useWebSpeech = computed(() => {
-  // Web Speech API has PRIORITY - use it whenever available
-  // This gives real-time streaming text as user speaks
-  return isWebSpeechSupported()
+  return isWebSpeechSupported() && !isNativeApp()
 })
 
 // Input persistence - auto-save with proper debouncing. Disabled during an
@@ -1323,7 +1334,7 @@ const startWhisperRecording = async () => {
       },
       onError: (error) => {
         console.error('❌ Recording error:', error)
-        showError(error.userMessage)
+        showError(t(error.messageKey))
         isRecording.value = false
       },
     })
@@ -1332,7 +1343,7 @@ const startWhisperRecording = async () => {
     const support = await audioRecorder.value.checkSupport()
     if (!support.supported || !support.hasDevices) {
       if (support.error) {
-        showError(support.error.userMessage)
+        showError(t(support.error.messageKey))
       }
       return
     }
@@ -1341,10 +1352,11 @@ const startWhisperRecording = async () => {
     await audioRecorder.value.startRecording()
   } catch (err: unknown) {
     console.error('❌ Failed to start recording:', err)
-    const error = err as { userMessage?: string; message?: string }
+    const error = err as { messageKey?: string; message?: string }
     showError(
-      error.userMessage ||
-        t('chatInput.recordingError', { error: error.message || 'Unknown error' })
+      error.messageKey
+        ? t(error.messageKey)
+        : t('chatInput.recordingError', { error: error.message || 'Unknown error' })
     )
     isRecording.value = false
   }

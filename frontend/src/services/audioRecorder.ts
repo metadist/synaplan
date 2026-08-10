@@ -3,6 +3,8 @@
  * Handles microphone access, recording, and transcription
  */
 
+import { getNativePlatform } from '@/services/api/nativeRuntime'
+
 export interface AudioRecorderOptions {
   onDataAvailable?: (blob: Blob) => void
   onError?: (error: AudioRecorderError) => void
@@ -14,7 +16,27 @@ export interface AudioRecorderError {
   type: 'permission' | 'not_found' | 'in_use' | 'not_supported' | 'unknown'
   name: string
   message: string
-  userMessage: string
+  /**
+   * i18n key of the text shown to the user. The service stays free of the
+   * translator so it can run outside a component; the caller resolves it.
+   */
+  messageKey: string
+}
+
+/**
+ * MOBILE-APP SEAM: telling someone to open their "browser settings" is wrong
+ * inside the app — there is no browser UI, and the permission lives in the
+ * operating system. Each platform gets the route that actually exists on it.
+ */
+function permissionMessageKey(): string {
+  switch (getNativePlatform()) {
+    case 'ios':
+      return 'chatInput.mic.permissionIos'
+    case 'android':
+      return 'chatInput.mic.permissionAndroid'
+    default:
+      return 'chatInput.mic.permissionWeb'
+  }
 }
 
 export class AudioRecorder {
@@ -45,8 +67,7 @@ export class AudioRecorder {
             type: 'not_supported',
             name: 'NotSupported',
             message: 'MediaDevices API not available',
-            userMessage:
-              '🚫 Your browser does not support audio recording. Please use a modern browser like Chrome, Firefox, or Edge.',
+            messageKey: 'chatInput.mic.notSupported',
           },
         }
       }
@@ -59,7 +80,7 @@ export class AudioRecorder {
             type: 'not_supported',
             name: 'NotSupported',
             message: 'MediaRecorder not available',
-            userMessage: '🚫 Recording is not supported by your browser.',
+            messageKey: 'chatInput.mic.notSupported',
           },
         }
       }
@@ -84,8 +105,7 @@ export class AudioRecorder {
               type: 'not_found',
               name: 'NoDevices',
               message: 'No audio input devices found',
-              userMessage:
-                '🎤 No microphone detected. Please connect a microphone and refresh the page.\n\n💡 Note: On WSL2/Linux, audio devices might not be accessible from the browser.',
+              messageKey: 'chatInput.mic.noDevices',
             },
           }
         }
@@ -268,8 +288,7 @@ export class AudioRecorder {
         type: 'permission',
         name,
         message,
-        userMessage:
-          '🔒 Microphone permission denied. Please allow microphone access in your browser settings and refresh the page.',
+        messageKey: permissionMessageKey(),
       }
     }
 
@@ -279,8 +298,7 @@ export class AudioRecorder {
         type: 'not_found',
         name,
         message,
-        userMessage:
-          '🎤 No microphone found. Please connect a microphone and try again.\n\n💡 Note: On WSL2/Linux, audio devices might not be accessible from the browser. Try accessing from Windows host.',
+        messageKey: 'chatInput.mic.noDevices',
       }
     }
 
@@ -290,8 +308,7 @@ export class AudioRecorder {
         type: 'in_use',
         name,
         message,
-        userMessage:
-          '⚠️ Microphone is already in use by another application. Please close other apps using the microphone and try again.',
+        messageKey: 'chatInput.mic.inUse',
       }
     }
 
@@ -301,7 +318,7 @@ export class AudioRecorder {
         type: 'unknown',
         name,
         message,
-        userMessage: '⚠️ Microphone access was aborted. Please try again.',
+        messageKey: 'chatInput.mic.aborted',
       }
     }
 
@@ -311,8 +328,7 @@ export class AudioRecorder {
         type: 'permission',
         name,
         message,
-        userMessage:
-          '🔒 Microphone access blocked by security settings. Please use HTTPS or allow microphone in browser settings.',
+        messageKey: permissionMessageKey(),
       }
     }
 
@@ -321,7 +337,7 @@ export class AudioRecorder {
       type: 'unknown',
       name,
       message,
-      userMessage: `⚠️ Microphone error: ${name}\n${message}`,
+      messageKey: 'chatInput.mic.unknown',
     }
   }
 }

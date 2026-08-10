@@ -14,9 +14,31 @@
       {{ $t('onboarding.welcome.subtitle') }}
     </p>
 
+    <!--
+      MOBILE-APP SEAM (App Review 2.1): Synaplan answers through third-party AI
+      models, so the first screen states what leaves the device before anything
+      can be sent. The CTA below is the affirmative act — no extra gate, but no
+      chat without having read this either.
+    -->
+    <div class="mt-10 space-y-1.5 onb-enter-4" data-testid="section-onboarding-ai-notice">
+      <p class="text-xs txt-tertiary leading-relaxed">
+        {{ $t('onboarding.welcome.aiNotice') }}
+      </p>
+      <p class="text-xs txt-tertiary">
+        <a
+          :href="config.branding.privacyUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-brand hover:underline underline-offset-2"
+          data-testid="link-onboarding-privacy"
+          >{{ $t('auth.privacyPolicy') }}</a
+        >
+      </p>
+    </div>
+
     <!-- Primary action: the focused "get started" CTA. -->
     <button
-      class="mt-10 w-full py-3.5 rounded-xl btn-primary font-semibold text-base transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-4"
+      class="mt-5 w-full py-3.5 rounded-xl btn-primary font-semibold text-base transition-all duration-200 hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98] onb-enter-4"
       data-testid="btn-welcome-next"
       @click="emit('next')"
     >
@@ -79,7 +101,8 @@
 /**
  * MOBILE-APP SEAM (first-run onboarding), page 1: welcome + quiet entry points.
  *
- * One focused "get started" CTA advances to the plans page. Below it, a row of
+ * One focused "get started" CTA advances to the plans page. Above it sits the
+ * AI-processing notice with the privacy-policy link; below it, a row of
  * deliberately understated pills open modals: "own server" (URL entry that
  * points the app at a self-hosted Synaplan server) and two info modals that
  * explain RAG and the chat widget. All modals close back to this page.
