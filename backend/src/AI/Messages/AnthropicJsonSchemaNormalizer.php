@@ -11,7 +11,8 @@ namespace App\AI\Messages;
  * `['properties' => []]`. A later {@see json_encode} then emits
  * `"properties":[]`, which Anthropic rejects (`input_schema.properties: Input
  * should be an object`). The same corruption hits empty schema objects used as
- * `additionalProperties: {}` (Claude Code's TaskCreate `metadata` field).
+ * `additionalProperties: {}` (Claude Code's TaskCreate `metadata` field) and
+ * empty child schemas such as a property defined as `{}` or `items: {}`.
  *
  * Claude Code ships several tools with these empty objects; the moment the
  * gateway mutates the body (tool injection, vision rewrite, …) and re-encodes,
@@ -54,10 +55,15 @@ final class AnthropicJsonSchemaNormalizer
     /**
      * @param array<string, mixed> $schema
      *
-     * @return array<string, mixed>
+     * @return array<string, mixed>|\stdClass
      */
-    public function normalizeSchema(array $schema): array
+    public function normalizeSchema(array $schema): array|\stdClass
     {
+        // A wholly empty schema object (`{}`) becomes [] after json_decode(true).
+        if ([] === $schema) {
+            return new \stdClass();
+        }
+
         if (\array_key_exists('properties', $schema)) {
             $schema['properties'] = $this->objectOrWalk($schema['properties']);
         }
@@ -70,20 +76,20 @@ final class AnthropicJsonSchemaNormalizer
             // `additionalProperties: {}` is a valid empty schema object; after
             // json_decode(true) it is []. Re-encoding that as a JSON array makes
             // Anthropic reject the whole tool schema as invalid draft 2020-12.
-            $schema['additionalProperties'] = [] === $schema['additionalProperties']
-                ? new \stdClass()
-                : $this->normalizeSchema($schema['additionalProperties']);
+            $schema['additionalProperties'] = $this->normalizeSchema($schema['additionalProperties']);
         }
 
         if (\array_key_exists('propertyNames', $schema) && \is_array($schema['propertyNames'])) {
-            $schema['propertyNames'] = [] === $schema['propertyNames']
-                ? new \stdClass()
-                : $this->normalizeSchema($schema['propertyNames']);
+            $schema['propertyNames'] = $this->normalizeSchema($schema['propertyNames']);
         }
 
         if (\array_key_exists('items', $schema) && \is_array($schema['items'])) {
-            // Tuple form (list of schemas) vs single schema object.
-            if ($this->isList($schema['items'])) {
+            // Empty [] here is ambiguous (tuple of zero vs empty schema object).
+            // Prefer the schema-object reading — `items: {}` is the form that
+            // actually appears in tool schemas; `items: []` is useless.
+            if ([] === $schema['items']) {
+                $schema['items'] = new \stdClass();
+            } elseif ($this->isList($schema['items'])) {
                 foreach ($schema['items'] as $i => $item) {
                     if (\is_array($item)) {
                         $schema['items'][$i] = $this->normalizeSchema($item);
@@ -134,6 +140,7 @@ final class AnthropicJsonSchemaNormalizer
 
         foreach ($value as $key => $child) {
             if (\is_array($child)) {
+                // Nested property schemas may themselves be empty objects.
                 $value[$key] = $this->normalizeSchema($child);
             }
         }

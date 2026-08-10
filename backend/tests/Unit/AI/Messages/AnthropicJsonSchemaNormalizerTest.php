@@ -113,4 +113,40 @@ final class AnthropicJsonSchemaNormalizerTest extends TestCase
 
         self::assertStringContainsString('"properties":{}', $encoded);
     }
+
+    public function testEmptyChildPropertySchemaBecomesObject(): void
+    {
+        // {"properties":{"extra":{}}} → property "extra" decodes as [].
+        $schema = [
+            'type' => 'object',
+            'properties' => [
+                'extra' => [],
+            ],
+        ];
+
+        $encoded = json_encode($this->normalizer->normalizeSchema($schema), \JSON_THROW_ON_ERROR);
+
+        self::assertStringContainsString('"extra":{}', $encoded);
+        self::assertStringNotContainsString('"extra":[]', $encoded);
+    }
+
+    public function testEmptyItemsSchemaBecomesObject(): void
+    {
+        $schema = [
+            'type' => 'array',
+            'items' => [],
+        ];
+
+        $encoded = json_encode($this->normalizer->normalizeSchema($schema), \JSON_THROW_ON_ERROR);
+
+        self::assertStringContainsString('"items":{}', $encoded);
+        self::assertStringNotContainsString('"items":[]', $encoded);
+    }
+
+    public function testEmptyRootSchemaBecomesObject(): void
+    {
+        $encoded = json_encode($this->normalizer->normalizeSchema([]), \JSON_THROW_ON_ERROR);
+
+        self::assertSame('{}', $encoded);
+    }
 }
