@@ -8,11 +8,28 @@
   "enabled": true,
   "timezone": "Europe/Berlin",
   "prHourlyLimit": 2,
+  // Make the implicit Renovate default (10) explicit. Grouping already collapses
+  // minor/patch into ~6 buckets, so this is a backlog cap, not a per-dependency knob.
+  "prConcurrentLimit": 10,
   "prCreation": "immediate",
   "dependencyDashboard": true,
   "labels": ["dependencies"],
   "ignorePaths": ["_devextras/mail-handler-test/**"],
+  // Security fixes (GitHub advisories) bypass the stability gate below and are
+  // labelled so they stand out from routine updates.
+  "vulnerabilityAlerts": {
+    "labels": ["dependencies", "security"]
+  },
   "packageRules": [
+    {
+      "description": "Stability gate: let fresh releases prove themselves before we open a PR (supply-chain + broken-release protection). Security fixes bypass this.",
+      "matchDatasources": ["*"],
+      "minimumReleaseAge": "3 days",
+      // Docker/registry sources without a reliable publish timestamp would otherwise
+      // hang forever; treat missing timestamps as "passed" for them.
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
+      "internalChecksFilter": "strict"
+    },
     {
       "description": "Catch-all composer patch/minor FIRST — later rules override groupName for Framework/QA",
       "groupName": "Backend Dependencies",
@@ -66,5 +83,16 @@
       "automerge": false,
       "labels": ["dependencies", "breaking"]
     }
+    // PLANNED (not enabled yet): auto-merge dev/QA tooling once we trust the
+    // stability gate. Dev-only deps are fully covered by CI; runtime deps, the
+    // PHP Framework and all majors would stay manual. Requires branch protection
+    // (required status checks) + platformAutomerge before switching on. Enable by
+    // uncommenting and adding a comma after the "Major updates" rule above:
+    // {
+    //   "description": "Auto-merge dev/QA tooling once the stability gate and CI both pass",
+    //   "matchDepTypes": ["devDependencies", "require-dev"],
+    //   "matchUpdateTypes": ["minor", "patch"],
+    //   "automerge": true
+    // }
   ]
 }
