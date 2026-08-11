@@ -1489,12 +1489,27 @@ secrets_resolved="$(run_ensure_secrets)"
 assert_resolves_secrets_before_compose() {
     local script="$1"
     local requirement="${2:-always}"
-    local name ensure_line stack_line
+    local name ensure_line stack_line direct_line
     name="$(basename "$script")"
-    ensure_line="$(awk '/^ensure_deployment_secrets$/ { print NR; exit }' "$script")"
+    ensure_line="$(awk '/^[[:space:]]*ensure_deployment_secrets$/ { print NR; exit }' "$script")"
+
+    # Two searches, because indentation means something different for each half
+    # of this rule.
+    #
+    # WHETHER a script needs the secrets is answered at any indentation: a
+    # `compose` or `app_tool` call inside a function body or an if-block reaches
+    # the stack exactly like one in the main flow, and searching only column 0
+    # would let a whole function through unseen. Delegating to a sibling script
+    # (`"$DEPLOY_DIR/scripts/...`) is deliberately not counted here — the child
+    # resolves its own secrets, which is the point of the portable scripts.
+    direct_line="$(awk '/^[[:space:]]*(compose |app_tool |begin_service_pause|pause_services|resume_paused_services|wait_for_service_health|validate_)/ { print NR; exit }' "$script")"
+    # WHERE the secrets are resolved can only be judged in the main flow, where
+    # line order is execution order. Inside a function, the line number says
+    # nothing about when the call runs, so those are left out of the comparison
+    # rather than guessed at.
     stack_line="$(awk '/^(compose |app_tool |begin_service_pause|pause_services|resume_paused_services|wait_for_service_health|validate_|"\$DEPLOY_DIR)/ { print NR; exit }' "$script")"
 
-    [[ "$requirement" == only-when-it-does && -z "$stack_line" ]] && return 0
+    [[ "$requirement" == only-when-it-does && -z "$direct_line" && -z "$stack_line" ]] && return 0
 
     [[ -n "$ensure_line" ]] || {
         printf '%s reaches the stack without resolving the deployment secrets first\n' "$name" >&2
