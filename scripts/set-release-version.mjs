@@ -2,7 +2,7 @@
 
 // Writes a published release version into the files that decide which version a
 // NEW deployment installs: the Elestio manifest, the self-hosting example
-// configuration, and the Umbrel App Store package.
+// configuration, the Umbrel App Store package, and the AWS Packer build.
 //
 // Existing deployments are untouched by design. They keep the version their
 // operator pinned, and change it only by following docs/UPDATE_ELESTIO.md,
@@ -222,6 +222,52 @@ export const readUmbrelComposePin = (text) => {
   }
 }
 
+// The AMI carries its release in the Packer default, which is what a build with
+// no arguments bakes in — and what firstboot.sh then pins deploy/.env to. Only
+// the `synaplan_version` variable block: `default` appears in every other
+// variable in the file, so matching it alone would rewrite whichever one comes
+// first.
+export const applyPackerVersion = (text, version) => {
+  const lines = text.split('\n')
+  let inVersionBlock = false
+  let replaced = 0
+
+  const result = lines.map((line) => {
+    if (/^variable\s+"synaplan_version"\s*\{\s*$/.test(line)) {
+      inVersionBlock = true
+      return line
+    }
+
+    if (!inVersionBlock) return line
+
+    if (/^\}\s*$/.test(line)) {
+      inVersionBlock = false
+      return line
+    }
+
+    const match = /^(\s*)default(\s*)=\s*.*$/.exec(line)
+    if (!match) return line
+
+    replaced += 1
+    return `${match[1]}default${match[2]}= "${version}"`
+  })
+
+  if (replaced !== 1) {
+    throw new Error(
+      `deploy/aws/packer/synaplan.pkr.hcl: expected exactly one synaplan_version default, found ${replaced}`
+    )
+  }
+
+  return result.join('\n')
+}
+
+export const readPackerVersion = (text) => {
+  const block = /^variable\s+"synaplan_version"\s*\{$([\s\S]*?)^\}$/m.exec(text)
+  if (!block) return null
+  const match = /^\s*default\s*=\s*"([^"\n]*)"\s*$/m.exec(block[1])
+  return match ? match[1].trim() : null
+}
+
 const TARGETS = [
   { path: 'elestio.yml', apply: (text, version) => applyElestioVersion(text, version) },
   {
@@ -236,6 +282,10 @@ const TARGETS = [
     path: join('deploy', 'umbrel', 'synaplan', 'docker-compose.yml'),
     apply: (text, version, digest) => applyUmbrelComposeVersion(text, version, digest),
     needsDigest: true,
+  },
+  {
+    path: join('deploy', 'aws', 'packer', 'synaplan.pkr.hcl'),
+    apply: (text, version) => applyPackerVersion(text, version),
   },
 ]
 

@@ -7,12 +7,14 @@ import { fileURLToPath } from 'node:url'
 import {
   applyElestioVersion,
   applyEnvExampleVersion,
+  applyPackerVersion,
   applyUmbrelAppVersion,
   applyUmbrelComposeVersion,
   parseImageDigest,
   parseReleaseVersion,
   readElestioVersion,
   readEnvExampleVersion,
+  readPackerVersion,
   readUmbrelAppVersion,
   readUmbrelComposePin,
 } from '../scripts/set-release-version.mjs'
@@ -41,6 +43,23 @@ const UMBREL_COMPOSE_SAMPLE = [
   'services:',
   '  web:',
   '    image: *app-image',
+].join('\n')
+
+// Two variable blocks, both with a `default`, because that is the shape of the
+// real file: an anchor on `default` alone would rewrite whichever comes first.
+const PACKER_SAMPLE = [
+  'variable "synaplan_version" {',
+  '  type = string',
+  '  # Raised by the release automation.',
+  '  default     = "4.0.12"',
+  '  description = "Released SemVer version to bake in."',
+  '}',
+  '',
+  'variable "region" {',
+  '  type        = string',
+  '  default     = "us-east-1"',
+  '  description = "Build region."',
+  '}',
 ].join('\n')
 
 const DIGEST_A = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
@@ -205,6 +224,51 @@ test('fails when either Umbrel compose anchor is missing', () => {
   )
 })
 
+test('rewrites the Packer release default and no other variable default', () => {
+  const result = applyPackerVersion(PACKER_SAMPLE, '4.0.14')
+
+  assert.ok(result.includes('  default     = "4.0.14"'))
+  assert.ok(result.includes('  default     = "us-east-1"'))
+  assert.ok(result.includes('  # Raised by the release automation.'))
+  assert.ok(!result.includes('4.0.12'))
+  assert.equal(result.split('\n').length, PACKER_SAMPLE.split('\n').length)
+})
+
+test('fails when the Packer release default is missing or duplicated', () => {
+  assert.throws(
+    () => applyPackerVersion('variable "synaplan_version" {\n  type = string\n}\n', '4.0.14'),
+    /found 0/
+  )
+
+  assert.throws(
+    () =>
+      applyPackerVersion(
+        'variable "synaplan_version" {\n  default = "1.0.0"\n  default = "2.0.0"\n}\n',
+        '4.0.14'
+      ),
+    /found 2/
+  )
+})
+
+// A default outside the block must not be picked up, in either direction: the
+// writer would rewrite the wrong variable, the reader would report its value as
+// the release.
+test('the Packer anchors ignore a default that belongs to another variable', () => {
+  const regionFirst = [
+    'variable "region" {',
+    '  default = "us-east-1"',
+    '}',
+    '',
+    'variable "synaplan_version" {',
+    '  default = "4.0.12"',
+    '}',
+  ].join('\n')
+
+  assert.equal(readPackerVersion(regionFirst), '4.0.12')
+  assert.ok(applyPackerVersion(regionFirst, '4.0.14').includes('  default = "us-east-1"'))
+  assert.equal(readPackerVersion('variable "region" {\n  default = "us-east-1"\n}'), null)
+})
+
 // readUmbrelComposePin builds a regex from the repository name. A partial
 // escape (dots only) would still work for `ghcr.io/metadist/synaplan` today,
 // but would misparse — or throw on — a line whose image differs by even one
@@ -234,6 +298,9 @@ test('the shipped files name one and the same released version', () => {
   )
   const umbrelCompose = readUmbrelComposePin(
     readFileSync(join(ROOT, 'deploy', 'umbrel', 'synaplan', 'docker-compose.yml'), 'utf8')
+  )
+  const packer = readPackerVersion(
+    readFileSync(join(ROOT, 'deploy', 'aws', 'packer', 'synaplan.pkr.hcl'), 'utf8')
   )
 
   assert.equal(
@@ -267,10 +334,17 @@ test('the shipped files name one and the same released version', () => {
     `umbrel docker-compose image must pin a digest, found ${JSON.stringify(umbrelCompose.digest)}`
   )
 
+  assert.equal(
+    parseReleaseVersion(packer),
+    packer,
+    `the AWS Packer build must bake a released version, found ${JSON.stringify(packer)}`
+  )
+
   assert.equal(elestio, example, 'Elestio and self-host must install the same version')
   assert.equal(elestio, umbrelApp, 'Umbrel store version must match Elestio')
   assert.equal(elestio, umbrelCompose.appVersion, 'Umbrel APP_VERSION must match Elestio')
   assert.equal(elestio, umbrelCompose.version, 'Umbrel image tag must match Elestio')
+  assert.equal(elestio, packer, 'The AWS AMI must bake the same version as Elestio')
 })
 
 test('a comment mentioning the variable is not treated as an assignment', () => {
