@@ -30,6 +30,11 @@ final class UpdatePlatformGuideTest extends TestCase
             UpdatePlatformGuide::PLATFORM_ELESTIO,
             UpdatePlatformGuide::GUIDE_URL_ELESTIO,
         ];
+        yield 'aws' => [
+            'aws',
+            UpdatePlatformGuide::PLATFORM_AWS,
+            UpdatePlatformGuide::GUIDE_URL_AWS,
+        ];
         yield 'selfhost' => [
             'selfhost',
             UpdatePlatformGuide::PLATFORM_SELFHOST,

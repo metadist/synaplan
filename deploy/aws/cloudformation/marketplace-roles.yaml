@@ -1,0 +1,218 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  The two roles the Synaplan AWS Marketplace listing needs in the seller
+  account: one for AWS Marketplace to read a published AMI, and one for this
+  repository's release workflow to build and verify it. Deployed once, by hand,
+  in us-east-1, with CAPABILITY_NAMED_IAM. It is not part of the product, is
+  never launched by a buyer, and therefore needs no architecture diagram.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: GitHub
+        Parameters:
+          - GitHubRepository
+          - CreateOidcProvider
+    ParameterLabels:
+      GitHubRepository: {default: Repository allowed to assume the build role}
+      CreateOidcProvider: {default: Create the GitHub OIDC provider}
+
+Parameters:
+  GitHubRepository:
+    Type: String
+    Default: metadist/synaplan
+    AllowedPattern: '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$'
+    ConstraintDescription: Must be owner/repository.
+    Description: >-
+      Only workflow runs of this repository may assume the build role. The trust
+      policy below narrows it further, to the branches and tags that build a
+      release.
+
+  CreateOidcProvider:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: >-
+      An account can hold only one provider per URL. Set this to false if the
+      account already trusts token.actions.githubusercontent.com.
+
+Conditions:
+  WantsOidcProvider: !Equals [!Ref CreateOidcProvider, 'true']
+
+Resources:
+  # GitHub signs a short-lived token per workflow run and AWS verifies it
+  # against this provider. That is what replaces a stored access key: there is
+  # no credential to leak, and a token is useless outside the run it was minted
+  # for.
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: WantsOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  AmiBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Assumed by the Synaplan release workflow to build and verify the Marketplace AMI.
+      MaxSessionDuration: 7200
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - WantsOidcProvider
+                - !Ref GitHubOidcProvider
+                - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              # Without a subject condition, ANY repository on GitHub could
+              # assume this role. Release tags and manual runs on the default
+              # branch are the only things that build an AMI.
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - !Sub 'repo:${GitHubRepository}:ref:refs/tags/v*'
+                  - !Sub 'repo:${GitHubRepository}:ref:refs/heads/main'
+      Policies:
+        - PolicyName: packer-build
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Packer's own set: a temporary instance, a temporary key pair and
+              # security group, then the image and its snapshots.
+              - Effect: Allow
+                Resource: '*'
+                Action:
+                  - ec2:DescribeImages
+                  - ec2:DescribeInstances
+                  - ec2:DescribeInstanceStatus
+                  - ec2:DescribeInstanceTypeOfferings
+                  - ec2:DescribeRegions
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeSnapshots
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeTags
+                  - ec2:DescribeVolumes
+                  - ec2:DescribeVpcs
+                  - ec2:RunInstances
+                  - ec2:StopInstances
+                  - ec2:TerminateInstances
+                  - ec2:CreateKeyPair
+                  - ec2:DeleteKeyPair
+                  - ec2:CreateSecurityGroup
+                  - ec2:DeleteSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:CreateTags
+                  - ec2:DeleteVolume
+                  - ec2:CreateImage
+                  - ec2:DeregisterImage
+                  - ec2:CopyImage
+                  - ec2:ModifyImageAttribute
+                  - ec2:CreateSnapshot
+                  - ec2:DeleteSnapshot
+                  - ec2:ModifySnapshotAttribute
+
+        # The verification stack the same workflow launches from
+        # synaplan-new-vpc.yaml, and deletes again. It creates an instance role,
+        # so the workflow needs to be able to create one — narrowed to the path
+        # CloudFormation generates for a stack.
+        - PolicyName: verification-stack
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Resource: '*'
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:DescribeStackResources
+                  - ec2:CreateVpc
+                  - ec2:DeleteVpc
+                  - ec2:ModifyVpcAttribute
+                  - ec2:CreateSubnet
+                  - ec2:DeleteSubnet
+                  - ec2:CreateInternetGateway
+                  - ec2:DeleteInternetGateway
+                  - ec2:AttachInternetGateway
+                  - ec2:DetachInternetGateway
+                  - ec2:CreateRouteTable
+                  - ec2:DeleteRouteTable
+                  - ec2:CreateRoute
+                  - ec2:DeleteRoute
+                  - ec2:AssociateRouteTable
+                  - ec2:DisassociateRouteTable
+                  - ec2:CreateVolume
+                  - ec2:AttachVolume
+                  - ec2:DetachVolume
+                  - ec2:RevokeSecurityGroupEgress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:DescribeRouteTables
+                  - ec2:DescribeInternetGateways
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeIamInstanceProfileAssociations
+                  - ssm:SendCommand
+                  - ssm:GetCommandInvocation
+                  - ssm:DescribeInstanceInformation
+                  - ssm:CreateDocument
+                  - ssm:DeleteDocument
+                  - ssm:DescribeDocument
+                  - ssm:AddTagsToResource
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:PassRole
+                  - iam:TagRole
+                  - iam:PutRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                  - iam:CreateInstanceProfile
+                  - iam:DeleteInstanceProfile
+                  - iam:GetInstanceProfile
+                  - iam:AddRoleToInstanceProfile
+                  - iam:RemoveRoleFromInstanceProfile
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/synaplan-verify-*'
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:instance-profile/synaplan-verify-*'
+
+  # AWS Marketplace assumes this to copy a submitted AMI into its own account.
+  # The managed policy is the one AWS documents for it; writing the permissions
+  # out by hand here would go stale the next time they change it.
+  AmiIngestionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AWSMarketplaceAmiIngestion
+      Description: Assumed by AWS Marketplace to read a submitted Synaplan AMI.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: assets.marketplace.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AWSMarketplaceAmiIngestion'
+
+Outputs:
+  BuildRoleArn:
+    Description: >-
+      Store this as the repository secret AWS_AMI_BUILD_ROLE_ARN. Until it is
+      set, .github/workflows/aws-ami.yml skips itself with a notice.
+    Value: !GetAtt AmiBuildRole.Arn
+
+  IngestionRoleArn:
+    Description: >-
+      Name this role in the AWS Marketplace Management Portal, under Settings,
+      so the AMI scan can read a submitted image.
+    Value: !GetAtt AmiIngestionRole.Arn

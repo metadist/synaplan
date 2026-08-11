@@ -1,0 +1,62 @@
+# Multi-region launch test for the two delivery templates.
+#
+# cfn-lint (run on every push, see .github/workflows/ci.yml) proves the
+# templates are well-formed. taskcat proves they actually launch: it creates the
+# stacks for real, in several regions at once, and deletes them again. That is
+# the last step before asking AWS Marketplace to make the listing public, and
+# the only one that catches a region where the chosen instance type does not
+# exist or the AMI was never copied.
+#
+# It is deliberately NOT part of CI: every region here is real instance time in
+# the seller account, so it is run by hand, per release.
+#
+#   pip install taskcat
+#   cd deploy/aws
+#   taskcat test run --regions eu-central-1
+#
+# An AMI id is only valid in the region it was copied to, so fill in the ids
+# below and run one region per invocation. The same goes for the VPC and subnet
+# of the existing-vpc test.
+#
+# Keep the region list short. Two or three regions cover the failure this test
+# exists for; a full sweep costs a stack in every region for no extra signal.
+
+project:
+  name: synaplan
+  owner: support@synaplan.com
+  package_lambda: false
+  shorten_stack_name: true
+  regions:
+    - us-east-1
+    - eu-central-1
+
+tests:
+  new-vpc:
+    template: cloudformation/synaplan-new-vpc.yaml
+    parameters:
+      # Overridden per run: an AMI id is only valid in its own region.
+      ImageId: ami-00000000000000000
+      # The smallest allowed shape. The templates default to a production size,
+      # which this test has no use for.
+      InstanceType: c7i.xlarge
+      DataVolumeSize: 20
+      # The DataVolume carries DeletionPolicy Snapshot, so leaving this on would
+      # also leave paid snapshots behind after taskcat deletes the stacks.
+      EnableDailySnapshots: 'false'
+      AdminEmail: $[taskcat_genuuid]@example.com
+
+  existing-vpc:
+    template: cloudformation/synaplan-existing-vpc.yaml
+    parameters:
+      ImageId: ami-00000000000000000
+      InstanceType: c7i.xlarge
+      DataVolumeSize: 20
+      EnableDailySnapshots: 'false'
+      AdminEmail: $[taskcat_genuuid]@example.com
+      # This template deploys into a network it does not own, and taskcat has no
+      # lookup for one. Fill in the test account's default VPC and one of its
+      # public subnets per region, alongside the AMI id:
+      #   aws ec2 describe-vpcs --filters Name=is-default,Values=true \
+      #     --query 'Vpcs[0].VpcId' --output text --region <region>
+      VpcId: vpc-00000000000000000
+      SubnetId: subnet-00000000000000000

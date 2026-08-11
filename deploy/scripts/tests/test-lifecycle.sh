@@ -219,6 +219,57 @@ for wrapper in "$SCRIPT_DIR/../elestio"/*.sh; do
     assert_no_direct_docker_compose "$wrapper"
 done
 
+# The AWS adapter is the same kind of wrapper, one layer further out: an EC2
+# instance runs these from systemd and from `synaplan-update` / `synaplan-snapshot`,
+# with no platform in between to resolve anything for them.
+AWS_DIR="$SCRIPT_DIR/../aws"
+for wrapper in "$AWS_DIR/scripts"/*.sh; do
+    assert_no_direct_docker_compose "$wrapper"
+done
+
+# The systemd units are the AWS equivalent of elestio.yml: the platform — here,
+# the instance itself — runs them outside every lifecycle hook, so a unit that
+# spelled out `docker compose` would be the one step of the deployment that
+# skipped the whole library.
+for unit in "$AWS_DIR/systemd"/*.service; do
+    assert_no_direct_docker_compose "$unit"
+done
+
+assert_systemd_runs() {
+    local unit="$AWS_DIR/systemd/$1"
+    local field="$2"
+    local script="$3"
+    grep -Eq "^$field=/opt/synaplan/$script( |\$)" "$unit" || {
+        printf '%s %s does not run /opt/synaplan/%s\n' "$1" "$field" "$script" >&2
+        exit 1
+    }
+}
+
+# Starting the stack is the portable script's job on AWS too, so an instance
+# comes up exactly the way a self-hosted install does.
+assert_systemd_runs synaplan.service ExecStart deploy/scripts/run.sh
+assert_systemd_runs synaplan-firstboot.service ExecStart deploy/aws/scripts/firstboot.sh
+
+# The update path owns no logic of its own: it is the portable backup gate, a
+# version bump, and the portable start. Dropping either half would turn
+# `synaplan-update` into an unguarded restart on a new image.
+for portable in pre-update.sh post-update.sh; do
+    grep -Fq "\$DEPLOY_DIR/scripts/$portable" "$AWS_DIR/scripts/update.sh" || {
+        printf 'deploy/aws/scripts/update.sh no longer calls deploy/scripts/%s\n' "$portable" >&2
+        exit 1
+    }
+done
+
+# systemd, the symlinks in /usr/local/bin and the SSM document all invoke these
+# by path. A file that lost its executable bit fails at boot, not at build.
+for script in "$AWS_DIR/scripts"/*.sh; do
+    [[ -x "$script" ]] || {
+        printf 'deploy/aws/scripts/%s is not executable, so the instance cannot invoke it\n' \
+            "$(basename "$script")" >&2
+        exit 1
+    }
+done
+
 # The same rule for the scripts, where lib.sh owns the single `docker compose`
 # invocation. Every other script has to reach Compose through compose().
 for script in "$SCRIPT_DIR"/*.sh; do
@@ -1430,26 +1481,39 @@ secrets_resolved="$(run_ensure_secrets)"
 # credentials. build.sh and pre-update.sh are the subtle ones: they call sibling
 # scripts as CHILD processes, whose exports never come back to them, and then run
 # a `compose pull` of their own.
+#
+# Pass "only-when-it-does" for a tree where reaching the stack is the exception
+# rather than the rule: the AWS adapter also contains image-build and first-boot
+# steps that run before a stack exists, and demanding the call there would only
+# teach the next author to add it as a ritual.
 assert_resolves_secrets_before_compose() {
-    local script="$SCRIPT_DIR/$1"
-    local ensure_line stack_line
+    local script="$1"
+    local requirement="${2:-always}"
+    local name ensure_line stack_line
+    name="$(basename "$script")"
     ensure_line="$(awk '/^ensure_deployment_secrets$/ { print NR; exit }' "$script")"
     stack_line="$(awk '/^(compose |app_tool |begin_service_pause|pause_services|resume_paused_services|wait_for_service_health|validate_|"\$DEPLOY_DIR)/ { print NR; exit }' "$script")"
 
+    [[ "$requirement" == only-when-it-does && -z "$stack_line" ]] && return 0
+
     [[ -n "$ensure_line" ]] || {
-        printf '%s reaches the stack without resolving the deployment secrets first\n' "$1" >&2
+        printf '%s reaches the stack without resolving the deployment secrets first\n' "$name" >&2
         exit 1
     }
     [[ -z "$stack_line" ]] || ((ensure_line < stack_line)) || {
         printf '%s calls ensure_deployment_secrets at line %s, after reaching the stack at line %s\n' \
-            "$1" "$ensure_line" "$stack_line" >&2
+            "$name" "$ensure_line" "$stack_line" >&2
         exit 1
     }
 }
 
 for script in "$SCRIPT_DIR"/*.sh; do
     [[ "$script" == */lib.sh ]] && continue
-    assert_resolves_secrets_before_compose "$(basename "$script")"
+    assert_resolves_secrets_before_compose "$script"
+done
+
+for script in "$AWS_DIR/scripts"/*.sh; do
+    assert_resolves_secrets_before_compose "$script" only-when-it-does
 done
 
 # The platform manifest must no longer declare the managed secrets. Elestio would

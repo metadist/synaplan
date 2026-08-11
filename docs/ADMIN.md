@@ -200,6 +200,7 @@ Follow the step-by-step guide for your platform:
 
 - [Update a Self-Hosted Deployment](UPDATE_SELFHOST.md)
 - [Update on Elestio](UPDATE_ELESTIO.md)
+- [Update on AWS (Marketplace AMI)](UPDATE_AWS.md)
 
 Production images must use a released, pinned `SYNAPLAN_VERSION`; never update
 a production deployment by following `latest`. Read the release notes and the

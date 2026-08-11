@@ -102,6 +102,13 @@ containers, every application container exits with code `78` before it touches
 the database, and the restart policy retries until the value is corrected. Full
 explanation:
 [Create the First Administrator](../docs/INSTALLATION.md#create-the-first-administrator).
+
+Set `BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE=true` when the password was generated
+by the deployment rather than typed by a person — a marketplace image that
+writes a per-instance password to a parameter store, for example. That
+credential then works exactly once: the account can sign in and do nothing but
+set its own password, enforced server-side, until it does. Leave it at `false`
+when you chose the password yourself.
 Configure a cloud AI key after login under Admin > AI Providers, or provide a
 bootstrap provider key in `deploy/.env`.
 
@@ -240,6 +247,15 @@ Platform-specific adapters must call the scripts in this directory rather than
 reimplementing operations. `deploy/elestio/` is the first thin adapter. Future
 Coolify, CapRover, or Railway definitions should preserve the same role,
 persistence, backup, restore, and health contracts.
+
+`deploy/aws/` is the AWS Marketplace AMI adapter and follows the same rule one
+layer further out: there is no managed platform on an EC2 instance, so systemd
+and the `synaplan-update` / `synaplan-snapshot` commands call these scripts
+directly. Its additions are the parts only AWS has — a Packer build, a first boot
+that configures itself from instance metadata, Caddy as a host TLS terminator,
+and CloudFormation templates.
+[`scripts/tests/test-lifecycle.sh`](scripts/tests/test-lifecycle.sh) enforces the
+contract for both adapters. Details in [`aws/README.md`](aws/README.md).
 
 `deploy/umbrel/` is the Umbrel App Store package and the one adapter that cannot
 call these scripts: umbrelOS installs an app from a self-contained directory and

@@ -1,0 +1,323 @@
+#!/usr/bin/env bash
+#
+# firstboot.sh, executed for real, without AWS and without a virtual machine.
+#
+# This is the script an EC2 instance runs once, before anything else, and every
+# defect in it is a customer whose instance never comes up — with no shell, no
+# logs they know how to reach, and a Marketplace review that has already
+# happened. It is also the script that is hardest to try out, because it wants
+# an instance metadata service, an AWS CLI with an instance role, and a blank
+# EBS volume.
+#
+# So all three are stubbed, and the parts that only exist on an instance — the
+# block-device handling — are steered past rather than faked: the mount check at
+# the top of prepare_data_volume() answers "already mounted", which is exactly
+# what the second and every later boot sees. What remains is the whole
+# configuration path, run as written.
+#
+# Run it directly, or in the same job as deploy/scripts/tests/test-lifecycle.sh:
+#
+#   bash deploy/aws/scripts/tests/test-firstboot.sh
+
+set -Eeuo pipefail
+
+AWS_SCRIPTS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DEPLOY_ROOT="$(cd "$AWS_SCRIPTS_DIR/../.." && pwd)"
+FIRSTBOOT="$AWS_SCRIPTS_DIR/firstboot.sh"
+
+# shellcheck source=../../../scripts/lib.sh
+source "$DEPLOY_ROOT/scripts/lib.sh"
+
+temporary_dir="$(mktemp -d)"
+trap 'rm -rf "$temporary_dir"' EXIT
+
+fail() {
+    printf '%s\n' "$*" >&2
+    exit 1
+}
+
+# --------------------------------------------------------------------------
+# The instance, as far as firstboot.sh can tell
+# --------------------------------------------------------------------------
+
+# Only the two absolute paths change, and the substitution is asserted: if a
+# constant is renamed, this suite has to fail rather than silently test a script
+# that still writes to /var/lib/synaplan.
+install_firstboot() {
+    local tree="$1"
+    local script="$tree/firstboot.sh"
+
+    sed \
+        -e "s#^APP_DIR=/opt/synaplan\$#APP_DIR=$tree/opt#" \
+        -e "s#^DATA_MOUNT=/var/lib/synaplan\$#DATA_MOUNT=$tree/data#" \
+        "$FIRSTBOOT" > "$script"
+
+    grep -Fq "APP_DIR=$tree/opt" "$script" ||
+        fail 'firstboot.sh no longer defines APP_DIR=/opt/synaplan on its own line; update this test'
+    grep -Fq "DATA_MOUNT=$tree/data" "$script" ||
+        fail 'firstboot.sh no longer defines DATA_MOUNT=/var/lib/synaplan on its own line; update this test'
+
+    chmod 0755 "$script"
+}
+
+write_stub() {
+    local path="$1"
+    shift
+    mkdir -p "$(dirname "$path")"
+    {
+        printf '#!/usr/bin/env bash\n'
+        printf '%s\n' "$@"
+    } > "$path"
+    chmod 0755 "$path"
+}
+
+# A tree that looks enough like a launched instance for the script to run.
+# `tags` and `parameters` are the two configuration sources it reads, written as
+# `key<tab>value` lines that the stubbed AWS CLI answers from.
+new_instance() {
+    tree="$temporary_dir/instance-$((++instance_index))"
+    bin="$tree/bin"
+    tags="$tree/tags"
+    parameters="$tree/parameters"
+    put_parameters="$tree/put-parameters"
+    env_file="$tree/data/.env"
+
+    mkdir -p "$tree/opt/deploy/scripts" "$tree/opt/deploy/aws/scripts" "$tree/data" "$bin"
+    : > "$tags"
+    : > "$parameters"
+    : > "$put_parameters"
+
+    printf 'SYNAPLAN_VERSION=9.9.9\n' > "$tree/opt/ami-release"
+    write_stub "$tree/opt/deploy/aws/scripts/configure-tls.sh" 'exit 0'
+    write_stub "$tree/opt/deploy/scripts/prepare.sh" 'exit 0'
+
+    # prepare_data_volume() asks this first, and an affirmative answer is the
+    # honest one for every boot after the volume exists.
+    write_stub "$bin/findmnt" 'exit 0'
+    # No instance metadata service. This is not only the test environment: it is
+    # also what a launch inside a VPC without metadata access looks like, and
+    # the script has to produce a working installation anyway.
+    write_stub "$bin/curl" 'exit 1'
+    # The AMI runs Amazon Linux, where `date --utc` exists. A maintainer's macOS
+    # has BSD date, which does not, so this suite would fail on the laptop it is
+    # most likely to be run from.
+    write_stub "$bin/date" 'printf "2026-01-01T00:00:00Z\n"'
+
+    install_firstboot "$tree"
+}
+
+# The AWS CLI as firstboot.sh uses it: three subcommands, answered from the
+# files above. Written into the tree only when a case wants an instance role —
+# `command -v aws` failing is the "Launch from Website" case.
+enable_aws_cli() {
+    cat > "$bin/aws" <<STUB
+#!/usr/bin/env bash
+case "\$1 \$2" in
+    "ec2 describe-tags")
+        key=""
+        for argument in "\$@"; do
+            [[ "\$argument" == Name=key,Values=* ]] && key="\${argument#Name=key,Values=}"
+        done
+        value="\$(awk -F'\t' -v k="\$key" '\$1 == k { print \$2; exit }' "$tags")"
+        printf '%s\n' "\${value:-None}"
+        ;;
+    "ssm get-parameter")
+        name=""
+        for argument in "\$@"; do
+            [[ "\$previous" == --name ]] && name="\$argument"
+            previous="\$argument"
+        done
+        value="\$(awk -F'\t' -v k="\$name" '\$1 == k { print \$2; exit }' "$parameters")"
+        [[ -n "\$value" ]] || exit 1
+        printf '%s\n' "\$value"
+        ;;
+    "ssm put-parameter")
+        printf '%s\n' "\$*" >> "$put_parameters"
+        [[ ! -e "$tree/ssm-write-fails" ]]
+        ;;
+    *)
+        exit 1
+        ;;
+esac
+STUB
+    chmod 0755 "$bin/aws"
+}
+
+set_tag() { printf '%s\t%s\n' "synaplan:$1" "$2" >> "$tags"; }
+set_parameter() { printf '%s\t%s\n' "/synaplan/$1/config/$2" "$3" >> "$parameters"; }
+
+boot() {
+    local status=0
+    PATH="$bin:$PATH" "$tree/firstboot.sh" > "$tree/boot.log" 2>&1 || status=$?
+    return "$status"
+}
+
+env_value() { env_file_raw_value "$env_file" "$1"; }
+
+assert_env() {
+    local key="$1" expected="$2" actual
+    actual="$(env_value "$key")" || actual="<unset>"
+    [[ "$actual" == "$expected" ]] ||
+        fail "Expected $key to be [$expected], got [$actual]"
+}
+
+instance_index=0
+tree=""; bin=""; tags=""; parameters=""; put_parameters=""; env_file=""
+
+# --------------------------------------------------------------------------
+# "Launch from Website": no stack, no tags, no instance role, no metadata
+#
+# The Marketplace one-click launch, and the hardest case, because everything
+# the script would like to read is absent. It still has to produce a complete,
+# startable configuration — an instance that comes up unconfigured is a support
+# ticket; one that does not come up at all is a refund and a bad review.
+# --------------------------------------------------------------------------
+
+new_instance
+boot || fail "A bare launch with no metadata and no AWS CLI failed:$(printf '\n%s' "$(<"$tree/boot.log")")"
+
+[[ -f "$env_file" ]] || fail 'A bare launch did not write a configuration file'
+[[ "$(stat -c '%a' "$env_file" 2>/dev/null || stat -f '%Lp' "$env_file")" == 600 ]] ||
+    fail 'The generated configuration file is readable by more than its owner'
+
+# The AMI bakes exactly one release, and compose.yaml pulls whatever this says.
+assert_env SYNAPLAN_VERSION 9.9.9
+assert_env SYNAPLAN_PULL_POLICY missing
+# Points the in-app update notice at docs/UPDATE_AWS.md rather than the generic
+# self-host instructions, which do not apply here.
+assert_env SYNAPLAN_PLATFORM aws
+
+# The security posture the Marketplace listing promises. Each of these is a
+# one-line regression away from an instance that is open to the internet.
+assert_env SYNAPLAN_HTTP_BIND 127.0.0.1
+assert_env REGISTRATION_ENABLED false
+assert_env AUTH_COOKIE_SECURE true
+assert_env BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE true
+
+# No domain and no public IP: the private address is the last fallback, and all
+# three URLs have to agree or the widget origin check and every absolute link
+# point somewhere the browser is not.
+assert_env APP_URL https://127.0.0.1
+assert_env FRONTEND_URL https://127.0.0.1
+assert_env REALTIME_ALLOWED_ORIGINS https://127.0.0.1
+
+# Billing off. The Marketplace product must ship unrestricted; an operator adds
+# their OWN Stripe account afterwards.
+for key in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_PRO STRIPE_PRICE_TEAM STRIPE_PRICE_BUSINESS; do
+    assert_env "$key" ''
+done
+
+assert_env AI_DEFAULT_PROVIDER groq
+assert_env GROQ_API_KEY ''
+assert_env MAILER_DSN 'null://null'
+assert_env BOOTSTRAP_ADMIN_EMAIL admin@example.com
+
+# THE contract with the rest of the deployment: prepare.sh runs
+# validate_bootstrap_admin_config on this password a few lines later, and a
+# generated value that fails it turns every launch of the published AMI into an
+# instance that refuses to start. Both the shape and the shared rule are pinned,
+# because the shape is what makes the value survive Compose's .env parser.
+admin_password="$(env_value BOOTSTRAP_ADMIN_PASSWORD)"
+[[ "$admin_password" =~ ^[0-9a-f]{24}$ ]] ||
+    fail "The generated administrator password is not 24 hexadecimal characters: ${#admin_password} bytes"
+validate_bootstrap_admin_values "$(env_value BOOTSTRAP_ADMIN_EMAIL)" "$admin_password" >/dev/null ||
+    fail 'The generated administrator credentials do not pass the preflight that prepare.sh runs'
+
+# Without an instance role the password exists only in this file, and the
+# operator has to be told so — it is the only way into their own installation.
+grep -Fq "$env_file" "$tree/boot.log" ||
+    fail 'A launch that could not publish the password does not say where to read it'
+grep -Fq "$admin_password" "$tree/boot.log" &&
+    fail 'The boot log prints the generated administrator password'
+
+# --------------------------------------------------------------------------
+# Idempotence
+#
+# A reboot, a stop/start and an instance replaced onto the same data volume all
+# re-run this script. Regenerating the password there would lock the operator
+# out of a running installation, with the database still holding the old hash.
+# --------------------------------------------------------------------------
+
+before="$(<"$env_file")"
+boot || fail "The second boot failed:$(printf '\n%s' "$(<"$tree/boot.log")")"
+[[ "$(<"$env_file")" == "$before" ]] ||
+    fail 'A second boot rewrote the configuration of a running installation'
+grep -Fq 'already initialised' "$tree/boot.log" ||
+    fail 'A second boot does not report that it left the installation untouched'
+
+# A volume restored from a snapshot carries the configuration but not the
+# marker file. Adopting it is the difference between a restore and a fresh,
+# empty installation whose database credentials no longer match its data.
+rm -f "$tree/data/.firstboot-complete"
+boot || fail "A restored volume failed to boot:$(printf '\n%s' "$(<"$tree/boot.log")")"
+[[ "$(<"$env_file")" == "$before" ]] ||
+    fail 'A restored data volume was reconfigured instead of adopted'
+grep -Fq 'adopting it unchanged' "$tree/boot.log" ||
+    fail 'A restored volume is not reported as adopted'
+
+# --------------------------------------------------------------------------
+# A CloudFormation launch: tags, an instance role, a domain
+# --------------------------------------------------------------------------
+
+new_instance
+enable_aws_cli
+set_tag domain synaplan.example.com
+set_tag admin-email operator@example.com
+set_tag ai-provider anthropic
+boot || fail "A stack launch failed:$(printf '\n%s' "$(<"$tree/boot.log")")"
+
+assert_env APP_URL https://synaplan.example.com
+assert_env FRONTEND_URL https://synaplan.example.com
+assert_env REALTIME_ALLOWED_ORIGINS https://synaplan.example.com
+assert_env BOOTSTRAP_ADMIN_EMAIL operator@example.com
+assert_env AI_DEFAULT_PROVIDER anthropic
+
+# The stack outputs an `aws ssm get-parameter` command for exactly this
+# parameter, and it is the only way a buyer reaches their instance.
+grep -Fq -- '--type SecureString' "$put_parameters" ||
+    fail 'The administrator password was not published as a SecureString'
+grep -Fq -- '--name /synaplan/unknown/admin-password' "$put_parameters" ||
+    fail 'The administrator password was not published under the documented parameter name'
+
+# --------------------------------------------------------------------------
+# Where each optional setting comes from
+#
+# Two sources, because the two ways of launching the AMI can each supply only
+# one: a stack sets tags at launch, an operator writes a parameter afterwards.
+# API keys are only ever accepted from the parameter store — a tag is readable
+# by anyone who can describe the instance.
+# --------------------------------------------------------------------------
+
+new_instance
+enable_aws_cli
+set_parameter unknown anthropic-api-key sk-ant-from-the-parameter-store
+set_parameter unknown mailer-dsn 'smtp://mail.example.com:587'
+set_parameter unknown registration-enabled true
+set_parameter unknown domain parameter.example.com
+set_tag domain tag.example.com
+boot || fail "A launch reading the parameter store failed:$(printf '\n%s' "$(<"$tree/boot.log")")"
+
+assert_env ANTHROPIC_API_KEY sk-ant-from-the-parameter-store
+assert_env MAILER_DSN 'smtp://mail.example.com:587'
+assert_env REGISTRATION_ENABLED true
+# The tag wins: it describes the launch the operator asked for, and a stale
+# parameter from a previous instance must not quietly override it.
+assert_env APP_URL https://tag.example.com
+
+# --------------------------------------------------------------------------
+# A failure to publish the password must not fail the boot
+#
+# The instance profile may deliberately not allow the write. An installation
+# that works but needs a shell to reveal its password beats an installation
+# that refuses to start.
+# --------------------------------------------------------------------------
+
+new_instance
+enable_aws_cli
+touch "$tree/ssm-write-fails"
+boot || fail "A launch whose instance role cannot write to SSM failed:$(printf '\n%s' "$(<"$tree/boot.log")")"
+[[ -f "$env_file" ]] || fail 'A launch that could not publish the password wrote no configuration'
+grep -Fq 'Session Manager' "$tree/boot.log" ||
+    fail 'A launch that could not publish the password does not say how to reach it instead'
+
+echo "AWS first-boot tests passed."
