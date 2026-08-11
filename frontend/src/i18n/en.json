@@ -2795,36 +2795,76 @@
     "chats": "Chats",
     "code": "Code",
     "settings": "Settings",
+    "configure": "Configure",
     "advancedConfigLabel": "Advanced Settings",
     "setupComplete": "Widget setup completed successfully!",
-    "simpleSetup": {
-      "title": "Create Widget",
-      "subtitle": "Get started in seconds with just the basics",
-      "nameLabel": "Widget Name",
-      "namePlaceholder": "e.g., Support Chat",
-      "websiteLabel": "Your Website URL",
-      "websitePlaceholder": "your-website.com",
-      "websiteHelp": "Enter your domain. Your domain will be added to the allowed list.",
-      "infoTitle": "Quick Start",
-      "infoDescription": "Your widget works right away. You can fine-tune it later with the AI Setup Assistant or in Advanced Settings.",
-      "previewLabel": "Widget Preview",
-      "previewClickHint": "Click the chat button to see how it works",
-      "previewChatGreeting": "Hi! How can I help you today?",
-      "previewChatPlaceholder": "Type a message...",
-      "createButton": "Create Widget",
-      "createError": "Failed to create widget"
+    "createWizard": {
+      "title": "Create chat widget",
+      "stepCounter": "Step {current} of {total}",
+      "steps": {
+        "basics": "Name & website",
+        "appearance": "Appearance",
+        "knowledge": "Data sources",
+        "options": "Options"
+      },
+      "basics": {
+        "nameLabel": "Widget name",
+        "namePlaceholder": "e.g. Support Chat",
+        "websiteLabel": "Your website",
+        "websitePlaceholder": "your-website.com",
+        "websiteHelp": "The chat widget will only run on this domain. You can add more domains later."
+      },
+      "appearance": {
+        "colorLabel": "Primary color",
+        "iconColorLabel": "Icon color",
+        "themeLabel": "Theme",
+        "themeLight": "Light",
+        "themeDark": "Dark",
+        "positionLabel": "Position on your website",
+        "positions": {
+          "bottomRight": "Bottom right",
+          "bottomLeft": "Bottom left",
+          "topRight": "Top right",
+          "topLeft": "Top left"
+        },
+        "previewLabel": "Preview",
+        "previewTitle": "Chat",
+        "previewGreeting": "Hi! How can I help you?"
+      },
+      "knowledge": {
+        "intro": "Add documents so the AI assistant can answer questions about your content. This step is optional.",
+        "uploadLabel": "Upload files",
+        "pickLabel": "Choose from File Manager",
+        "uploadHint": "PDF, Word, text, Markdown, CSV or JSON. Files are processed after the widget is created.",
+        "empty": "No data sources yet — you can also add them later."
+      },
+      "options": {
+        "welcomeLabel": "Welcome message",
+        "welcomePlaceholder": "Hello! How can I help you today?",
+        "autoOpenLabel": "Open chat automatically",
+        "autoOpenHint": "The chat window opens on its own when a visitor arrives.",
+        "fileUploadLabel": "Allow visitor file uploads",
+        "fileUploadHint": "Visitors can attach files to their messages.",
+        "changeLaterHint": "Every setting can be changed later in the widget configuration."
+      },
+      "back": "Back",
+      "next": "Next",
+      "create": "Create widget",
+      "creatingWidget": "Creating widget...",
+      "creatingDesign": "Applying design...",
+      "creatingFiles": "Adding data sources...",
+      "createError": "Failed to create widget",
+      "finishError": "The widget was created, but some settings could not be applied. Please check the widget configuration.",
+      "footerHint": "Tip: After creation, the AI Setup Assistant can configure the answers for you, and you can connect more data sources at any time."
     },
     "success": {
-      "title": "Widget Created!",
-      "statusActive": "Active",
-      "readyToUse": "Ready to embed on your website",
-      "embedCodeLabel": "Embed Code",
+      "title": "Widget created!",
+      "readyToUse": "ready to embed on your website",
+      "embedCodeLabel": "Embed code",
       "embedCodeError": "Failed to load embed code",
-      "aiSetupTitle": "AI Setup Assistant",
-      "aiSetupDescription": "Answer a few quick questions and the AI Setup Assistant configures your widget for you.",
-      "advancedTitle": "Advanced Settings",
-      "advancedDescription": "Customize branding, behavior, file uploads, and security settings manually.",
-      "testNow": "Test Widget Now"
+      "configureTitle": "Open configuration",
+      "testNow": "Test widget",
+      "aiSetupLink": "Let the AI Setup Assistant configure the answers for you"
     },
     "setupChat": {
       "title": "AI Setup Assistant",

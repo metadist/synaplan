@@ -17,11 +17,26 @@
           <div class="flex gap-2">
             <button
               v-if="widget"
-              class="px-4 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-sm hover:txt-primary transition-colors"
+              :class="[
+                'px-4 py-2.5 rounded-xl border text-sm transition-colors inline-flex items-center gap-2',
+                showAiPanel
+                  ? 'border-[var(--brand)]/40 bg-[var(--brand-alpha-light)] txt-brand'
+                  : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary',
+              ]"
+              data-testid="btn-toggle-ai-panel"
+              @click="showAiPanel = !showAiPanel"
+            >
+              <Icon icon="heroicons:sparkles" class="w-4 h-4" />
+              <span class="hidden sm:inline">{{ $t('widgets.setupChat.title') }}</span>
+            </button>
+            <button
+              v-if="widget"
+              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium transition-colors inline-flex items-center gap-2"
               data-testid="btn-widget-settings"
               @click="openAdvancedModal()"
             >
               <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4" />
+              <span class="hidden sm:inline">{{ $t('widgets.settings') }}</span>
             </button>
           </div>
         </div>
@@ -72,46 +87,10 @@
         </div>
 
         <div v-else class="h-full relative">
-          <!-- PHASE 1: Fullscreen AI Chat (initial setup) -->
-          <Transition
-            enter-active-class="transition-all duration-500 ease-out"
-            enter-from-class="opacity-0 scale-95"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition-all duration-500 ease-in-out"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-          >
-            <div
-              v-if="aiSetupPhase === 'fullscreen'"
-              class="absolute inset-0 z-20 flex items-stretch justify-center px-4 py-6"
-            >
-              <WidgetAiSetupPanel
-                v-if="widget"
-                :widget-id="widget.widgetId"
-                :fullscreen="true"
-                :current-flow="currentFlowSnapshot"
-                @update-flow="handleAiFlowUpdate"
-                @first-flow-received="transitionToSplitView"
-                @update-widget-name="handleWidgetNameUpdate"
-                @open-settings="openAdvancedModal"
-              />
-            </div>
-          </Transition>
-
-          <!-- PHASE 2: Split layout (Flow Builder left + AI Panel right) -->
-          <div
-            :class="[
-              'h-full flex flex-col lg:flex-row transition-all duration-700 ease-out',
-              aiSetupPhase === 'fullscreen' ? 'opacity-0 pointer-events-none' : 'opacity-100',
-            ]"
-          >
+          <!-- Split layout (Flow Builder left + optional AI Panel right) -->
+          <div class="h-full flex flex-col lg:flex-row">
             <!-- Left: Flow Builder -->
-            <div
-              :class="[
-                'w-full min-w-0 lg:w-[70%] lg:flex-shrink-0 overflow-y-auto px-4 lg:px-6 py-6 scroll-thin transition-all duration-700 ease-out',
-                aiSetupPhase === 'entering' ? 'animate-slide-in-left' : '',
-              ]"
-            >
+            <div class="w-full min-w-0 flex-1 overflow-y-auto px-4 lg:px-6 py-6 scroll-thin">
               <div class="space-y-8">
                 <!-- Flow Builder -->
                 <section>
@@ -1086,60 +1065,43 @@
               </div>
             </div>
 
-            <!-- Right: AI Setup Panel (desktop, only in split phase) -->
+            <!-- Right: AI Setup Assistant (desktop side panel, opt-in via header toggle) -->
             <div
-              v-if="aiSetupPhase !== 'fullscreen'"
-              :class="[
-                'hidden lg:flex lg:w-[30%] lg:flex-shrink-0 border-l border-light-border/30 dark:border-dark-border/20 p-4 transition-all duration-700 ease-out',
-                aiSetupPhase === 'entering' ? 'animate-slide-in-right' : '',
-              ]"
+              v-if="showAiPanel"
+              class="hidden lg:flex lg:w-[30%] lg:flex-shrink-0 border-l border-light-border/30 dark:border-dark-border/20 p-4"
             >
               <WidgetAiSetupPanel
                 v-if="widget"
                 :widget-id="widget.widgetId"
                 :current-flow="currentFlowSnapshot"
                 @update-flow="handleAiFlowUpdate"
-                @first-flow-received="transitionToSplitView"
                 @update-widget-name="handleWidgetNameUpdate"
                 @open-settings="openAdvancedModal"
               />
             </div>
 
-            <!-- Mobile: AI Panel toggle button + overlay (only in split phase) -->
-            <template v-if="aiSetupPhase !== 'fullscreen'">
-              <button
-                class="lg:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[var(--brand)] text-white shadow-lg shadow-[var(--brand)]/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-                @click="showMobileAiPanel = !showMobileAiPanel"
+            <!-- Mobile: AI Panel bottom sheet (opt-in via header toggle) -->
+            <Transition
+              enter-active-class="transition-transform duration-300 ease-out"
+              enter-from-class="translate-y-full"
+              enter-to-class="translate-y-0"
+              leave-active-class="transition-transform duration-200 ease-in"
+              leave-from-class="translate-y-0"
+              leave-to-class="translate-y-full"
+            >
+              <div
+                v-if="showAiPanel && widget"
+                class="lg:hidden fixed inset-x-0 bottom-0 z-30 h-[75vh] bg-chat rounded-t-2xl shadow-2xl p-4"
               >
-                <Icon
-                  :icon="showMobileAiPanel ? 'heroicons:x-mark' : 'heroicons:sparkles'"
-                  class="w-6 h-6"
+                <WidgetAiSetupPanel
+                  :widget-id="widget.widgetId"
+                  :current-flow="currentFlowSnapshot"
+                  @update-flow="handleAiFlowUpdate"
+                  @update-widget-name="handleWidgetNameUpdate"
+                  @open-settings="openAdvancedModal"
                 />
-              </button>
-
-              <Transition
-                enter-active-class="transition-transform duration-300 ease-out"
-                enter-from-class="translate-y-full"
-                enter-to-class="translate-y-0"
-                leave-active-class="transition-transform duration-200 ease-in"
-                leave-from-class="translate-y-0"
-                leave-to-class="translate-y-full"
-              >
-                <div
-                  v-if="showMobileAiPanel && widget"
-                  class="lg:hidden fixed inset-x-0 bottom-0 z-30 h-[75vh] bg-chat rounded-t-2xl shadow-2xl p-4"
-                >
-                  <WidgetAiSetupPanel
-                    :widget-id="widget.widgetId"
-                    :current-flow="currentFlowSnapshot"
-                    @update-flow="handleAiFlowUpdate"
-                    @first-flow-received="transitionToSplitView"
-                    @update-widget-name="handleWidgetNameUpdate"
-                    @open-settings="openAdvancedModal"
-                  />
-                </div>
-              </Transition>
-            </template>
+              </div>
+            </Transition>
           </div>
         </div>
       </div>
@@ -1252,9 +1214,9 @@ const selectedTriggerId = ref<string | null>(null)
 const newTriggerText = ref('')
 const newResponseText = ref('')
 
-// AI setup phase: 'fullscreen' (initial) -> 'entering' (animating) -> 'split' (final)
-const aiSetupPhase = ref<'fullscreen' | 'entering' | 'split'>('fullscreen')
-const showMobileAiPanel = ref(false)
+// AI Setup Assistant side panel — opt-in via the header toggle. The manual
+// flow builder and data sources are the primary configuration surface.
+const showAiPanel = ref(false)
 
 // Expand state for flow cards
 const expandedNodeId = ref<string | null>(null)
@@ -1592,14 +1554,6 @@ const removeResponse = (id: string) => {
   connections.value = connections.value.filter((c) => c.to !== id)
 }
 
-const transitionToSplitView = () => {
-  if (aiSetupPhase.value !== 'fullscreen') return
-  aiSetupPhase.value = 'entering'
-  setTimeout(() => {
-    aiSetupPhase.value = 'split'
-  }, 800)
-}
-
 const handleWidgetNameUpdate = async (name: string) => {
   if (!widget.value || !name.trim()) return
   try {
@@ -1804,9 +1758,6 @@ const loadData = async () => {
     nextTick(() => {
       dataReady.value = true
     })
-    if (triggers.value.length > 0 || responses.value.length > 0) {
-      aiSetupPhase.value = 'split'
-    }
   }
 }
 
@@ -1858,35 +1809,5 @@ onMounted(loadData)
   100% {
     offset-distance: 100%;
   }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.animate-slide-in-left {
-  animation: slideInLeft 0.6s ease-out both;
-}
-
-.animate-slide-in-right {
-  animation: slideInRight 0.6s ease-out 0.15s both;
 }
 </style>

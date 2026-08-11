@@ -89,9 +89,9 @@
               data-testid="item-widget"
               role="button"
               tabindex="0"
-              @click="viewSessions(widget)"
-              @keydown.enter.prevent="viewSessions(widget)"
-              @keydown.space.prevent="viewSessions(widget)"
+              @click="openAdvancedConfig(widget)"
+              @keydown.enter.prevent="openAdvancedConfig(widget)"
+              @keydown.space.prevent="openAdvancedConfig(widget)"
             >
               <div class="flex items-start justify-between mb-4">
                 <div class="flex-1 min-w-0 pr-2">
@@ -171,23 +171,32 @@
 
               <!-- Quick Actions -->
               <div class="flex flex-wrap items-center gap-1.5" @click.stop>
-                <!-- Primary: Chats button -->
+                <!-- Primary: Configure -->
                 <button
-                  class="flex-1 min-w-[70px] btn-primary px-3 py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                  class="flex-1 min-w-[90px] btn-primary px-3 py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                  data-testid="btn-widget-advanced"
+                  @click="openAdvancedConfig(widget)"
+                >
+                  <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4 flex-shrink-0" />
+                  <span>{{ $t('widgets.configure') }}</span>
+                </button>
+                <!-- Secondary: Chats -->
+                <button
+                  class="flex-1 min-w-[70px] px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] txt-brand hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
                   data-testid="btn-widget-sessions"
                   @click="viewSessions(widget)"
                 >
                   <Icon icon="heroicons:chat-bubble-left-right" class="w-4 h-4 flex-shrink-0" />
                   <span>{{ $t('widgets.chats') }}</span>
                 </button>
-                <!-- Secondary: Get Code -->
+                <!-- Get Code -->
                 <button
-                  class="flex-1 min-w-[65px] px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] txt-brand hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                  class="p-2 rounded-lg hover-surface transition-colors flex-shrink-0"
+                  :title="$t('widgets.code')"
                   data-testid="btn-widget-embed"
                   @click="showEmbed(widget)"
                 >
-                  <Icon icon="heroicons:code-bracket" class="w-4 h-4 flex-shrink-0" />
-                  <span>{{ $t('widgets.code') }}</span>
+                  <Icon icon="heroicons:code-bracket" class="w-4 h-4 txt-secondary" />
                 </button>
                 <!-- Test Chat -->
                 <button
@@ -197,15 +206,6 @@
                   @click="openTestChat(widget)"
                 >
                   <Icon icon="heroicons:play" class="w-4 h-4 text-green-600 dark:text-green-400" />
-                </button>
-                <!-- Settings -->
-                <button
-                  class="p-2 rounded-lg hover-surface transition-colors flex-shrink-0"
-                  :title="$t('widgets.settings')"
-                  data-testid="btn-widget-advanced"
-                  @click="openAdvancedConfig(widget)"
-                >
-                  <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4 txt-secondary" />
                 </button>
                 <!-- Delete -->
                 <button
@@ -223,11 +223,11 @@
       </div>
     </div>
 
-    <!-- Simple Widget Form (Quick Create) -->
-    <SimpleWidgetForm
-      v-if="showSimpleForm"
-      data-testid="comp-simple-form"
-      @close="showSimpleForm = false"
+    <!-- Widget Creation Wizard -->
+    <WidgetSetupWizard
+      v-if="showWizard"
+      data-testid="comp-widget-wizard"
+      @close="showWizard = false"
       @created="handleWidgetCreated"
     />
 
@@ -260,15 +260,6 @@
       @close="closeAdvancedConfig"
       @saved="handleAdvancedSaved"
       @start-ai-setup="startAiSetupFromAdvanced"
-    />
-
-    <!-- Legacy Edit Modal -->
-    <WidgetEditorModal
-      v-if="currentWidget"
-      :widget="currentWidget"
-      data-testid="comp-widget-editor-modal"
-      @close="currentWidget = null"
-      @save="handleSave"
     />
 
     <!-- Embed Code Dialog -->
@@ -416,11 +407,10 @@ import MainLayout from '@/components/MainLayout.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
-import SimpleWidgetForm from '@/components/widgets/SimpleWidgetForm.vue'
+import WidgetSetupWizard from '@/components/widgets/setup-wizard/WidgetSetupWizard.vue'
 import WidgetSuccessModal from '@/components/widgets/WidgetSuccessModal.vue'
 import SetupChatModal from '@/components/widgets/SetupChatModal.vue'
 import AdvancedWidgetConfig from '@/components/widgets/AdvancedWidgetConfig.vue'
-import WidgetEditorModal from '@/components/widgets/WidgetEditorModal.vue'
 import EmbedCodeDialog from '@/components/widgets/EmbedCodeDialog.vue'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import WidgetCustomFieldsPanel from '@/components/widgets/WidgetCustomFieldsPanel.vue'
@@ -437,12 +427,11 @@ const configStore = useConfigStore()
 
 const loading = ref(false)
 const widgets = ref<widgetsApi.Widget[]>([])
-const showSimpleForm = ref(false)
+const showWizard = ref(false)
 const successWidget = ref<widgetsApi.Widget | null>(null)
 const setupWidget = ref<widgetsApi.Widget | null>(null)
 const advancedWidget = ref<widgetsApi.Widget | null>(null)
 const advancedWidgetInitialTab = ref<string | undefined>(undefined)
-const currentWidget = ref<widgetsApi.Widget | null>(null)
 const showEmbedModal = ref(false)
 const embedWidget = ref<widgetsApi.Widget | null>(null)
 const embedCode = ref('')
@@ -476,17 +465,17 @@ const loadWidgets = async () => {
 }
 
 /**
- * Start widget creation (simple form)
+ * Start widget creation (step-by-step wizard)
  */
 const startCreation = () => {
-  showSimpleForm.value = true
+  showWizard.value = true
 }
 
 /**
  * Handle widget created - show success modal
  */
 const handleWidgetCreated = async (widget: widgetsApi.Widget) => {
-  showSimpleForm.value = false
+  showWizard.value = false
   successWidget.value = widget
   await loadWidgets()
   success(t('widgets.createSuccess'))
@@ -611,23 +600,6 @@ const closeTestChat = () => {
  */
 const viewSessions = (widget: widgetsApi.Widget) => {
   router.push({ name: 'widget-chats', params: { widgetId: widget.widgetId } })
-}
-
-/**
- * Handle save (legacy editor)
- */
-const handleSave = async (data: widgetsApi.UpdateWidgetRequest) => {
-  try {
-    if (currentWidget.value) {
-      await widgetsApi.updateWidget(currentWidget.value.widgetId, data)
-      success(t('widgets.updateSuccess'))
-    }
-
-    currentWidget.value = null
-    await loadWidgets()
-  } catch (err: unknown) {
-    error(getErrorMessage(err) || 'Failed to save widget')
-  }
 }
 
 /**

@@ -148,11 +148,16 @@ export async function createTestWidget(
   await page.goto('/channels/widgets')
   await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.LONG })
   await page.click(selectors.widgets.createButton)
-  await page.waitForSelector(selectors.widgets.simpleForm.modal, { timeout: TIMEOUTS.SHORT })
+  await page.waitForSelector(selectors.widgets.wizard.modal, { timeout: TIMEOUTS.SHORT })
 
-  await page.fill(selectors.widgets.simpleForm.nameInput, name)
-  await page.fill(selectors.widgets.simpleForm.websiteInput, websiteUrl)
-  await page.click(selectors.widgets.simpleForm.createButton)
+  // Step 1: name & website; steps 2-4 (appearance, data sources, options)
+  // have valid defaults, so skip through them and create.
+  await page.fill(selectors.widgets.wizard.nameInput, name)
+  await page.fill(selectors.widgets.wizard.websiteInput, websiteUrl)
+  for (let step = 0; step < 3; step++) {
+    await page.click(selectors.widgets.wizard.nextButton)
+  }
+  await page.click(selectors.widgets.wizard.createButton)
 
   await page.waitForSelector(selectors.widgets.successModal.modal, { timeout: TIMEOUTS.STANDARD })
 
