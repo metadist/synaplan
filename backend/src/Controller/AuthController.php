@@ -293,6 +293,7 @@ class AuthController extends AbstractController
                     new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
                     new OA\Property(property: 'memoriesEnabled', type: 'boolean', example: true),
                     new OA\Property(property: 'firstName', type: 'string', nullable: true, description: 'First name from Personal Information; null until the user sets it.', example: 'John'),
+                    new OA\Property(property: 'mustChangePassword', type: 'boolean', description: 'The account still uses a password the deployment generated. Every API route except the password change is blocked until it is replaced.', example: false),
                 ]),
             ]
         )
@@ -378,6 +379,7 @@ class AuthController extends AbstractController
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
                 'firstName' => $this->extractFirstName($user),
+                'mustChangePassword' => $user->mustChangePassword(),
             ],
         ];
 
@@ -962,7 +964,7 @@ class AuthController extends AbstractController
                 new OA\Property(
                     property: 'user',
                     type: 'object',
-                    required: ['id', 'email', 'level', 'emailVerified', 'created', 'isAdmin', 'memoriesEnabled'],
+                    required: ['id', 'email', 'level', 'emailVerified', 'created', 'isAdmin', 'memoriesEnabled', 'mustChangePassword'],
                     properties: [
                         new OA\Property(property: 'id', type: 'integer', example: 42),
                         new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
@@ -972,6 +974,7 @@ class AuthController extends AbstractController
                         new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
                         new OA\Property(property: 'memoriesEnabled', type: 'boolean', example: true),
                         new OA\Property(property: 'firstName', type: 'string', nullable: true, description: 'First name from Personal Information; null until the user sets it.', example: 'John'),
+                        new OA\Property(property: 'mustChangePassword', type: 'boolean', description: 'The account still uses a password the deployment generated. Every API route except the password change is blocked until it is replaced.', example: false),
                     ]
                 ),
                 new OA\Property(
@@ -1009,6 +1012,7 @@ class AuthController extends AbstractController
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
                 'firstName' => $this->extractFirstName($user),
+                'mustChangePassword' => $user->mustChangePassword(),
             ],
             'impersonator' => $impersonator ? [
                 'id' => $impersonator->getId(),

@@ -41,10 +41,16 @@ final readonly class BootstrapAdminService
     ) {
     }
 
+    /**
+     * @param bool $forcePasswordChange for deployments that generate the password themselves
+     *                                  (marketplace images), so the generated value is a
+     *                                  one-time credential the admin must replace at first login
+     */
     public function bootstrap(
         string $configuredEmail,
         #[\SensitiveParameter]
         string $configuredPassword,
+        bool $forcePasswordChange = false,
     ): string {
         $configuration = BootstrapAdminConfiguration::fromConfiguration($configuredEmail, $configuredPassword);
         if (null === $configuration) {
@@ -69,6 +75,7 @@ final readonly class BootstrapAdminService
                 $user->setUserLevel('ADMIN');
                 $user->setEmailVerified(true);
                 $user->setPw($this->passwordHasher->hashPassword($user, $password));
+                $user->setMustChangePassword($forcePasswordChange);
                 $this->entityManager->flush();
 
                 $this->logger->notice('Promoted existing user during first-admin bootstrap', [
@@ -85,8 +92,14 @@ final readonly class BootstrapAdminService
                 emailVerified: true,
             );
 
+            if ($forcePasswordChange) {
+                $user->setMustChangePassword(true);
+                $this->entityManager->flush();
+            }
+
             $this->logger->notice('Created user during first-admin bootstrap', [
                 'user_id' => $user->getId(),
+                'must_change_password' => $forcePasswordChange,
             ]);
 
             return self::RESULT_CREATED;

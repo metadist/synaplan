@@ -14,6 +14,7 @@ import { isNativeApp } from '@/services/api/nativeRuntime'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { shouldShowOnboarding } from '@/composables/useOnboarding'
+import { resolveForcedPasswordChange, CHANGE_PASSWORD_ROUTE } from '@/router/forcedPasswordChange'
 import { i18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
@@ -414,6 +415,15 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.profile' },
     },
     {
+      // Dead end for an account that still carries a deployment-generated
+      // password. The beforeEach guard sends it here and lets nothing else
+      // through until the change succeeds.
+      path: '/change-password',
+      name: CHANGE_PASSWORD_ROUTE,
+      component: () => import('@/views/ForcedPasswordChangeView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.changePassword' },
+    },
+    {
       path: '/admin',
       name: 'admin',
       component: () => import('@/views/AdminView.vue'),
@@ -646,12 +656,27 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  const { isAuthenticated, isAdmin } = useAuth()
+  const { isAuthenticated, isAdmin, user } = useAuth()
   const requiresAuth = to.meta.requiresAuth !== false // Default to true
   const requiresAdminAccess = to.meta.requiresAdmin === true
   const isPublicRoute = to.meta.public === true
 
   const authenticated = isAuthenticated.value
+
+  const forcedPasswordChange = resolveForcedPasswordChange({
+    authenticated,
+    mustChangePassword: true === user.value?.mustChangePassword,
+    isPublicRoute,
+    routeName: to.name,
+  })
+  if ('force' === forcedPasswordChange) {
+    next({ name: CHANGE_PASSWORD_ROUTE })
+    return
+  }
+  if ('release' === forcedPasswordChange) {
+    next(authenticated ? resolveDefaultRoute() : { name: 'login' })
+    return
+  }
 
   if (requiresAuth && !authenticated) {
     // Check for redirect loop before redirecting

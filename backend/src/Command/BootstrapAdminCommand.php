@@ -22,6 +22,7 @@ final class BootstrapAdminCommand extends Command
         private readonly string $bootstrapAdminEmail,
         #[\SensitiveParameter]
         private readonly string $bootstrapAdminPassword,
+        private readonly bool $bootstrapAdminForcePasswordChange = false,
     ) {
         parent::__construct();
     }
@@ -34,6 +35,7 @@ final class BootstrapAdminCommand extends Command
             $result = $this->bootstrapAdminService->bootstrap(
                 $this->bootstrapAdminEmail,
                 $this->bootstrapAdminPassword,
+                $this->bootstrapAdminForcePasswordChange,
             );
         } catch (\Throwable $exception) {
             $io->error('First-admin bootstrap failed: '.$exception->getMessage());
