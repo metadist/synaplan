@@ -27,6 +27,18 @@ use Symfony\Component\HttpKernel\KernelEvents;
 final readonly class PasswordChangeRequiredSubscriber
 {
     /**
+     * The path prefix of every firewall in security.yaml that can authenticate a
+     * user, so the lock covers all of them: the JSON API the frontend talks to,
+     * the MCP endpoint and the OpenAI-compatible gateway. The latter two accept
+     * an API key, and leaving them out would let an account whose initial
+     * password is still in use drive the product through a different door.
+     *
+     * PasswordChangeRequiredSubscriberTest reads the firewalls out of
+     * security.yaml and fails if one of them is missing here.
+     */
+    private const GUARDED_PATH_PREFIXES = ['/api', '/mcp', '/v1'];
+
+    /**
      * Routes that stay reachable while the change is pending: the change
      * itself, the session endpoints the frontend needs to render the forced
      * dialog, and the way out.
@@ -51,7 +63,7 @@ final readonly class PasswordChangeRequiredSubscriber
         }
 
         $request = $event->getRequest();
-        if (!str_starts_with($request->getPathInfo(), '/api/')) {
+        if (!$this->isGuardedPath($request->getPathInfo())) {
             return;
         }
 
@@ -69,5 +81,16 @@ final readonly class PasswordChangeRequiredSubscriber
             'code' => 'PASSWORD_CHANGE_REQUIRED',
             'message' => 'This account still uses its initial password. Set a new password to continue.',
         ], Response::HTTP_FORBIDDEN));
+    }
+
+    private function isGuardedPath(string $path): bool
+    {
+        foreach (self::GUARDED_PATH_PREFIXES as $prefix) {
+            if (str_starts_with($path, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

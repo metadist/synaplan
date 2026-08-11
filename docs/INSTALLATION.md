@@ -123,9 +123,10 @@ BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE=true
 ```
 
 and the bootstrap account is created in a state where signing in is all it can
-do: the application answers every other API call with `403` and the UI opens the
-password form, until a new password is set. The default is `false`, which is
-right whenever a person chose the password themselves.
+do: the UI opens the password form, and every other request is answered with
+`403` — the JSON API, the MCP endpoint and the OpenAI-compatible gateway alike,
+so an API key is no way around it. The default is `false`, which is right
+whenever a person chose the password themselves.
 
 The production bootstrap creates or promotes this account only when no
 administrator exists. If an administrator is already present, it changes nothing,
