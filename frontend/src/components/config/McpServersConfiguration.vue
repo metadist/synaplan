@@ -160,6 +160,7 @@
             <button
               type="button"
               class="text-sm text-red-500 hover:underline"
+              :data-testid="`btn-mcp-delete-${server.id}`"
               @click="removeServer(server)"
             >
               {{ $t('common.delete') }}
