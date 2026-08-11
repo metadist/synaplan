@@ -8,13 +8,13 @@ use App\Repository\UserRepository;
 use App\Service\BillingService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\IapPricingService;
+use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -108,9 +108,8 @@ class SubscriptionController extends AbstractController
         private IapPricingService $iapPricingService,
         private RateLimitService $rateLimitService,
         private ClientContextResolver $clientContextResolver,
+        private PremiumFeatureGate $premiumFeatureGate,
         private bool $stripeAutomaticTaxEnabled = false,
-        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
-        private bool $costBudgetGateEnabled = false,
     ) {
     }
 
@@ -502,7 +501,7 @@ class SubscriptionController extends AbstractController
 
         return $this->json([
             ...$status,
-            'gate_enabled' => $this->costBudgetGateEnabled,
+            'gate_enabled' => $this->premiumFeatureGate->isCostBudgetEnforced(),
             'topup_step_eur' => self::TOPUP_STEP_EUR,
             'billing_enabled' => $this->billingService->isEnabled(),
         ]);

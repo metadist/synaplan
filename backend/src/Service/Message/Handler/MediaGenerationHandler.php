@@ -21,6 +21,7 @@ use App\Service\Media\MediaJobService;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
+use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
@@ -57,9 +58,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private MediaJobDispatcher $mediaJobDispatcher,
         private MediaJobMessageSync $mediaJobMessageSync,
         private GeneratedFileRegistrar $generatedFileRegistrar,
+        private PremiumFeatureGate $premiumFeatureGate,
         private string $uploadDir = '/var/www/backend/var/uploads',
-        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
-        private bool $costBudgetGateEnabled = false,
         // Public base URL that serves /api/v1/files/uploads/* (same value used
         // by OgImageService / shared chat pages). Needed for image-to-video:
         // Higgsfield (and most i2v providers) fetch the source frame from a
@@ -475,7 +475,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // Cost-budget backstop: media spend (incl. the +markup) counts toward
             // the user's monthly budget. Primary enforcement is at the chat entry
             // (StreamController); this also covers worker/multitask media paths.
-            if ($this->costBudgetGateEnabled) {
+            if ($this->premiumFeatureGate->isCostBudgetEnforced()) {
                 $budgetCheck = $this->rateLimitService->checkCostBudget($user);
                 if (!$budgetCheck['allowed']) {
                     $lang = $classification['language'] ?? 'en';

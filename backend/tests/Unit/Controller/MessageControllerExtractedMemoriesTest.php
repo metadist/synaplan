@@ -10,6 +10,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\BillingService;
 use App\Service\File\DataUrlFixer;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
@@ -19,6 +20,7 @@ use App\Service\Message\AgainHandler;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\MessageEnqueueService;
 use App\Service\ModelConfigService;
+use App\Service\PremiumFeatureGate;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -92,6 +94,7 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
                     new NullLogger(),
                 ),
             ),
+            new PremiumFeatureGate(new BillingService('', '')),
             new NullLogger(),
         );
 

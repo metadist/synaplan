@@ -9,13 +9,17 @@ use App\Entity\User;
 use App\Repository\RevectorizeRunRepository;
 use App\Service\Embedding\Exception\CooldownActiveException;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\PremiumFeatureGate;
 
 /**
  * EmbeddingModelChangeGuard — single decision point for "may this user
  * switch the VECTORIZE model right now?".
  *
  * Two checks:
- *   1. Subscription gate — Free / Anonymous / NEW users are blocked.
+ *   1. Subscription gate — Free / Anonymous / NEW users are blocked, but
+ *      only where subscriptions are actually sold: an install without
+ *      Stripe runs in open-source mode and the tier check opens for
+ *      everyone (see {@see PremiumFeatureGate}).
  *      Self-hosted admins (ROLE_ADMIN) are always allowed; the operator
  *      runs the costs themselves.
  *   2. Cooldown — at most one switch per scope per hour. The cooldown
@@ -34,11 +38,9 @@ final class EmbeddingModelChangeGuard
 {
     public const COOLDOWN_SECONDS = 3600;
 
-    /** Plan tiers that may switch the embedding model. */
-    private const PAID_LEVELS = ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
-
     public function __construct(
         private readonly RevectorizeRunRepository $runRepository,
+        private readonly PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -69,7 +71,7 @@ final class EmbeddingModelChangeGuard
         $cooldownEndsAt = $this->cooldownEndsAt($scope);
         $remaining = max(0, $cooldownEndsAt - time());
 
-        if (!$this->isPaidLevel($level)) {
+        if (!$this->premiumFeatureGate->isUnlockedFor($user)) {
             return [
                 'canChange' => false,
                 'reason' => 'requires_premium',
@@ -98,19 +100,13 @@ final class EmbeddingModelChangeGuard
         ];
     }
 
-    public function isPaidLevel(string $level): bool
-    {
-        return in_array(strtoupper($level), self::PAID_LEVELS, true);
-    }
-
     /**
      * @throws PremiumRequiredException
      */
     private function assertPremium(User $user): void
     {
-        $level = $user->getRateLimitLevel();
-        if (!$this->isPaidLevel($level)) {
-            throw new PremiumRequiredException($level);
+        if (!$this->premiumFeatureGate->isUnlockedFor($user)) {
+            throw new PremiumRequiredException($user->getRateLimitLevel());
         }
     }
 

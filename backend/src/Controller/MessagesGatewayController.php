@@ -6,7 +6,6 @@ namespace App\Controller;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\UserProviderKeyResolver;
-use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
@@ -14,6 +13,7 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -39,6 +39,7 @@ final class MessagesGatewayController extends AbstractController
         private readonly ProviderKeyStore $providerKeyStore,
         private readonly ConfigRepository $configRepository,
         private readonly RateLimitService $rateLimitService,
+        private readonly PremiumFeatureGate $premiumFeatureGate,
         private readonly WebSearchTool $webSearchTool,
         private readonly AnalyzeImageTool $analyzeImageTool,
         private readonly GatewayToolCatalog $toolCatalog,
@@ -262,7 +263,7 @@ final class MessagesGatewayController extends AbstractController
             return $this->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!\in_array($user->getRateLimitLevel(), MessagesGateway::BYO_ALLOWED_LEVELS, true)) {
+        if (!$this->premiumFeatureGate->isUnlockedFor($user)) {
             return $this->json(
                 ['error' => 'Using your own provider API key requires at least the Pro plan. Upgrade your Synaplan subscription to save a BYO key.'],
                 Response::HTTP_FORBIDDEN,

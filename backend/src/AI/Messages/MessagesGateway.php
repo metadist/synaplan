@@ -16,6 +16,7 @@ use App\Message\SummarizeApiSessionCommand;
 use App\Repository\ModelRepository;
 use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use App\Service\Vision\VisionModelResolver;
 use Psr\Cache\CacheItemPoolInterface;
@@ -91,9 +92,11 @@ final readonly class MessagesGateway
     /**
      * Plans allowed to use a BYO provider key through the gateway. BYO calls
      * are metered at zero cost (the user pays the provider directly), so a
-     * paid plan is the entry requirement instead of the cost budget.
+     * paid plan is the entry requirement instead of the cost budget. Enforced
+     * through {@see PremiumFeatureGate}, so an install without billing lets
+     * everyone bring their own key.
      */
-    public const BYO_ALLOWED_LEVELS = ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
+    public const BYO_ALLOWED_LEVELS = PremiumFeatureGate::PAID_LEVELS;
 
     /** Providers the Messages gateway can translate to. */
     private const GATEWAY_PROVIDERS = ['anthropic', 'openai', 'google', 'gemini'];
@@ -108,6 +111,7 @@ final readonly class MessagesGateway
         private VisionModelResolver $visionModelResolver,
         private UserProviderKeyResolver $keyResolver,
         private RateLimitService $rateLimitService,
+        private PremiumFeatureGate $premiumFeatureGate,
         private AnthropicPassthroughTranslator $anthropicPassthrough,
         private GatewayToolCatalog $toolCatalog,
         private GatewayToolLoop $toolLoop,
@@ -212,7 +216,7 @@ final readonly class MessagesGateway
         if ('user' === $credential['source']) {
             // BYO key: metered at zero cost (the user pays the provider), so
             // the Synaplan budget does not apply — a paid plan is required instead.
-            if (!\in_array($user->getRateLimitLevel(), self::BYO_ALLOWED_LEVELS, true)) {
+            if (!$this->premiumFeatureGate->isUnlockedFor($user)) {
                 return $this->err(
                     403,
                     'permission_error',

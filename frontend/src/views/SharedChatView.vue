@@ -29,7 +29,7 @@
                   {{ chat?.title || $t('shared.title') }}
                 </h1>
                 <p class="text-xs sm:text-sm txt-secondary">
-                  {{ $t('shared.subtitle') }}
+                  {{ $t('shared.subtitle', { brand: config.branding.name }) }}
                 </p>
               </div>
             </div>
@@ -50,12 +50,12 @@
                 </select>
               </div>
               <a
-                href="https://synaplan.com"
+                :href="config.branding.homepageUrl"
                 target="_blank"
                 class="btn-primary px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
                 data-testid="btn-try-synaplan"
               >
-                {{ $t('shared.trySynaplan') }}
+                {{ $t('shared.tryBrand', { brand: config.branding.name }) }}
               </a>
             </div>
           </div>
@@ -94,8 +94,11 @@
           </svg>
           <h2 class="text-2xl font-bold txt-primary mb-2">{{ $t('shared.notFound') }}</h2>
           <p class="txt-secondary mb-6">{{ $t('shared.notFoundDesc') }}</p>
-          <a href="https://synaplan.com" class="btn-primary px-6 py-3 rounded-lg inline-block">
-            {{ $t('shared.visitSynaplan') }}
+          <a
+            :href="config.branding.homepageUrl"
+            class="btn-primary px-6 py-3 rounded-lg inline-block"
+          >
+            {{ $t('shared.visitBrand', { brand: config.branding.name }) }}
           </a>
         </div>
       </div>
@@ -126,7 +129,7 @@
               <p class="text-sm txt-secondary">
                 {{ $t('shared.infoDesc') }}
                 <a
-                  href="https://synaplan.com"
+                  :href="config.branding.homepageUrl"
                   target="_blank"
                   class="text-[var(--brand)] hover:underline"
                 >
@@ -196,7 +199,11 @@
             >
               <div class="flex items-baseline justify-between mb-2">
                 <span class="font-semibold txt-primary text-sm">
-                  {{ message.direction === 'IN' ? $t('shared.user') : $t('shared.assistant') }}
+                  {{
+                    message.direction === 'IN'
+                      ? $t('shared.user')
+                      : $t('shared.assistant', { brand: config.branding.name })
+                  }}
                 </span>
                 <span class="text-xs txt-secondary">
                   {{ formatDate(message.timestamp) }}
@@ -303,25 +310,17 @@
             {{ $t('shared.ctaTitle') }}
           </h3>
           <p class="txt-secondary mb-6 max-w-2xl mx-auto">
-            {{ $t('shared.ctaDesc') }}
+            {{ $t('shared.ctaDesc', { brand: config.branding.name }) }}
           </p>
           <div class="flex gap-4 justify-center">
-            <a
-              v-if="config.billing.enabled"
-              href="https://synaplan.com/register"
-              class="btn-primary px-6 py-3 rounded-lg font-medium inline-block"
-            >
-              {{ $t('shared.getStarted') }}
-            </a>
             <router-link
-              v-else
               to="/register"
               class="btn-primary px-6 py-3 rounded-lg font-medium inline-block"
             >
               {{ $t('shared.getStarted') }}
             </router-link>
             <a
-              href="https://synaplan.com"
+              :href="config.branding.homepageUrl"
               class="px-6 py-3 rounded-lg border border-light-border dark:border-dark-border hover-surface transition-colors font-medium inline-block"
             >
               {{ $t('shared.learnMore') }}
@@ -487,12 +486,12 @@ const switchLanguage = () => {
 }
 
 const pageTitle = computed(() => {
-  if (!chat.value) return `${t('shared.title')} | Synaplan AI`
-  return `${chat.value.title} | ${t('shared.title')} | Synaplan AI`
+  if (!chat.value) return `${t('shared.title')} | ${config.branding.name}`
+  return `${chat.value.title} | ${t('shared.title')} | ${config.branding.name}`
 })
 
 const pageDescription = computed(() => {
-  if (!messages.value.length) return t('shared.subtitle')
+  if (!messages.value.length) return t('shared.subtitle', { brand: config.branding.name })
   const firstMessage = messages.value.find((m) => m.direction === 'IN')?.text || ''
   return firstMessage.substring(0, 160) + (firstMessage.length > 160 ? '...' : '')
 })
@@ -518,7 +517,7 @@ const updateMetaTags = () => {
   updateOrCreateMeta('property', 'og:url', currentUrl.value)
   updateOrCreateMeta('property', 'og:title', pageTitle.value)
   updateOrCreateMeta('property', 'og:description', pageDescription.value)
-  updateOrCreateMeta('property', 'og:site_name', 'Synaplan AI')
+  updateOrCreateMeta('property', 'og:site_name', config.branding.name)
   updateOrCreateMeta('property', 'og:locale', currentLang.value)
 
   // Twitter
@@ -603,7 +602,7 @@ const updateStructuredData = () => {
     inLanguage: currentLang.value,
     author: {
       '@type': 'Organization',
-      name: 'Synaplan AI',
+      name: config.branding.name,
     },
     commentCount: messages.value.length,
   })

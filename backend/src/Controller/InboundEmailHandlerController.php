@@ -8,6 +8,7 @@ use App\Repository\InboundEmailHandlerRepository;
 use App\Service\EncryptionService;
 use App\Service\InboundEmailHandlerService;
 use App\Service\MailHandlerLogService;
+use App\Service\PremiumFeatureGate;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -33,6 +34,7 @@ class InboundEmailHandlerController extends AbstractController
         private InboundEmailHandlerService $handlerService,
         private EncryptionService $encryptionService,
         private MailHandlerLogService $activityLog,
+        private PremiumFeatureGate $premiumFeatureGate,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -160,8 +162,8 @@ class InboundEmailHandlerController extends AbstractController
         // Email filter configuration
         $emailFilterMode = $data['emailFilterMode'] ?? 'new';
 
-        // PRO+ required for historical emails
-        if ('historical' === $emailFilterMode && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'])) {
+        // PRO+ required for historical emails, unless the install sells no plans
+        if ('historical' === $emailFilterMode && !$this->premiumFeatureGate->isUnlockedForLevel($user->getUserLevel())) {
             return $this->json([
                 'success' => false,
                 'error' => 'Historical email processing is only available for PRO users and above',
@@ -401,8 +403,8 @@ class InboundEmailHandlerController extends AbstractController
 
         // Update email filter configuration
         if (isset($data['emailFilterMode'])) {
-            // PRO+ required for historical emails
-            if ('historical' === $data['emailFilterMode'] && !in_array($user->getUserLevel(), ['PRO', 'TEAM', 'BUSINESS', 'ADMIN'])) {
+            // PRO+ required for historical emails, unless the install sells no plans
+            if ('historical' === $data['emailFilterMode'] && !$this->premiumFeatureGate->isUnlockedForLevel($user->getUserLevel())) {
                 return $this->json([
                     'success' => false,
                     'error' => 'Historical email processing is only available for PRO users and above',

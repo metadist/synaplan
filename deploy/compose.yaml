@@ -43,6 +43,7 @@ x-app-environment: &app-environment
   AUTH_COOKIE_SECURE: "${AUTH_COOKIE_SECURE:-}"
   BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
   BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
+  BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE: "${BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE:-false}"
   DB_HOST: db
   DB_PORT: "3306"
   DB_NAME: "${MARIADB_DATABASE:-synaplan}"
@@ -80,6 +81,24 @@ x-app-environment: &app-environment
   GOOGLE_GEMINI_API_KEY: "${GOOGLE_GEMINI_API_KEY:-}"
   MISTRAL_API_KEY: "${MISTRAL_API_KEY:-}"
   XAI_API_KEY: "${XAI_API_KEY:-}"
+  # Whether visitors can create their own account. An install reachable from the
+  # open internet that nobody watches wants this off; the application default
+  # stays `true` so an existing deployment is unaffected.
+  REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-true}"
+  # Operator billing. Empty keys mean open-source mode: no plans, no quotas, no
+  # upgrade prompts, and every tier gate open (see docs/BILLING_SELFHOST.md).
+  # Setting them turns this install into a paid product run by YOU, billed
+  # through YOUR Stripe account.
+  STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:-}"
+  STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:-}"
+  STRIPE_PRICE_PRO: "${STRIPE_PRICE_PRO:-}"
+  STRIPE_PRICE_TEAM: "${STRIPE_PRICE_TEAM:-}"
+  STRIPE_PRICE_BUSINESS: "${STRIPE_PRICE_BUSINESS:-}"
+  STRIPE_PAYMENT_METHODS: "${STRIPE_PAYMENT_METHODS:-}"
+  STRIPE_AUTOMATIC_TAX: "${STRIPE_AUTOMATIC_TAX:-false}"
+  # Per-plan spending ceiling for AI usage. Only ever enforced together with
+  # Stripe, because the budget is denominated in the plan a user pays for.
+  COST_BUDGET_GATE_ENABLED: "${COST_BUDGET_GATE_ENABLED:-false}"
 
 x-app-volumes: &app-volumes
   - ./data/uploads:/var/www/backend/var/uploads

@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\Message\Handler;
 use App\AI\Service\AiFacade;
 use App\Entity\Model;
 use App\Entity\User;
+use App\Service\BillingService;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\GeneratedFileRegistrar;
@@ -21,6 +22,7 @@ use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
+use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -84,8 +86,8 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
             $this->mediaJobDispatcher,
             $this->mediaJobMessageSync,
             $this->createMock(GeneratedFileRegistrar::class),
+            new PremiumFeatureGate(new BillingService('', '')),
             sys_get_temp_dir(),
-            false,
             'https://app.example.test',
         );
     }
