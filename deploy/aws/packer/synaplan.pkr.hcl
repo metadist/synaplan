@@ -28,7 +28,7 @@ variable "synaplan_version" {
 
   validation {
     condition     = can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$", var.synaplan_version))
-    error_message = "synaplan_version must be an immutable SemVer version such as 1.4.0 — 'latest' and other mutable tags are rejected by validate-release.sh at boot anyway."
+    error_message = "The version must be an immutable SemVer version such as 1.4.0. Mutable tags like 'latest' are rejected by validate-release.sh at boot anyway."
   }
 }
 
@@ -45,7 +45,7 @@ variable "architecture" {
 
   validation {
     condition     = contains(["x86_64", "arm64"], var.architecture)
-    error_message = "architecture must be x86_64 or arm64."
+    error_message = "The architecture must be either x86_64 or arm64."
   }
 }
 
