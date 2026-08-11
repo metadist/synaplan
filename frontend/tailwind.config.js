@@ -32,6 +32,9 @@ export default {
       },
       fontFamily: {
         sans: [
+          // Name of the bundled variable font; the static name below still
+          // matches a locally installed copy.
+          "'Plus Jakarta Sans Variable'",
           "'Plus Jakarta Sans'",
           '-apple-system',
           'BlinkMacSystemFont',
