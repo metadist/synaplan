@@ -13,25 +13,69 @@ the AMI ships with billing switched off entirely — see
 
 ## What has to exist before anything can be submitted
 
-These are account and company matters, not engineering ones.
+These are account and company matters, not engineering ones. Seller registration
+is consolidated with AWS Partner Central, so both happen in one flow, and one
+person has to carry it: whoever holds the legal authority to accept the AWS
+Partner Network terms becomes the **alliance lead**.
 
 1. **An AWS account for the listing**, separate from any account used for
-   customer work. This is where AMIs are built and where the listing lives.
-2. **Seller registration** in the AWS Marketplace Management Portal, with a
-   public seller profile: display name, company description, website, and a logo
-   (SVG or PNG on a transparent background, up to 300×150 px, max 500 kB).
+   customer work, with a valid payment method and in good standing — the
+   registration refuses an account that is not. This is where AMIs are built and
+   where the listing lives; AWS recommends keeping it in an AWS Organization.
+2. **Seller registration** as the alliance lead, which asks for:
+   - the legal company name, which has to be unique across all AWS Marketplace
+     sellers;
+   - a government-issued photo ID for identity verification, plus the business
+     tax ID and its registration country for business verification — both are
+     checks on the company, not billing settings, and they apply to a free
+     listing as well;
+   - an alliance lead contact on a company mailbox, which AWS requires to be a
+     person rather than an alias;
+   - the public seller profile: display name, company description, website, and a
+     logo (SVG or PNG on a transparent background, up to 300×150 px, max 500 kB).
 3. **A product logo**, at least 110 px wide, aspect ratio between 1:1 and 2:1.
 4. **A named support channel** — an address or URL, plus a stated response time.
    AWS requires one even for a free product.
 5. **An EULA decision**: the AWS Marketplace standard contract, or our own text.
    The standard contract is the recommendation; Synaplan is Apache 2.0, and the
    standard contract shortens the review.
-6. **No tax or banking setup is needed** for a free listing: no bank account, no
-   tax interview, no KYC. Those become mandatory only if a **paid** AMI listing
-   is ever added, and KYC alone can take weeks — so if a paid listing is
-   plausible within the year, it is worth completing the registration now.
-7. **Time**: the AWS Seller Operations review takes roughly 5 to 14 business
-   days. The automated AMI scan is usually under an hour.
+6. **No tax, banking, disbursement or KYC setup is needed** for a free listing —
+   only the profile step above. Those become mandatory the moment a **paid**
+   listing is added, and KYC alone can take weeks, so if a paid listing is
+   plausible within the year it is worth finishing the registration now.
+7. **Time**: identity and business verification first, then roughly 5 to 14
+   business days for the Seller Operations review of the listing itself. The
+   automated AMI scan is usually under an hour.
+
+## Who needs which access
+
+The alliance lead owns the registration, the company identity and anything
+financial, and cannot hand those over. Everything else — the AMI, the product,
+its versions — is engineering work, and delegating it is worth doing: whoever
+ships the release should be the one who submits it.
+
+Partner Central manages users through IAM, so delegating is one IAM role in the
+listing account plus one mapping:
+
+1. **Partner admin → User onboarding** in Partner Central: add the engineer with
+   their company email address.
+2. Create an IAM role whose name **starts with `PartnerCentralRoleFor`** —
+   Partner Central refuses to map a role named anything else — and attach:
+   - `AWSMarketplaceSellerProductsFullAccess` for the Products pages and AMI
+     management: create the product, add a version, run Test Add Version. It
+     covers neither seller settings nor tax nor banking, which is the point.
+   - `AWSMarketplaceSellerFullAccess` instead of it, if the engineer should also
+     reach Settings — the page where the ingestion role below is named.
+   - plus permissions for the AWS side that no Marketplace policy covers:
+     deploying the roles template, launching and deleting the verification
+     stacks, snapshots, `taskcat`. `AdministratorAccess` in this one account is
+     the pragmatic choice; it holds no customer data, and the alliance lead keeps
+     the root user and the billing.
+3. **Account linking → Manage linked account**, pick the user, **Map to IAM
+   role**.
+
+AWS explicitly discourages signing in to the Management Portal as the account
+root user; a role is the supported path.
 
 Fixed technical constraints, which the build already satisfies: the source AMI
 must live in **us-east-1**, unencrypted, EBS-backed and HVM, and every
