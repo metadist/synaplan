@@ -21,7 +21,12 @@ Partner Network terms becomes the **alliance lead**.
 1. **An AWS account for the listing**, separate from any account used for
    customer work, with a valid payment method and in good standing — the
    registration refuses an account that is not. This is where AMIs are built and
-   where the listing lives; AWS recommends keeping it in an AWS Organization.
+   where the listing lives. AWS recommends a newly created account; an existing
+   one qualifies only if it was created after 27 September 2017. It may sit in the
+   company's AWS Organization as long as that organization represents the same
+   legal entity, and a standalone account is the recommendation otherwise.
+   **Choose it carefully: once a product is listed, the account behind it cannot
+   be changed.**
 2. **Seller registration** as the alliance lead, which asks for:
    - the legal company name, which has to be unique across all AWS Marketplace
      sellers;
@@ -47,6 +52,11 @@ Partner Network terms becomes the **alliance lead**.
    business days for the Seller Operations review of the listing itself. The
    automated AMI scan is usually under an hour.
 
+Fixed technical constraints, which the build already satisfies: the source AMI
+must live in **us-east-1**, unencrypted, EBS-backed and HVM, and every
+CloudFormation template needs an architecture diagram
+([`deploy/aws/cloudformation/architecture.md`](../deploy/aws/cloudformation/architecture.md)).
+
 ## Who needs which access
 
 The alliance lead owns the registration, the company identity and anything
@@ -54,13 +64,15 @@ financial, and cannot hand those over. Everything else — the AMI, the product,
 its versions — is engineering work, and delegating it is worth doing: whoever
 ships the release should be the one who submits it.
 
-Partner Central manages users through IAM, so delegating is one IAM role in the
-listing account plus one mapping:
+Partner Central and the Management Portal are both reached with an identity in
+the **listing account**, so the engineer needs no AWS account of their own and
+has nothing to accept: the alliance lead, or whoever administers IAM, creates the
+identity for them. A company mailbox is the only prerequisite on their side,
+because that is where the invitation goes.
 
-1. **Partner admin → User onboarding** in Partner Central: add the engineer with
-   their company email address.
-2. Create an IAM role whose name **starts with `PartnerCentralRoleFor`** —
-   Partner Central refuses to map a role named anything else — and attach:
+1. Create the user in the listing account — IAM Identity Center if the company
+   already uses single sign-on, otherwise an IAM user is enough for one person.
+2. Attach:
    - `AWSMarketplaceSellerProductsFullAccess` for the Products pages and AMI
      management: create the product, add a version, run Test Add Version. It
      covers neither seller settings nor tax nor banking, which is the point.
@@ -71,16 +83,22 @@ listing account plus one mapping:
      stacks, snapshots, `taskcat`. `AdministratorAccess` in this one account is
      the pragmatic choice; it holds no customer data, and the alliance lead keeps
      the root user and the billing.
-3. **Account linking → Manage linked account**, pick the user, **Map to IAM
-   role**.
+
+One extra step applies **only if the company already used the legacy Partner
+Central** with company-email logins instead of an AWS account: that identity has
+to be linked to the listing account once, and each existing Partner Central user
+is then mapped to an IAM role whose name **starts with `PartnerCentralRoleFor`**
+(**Account linking → Manage linked account → Map to IAM role**) — Partner Central
+refuses a role named anything else. A registration that starts fresh on the new
+Partner Central has no legacy identity and skips this entirely.
 
 AWS explicitly discourages signing in to the Management Portal as the account
-root user; a role is the supported path.
+root user; a user or role is the supported path.
 
-Fixed technical constraints, which the build already satisfies: the source AMI
-must live in **us-east-1**, unencrypted, EBS-backed and HVM, and every
-CloudFormation template needs an architecture diagram
-([`deploy/aws/cloudformation/architecture.md`](../deploy/aws/cloudformation/architecture.md)).
+Testing the product does not need a second AWS account either. A **Limited**
+listing is visible and subscribable from the seller account itself (and from the
+Seller Operations test account); an allowlist of account IDs is there for when a
+launch from a genuine buyer's account is worth checking.
 
 ## The two IAM roles
 
@@ -119,9 +137,9 @@ later and slower.
    `deploy/aws/scripts/harden.sh` fails the Packer build on the first three, so
    this should be a formality.
 3. **Create the product** as a Limited listing — published, but visible only to
-   AWS accounts we allow. Subscribe from a test account and launch it the way a
-   customer will, including one-click "Launch from Website". This is the real
-   end-to-end test.
+   the seller account and any account we allowlist. Subscribe and launch it the
+   way a customer will, including one-click "Launch from Website". This is the
+   real end-to-end test.
 4. **Multi-region check** with `taskcat` and
    [`deploy/aws/.taskcat.yml`](../deploy/aws/.taskcat.yml), limited to two or
    three regions. Each region is real instance time for no extra signal beyond
