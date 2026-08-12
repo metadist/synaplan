@@ -21,29 +21,16 @@
                 {{ $t('widgets.success.title') }}
               </h2>
               <p class="text-sm txt-secondary mt-0.5">
-                {{ widget.name }}
+                {{ widget.name }} — {{ $t('widgets.success.readyToUse') }}
               </p>
             </div>
           </div>
         </div>
 
         <!-- Content -->
-        <div class="p-6 space-y-6 overflow-y-auto flex-1 min-h-0">
-          <!-- Status Badge -->
-          <div class="flex items-center gap-2">
-            <span
-              class="px-3 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-1.5"
-            >
-              <Icon icon="heroicons:check" class="w-4 h-4" />
-              {{ $t('widgets.success.statusActive') }}
-            </span>
-            <span class="txt-secondary text-sm">
-              {{ $t('widgets.success.readyToUse') }}
-            </span>
-          </div>
-
+        <div class="p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
           <!-- Embed Code Section -->
-          <div class="space-y-3" data-testid="section-embed-code">
+          <div class="space-y-2" data-testid="section-embed-code">
             <label class="block text-sm font-medium txt-primary">
               {{ $t('widgets.success.embedCodeLabel') }}
             </label>
@@ -63,65 +50,21 @@
           </div>
 
           <!-- Next Steps -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <!-- AI Setup -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
-              class="p-4 rounded-xl border-2 border-[var(--brand)]/30 bg-[var(--brand-alpha-light)] hover:border-[var(--brand)] transition-all text-left group"
-              data-testid="btn-ai-setup"
-              @click="$emit('startAiSetup')"
-            >
-              <div class="flex items-start gap-3">
-                <div
-                  class="w-10 h-10 rounded-lg bg-[var(--brand)]/20 flex items-center justify-center group-hover:bg-[var(--brand)]/30 transition-colors"
-                >
-                  <Icon icon="heroicons:sparkles" class="w-5 h-5 txt-brand" />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <h3 class="font-semibold txt-primary group-hover:txt-brand transition-colors">
-                    {{ $t('widgets.success.aiSetupTitle') }}
-                  </h3>
-                  <p class="text-xs txt-secondary mt-1 line-clamp-2">
-                    {{ $t('widgets.success.aiSetupDescription') }}
-                  </p>
-                </div>
-              </div>
-            </button>
-
-            <!-- Advanced Config -->
-            <button
-              class="p-4 rounded-xl border-2 border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50 transition-all text-left group"
+              class="px-4 py-3 rounded-xl border-2 border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50 transition-all flex items-center justify-center gap-2 font-medium txt-primary"
               data-testid="btn-advanced-config"
               @click="$emit('openAdvanced')"
             >
-              <div class="flex items-start gap-3">
-                <div
-                  class="w-10 h-10 rounded-lg surface-chip flex items-center justify-center group-hover:bg-[var(--brand-alpha-light)] transition-colors"
-                >
-                  <Icon
-                    icon="heroicons:cog-6-tooth"
-                    class="w-5 h-5 txt-secondary group-hover:txt-brand transition-colors"
-                  />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <h3 class="font-semibold txt-primary group-hover:txt-brand transition-colors">
-                    {{ $t('widgets.success.advancedTitle') }}
-                  </h3>
-                  <p class="text-xs txt-secondary mt-1 line-clamp-2">
-                    {{ $t('widgets.success.advancedDescription') }}
-                  </p>
-                </div>
-              </div>
+              <Icon icon="heroicons:cog-6-tooth" class="w-5 h-5 txt-brand" />
+              {{ $t('widgets.success.configureTitle') }}
             </button>
-          </div>
-
-          <!-- Test Widget Button -->
-          <div class="pt-2">
             <button
-              class="w-full py-3 rounded-lg border-2 border-dashed border-light-border/50 dark:border-dark-border/30 hover:border-green-500/50 hover:bg-green-500/5 transition-all flex items-center justify-center gap-2 txt-secondary hover:text-green-600 dark:hover:text-green-400"
+              class="px-4 py-3 rounded-xl border-2 border-light-border/30 dark:border-dark-border/20 hover:border-green-500/50 transition-all flex items-center justify-center gap-2 font-medium txt-primary"
               data-testid="btn-test-widget"
               @click="$emit('testWidget')"
             >
-              <Icon icon="heroicons:play" class="w-5 h-5" />
+              <Icon icon="heroicons:play" class="w-5 h-5 text-green-600 dark:text-green-400" />
               {{ $t('widgets.success.testNow') }}
             </button>
           </div>
@@ -129,10 +72,18 @@
 
         <!-- Footer -->
         <div
-          class="px-6 py-4 border-t border-light-border/30 dark:border-dark-border/20 flex justify-end"
+          class="px-6 py-4 border-t border-light-border/30 dark:border-dark-border/20 flex items-center justify-between gap-3"
         >
           <button
-            class="px-5 py-2.5 rounded-lg hover-surface transition-colors txt-primary font-medium"
+            class="text-xs txt-secondary hover:txt-brand transition-colors inline-flex items-center gap-1.5 text-left"
+            data-testid="btn-ai-setup"
+            @click="$emit('startAiSetup')"
+          >
+            <Icon icon="heroicons:sparkles" class="w-4 h-4 flex-shrink-0" />
+            {{ $t('widgets.success.aiSetupLink') }}
+          </button>
+          <button
+            class="btn-primary px-5 py-2.5 rounded-lg transition-colors font-medium"
             data-testid="btn-close"
             @click="$emit('close')"
           >

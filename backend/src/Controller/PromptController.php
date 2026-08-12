@@ -11,6 +11,7 @@ use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\File\FileUploadService;
 use App\Service\Model\Exception\InvalidPromptModelException;
 use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
@@ -56,6 +57,7 @@ class PromptController extends AbstractController
         private VectorStorageFacade $vectorStorageFacade,
         private PromptModelEligibilityValidator $modelEligibilityValidator,
         private TaskPlanner $taskPlanner,
+        private FileUploadService $fileUploadService,
     ) {
     }
 
@@ -1460,7 +1462,7 @@ class PromptController extends AbstractController
     #[OA\Post(
         path: '/api/v1/prompts/{topic}/files/link',
         summary: 'Link an existing file to task prompt',
-        description: 'Updates the groupKey of all RAG chunks for a file to link it to this task prompt',
+        description: 'Updates the groupKey of all RAG chunks for a file to link it to this task prompt. Files without chunks (never vectorized, or previously removed from a prompt) are vectorized on the fly from their stored extracted text.',
         tags: ['Task Prompts'],
         requestBody: new OA\RequestBody(
             required: true,
@@ -1483,6 +1485,7 @@ class PromptController extends AbstractController
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'File not found'),
+            new OA\Response(response: 422, description: 'File has no indexable content and could not be vectorized'),
         ]
     )]
     public function linkFile(
@@ -1514,6 +1517,36 @@ class PromptController extends AbstractController
             $messageId,
             $newGroupKey
         );
+
+        if ($chunksLinked > 0) {
+            // Keep the file-level group key in sync with the chunk payloads.
+            $this->fileRepository->updateGroupKey($file, $newGroupKey);
+        } else {
+            // A file without chunks (never vectorized, or its chunks were
+            // removed from another prompt) has nothing to re-tag. Linking
+            // used to be a silent no-op here — the file never showed up in
+            // the prompt's knowledge base. Build its chunks now instead;
+            // reVectorize() prefers the stored extracted text and only falls
+            // back to fresh extraction when no text is available.
+            $result = $this->fileUploadService->reVectorize($file, $user, $newGroupKey);
+            if (!$result['success']) {
+                // Log the low-level detail server-side only; exception messages
+                // from extraction/vectorization must not reach the client.
+                $this->logger->warning('Failed to vectorize file while linking to task prompt', [
+                    'user_id' => $user->getId(),
+                    'topic' => $topic,
+                    'message_id' => $messageId,
+                    'file_name' => $file->getFileName(),
+                    'error' => $result['error'] ?? 'unknown error',
+                    'error_type' => $result['errorType'] ?? null,
+                ]);
+
+                return $this->json([
+                    'error' => 'File could not be added to the knowledge base',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $chunksLinked = $result['chunksCreated'] ?? 0;
+        }
 
         $this->logger->info('Linked file to task prompt', [
             'user_id' => $user->getId(),

@@ -2977,36 +2977,76 @@
     "chats": "Chats",
     "code": "Code",
     "settings": "Einstellungen",
+    "configure": "Konfigurieren",
     "advancedConfigLabel": "Erweiterte Einstellungen",
     "setupComplete": "Widget-Setup erfolgreich abgeschlossen!",
-    "simpleSetup": {
-      "title": "Widget erstellen",
-      "subtitle": "Starten Sie in Sekunden mit den Grundlagen",
-      "nameLabel": "Widget-Name",
-      "namePlaceholder": "z.B. Support-Chat",
-      "websiteLabel": "Ihre Website-URL",
-      "websitePlaceholder": "ihre-website.de",
-      "websiteHelp": "Domain eingeben. Domain wird zur erlaubten Liste hinzugefügt.",
-      "infoTitle": "Schnellstart",
-      "infoDescription": "Ihr Widget ist sofort einsatzbereit. Sie können es später mit dem KI-Setup-Assistenten oder in den Erweiterten Einstellungen feinabstimmen.",
-      "previewLabel": "Widget-Vorschau",
-      "previewClickHint": "Klicken Sie auf den Chat-Button, um zu sehen wie es funktioniert",
-      "previewChatGreeting": "Hallo! Wie kann ich Ihnen helfen?",
-      "previewChatPlaceholder": "Nachricht eingeben...",
-      "createButton": "Widget erstellen",
-      "createError": "Widget konnte nicht erstellt werden"
+    "createWizard": {
+      "title": "Chat-Widget erstellen",
+      "stepCounter": "Schritt {current} von {total}",
+      "steps": {
+        "basics": "Name & Website",
+        "appearance": "Aussehen",
+        "knowledge": "Datenquellen",
+        "options": "Optionen"
+      },
+      "basics": {
+        "nameLabel": "Widget-Name",
+        "namePlaceholder": "z. B. Support-Chat",
+        "websiteLabel": "Ihre Website",
+        "websitePlaceholder": "ihre-website.de",
+        "websiteHelp": "Das Chat-Widget funktioniert nur auf dieser Domain. Weitere Domains können Sie später hinzufügen."
+      },
+      "appearance": {
+        "colorLabel": "Hauptfarbe",
+        "iconColorLabel": "Symbolfarbe",
+        "themeLabel": "Design",
+        "themeLight": "Hell",
+        "themeDark": "Dunkel",
+        "positionLabel": "Position auf Ihrer Website",
+        "positions": {
+          "bottomRight": "Unten rechts",
+          "bottomLeft": "Unten links",
+          "topRight": "Oben rechts",
+          "topLeft": "Oben links"
+        },
+        "previewLabel": "Vorschau",
+        "previewTitle": "Chat",
+        "previewGreeting": "Hallo! Wie kann ich Ihnen helfen?"
+      },
+      "knowledge": {
+        "intro": "Fügen Sie Dokumente hinzu, damit der KI-Assistent Fragen zu Ihren Inhalten beantworten kann. Dieser Schritt ist optional.",
+        "uploadLabel": "Dateien hochladen",
+        "pickLabel": "Aus Dateimanager wählen",
+        "uploadHint": "PDF, Word, Text, Markdown, CSV oder JSON. Die Dateien werden nach dem Erstellen des Widgets verarbeitet.",
+        "empty": "Noch keine Datenquellen — Sie können sie auch später hinzufügen."
+      },
+      "options": {
+        "welcomeLabel": "Begrüßungsnachricht",
+        "welcomePlaceholder": "Hallo! Wie kann ich Ihnen heute helfen?",
+        "autoOpenLabel": "Chat automatisch öffnen",
+        "autoOpenHint": "Das Chat-Fenster öffnet sich von selbst, wenn ein Besucher die Seite aufruft.",
+        "fileUploadLabel": "Datei-Uploads für Besucher erlauben",
+        "fileUploadHint": "Besucher können Dateien an ihre Nachrichten anhängen.",
+        "changeLaterHint": "Jede Einstellung kann später in der Widget-Konfiguration geändert werden."
+      },
+      "back": "Zurück",
+      "next": "Weiter",
+      "create": "Widget erstellen",
+      "creatingWidget": "Widget wird erstellt...",
+      "creatingDesign": "Design wird übernommen...",
+      "creatingFiles": "Datenquellen werden hinzugefügt...",
+      "createError": "Widget konnte nicht erstellt werden",
+      "finishError": "Das Widget wurde erstellt, aber einige Einstellungen konnten nicht übernommen werden. Bitte prüfen Sie die Widget-Konfiguration.",
+      "footerHint": "Tipp: Nach dem Erstellen kann der KI-Setup-Assistent die Antworten für Sie konfigurieren, und Sie können jederzeit weitere Datenquellen verbinden."
     },
     "success": {
       "title": "Widget erstellt!",
-      "statusActive": "Aktiv",
-      "readyToUse": "Bereit zum Einbetten auf Ihrer Website",
+      "readyToUse": "bereit zum Einbetten auf Ihrer Website",
       "embedCodeLabel": "Einbettungs-Code",
       "embedCodeError": "Einbettungs-Code konnte nicht geladen werden",
-      "aiSetupTitle": "KI-Setup-Assistent",
-      "aiSetupDescription": "Beantworten Sie ein paar kurze Fragen, und der KI-Setup-Assistent richtet Ihr Widget für Sie ein.",
-      "advancedTitle": "Erweiterte Einstellungen",
-      "advancedDescription": "Passen Sie Branding, Verhalten, Datei-Uploads und Sicherheitseinstellungen manuell an.",
-      "testNow": "Widget jetzt testen"
+      "configureTitle": "Konfiguration öffnen",
+      "testNow": "Widget testen",
+      "aiSetupLink": "Lassen Sie den KI-Setup-Assistenten die Antworten für Sie konfigurieren"
     },
     "setupChat": {
       "title": "KI-Setup-Assistent",
@@ -3122,7 +3162,22 @@
         "crawlError": "Inhalt konnte nicht gecrawlt werden",
         "externalUserIdHint": "Verwende {placeholder} als Platzhalter — er wird automatisch durch die User-ID der einbettenden Seite ersetzt."
       },
-      "filesTitle": "Verbundene Dateien",
+      "knowledge": {
+        "title": "Wissen & Quellen",
+        "description": "Dateien, die der KI-Assistent nutzt, um Fragen in diesem Widget zu beantworten.",
+        "empty": "Noch keine Quellen verbunden. Füge Dateien hinzu, damit die KI aus deinen Inhalten antworten kann.",
+        "upload": "Datei hochladen",
+        "pick": "Aus Dateimanager wählen",
+        "chunks": "{count} Abschnitte",
+        "remove": "Quelle entfernen",
+        "removeTitle": "Quelle entfernen?",
+        "removeConfirm": "„{name}“ wird von diesem Widget nicht mehr genutzt. Die Datei selbst bleibt in deinem Dateimanager erhalten.",
+        "removed": "Quelle entfernt",
+        "removeError": "Quelle konnte nicht entfernt werden.",
+        "added": "Quellen aktualisiert",
+        "addError": "Quelle konnte nicht hinzugefügt werden.",
+        "linkFailed": "Konnte nicht hinzugefügt werden: {names}"
+      },
       "avvNoticeTitle": "Auftragsverarbeitungsvertrag erforderlich",
       "avvNoticeDescription": "Dieses Widget verarbeitet Nutzerdaten. Bitte akzeptiere den Auftragsverarbeitungsvertrag (AVV) bevor du live gehst.",
       "avvNoticeCta": "Jetzt einrichten",

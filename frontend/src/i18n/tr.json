@@ -1191,6 +1191,75 @@
     "title": "Sohbet Widgetları",
     "subtitle": "AI destekli sohbet widgetlarını web sitenize yerleştirin",
     "createNew": "Widget Oluştur",
+    "configure": "Yapılandır",
+    "createWizard": {
+      "title": "Sohbet widget'ı oluştur",
+      "stepCounter": "Adım {current} / {total}",
+      "steps": {
+        "basics": "Ad ve web sitesi",
+        "appearance": "Görünüm",
+        "knowledge": "Veri kaynakları",
+        "options": "Seçenekler"
+      },
+      "basics": {
+        "nameLabel": "Widget adı",
+        "namePlaceholder": "ör. Destek Sohbeti",
+        "websiteLabel": "Web siteniz",
+        "websitePlaceholder": "web-siteniz.com",
+        "websiteHelp": "Sohbet widget'ı yalnızca bu alan adında çalışır. Daha sonra başka alan adları ekleyebilirsiniz."
+      },
+      "appearance": {
+        "colorLabel": "Ana renk",
+        "iconColorLabel": "Simge rengi",
+        "themeLabel": "Tema",
+        "themeLight": "Açık",
+        "themeDark": "Koyu",
+        "positionLabel": "Web sitenizdeki konum",
+        "positions": {
+          "bottomRight": "Sağ alt",
+          "bottomLeft": "Sol alt",
+          "topRight": "Sağ üst",
+          "topLeft": "Sol üst"
+        },
+        "previewLabel": "Önizleme",
+        "previewTitle": "Sohbet",
+        "previewGreeting": "Merhaba! Size nasıl yardımcı olabilirim?"
+      },
+      "knowledge": {
+        "intro": "AI asistanının içeriğinizle ilgili soruları yanıtlayabilmesi için belgeler ekleyin. Bu adım isteğe bağlıdır.",
+        "uploadLabel": "Dosya yükle",
+        "pickLabel": "Dosya Yöneticisinden seç",
+        "uploadHint": "PDF, Word, metin, Markdown, CSV veya JSON. Dosyalar widget oluşturulduktan sonra işlenir.",
+        "empty": "Henüz veri kaynağı yok — daha sonra da ekleyebilirsiniz."
+      },
+      "options": {
+        "welcomeLabel": "Karşılama mesajı",
+        "welcomePlaceholder": "Merhaba! Bugün size nasıl yardımcı olabilirim?",
+        "autoOpenLabel": "Sohbeti otomatik aç",
+        "autoOpenHint": "Bir ziyaretçi geldiğinde sohbet penceresi kendiliğinden açılır.",
+        "fileUploadLabel": "Ziyaretçilerin dosya yüklemesine izin ver",
+        "fileUploadHint": "Ziyaretçiler mesajlarına dosya ekleyebilir.",
+        "changeLaterHint": "Her ayar daha sonra widget yapılandırmasında değiştirilebilir."
+      },
+      "back": "Geri",
+      "next": "İleri",
+      "create": "Widget oluştur",
+      "creatingWidget": "Widget oluşturuluyor...",
+      "creatingDesign": "Tasarım uygulanıyor...",
+      "creatingFiles": "Veri kaynakları ekleniyor...",
+      "createError": "Widget oluşturulamadı",
+      "finishError": "Widget oluşturuldu, ancak bazı ayarlar uygulanamadı. Lütfen widget yapılandırmasını kontrol edin.",
+      "footerHint": "İpucu: Oluşturduktan sonra AI Kurulum Asistanı yanıtları sizin için yapılandırabilir ve istediğiniz zaman daha fazla veri kaynağı bağlayabilirsiniz."
+    },
+    "success": {
+      "title": "Widget oluşturuldu!",
+      "readyToUse": "web sitenize yerleştirilmeye hazır",
+      "embedCodeLabel": "Yerleştirme kodu",
+      "embedCodeError": "Yerleştirme kodu yüklenemedi",
+      "configureTitle": "Yapılandırmayı aç",
+      "testNow": "Widget'ı test et",
+      "aiSetupLink": "AI Kurulum Asistanı yanıtları sizin için yapılandırsın"
+    },
     "createNewWidget": "Yeni Sohbet Widgetı Oluştur",
     "createWidget": "Widget Oluştur",
     "editWidget": "Widgetı Düzenle",
@@ -1280,6 +1349,28 @@
     "createSuccess": "Widget başarıyla oluşturuldu! 🎉",
     "updateSuccess": "Widget başarıyla güncellendi",
     "deleteSuccess": "Widget başarıyla silindi",
+    "detail": {
+      "wizard": {
+        "uploading": "Yükleniyor...",
+        "uploadError": "Dosya yüklenemedi."
+      },
+      "knowledge": {
+        "title": "Bilgi ve Kaynaklar",
+        "description": "AI asistanının bu widget'ta soruları yanıtlamak için kullandığı dosyalar.",
+        "empty": "Henüz bağlı kaynak yok. AI'nın içeriğinizden yanıt verebilmesi için dosya ekleyin.",
+        "upload": "Dosya yükle",
+        "pick": "Dosya yöneticisinden seç",
+        "chunks": "{count} bölüm",
+        "remove": "Kaynağı kaldır",
+        "removeTitle": "Kaynak kaldırılsın mı?",
+        "removeConfirm": "\"{name}\" artık bu widget tarafından kullanılmayacak. Dosya, dosya yöneticinizde kalır.",
+        "removed": "Kaynak kaldırıldı",
+        "removeError": "Kaynak kaldırılamadı.",
+        "added": "Kaynaklar güncellendi",
+        "addError": "Kaynak eklenemedi.",
+        "linkFailed": "Eklenemedi: {names}"
+      }
+    },
     "deleteTitle": "Widget Silinsin mi?",
     "deleteDescription": "\"{name}\" silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "deleteConfirm": "Sil",

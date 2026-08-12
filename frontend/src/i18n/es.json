@@ -1191,6 +1191,75 @@
     "title": "Widgets de Chat",
     "subtitle": "Integra widgets de chat con IA en tu sitio web",
     "createNew": "Crear Widget",
+    "configure": "Configurar",
+    "createWizard": {
+      "title": "Crear widget de chat",
+      "stepCounter": "Paso {current} de {total}",
+      "steps": {
+        "basics": "Nombre y sitio web",
+        "appearance": "Apariencia",
+        "knowledge": "Fuentes de datos",
+        "options": "Opciones"
+      },
+      "basics": {
+        "nameLabel": "Nombre del widget",
+        "namePlaceholder": "ej. Chat de Soporte",
+        "websiteLabel": "Tu sitio web",
+        "websitePlaceholder": "tu-sitio-web.com",
+        "websiteHelp": "El widget de chat solo funcionará en este dominio. Puedes añadir más dominios después."
+      },
+      "appearance": {
+        "colorLabel": "Color principal",
+        "iconColorLabel": "Color del icono",
+        "themeLabel": "Tema",
+        "themeLight": "Claro",
+        "themeDark": "Oscuro",
+        "positionLabel": "Posición en tu sitio web",
+        "positions": {
+          "bottomRight": "Abajo a la derecha",
+          "bottomLeft": "Abajo a la izquierda",
+          "topRight": "Arriba a la derecha",
+          "topLeft": "Arriba a la izquierda"
+        },
+        "previewLabel": "Vista previa",
+        "previewTitle": "Chat",
+        "previewGreeting": "¡Hola! ¿En qué puedo ayudarte?"
+      },
+      "knowledge": {
+        "intro": "Añade documentos para que el asistente de IA pueda responder preguntas sobre tu contenido. Este paso es opcional.",
+        "uploadLabel": "Subir archivos",
+        "pickLabel": "Elegir del Gestor de Archivos",
+        "uploadHint": "PDF, Word, texto, Markdown, CSV o JSON. Los archivos se procesan después de crear el widget.",
+        "empty": "Aún no hay fuentes de datos — también puedes añadirlas más tarde."
+      },
+      "options": {
+        "welcomeLabel": "Mensaje de bienvenida",
+        "welcomePlaceholder": "¡Hola! ¿En qué puedo ayudarte hoy?",
+        "autoOpenLabel": "Abrir el chat automáticamente",
+        "autoOpenHint": "La ventana de chat se abre sola cuando llega un visitante.",
+        "fileUploadLabel": "Permitir subida de archivos a visitantes",
+        "fileUploadHint": "Los visitantes pueden adjuntar archivos a sus mensajes.",
+        "changeLaterHint": "Cada ajuste se puede cambiar más tarde en la configuración del widget."
+      },
+      "back": "Atrás",
+      "next": "Siguiente",
+      "create": "Crear widget",
+      "creatingWidget": "Creando widget...",
+      "creatingDesign": "Aplicando diseño...",
+      "creatingFiles": "Añadiendo fuentes de datos...",
+      "createError": "No se pudo crear el widget",
+      "finishError": "El widget se creó, pero algunos ajustes no se pudieron aplicar. Revisa la configuración del widget.",
+      "footerHint": "Consejo: Después de crearlo, el Asistente de Configuración IA puede configurar las respuestas por ti, y puedes conectar más fuentes de datos en cualquier momento."
+    },
+    "success": {
+      "title": "¡Widget creado!",
+      "readyToUse": "listo para integrar en tu sitio web",
+      "embedCodeLabel": "Código de integración",
+      "embedCodeError": "No se pudo cargar el código de integración",
+      "configureTitle": "Abrir configuración",
+      "testNow": "Probar widget",
+      "aiSetupLink": "Deja que el Asistente de Configuración IA configure las respuestas por ti"
+    },
     "createNewWidget": "Crear Nuevo Widget de Chat",
     "createWidget": "Crear Widget",
     "editWidget": "Editar Widget",
@@ -1280,6 +1349,28 @@
     "createSuccess": "¡Widget creado exitosamente! 🎉",
     "updateSuccess": "Widget actualizado exitosamente",
     "deleteSuccess": "Widget eliminado exitosamente",
+    "detail": {
+      "wizard": {
+        "uploading": "Subiendo...",
+        "uploadError": "No se pudo subir el archivo."
+      },
+      "knowledge": {
+        "title": "Conocimiento y fuentes",
+        "description": "Archivos que el asistente de IA usa para responder preguntas en este widget.",
+        "empty": "Aún no hay fuentes conectadas. Añade archivos para que la IA responda con tu contenido.",
+        "upload": "Subir archivo",
+        "pick": "Elegir del gestor de archivos",
+        "chunks": "{count} secciones",
+        "remove": "Quitar fuente",
+        "removeTitle": "¿Quitar fuente?",
+        "removeConfirm": "\"{name}\" ya no será utilizado por este widget. El archivo permanece en tu gestor de archivos.",
+        "removed": "Fuente eliminada",
+        "removeError": "No se pudo quitar la fuente.",
+        "added": "Fuentes actualizadas",
+        "addError": "No se pudo añadir la fuente.",
+        "linkFailed": "No se pudo añadir: {names}"
+      }
+    },
     "deleteTitle": "¿Eliminar Widget?",
     "deleteDescription": "¿Estás seguro de que deseas eliminar \"{name}\"? Esta acción no se puede deshacer.",
     "deleteConfirm": "Eliminar",

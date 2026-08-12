@@ -17,11 +17,26 @@
           <div class="flex gap-2">
             <button
               v-if="widget"
-              class="px-4 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-sm hover:txt-primary transition-colors"
+              :class="[
+                'px-4 py-2.5 rounded-xl border text-sm transition-colors inline-flex items-center gap-2',
+                showAiPanel
+                  ? 'border-[var(--brand)]/40 bg-[var(--brand-alpha-light)] txt-brand'
+                  : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary',
+              ]"
+              data-testid="btn-toggle-ai-panel"
+              @click="showAiPanel = !showAiPanel"
+            >
+              <Icon icon="heroicons:sparkles" class="w-4 h-4" />
+              <span class="hidden sm:inline">{{ $t('widgets.setupChat.title') }}</span>
+            </button>
+            <button
+              v-if="widget"
+              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium transition-colors inline-flex items-center gap-2"
               data-testid="btn-widget-settings"
               @click="openAdvancedModal()"
             >
               <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4" />
+              <span class="hidden sm:inline">{{ $t('widgets.settings') }}</span>
             </button>
           </div>
         </div>
@@ -72,46 +87,10 @@
         </div>
 
         <div v-else class="h-full relative">
-          <!-- PHASE 1: Fullscreen AI Chat (initial setup) -->
-          <Transition
-            enter-active-class="transition-all duration-500 ease-out"
-            enter-from-class="opacity-0 scale-95"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition-all duration-500 ease-in-out"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-          >
-            <div
-              v-if="aiSetupPhase === 'fullscreen'"
-              class="absolute inset-0 z-20 flex items-stretch justify-center px-4 py-6"
-            >
-              <WidgetAiSetupPanel
-                v-if="widget"
-                :widget-id="widget.widgetId"
-                :fullscreen="true"
-                :current-flow="currentFlowSnapshot"
-                @update-flow="handleAiFlowUpdate"
-                @first-flow-received="transitionToSplitView"
-                @update-widget-name="handleWidgetNameUpdate"
-                @open-settings="openAdvancedModal"
-              />
-            </div>
-          </Transition>
-
-          <!-- PHASE 2: Split layout (Flow Builder left + AI Panel right) -->
-          <div
-            :class="[
-              'h-full flex flex-col lg:flex-row transition-all duration-700 ease-out',
-              aiSetupPhase === 'fullscreen' ? 'opacity-0 pointer-events-none' : 'opacity-100',
-            ]"
-          >
+          <!-- Split layout (Flow Builder left + optional AI Panel right) -->
+          <div class="h-full flex flex-col lg:flex-row">
             <!-- Left: Flow Builder -->
-            <div
-              :class="[
-                'w-full min-w-0 lg:w-[70%] lg:flex-shrink-0 overflow-y-auto px-4 lg:px-6 py-6 scroll-thin transition-all duration-700 ease-out',
-                aiSetupPhase === 'entering' ? 'animate-slide-in-left' : '',
-              ]"
-            >
+            <div class="w-full min-w-0 flex-1 overflow-y-auto px-4 lg:px-6 py-6 scroll-thin">
               <div class="space-y-8">
                 <!-- Flow Builder -->
                 <section>
@@ -1009,21 +988,94 @@
                   </div>
                 </section>
 
-                <!-- Connected Files -->
-                <section v-if="promptFiles.length > 0">
-                  <h2 class="text-lg font-bold txt-primary mb-3 flex items-center gap-2">
-                    <Icon icon="heroicons:document-text" class="w-5 h-5 txt-brand" />
-                    {{ $t('widgets.detail.filesTitle') }}
+                <!-- Knowledge & Sources -->
+                <section data-testid="section-knowledge">
+                  <h2 class="text-lg font-bold txt-primary mb-1 flex items-center gap-2">
+                    <Icon icon="heroicons:book-open" class="w-5 h-5 txt-brand" />
+                    {{ $t('widgets.detail.knowledge.title') }}
                   </h2>
-                  <div class="flex flex-wrap gap-2">
-                    <span
+                  <p class="text-sm txt-secondary mb-3">
+                    {{ $t('widgets.detail.knowledge.description') }}
+                  </p>
+
+                  <!-- Linked files -->
+                  <div v-if="promptFiles.length > 0" class="space-y-2 mb-3">
+                    <div
                       v-for="file in promptFiles"
                       :key="file.id"
-                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--brand)]/10 txt-primary border border-[var(--brand)]/20"
+                      class="flex items-center gap-3 p-2.5 rounded-lg surface-chip"
+                      data-testid="knowledge-file"
                     >
-                      <Icon icon="heroicons:document" class="w-3.5 h-3.5" />
-                      {{ file.fileName }}
-                    </span>
+                      <Icon icon="heroicons:document" class="w-5 h-5 txt-secondary flex-shrink-0" />
+                      <span class="flex-1 min-w-0 text-sm txt-primary truncate">
+                        {{ file.fileName }}
+                      </span>
+                      <span v-if="file.chunks > 0" class="text-xs txt-secondary flex-shrink-0">
+                        {{ $t('widgets.detail.knowledge.chunks', { count: file.chunks }) }}
+                      </span>
+                      <button
+                        type="button"
+                        class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
+                        :aria-label="$t('widgets.detail.knowledge.remove')"
+                        data-testid="btn-remove-knowledge-file"
+                        @click="removeKnowledgeFile(file)"
+                      >
+                        <Icon icon="heroicons:x-mark" class="w-4 h-4 text-red-500" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Empty state -->
+                  <div v-else class="text-center py-4 surface-chip rounded-lg mb-3">
+                    <Icon
+                      icon="heroicons:document-text"
+                      class="w-7 h-7 txt-secondary mx-auto mb-1 opacity-50"
+                    />
+                    <p class="text-sm txt-secondary">
+                      {{ $t('widgets.detail.knowledge.empty') }}
+                    </p>
+                  </div>
+
+                  <!-- Add sources -->
+                  <div class="flex flex-col sm:flex-row gap-2">
+                    <label
+                      class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-lg cursor-pointer border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
+                      :class="{ 'opacity-60 pointer-events-none': knowledgeUploading }"
+                    >
+                      <Icon
+                        v-if="knowledgeUploading"
+                        icon="heroicons:arrow-path"
+                        class="w-4 h-4 txt-secondary animate-spin"
+                      />
+                      <Icon v-else icon="heroicons:cloud-arrow-up" class="w-4 h-4 txt-secondary" />
+                      <span class="text-sm font-medium txt-brand">
+                        {{
+                          knowledgeUploading
+                            ? $t('widgets.detail.wizard.uploading')
+                            : $t('widgets.detail.knowledge.upload')
+                        }}
+                      </span>
+                      <input
+                        type="file"
+                        class="hidden"
+                        accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
+                        multiple
+                        :disabled="knowledgeUploading"
+                        data-testid="input-knowledge-upload"
+                        @change="handleKnowledgeUpload"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-lg border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
+                      data-testid="btn-pick-knowledge-files"
+                      @click="showKnowledgeFilePicker = true"
+                    >
+                      <Icon icon="heroicons:folder-open" class="w-4 h-4 txt-secondary" />
+                      <span class="text-sm font-medium txt-brand">
+                        {{ $t('widgets.detail.knowledge.pick') }}
+                      </span>
+                    </button>
                   </div>
                 </section>
 
@@ -1086,60 +1138,43 @@
               </div>
             </div>
 
-            <!-- Right: AI Setup Panel (desktop, only in split phase) -->
+            <!-- Right: AI Setup Assistant (desktop side panel, opt-in via header toggle) -->
             <div
-              v-if="aiSetupPhase !== 'fullscreen'"
-              :class="[
-                'hidden lg:flex lg:w-[30%] lg:flex-shrink-0 border-l border-light-border/30 dark:border-dark-border/20 p-4 transition-all duration-700 ease-out',
-                aiSetupPhase === 'entering' ? 'animate-slide-in-right' : '',
-              ]"
+              v-if="showAiPanel"
+              class="hidden lg:flex lg:w-[30%] lg:flex-shrink-0 border-l border-light-border/30 dark:border-dark-border/20 p-4"
             >
               <WidgetAiSetupPanel
                 v-if="widget"
                 :widget-id="widget.widgetId"
                 :current-flow="currentFlowSnapshot"
                 @update-flow="handleAiFlowUpdate"
-                @first-flow-received="transitionToSplitView"
                 @update-widget-name="handleWidgetNameUpdate"
                 @open-settings="openAdvancedModal"
               />
             </div>
 
-            <!-- Mobile: AI Panel toggle button + overlay (only in split phase) -->
-            <template v-if="aiSetupPhase !== 'fullscreen'">
-              <button
-                class="lg:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[var(--brand)] text-white shadow-lg shadow-[var(--brand)]/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-                @click="showMobileAiPanel = !showMobileAiPanel"
+            <!-- Mobile: AI Panel bottom sheet (opt-in via header toggle) -->
+            <Transition
+              enter-active-class="transition-transform duration-300 ease-out"
+              enter-from-class="translate-y-full"
+              enter-to-class="translate-y-0"
+              leave-active-class="transition-transform duration-200 ease-in"
+              leave-from-class="translate-y-0"
+              leave-to-class="translate-y-full"
+            >
+              <div
+                v-if="showAiPanel && widget"
+                class="lg:hidden fixed inset-x-0 bottom-0 z-30 h-[75vh] bg-chat rounded-t-2xl shadow-2xl p-4"
               >
-                <Icon
-                  :icon="showMobileAiPanel ? 'heroicons:x-mark' : 'heroicons:sparkles'"
-                  class="w-6 h-6"
+                <WidgetAiSetupPanel
+                  :widget-id="widget.widgetId"
+                  :current-flow="currentFlowSnapshot"
+                  @update-flow="handleAiFlowUpdate"
+                  @update-widget-name="handleWidgetNameUpdate"
+                  @open-settings="openAdvancedModal"
                 />
-              </button>
-
-              <Transition
-                enter-active-class="transition-transform duration-300 ease-out"
-                enter-from-class="translate-y-full"
-                enter-to-class="translate-y-0"
-                leave-active-class="transition-transform duration-200 ease-in"
-                leave-from-class="translate-y-0"
-                leave-to-class="translate-y-full"
-              >
-                <div
-                  v-if="showMobileAiPanel && widget"
-                  class="lg:hidden fixed inset-x-0 bottom-0 z-30 h-[75vh] bg-chat rounded-t-2xl shadow-2xl p-4"
-                >
-                  <WidgetAiSetupPanel
-                    :widget-id="widget.widgetId"
-                    :current-flow="currentFlowSnapshot"
-                    @update-flow="handleAiFlowUpdate"
-                    @first-flow-received="transitionToSplitView"
-                    @update-widget-name="handleWidgetNameUpdate"
-                    @open-settings="openAdvancedModal"
-                  />
-                </div>
-              </Transition>
-            </template>
+              </div>
+            </Transition>
           </div>
         </div>
       </div>
@@ -1167,6 +1202,13 @@
       @close="showWizardFilePicker = false"
       @select="handleWizardFilePickerSelect"
     />
+
+    <FilePicker
+      :is-open="showKnowledgeFilePicker"
+      :exclude-message-ids="promptFiles.map((f) => f.id)"
+      @close="showKnowledgeFilePicker = false"
+      @select="handleKnowledgePickerSelect"
+    />
   </MainLayout>
 </template>
 
@@ -1192,6 +1234,7 @@ import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi, type PromptMetadata } from '@/services/api/promptsApi'
 import { chatApi } from '@/services/api/chatApi'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
 import {
   WIDGET_RULES_BLOCK_START,
   WIDGET_RULES_BLOCK_END,
@@ -1227,6 +1270,7 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const { error: showError, success } = useNotification()
+const { confirm } = useDialog()
 const { t } = useI18n()
 
 // No purchase path on a custom server in the native app (store IAP only).
@@ -1252,9 +1296,9 @@ const selectedTriggerId = ref<string | null>(null)
 const newTriggerText = ref('')
 const newResponseText = ref('')
 
-// AI setup phase: 'fullscreen' (initial) -> 'entering' (animating) -> 'split' (final)
-const aiSetupPhase = ref<'fullscreen' | 'entering' | 'split'>('fullscreen')
-const showMobileAiPanel = ref(false)
+// AI Setup Assistant side panel — opt-in via the header toggle. The manual
+// flow builder and data sources are the primary configuration surface.
+const showAiPanel = ref(false)
 
 // Expand state for flow cards
 const expandedNodeId = ref<string | null>(null)
@@ -1273,6 +1317,10 @@ const wizardFiles = ref<Array<{ messageId: number; fileName: string }>>([])
 const wizardUploadingFile = ref(false)
 const showWizardFilePicker = ref(false)
 const wizardFilePickerExcludeIds = computed(() => wizardFiles.value.map((f) => f.messageId))
+
+// Knowledge & Sources card
+const knowledgeUploading = ref(false)
+const showKnowledgeFilePicker = ref(false)
 
 const isUserDataConfigured = computed(() => {
   const url = widget.value?.config?.externalApiUrl
@@ -1489,6 +1537,110 @@ const removeWizardFile = (messageId: number) => {
   wizardFiles.value = wizardFiles.value.filter((f) => f.messageId !== messageId)
 }
 
+// --- Knowledge & Sources card ---
+
+const DEFAULT_WIDGET_TOPIC = 'tools:widget-default'
+
+const reloadPromptFiles = async (topic: string) => {
+  promptFiles.value = (await promptsApi.getPromptFiles(topic)).map((f) => ({
+    id: f.messageId,
+    fileName: f.fileName,
+    chunks: f.chunks,
+  }))
+}
+
+/**
+ * Widgets on the shared default prompt cannot own knowledge files. Saving the
+ * flow creates a widget-specific prompt (generateWidgetPrompt inside
+ * persistFlowData) — do that first, then return the private topic.
+ */
+const ensurePromptTopic = async (): Promise<string | null> => {
+  if (!widget.value) return null
+  const topic = widget.value.taskPromptTopic
+  if (topic && topic !== DEFAULT_WIDGET_TOPIC) return topic
+  await persistFlowData()
+  const newTopic = widget.value.taskPromptTopic
+  return newTopic && newTopic !== DEFAULT_WIDGET_TOPIC ? newTopic : null
+}
+
+const handleKnowledgeUpload = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = input.files
+  if (!files || files.length === 0) return
+  knowledgeUploading.value = true
+  try {
+    const topic = await ensurePromptTopic()
+    if (!topic) {
+      showError(t('widgets.detail.knowledge.addError'))
+      return
+    }
+    for (const file of Array.from(files)) {
+      await promptsApi.uploadPromptFile(topic, file)
+    }
+    await reloadPromptFiles(topic)
+    success(t('widgets.detail.knowledge.added'))
+  } catch {
+    showError(t('widgets.detail.wizard.uploadError'))
+  } finally {
+    knowledgeUploading.value = false
+    input.value = ''
+  }
+}
+
+const handleKnowledgePickerSelect = async (
+  files: Array<{ messageId: number; fileName: string }>
+) => {
+  showKnowledgeFilePicker.value = false
+  if (files.length === 0) return
+  knowledgeUploading.value = true
+  try {
+    const topic = await ensurePromptTopic()
+    if (!topic) {
+      showError(t('widgets.detail.knowledge.addError'))
+      return
+    }
+    const failed: string[] = []
+    for (const f of files) {
+      try {
+        await promptsApi.linkFileToPrompt(topic, f.messageId)
+      } catch {
+        failed.push(f.fileName)
+      }
+    }
+    await reloadPromptFiles(topic)
+    if (failed.length > 0) {
+      showError(t('widgets.detail.knowledge.linkFailed', { names: failed.join(', ') }))
+    }
+    if (failed.length < files.length) {
+      success(t('widgets.detail.knowledge.added'))
+    }
+  } catch {
+    showError(t('widgets.detail.knowledge.addError'))
+  } finally {
+    knowledgeUploading.value = false
+  }
+}
+
+const removeKnowledgeFile = async (file: { id: number; fileName: string }) => {
+  const topic = widget.value?.taskPromptTopic
+  if (!topic || topic === DEFAULT_WIDGET_TOPIC) return
+  const confirmed = await confirm({
+    title: t('widgets.detail.knowledge.removeTitle'),
+    message: t('widgets.detail.knowledge.removeConfirm', { name: file.fileName }),
+    confirmText: t('widgets.detail.knowledge.remove'),
+    cancelText: t('common.cancel'),
+    danger: true,
+  })
+  if (!confirmed) return
+  try {
+    await promptsApi.deletePromptFile(topic, file.id)
+    promptFiles.value = promptFiles.value.filter((f) => f.id !== file.id)
+    success(t('widgets.detail.knowledge.removed'))
+  } catch {
+    showError(t('widgets.detail.knowledge.removeError'))
+  }
+}
+
 const autoConnectResponse = (responseId: string) => {
   if (connections.value.length > 0) return
   for (const trig of triggers.value) {
@@ -1590,14 +1742,6 @@ const removeTrigger = (id: string) => {
 const removeResponse = (id: string) => {
   responses.value = responses.value.filter((n) => n.id !== id)
   connections.value = connections.value.filter((c) => c.to !== id)
-}
-
-const transitionToSplitView = () => {
-  if (aiSetupPhase.value !== 'fullscreen') return
-  aiSetupPhase.value = 'entering'
-  setTimeout(() => {
-    aiSetupPhase.value = 'split'
-  }, 800)
 }
 
 const handleWidgetNameUpdate = async (name: string) => {
@@ -1749,7 +1893,7 @@ const loadData = async () => {
   try {
     widget.value = await widgetsApi.getWidget(widgetId)
     const topic = widget.value.taskPromptTopic
-    if (topic && topic !== 'tools:widget-default') {
+    if (topic && topic !== DEFAULT_WIDGET_TOPIC) {
       const prompts = await promptsApi.getPrompts()
       const prompt = prompts.find((p) => p.topic === topic)
       if (prompt) {
@@ -1786,11 +1930,7 @@ const loadData = async () => {
         responses.value = defaultResponses()
         connections.value = []
       }
-      promptFiles.value = (await promptsApi.getPromptFiles(topic)).map((f) => ({
-        id: f.messageId,
-        fileName: f.fileName,
-        chunks: f.chunks,
-      }))
+      await reloadPromptFiles(topic)
     } else {
       triggers.value = defaultTriggers()
       responses.value = defaultResponses()
@@ -1804,9 +1944,6 @@ const loadData = async () => {
     nextTick(() => {
       dataReady.value = true
     })
-    if (triggers.value.length > 0 || responses.value.length > 0) {
-      aiSetupPhase.value = 'split'
-    }
   }
 }
 
@@ -1858,35 +1995,5 @@ onMounted(loadData)
   100% {
     offset-distance: 100%;
   }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.animate-slide-in-left {
-  animation: slideInLeft 0.6s ease-out both;
-}
-
-.animate-slide-in-right {
-  animation: slideInRight 0.6s ease-out 0.15s both;
 }
 </style>
