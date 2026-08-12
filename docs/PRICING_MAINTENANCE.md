@@ -266,13 +266,15 @@ Dry-run baseline 2026-07-13: **70 unchanged (per-token + same-mode media, no dri
 
 You can run the same check locally: `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run --fail-on-drift; echo $?` (0 = no drift, 2 = drift).
 
+> No-drift note (2026-08-12): Anthropic made Claude Sonnet 5's $2/$10 rate **permanent** and cancelled the $3/$15 increase that was scheduled for 2026-09-01. The catalog already read $2/$10, so no price change and no migration were needed; we only dropped the stale "revert to $3/$15" TODO (BID 249/250/222). The weekly drift check never surfaced this — it only diffs the current catalog number against LiteLLM (both $2/$10), and is blind to time-boxed manual reverts.
+
 > Resolved drift (2026-08-03): the weekly check flagged `gpt-5.6-terra` and `gpt-5.6-luna` (each twice — chat + vision row). Verified against the [official OpenAI pricing](https://developers.openai.com/api/docs/pricing): OpenAI cut GPT-5.6 prices on 2026-07-30 — Terra 2.50/15 → **2.00/12** (−20%), Luna 1.00/6 → **0.20/1.20** (−80%), Sol unchanged. Not a LiteLLM error; keeping the old (higher) rate overcharged every Terra/Luna call. Applied to `ModelCatalog.php` (base rows + `CONTEXT_PRICING` long-context tiers: Terra 4.00/18, Luna 0.40/1.80) and rolled out to existing installs by `Version20260803120000`.
 
 > History (2026-07-13): an earlier draft claimed whisper's `0.111 perhour` was "the same price" as the sync's per-second value. That was wrong at the time — `perhour` fell through `normaliseToPerUnit()` unchanged and whisper carried no `pricing_mode`. #1314 fixed both: whisper/Voxtral now carry `pricing_mode: per_second` and `normaliseToPerUnit()` converts `perhour`/`permin` down to per-second, and `AiFacade::transcribe()` records the provider-reported audio duration (see below).
 
 ## Time-boxed / reminders
 
-- **Claude Sonnet 5**: introductory $2/$10 → revert to standard $3/$15 after **2026-08-31** (TODO in `ModelCatalog.php` BID 249/250 **and** the MEM row BID 222, which now runs Sonnet 5 too).
+- _(none active)_ — the Claude Sonnet 5 "revert to $3/$15 after 2026-08-31" reminder was **cancelled** on 2026-08-12 (Anthropic made the $2/$10 rate permanent; see the drift-log note below). Do not reintroduce it.
 
 ## Anthropic catalog generations (snapshot 2026-07-27)
 
@@ -282,7 +284,7 @@ Source: https://platform.claude.com/docs/en/about-claude/models/overview
 | ----- | -------------------- | ------------------- |
 | Claude Fable 5 | 240 / 241 | $10 / $50 |
 | Claude Opus 5 | 257 / 258 | $5 / $25 |
-| Claude Sonnet 5 | 249 / 250 (+ 222 MEM) | $2 / $10 intro, $3 / $15 from 2026-09-01 |
+| Claude Sonnet 5 | 249 / 250 (+ 222 MEM) | $2 / $10 (permanent — see 2026-08-12 note) |
 | Claude Opus 4.8 | 238 / 239 | $5 / $25 |
 | Claude Haiku 4.5 | 162 / 235 | $1 / $5 |
 
