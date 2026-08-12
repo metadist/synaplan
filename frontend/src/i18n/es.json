@@ -1349,6 +1349,28 @@
     "createSuccess": "¡Widget creado exitosamente! 🎉",
     "updateSuccess": "Widget actualizado exitosamente",
     "deleteSuccess": "Widget eliminado exitosamente",
+    "detail": {
+      "wizard": {
+        "uploading": "Subiendo...",
+        "uploadError": "No se pudo subir el archivo."
+      },
+      "knowledge": {
+        "title": "Conocimiento y fuentes",
+        "description": "Archivos que el asistente de IA usa para responder preguntas en este widget.",
+        "empty": "Aún no hay fuentes conectadas. Añade archivos para que la IA responda con tu contenido.",
+        "upload": "Subir archivo",
+        "pick": "Elegir del gestor de archivos",
+        "chunks": "{count} secciones",
+        "remove": "Quitar fuente",
+        "removeTitle": "¿Quitar fuente?",
+        "removeConfirm": "\"{name}\" ya no será utilizado por este widget. El archivo permanece en tu gestor de archivos.",
+        "removed": "Fuente eliminada",
+        "removeError": "No se pudo quitar la fuente.",
+        "added": "Fuentes actualizadas",
+        "addError": "No se pudo añadir la fuente.",
+        "linkFailed": "No se pudo añadir: {names}"
+      }
+    },
     "deleteTitle": "¿Eliminar Widget?",
     "deleteDescription": "¿Estás seguro de que deseas eliminar \"{name}\"? Esta acción no se puede deshacer.",
     "deleteConfirm": "Eliminar",

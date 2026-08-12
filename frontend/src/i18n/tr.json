@@ -1349,6 +1349,28 @@
     "createSuccess": "Widget başarıyla oluşturuldu! 🎉",
     "updateSuccess": "Widget başarıyla güncellendi",
     "deleteSuccess": "Widget başarıyla silindi",
+    "detail": {
+      "wizard": {
+        "uploading": "Yükleniyor...",
+        "uploadError": "Dosya yüklenemedi."
+      },
+      "knowledge": {
+        "title": "Bilgi ve Kaynaklar",
+        "description": "AI asistanının bu widget'ta soruları yanıtlamak için kullandığı dosyalar.",
+        "empty": "Henüz bağlı kaynak yok. AI'nın içeriğinizden yanıt verebilmesi için dosya ekleyin.",
+        "upload": "Dosya yükle",
+        "pick": "Dosya yöneticisinden seç",
+        "chunks": "{count} bölüm",
+        "remove": "Kaynağı kaldır",
+        "removeTitle": "Kaynak kaldırılsın mı?",
+        "removeConfirm": "\"{name}\" artık bu widget tarafından kullanılmayacak. Dosya, dosya yöneticinizde kalır.",
+        "removed": "Kaynak kaldırıldı",
+        "removeError": "Kaynak kaldırılamadı.",
+        "added": "Kaynaklar güncellendi",
+        "addError": "Kaynak eklenemedi.",
+        "linkFailed": "Eklenemedi: {names}"
+      }
+    },
     "deleteTitle": "Widget Silinsin mi?",
     "deleteDescription": "\"{name}\" silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "deleteConfirm": "Sil",

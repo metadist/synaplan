@@ -6,6 +6,8 @@ namespace App\Tests\Unit\AI\Messages;
 
 use App\AI\Messages\MessagesContextInjector;
 use App\Entity\User;
+use App\Repository\ConfigRepository;
+use App\Service\FeedbackConfigService;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\RAG\VectorSearchService;
 use App\Service\UserMemoryService;
@@ -69,6 +71,7 @@ final class MessagesContextInjectorTest extends TestCase
             new KnowledgeContextFormatter(),
             $cache,
             new NullLogger(),
+            $this->createFeedbackConfig(),
         );
 
         $body = [
@@ -102,6 +105,7 @@ final class MessagesContextInjectorTest extends TestCase
             new KnowledgeContextFormatter(),
             $this->createMock(CacheItemPoolInterface::class),
             new NullLogger(),
+            $this->createFeedbackConfig(),
         );
 
         $body = [
@@ -110,5 +114,15 @@ final class MessagesContextInjectorTest extends TestCase
         $result = $injector->inject($body, $user, 's', 'off');
         $this->assertFalse($result['injected']);
         $this->assertSame($body, $result['body']);
+    }
+
+    private function createFeedbackConfig(): FeedbackConfigService
+    {
+        // FeedbackConfigService is final and cannot be mocked; a stubbed
+        // repository makes it fall back to the FeedbackConstants defaults.
+        $configRepository = $this->createStub(ConfigRepository::class);
+        $configRepository->method('getValue')->willReturn(null);
+
+        return new FeedbackConfigService($configRepository);
     }
 }

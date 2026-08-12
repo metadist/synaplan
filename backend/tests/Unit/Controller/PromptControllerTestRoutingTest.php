@@ -13,6 +13,7 @@ use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Service\File\FileUploadService;
 use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlanValidator;
@@ -82,6 +83,7 @@ final class PromptControllerTestRoutingTest extends TestCase
                 ),
                 $this->createMock(RateLimitService::class),
             ),
+            $this->createMock(FileUploadService::class),
         );
 
         $container = new Container();

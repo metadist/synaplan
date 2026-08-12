@@ -3162,7 +3162,22 @@
         "crawlError": "Inhalt konnte nicht gecrawlt werden",
         "externalUserIdHint": "Verwende {placeholder} als Platzhalter — er wird automatisch durch die User-ID der einbettenden Seite ersetzt."
       },
-      "filesTitle": "Verbundene Dateien",
+      "knowledge": {
+        "title": "Wissen & Quellen",
+        "description": "Dateien, die der KI-Assistent nutzt, um Fragen in diesem Widget zu beantworten.",
+        "empty": "Noch keine Quellen verbunden. Füge Dateien hinzu, damit die KI aus deinen Inhalten antworten kann.",
+        "upload": "Datei hochladen",
+        "pick": "Aus Dateimanager wählen",
+        "chunks": "{count} Abschnitte",
+        "remove": "Quelle entfernen",
+        "removeTitle": "Quelle entfernen?",
+        "removeConfirm": "„{name}“ wird von diesem Widget nicht mehr genutzt. Die Datei selbst bleibt in deinem Dateimanager erhalten.",
+        "removed": "Quelle entfernt",
+        "removeError": "Quelle konnte nicht entfernt werden.",
+        "added": "Quellen aktualisiert",
+        "addError": "Quelle konnte nicht hinzugefügt werden.",
+        "linkFailed": "Konnte nicht hinzugefügt werden: {names}"
+      },
       "avvNoticeTitle": "Auftragsverarbeitungsvertrag erforderlich",
       "avvNoticeDescription": "Dieses Widget verarbeitet Nutzerdaten. Bitte akzeptiere den Auftragsverarbeitungsvertrag (AVV) bevor du live gehst.",
       "avvNoticeCta": "Jetzt einrichten",

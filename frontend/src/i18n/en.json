@@ -2980,7 +2980,22 @@
         "crawlError": "Failed to crawl content",
         "externalUserIdHint": "Use {placeholder} as a placeholder — it will be replaced with the logged-in user's ID from the embedding site."
       },
-      "filesTitle": "Connected Files",
+      "knowledge": {
+        "title": "Knowledge & Sources",
+        "description": "Files the AI assistant uses to answer questions in this widget.",
+        "empty": "No sources connected yet. Add files so the AI can answer from your content.",
+        "upload": "Upload file",
+        "pick": "Choose from file manager",
+        "chunks": "{count} sections",
+        "remove": "Remove source",
+        "removeTitle": "Remove source?",
+        "removeConfirm": "\"{name}\" will no longer be used by this widget. The file itself stays in your file manager.",
+        "removed": "Source removed",
+        "removeError": "Failed to remove the source.",
+        "added": "Sources updated",
+        "addError": "Failed to add the source.",
+        "linkFailed": "Could not add: {names}"
+      },
       "avvNoticeTitle": "Data Processing Agreement Required",
       "avvNoticeDescription": "This widget processes user data. Please accept the data processing agreement (DPA) before going live.",
       "avvNoticeCta": "Set up now",
