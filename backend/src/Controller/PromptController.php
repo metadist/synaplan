@@ -1530,17 +1530,19 @@ class PromptController extends AbstractController
             // back to fresh extraction when no text is available.
             $result = $this->fileUploadService->reVectorize($file, $user, $newGroupKey);
             if (!$result['success']) {
-                $errorDetail = $result['error'] ?? 'unknown error';
+                // Log the low-level detail server-side only; exception messages
+                // from extraction/vectorization must not reach the client.
                 $this->logger->warning('Failed to vectorize file while linking to task prompt', [
                     'user_id' => $user->getId(),
                     'topic' => $topic,
                     'message_id' => $messageId,
                     'file_name' => $file->getFileName(),
-                    'error' => $errorDetail,
+                    'error' => $result['error'] ?? 'unknown error',
+                    'error_type' => $result['errorType'] ?? null,
                 ]);
 
                 return $this->json([
-                    'error' => 'File could not be added to the knowledge base: '.$errorDetail,
+                    'error' => 'File could not be added to the knowledge base',
                 ], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
             $chunksLinked = $result['chunksCreated'] ?? 0;

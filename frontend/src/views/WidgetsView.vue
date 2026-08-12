@@ -193,6 +193,7 @@
                 <button
                   class="p-2 rounded-lg hover-surface transition-colors flex-shrink-0"
                   :title="$t('widgets.code')"
+                  :aria-label="$t('widgets.code')"
                   data-testid="btn-widget-embed"
                   @click="showEmbed(widget)"
                 >
@@ -202,6 +203,7 @@
                 <button
                   class="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 transition-colors flex-shrink-0"
                   :title="$t('widgets.testChat')"
+                  :aria-label="$t('widgets.testChat')"
                   data-testid="btn-widget-test"
                   @click="openTestChat(widget)"
                 >
@@ -211,6 +213,7 @@
                 <button
                   class="p-2 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
                   :title="$t('widgets.delete')"
+                  :aria-label="$t('widgets.delete')"
                   data-testid="btn-widget-delete"
                   @click="confirmDelete(widget)"
                 >
