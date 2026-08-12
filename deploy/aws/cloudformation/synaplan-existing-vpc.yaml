@@ -203,6 +203,19 @@ Conditions:
     - !Condition WantsDailySnapshots
     - !Equals [!Ref QuiesceForDailySnapshots, 'true']
 
+Mappings:
+  # The parameter name the first boot reads a provider key from. It follows the
+  # environment variable the application expects, not the label above: Gemini's
+  # key is GOOGLE_GEMINI_API_KEY, so `google-api-key` would be a parameter
+  # nothing ever reads.
+  ProviderKeyParameter:
+    groq: {Name: groq-api-key}
+    openai: {Name: openai-api-key}
+    anthropic: {Name: anthropic-api-key}
+    google: {Name: google-gemini-api-key}
+    mistral: {Name: mistral-api-key}
+    xai: {Name: xai-api-key}
+
 Resources:
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -365,10 +378,17 @@ Resources:
             DeleteOnTermination: true
       # IMDSv2 only. The first-boot script speaks it, and IMDSv1 turns any
       # request-forgery bug in a web application into credential theft.
+      #
+      # One hop means the instance credentials are reachable from the host and
+      # from nowhere else: a request out of a container crosses the bridge, so
+      # the TTL is already spent when it arrives, and a request-forgery bug in
+      # the application cannot read the role at all. Bedrock is the one feature
+      # that needs the AWS SDK inside the container, so it - and only it -
+      # raises the limit.
       MetadataOptions:
         HttpTokens: required
         HttpEndpoint: enabled
-        HttpPutResponseHopLimit: 2
+        HttpPutResponseHopLimit: !If [WantsBedrock, 2, 1]
       # Configuration travels as tags, not user data: "Launch from Website"
       # starts the AMI with no user data at all, and both launch paths have to
       # produce the same installation. Nothing secret goes in here - tags are
@@ -517,20 +537,28 @@ Outputs:
       /synaplan/${Instance}/admin-password --query Parameter.Value --output text
 
   AdministratorEmail:
-    Description: Sign in with this address.
+    Description: >-
+      Sign in with this address. Without an AdminEmail the first boot derives one
+      from the domain, and falls back to the example address when there is no
+      domain either.
     Value: !If
       - HasAdminEmail
       - !Ref AdminEmail
-      - 'admin@example.com (no AdminEmail was given)'
+      - !If
+        - HasDomainName
+        - !Sub 'admin@${DomainName}'
+        - 'admin@example.com'
 
   SetAiProviderKey:
     Description: >-
       Adds the API key without signing in or opening a shell; reboot the
       instance afterwards. Signing in and using Admin then AI Providers does the
       same thing and needs no AWS permissions.
-    Value: !Sub >-
-      aws ssm put-parameter --type SecureString --region ${AWS::Region} --name
-      /synaplan/${Instance}/config/${AiProvider}-api-key --value YOUR_API_KEY
+    Value: !Sub
+      - >-
+        aws ssm put-parameter --type SecureString --region ${AWS::Region} --name
+        /synaplan/${Instance}/config/${KeyParameter} --value YOUR_API_KEY
+      - KeyParameter: !FindInMap [ProviderKeyParameter, !Ref AiProvider, Name]
 
   ShellCommand:
     Description: A shell on the instance, with no SSH key and no open port 22.

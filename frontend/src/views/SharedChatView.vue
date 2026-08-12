@@ -313,7 +313,11 @@
             {{ $t('shared.ctaDesc', { brand: config.branding.name }) }}
           </p>
           <div class="flex gap-4 justify-center">
+            <!-- Hidden where the install offers no self-registration: the
+                 /register route redirects to the login page there, so the
+                 button would take a visitor of a public shared chat nowhere. -->
             <router-link
+              v-if="config.auth.registrationEnabled"
               to="/register"
               class="btn-primary px-6 py-3 rounded-lg font-medium inline-block"
             >

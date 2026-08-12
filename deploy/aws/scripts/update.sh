@@ -13,10 +13,6 @@ set -Eeuo pipefail
 # shellcheck source=../../scripts/lib.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/lib.sh"
 
-# Before anything reaches Compose: the sibling scripts below run as child
-# processes and their exports never come back here.
-ensure_deployment_secrets
-
 usage() {
     cat >&2 <<'USAGE'
 Usage: sudo synaplan-update <version>
@@ -42,6 +38,12 @@ target_version="${1-}"
     echo "synaplan-update must run as root: sudo synaplan-update $target_version" >&2
     exit 1
 }
+
+# Only now, once the request is known to be a valid one from root: the sibling
+# scripts below run as child processes and their exports never come back here,
+# and generating deployment secrets is not something a mistyped command line or
+# a run without sudo should reach.
+ensure_deployment_secrets
 
 env_file="$(resolve_compose_env_file)"
 [[ -n "$env_file" ]] || {

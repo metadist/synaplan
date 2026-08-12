@@ -22,6 +22,41 @@ DATA_MOUNT=/var/lib/synaplan
 ENV_FILE="$DATA_MOUNT/.env"
 
 log() { printf '[synaplan-tls] %s\n' "$*"; }
+warn() { printf '[synaplan-tls] %s\n' "$*" >&2; }
+
+usage() {
+    cat >&2 <<'USAGE'
+Usage: sudo synaplan-tls <domain> [acme-email]
+
+  <domain>      A host name whose A record points at this instance, for example
+                app.example.com. Without one the instance keeps its self-signed
+                certificate.
+  [acme-email]  Where Let's Encrypt sends expiry notices. Defaults to the
+                administrator address of this installation.
+USAGE
+    exit 64
+}
+
+# It writes /etc/caddy and restarts a unit, so a run without sudo would fail
+# halfway through with a permission error rather than up front.
+[[ $EUID -eq 0 ]] || {
+    echo "synaplan-tls must run as root: sudo synaplan-tls ${1-app.example.com}" >&2
+    exit 1
+}
+
+# A host name and nothing else. The value is substituted into APP_URL with sed
+# and becomes a Caddy site address, so a slash, a space or a `|` would each
+# rewrite the configuration into something other than what was asked for.
+is_domain() {
+    [[ "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$ ]]
+}
+
+# Caddy only ever uses this to notify about an expiring certificate. It becomes a
+# line of its own in an EnvironmentFile, so a value carrying anything but an
+# address is dropped rather than written.
+is_email() {
+    [[ "$1" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]
+}
 
 # The value the operator passed wins; otherwise take the domain the running
 # configuration already names, so a restart never silently downgrades a working
@@ -30,17 +65,32 @@ domain="${1-}"
 acme_email="${2-}"
 requested_domain="$domain"
 
+if [[ -n "$requested_domain" ]] && ! is_domain "$requested_domain"; then
+    printf 'Not a domain name: %s\n\n' "$requested_domain" >&2
+    usage
+fi
+
 if [[ -z "$domain" && -f "$ENV_FILE" ]]; then
     app_url="$(awk -F= '/^APP_URL=/ { print $2; exit }' "$ENV_FILE")"
     host="${app_url#https://}"
     host="${host#http://}"
     host="${host%%/*}"
-    # A bare IPv4 address is not a domain and cannot get a public certificate.
-    [[ "$host" =~ ^[0-9]+(\.[0-9]+){3}$ ]] || domain="$host"
+    # A bare IPv4 address is not a domain and cannot get a public certificate,
+    # and neither can anything else that is not a host name — an APP_URL edited
+    # by hand reaches this line too.
+    if is_domain "$host" && ! [[ "$host" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
+        domain="$host"
+    fi
 fi
 
 if [[ -z "$acme_email" && -f "$ENV_FILE" ]]; then
     acme_email="$(awk -F= '/^BOOTSTRAP_ADMIN_EMAIL=/ { print $2; exit }' "$ENV_FILE")"
+fi
+
+if [[ -n "$acme_email" ]] && ! is_email "$acme_email"; then
+    warn "Ignoring \"$acme_email\": not an email address, so Let's Encrypt gets none."
+    warn 'Certificates are still issued and renewed; only the expiry notices are lost.'
+    acme_email=""
 fi
 
 # A domain named on the command line is a change of the public address, so the

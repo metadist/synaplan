@@ -250,6 +250,8 @@ jobs:
       # would leave the delivery path — instance profile, tags, security group,
       # data volume — untested, and that is where a launch actually breaks.
       - name: Create the stack
+        env:
+          AMI_ID: ${{ steps.ami.outputs.ami }}
         run: |
           set -euo pipefail
           aws cloudformation create-stack \
@@ -258,7 +260,7 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --on-failure DO_NOTHING \
             --parameters \
-              "ParameterKey=ImageId,ParameterValue=${{ steps.ami.outputs.ami }}" \
+              "ParameterKey=ImageId,ParameterValue=${AMI_ID}" \
               ParameterKey=InstanceType,ParameterValue=c7i.xlarge \
               ParameterKey=DataVolumeSize,ParameterValue=20 \
               ParameterKey=EnableDailySnapshots,ParameterValue=false \
