@@ -696,8 +696,7 @@ class ModelCatalog
         ],
         [
             // Moved from the retired Claude Opus 4.6 to Claude Sonnet 5 (same BID
-            // so an operator who selected this MEM option keeps working). Carries
-            // Sonnet 5's introductory pricing — see the BID 249/250 note.
+            // so an operator who selected this MEM option keeps working).
             'id' => 222,
             'service' => 'Anthropic',
             'name' => 'Claude Sonnet 5',
@@ -1467,9 +1466,8 @@ class ModelCatalog
             // Claude Sonnet 5 — Anthropic's most agentic Sonnet yet; performance
             // close to Opus 4.8 at a lower price. Uses adaptive thinking and
             // effort levels, and (like Opus 4.7+) no longer accepts `temperature`.
-            // Introductory API pricing through 2026-08-31: $2/MTok in, $10/MTok out.
-            // Standard pricing starting 2026-09-01: $3/MTok in, $15/MTok out.
-            // TODO: Update to standard pricing after 2026-08-31.
+            // Pricing $2/$10 per 1M is now permanent (Anthropic cancelled the
+            // 2026-09-01 increase to $3/$15 on 2026-08-12).
             'id' => 249,
             'service' => 'Anthropic',
             'name' => 'Claude Sonnet 5',
