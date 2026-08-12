@@ -313,11 +313,12 @@ export const selectors = {
   widgets: {
     page: '[data-testid="page-widgets"]',
     createButton: '[data-testid="btn-create-widget"]',
-    simpleForm: {
-      modal: '[data-testid="modal-simple-widget-form"]',
+    wizard: {
+      modal: '[data-testid="modal-widget-wizard"]',
       nameInput: '[data-testid="input-widget-name"]',
       websiteInput: '[data-testid="input-website-url"]',
-      taskPromptInput: '[data-testid="input-task-prompt"]',
+      nextButton: '[data-testid="btn-wizard-next"]',
+      backButton: '[data-testid="btn-wizard-back"]',
       createButton: '[data-testid="btn-create"]',
       cancelButton: '[data-testid="btn-cancel"]',
     },

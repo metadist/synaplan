@@ -22,8 +22,15 @@ final readonly class FeedbackConstants
     /** Minimum score for feedback results used as chat context (must be clearly on-topic). */
     public const MIN_CHAT_FEEDBACK_SCORE = 0.55;
 
-    /** Minimum score for memories loaded as chat context. */
-    public const MIN_CHAT_MEMORY_SCORE = 0.55;
+    /**
+     * Minimum score for memories loaded as chat context.
+     *
+     * Memories are short "key: value" texts, so even a direct hit scores
+     * moderately: with bge-m3, "What is my name?" vs "name: Ralf" lands at
+     * ~0.53 while unrelated queries stay below ~0.43. A threshold above that
+     * band silently drops every memory from the chat context.
+     */
+    public const MIN_CHAT_MEMORY_SCORE = 0.45;
 
     /** Minimum score for contradiction detection (slightly lower to catch edge cases). */
     public const MIN_CONTRADICTION_SCORE = 0.4;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AI\Messages;
 
 use App\Entity\User;
+use App\Service\FeedbackConfigService;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\RAG\VectorSearchService;
 use App\Service\UserMemoryService;
@@ -32,6 +33,7 @@ final readonly class MessagesContextInjector
         private KnowledgeContextFormatter $formatter,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
+        private FeedbackConfigService $feedbackConfig,
     ) {
     }
 
@@ -127,7 +129,7 @@ final readonly class MessagesContextInjector
                     $memoryVector,
                     null,
                     self::MEMORY_LIMIT,
-                    0.5,
+                    $this->feedbackConfig->getMinChatMemoryScore(),
                 );
                 $memories = $this->formatter->formatMemoriesContext($memoryHits);
             } catch (\Throwable $e) {

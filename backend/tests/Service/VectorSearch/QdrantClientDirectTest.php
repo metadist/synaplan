@@ -7,6 +7,7 @@ namespace App\Tests\Service\VectorSearch;
 use App\Service\VectorSearch\QdrantClientDirect;
 use App\Service\VectorSearch\QdrantPointId;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -305,6 +306,44 @@ final class QdrantClientDirectTest extends TestCase
         $this->assertSame('mem_1_dup', $results[0]['id']);
         $this->assertSame(0.91, $results[0]['score'], 'dedup must keep the higher-scoring copy');
         $this->assertSame('fresh-uuid', $results[0]['payload']['value']);
+    }
+
+    /**
+     * Collections are created lazily on first upsert. Searching one that has
+     * never been written to (e.g. a feedback namespace before any feedback
+     * exists) must be a silent empty result, not an error-level log entry.
+     */
+    public function testSearchMemoriesTreatsMissingCollectionAsEmptyWithoutErrorLog(): void
+    {
+        $logger = new class extends AbstractLogger {
+            /** @var list<array{level: mixed, message: string}> */
+            public array $records = [];
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                $this->records[] = ['level' => $level, 'message' => (string) $message];
+            }
+        };
+
+        $factory = static fn (): MockResponse => new MockResponse(
+            json_encode(['status' => ['error' => "Not found: Collection `user_memories_feedback_positive` doesn't exist!"], 'time' => 0.0]),
+            ['http_code' => 404],
+        );
+        $client = new QdrantClientDirect(
+            httpClient: new MockHttpClient($factory),
+            qdrantUrl: self::QDRANT_URL,
+            logger: $logger,
+        );
+
+        $results = $client->searchMemories(
+            queryVector: array_fill(0, 1024, 0.5),
+            userId: 1,
+            namespace: 'feedback_positive',
+        );
+
+        $this->assertSame([], $results);
+        $errorRecords = array_filter($logger->records, static fn (array $r): bool => 'error' === $r['level']);
+        $this->assertSame([], array_values($errorRecords), 'missing collection must not be logged as an error');
     }
 
     public function testUpsertDocumentIssuesAtomicBatchDeleteThenUpsert(): void

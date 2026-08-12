@@ -214,6 +214,18 @@ final class QdrantClientDirect implements QdrantClientInterface
 
             return array_slice($results, 0, $limit);
         } catch (\Throwable $e) {
+            // Collections are created lazily on first upsert, so searching a
+            // collection that has never been written to (e.g. the feedback
+            // namespaces) is a normal empty state, not an error.
+            if ($this->isMissingCollectionError($e)) {
+                $this->logger->debug('Qdrant memory collection does not exist yet, returning no results', [
+                    'user_id' => $userId,
+                    'collection' => $collection,
+                ]);
+
+                return [];
+            }
+
             $this->logger->error('Failed to search memories in Qdrant', [
                 'user_id' => $userId,
                 'error' => $e->getMessage(),
@@ -221,6 +233,12 @@ final class QdrantClientDirect implements QdrantClientInterface
 
             return [];
         }
+    }
+
+    private function isMissingCollectionError(\Throwable $e): bool
+    {
+        return str_contains($e->getMessage(), 'HTTP 404')
+            && str_contains($e->getMessage(), "doesn't exist");
     }
 
     public function scrollMemories(
