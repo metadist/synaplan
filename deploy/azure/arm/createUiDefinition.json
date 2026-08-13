@@ -1,0 +1,278 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+  "handler": "Microsoft.Azure.CreateUIDef",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "basics": [
+      {
+        "name": "vmName",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Virtual machine name",
+        "defaultValue": "synaplan",
+        "toolTip": "Every other resource in this deployment is named after it.",
+        "constraints": {
+          "required": true,
+          "regex": "^[a-z0-9][a-z0-9-]{1,58}[a-z0-9]$",
+          "validationMessage": "1 to 60 characters: lowercase letters, digits and dashes, not starting or ending with a dash."
+        }
+      },
+      {
+        "name": "credentials",
+        "type": "Microsoft.Compute.CredentialsCombo",
+        "label": {
+          "authenticationType": "Authentication type",
+          "password": "Password",
+          "confirmPassword": "Confirm password",
+          "sshPublicKey": "SSH public key"
+        },
+        "toolTip": {
+          "sshPublicKey": "Your public key, starting with ssh-rsa or ssh-ed25519. Password login is switched off inside the image, so a key is the only way to reach a shell over SSH."
+        },
+        "constraints": {
+          "required": true
+        },
+        "options": {
+          "hideConfirmation": true,
+          "hidePassword": true
+        },
+        "osPlatform": "Linux"
+      },
+      {
+        "name": "adminUsername",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Operating-system user name",
+        "defaultValue": "synaplan",
+        "toolTip": "The Linux account the SSH key belongs to. This is not the Synaplan administrator - that one is created for you with a generated password.",
+        "constraints": {
+          "required": true,
+          "regex": "^[a-z][a-z0-9-]{2,31}$",
+          "validationMessage": "3 to 32 lowercase letters, digits and dashes, starting with a letter."
+        }
+      }
+    ],
+    "steps": [
+      {
+        "name": "machine",
+        "label": "Machine",
+        "elements": [
+          {
+            "name": "vmSize",
+            "type": "Microsoft.Compute.SizeSelector",
+            "label": "Virtual machine size",
+            "toolTip": "Synaplan needs at least 4 vCPU and 8 GB of memory.",
+            "recommendedSizes": ["Standard_D4s_v5", "Standard_D8s_v5", "Standard_E4s_v5"],
+            "constraints": {
+              "allowedSizes": [
+                "Standard_D4s_v5",
+                "Standard_D8s_v5",
+                "Standard_E4s_v5",
+                "Standard_E8s_v5",
+                "Standard_D4ps_v5",
+                "Standard_D8ps_v5"
+              ]
+            },
+            "osPlatform": "Linux",
+            "count": 1
+          },
+          {
+            "name": "dataDiskSizeGb",
+            "type": "Microsoft.Common.Slider",
+            "label": "Data disk size in GB",
+            "defaultValue": 100,
+            "min": 20,
+            "max": 4096,
+            "showStepMarkers": false,
+            "toolTip": "Holds the database, the uploaded documents and the vector index. The disk outlives the virtual machine, so size it for your documents rather than for today.",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "backupSection",
+            "type": "Microsoft.Common.Section",
+            "label": "Backups",
+            "elements": [
+              {
+                "name": "enableDailyBackup",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Daily backup",
+                "defaultValue": true,
+                "toolTip": "Creates a Recovery Services vault and protects this virtual machine daily. The image ships the scripts that pause Synaplan for the snapshot, so the backup is application-consistent rather than a copy taken mid-write."
+              },
+              {
+                "name": "backupRetentionDays",
+                "type": "Microsoft.Common.Slider",
+                "label": "Keep backups for (days)",
+                "defaultValue": 7,
+                "min": 7,
+                "max": 90,
+                "showStepMarkers": false,
+                "visible": "[steps('machine').backupSection.enableDailyBackup]",
+                "constraints": {
+                  "required": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "network",
+        "label": "Network",
+        "elements": [
+          {
+            "name": "virtualNetwork",
+            "type": "Microsoft.Network.VirtualNetworkCombo",
+            "label": {
+              "virtualNetwork": "Virtual network",
+              "subnets": "Subnet"
+            },
+            "toolTip": {
+              "virtualNetwork": "Create one for this deployment, or pick a network you already run.",
+              "subnets": "The subnet the virtual machine gets its address from."
+            },
+            "defaultValue": {
+              "name": "synaplan-vnet",
+              "addressPrefixSize": "/16"
+            },
+            "constraints": {
+              "minAddressPrefixSize": "/24"
+            },
+            "options": {
+              "hideExisting": false
+            },
+            "subnets": {
+              "subnet": {
+                "label": "Subnet",
+                "defaultValue": {
+                  "name": "synaplan",
+                  "addressPrefixSize": "/24"
+                },
+                "constraints": {
+                  "minAddressPrefixSize": "/28",
+                  "minAddressCount": 8,
+                  "requireContiguousAddresses": false
+                }
+              }
+            }
+          },
+          {
+            "name": "allowedWebSourceAddress",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Allowed source addresses for the web interface",
+            "defaultValue": "Internet",
+            "toolTip": "Internet means everyone. Narrow it to a range such as 203.0.113.0/24 for an installation only your office should reach.",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "allowedSshSourceAddress",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Allowed source addresses for SSH (optional)",
+            "defaultValue": "",
+            "toolTip": "Leave empty. Azure Run Command and the serial console give you a shell without opening port 22 to anyone.",
+            "constraints": {
+              "required": false
+            }
+          }
+        ]
+      },
+      {
+        "name": "application",
+        "label": "Synaplan",
+        "elements": [
+          {
+            "name": "domainInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Info",
+              "text": "Without a domain, Synaplan serves a self-signed certificate and every browser warns on each visit. You can attach a domain later with: sudo synaplan-tls app.example.com"
+            }
+          },
+          {
+            "name": "domainName",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Domain name (optional)",
+            "defaultValue": "",
+            "toolTip": "A name whose A record you will point at this machine, for example synaplan.example.com. With one, Synaplan obtains a real Let's Encrypt certificate on its own.",
+            "constraints": {
+              "required": false,
+              "regex": "^$|^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$",
+              "validationMessage": "A domain name such as synaplan.example.com."
+            }
+          },
+          {
+            "name": "adminEmail",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Administrator email address",
+            "defaultValue": "",
+            "toolTip": "The login for your first Synaplan administrator. The password is generated for this machine alone and has to be replaced at the first sign-in.",
+            "constraints": {
+              "required": false,
+              "regex": "^$|^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+              "validationMessage": "An email address."
+            }
+          },
+          {
+            "name": "aiProvider",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Default AI provider",
+            "defaultValue": "Groq",
+            "toolTip": "Synaplan cannot answer anything without a key for an AI provider. The key is yours and is billed by that provider.",
+            "constraints": {
+              "allowedValues": [
+                { "label": "Groq", "value": "groq" },
+                { "label": "OpenAI", "value": "openai" },
+                { "label": "Anthropic", "value": "anthropic" },
+                { "label": "Google Gemini", "value": "google" },
+                { "label": "Mistral", "value": "mistral" },
+                { "label": "xAI", "value": "xai" }
+              ],
+              "required": true
+            }
+          },
+          {
+            "name": "aiProviderApiKey",
+            "type": "Microsoft.Common.PasswordBox",
+            "label": {
+              "password": "API key for that provider (optional)",
+              "confirmPassword": "Confirm API key"
+            },
+            "toolTip": "Optional. Anyone with read access to the virtual machine can retrieve it afterwards, so the safer route is to leave this empty and add the key under Admin then AI Providers once you are signed in.",
+            "constraints": {
+              "required": false
+            },
+            "options": {
+              "hideConfirmation": true
+            },
+            "visible": true
+          }
+        ]
+      }
+    ],
+    "outputs": {
+      "vmName": "[basics('vmName')]",
+      "adminUsername": "[basics('adminUsername')]",
+      "sshPublicKey": "[basics('credentials').sshPublicKey]",
+      "vmSize": "[steps('machine').vmSize]",
+      "dataDiskSizeGb": "[steps('machine').dataDiskSizeGb]",
+      "enableDailyBackup": "[steps('machine').backupSection.enableDailyBackup]",
+      "backupRetentionDays": "[steps('machine').backupSection.backupRetentionDays]",
+      "virtualNetworkNewOrExisting": "[steps('network').virtualNetwork.newOrExisting]",
+      "virtualNetworkName": "[steps('network').virtualNetwork.name]",
+      "virtualNetworkResourceGroup": "[steps('network').virtualNetwork.resourceGroup]",
+      "virtualNetworkAddressPrefix": "[first(steps('network').virtualNetwork.addressPrefixes)]",
+      "subnetName": "[steps('network').virtualNetwork.subnets.subnet.name]",
+      "subnetAddressPrefix": "[steps('network').virtualNetwork.subnets.subnet.addressPrefix]",
+      "allowedWebSourceAddress": "[steps('network').allowedWebSourceAddress]",
+      "allowedSshSourceAddress": "[steps('network').allowedSshSourceAddress]",
+      "domainName": "[steps('application').domainName]",
+      "adminEmail": "[steps('application').adminEmail]",
+      "aiProvider": "[steps('application').aiProvider]",
+      "aiProviderApiKey": "[steps('application').aiProviderApiKey]",
+      "location": "[location()]"
+    }
+  }
+}

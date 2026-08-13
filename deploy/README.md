@@ -232,9 +232,11 @@ RESTORE_PORTABLE_BACKUP=true deploy/scripts/post-restore.sh
 ## Update
 
 Step-by-step instructions:
-[Update a Self-Hosted Deployment](../docs/UPDATE_SELFHOST.md), or
-[Update on Elestio](../docs/UPDATE_ELESTIO.md) for a pipeline on that platform.
-Only a tested, concrete `SYNAPLAN_VERSION` may be deployed.
+[Update a Self-Hosted Deployment](../docs/UPDATE_SELFHOST.md),
+[Update on Elestio](../docs/UPDATE_ELESTIO.md) for a pipeline on that platform,
+or [Update on AWS](../docs/UPDATE_AWS.md) and
+[Update on Azure](../docs/UPDATE_AZURE.md) for a marketplace image. Only a
+tested, concrete `SYNAPLAN_VERSION` may be deployed.
 
 The pre hook enforces a successful backup and pulls the pin. The post hook waits
 for every role and dependency, then verifies health and reports the running image
@@ -248,14 +250,21 @@ reimplementing operations. `deploy/elestio/` is the first thin adapter. Future
 Coolify, CapRover, or Railway definitions should preserve the same role,
 persistence, backup, restore, and health contracts.
 
-`deploy/aws/` is the AWS Marketplace AMI adapter and follows the same rule one
-layer further out: there is no managed platform on an EC2 instance, so systemd
-and the `synaplan-update` / `synaplan-snapshot` commands call these scripts
-directly. Its additions are the parts only AWS has — a Packer build, a first boot
-that configures itself from instance metadata, Caddy as a host TLS terminator,
-and CloudFormation templates.
+`deploy/aws/` and `deploy/azure/` are the two marketplace image adapters and
+follow the same rule one layer further out: there is no managed platform on a
+virtual machine, so systemd and the `synaplan-update` / `synaplan-snapshot`
+commands call these scripts directly. Their additions are the parts only a cloud
+has — a Packer build, a first boot that configures itself from instance
+metadata, and the delivery templates (CloudFormation on AWS, ARM on Azure).
+Details in [`aws/README.md`](aws/README.md) and
+[`azure/README.md`](azure/README.md).
+
+`deploy/host/` is what those two adapters share: the Caddyfiles for the host TLS
+terminator, `configure-tls.sh`, the `synaplan-update` sequencer, the `ExecStop`
+wrapper, and the image-bake pull. It is a property of the host, not of a cloud,
+so duplicating it per cloud would only create two copies that drift.
 [`scripts/tests/test-lifecycle.sh`](scripts/tests/test-lifecycle.sh) enforces the
-contract for both adapters. Details in [`aws/README.md`](aws/README.md).
+contract for every adapter.
 
 `deploy/umbrel/` is the Umbrel App Store package and the one adapter that cannot
 call these scripts: umbrelOS installs an app from a self-contained directory and
