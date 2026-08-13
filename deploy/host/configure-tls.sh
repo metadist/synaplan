@@ -15,7 +15,7 @@
 set -Eeuo pipefail
 
 APP_DIR=/opt/synaplan
-CADDY_SRC="$APP_DIR/deploy/aws/caddy"
+CADDY_SRC="$APP_DIR/deploy/host/caddy"
 CADDY_FILE=/etc/caddy/Caddyfile
 CADDY_ENV=/etc/caddy/synaplan.env
 DATA_MOUNT=/var/lib/synaplan

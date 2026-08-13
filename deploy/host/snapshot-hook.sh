@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 #
-# The instance side of an application-consistent EBS snapshot, called through
-# SSM rather than by a person: `deploy/aws/ssm/synaplan-backup-document.yaml`
-# and the Data Lifecycle Manager pre/post scripts both do nothing but invoke
-# this with a stage name.
+# The instance side of an application-consistent disk snapshot, called by the
+# cloud rather than by a person. On AWS that is
+# `deploy/aws/ssm/synaplan-backup-document.yaml` and the Data Lifecycle Manager
+# pre/post scripts; on Azure it is the Backup script framework configured by
+# `deploy/azure/backup/VMSnapshotScriptPluginConfig.json`. All of them do
+# nothing but invoke this with a stage name, which is why it lives here and not
+# under one cloud.
 #
 # The work itself is the portable backup gate. pre-backup.sh writes a
 # transactional MariaDB dump, Qdrant collection snapshots and an uploads archive
-# onto the data volume and then pauses every service, so the snapshot taken
+# onto the data disk and then pauses every service, so the snapshot taken
 # between the two stages captures a quiesced filesystem that already carries its
 # own restorable artifacts. post-backup.sh brings the services back.
 #
@@ -40,7 +43,8 @@ case "$stage" in
         ;;
     dry-run)
         # What Data Lifecycle Manager runs when a policy is created, to prove
-        # the document reaches the instance. It must not pause anything.
+        # the document reaches the instance, and what a maintainer can run on an
+        # Azure VM to prove the same. It must not pause anything.
         for hook in pre-backup.sh post-backup.sh; do
             [[ -x "$DEPLOY_DIR/scripts/$hook" ]] || {
                 echo "Missing or not executable: $DEPLOY_DIR/scripts/$hook" >&2

@@ -318,7 +318,7 @@ main() {
         write_env_file
     fi
 
-    "$APP_DIR/deploy/aws/scripts/configure-tls.sh"
+    "$APP_DIR/deploy/host/configure-tls.sh"
 
     # The portable contract does the rest: resolve the deployment secrets,
     # create the data directories, and refuse to continue on a configuration

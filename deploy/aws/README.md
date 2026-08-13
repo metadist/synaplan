@@ -21,20 +21,20 @@ units must run the portable scripts.
 | ---- | ---------- |
 | `packer/synaplan.pkr.hcl` | Builds the AMI from Amazon Linux 2023. |
 | `scripts/provision.sh` | Packer provisioner: runtime, Caddy, application tree, pre-pulled images, systemd units. |
-| `scripts/pull-images.sh` | Bakes one release's container images into the image cache. |
 | `scripts/harden.sh` | Last provisioner: the Marketplace scanner's rules, applied and verified. |
 | `scripts/firstboot.sh` | Per-instance setup on the first boot of a data volume. |
-| `scripts/configure-tls.sh` | Picks the certificate strategy; also published as `synaplan-tls`. |
-| `scripts/update.sh` | Published as `synaplan-update`. |
 | `scripts/snapshot.sh` | Published as `synaplan-snapshot`. |
-| `scripts/snapshot-hook.sh` | The instance side of the SSM snapshot document. |
-| `scripts/stop.sh` | `ExecStop` for the service unit. |
 | `systemd/` | `synaplan-firstboot.service` and `synaplan.service`. |
-| `caddy/` | Caddyfile for a real certificate, and for the self-signed fallback. |
 | `cloudformation/` | The two delivery templates, the required architecture diagram, and the seller-account IAM roles. |
 | `ssm/` | The snapshot document, for registering it outside CloudFormation. |
 | `scripts/tests/test-firstboot.sh` | Runs `firstboot.sh` for real, with AWS stubbed. |
 | `.taskcat.yml` | Multi-region launch test of both templates, run by hand before a public listing. |
+
+Everything that is a property of the *host* rather than of AWS lives one level
+up in [`deploy/host/`](../host) and is shared with the Azure adapter: the
+Caddyfiles, `configure-tls.sh`, `update.sh`, `stop.sh`, `pull-images.sh` and
+`snapshot-hook.sh` — the last one is invoked by the SSM document here and by the
+Azure Backup script framework there, with the same two stage names.
 
 ## What the AMI contains, and what it does not
 

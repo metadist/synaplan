@@ -12,7 +12,7 @@ WorkingDirectory=/opt/synaplan/deploy
 # the deployment secrets, validates the pinned release, and brings the stack up.
 # The AWS adapter must not reimplement any of that.
 ExecStart=/opt/synaplan/deploy/scripts/run.sh
-ExecStop=/opt/synaplan/deploy/aws/scripts/stop.sh
+ExecStop=/opt/synaplan/deploy/host/stop.sh
 # The first start pulls nothing (the images are baked in) but does run database
 # migrations and waits for six services to become healthy.
 TimeoutStartSec=1800
