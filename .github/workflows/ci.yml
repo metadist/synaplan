@@ -62,15 +62,18 @@ jobs:
       - name: Run deploy-lifecycle bash tests
         run: bash deploy/scripts/tests/test-lifecycle.sh
 
-      # firstboot.sh executed for real, with the metadata service, the AWS CLI
-      # and the data volume stubbed. It is the one script no customer can
-      # recover from by hand, and the only place it otherwise runs is a
-      # published AMI.
+      # firstboot.sh executed for real, with the metadata service, the cloud CLI
+      # and the data disk stubbed. It is the one script no customer can recover
+      # from by hand, and the only place it otherwise runs is a published
+      # marketplace image.
       - name: Run the AWS first-boot tests
         run: bash deploy/aws/scripts/tests/test-firstboot.sh
 
+      - name: Run the Azure first-boot tests
+        run: bash deploy/azure/scripts/tests/test-firstboot.sh
+
   deployment-templates:
-    name: Deployment Templates (AWS)
+    name: Deployment Templates (AWS and Azure)
     runs-on: ubuntu-latest
 
     steps:
@@ -96,15 +99,58 @@ jobs:
         with:
           version: 1.16.0
 
-      - name: Check the Packer template
+      - name: Check the Packer templates
         run: |
           set -euo pipefail
-          packer fmt -check -diff deploy/aws/packer/
+          packer fmt -check -diff deploy/aws/packer/ deploy/azure/packer/
           packer init deploy/aws/packer/synaplan.pkr.hcl
+          packer init deploy/azure/packer/synaplan.pkr.hcl
           # No credentials and no build: this resolves variables and validates
           # the schema. -evaluate-datasources is off because the source AMI
           # lookup would need an AWS account.
           packer validate deploy/aws/packer/synaplan.pkr.hcl
+          # The Azure builder authenticates while validating, so only the syntax
+          # and the variable expressions can be checked without a subscription.
+          packer validate -syntax-only deploy/azure/packer/synaplan.pkr.hcl
+
+      # The template a "Deploy to Azure" button deploys, and the one the future
+      # solution-template offer will ship. Two cheap, account-free checks: the
+      # files parse, and every value the portal form produces is a parameter the
+      # template actually declares — a mismatch there is a deployment that fails
+      # after the customer has filled in the whole form.
+      #
+      # The full Microsoft certification suite (arm-ttk) is a manual step before
+      # a submission, because it needs PowerShell and its findings are advisory
+      # for a template delivered by a button rather than by an offer. See
+      # docs/AZURE_MARKETPLACE_LISTING.md.
+      - name: Validate the ARM template
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import sys
+
+          template = json.load(open('deploy/azure/arm/mainTemplate.json'))
+          ui = json.load(open('deploy/azure/arm/createUiDefinition.json'))
+
+          declared = set(template['parameters'])
+          produced = set(ui['parameters']['outputs'])
+
+          unknown = sorted(produced - declared)
+          if unknown:
+              print(f'createUiDefinition.json produces parameters the template does not declare: {unknown}')
+              sys.exit(1)
+
+          required = sorted(
+              name for name, spec in template['parameters'].items()
+              if 'defaultValue' not in spec and name not in produced
+          )
+          if required:
+              print(f'The template requires parameters the portal form never asks for: {required}')
+              sys.exit(1)
+
+          print(f'{len(produced)} portal outputs match the template parameters.')
+          PY
 
   mobile-tooling:
     name: Mobile Release Tooling
