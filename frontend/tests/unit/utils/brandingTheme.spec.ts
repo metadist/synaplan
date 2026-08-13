@@ -24,6 +24,10 @@ function iconLinks(): HTMLLinkElement[] {
   return Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]'))
 }
 
+function appleTouchIcon(): HTMLLinkElement | null {
+  return document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
+}
+
 describe('applyBrandingTheme — icon', () => {
   beforeEach(() => {
     branding.iconUrl = ''
@@ -43,9 +47,7 @@ describe('applyBrandingTheme — icon', () => {
     expect(icons[0]?.type).toBe('image/svg+xml')
     expect(icons[1]?.href).toContain('/favicon-32.png')
     expect(icons[1]?.type).toBe('image/png')
-    expect(document.querySelector('link[rel="apple-touch-icon"]')?.href).toContain(
-      '/apple-touch-icon.png'
-    )
+    expect(appleTouchIcon()?.href).toContain('/apple-touch-icon.png')
   })
 
   it('replaces bundled favicons with a single correctly-typed branding icon', () => {
@@ -56,9 +58,7 @@ describe('applyBrandingTheme — icon', () => {
     expect(icons).toHaveLength(1)
     expect(icons[0]?.href).toContain('https://brand.test/icon.svg')
     expect(icons[0]?.type).toBe('image/svg+xml')
-    expect(document.querySelector('link[rel="apple-touch-icon"]')?.href).toContain(
-      'https://brand.test/icon.svg'
-    )
+    expect(appleTouchIcon()?.href).toContain('https://brand.test/icon.svg')
   })
 
   it('sets image/png type when the branding icon is a PNG', () => {
