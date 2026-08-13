@@ -137,7 +137,7 @@ final class AdminUpdatesController extends AbstractController
                 new OA\Property(
                     property: 'platform',
                     type: 'string',
-                    enum: [UpdatePlatformGuide::PLATFORM_SELFHOST, UpdatePlatformGuide::PLATFORM_ELESTIO, UpdatePlatformGuide::PLATFORM_AWS],
+                    enum: [UpdatePlatformGuide::PLATFORM_SELFHOST, UpdatePlatformGuide::PLATFORM_ELESTIO, UpdatePlatformGuide::PLATFORM_AWS, UpdatePlatformGuide::PLATFORM_AZURE],
                     description: 'Deployment hint (SYNAPLAN_PLATFORM), used to pick the update guide',
                     example: UpdatePlatformGuide::PLATFORM_SELFHOST
                 ),
@@ -210,7 +210,7 @@ final class AdminUpdatesController extends AbstractController
                 new OA\Property(
                     property: 'platform',
                     type: 'string',
-                    enum: [UpdatePlatformGuide::PLATFORM_SELFHOST, UpdatePlatformGuide::PLATFORM_ELESTIO, UpdatePlatformGuide::PLATFORM_AWS],
+                    enum: [UpdatePlatformGuide::PLATFORM_SELFHOST, UpdatePlatformGuide::PLATFORM_ELESTIO, UpdatePlatformGuide::PLATFORM_AWS, UpdatePlatformGuide::PLATFORM_AZURE],
                     example: UpdatePlatformGuide::PLATFORM_SELFHOST
                 ),
                 new OA\Property(property: 'guideUrl', type: 'string', example: UpdatePlatformGuide::GUIDE_URL_SELFHOST),
