@@ -23,6 +23,7 @@ const BRAND_COLOR_STYLE_ID = 'brand-color-vars'
 export function applyBrandingTheme(): void {
   applyColors()
   applyFonts()
+  applyIcon()
 }
 
 /**
@@ -145,6 +146,26 @@ function applyFonts(): void {
       document.head.appendChild(styleEl)
     }
     styleEl.textContent = `h1,h2,h3,h4,h5,h6{font-family:${heading};}`
+  }
+}
+
+/**
+ * Point the document favicon at `branding.iconUrl` when configured.
+ * Empty keeps the bundled Synaplan bird from index.html.
+ */
+function applyIcon(): void {
+  const iconUrl = config.branding.iconUrl
+  if (!iconUrl) {
+    return
+  }
+
+  document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]').forEach((link) => {
+    link.href = iconUrl
+  })
+
+  const apple = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
+  if (apple) {
+    apple.href = iconUrl
   }
 }
 

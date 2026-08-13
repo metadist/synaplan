@@ -12,7 +12,12 @@
     <div
       class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-[76px]"
     >
-      <img :src="logoIconSrc" alt="synaplan" class="h-7 w-auto" />
+      <img
+        :src="iconSrc"
+        :alt="configStore.branding.name"
+        class="h-7 w-auto"
+        data-testid="img-sidebar-brand"
+      />
     </div>
 
     <!-- New Chat Button -->
@@ -667,6 +672,7 @@ import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
 import { useNavItems, type NavChild, type NavItem } from '../composables/useNavItems'
 import { useTheme } from '../composables/useTheme'
+import { useBrandLogo } from '../composables/useBrandLogo'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useUpdatesStore } from '../stores/updates'
 import { formatRunningVersion } from '@/utils/formatRunningVersion'
@@ -690,7 +696,8 @@ const updatesStore = useUpdatesStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
 const { navItems, isItemActive, isGuestMode, loadFeatureStatus } = useNavItems()
-const { theme } = useTheme()
+const { isDark } = useTheme()
+const { iconSrc } = useBrandLogo(isDark)
 const route = useRoute()
 const router = useRouter()
 const isMemoriesDialogOpen = ref(false)
@@ -780,17 +787,6 @@ const handleEscape = (event: KeyboardEvent) => {
     closeFlyout()
   }
 }
-
-const isDark = computed(() => {
-  if (theme.value === 'dark') return true
-  if (theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
-
-const logoIconSrc = computed(
-  () =>
-    `${import.meta.env.BASE_URL}${isDark.value ? 'single_bird-light.svg' : 'single_bird-dark.svg'}`
-)
 
 const initials = computed(() => {
   const email = authStore.user?.email || 'G'
