@@ -35,7 +35,7 @@
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
         <router-link to="/login" class="inline-block" data-testid="link-back-login">
-          <img :src="logoSrc" alt="synaplan" class="h-12 mx-auto mb-6" />
+          <img :src="logoSrc" :alt="config.branding.name" class="h-12 mx-auto mb-6" />
         </router-link>
       </div>
 
@@ -191,6 +191,8 @@ import {
   InformationCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
+import { useBrandLogo } from '@/composables/useBrandLogo'
+import { useConfigStore } from '@/stores/config'
 import { authApi } from '@/services/api'
 import { getApiErrorMessage } from '@/utils/errorMessage'
 import Button from '../components/Button.vue'
@@ -199,16 +201,8 @@ const route = useRoute()
 const router = useRouter()
 const { locale } = useI18n()
 const themeStore = useTheme()
-
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
-
-const logoSrc = computed(
-  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
-)
+const config = useConfigStore()
+const { logoSrc } = useBrandLogo(themeStore.isDark)
 
 const userEmail = ref((route.query.email as string) || 'your@email.com')
 const isResending = ref(false)

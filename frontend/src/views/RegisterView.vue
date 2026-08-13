@@ -15,7 +15,7 @@
         class="absolute -bottom-24 right-1/4 w-[28rem] h-[28rem] bg-brand/4 dark:bg-brand/8 rounded-full blur-3xl animate-float-delayed"
       ></div>
       <img
-        :src="birdSrc"
+        :src="iconSrc"
         alt=""
         class="absolute top-[8%] right-[5%] w-[280px] opacity-[0.035] dark:opacity-[0.06] rotate-12 pointer-events-none select-none"
       />
@@ -454,11 +454,7 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const { logoSrc } = useBrandLogo(isDark)
-const birdSrc = computed(
-  () =>
-    `${import.meta.env.BASE_URL}${isDark.value ? 'single_bird-light.svg' : 'single_bird-dark.svg'}`
-)
+const { logoSrc, iconSrc } = useBrandLogo(isDark)
 
 const fullName = ref('')
 const email = ref('')
