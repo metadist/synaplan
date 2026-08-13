@@ -14,6 +14,10 @@ Synaplan has separate development and production deployment contracts:
 - **Elestio evaluation:** import the repository as a custom Docker Compose
   CI/CD pipeline. The root `elestio.yml` delegates to the same production
   contract under `deploy/`.
+- **One virtual machine on Azure:** deploy the ARM template in
+  [`deploy/azure/arm/`](../deploy/azure/arm), which creates the VM, its network
+  and its data disk and configures Synaplan on the first boot. See
+  [Deploy on Azure](#deploy-on-azure) below.
 
 The Elestio files make a custom import possible; they do **not** mean that
 Synaplan has been accepted into Elestio's Fully Managed Catalog.
@@ -190,10 +194,47 @@ Test `local-ai` only when the selected machine and remaining trial credit are
 sufficient. Do not publish credentials, deployment logs containing secrets, or
 private endpoint details.
 
+### Deploy on Azure
+
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmetadist%2Fsynaplan%2Fmain%2Fdeploy%2Fazure%2Farm%2FmainTemplate.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fmetadist%2Fsynaplan%2Fmain%2Fdeploy%2Fazure%2Farm%2FcreateUiDefinition.json)
+
+The button opens the Azure portal with
+[`deploy/azure/arm/mainTemplate.json`](../deploy/azure/arm/mainTemplate.json)
+loaded. It creates one VM with its own virtual network, network security group,
+public IP, data disk and Key Vault, and — unless you turn it off — a Recovery
+Services vault taking daily application-consistent backups. The form asks for an
+SSH public key and an administrator email address; everything else has a working
+default.
+
+By default it deploys the published Marketplace image. To deploy an image version
+from your own Azure Compute Gallery instead, set `imageResourceId` to that
+version's resource ID.
+
+The same template from a shell:
+
+```bash
+az group create --name synaplan --location westeurope
+az deployment group create \
+  --resource-group synaplan \
+  --template-file deploy/azure/arm/mainTemplate.json \
+  --parameters sshPublicKey="$(cat ~/.ssh/id_ed25519.pub)" \
+               adminEmail=admin@example.com
+```
+
+Open the `webUrl` from the deployment outputs and sign in with the generated
+administrator password, which the `revealAdministratorCredentials` output tells
+you how to read. Without a domain name the VM serves a self-signed certificate
+and the browser warns; `sudo synaplan-tls app.example.com admin@example.com`
+replaces it once the DNS A record points at the VM.
+
+What the VM contains and how it is operated:
+[`deploy/azure/README.md`](../deploy/azure/README.md).
+
 See [Administration Guide](ADMIN.md) for backups, restore, and cleanup, and
 [Update a Self-Hosted Deployment](UPDATE_SELFHOST.md),
-[Update on Elestio](UPDATE_ELESTIO.md), or
-[Update on AWS (Marketplace AMI)](UPDATE_AWS.md) for version upgrades.
+[Update on Elestio](UPDATE_ELESTIO.md),
+[Update on AWS (Marketplace AMI)](UPDATE_AWS.md), or
+[Update on Azure (Marketplace VM)](UPDATE_AZURE.md) for version upgrades.
 
 ---
 
