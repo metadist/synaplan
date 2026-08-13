@@ -108,12 +108,17 @@ findmnt --noheadings --target "$DATA_MOUNT" --mountpoint "$DATA_MOUNT" >/dev/nul
 }
 
 # The disk at LUN 0 is the one firstboot.sh mounted, and IMDS names its resource
-# id — so no guessing from a device path that Azure may renumber.
+# id — so no guessing from a device path that Azure may renumber. IMDS documents
+# every scalar as a string, `"lun": "0"`, but the comparison goes through
+# `tostring` anyway: the cost is nothing, and the failure it would otherwise
+# cause lands on the operator in the one moment they can least afford it, since
+# this is the backup gate they run right before an update.
 disk_id="$(printf '%s' "$instance" |
-    jq -r '.compute.storageProfile.dataDisks[]? | select(.lun == "0") | .managedDisk.id // empty' | head -n1)"
+    jq -r '.compute.storageProfile.dataDisks[]? | select((.lun | tostring) == "0") | .managedDisk.id // empty' | head -n1)"
 
 [[ -n "$disk_id" ]] || {
     echo "Could not identify the managed disk behind $DATA_MOUNT." >&2
+    echo "Snapshot it from the Azure portal instead: Virtual machine > Disks > the disk at LUN 0 > Create snapshot." >&2
     exit 1
 }
 
