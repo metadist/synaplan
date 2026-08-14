@@ -34,7 +34,8 @@ Do not ship Saved Tasks without this fix.
 Additive Doctrine migration, Galera-safe:
 
 - `CREATE TABLE IF NOT EXISTS` for `saved_tasks` and `saved_task_runs` (column list: [master plan §3.3](./00_master_plan.md#33-proposed-data-model-sprint-1--review-with-schema-ask)).
-- Indexes: `(owner_id, enabled)`, `(saved_task_id, created_at)` on runs.
+- **Include the Sprint 3 columns now, nullable and unused:** `next_run_at`, `last_run_at`, `consecutive_failures`, `chat_id`. One reviewed migration instead of two; the scheduler sprint then touches no schema.
+- Indexes: `(owner_id, enabled)`, `(next_run_at)`, `(saved_task_id, created_at)` on runs.
 - **No** Schema API (`hasTable` / `getTable`) in the migration class.
 - Delete runs before tasks in any later down migration; do not assume `ON DELETE CASCADE`.
 - Seed `SAVEDTASKS.ENABLED`: insert-if-missing. **Recommendation:** global default `0` until Sprint 2; code default `false`. Document the choice in the migration comment.
@@ -61,15 +62,20 @@ Mirror `MultitaskRoutingConfig`:
 | `SavedTaskRunner` | Run now: build a synthetic inbound message **or** call existing stream/send path with `promptTopic` / `promptId` forced |
 | `SavedTaskRunStore` | Insert/update run rows; attach `message_id` + `plan_snapshot` when the turn finishes |
 
+**Execution identity (master plan §3.4 — enforce here):** the runner receives an **owner id**, never a security token. Resolve the user the way the email/WhatsApp channels do; nothing in the run path touches the session or OIDC stack. This is what makes Sprint 3's cron-driven runs possible without auth changes — and it is why OIDC login stays untouched by this epic (compatibility invariant C1).
+
+**Run placement (checklist row 12):** on first run, create a dedicated conversation for the task (name = task name), store its id in `saved_tasks.chat_id`. Every run appends its turn there. The Runs list links to it. Do not scatter runs across new anonymous chats — the user must have **one** place to look.
+
 **Run now algorithm (keep it boring):**
 
 1. Flag off → 403/404 as appropriate (do not leak existence to other users).
 2. Load task, verify `owner_id`.
 3. Load Task Prompt; if missing/disabled → fail the run with a specific error.
-4. Create `saved_task_runs` row `queued` → `running`.
-5. Enqueue or synchronously process **one** user message. Preferred: reuse `MessageProcessor` with a system-authored IN message whose classification is **forced** to the prompt topic (same mechanism as stream API `promptTopic` / widget `taskPromptTopic`). Do **not** invent a second pipeline.
-6. Message text for manual run: use a stored `run_prompt` on the task (optional, default a short i18n template like “Run saved task: {name}”) **or** require the user to type the instruction in a dialog. **Lock in implementation:** dialog with required user text is clearer and avoids empty-message planner nonsense.
-7. On complete/fail: update run; copy plan snapshot from `BMESSAGE_TASKS` if present.
+4. Rate limit: account the run against the owner via `RateLimitService`; over budget → `failed` run with a user-readable reason (no partial execution).
+5. Create `saved_task_runs` row `queued` → `running`.
+6. Enqueue or synchronously process **one** user message **in the task's dedicated conversation** (create it on first run, store `chat_id`). Preferred: reuse `MessageProcessor` with a system-authored IN message whose classification is **forced** to the prompt topic (same mechanism as stream API `promptTopic` / widget `taskPromptTopic`). Do **not** invent a second pipeline.
+7. Message text for manual run: use a stored `run_prompt` on the task (optional, default a short i18n template like “Run saved task: {name}”) **or** require the user to type the instruction in a dialog. **Lock in implementation:** dialog with required user text is clearer and avoids empty-message planner nonsense.
+8. On complete/fail: update run; copy plan snapshot from `BMESSAGE_TASKS` if present. Failure sets a user-readable `error` on the run (shown in the Runs list — never a bare exception class) and increments `consecutive_failures`; success resets it to 0. Auto-pause at 3 activates in Sprint 3 with schedules, but the counter is maintained from day one.
 
 **Do not** call IMAP or generate `.ics` from this service directly. If the user’s text is “look into my mail and create calendar entries”, the **existing planner** may emit `email_search` + `calendar_event`. That is enough for Sprint 1.
 
@@ -115,6 +121,9 @@ Pinia: setup store only if state is shared with chat; otherwise keep it in the c
 | ----- | ---- |
 | Unit | `SavedTaskConfig` resolution order; disabled flag short-circuits runner |
 | Unit | `SavedTaskService` ownership (user A cannot run user B’s task) |
+| Unit | Runner resolves the user by owner id with **no** security-token/session dependency (construct it with no `Security` service at all — compile-time guarantee) |
+| Unit | Runs append to the same `chat_id`; first run creates the conversation |
+| Unit | Over-budget run → `failed` with readable reason; `consecutive_failures` increments and resets on success |
 | Unit | `ChatRunner` topic_id binding (prerequisite) |
 | Integration / feature | POST create → POST run → GET runs; 403 when flag off; 404 other user |
 | PHPUnit | MessageProcessor (or facade) invoked with forced topic — mock AI |

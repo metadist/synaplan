@@ -44,6 +44,7 @@ Lock this schema in PHP (`SavedTaskGraph` DTO + validator) **and** a Zod schema 
 
 Rules:
 
+- **Trigger source of truth:** the `saved_tasks.trigger_type` / `trigger_config` **columns are authoritative** (master plan §3.3). The graph's trigger box is a rendered view; saving the editor writes the columns in the same transaction, and the validator rejects a payload whose graph trigger disagrees with the columns. Runtime code (scheduler, ingress adapters) reads columns only — never `graph.trigger`.
 - `depends_on` acyclic; ids unique.
 - `chat` nodes inherit the Saved Task’s `prompt_id` unless `params.topic_id` overridden (v1: no override UI).
 - Trigger `inbound_email`: `accountId` must be an `InboundEmailHandler` account **owned by this user**.
@@ -85,6 +86,10 @@ Forced inputs:
 | Widget | Never Saved Tasks | Never |
 | Inbound email trigger | n/a | Only if this mailbox is the trigger; **do not** steal department mail-handler routing |
 
+**Compatibility invariant C3 guard:** the chat short-circuit fires **only** when (a) the flag is on for this user, (b) the classified topic has an enabled Saved Task, and (c) that task has a non-null graph. Every other chat turn must reach `TaskPlanner` / the legacy path byte-identically — locked by characterization snapshots with zero-graph fixtures.
+
+**Clear communication:** when a chat turn is short-circuited by an authored graph, the user must be able to see why the answer followed fixed steps — show the Saved Task name on the turn (e.g. in the plan disclosure from Sprint 0). Silent behaviour switches confuse users and support alike. The AI Instructions editor also states it plainly on save: *"Chats that match this instruction will now follow your saved steps."*
+
 **Mail-handler invariant:** `tools:mailhandler` department forwarding stays a separate product. A Saved Task trigger on a mailbox is opt-in per account. If both exist, document precedence: **mail handler first** (existing), Saved Task only for accounts **not** configured as department routers — **or** explicit “use for Saved Tasks” checkbox on the email account. **Lock in this sprint’s PR:** checkbox on the account is clearer. Default off.
 
 ### 2.4 Ingress adapters
@@ -94,7 +99,7 @@ Forced inputs:
 | `manual` | Sprint 1 run endpoint |
 | `chat` | `MessageProcessor` / `TaskPlanExecutor` hook: if classification topic has an enabled Saved Task with graph, compile instead of plan |
 | `inbound_email` | After IMAP fetch (mail handler **or** a dedicated fetch in Sprint 3). For Sprint 2, implement **webhook-shaped tests** + a command `app:saved-tasks:process-mailbox {accountId}` that can be invoked manually; wire into existing `ProcessMailHandlersCommand` **only** behind the per-account checkbox |
-| `webhook` | `POST /api/v1/saved-tasks/hooks/{publicId}` — HMAC or secret header, rate-limited, SSRF N/A (inbound). Auth is the secret, not the user session |
+| `webhook` | `POST /api/v1/saved-tasks/hooks/{publicId}` — HMAC or secret header, rate-limited, SSRF N/A (inbound). Auth is the secret, not the user session. **Must not touch the OIDC/session firewalls** (invariant C1): stateless route, secret-only authenticator, `security.yaml` diff limited to this path. Abuse handling: per-hook rate limit; repeated bad-secret hits temporarily lock the hook (429/disabled) and surface a notice on the task — never silently drop |
 
 Create a run row for every firing.
 

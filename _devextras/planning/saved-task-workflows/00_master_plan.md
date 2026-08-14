@@ -28,7 +28,7 @@
 
 ## 0. Decision checklist (check before any code)
 
-Print this section. Tick every box. Do **not** start Sprint 1 until rows 1–8 are agreed.
+Print this section. Tick every box. Do **not** start Sprint 1 until every row is agreed.
 
 | # | Decision | Proposed default | Agree? |
 | - | -------- | ---------------- | ------ |
@@ -42,6 +42,8 @@ Print this section. Tick every box. Do **not** start Sprint 1 until rows 1–8 a
 | 8 | Feature flag: `SAVEDTASKS.ENABLED` in `BCONFIG` (default **off** for existing installs; seed **on** for new installs — same grandfather pattern as `MULTITASK.ROUTING_ENABLED`). Widget chat **does not** run Saved Tasks. | Flag + widget invariant | ☐ |
 | 9 | Schema is additive only. Galera-safe migrations (`addSql`, `IF NOT EXISTS`). No `doctrine:schema:update --force`. Ask again before the first migration lands. | AGENTS.md | ☐ |
 | 10 | Office 365 / Microsoft Graph is **out of v1**. Track as connector epic after Saved Tasks Run-now + schedule work. | Deferred | ☐ |
+| 11 | **Production scheduling = the existing `synaplan-platform` host-cron family, expanded.** A new `cron-saved-tasks.sh` (same pattern as `cron-gmail.sh` / `cron-media-reaper.sh`: web1-only, `docker compose exec -T backend php bin/console …`, log to `/var/log/synaplan-*.log`, covered by `synaplan-cron.logrotate`). The tick command self-locks via a cross-node Redis lock (like `app:media:reap-jobs`) so the dev/self-host Docker scheduler role and host cron can both run it safely. Details: [Sprint 3 §1](./04_sprint_3_scheduler.md#1-where-schedules-actually-run-production-reality). | Expand platform crons | ☐ |
+| 12 | **Run results live in one dedicated conversation per Saved Task** (created on first run, named after the task). Runs list links into it. Scheduled failures notify the user; **3 consecutive failures auto-pause the task** with a visible reason. | One home per task + auto-pause | ☐ |
 
 If a row is rejected, update this file in the same change as the alternative — do not leave the sprint files implying the old default.
 
@@ -77,7 +79,8 @@ The Chat widget’s connect-the-boxes UI is the closest interaction pattern we a
 | Plugin `chatCommands` | Shipped | Slash commands (e.g. `/fastbill`). **Not** graph nodes yet |
 | n8n → Synaplan | Works today | OpenAI-compat `/v1`, MCP `/mcp`, generic webhook, REST — see n8n research |
 | Synaplan → n8n | **Gap** | No outbound webhook / event emitter |
-| User scheduler | **Missing** | Docker `SYNAPLAN_ROLE=scheduler` is maintenance only |
+| Platform host crons | Shipped (prod) | `synaplan-platform`: `cron-gmail.sh` (mail handlers + smart@ pickup — **currently the only inbound pickup**), `cron-media-reaper.sh` (Redis cross-node lock), `cron-disk-watchdog.sh`, `cron-model-pricing.sh`, shared `synaplan-cron.logrotate`. **This is the scheduling backbone we expand** — see checklist row 11 |
+| User scheduler | **Missing** | Docker `SYNAPLAN_ROLE=scheduler` is maintenance only (dev/self-host); prod uses host crons above |
 | Office 365 / Graph | **Missing** | No connector |
 
 **Known gap to fix inside Sprint 1 (not optional):** `ChatRunner` documents `params.topic_id` but multi-node intermediate `chat` nodes still use a generic system prompt. Saved Tasks that “run this Task Prompt” will silently ignore the prompt until that binding is complete. Characterization tests must lock the fix.
@@ -152,7 +155,12 @@ Additive tables (names illustrative; final names follow existing `B*` convention
 | `trigger_config` | JSON (cron/rrule + tz; mailbox id; webhook secret) |
 | `graph` | JSON authored DAG (Sprint 2; null = implicit single `chat` node with this prompt) |
 | `allow_unattended` | Bool — required for schedule + mutating actions |
+| `chat_id` | Nullable FK to the task's dedicated conversation (created on first run — checklist row 12) |
+| `next_run_at` / `last_run_at` | Nullable UTC datetimes, `next_run_at` indexed. **Created in the Sprint 1 migration** (nullable, unused until Sprint 3) so the scheduler sprint needs no second migration |
+| `consecutive_failures` | Int, default 0. Reset on success; at **3** the task auto-pauses (`enabled = 0`) and the user is notified |
 | `created_at` / `updated_at` | Timestamps |
+
+**Trigger source of truth (avoid double definition):** the `trigger_type` / `trigger_config` **columns are authoritative** — the scheduler and ingress adapters query only them. When a graph exists, its trigger box is a *view* of the columns; saving the graph editor writes the columns in the same transaction. Validation rejects a graph whose trigger disagrees with the columns. Never read `graph.trigger` at runtime.
 
 **`saved_task_runs`**
 
@@ -167,6 +175,18 @@ Additive tables (names illustrative; final names follow existing `B*` convention
 Galera: raw `CREATE TABLE IF NOT EXISTS` in a Doctrine migration; no Schema API. Delete child runs before parent tasks (no assumed `ON DELETE CASCADE`).
 
 `chat` trigger type with empty graph **preserves today’s Task Prompt behaviour** — every existing prompt remains a valid Saved Task with no user action.
+
+**Run retention:** keep the last **50 runs per task or 90 days**, whichever is more. Pruning rides the existing maintenance tick (reaper family), not a new cron. Linked chat messages are **not** deleted by pruning — only run bookkeeping rows.
+
+**Cost control:** every run (manual, scheduled, webhook) goes through the existing `RateLimitService` accounting as the owning user — a schedule is not a way around budgets. Shortest interval in v1 is 15 minutes. A run that would exceed the user's rate limit records a `failed` run with a clear, user-readable reason (counts toward auto-pause).
+
+### 3.4 Execution identity (no session, no OIDC involvement)
+
+Scheduled and webhook-triggered runs execute with **no HTTP session and no OIDC token**. `SavedTaskRunner` resolves the acting user **by owner id**, exactly like the email and WhatsApp channels do today (`ModelConfigService::getEffectiveUserIdForMessage` pattern) — never from `Security`/token context. Consequences to enforce in code review:
+
+- Nothing in the run path may call the OIDC stack; login flows are untouched by this epic.
+- Model resolution uses the same chain as any chat turn for that user (`PromptMeta.aiModel` → per-user `DEFAULTMODEL.*` → global). A user who changes their default model changes what their Saved Tasks use next run — that is correct and must be tested, not accidental.
+- A deleted or disabled user's tasks must fail fast and pause, not throw.
 
 ---
 
@@ -250,15 +270,32 @@ Rules:
 
 1. **One canonical term:** Saved Task. German: *Gespeicherte Aufgabe* (confirm in i18n review). Spanish/Turkish: add in the same sprint as the UI — all four locales, always.
 2. **AI Instructions remains home.** Tabs or sections: *Prompt* (today) | *When to run* | *Graph* (Sprint 2) | *Runs*. Do not add a second nav item until the feature is GA and the IA is reviewed.
-3. **Widget canvas as interaction, not storage.** Two-column boxes + Bézier links are fine. Persist `graph` JSON on the Saved Task. Do not write `<!-- WIDGET_RULES_START -->` blocks.
-4. **Do not visualize the routing prompt as the graph.** Sprint 0 visualizes *executed* `TaskPlan`s (debug/history). Sprint 2 visualizes *authored* graphs. Mixing them is a product bug.
-5. **Copy is honest.** `.ics` is “calendar file”, Graph is “Outlook calendar” only after the connector exists.
-6. **Default-off mobile / widget.** Saved Tasks are web + API + scheduled. Chat widget and mobile app must keep current behaviour without the flag. Classify new paths in `.github/mobile-impact-policy.json` (`ota-candidate` for AI Instructions UI; `backend-only` for PHP/scheduler).
-7. **Styling:** `style.css` / V2 tokens, WCAG AA both themes, `useDialog` / `useNotification`, no hardcoded strings.
+3. **Progressive disclosure — the simple path is the default path.** v1 of the Saved Task surface is **one small card with three controls**: Run now, a schedule picker (off / interval / daily / weekly), and an on/off toggle. The graph editor is hidden behind an explicit *Advanced steps* action and is never required for the flagship story. A user who never opens it still gets mail → prompt → calendar file. If a design review finds the card needs a fourth control, cut scope, not add UI.
+4. **Failures are communicated, never silent.** A failed run shows a plain-language reason in the Runs list; a scheduled task that fails 3× in a row auto-pauses and tells the user why and how to resume (checklist row 12). No stuck "running" states — every run reaches a terminal status (same principle as async media).
+5. **Widget canvas as interaction, not storage.** Two-column boxes + Bézier links are fine. Persist `graph` JSON on the Saved Task. Do not write `<!-- WIDGET_RULES_START -->` blocks.
+6. **Do not visualize the routing prompt as the graph.** Sprint 0 visualizes *executed* `TaskPlan`s (debug/history). Sprint 2 visualizes *authored* graphs. Mixing them is a product bug.
+7. **Copy is honest.** `.ics` is “calendar file”, Graph is “Outlook calendar” only after the connector exists.
+8. **Default-off mobile / widget.** Saved Tasks are web + API + scheduled. Chat widget and mobile app must keep current behaviour without the flag. Classify new paths in `.github/mobile-impact-policy.json` (`ota-candidate` for AI Instructions UI; `backend-only` for PHP/scheduler).
+9. **Styling:** `style.css` / V2 tokens, WCAG AA both themes, `useDialog` / `useNotification`, no hardcoded strings.
 
 ---
 
 ## 7. Hard constraints (every sprint)
+
+### 7.0 Named compatibility invariants — Synaplan must stay compatible with its earlier self
+
+These are not covered by "zero regressions" hand-waving; each has an explicit test in [`06_testing_and_documentation.md` §3.0](./06_testing_and_documentation.md#30-compatibility-regression-suite-every-sprint):
+
+| # | Invariant | Why this epic could break it |
+| - | --------- | ---------------------------- |
+| C1 | **OIDC / session login works unchanged.** No new firewall rules on `/api` beyond the webhook-ingress route (secret-authenticated, stateless). | Webhook trigger endpoint and MCP tools touch `security.yaml` territory |
+| C2 | **Per-conversation model change works unchanged**, and Saved Task runs follow the owner's current model chain (see §3.4). | Compiled plans bypass the planner; must not bypass model resolution |
+| C3 | **Simple DAG requests behave identically**: plain chat fast-path, single-node plans, combo requests ("write X and read it as MP3"). Locked by characterization snapshots. | The Sprint 2 chat hook sits directly in front of `TaskPlanner` |
+| C4 | **Existing platform crons keep working untouched**: `cron-gmail.sh` (mail handlers + smart@), `cron-media-reaper.sh`, disk watchdog, model pricing. Saved Tasks add a **sibling** script; they never modify or replace these. | Sprint 3 lands in the same cron family |
+| C5 | **API keys, `/v1`, `/mcp`, generic/WhatsApp/email webhooks** keep their current contracts (additive tools/endpoints only). | Sprint 4 extends MCP + webhooks |
+| C6 | **Widget and mobile app behave exactly as before** with the flag off *and* on (widget never runs Saved Tasks). | Chat pipeline hook |
+
+Each sprint PR must state which invariants its diff can touch and point to the green tests.
 
 1. **Zero regressions** on plain chat, slash commands, widgets, WhatsApp, email pipeline, MCP client/server.
 2. **Widget invariant:** ChatWidget continues to skip multitask task-card UI and does **not** execute Saved Task schedules.
@@ -279,7 +316,8 @@ Same pattern as multitask routing:
 2. Seeder insert-if-missing: global `true` for **new** installs.
 3. Grandfather migration: existing users get an explicit `false` row **or** we leave the code default off until GA — **pick at Sprint 1 review**. Recommendation: **default off until Sprint 2 graph is usable**, then seed on for new installs only.
 4. Shadow: Sprint 0 is UI-only on history. Sprint 1 Run-now is the first mutating path (creates messages / `.ics`).
-5. Rollback: flag off. Tables remain (additive). Runs stop being claimed by the scheduler.
+5. **Production scheduling rollout (checklist row 11):** ship `cron-saved-tasks.sh` to `synaplan-platform` in its own PR there (web1 crontab entry, every minute, logrotate already covers the log). The tick is a no-op while `SAVEDTASKS.ENABLED` is globally off, so the cron can be installed **before** the feature is enabled — same order as the media reaper rollout.
+6. Rollback: flag off. Tables remain (additive). The tick exits early; the cron entry can stay installed.
 
 ---
 

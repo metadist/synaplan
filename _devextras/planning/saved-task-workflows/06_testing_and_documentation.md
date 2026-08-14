@@ -62,6 +62,41 @@ docker compose exec -T backend sh -c \
 
 ## 3. Test matrix by sprint
 
+### 3.0 Compatibility regression suite (every sprint)
+
+These map 1:1 to the master plan's [named invariants §7.0](./00_master_plan.md#70-named-compatibility-invariants--synaplan-must-stay-compatible-with-its-earlier-self). They run in **every** sprint PR that touches backend routing, security config, or the chat pipeline — not only when someone remembers:
+
+| Inv. | Test | Where |
+| ---- | ---- | ----- |
+| C1 | OIDC / session login E2E stays green (existing auth spec — do not rewrite it, just keep it green). New route diff review: `security.yaml` changes limited to the stateless webhook-ingress path | Existing E2E + PR review checklist |
+| C1 | Saved Task runner has **no** `Security`/token dependency (constructor-level unit test; PHPStan will also flag an unused injection) | `backend/tests/Unit/.../SavedTaskRunnerTest.php` |
+| C2 | Per-conversation model switch E2E stays green; new: a Saved Task run resolves the owner's *current* default model (change default → next run uses it) | Existing model-switch spec + new unit on the runner |
+| C3 | Routing characterization snapshots: plain chat fast-path, single-node, combo multi-node — **byte-identical with zero Saved Task graphs in fixtures**. New snapshot cases cover the short-circuit *only* with a graph present | `backend/tests/Characterization/` |
+| C3 | E2E: plain chat and one combo request (TestProvider) unchanged with flag ON but no Saved Tasks defined | Existing chat E2E |
+| C4 | `cron-gmail.sh`, `cron-media-reaper.sh` byte-identical (platform-repo PR review); `app:process-mail-handlers` / `app:process-emails` test suites untouched and green | Platform PR review + existing PHPUnit |
+| C5 | MCP `tools/list` and `/v1` contract tests: additive only (snapshot of tool names must be a superset, never a mutation) | Existing MCP/OpenAI-compat tests |
+| C6 | Widget E2E (chat + flow editor) green in every sprint; no Saved Task UI or execution inside the widget bundle | Existing widget specs |
+
+A failing row here **blocks the sprint** regardless of how green the new-feature tests are.
+
+### 3.0.1 CI steps (what actually gates the PR)
+
+No new CI workflow is required — all new tests slot into the existing `CI` jobs, which is the point (the gate stays one workflow):
+
+| CI job (existing) | Covers in this epic |
+| ----------------- | ------------------- |
+| PHP Code Formatting | New backend classes |
+| Backend — PHPStan | Entities, repos, runner, tick command, `tests/` |
+| Backend — PHPUnit | All unit/integration/characterization rows above |
+| Frontend — lint / vue-tsc / Vitest | Editor, runs list, generated Zod schemas |
+| Mobile impact (`mobile-impact.mjs`) | New paths classified (`backend-only` / `ota-candidate`) — unlisted paths fail closed |
+
+Additions **inside** existing jobs (small, explicit):
+
+1. **Guard test — no n8n in the stack:** a PHPUnit (or `.mjs`) test asserting no service named `n8n` exists in `docker-compose*.yml`. Cheap insurance for checklist row 1.
+2. **Characterization job discipline:** any PR labeled `saved-tasks` that touches `Service/Message/` or `Service/Multitask/` must include a snapshot diff (empty diff is fine, but the run must be shown). Enforced by review checklist, not new tooling.
+3. **Platform repo:** `synaplan-platform` has no CI gate for cron scripts — the Sprint 3 platform PR is reviewed by hand against §1.1 of the sprint file (web1-only, Redis-locked command, logrotate-covered log name).
+
 ### Sprint 0 — Observe
 
 | ID | Layer | File (suggested) | Assert |
@@ -79,7 +114,9 @@ docker compose exec -T backend sh -c \
 | 1.0 | Unit | `ChatRunnerTest` | `params.topic_id` loads custom prompt + meta |
 | 1.1 | Unit | `SavedTaskConfigTest` | user → global → false |
 | 1.2 | Unit | `SavedTaskServiceTest` | cross-user 404/403 |
-| 1.3 | Feature | `SavedTaskRunTest` | create → run → run row + message_id |
+| 1.3 | Feature | `SavedTaskRunTest` | create → run → run row + message_id in the task's dedicated `chat_id` conversation |
+| 1.3a | Unit | runner identity | no `Security`/session dependency (C1); user resolved by owner id |
+| 1.3b | Unit | failure accounting | readable `error`, `consecutive_failures` inc/reset; over-budget run fails cleanly |
 | 1.4 | Feature | flag off | endpoints 403/hidden |
 | 1.5 | Vitest | Run now dialog | empty message blocked; success toast |
 | 1.6 | E2E | `task-prompts.spec.ts` | save + run now with TestProvider |
@@ -106,10 +143,11 @@ docker compose exec -T backend sh -c \
 | -- | ----- | ---------------- | ------ |
 | 3.1 | Unit | `ScheduleCalculatorTest` | Berlin DST fixtures; injected clock |
 | 3.2 | Unit | claim | second UPDATE 0 rows |
-| 3.3 | Unit | failure | `next_run_at` advances; unique idempotency |
+| 3.2a | Unit | Redis lock | tick exits 0 with no work when `saved-tasks-tick` lock held (host cron + scheduler role coexistence) |
+| 3.3 | Unit | failure | `next_run_at` advances; unique idempotency; 3× failure auto-pauses + notifies |
 | 3.4 | Unit | `allow_unattended` | `email_me` + schedule rejected |
 | 3.5 | Integration | tick | enqueues Messenger; handler uses TestProvider |
-| 3.6 | Regression | container-runtime | media reap still invoked (script unit or review) |
+| 3.6 | Regression | container-runtime + platform crons | media reap still invoked; `cron-gmail.sh` byte-identical (C4, platform PR review) |
 | 3.7 | Vitest | schedule form | tz + next run label |
 | 3.8 | E2E | save schedule | no real wait; persist + pause |
 
@@ -180,7 +218,12 @@ Saved Task Workflows — Sprint N
 ## Decision checklist
 Master plan §0 rows still agreed: yes / deviations:
 
+## Compatibility invariants touched (master plan §7.0)
+C1 OIDC: … / C2 model change: … / C3 simple DAG: … / C4 platform crons: … / C5 API contracts: … / C6 widget+mobile: …
+(state "not touched" or point to the green test)
+
 ## Test plan
+- [ ] Compatibility regression suite (§3.0) green
 - [ ] Unfiltered `make lint && make -C backend phpstan && make test`
 - [ ] Frontend lint + `check:types` + `make -C frontend test`
 - [ ] Characterization diff reviewed (or N/A)
