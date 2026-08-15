@@ -337,6 +337,15 @@
               </div>
               <p class="text-xs txt-secondary font-mono truncate">{{ currentPrompt.topic }}</p>
             </div>
+            <button
+              v-if="showSaveAsTask"
+              type="button"
+              class="btn-secondary text-sm whitespace-nowrap"
+              data-testid="btn-save-as-task"
+              @click="onSaveAsTask"
+            >
+              {{ $t('config.savedTasks.saveAsTask') }}
+            </button>
           </div>
 
           <!-- System prompt info banner -->
@@ -1187,6 +1196,7 @@ import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
 import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import { ApiError } from '@/services/api/httpClient'
 
@@ -1229,7 +1239,21 @@ const dialog = useDialog()
 const { t, locale } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 const authStore = useAuthStore()
+const configStore = useConfigStore()
 const isAdmin = computed(() => authStore.isAdmin)
+const showSaveAsTask = computed(
+  () =>
+    configStore.features.savedTasks &&
+    currentPrompt.value !== null &&
+    (!currentPrompt.value.isDefault || currentPrompt.value.isUserOverride === true)
+)
+
+const onSaveAsTask = async () => {
+  await dialog.alert({
+    title: t('config.savedTasks.comingSoonTitle'),
+    message: t('config.savedTasks.comingSoonBody'),
+  })
+}
 
 const PROMPT_LANGUAGES = [
   { value: 'en', label: 'English' },

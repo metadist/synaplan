@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { TaskPlanState } from '@/stores/history'
 import TaskCard from '@/components/multitask/TaskCard.vue'
+import ExecutedPlanGraph from '@/components/multitask/ExecutedPlanGraph.vue'
 
 const props = defineProps<{ plan: TaskPlanState }>()
 
@@ -14,6 +15,8 @@ const emit = defineEmits<{
 }>()
 
 const doneCount = computed(() => props.plan.cards.filter((c) => c.state === 'done').length)
+const showGraph = ref(false)
+const canShowGraph = computed(() => props.plan.cards.length > 1)
 </script>
 
 <template>
@@ -31,5 +34,16 @@ const doneCount = computed(() => props.plan.cards.filter((c) => c.state === 'don
       @retry="emit('retryTask', $event)"
       @cancel="emit('cancelTask', $event)"
     />
+
+    <button
+      v-if="canShowGraph"
+      type="button"
+      class="text-xs txt-secondary hover:txt-primary"
+      data-testid="btn-toggle-plan-graph"
+      @click="showGraph = !showGraph"
+    >
+      {{ showGraph ? $t('taskPlan.hideSteps') : $t('taskPlan.showSteps') }}
+    </button>
+    <ExecutedPlanGraph v-if="showGraph && canShowGraph" :plan="plan" />
   </div>
 </template>

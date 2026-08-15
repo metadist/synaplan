@@ -1142,6 +1142,8 @@
   },
   "taskPlan": {
     "title": "Aufgabenplan",
+    "showSteps": "Schritte anzeigen",
+    "hideSteps": "Schritte ausblenden",
     "download": "Herunterladen",
     "failedBody": "Dieser Schritt konnte nicht abgeschlossen werden.",
     "cancelledBody": "Du hast diesen Schritt gestoppt.",
@@ -1716,6 +1718,12 @@
       "listCount": "keine Topics | {n} Topic | {n} Topics",
       "expandAll": "Alle ausklappen",
       "collapseAll": "Alle einklappen"
+    },
+    "savedTasks": {
+      "saveAsTask": "Als Aufgabe speichern",
+      "comingSoonTitle": "Gespeicherte Aufgabe",
+      "comingSoonBody": "Damit kannst du diese Anweisung nach einem Zeitplan oder über einen Kanal ausführen. Folgt in einem späteren Update.",
+      "emptyHint": "Eine gespeicherte Aufgabe führt diese Anweisung aus, wenn du sie startest — später auch nach Zeitplan."
     },
     "routing": {
       "title": "Routing",

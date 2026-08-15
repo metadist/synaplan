@@ -194,6 +194,7 @@ final class ResultAssembler
                 'capability' => $node->capability->value,
                 'kind' => $node->capability->uiKind(),
                 'state' => $nodeStatus,
+                'depends_on' => $node->dependsOn,
             ];
             if (null !== $nodeResult) {
                 if ('search' === $node->capability->uiKind()) {

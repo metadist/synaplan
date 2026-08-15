@@ -1575,6 +1575,8 @@
   },
   "taskPlan": {
     "title": "Plan de tareas",
+    "showSteps": "Mostrar pasos",
+    "hideSteps": "Ocultar pasos",
     "download": "Descargar",
     "failedBody": "Este paso no se pudo completar.",
     "cancelledBody": "Has detenido este paso.",
@@ -2246,6 +2248,12 @@
     "deletionNote": "Cuando eliminas un archivo, sus vectores también se eliminan del almacén vectorial activo."
   },
   "config": {
+    "savedTasks": {
+      "saveAsTask": "Guardar como tarea",
+      "comingSoonTitle": "Tarea guardada",
+      "comingSoonBody": "Esto te permitirá ejecutar esta instrucción según un horario o desde un canal. Llegará en una actualización posterior.",
+      "emptyHint": "Una tarea guardada ejecuta esta instrucción cuando la inicias y, más adelante, también según un horario."
+    },
     "aiModels": {
       "title": "Modelos de IA",
       "description": "Configura y administra tus modelos de IA",

@@ -109,6 +109,9 @@ const config = {
     get memoryServiceLoading(): boolean {
       return memoryServiceLoading.value
     },
+    get savedTasks(): boolean {
+      return getConfigSync().features?.savedTasks === true
+    },
   },
 
   /**

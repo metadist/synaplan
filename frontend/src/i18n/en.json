@@ -1678,6 +1678,12 @@
       "expandAll": "Expand all",
       "collapseAll": "Collapse all"
     },
+    "savedTasks": {
+      "saveAsTask": "Save as task",
+      "comingSoonTitle": "Saved Task",
+      "comingSoonBody": "This will let you run this instruction on a schedule or from a channel. Coming in a later update.",
+      "emptyHint": "A Saved Task runs this instruction when you ask, or later on a schedule."
+    },
     "routing": {
       "title": "Routing",
       "flowBody": "When a message arrives, the planner reads it and turns it into a small set of tasks (for example: generate an image, then summarize it as audio). Each task is handled by the right capability and the results are combined into one reply.",
@@ -3638,6 +3644,8 @@
   },
   "taskPlan": {
     "title": "Task plan",
+    "showSteps": "Show steps",
+    "hideSteps": "Hide steps",
     "download": "Download",
     "failedBody": "This step couldn't be completed.",
     "cancelledBody": "You stopped this step.",

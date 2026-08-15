@@ -1575,6 +1575,8 @@
   },
   "taskPlan": {
     "title": "Görev planı",
+    "showSteps": "Adımları göster",
+    "hideSteps": "Adımları gizle",
     "download": "İndir",
     "failedBody": "Bu adım tamamlanamadı.",
     "cancelledBody": "Bu adımı durdurdunuz.",
@@ -2247,6 +2249,12 @@
     "deletionNote": "Bir dosyayı sildiğinizde, vektörleri de etkin vektör deposundan kaldırılır."
   },
   "config": {
+    "savedTasks": {
+      "saveAsTask": "Görev olarak kaydet",
+      "comingSoonTitle": "Kayıtlı görev",
+      "comingSoonBody": "Bu, talimatı bir zamanlamayla veya bir kanaldan çalıştırmanı sağlayacak. Sonraki bir güncellemede gelecek.",
+      "emptyHint": "Kayıtlı bir görev bu talimatı sen başlattığında çalıştırır; ileride bir zamanlamayla da çalışır."
+    },
     "aiModels": {
       "title": "AI Modelleri",
       "description": "AI modellerinizi yapılandırın ve yönetin",
