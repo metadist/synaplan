@@ -66,7 +66,9 @@ describe('i18n locale parity (Saved Tasks / Connections)', () => {
   ) as Record<Locale, Record<string, string>>
 
   const unionKeys = [
-    ...new Set((Object.keys(LOCALES) as Locale[]).flatMap((locale) => keysInNamespaces(flats[locale]))),
+    ...new Set(
+      (Object.keys(LOCALES) as Locale[]).flatMap((locale) => keysInNamespaces(flats[locale]))
+    ),
   ].sort()
 
   it('has the same keys in en/de/es/tr inside gated namespaces', () => {

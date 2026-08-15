@@ -30,7 +30,7 @@ Configuration: [CONFIGURATION.md → Multi-Task Routing](CONFIGURATION.md#multi-
 
 ## Saved Tasks
 
-Pin a Task Prompt as a **Saved Task** and run it on demand (and later on a schedule). Lives on **AI Instructions** — not a new product name. Behind `SAVEDTASKS / ENABLED` (off when no BCONFIG row exists; seeded on for new/local installs). The chat widget never runs Saved Tasks.
+Pin a Task Prompt as a **Saved Task** and run it on demand or on a weekday / daily / hourly schedule. Lives on **AI Instructions** — not a new product name. Behind `SAVEDTASKS / ENABLED` (off when no BCONFIG row exists; seeded on for new/local installs). Three consecutive failures auto-pause the task. The chat widget never runs Saved Tasks. Connections (mailboxes, MCP, folders) are listed under **Channels → Connections**.
 
 Configuration: [CONFIGURATION.md → Saved Tasks](CONFIGURATION.md#saved-tasks-bconfig)
 

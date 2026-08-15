@@ -120,7 +120,8 @@
     "accountDeletion": "Hesap Silme",
     "onboarding": "Hoş geldin",
     "mcpServers": "MCP Sunucuları",
-    "aiAgents": "Yapay zeka ajanları"
+    "aiAgents": "Yapay zeka ajanları",
+    "connections": "Bağlantılar"
   },
   "addinConnect": {
     "title": "Synaplan'a bağlan",
@@ -522,6 +523,7 @@
     "toolsDocSummary": "Özetleyici",
     "toolsMailHandler": "E-posta Otomasyonu",
     "mcpServers": "MCP Sunucuları",
+    "connections": "Bağlantılar",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
     "filesDescription": "Sohbetleriniz için kaynaklar",
@@ -2253,7 +2255,78 @@
       "saveAsTask": "Görev olarak kaydet",
       "comingSoonTitle": "Kayıtlı görev",
       "comingSoonBody": "Bu, talimatı bir zamanlamayla veya bir kanaldan çalıştırmanı sağlayacak. Sonraki bir güncellemede gelecek.",
-      "emptyHint": "Kayıtlı bir görev bu talimatı sen başlattığında çalıştırır; ileride bir zamanlamayla da çalışır."
+      "emptyHint": "Kayıtlı bir görev bu talimatı sen başlattığında çalıştırır; ileride bir zamanlamayla da çalışır.",
+      "title": "Kayıtlı görev",
+      "on": "Açık",
+      "off": "Kapalı",
+      "runNow": "Şimdi çalıştır",
+      "runNowHint": "Bu çalıştırmada görev ne yapsın?",
+      "runStarted": "Görev kendi sohbetinde çalışıyor.",
+      "runFailed": "Çalıştırma tamamlanamadı.",
+      "updateFailed": "Kayıtlı görev güncellenemedi.",
+      "runsFailed": "Çalıştırmalar yüklenemedi.",
+      "scheduleSaved": "Zamanlama kaydedildi.",
+      "resumed": "Görev yeniden çalışacak.",
+      "resume": "Devam et",
+      "viewRuns": "Çalıştırmaları gör",
+      "hideRuns": "Çalıştırmaları gizle",
+      "advancedSteps": "Gelişmiş adımlar",
+      "advancedHint": "Tam adımları sabitlemek istemiyorsan kapalı bırak. Çoğu görev için Şimdi çalıştır ve bir zamanlama yeter.",
+      "autoPauseTitle": "Otomatik olarak duraklatıldı",
+      "autoPauseBody": "Bu görev üst üste üç kez başarısız oldu. Sorunu gider, sonra devam et.",
+      "createFailed": "Görev olarak kaydedilemedi.",
+      "created": "Görev olarak kaydedildi. Şimdi çalıştırabilirsin.",
+      "state": {
+        "off": "Çalışmıyor",
+        "neverRun": "Kaydedildi — henüz çalışmadı",
+        "scheduled": "Zamanlandı — ilk çalıştırma {when}",
+        "running": "Şu anda çalışıyor",
+        "lastRun": "Son çalıştırma: {when}",
+        "autoPaused": "Otomatik olarak duraklatıldı"
+      },
+      "schedule": {
+        "off": "Zamanlama yok",
+        "hourly": "Her saat",
+        "daily": "Her gün",
+        "weekdays": "Her iş günü"
+      },
+      "summary": {
+        "template": "{when} çalışır. {reads} okur → {saves} kaydeder."
+      }
+    },
+    "connections": {
+      "title": "Bağlantılar",
+      "subtitle": "Bu çalışma alanının okuyabileceği veya gönderebileceği posta kutuları, klasörler ve diğer sistemler.",
+      "empty": "Henüz bağlantı yok. Kurduğun e-posta ve MCP hesapları burada kendiliğinden görünür.",
+      "loading": "Bağlantılar yükleniyor…",
+      "loadFailed": "Bağlantılar yüklenemedi.",
+      "test": "Bağlantıyı test et",
+      "testOk": "Bağlantı iyi görünüyor.",
+      "testFailed": "Bağlantı testi başarısız oldu.",
+      "status": {
+        "connected": "Bağlı",
+        "error": "Hata",
+        "reauth_required": "Yeniden bağlanma gerekli",
+        "never_tested": "Hiç test edilmedi",
+        "disconnected": "Bağlantı kesildi"
+      },
+      "types": {
+        "mailbox": "Posta kutusu",
+        "mcp": "Bağlı sistem",
+        "webdav": "Klasör",
+        "webhook": "Bildirim adresi",
+        "caldav": "Takvim",
+        "generic": "Bağlantı"
+      },
+      "failure": {
+        "unauthorized": "{connection} oturum açmayı reddetti. Devam etmek için yeniden bağla.",
+        "not_found": "{target} klasörü {connection} içinde artık yok.",
+        "quota_exceeded": "{connection} dolu.",
+        "too_large": "Dosya, {connection} kabul ettiğinden daha büyük.",
+        "unreachable": "{connection} ulaşılabilir değil. Synaplan bir sonraki çalışmada yeniden deneyecek.",
+        "conflict": "Bu adda bir dosya zaten var; {newName} olarak kaydedildi.",
+        "rate_limited": "Kullanım sınırına ulaşıldı, bu çalışma atlandı."
+      }
     },
     "aiModels": {
       "title": "AI Modelleri",

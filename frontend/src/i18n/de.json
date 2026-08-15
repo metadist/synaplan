@@ -121,7 +121,8 @@
     "accountDeletion": "Konto löschen",
     "onboarding": "Willkommen",
     "mcpServers": "MCP-Server",
-    "aiAgents": "KI-Agenten"
+    "aiAgents": "KI-Agenten",
+    "connections": "Verbindungen"
   },
   "addinConnect": {
     "title": "Mit Synaplan verbinden",
@@ -529,6 +530,7 @@
     "toolsDocSummary": "Zusammenfasser",
     "toolsMailHandler": "E-Mail-Automatisierung",
     "mcpServers": "MCP-Server",
+    "connections": "Verbindungen",
     "plugins": "Plugins",
     "files": "Quellen",
     "filesDescription": "Quellen für deine Chats",
@@ -1723,7 +1725,78 @@
       "saveAsTask": "Als Aufgabe speichern",
       "comingSoonTitle": "Gespeicherte Aufgabe",
       "comingSoonBody": "Damit kannst du diese Anweisung nach einem Zeitplan oder über einen Kanal ausführen. Folgt in einem späteren Update.",
-      "emptyHint": "Eine gespeicherte Aufgabe führt diese Anweisung aus, wenn du sie startest — später auch nach Zeitplan."
+      "emptyHint": "Eine gespeicherte Aufgabe führt diese Anweisung aus, wenn du sie startest — später auch nach Zeitplan.",
+      "title": "Gespeicherte Aufgabe",
+      "on": "An",
+      "off": "Aus",
+      "runNow": "Jetzt ausführen",
+      "runNowHint": "Was soll diese Aufgabe in diesem Durchlauf tun?",
+      "runStarted": "Die Aufgabe läuft in einem eigenen Gespräch.",
+      "runFailed": "Die Ausführung konnte nicht abgeschlossen werden.",
+      "updateFailed": "Die gespeicherte Aufgabe konnte nicht aktualisiert werden.",
+      "runsFailed": "Ausführungen konnten nicht geladen werden.",
+      "scheduleSaved": "Zeitplan gespeichert.",
+      "resumed": "Die Aufgabe läuft wieder.",
+      "resume": "Fortsetzen",
+      "viewRuns": "Ausführungen anzeigen",
+      "hideRuns": "Ausführungen ausblenden",
+      "advancedSteps": "Erweiterte Schritte",
+      "advancedHint": "Nur öffnen, wenn du genaue Schritte festlegen willst. Die meisten Aufgaben brauchen nur „Jetzt ausführen“ und einen Zeitplan.",
+      "autoPauseTitle": "Automatisch pausiert",
+      "autoPauseBody": "Diese Aufgabe ist dreimal hintereinander fehlgeschlagen. Behebe das Problem und setze sie fort.",
+      "createFailed": "Konnte nicht als Aufgabe gespeichert werden.",
+      "created": "Als Aufgabe gespeichert. Du kannst sie jetzt ausführen.",
+      "state": {
+        "off": "Läuft nicht",
+        "neverRun": "Gespeichert — noch nicht ausgeführt",
+        "scheduled": "Geplant — erste Ausführung {when}",
+        "running": "Läuft gerade",
+        "lastRun": "Letzte Ausführung: {when}",
+        "autoPaused": "Automatisch pausiert"
+      },
+      "schedule": {
+        "off": "Kein Zeitplan",
+        "hourly": "Jede Stunde",
+        "daily": "Jeden Tag",
+        "weekdays": "Jeden Werktag"
+      },
+      "summary": {
+        "template": "Läuft {when}. Liest {reads} → Speichert {saves}."
+      }
+    },
+    "connections": {
+      "title": "Verbindungen",
+      "subtitle": "Postfächer, Ordner und andere Systeme, die dieser Arbeitsbereich lesen oder beschreiben darf.",
+      "empty": "Noch keine Verbindungen. E-Mail- und MCP-Konten, die du schon eingerichtet hast, erscheinen hier automatisch.",
+      "loading": "Verbindungen werden geladen…",
+      "loadFailed": "Verbindungen konnten nicht geladen werden.",
+      "test": "Verbindung testen",
+      "testOk": "Die Verbindung sieht gut aus.",
+      "testFailed": "Der Verbindungstest ist fehlgeschlagen.",
+      "status": {
+        "connected": "Verbunden",
+        "error": "Fehler",
+        "reauth_required": "Neu verbinden erforderlich",
+        "never_tested": "Noch nicht getestet",
+        "disconnected": "Getrennt"
+      },
+      "types": {
+        "mailbox": "Postfach",
+        "mcp": "Verbundenes System",
+        "webdav": "Ordner",
+        "webhook": "Aufruf-Adresse",
+        "caldav": "Kalender",
+        "generic": "Verbindung"
+      },
+      "failure": {
+        "unauthorized": "{connection} hat die Anmeldung abgelehnt. Verbinde es erneut, um fortzufahren.",
+        "not_found": "Der Ordner {target} existiert in {connection} nicht mehr.",
+        "quota_exceeded": "{connection} hat keinen Speicherplatz mehr.",
+        "too_large": "Die Datei ist größer, als {connection} akzeptiert.",
+        "unreachable": "{connection} war nicht erreichbar. Synaplan versucht es beim nächsten Lauf erneut.",
+        "conflict": "Eine Datei mit diesem Namen existiert bereits; gespeichert als {newName}.",
+        "rate_limited": "Dein Nutzungslimit wurde erreicht, daher wurde dieser Lauf übersprungen."
+      }
     },
     "routing": {
       "title": "Routing",

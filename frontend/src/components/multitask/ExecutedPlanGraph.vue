@@ -54,21 +54,11 @@ function cardFor(id: string): TaskCard | undefined {
           <span class="txt-muted font-mono mr-1">{{ node.id }}</span>
           {{ $t(`taskPlan.capability.${cardFor(node.id)?.capability}`, node.label) }}
         </li>
-        <li
-          v-if="index < nodes.length - 1"
-          class="txt-muted text-xs"
-          aria-hidden="true"
-        >
-          →
-        </li>
+        <li v-if="index < nodes.length - 1" class="txt-muted text-xs" aria-hidden="true">→</li>
       </template>
     </ol>
     <p v-if="edges.length > 0" class="sr-only">
-      {{
-        edges
-          .map((edge) => `${edge.from} → ${edge.to}`)
-          .join(', ')
-      }}
+      {{ edges.map((edge) => `${edge.from} → ${edge.to}`).join(', ') }}
     </p>
   </div>
 </template>

@@ -228,7 +228,7 @@ Pin a Task Prompt and run it on demand or on a schedule. Configured via
 
 | Group / Key | Default | Description |
 |-------------|---------|-------------|
-| `SAVEDTASKS / ENABLED` | `true` (new / local-dev installs); code default `false` | Master switch: Saved Task APIs and AI Instructions chrome. Widget chat never runs Saved Tasks. |
+| `SAVEDTASKS / ENABLED` | `true` (new / local-dev installs); code default `false` | Master switch: Saved Task APIs, AI Instructions chrome, and the Connections page. Widget chat never runs Saved Tasks. When the flag is off, `app:saved-tasks:tick` is a no-op. |
 
 ---
 

@@ -120,7 +120,8 @@
     "accountDeletion": "Eliminación de cuenta",
     "onboarding": "Bienvenida",
     "mcpServers": "Servidores MCP",
-    "aiAgents": "Agentes de IA"
+    "aiAgents": "Agentes de IA",
+    "connections": "Conexiones"
   },
   "addinConnect": {
     "title": "Conectar a Synaplan",
@@ -522,6 +523,7 @@
     "toolsDocSummary": "Resumidor",
     "toolsMailHandler": "Automatización de correo",
     "mcpServers": "Servidores MCP",
+    "connections": "Conexiones",
     "plugins": "Plugins",
     "files": "Fuentes",
     "filesDescription": "Fuentes para tus chats",
@@ -2252,7 +2254,78 @@
       "saveAsTask": "Guardar como tarea",
       "comingSoonTitle": "Tarea guardada",
       "comingSoonBody": "Esto te permitirá ejecutar esta instrucción según un horario o desde un canal. Llegará en una actualización posterior.",
-      "emptyHint": "Una tarea guardada ejecuta esta instrucción cuando la inicias y, más adelante, también según un horario."
+      "emptyHint": "Una tarea guardada ejecuta esta instrucción cuando la inicias y, más adelante, también según un horario.",
+      "title": "Tarea guardada",
+      "on": "Activada",
+      "off": "Desactivada",
+      "runNow": "Ejecutar ahora",
+      "runNowHint": "¿Qué debe hacer esta tarea en esta ejecución?",
+      "runStarted": "La tarea se está ejecutando en su propia conversación.",
+      "runFailed": "La ejecución no pudo terminar.",
+      "updateFailed": "No se pudo actualizar esta tarea guardada.",
+      "runsFailed": "No se pudieron cargar las ejecuciones.",
+      "scheduleSaved": "Programación guardada.",
+      "resumed": "La tarea volverá a ejecutarse.",
+      "resume": "Reanudar",
+      "viewRuns": "Ver ejecuciones",
+      "hideRuns": "Ocultar ejecuciones",
+      "advancedSteps": "Pasos avanzados",
+      "advancedHint": "Déjalo cerrado salvo que quieras fijar pasos exactos. La mayoría de las tareas solo necesitan Ejecutar ahora y una programación.",
+      "autoPauseTitle": "Pausada automáticamente",
+      "autoPauseBody": "Esta tarea falló tres veces seguidas. Corrige el problema y reanúdala.",
+      "createFailed": "No se pudo guardar como tarea.",
+      "created": "Guardada como tarea. Ya puedes ejecutarla.",
+      "state": {
+        "off": "No se está ejecutando",
+        "neverRun": "Guardada — aún no se ha ejecutado",
+        "scheduled": "Programada — primera ejecución {when}",
+        "running": "Ejecutándose ahora",
+        "lastRun": "Última ejecución: {when}",
+        "autoPaused": "Pausada automáticamente"
+      },
+      "schedule": {
+        "off": "Sin programación",
+        "hourly": "Cada hora",
+        "daily": "Cada día",
+        "weekdays": "Cada día laborable"
+      },
+      "summary": {
+        "template": "Se ejecuta {when}. Lee {reads} → Guarda {saves}."
+      }
+    },
+    "connections": {
+      "title": "Conexiones",
+      "subtitle": "Buzones, carpetas y otros sistemas que este espacio puede leer o usar para enviar.",
+      "empty": "Aún no hay conexiones. Las cuentas de correo y MCP que ya configuraste aparecen aquí solas.",
+      "loading": "Cargando conexiones…",
+      "loadFailed": "No se pudieron cargar las conexiones.",
+      "test": "Probar conexión",
+      "testOk": "La conexión parece correcta.",
+      "testFailed": "La prueba de conexión falló.",
+      "status": {
+        "connected": "Conectada",
+        "error": "Con error",
+        "reauth_required": "Es necesario reconectar",
+        "never_tested": "Nunca probada",
+        "disconnected": "Desconectada"
+      },
+      "types": {
+        "mailbox": "Buzón",
+        "mcp": "Sistema conectado",
+        "webdav": "Carpeta",
+        "webhook": "Dirección de aviso",
+        "caldav": "Calendario",
+        "generic": "Conexión"
+      },
+      "failure": {
+        "unauthorized": "{connection} rechazó el inicio de sesión. Vuelve a conectarlo para continuar.",
+        "not_found": "La carpeta {target} ya no existe en {connection}.",
+        "quota_exceeded": "{connection} no tiene espacio.",
+        "too_large": "El archivo es más grande de lo que {connection} acepta.",
+        "unreachable": "No se pudo alcanzar {connection}. Synaplan lo intentará de nuevo en la próxima ejecución.",
+        "conflict": "Ya existe un archivo con ese nombre; se guardó como {newName}.",
+        "rate_limited": "Se alcanzó tu límite de uso, así que se omitió esta ejecución."
+      }
     },
     "aiModels": {
       "title": "Modelos de IA",

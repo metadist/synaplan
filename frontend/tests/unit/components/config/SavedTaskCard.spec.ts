@@ -1,0 +1,161 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
+import type { SavedTask, SavedTaskRun } from '@/services/api/savedTasksApi'
+
+const { mockUpdate, mockRun, mockRuns, mockResume, mockPrompt, mockPush } = vi.hoisted(() => ({
+  mockUpdate: vi.fn(),
+  mockRun: vi.fn(),
+  mockRuns: vi.fn(),
+  mockResume: vi.fn(),
+  mockPrompt: vi.fn(),
+  mockPush: vi.fn(),
+}))
+
+vi.mock('@/services/api/savedTasksApi', () => ({
+  savedTasksApi: {
+    update: mockUpdate,
+    run: mockRun,
+    runs: mockRuns,
+    resume: mockResume,
+  },
+}))
+
+vi.mock('@/composables/useDialog', () => ({
+  useDialog: () => ({ prompt: mockPrompt }),
+}))
+
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
+}))
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: mockPush }),
+}))
+
+function task(overrides: Partial<SavedTask> = {}): SavedTask {
+  return {
+    id: 7,
+    promptId: 12,
+    name: 'Meeting requests',
+    enabled: true,
+    triggerType: 'manual',
+    triggerConfig: null,
+    graph: null,
+    allowUnattended: false,
+    chatId: null,
+    nextRunAt: null,
+    lastRunAt: null,
+    consecutiveFailures: 0,
+    autoPaused: false,
+    summary: {
+      key: 'config.savedTasks.summary.template',
+      params: { when: 'when you run it', reads: 'this instruction', saves: 'a calendar file' },
+    },
+    ...overrides,
+  }
+}
+
+function run(overrides: Partial<SavedTaskRun> = {}): SavedTaskRun {
+  return {
+    id: 1,
+    status: 'completed',
+    trigger: 'manual',
+    messageId: 99,
+    planSnapshot: null,
+    error: null,
+    started: '2026-08-15T07:00:00+00:00',
+    finished: '2026-08-15T07:00:12+00:00',
+    created: 20260815070000,
+    ...overrides,
+  }
+}
+
+const mountCard = (value: SavedTask) =>
+  mount(SavedTaskCard, {
+    props: { task: value },
+    global: {
+      stubs: { Icon: true },
+    },
+  })
+
+describe('SavedTaskCard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockPrompt.mockResolvedValue('Look for meeting requests')
+    mockUpdate.mockImplementation(async (_id: number, patch: Record<string, unknown>) =>
+      task({ ...patch } as Partial<SavedTask>)
+    )
+    mockResume.mockResolvedValue(task({ enabled: true, autoPaused: false, consecutiveFailures: 0 }))
+  })
+
+  it('shows the off state when the task is disabled', () => {
+    const wrapper = mountCard(task({ enabled: false }))
+    expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain('Not running')
+    expect(wrapper.get('[data-testid="saved-task-enabled"]').attributes('checked')).toBeUndefined()
+  })
+
+  it('shows never-run copy when the task has no history', () => {
+    const wrapper = mountCard(task())
+    expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain(
+      'Saved — not run yet'
+    )
+  })
+
+  it('shows the scheduled first-run line', () => {
+    const wrapper = mountCard(
+      task({
+        triggerType: 'schedule',
+        nextRunAt: '2026-08-17T05:00:00+00:00',
+        triggerConfig: { kind: 'weekly', at: '07:00', tz: 'Europe/Berlin', days: [1, 2, 3, 4, 5] },
+      })
+    )
+    expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain('Scheduled')
+    expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain(
+      '2026-08-17T05:00:00+00:00'
+    )
+  })
+
+  it('shows running copy while Run now is in flight', async () => {
+    let resolveRun: (value: { task: SavedTask; run: SavedTaskRun }) => void = () => undefined
+    mockRun.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRun = resolve
+      })
+    )
+    const wrapper = mountCard(task())
+    await wrapper.get('[data-testid="btn-run-now"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain('Running now')
+    resolveRun({
+      task: task({ lastRunAt: '2026-08-15T12:00:00+00:00', chatId: 44 }),
+      run: run(),
+    })
+    await flushPromises()
+    expect(mockPush).toHaveBeenCalledWith({ path: '/', query: { chat: '44' } })
+  })
+
+  it('shows the auto-pause notice and resume control', async () => {
+    const wrapper = mountCard(task({ enabled: false, autoPaused: true, consecutiveFailures: 3 }))
+    expect(wrapper.get('[data-testid="saved-task-auto-pause"]').text()).toContain(
+      'Paused automatically'
+    )
+    await wrapper.get('[data-testid="saved-task-auto-pause"] button').trigger('click')
+    expect(mockResume).toHaveBeenCalledWith(7)
+  })
+
+  it('lists failed runs with the plain-language reason', async () => {
+    mockRuns.mockResolvedValue({
+      runs: [
+        run({ status: 'failed', error: 'Your usage limit was reached, so this run was skipped.' }),
+      ],
+      retention: 'Last 50 runs or 90 days, whichever keeps more history.',
+    })
+    const wrapper = mountCard(task({ lastRunAt: '2026-08-15T12:00:00+00:00' }))
+    await wrapper.get('[data-testid="btn-view-runs"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="saved-task-runs"]').text()).toContain(
+      'Your usage limit was reached, so this run was skipped.'
+    )
+  })
+})

@@ -121,7 +121,8 @@
     "accountDeletion": "Account Deletion",
     "onboarding": "Welcome",
     "mcpServers": "MCP Servers",
-    "aiAgents": "AI Agents"
+    "aiAgents": "AI Agents",
+    "connections": "Connections"
   },
   "addinConnect": {
     "title": "Connect to Synaplan",
@@ -534,6 +535,7 @@
     "toolsDocSummary": "Summarizer",
     "toolsMailHandler": "Email Automation",
     "mcpServers": "MCP Servers",
+    "connections": "Connections",
     "plugins": "Plugins",
     "files": "Sources",
     "filesDescription": "Sources for your chats",
@@ -1682,7 +1684,78 @@
       "saveAsTask": "Save as task",
       "comingSoonTitle": "Saved Task",
       "comingSoonBody": "This will let you run this instruction on a schedule or from a channel. Coming in a later update.",
-      "emptyHint": "A Saved Task runs this instruction when you ask, or later on a schedule."
+      "emptyHint": "A Saved Task runs this instruction when you ask, or later on a schedule.",
+      "title": "Saved Task",
+      "on": "On",
+      "off": "Off",
+      "runNow": "Run now",
+      "runNowHint": "What should this task do in this run?",
+      "runStarted": "The task is running in its own conversation.",
+      "runFailed": "The run could not finish.",
+      "updateFailed": "Could not update this Saved Task.",
+      "runsFailed": "Could not load runs.",
+      "scheduleSaved": "Schedule saved.",
+      "resumed": "The task will run again.",
+      "resume": "Resume",
+      "viewRuns": "View runs",
+      "hideRuns": "Hide runs",
+      "advancedSteps": "Advanced steps",
+      "advancedHint": "Leave this closed unless you want to pin exact steps. Most tasks only need Run now and a schedule.",
+      "autoPauseTitle": "Paused automatically",
+      "autoPauseBody": "This task failed three times in a row. Fix the issue, then resume.",
+      "createFailed": "Could not save this as a task.",
+      "created": "Saved as a task. You can run it now.",
+      "state": {
+        "off": "Not running",
+        "neverRun": "Saved — not run yet",
+        "scheduled": "Scheduled — first run {when}",
+        "running": "Running now",
+        "lastRun": "Last run: {when}",
+        "autoPaused": "Paused automatically"
+      },
+      "schedule": {
+        "off": "No schedule",
+        "hourly": "Every hour",
+        "daily": "Every day",
+        "weekdays": "Every weekday"
+      },
+      "summary": {
+        "template": "Runs {when}. Reads {reads} → Saves {saves}."
+      }
+    },
+    "connections": {
+      "title": "Connections",
+      "subtitle": "Mailboxes, folders and other systems this workspace can read or send to.",
+      "empty": "No connections yet. Email and MCP accounts you already set up appear here automatically.",
+      "loading": "Loading connections…",
+      "loadFailed": "Could not load connections.",
+      "test": "Test connection",
+      "testOk": "Connection looks good.",
+      "testFailed": "The connection test failed.",
+      "status": {
+        "connected": "Connected",
+        "error": "Error",
+        "reauth_required": "Reconnect needed",
+        "never_tested": "Never tested",
+        "disconnected": "Disconnected"
+      },
+      "types": {
+        "mailbox": "Mailbox",
+        "mcp": "Connected system",
+        "webdav": "Folder",
+        "webhook": "Webhook",
+        "caldav": "Calendar",
+        "generic": "Connection"
+      },
+      "failure": {
+        "unauthorized": "{connection} rejected the login. Reconnect it to continue.",
+        "not_found": "The folder {target} no longer exists in {connection}.",
+        "quota_exceeded": "{connection} is out of space.",
+        "too_large": "The file is larger than {connection} accepts.",
+        "unreachable": "{connection} could not be reached. Synaplan will try again at the next run.",
+        "conflict": "A file with that name already exists; saved as {newName} instead.",
+        "rate_limited": "Your usage limit was reached, so this run was skipped."
+      }
     },
     "routing": {
       "title": "Routing",
