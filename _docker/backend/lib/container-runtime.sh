@@ -361,6 +361,10 @@ run_scheduler_role() {
             runtime_log "Media reaper failed; it will be retried on the next tick." >&2
         fi
 
+        if ! run_scheduler_command bin/console --env="$env" app:saved-tasks:tick --no-interaction; then
+            runtime_log "Saved Tasks tick failed; it will be retried on the next tick." >&2
+        fi
+
         if [ "$now" -ge "$next_hourly" ]; then
             if ! run_scheduler_command bin/console --env="$env" app:files:reap-ephemeral --no-interaction; then
                 runtime_log "Ephemeral-file reaper failed; it will be retried next hour." >&2
