@@ -168,6 +168,8 @@ services:
             tags: ['app.multitask.runner']
         App\Realtime\Authorizer\ChannelAuthorizerInterface:
             tags: ['app.realtime.authorizer']
+        App\Service\Destination\DestinationProvider:
+            tags: ['app.destination.provider']
 
     App\:
         resource: '../src/'
@@ -636,6 +638,12 @@ services:
     App\Service\EncryptionService:
         arguments:
             $secretKey: '%env(APP_SECRET)%'
+
+    App\Service\Credential\CredentialVaultInterface: '@App\Service\Credential\AesCredentialVault'
+
+    App\Service\Destination\DestinationRegistry:
+        arguments:
+            $providers: !tagged_iterator app.destination.provider
 
     # Social Login Controllers (Google & GitHub OAuth)
     App\Controller\GoogleAuthController:
