@@ -24,6 +24,14 @@
 | 4 | [`05_sprint_4_connectors_plugins_n8n.md`](./05_sprint_4_connectors_plugins_n8n.md) | Outbound actions, plugin nodes, n8n interface |
 | — | [`06_testing_and_documentation.md`](./06_testing_and_documentation.md) | Gate, characterization, E2E, docs inventory (applies to every sprint) |
 
+**Cross-cutting files (read before starting any sprint):**
+
+| File | Role |
+| ---- | ---- |
+| [`07_connectors.md`](./07_connectors.md) | **Gates the epic.** Connector inventory, the five foundations (F1–F5), and the sign-off checklist. Ways in and out are prepared *before* implementation |
+| [`08_ux_and_i18n.md`](./08_ux_and_i18n.md) | UX contract, canonical terminology in EN/DE/ES/TR, failure copy, locale-parity CI, comprehension checks |
+| [`09_work_breakdown.md`](./09_work_breakdown.md) | Every sprint cut into PR-sized steps with dependencies, sizes and acceptance criteria |
+
 ---
 
 ## 0. Decision checklist (check before any code)
@@ -41,9 +49,13 @@ Print this section. Tick every box. Do **not** start Sprint 1 until every row is
 | 7 | Plugin tools (Synamail, Synasort, Synaform, Synafastbill, …) join the graph **only when installed** for that user, via a new optional manifest key (`graphNodes`). `chatCommands` stay the slash-command seam. | Manifest seam, later | ☐ |
 | 8 | Feature flag: `SAVEDTASKS.ENABLED` in `BCONFIG` (default **off** for existing installs; seed **on** for new installs — same grandfather pattern as `MULTITASK.ROUTING_ENABLED`). Widget chat **does not** run Saved Tasks. | Flag + widget invariant | ☐ |
 | 9 | Schema is additive only. Galera-safe migrations (`addSql`, `IF NOT EXISTS`). No `doctrine:schema:update --force`. Ask again before the first migration lands. | AGENTS.md | ☐ |
-| 10 | Office 365 / Microsoft Graph is **out of v1**. Track as connector epic after Saved Tasks Run-now + schedule work. | Deferred | ☐ |
+| 10 | Office 365 / Microsoft Graph is **out of v1**. Track as a connector epic after Saved Tasks Run-now + schedule work. Note the hard reason: Exchange Online no longer accepts Basic auth, so O365 mail needs an **outbound OAuth2 framework** we do not have — [`07_connectors.md` Finding B](./07_connectors.md#11-four-findings-that-change-the-plan). | Deferred | ☐ |
 | 11 | **Production scheduling = the existing `synaplan-platform` host-cron family, expanded.** A new `cron-saved-tasks.sh` (same pattern as `cron-gmail.sh` / `cron-media-reaper.sh`: web1-only, `docker compose exec -T backend php bin/console …`, log to `/var/log/synaplan-*.log`, covered by `synaplan-cron.logrotate`). The tick command self-locks via a cross-node Redis lock (like `app:media:reap-jobs`) so the dev/self-host Docker scheduler role and host cron can both run it safely. Details: [Sprint 3 §1](./04_sprint_3_scheduler.md#1-where-schedules-actually-run-production-reality). | Expand platform crons | ☐ |
 | 12 | **Run results live in one dedicated conversation per Saved Task** (created on first run, named after the task). Runs list links into it. Scheduled failures notify the user; **3 consecutive failures auto-pause the task** with a visible reason. | One home per task + auto-pause | ☐ |
+| 13 | **Connections are prepared before the engine needs them.** Build the five foundations (connection registry, credential vault, OAuth2 framework, destination seam, connection-health UX) **before** any individual connector; no connector ships its own credential store, status widget or delivery endpoint. Full inventory and per-connector sign-off: [`07_connectors.md`](./07_connectors.md). | **Decided 2026-08-15: foundations first (not parallel)** | ✅ |
+| 14 | **There is no write path from Synaplan into Nextcloud or OpenCloud today.** Both integrations are inbound *pull* (the NC app downloads with an admin API key; the OpenCloud extension reads over CS3 with an exchanged user token). "Save the result to my folder" requires the destination seam **plus** a new write client, and OpenCloud's mechanism is decided by a timeboxed spike. Both existing integrations keep working unchanged. | Additive push, spike for OpenCloud | ☐ |
+| 15 | **UX and four-language comprehension are gates, not chores.** Canonical terminology signed off by a native speaker per locale before the UI is built; locale parity enforced by CI; every failure expressed in one shared vocabulary so a new connector adds zero translation keys. See [`08_ux_and_i18n.md`](./08_ux_and_i18n.md). | Copy reviewed before build | ☐ |
+| 16 | **Work is executed in PR-sized steps** from [`09_work_breakdown.md`](./09_work_breakdown.md), lowest unfinished step first, each independently revertable and gate-green. A step whose connector checklist is unticked does not start. | Small steps, strict order | ☐ |
 
 If a row is rejected, update this file in the same change as the alternative — do not leave the sprint files implying the old default.
 
@@ -81,7 +93,13 @@ The Chat widget’s connect-the-boxes UI is the closest interaction pattern we a
 | Synaplan → n8n | **Gap** | No outbound webhook / event emitter |
 | Platform host crons | Shipped (prod) | `synaplan-platform`: `cron-gmail.sh` (mail handlers + smart@ pickup — **currently the only inbound pickup**), `cron-media-reaper.sh` (Redis cross-node lock), `cron-disk-watchdog.sh`, `cron-model-pricing.sh`, shared `synaplan-cron.logrotate`. **This is the scheduling backbone we expand** — see checklist row 11 |
 | User scheduler | **Missing** | Docker `SYNAPLAN_ROLE=scheduler` is maintenance only (dev/self-host); prod uses host crons above |
-| Office 365 / Graph | **Missing** | No connector |
+| Office 365 / Graph | **Missing** | No connector, and no outbound OAuth2 framework to build one on |
+| Document parsing (PPTX/XLSX/DOCX/PDF) | Shipped | Tika via `FileProcessor` / `TikaClient`. Needs coverage inside *scheduled* runs, not new code |
+| Document generation (DOCX/XLSX/PPTX/ICS/CSV) | Shipped | `DocumentGeneratorService`. Already the honest v1 output of a Saved Task |
+| Nextcloud | Shipped, **inbound only** | External NC app (`synaplan-nextcloud`) that **pulls** from Synaplan with an admin API key and writes via `IRootFolder`. No push path from Synaplan |
+| OpenCloud | Shipped, **inbound + read-only** | `synaplan-opencloud`: web extension + Go backend, reads user files over the **CS3/reva gateway**, authenticates via **RFC 8693 token exchange** against the shared Keycloak. No upload path |
+| File destination seam | **Missing** | `ShareableFile` / `DestinationProvider` / `POST /files/{id}/send` are planning only (`release4.0/07_file-sharing-destinations.md` Phase B). This is what "put the result in a folder" depends on |
+| Jira / Confluence | **Missing** | Intended via MCP, not bespoke clients — and MCP is read-only until the mutating decision lands |
 
 **Known gap to fix inside Sprint 1 (not optional):** `ChatRunner` documents `params.topic_id` but multi-node intermediate `chat` nodes still use a generic system prompt. Saved Tasks that “run this Task Prompt” will silently ignore the prompt until that binding is complete. Characterization tests must lock the fix.
 
@@ -268,7 +286,9 @@ Rules:
 
 ## 6. UX principles
 
-1. **One canonical term:** Saved Task. German: *Gespeicherte Aufgabe* (confirm in i18n review). Spanish/Turkish: add in the same sprint as the UI — all four locales, always.
+Full specification, terminology table and comprehension gates: [`08_ux_and_i18n.md`](./08_ux_and_i18n.md). The principles below are the summary.
+
+1. **One canonical term:** Saved Task. German: *Gespeicherte Aufgabe*; Spanish: *Tarea guardada*; Turkish: *Kayıtlı görev* — all four locales in the same commit, native-speaker reviewed before GA.
 2. **AI Instructions remains home.** Tabs or sections: *Prompt* (today) | *When to run* | *Graph* (Sprint 2) | *Runs*. Do not add a second nav item until the feature is GA and the IA is reviewed.
 3. **Progressive disclosure — the simple path is the default path.** v1 of the Saved Task surface is **one small card with three controls**: Run now, a schedule picker (off / interval / daily / weekly), and an on/off toggle. The graph editor is hidden behind an explicit *Advanced steps* action and is never required for the flagship story. A user who never opens it still gets mail → prompt → calendar file. If a design review finds the card needs a fourth control, cut scope, not add UI.
 4. **Failures are communicated, never silent.** A failed run shows a plain-language reason in the Runs list; a scheduled task that fails 3× in a row auto-pauses and tells the user why and how to resume (checklist row 12). No stuck "running" states — every run reaches a terminal status (same principle as async media).
@@ -324,7 +344,9 @@ Same pattern as multitask routing:
 ## 9. Out of scope (v1)
 
 - Embedding or operating n8n / Make / Zapier.
-- Microsoft Graph / Google Calendar write.
+- Microsoft Graph / Google Calendar write (blocked on the OAuth2 framework — [`07_connectors.md`](./07_connectors.md) F3).
+- Google Workspace connectors (deferred until a customer requires them).
+- Bespoke Jira / Confluence / CRM clients — the MCP connection and the outbound webhook are the escape hatches.
 - Mutating MCP tools.
 - User-defined arbitrary HTTP (SSRF). Outbound webhook is **user-configured HTTPS URL** with SSRF guard, allowlist optional for cloud.
 - Rewriting `tools:plan` / `tools:sort` into a visual editor.
@@ -343,6 +365,10 @@ A user who has connected an IMAP mailbox can:
 4. Receive `.ics` files / an email with invites — not a claim that Outlook was updated.
 5. Optionally add an action “Send to webhook” and have n8n receive the structured result (Sprint 4).
 6. Disable the task; no further runs. Flag-off restores the product as if this epic did not exist (minus empty tables).
+
+**Connector checkpoint (first genuinely new capability):** once the destination seam and the WebDAV client land ([`09_work_breakdown.md`](./09_work_breakdown.md) K10a–K10d), the same user can add “Save to folder” and have the result filed in Nextcloud by a run nobody was watching. That is the moment the feature stops being a nicer chat and starts being an agent.
+
+**Comprehension criterion (equally binding):** a user who speaks only German, Spanish or Turkish can answer all five questions in [`08_ux_and_i18n.md` §1](./08_ux_and_i18n.md#1-the-five-questions-every-screen-must-answer) from the screen alone, and can understand and act on a failure message without support.
 
 ---
 

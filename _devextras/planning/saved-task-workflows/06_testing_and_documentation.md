@@ -10,11 +10,12 @@ This file is the quality contract for [`00_master_plan.md`](./00_master_plan.md)
 2. **Deterministic and offline.** No live LLM, IMAP, Graph, or n8n. TestProvider, fake HTTP, in-memory Messenger, fixed clock.
 3. **Characterization is a contract.** Sorter / classifier / planner / fast-path changes require snapshot re-record **and a reviewed diff**. Silent re-record is a defect.
 4. **Widget invariant.** Every sprint that touches routing or frontend chat must keep ChatWidget E2E green and must not run Saved Tasks inside the widget.
-5. **Four locales.** Any user-visible string: `frontend/src/i18n/{en,de,es,tr}.json` in the **same** change.
+5. **Four locales, enforced.** Any user-visible string: `frontend/src/i18n/{en,de,es,tr}.json` in the **same** change — and parity is a **CI gate**, not a convention (§3.0.2). Terminology follows [`08_ux_and_i18n.md` §2](./08_ux_and_i18n.md#2-canonical-terminology--all-four-locales).
 6. **OpenAPI → Zod.** New/changed HTTP: annotations complete, then `make -C frontend generate-schemas`, then `vue-tsc`. No hand-written API interfaces.
 7. **Mobile impact.** New paths go into `.github/mobile-impact-policy.json` and `tests/mobile-impact.test.mjs`. Default: PHP/scheduler = `backend-only`; AI Instructions / graph UI = `ota-candidate`. Never `store-required` for this epic.
 8. **Galera.** Prod-reachable migrations: raw idempotent `addSql` only. See `docs/MIGRATIONS.md`.
 9. **No secrets in tests or fixtures.** HMAC secrets = `test-secret`; URLs = `https://hooks.example.test/...`.
+10. **Connectors never touch the network in CI.** Fake clients and recorded fixtures only. Live verification is a manual step with evidence in the PR body — full rules in [`07_connectors.md` §8](./07_connectors.md#8-testing-rules-for-connectors-all-of-them).
 
 ---
 
@@ -96,6 +97,34 @@ Additions **inside** existing jobs (small, explicit):
 1. **Guard test — no n8n in the stack:** a PHPUnit (or `.mjs`) test asserting no service named `n8n` exists in `docker-compose*.yml`. Cheap insurance for checklist row 1.
 2. **Characterization job discipline:** any PR labeled `saved-tasks` that touches `Service/Message/` or `Service/Multitask/` must include a snapshot diff (empty diff is fine, but the run must be shown). Enforced by review checklist, not new tooling.
 3. **Platform repo:** `synaplan-platform` has no CI gate for cron scripts — the Sprint 3 platform PR is reviewed by hand against §1.1 of the sprint file (web1-only, Redis-locked command, logrotate-covered log name).
+
+### 3.0.2 i18n parity gate (new, lands in step F0)
+
+Today a missing key silently falls back to English and — as far as the repo shows — only `resilientCompiler.spec.ts` and `searchSummaryPlural.spec.ts` exist under `frontend/tests/unit/i18n/`. **First verify whether a parity check already exists; if not, add one before any Saved Tasks UI is written.** It runs inside the existing `Frontend (Vue/TypeScript)` job via `make -C frontend test` — no new CI workflow.
+
+| Check | Fails when |
+| ----- | ---------- |
+| Key parity | A key exists in one of `en/de/es/tr` but not the others |
+| Placeholder parity | The same key has different interpolation placeholders across locales (`{count}` vs `{anzahl}`) — a runtime break, not a cosmetic one |
+| Untranslated detection | Within the `config.savedTasks.*` / `config.connections.*` namespaces, a `de`/`es`/`tr` value is byte-identical to English, unless it is on the documented loanword opt-out list |
+| Jargon scan | A primary-copy key contains a banned term from [`08_ux_and_i18n.md` §2.1](./08_ux_and_i18n.md#21-words-that-must-never-appear-in-primary-ui-copy) (`DAG`, `cron`, `node`, `payload`, …) |
+
+### 3.0.3 Connector test matrix (every connector, no exceptions)
+
+Applies to each connector in [`07_connectors.md` §3](./07_connectors.md#3-connector-inventory) as it lands. A connector PR missing any row does not merge.
+
+| ID | Layer | Assert |
+| -- | ----- | ------ |
+| X.1 | Unit | Happy path against a **fake** client (no socket) |
+| X.2 | Unit | Every documented failure mode maps onto the shared vocabulary (`unauthorized`, `not_found`, `quota_exceeded`, `too_large`, `unreachable`, `conflict`) and yields a translated message |
+| X.3 | Unit | Logger spy: the credential appears in **no** log line, exception message, or API response |
+| X.4 | Unit | SSRF guard rejects `http://127.0.0.1`, `http://169.254.169.254`, and a redirect to a private host |
+| X.5 | Unit | Runs with an **empty security context** (the cron shape) — proves invariant C1 and §3.4 execution identity |
+| X.6 | Unit | Token refresh (OAuth connectors only): valid refresh succeeds; expired refresh sets `reauth_required` rather than throwing |
+| X.7 | Feature | Disconnecting the connection pauses dependent Saved Tasks with a visible reason; the tick does not crash |
+| X.8 | Feature | Idempotency: re-delivering the same artifact dedupes or renames per the documented behaviour |
+| X.9 | Manual | Live verification against the real system, evidence pasted into the PR body (S5 test account) |
+| X.10 | Docs | `docs/CONNECTIONS.md` section exists, written for a non-technical admin |
 
 ### Sprint 0 — Observe
 
@@ -198,6 +227,10 @@ Ship docs **in the same PR as the behaviour**. English. No German in docs unless
 | `docs/MULTITASK_DATA_NODES.md` | 2 | Authored graphs may place data nodes; still read-only |
 | `docs/API` via OpenAPI | 1–4 | Controllers |
 | `docs/N8N.md` | 4 | **New.** Interface, not embed |
+| `docs/CONNECTIONS.md` | Phase F / K | **New.** One page per connector for a non-technical admin: what it does, what you need, how to connect, what leaves your server, how to disconnect |
+| `release4.0/07_file-sharing-destinations.md` | Phase F | Status update — Phase B (`DestinationProvider`) is implemented by this epic |
+| `synaplan-nextcloud` README | K10 | Synaplan can now push via WebDAV; state which direction to use when |
+| `synaplan-opencloud` README | K11 | Record the write-mechanism spike result |
 | `README.md` | 4 | Distinguish n8n-as-MCP-peer vs outbound webhook |
 | `docs/MIGRATIONS.md` | 1 | If new seeders/tables need a mention |
 | Frontend i18n | every | four locales |
@@ -212,11 +245,15 @@ Operator/platform (`synaplan-platform` `_devextras/SYSADMIN-help.md`): scheduler
 ## 7. PR template (copy into each sprint PR)
 
 ```markdown
-## Sprint
-Saved Task Workflows — Sprint N
+## Sprint / step
+Saved Task Workflows — Sprint N, step <ID from 09_work_breakdown.md>
 
 ## Decision checklist
 Master plan §0 rows still agreed: yes / deviations:
+
+## Connector readiness (if this PR touches a connector)
+07_connectors.md §7 per-connector checklist: all ticked / N/A
+Live verification evidence: …
 
 ## Compatibility invariants touched (master plan §7.0)
 C1 OIDC: … / C2 model change: … / C3 simple DAG: … / C4 platform crons: … / C5 API contracts: … / C6 widget+mobile: …
@@ -228,7 +265,9 @@ C1 OIDC: … / C2 model change: … / C3 simple DAG: … / C4 platform crons: �
 - [ ] Frontend lint + `check:types` + `make -C frontend test`
 - [ ] Characterization diff reviewed (or N/A)
 - [ ] Widget E2E or justification
-- [ ] i18n en/de/es/tr
+- [ ] i18n en/de/es/tr + parity gate green (§3.0.2)
+- [ ] Connector matrix §3.0.3 complete (or N/A)
+- [ ] DE string length + dark mode + V2 checked (or N/A)
 - [ ] generate-schemas (or N/A)
 - [ ] mobile-impact allow-list
 - [ ] Docs table in sprint file updated
@@ -248,4 +287,7 @@ Stop and update the sprint file with `WIP: blocked because …` if:
 - Planner prompt text is being parsed into boxes.
 - n8n is added as a Compose service.
 - Tests need the network.
+- A connector needs its own credential store, status widget, or delivery endpoint — a foundation (F1–F5) is missing.
+- A connector is being built without a live test account (checklist row S5).
+- The UI needs a fourth primary control on the Saved Task card — cut scope instead.
 - Two implementation attempts failed (AGENTS.md).
