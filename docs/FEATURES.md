@@ -26,6 +26,12 @@ Complex requests are decomposed into a plan instead of a single AI call:
 
 Configuration: [CONFIGURATION.md → Multi-Task Routing](CONFIGURATION.md#multi-task-routing-bconfig)
 
+## Saved Tasks
+
+Pin a Task Prompt as a **Saved Task** and run it on demand (and later on a schedule). Lives on **AI Instructions** — not a new product name. Behind `SAVEDTASKS / ENABLED` (off when no BCONFIG row exists; seeded on for new/local installs). The chat widget never runs Saved Tasks.
+
+Configuration: [CONFIGURATION.md → Saved Tasks](CONFIGURATION.md#saved-tasks-bconfig)
+
 ## RAG System
 
 Semantic document search and retrieval:

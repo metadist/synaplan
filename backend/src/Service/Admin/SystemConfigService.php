@@ -15,6 +15,7 @@ use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
 
@@ -118,6 +119,7 @@ final readonly class SystemConfigService
                 'label' => 'Routing',
                 'sections' => [
                     'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
+                    'saved_tasks' => ['label' => 'Saved Tasks', 'fields' => ['SAVEDTASKS_ENABLED']],
                     'conversation_summary' => ['label' => 'Rolling conversation summary', 'fields' => [
                         'CONVERSATION_SUMMARY_ENABLED',
                         'CONVERSATION_SUMMARY_TARGET_WINDOW_CHARS',
@@ -425,6 +427,29 @@ final readonly class SystemConfigService
         // Version20260706130000, but hand-set overrides can still exist). Drop
         // the acting admin's own override so the value they just set actually
         // applies to their own account immediately.
+        if (SavedTaskConfig::CONFIG_GROUP === $group
+            && SavedTaskConfig::KEY_ENABLED === $key
+            && null !== $actingUserId && $actingUserId > 0
+        ) {
+            try {
+                $removed = $this->configRepository->deleteValue(
+                    $actingUserId,
+                    SavedTaskConfig::CONFIG_GROUP,
+                    SavedTaskConfig::KEY_ENABLED,
+                );
+                $this->logger->info('SystemConfigService: cleared admin per-user saved-tasks override', [
+                    'userId' => $actingUserId,
+                    'removed' => $removed,
+                    'globalValue' => $value,
+                ]);
+            } catch (\Throwable $sideEffect) {
+                $this->logger->error('SystemConfigService: failed clearing per-user saved-tasks override', [
+                    'userId' => $actingUserId,
+                    'error' => $sideEffect->getMessage(),
+                ]);
+            }
+        }
+
         if (MultitaskRoutingConfig::CONFIG_GROUP === $group
             && MultitaskRoutingConfig::KEY_ROUTING_ENABLED === $key
             && null !== $actingUserId && $actingUserId > 0
@@ -822,6 +847,15 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
+            ],
+            'SAVEDTASKS_ENABLED' => [
+                'tab' => 'routing', 'section' => 'saved_tasks', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Allow users to pin a Task Prompt as a Saved Task and run it on demand or on a schedule. When OFF, AI Instructions stay unchanged and no Saved Task APIs or UI are exposed. Per-user BCONFIG row overrides the global row; code default is OFF when no row exists.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => SavedTaskConfig::CONFIG_GROUP,
+                'dbKey' => SavedTaskConfig::KEY_ENABLED,
             ],
             // === Routing — rolling conversation summary (database-backed) ===
             // BCONFIG group CONVERSATION_SUMMARY (ownerId=0), the rows

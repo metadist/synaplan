@@ -218,6 +218,18 @@ group in the `BCONFIG` table.
 ¹ Existing installations are grandfathered to `0` by migration so behavior
 doesn't change on upgrade — enable it per user or globally when ready.
 
+## Saved Tasks (BCONFIG)
+
+Pin a Task Prompt and run it on demand or on a schedule. Configured via
+**BCONFIG**, not environment variables. Admins manage the master switch in
+**Settings → Routing → Saved Tasks**. Resolution is per-user row → global row
+(`BOWNERID=0`) → built-in code default (`false`). The seeder inserts a global
+`1` for new and local-dev installs (insert-if-missing).
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `SAVEDTASKS / ENABLED` | `true` (new / local-dev installs); code default `false` | Master switch: Saved Task APIs and AI Instructions chrome. Widget chat never runs Saved Tasks. |
+
 ---
 
 ## Async Media Jobs (BCONFIG)

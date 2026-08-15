@@ -1,7 +1,7 @@
 # Saved Task Workflows — Status
 
 **Plan draft:** 2026-08-15 (third pass)
-**Implementation:** not started
+**Implementation:** in progress on `feat/saved-task-workflows` (checkpoint 3 = through E19; E17 platform cron skipped)
 **Code freeze:** none until **both** gates are signed off — the [decision checklist](./00_master_plan.md#0-decision-checklist-check-before-any-code) and the [connector sign-off](./07_connectors.md#7-sign-off-gate-tick-before-any-connector-code)
 
 ## Documents
