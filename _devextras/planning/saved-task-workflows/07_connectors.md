@@ -79,22 +79,27 @@ Direction is from Synaplan's perspective: **IN** = data enters a Saved Task; **O
 | K8 | Nextcloud app (pull) | IN | Admin API key | User pushes a file into Synaplan from NC | Unchanged; C10 is additive (row S10) |
 | K9 | OpenCloud extension (pull, read-only CS3) | IN | RFC 8693 token exchange | Summarize / translate / index an OC file | Unchanged; reuse its auth thinking for C11 |
 
-### Tier 1 — the connectors this epic requires
+### Tier 1 — the required set (locked 2026-08-15)
 
-Ordered by **value ÷ risk**. `PR≈` counts reviewable steps (see [`09_work_breakdown.md`](./09_work_breakdown.md)), not calendar time.
+The product owner fixed the required connectors on 2026-08-15: **calendar in/out (create entries and check for existing ones), Jira + Confluence (check tickets, create pages), Dropbox alongside the OpenCloud/Nextcloud/ownCloud file paths, SharePoint (scoped honestly), and mailbox checks over IMAP, POP and Office 365.** The table maps that list onto connector IDs. Ordered by **value ÷ risk**; `PR≈` counts reviewable steps ([`09_work_breakdown.md`](./09_work_breakdown.md)), not calendar time.
 
 | ID | Connector | Dir | Auth | Needs | PR≈ | Recommendation |
 | -- | --------- | --- | ---- | ----- | --- | -------------- |
 | **C10** | **Generic WebDAV write** | OUT | App password (Basic) | F1, F2, F4 | 3–4 | **Build first.** One adapter covers Nextcloud, ownCloud and any WebDAV server. No OAuth dependency |
-| **C1** | Nextcloud folder | OUT | via C10 | C10 | 0–1 | A preset of C10 (`https://host/remote.php/dav/files/{user}/`). Keep the `Synaplan/<Kind>/` layout the NC app already uses |
+| **C1** | Nextcloud / ownCloud folder | OUT | via C10 | C10 | 0–1 | Presets of C10 (`https://host/remote.php/dav/files/{user}/`). Keep the `Synaplan/<Kind>/` layout the NC app already uses |
 | **C11** | **OpenCloud / OCIS folder** | OUT | **Open — see S11** | C10 or CS3, F1–F2 | 2–4 | Strategically the most important (sovereignty stack). **Do a spike before committing**: does the target OCIS expose WebDAV with an app token (`auth-app`), or must we use CS3 upload / token exchange? Decide in the spike, not in the plan |
+| **C12** | **CalDAV calendar (read + write)** | IN/OUT | App password (Basic) | C10 client, F1–F2; write needs S6 | 2–3 | The sovereign calendar: Nextcloud/ownCloud expose CalDAV under the same `remote.php/dav` endpoint and the same app password as WebDAV. **Read is required, not optional** — "does this entry already exist?" is what makes scheduled calendar tasks idempotent (S13). ⚠️ OpenCloud/OCIS ships no CalDAV server as far as we can tell — verify in the C11 spike; "calendar in OpenCloud" may have no target |
 | **C3** | Microsoft 365 mail | IN | **OAuth2 (Graph)** | F1–F3 | 5–7 | Required for the flagship story on O365 tenants. Basic auth is dead — no shortcut exists |
-| **C4** | Microsoft 365 calendar (real events) | OUT | **OAuth2 (Graph)**, mutating | F1–F3, S6 | 3–4 | The honest upgrade over `.ics`. Ship only after C3 proves the OAuth plumbing |
-| **C5** | OneDrive / SharePoint folder | OUT | **OAuth2 (Graph)** | F1–F4, C3 | 2–3 | Nearly free once C3 + F4 exist |
-| **C6** | Google Workspace (Gmail IN, Drive/Calendar OUT) | IN/OUT | OAuth2 | F1–F3 | 4–6 | Gmail IMAP already works with app passwords (K3). Drive/Calendar need OAuth. **Defer unless a customer asks** |
-| **C7** | Jira (read issues / create issue) | IN/OUT | API token or OAuth | F1, F2; write needs S6 | 2 via MCP / 5+ native | **Prefer MCP** |
-| **C8** | Confluence (read pages / create page) | IN/OUT | API token or OAuth | as C7 | 2 via MCP / 5+ | As C7 |
+| **C4** | Microsoft 365 calendar (**read + write**) | IN/OUT | **OAuth2 (Graph)**, write mutating | F1–F3, S6 | 3–4 | The honest upgrade over `.ics`. Read (`Calendars.Read`) does the duplicate check; write creates events. Ship only after C3 proves the OAuth plumbing |
+| **C5** | OneDrive / **SharePoint Online** document-library folder | OUT | **OAuth2 (Graph)** | F1–F4, C3 | 2–3 | Nearly free once C3 + F4 exist — same Graph drive API. **Honest scope (S14):** file drop into a document library only; no lists, pages or metadata columns; `Sites.Selected` means a tenant admin grants access per site, so setup involves the customer's IT. On-prem SharePoint is a hard no |
+| **C13** | **Dropbox folder** | OUT | **OAuth2 (Dropbox API)** | F1–F4 | 2–3 | **Not WebDAV** — Dropbox has no WebDAV endpoint; needs its own OAuth app (incl. Dropbox production approval) and API client (`/files/upload`). US cloud → sovereignty label (S7). One more `DestinationProvider`, no new UI |
+| **C7** | Jira (check tickets / create issue) | IN/OUT | API token or OAuth | F1, F2; write needs S6 | 2 via MCP / 5+ native | **Prefer MCP** |
+| **C8** | Confluence (read / create pages) | IN/OUT | API token or OAuth | as C7 | 2 via MCP / 5+ | As C7 |
 | **C9** | Generic outbound webhook | OUT | Shared secret + HMAC | F1 | 2 | Already scoped in Sprint 4. Covers n8n / Make / anything |
+
+**Mailbox coverage note:** IMAP and POP3 are shipped (K3); Office 365 mail is C3. Together they cover the required "email checks in imap, pop and Office365" — nothing further is needed for mail IN.
+
+**Critical-path consequence:** O365 mail (C3), O365 calendar (C4), SharePoint (C5) and Dropbox (C13) all sit behind the OAuth2 framework — **F3 is now on the critical path of the required set**, no longer a "later" item. The no-OAuth half (K3, C10/C1, C11, C12) ships first and completes the sovereign story on its own.
 
 ### Tier 2 — explicitly not building
 
@@ -102,8 +107,21 @@ Ordered by **value ÷ risk**. `PR≈` counts reviewable steps (see [`09_work_bre
 | ------------ | ------- |
 | Bespoke CRM / ticketing / wiki clients (Salesforce, HubSpot, ServiceNow, Notion, …) | MCP connection (C7/C8 pattern) or outbound webhook (C9) |
 | Slack / Teams / Telegram channels | Outbound webhook, or an existing channel |
-| Dropbox / Box / S3 | WebDAV where supported, else webhook. Revisit on demand |
+| Google Workspace (Gmail OAuth, Drive, Google Calendar) | Deferred (S9) — Gmail works today via IMAP app password |
+| Box / S3 / other file clouds beyond Dropbox | WebDAV where supported, else webhook. Revisit on demand |
+| SharePoint lists, pages, metadata columns; on-prem SharePoint | Out of scope permanently (S14) — file drop only |
 | An n8n runtime | Interface only — [master plan §4](./00_master_plan.md#4-n8n-embed-vs-interface) |
+
+### 3.1 Why the core output channels are ours, not n8n's (decided 2026-08-15)
+
+The question "could n8n deliver the outputs instead of us building connectors?" was asked and answered: **no for the core, yes for the long tail.** Recorded here so it is not relitigated per connector.
+
+1. **Someone has to run n8n.** Self-hosters mostly don't, and Synaplan Cloud cannot operate it for customers (Sustainable Use License — the same reason embedding was rejected). Delegating outputs to n8n means every customer installs a second product before their first Saved Task can file a result. That breaks the flagship story and the `synaplan.eu` sovereignty promise: *mail in → result in your own cloud, out of the box*.
+2. **The failure contract dies at the webhook boundary.** Auto-pause, the translated failure vocabulary, "Reconnect needed" — all require Synaplan to *see* the delivery fail. Behind an n8n webhook, the Runs list reports "delivered, 200 OK" while the file never arrived. The five-questions contract ([`08_ux_and_i18n.md` §1](./08_ux_and_i18n.md#1-the-five-questions-every-screen-must-answer)) becomes unanswerable.
+3. **Security invariants leave our control.** Confirm-then-automate, `allow_unattended`, the credential vault, sovereignty labels, per-call audit — none reach into an n8n workflow, and the destination credentials would live in n8n's store where we cannot mask, rotate, pause or label them.
+4. **The saving is small.** The core list is deliberately tiny (one WebDAV client covers three clouds; email and share link exist). The expensive piece — M365 OAuth — stays expensive either way; n8n only moves the Azure consent problem into a product we do not control.
+
+**Consequences:** connectors we ship = the ones carrying the product promise (folders in the sovereign clouds, mail, calendar, webhook). n8n via C9 = the thousand integrations we will never build. An n8n recipe ("poll O365, POST into the Saved Task webhook trigger") is a legitimate **documented stopgap** until C3 lands — one docs page, zero code, clearly labelled as interim.
 
 ---
 
@@ -176,7 +194,28 @@ Three candidate mechanisms, to be decided by the spike:
 - **Blocker for writes:** needs an `mcp_action` capability (planner-invisible, authored-graph only), confirmation on interactive runs, `allow_unattended` for scheduled runs, and a per-call audit record.
 - **Test plan:** the existing fixture MCP server gains a fake `create_issue`; assert confirmation is enforced and that the planner never emits the mutating capability.
 
-### 4.6 K1 / K2 — Office formats (shipped, still need task-level tests)
+### 4.6 C12 — CalDAV calendar read + write (the sovereign calendar)
+
+- **Direction:** IN (query existing events) + OUT (create events, mutating).
+- **Auth:** HTTP Basic with the **same app password** as C10 — Nextcloud/ownCloud serve CalDAV under `remote.php/dav/calendars/{username}/{calendar}/`. One connection can carry both the file and the calendar capability.
+- **Read (required for correctness, not a feature):** before creating an event, the runner queries the target calendar for the time window (`REPORT` `calendar-query` with a time-range filter) and skips or updates duplicates. Without this, a scheduled task creates the same meeting on every run — the definition of an untrustworthy agent (S13).
+- **Write:** `PUT` of a VEVENT (we already generate RFC 5545 via `CalendarEventService` — reuse it; the `.ics` output path stays as the no-connection fallback). Mutating → confirmation on interactive runs, `allow_unattended` for schedules, audit record.
+- **Dedup key:** deterministic `UID` derived from task id + source message id, so re-delivery is idempotent by construction, with the time-range query as the safety net.
+- **Failure modes:** shared vocabulary — `unauthorized`, `not_found` (calendar deleted), `unreachable`, `conflict` (UID exists → treated as success/update).
+- **OpenCloud caveat:** OCIS has no CalDAV server to our knowledge. Verify during the C11 spike; if confirmed, the UI simply never offers a calendar for OpenCloud connections — do not fake it.
+- **Test plan:** unit against a fake CalDAV client (query/put/each error); fixture round-trip (create → query finds it → re-run skips); **manual against a live Nextcloud calendar**; negative: deleted calendar, revoked app password, duplicate UID.
+
+### 4.7 C13 — Dropbox folder (OAuth family, not WebDAV)
+
+- **Direction:** OUT. One more `DestinationProvider`; no bespoke UI.
+- **Auth:** OAuth2 authorization code + PKCE against Dropbox; scoped app (`files.content.write`), refresh token in the F2 vault. **Dropbox has no WebDAV endpoint — do not try to route it through C10.**
+- **App registration:** a Dropbox app must pass Dropbox's production approval before non-team users can connect; self-hosters register their own app (same documented-path rule as S3).
+- **Endpoints:** `POST /2/files/upload` (≤150 MB single call; chunked upload sessions above that — enforce our per-run byte cap below 150 MB in v1 and skip the session API), conflict policy via `autorename`.
+- **Failure modes:** shared vocabulary; 401/invalid refresh → `reauth_required`; 507-equivalent (`insufficient_space`) → `quota_exceeded`; 429 with `Retry-After` honoured.
+- **Sovereignty:** US cloud — labelled in the connection UI (S7).
+- **Test plan:** unit with fake client incl. token refresh; **manual against a live Dropbox account**; negative: revoked app access mid-schedule.
+
+### 4.8 K1 / K2 — Office formats (shipped, still need task-level tests)
 
 - **In:** Tika extracts PPTX/XLSX/DOCX. Verify inside a *scheduled* run (no HTTP request context) and with a large deck/sheet; document size and timeout limits, and what the user sees when extraction fails or returns junk.
 - **Out:** `DocumentGeneratorService` writes real OOXML. Add a test asserting each generated binary is a valid archive with the expected content type — a corrupt PPTX that only fails inside PowerPoint is a support nightmare.
@@ -224,10 +263,16 @@ Phase F  F0 -> F1 F2 -> F4 -> F5              (seams, one UI pattern, vault)
               |
 Engine        +-> E1 E2 -> E3 -> E4 -> E5      (Run now; may start once F2 lands)
                                     |
-Connectors                          +-> C10 (C1) -> C11 spike -> F3 -> C3 -> C4/C5 -> C7/C8
-                                              ^                        ^
-                              Sprint 2's action palette      "Office 365" claim
-                              becomes useful here            becomes truthful here
+No-OAuth                            +-> C10 (C1) -> C12 CalDAV -> C11 spike
+connectors                                    ^
+                              Sprint 2's action palette becomes useful here;
+                              sovereign story (files + calendar) complete
+                                              |
+OAuth family                                  +-> F3 -> C3 -> C4 -> C5 / C13
+(required set)                                           ^
+                                             "Office 365" claim becomes truthful
+                                                          |
+Long tail                                                 +-> C7/C8 (MCP), C9
 ```
 
 Sprint 0 (observe) is unaffected and can run at any time — it touches no connectors.
@@ -260,21 +305,24 @@ Product and engineering both sign. An unticked row blocks its connector, not the
 | S10 | **The existing Nextcloud app and OpenCloud extension keep working unchanged.** Push (C10/C11) is additive; we do not migrate or deprecate the pull paths in this epic | Agree | ☐ |
 | S11 | **OpenCloud write mechanism is decided by a timeboxed spike (§4.3), not by this plan.** If the spike lands on token exchange, the follow-up question *"may Synaplan hold a long-lived credential that acts as the user?"* is a **security decision requiring explicit approval** — server-side refresh tokens and Keycloak impersonation both widen the blast radius of a Synaplan compromise | Spike first, approve separately | ☐ |
 | S12 | **Every connector failure is expressed in the shared vocabulary** (§5 rule 3) so a new provider adds no new translation keys | Agree | ☐ |
+| S13 | **Calendar connectors must read before they write.** "Does this entry already exist?" is a correctness requirement for scheduled runs (idempotency), enforced by a deterministic event `UID` plus a time-range query. A calendar connector that can only create is not accepted | **Decided 2026-08-15 with the required set** | ✅ |
+| S14 | **SharePoint scope is fixed**: SharePoint **Online** document-library file drop via Graph only. No lists, no pages, no metadata columns, no on-prem SharePoint — ever in this epic. Setup requires a tenant admin (`Sites.Selected` per-site grant) and the docs say so up front | **Decided 2026-08-15** | ✅ |
+| S15 | **Dropbox is a required connector** (own OAuth app + API client, not WebDAV), US-cloud labelled per S7; self-hosters register their own Dropbox app | **Decided 2026-08-15 with the required set** | ✅ |
 
 ### Per-connector readiness (repeat before each connector's first PR)
 
-| Check | C10 | C11 | C3 | C4 | C7/C8 |
-| ----- | --- | --- | -- | -- | ----- |
-| Detail sheet (§4.1) completed and reviewed | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Auth model + exact scopes agreed | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Live test account available, owner named | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Rate limits + timeout + retry policy written down | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Every failure mode maps to the shared vocabulary, translated ×4 | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Unattended behaviour defined (refresh / reauth / auto-pause) | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Privacy note written (what content leaves, to where) | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Disconnect / rollback behaviour defined | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Test plan covers unit + fixture + live-manual + negative | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Docs section drafted (`docs/CONNECTIONS.md`) | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Check | C10 | C11 | C12 | C3 | C4 | C5 | C13 | C7/C8 |
+| ----- | --- | --- | --- | -- | -- | -- | --- | ----- |
+| Detail sheet (§4.1) completed and reviewed | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Auth model + exact scopes agreed | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Live test account available, owner named | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Rate limits + timeout + retry policy written down | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Every failure mode maps to the shared vocabulary, translated ×4 | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Unattended behaviour defined (refresh / reauth / auto-pause) | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Privacy note written (what content leaves, to where) | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Disconnect / rollback behaviour defined | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Test plan covers unit + fixture + live-manual + negative | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Docs section drafted (`docs/CONNECTIONS.md`) | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 
 ---
 

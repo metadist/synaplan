@@ -30,13 +30,15 @@
 - **Jira/Confluence via MCP**, not bespoke clients.
 - **Sequencing is foundations-first, not parallel** (decided 2026-08-15, row S1) — the engine waits on the seams rather than building against a destination that does not exist.
 - **Microsoft 365 uses a Synaplan Cloud multi-tenant app registration; self-hosters register their own** (decided 2026-08-15, row S3) — the self-host path must be documented and fully supported, not a fallback.
+- **Core output channels are shipped connectors, not n8n workflows** (decided 2026-08-15, [`07_connectors.md` §3.1](./07_connectors.md#31-why-the-core-output-channels-are-ours-not-n8ns-decided-2026-08-15)) — n8n stays the long-tail escape hatch via the outbound webhook, plus a documented interim recipe for O365 mail until C3 exists.
+- **The required connector set is locked** (2026-08-15, Tier 1 in [`07_connectors.md` §3](./07_connectors.md#3-connector-inventory)): calendar **read + write** (CalDAV for Nextcloud/ownCloud, Graph for O365 — read is mandatory for duplicate-safe scheduled runs, S13); Jira + Confluence via MCP; files out to Nextcloud/ownCloud/OpenCloud (WebDAV / spike) **plus Dropbox** (own OAuth API, S15) and **SharePoint Online scoped to document-library file drop only** (S14, tenant-admin setup, no on-prem); mail in via IMAP + POP (shipped) + O365 Graph. Consequence: **F3 (OAuth2 framework) is on the critical path** — the no-OAuth half ships first and completes the sovereign story on its own.
 
 ## Open decisions blocking implementation
 
 | Ref | Question |
 | --- | -------- |
 | 07 S3 | Named owner for the Cloud multi-tenant app registration — admin-consent conversation and credential rotation (the model itself is decided) |
-| 07 S5 | Who provides the live Nextcloud, OpenCloud, M365 and Atlassian test accounts? |
+| 07 S5 | Who provides the live Nextcloud (files + calendar), OpenCloud, M365, Atlassian and Dropbox test accounts? |
 | 07 S11 | OpenCloud write mechanism — WebDAV app token, CS3 upload, or reversed token exchange? Needs a spike, then a **separate security approval** if it implies Synaplan holding a long-lived credential that acts as the user |
 | 08 L1 | Named native-speaker reviewers for DE, ES, TR |
 | 00 row 9 | Schema ask before the first migration lands |
@@ -52,3 +54,5 @@
 3. **Jira/Confluence writes are blocked by the read-only MCP policy**, not by effort — routed through MCP with an explicit mutating-action decision (S6).
 
 Added [`07_connectors.md`](./07_connectors.md) (inventory, five foundations, per-connector detail sheets, 12 strategic sign-off rows, per-connector readiness checklist, connector testing rules), [`08_ux_and_i18n.md`](./08_ux_and_i18n.md) (five questions every screen answers, canonical terminology in four locales, banned-jargon list, task-card states, shared failure vocabulary, locale-parity CI gate, six comprehension checks) and [`09_work_breakdown.md`](./09_work_breakdown.md) (step-size rules, ~50 PR-sized steps with dependencies and acceptance criteria, merge order, three release checkpoints). Master plan gained checklist rows 13–16; the testing doc gained the i18n parity gate (§3.0.2) and the connector test matrix (§3.0.3).
+
+**2026-08-15 (fourth pass — required set locked):** product owner fixed the final connector list. New connectors: **C12 CalDAV calendar read+write** (calendar *read* is now a correctness requirement — deterministic event `UID` + time-range query make scheduled calendar tasks duplicate-safe, sign-off S13; OpenCloud likely has no CalDAV target, to be verified in the C11 spike), **C13 Dropbox** (own OAuth API, not WebDAV, S15). **C4 (M365 calendar) extended to read+write.** **C5 SharePoint scope fixed** to Online document-library file drop with tenant-admin setup; lists/pages/on-prem permanently out (S14). Google Workspace stays deferred; Tier 2 updated accordingly. Work breakdown gained K12a–d, K13a–b, K4a/K4b split, K5a, and release checkpoints 4 (sovereign files + calendar, no OAuth) and 5 (the OAuth family as its own epic — F3 is now on the critical path of the required set).

@@ -142,14 +142,22 @@ Each connector runs its readiness checklist ([`07_connectors.md` §7](./07_conne
 | **K10b** | `WebDavDestinationProvider` + `webdav` connection type | BE | M | K10a, F4a, F1a | Maps every error onto the shared vocabulary (F4d); per-run file/byte caps enforced |
 | **K10c** | Connections UI for WebDAV + **Nextcloud preset** | FE | M | K10b, F1c | Preset fills the DAV path from a base URL; test-connection round-trip; four locales |
 | **K10d** | Live verification against a real Nextcloud + `docs/CONNECTIONS.md` page | Docs+QA | S | K10c | Evidence in the PR; conflict/quota/permission cases exercised manually |
-| **K11a** | **OpenCloud write spike** (timeboxed): decide WebDAV+app-token vs CS3 upload vs reversed token exchange | Spike | M | K10a | One page in [`07_connectors.md` §4.3](./07_connectors.md#43-c11--opencloud--ocis-write-spike-before-committing) recording endpoint, auth artefact and lifetime, verified against a live instance |
+| **K11a** | **OpenCloud write spike** (timeboxed): decide WebDAV+app-token vs CS3 upload vs reversed token exchange; **also verify whether OCIS offers any CalDAV target** | Spike | M | K10a | One page in [`07_connectors.md` §4.3](./07_connectors.md#43-c11--opencloud--ocis-write-spike-before-committing) recording endpoint, auth artefact and lifetime, verified against a live instance |
 | **K11b** | OpenCloud destination provider per the spike result | BE | M | K11a | Plugs into F4 as one more provider; no bespoke UI |
 | **K11c** | OpenCloud connection UI + docs (+ note in the `synaplan-opencloud` README) | FE+Docs | S | K11b | Sovereignty note shown (S7); four locales |
+| **K12a** | CalDAV client (pure class: `REPORT` calendar-query with time-range, `PUT` VEVENT), no wiring | BE | M | K10a | Fake-client unit tests incl. every error code; reuses `CalendarEventService` for VEVENT generation; deterministic `UID` from task id + source message id |
+| **K12b** | Calendar read step (`calendar_query`) + duplicate check in the runner | BE | M | K12a | Re-running the same task does **not** create a duplicate event (fixture round-trip: create → query finds it → skip); read-only, planner-visible per data-node contract |
+| **K12c** | Calendar write via CalDAV as a mutating action (`.ics` stays the no-connection fallback) | BE | M | K12b, S6 | Confirmation on interactive runs; `allow_unattended` on schedules; audit record; `conflict` (existing UID) treated as success |
+| **K12d** | Calendar connection UI (reuses the WebDAV connection; calendar picker) + docs | FE+Docs | S | K12c, F1c | Test-connection lists calendars; four locales; not offered on connections without CalDAV (OpenCloud caveat) |
 | **K3a** | OAuth2 framework: client, PKCE, token storage in the vault, **refresh without a session** | BE | L → split | F2a | Split into: consent flow / token store / refresh-in-cron. Expired-refresh sets `reauth_required` |
 | **K3b** | Microsoft Graph client + `Mail.Read` | BE | M | K3a | Fake-Graph unit tests; 429 + `Retry-After` honoured |
 | **K3c** | M365 mailbox as a connection + trigger source | BE+FE | M | K3b, F1c | Live-tenant verification; consent-revoked path auto-pauses with a readable reason |
-| **K4a** | Graph calendar write (mutating) | BE | M | K3b, S6 | Confirmation on interactive runs; `allow_unattended` required for scheduled; audit record per call |
-| **K7a** | Jira/Confluence via MCP connection (read) | BE+FE | S | F1c | No new credential type; documented recipe |
+| **K4a** | Graph calendar **read** (`Calendars.Read`) + the same duplicate check as K12b | BE | M | K3b | Shares the dedup logic with K12b (one implementation, two backends) |
+| **K4b** | Graph calendar **write** (mutating) | BE | M | K4a, S6 | Confirmation on interactive runs; `allow_unattended` required for scheduled; audit record per call |
+| **K5a** | OneDrive / SharePoint Online document-library drop (Graph drive API) | BE+FE | M | K3b, F4a | Scope per S14: file drop only; `Sites.Selected` admin-grant path documented; live-tenant verification |
+| **K13a** | Dropbox OAuth app + API client (`/files/upload`, ≤150 MB, `autorename`) | BE | M | K3a, F4a | Fake-client unit tests incl. refresh + 429 `Retry-After`; per-run byte cap below the chunked-session threshold |
+| **K13b** | Dropbox connection UI + docs (US-cloud label per S7) | FE+Docs | S | K13a, F1c | Live-account verification; self-host app-registration path documented |
+| **K7a** | Jira/Confluence via MCP connection (read: check tickets / read pages) | BE+FE | S | F1c | No new credential type; documented recipe |
 | **K7b** | `mcp_action` mutating capability (planner-invisible) | BE | M | S6 | A test asserts the planner never emits it; confirmation enforced |
 
 ---
@@ -171,18 +179,22 @@ E6 ─ E7 ─ E8 ─ E9 ─ E10 ─ E11 ─ E12 ──────────�
                                               │
 E13 ─ E14 ─ E15 ─ E16 ─ E17 ─ E18 ─ E19 ──────┤                (schedules)
                                               │
+                                    K12a ─ K12b ─ K12c ─ K12d  (CalDAV calendar, no OAuth)
                                     K11a ─ K11b ─ K11c         (OpenCloud)
-                                    K3a ─ K3b ─ K3c ─ K4a      (Microsoft 365)
+                                    K3a ─ K3b ─ K3c            (M365 mail — needs F3)
+                                            ├─ K4a ─ K4b       (M365 calendar read+write)
+                                            ├─ K5a              (OneDrive/SharePoint drop)
+                                            └─ K13a ─ K13b      (Dropbox — needs F3)
                                     E20 ─ E21 / E22 ─ E23 ─ E24
 ```
 
-**Three natural release checkpoints:**
+**Release checkpoints:**
 
 1. **After E5d** — "Run this instruction on demand, results in its own conversation." Shippable behind the flag; no new connectors.
 2. **After K10d** — "…and file the result in my Nextcloud." The first genuinely new capability for users.
 3. **After E19** — "…every weekday at 07:00, and tell me when it breaks." The core agent feature is complete.
-
-Microsoft 365 (K3/K4) is a fourth checkpoint and should be planned as its own epic once F3 exists; it is the single largest remaining unknown.
+4. **After K12d** — "…and put the meetings in my Nextcloud calendar, without duplicates." The sovereign story (files + calendar) is complete with **no OAuth anywhere**.
+5. **The OAuth family (F3 → K3, K4, K5a, K13) is its own epic** — M365 mail/calendar, SharePoint drop and Dropbox all unlock together once F3 exists. It is the single largest remaining unknown; plan it after checkpoint 4.
 
 ---
 
