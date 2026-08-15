@@ -6,6 +6,7 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
+use App\Entity\Prompt;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\NodeContext;
@@ -14,6 +15,7 @@ use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use Psr\Log\LoggerInterface;
 
@@ -25,16 +27,16 @@ use Psr\Log\LoggerInterface;
  * principle: the planner picks the task, the model resolution stays here. It
  * runs the transform through AiFacade::chat on the upstream text input.
  *
+ * `chat` nodes honour `params.topic_id` the same way ChatHandler binds a
+ * Task Prompt: the topic's system text is used, and PromptMeta.aiModel pins
+ * the model when the user did not pick one for the turn. Missing or unknown
+ * topics fall back to the generic assistant prompt — they never fail the node.
+ *
  * `rag_query` nodes additionally retrieve knowledge-base context through the
  * same {@see VectorSearchService} the legacy ChatHandler uses (user-selected
  * `rag_group_key` scope when present, whole knowledge base otherwise) and
  * inject it into the system prompt. Retrieval failure degrades to a plain
  * answer — never fails the node.
- *
- * NOTE (Sprint 3b): a multi-node `chat` node uses a generic system prompt. Full
- * custom-topic (params.topic_id → PromptMeta) binding for INTERMEDIATE nodes is
- * a later refinement; single-node custom topics already work via the Sprint 2
- * path.
  */
 final readonly class ChatRunner implements TaskRunner
 {
@@ -43,6 +45,7 @@ final readonly class ChatRunner implements TaskRunner
         private ModelConfigService $modelConfigService,
         private VectorSearchService $vectorSearchService,
         private KnowledgeContextFormatter $knowledgeContextFormatter,
+        private PromptService $promptService,
         private LoggerInterface $logger,
     ) {
     }
@@ -75,12 +78,13 @@ final readonly class ChatRunner implements TaskRunner
         }
 
         $language = is_string($context->classification['language'] ?? null) ? $context->classification['language'] : ($context->message->getLanguage() ?: 'en');
+        $topicBinding = $this->resolveTopicBinding($node, $context, $language);
         $capabilityTag = Capability::Summarize === $node->capability ? 'SUMMARIZE' : 'CHAT';
-        $modelId = $this->resolveModelId($capabilityTag, $context);
+        $modelId = $this->resolveModelId($capabilityTag, $context, $topicBinding['modelId']);
         $provider = $modelId ? $this->modelConfigService->getProviderForModel($modelId) : null;
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
-        $systemPrompt = $this->systemPrompt($node, $language, $context);
+        $systemPrompt = $this->systemPrompt($node, $language, $context, $topicBinding['systemPrompt']);
         $ragChunks = 0;
         if (Capability::RagQuery === $node->capability) {
             $ragContext = $this->ragContext($text, $context, $ragChunks);
@@ -156,7 +160,7 @@ final readonly class ChatRunner implements TaskRunner
      * default instead of surfacing an error. Mirror the legacy chain here so the
      * behaviour is identical regardless of which path the classifier picks.
      */
-    private function resolveModelId(string $capabilityTag, NodeContext $context): ?int
+    private function resolveModelId(string $capabilityTag, NodeContext $context, ?int $topicModelId = null): ?int
     {
         $selected = $context->classification['model_id'] ?? null;
         if (is_numeric($selected) && (int) $selected > 0) {
@@ -168,8 +172,53 @@ final readonly class ChatRunner implements TaskRunner
             return (int) $override;
         }
 
+        if (null !== $topicModelId && $topicModelId > 0) {
+            return $topicModelId;
+        }
+
         return $this->modelConfigService->getDefaultModel($capabilityTag, $context->userId)
             ?? $this->modelConfigService->getDefaultModel('CHAT', $context->userId);
+    }
+
+    /**
+     * @return array{systemPrompt: ?string, modelId: ?int}
+     */
+    private function resolveTopicBinding(TaskNode $node, NodeContext $context, string $language): array
+    {
+        if (Capability::Chat !== $node->capability) {
+            return ['systemPrompt' => null, 'modelId' => null];
+        }
+
+        $topicId = $node->params['topic_id'] ?? null;
+        if (!is_string($topicId) || '' === trim($topicId)) {
+            return ['systemPrompt' => null, 'modelId' => null];
+        }
+
+        $userId = $context->userId ?? 0;
+        try {
+            $promptData = $this->promptService->getPromptWithMetadata(trim($topicId), $userId, $language);
+        } catch (\Throwable $e) {
+            $this->logger->warning('ChatRunner: topic binding failed, using generic prompt', [
+                'topic_id' => $topicId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['systemPrompt' => null, 'modelId' => null];
+        }
+
+        if (null === $promptData) {
+            return ['systemPrompt' => null, 'modelId' => null];
+        }
+
+        $prompt = $promptData['prompt'] ?? null;
+        $text = $prompt instanceof Prompt ? trim($prompt->getPrompt()) : '';
+        $metadata = is_array($promptData['metadata'] ?? null) ? $promptData['metadata'] : [];
+        $pinned = isset($metadata['aiModel']) && is_numeric($metadata['aiModel']) ? (int) $metadata['aiModel'] : null;
+
+        return [
+            'systemPrompt' => '' !== $text ? $text : null,
+            'modelId' => (null !== $pinned && $pinned > 0) ? $pinned : null,
+        ];
     }
 
     /**
@@ -217,8 +266,12 @@ final readonly class ChatRunner implements TaskRunner
         return $this->knowledgeContextFormatter->formatRagContext($results);
     }
 
-    private function systemPrompt(TaskNode $node, string $language, NodeContext $context): string
+    private function systemPrompt(TaskNode $node, string $language, NodeContext $context, ?string $topicPrompt = null): string
     {
+        if (null !== $topicPrompt && '' !== $topicPrompt) {
+            return $topicPrompt.$this->pipelineDirective($context);
+        }
+
         $base = match ($node->capability) {
             Capability::Summarize => sprintf(
                 'You are a precise summarizer. Summarize the user text concisely%s in language "%s". Return ONLY the summary, no preamble.',
