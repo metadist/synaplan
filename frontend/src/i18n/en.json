@@ -1769,7 +1769,8 @@
         "too_large": "The file is larger than {connection} accepts.",
         "unreachable": "{connection} could not be reached. Synaplan will try again at the next run.",
         "conflict": "A file with that name already exists; saved as {newName} instead.",
-        "rate_limited": "Your usage limit was reached, so this run was skipped."
+        "rate_limited": "Your usage limit was reached, so this run was skipped.",
+        "unsupported": "This file type cannot be delivered to {connection}."
       },
       "explainer": "Connect a system once here. Saved tasks and the AI can then use it — for example to read your latest Outlook mail. Your password is never stored: Microsoft 365 asks you to sign in and gives Synaplan a token you can revoke at any time.",
       "yourConnections": "Your connections",
@@ -1809,6 +1810,29 @@
           "name": "Connected system (MCP)",
           "description": "Give the AI tools from an external MCP server, such as a ticket system or your own service.",
           "action": "Add system"
+        },
+        "dav": {
+          "name": "Nextcloud folder & calendar (WebDAV)",
+          "description": "Save task results into your cloud folder and put meetings into your calendar. Works with Nextcloud, ownCloud and any WebDAV server.",
+          "hosting": "Connects to a server you choose — your files stay on your own cloud.",
+          "action": "Connect",
+          "kind": {
+            "nextcloud": "Nextcloud / ownCloud",
+            "webdav": "Other WebDAV address"
+          },
+          "serverUrl": "Server address",
+          "davUrl": "WebDAV address (full URL)",
+          "username": "Username",
+          "appPassword": "App password",
+          "appPasswordHint": "Create one in Nextcloud under Settings → Security → Devices & sessions. Your account password is never stored.",
+          "folder": "Folder for results",
+          "withCalendar": "Also connect a calendar:",
+          "connect": "Connect",
+          "connecting": "Connecting…",
+          "created": "{name} is connected.",
+          "createFailed": "The connection could not be created. Check the address and try again.",
+          "folderName": "{host} folder ({user})",
+          "calendarName": "{host} calendar ({calendar})"
         }
       }
     },

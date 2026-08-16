@@ -2340,7 +2340,8 @@
         "too_large": "Dosya, {connection} kabul ettiğinden daha büyük.",
         "unreachable": "{connection} ulaşılabilir değil. Synaplan bir sonraki çalışmada yeniden deneyecek.",
         "conflict": "Bu adda bir dosya zaten var; {newName} olarak kaydedildi.",
-        "rate_limited": "Kullanım sınırına ulaşıldı, bu çalışma atlandı."
+        "rate_limited": "Kullanım sınırına ulaşıldı, bu çalışma atlandı.",
+        "unsupported": "Bu dosya türü {connection} hedefine aktarılamaz."
       },
       "explainer": "Bir sistemi burada bir kez bağla. Kaydedilmiş görevler ve yapay zekâ sonrasında onu kullanabilir; örneğin en son Outlook postalarını okuyabilir. Parolan hiçbir zaman saklanmaz: Microsoft 365 oturum açmanı ister ve Synaplan’a istediğin an geri alabileceğin bir belirteç verir.",
       "yourConnections": "Bağlantıların",
@@ -2380,6 +2381,29 @@
           "name": "Bağlı sistem (MCP)",
           "description": "Yapay zekâya harici bir MCP sunucusundan araçlar ver; örneğin bir talep sistemi veya kendi servisin.",
           "action": "Sistem ekle"
+        },
+        "dav": {
+          "name": "Nextcloud klasörü ve takvimi (WebDAV)",
+          "description": "Görev sonuçlarını bulut klasörüne kaydeder ve toplantıları takvimine ekler. Nextcloud, ownCloud ve tüm WebDAV sunucularıyla çalışır.",
+          "hosting": "Seçtiğin bir sunucuya bağlanır — dosyaların kendi bulutunda kalır.",
+          "action": "Bağlan",
+          "kind": {
+            "nextcloud": "Nextcloud / ownCloud",
+            "webdav": "Başka bir WebDAV adresi"
+          },
+          "serverUrl": "Sunucu adresi",
+          "davUrl": "WebDAV adresi (tam URL)",
+          "username": "Kullanıcı adı",
+          "appPassword": "Uygulama parolası",
+          "appPasswordHint": "Nextcloud'da Ayarlar → Güvenlik → Cihazlar ve oturumlar altında oluştur. Hesap parolan asla saklanmaz.",
+          "folder": "Sonuçlar için klasör",
+          "withCalendar": "Bir takvimi de bağla:",
+          "connect": "Bağlan",
+          "connecting": "Bağlanıyor…",
+          "created": "{name} bağlandı.",
+          "createFailed": "Bağlantı oluşturulamadı. Adresi kontrol edip yeniden dene.",
+          "folderName": "{host} klasörü ({user})",
+          "calendarName": "{host} takvimi ({calendar})"
         }
       }
     },

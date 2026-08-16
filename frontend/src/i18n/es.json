@@ -2339,7 +2339,8 @@
         "too_large": "El archivo es más grande de lo que {connection} acepta.",
         "unreachable": "No se pudo alcanzar {connection}. Synaplan lo intentará de nuevo en la próxima ejecución.",
         "conflict": "Ya existe un archivo con ese nombre; se guardó como {newName}.",
-        "rate_limited": "Se alcanzó tu límite de uso, así que se omitió esta ejecución."
+        "rate_limited": "Se alcanzó tu límite de uso, así que se omitió esta ejecución.",
+        "unsupported": "Este tipo de archivo no se puede entregar a {connection}."
       },
       "explainer": "Configura un sistema aquí una sola vez. Después, las tareas guardadas y la IA podrán usarlo, por ejemplo para leer tus últimos correos de Outlook. Tu contraseña nunca se guarda: Microsoft 365 te pide iniciar sesión y le da a Synaplan un token que puedes revocar cuando quieras.",
       "yourConnections": "Tus conexiones",
@@ -2379,6 +2380,29 @@
           "name": "Sistema conectado (MCP)",
           "description": "Dale a la IA herramientas de un servidor MCP externo, como un sistema de tickets o tu propio servicio.",
           "action": "Añadir sistema"
+        },
+        "dav": {
+          "name": "Carpeta y calendario de Nextcloud (WebDAV)",
+          "description": "Guarda los resultados de tus tareas en tu carpeta en la nube y añade reuniones a tu calendario. Funciona con Nextcloud, ownCloud y cualquier servidor WebDAV.",
+          "hosting": "Se conecta a un servidor que tú eliges: tus archivos permanecen en tu propia nube.",
+          "action": "Conectar",
+          "kind": {
+            "nextcloud": "Nextcloud / ownCloud",
+            "webdav": "Otra dirección WebDAV"
+          },
+          "serverUrl": "Dirección del servidor",
+          "davUrl": "Dirección WebDAV (URL completa)",
+          "username": "Nombre de usuario",
+          "appPassword": "Contraseña de aplicación",
+          "appPasswordHint": "Créala en Nextcloud en Ajustes → Seguridad → Dispositivos y sesiones. Tu contraseña de la cuenta nunca se guarda.",
+          "folder": "Carpeta para los resultados",
+          "withCalendar": "Conectar también un calendario:",
+          "connect": "Conectar",
+          "connecting": "Conectando…",
+          "created": "{name} está conectado.",
+          "createFailed": "No se pudo crear la conexión. Comprueba la dirección e inténtalo de nuevo.",
+          "folderName": "Carpeta de {host} ({user})",
+          "calendarName": "Calendario de {host} ({calendar})"
         }
       }
     },

@@ -294,7 +294,7 @@ Product and engineering both sign. An unticked row blocks its connector, not the
 | # | Decision | Answer | OK? |
 | - | -------- | ------ | --- |
 | S1 | Build the **five foundations (F1–F5) before any Tier-1 connector**; no connector ships its own credential store, status widget or delivery endpoint. **Sequencing is foundations-first, not parallel** — the engine waits rather than building against a seam that does not exist yet | **Decided 2026-08-15: foundations first** | ✅ |
-| S2 | **Generic WebDAV (C10) is the first connector**; Nextcloud ships as a preset of it, not as a bespoke integration | Agree | ☐ |
+| S2 | **Generic WebDAV (C10) is the first connector**; Nextcloud ships as a preset of it, not as a bespoke integration | **Decided 2026-08-16: implemented that way** — `WebDavClient` + `webdav`/`caldav` destination providers; the connection UI offers Nextcloud as a preset (`DavConnectionForm.vue`). Live-instance verification (S5) still pending | ✅ |
 | S3 | **Microsoft 365 requires F3 plus an Azure app registration.** | **Decided 2026-08-15: Synaplan Cloud runs a multi-tenant app; self-hosters register their own.** Two consequences to honour: (a) the self-host registration path is **documented and supported**, never a second-class fallback — O365 must work on a self-hosted install; (b) the multi-tenant app needs a named owner for the admin-consent conversation and for credential rotation, recorded in the F3 PR | ✅ |
 | S4 | **Graph API for M365 mail**, not IMAP-XOAUTH2 | Agree | ☐ |
 | S5 | **Test accounts exist before the build starts**: live Nextcloud, live OpenCloud/OCIS, an M365 test tenant, a Jira/Confluence instance — named owner per system. **A connector without a test account is not scheduled** | Agree | ☐ |

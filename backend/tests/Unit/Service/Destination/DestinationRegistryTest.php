@@ -34,11 +34,17 @@ final class DestinationRegistryTest extends TestCase
         $registry->get('webdav');
     }
 
+    /**
+     * Extending this list is a conscious act: every code needs translations in
+     * all four locales (config.destinations.errors.*) in the same change.
+     * `unsupported` was added with the CalDAV provider (a non-.ics file cannot
+     * become calendar events).
+     */
     public function testFailureVocabularyIsClosed(): void
     {
         $codes = array_map(static fn (DestinationFailureCode $c): string => $c->value, DestinationFailureCode::cases());
         $this->assertSame(
-            ['unauthorized', 'not_found', 'quota_exceeded', 'too_large', 'unreachable', 'conflict', 'rate_limited'],
+            ['unauthorized', 'not_found', 'quota_exceeded', 'too_large', 'unreachable', 'conflict', 'rate_limited', 'unsupported'],
             $codes
         );
     }

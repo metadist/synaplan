@@ -16,4 +16,6 @@ enum DestinationFailureCode: string
     case Unreachable = 'unreachable';
     case Conflict = 'conflict';
     case RateLimited = 'rate_limited';
+    /** The file's format cannot be delivered to this destination (e.g. a non-.ics file to a calendar). */
+    case Unsupported = 'unsupported';
 }

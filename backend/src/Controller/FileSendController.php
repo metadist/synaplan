@@ -26,7 +26,7 @@ final class FileSendController extends AbstractController
     #[Route('/{id}/send', name: 'send', methods: ['POST'], requirements: ['id' => '\d+'])]
     #[OA\Post(
         path: '/api/v1/files/{id}/send',
-        summary: 'Deliver a file to a destination (email or share link)',
+        summary: 'Deliver a file to a destination (email, share link, WebDAV folder, or CalDAV calendar)',
         tags: ['Files'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         requestBody: new OA\RequestBody(
@@ -34,10 +34,11 @@ final class FileSendController extends AbstractController
             content: new OA\JsonContent(
                 required: ['destination'],
                 properties: [
-                    new OA\Property(property: 'destination', type: 'string', enum: ['email', 'share_link'], example: 'email'),
+                    new OA\Property(property: 'destination', type: 'string', enum: ['email', 'share_link', 'webdav', 'caldav'], example: 'email'),
                     new OA\Property(property: 'subject', type: 'string'),
                     new OA\Property(property: 'body', type: 'string'),
                     new OA\Property(property: 'expiry_days', type: 'integer', example: 7),
+                    new OA\Property(property: 'connection_id', type: 'integer', description: 'Required for webdav/caldav: the connection to deliver through', example: 12),
                 ]
             )
         ),

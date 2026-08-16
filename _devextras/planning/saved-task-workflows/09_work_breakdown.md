@@ -6,6 +6,37 @@ The sprint files say *what* and *why*. This file says *how big*, *in what order*
 
 ---
 
+## 0. Status (2026-08-16, branch `feat/saved-task-workflows`)
+
+Recorded per the working agreement (§7.5). The branch was built as one feature branch rather than
+one PR per step — noted here so the deviation is explicit, not repeated.
+
+**Done on this branch:**
+
+| Area | Steps | Notes |
+| ---- | ----- | ----- |
+| Foundations | F0, F1a–F1d, F2a, F4a–F4d | Locale-parity CI; connections registry/UI incl. mailbox+MCP adapter; AES vault with rotate/forget; destination seam with email + share-link providers and shared failure vocabulary |
+| Sprint 0 | E0a–E0c | Executed-plan viewer + "Save as task" affordance |
+| Sprint 1 | E1–E5d | E1's lock is unit-level (`RunnersTest::testChatRunnerUsesTopicIdSystemPrompt` + fallback + pinned-model tests); characterization snapshots unchanged and green |
+| Sprint 2 | E6–E9, E11 | Graph schema/validator/compiler/summary; inbound-email trigger via `app:saved-tasks:process-mailbox` |
+| Sprint 3 | E13–E16, E18, E19 | Tick command self-locks via `LockFactory` (`saved-tasks-tick`, 120 s TTL); schedule picker, auto-pause + resume UI |
+| Pulled forward (checklist row 10 revised) | F3/K3a (OAuth2 framework), K3b partial, K3c partial | M365 consent, token store/refresh, `GraphClient` mail read, connection UI. **Not** yet a trigger source; no calendar/write |
+| Connectors (2026-08-16) | K10a, K10b, K10c, K12a + CalDAV destination | `WebDavClient` (PROPFIND/MKCOL/PUT, SSRF guard, HTTPS-only, secret-safe errors), `webdav` + `caldav` destination providers on the F4 seam, `DavConnectionTester`, Nextcloud-preset connection form (`DavConnectionForm.vue`, ×4 locales). CalDAV delivery is idempotent per S13: deterministic UID + REPORT UID query + create-only PUT. Vocabulary extended by `unsupported` (non-.ics → calendar) |
+
+**Open (not on this branch):**
+
+| Steps | Blocker / note |
+| ----- | -------------- |
+| E10 (chat trigger hook) | `chat` trigger currently equals today's topic-match behaviour; an authored graph on a chat trigger does not short-circuit the planner yet |
+| E12 (advanced-steps editor UI) | Graph JSON is API-only; no editor component |
+| E17 (`cron-saved-tasks.sh`) | Separate `synaplan-platform` PR — **scheduled tasks have no production trigger until this lands** |
+| E20–E24 (plugin nodes, outbound webhook, events, `docs/N8N.md`) | Sprint 4 n8n interface untouched. The `webhook` trigger type is rejected by the entity until E22's ingress exists |
+| F2b (port inbound-email credentials onto the vault) | Existing handlers still use their own storage |
+| K10d (live Nextcloud verification), K12b/K12c (runner-integrated `calendar_query` read node + mutating write action with confirmation/`allow_unattended`) | WebDAV/CalDAV delivery works through `POST /files/{id}/send`; wiring them as run-step nodes needs the S6 mutating-action machinery. Live-instance verification per S5 still pending |
+| K11 (OpenCloud), K4/K5a/K13 (Graph write, OneDrive, Dropbox), K7 | Release checkpoints 2 and 4 not reached |
+
+---
+
 ## 1. Step-size rules
 
 A step that violates any of these is too big — split it before starting.

@@ -8,6 +8,7 @@ import { connectionsApi, type ConnectionItem } from '@/services/api/connectionsA
 import { m365Api } from '@/services/api/m365Api'
 import { useAuthStore } from '@/stores/auth'
 import ConnectionStatusPill from '@/components/config/ConnectionStatusPill.vue'
+import DavConnectionForm from '@/components/config/DavConnectionForm.vue'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -242,6 +243,9 @@ onMounted(async () => {
             }}
           </button>
         </li>
+
+        <!-- Nextcloud / WebDAV folder and calendar -->
+        <DavConnectionForm @created="load" />
 
         <!-- Mailbox (IMAP) -->
         <li class="surface-card p-4 flex flex-wrap items-start gap-3">

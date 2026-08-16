@@ -1810,7 +1810,8 @@
         "too_large": "Die Datei ist größer, als {connection} akzeptiert.",
         "unreachable": "{connection} war nicht erreichbar. Synaplan versucht es beim nächsten Lauf erneut.",
         "conflict": "Eine Datei mit diesem Namen existiert bereits; gespeichert als {newName}.",
-        "rate_limited": "Dein Nutzungslimit wurde erreicht, daher wurde dieser Lauf übersprungen."
+        "rate_limited": "Dein Nutzungslimit wurde erreicht, daher wurde dieser Lauf übersprungen.",
+        "unsupported": "Dieser Dateityp kann nicht an {connection} übergeben werden."
       },
       "explainer": "Richte ein System hier einmal ein. Gespeicherte Aufgaben und die KI können es danach nutzen – zum Beispiel, um deine neuesten Outlook-Mails zu lesen. Dein Passwort wird nie gespeichert: Microsoft 365 fragt dich nach der Anmeldung und gibt Synaplan ein Token, das du jederzeit zurückziehen kannst.",
       "yourConnections": "Deine Verbindungen",
@@ -1850,6 +1851,29 @@
           "name": "Verbundenes System (MCP)",
           "description": "Gib der KI Werkzeuge von einem externen MCP-Server, etwa einem Ticketsystem oder deinem eigenen Dienst.",
           "action": "System hinzufügen"
+        },
+        "dav": {
+          "name": "Nextcloud-Ordner & -Kalender (WebDAV)",
+          "description": "Speichert Aufgaben-Ergebnisse in deinem Cloud-Ordner und trägt Termine in deinen Kalender ein. Funktioniert mit Nextcloud, ownCloud und jedem WebDAV-Server.",
+          "hosting": "Verbindet sich mit einem Server deiner Wahl — deine Dateien bleiben in deiner eigenen Cloud.",
+          "action": "Verbinden",
+          "kind": {
+            "nextcloud": "Nextcloud / ownCloud",
+            "webdav": "Andere WebDAV-Adresse"
+          },
+          "serverUrl": "Server-Adresse",
+          "davUrl": "WebDAV-Adresse (vollständige URL)",
+          "username": "Benutzername",
+          "appPassword": "App-Passwort",
+          "appPasswordHint": "Erstelle eines in Nextcloud unter Einstellungen → Sicherheit → Geräte & Sitzungen. Dein Konto-Passwort wird nie gespeichert.",
+          "folder": "Ordner für Ergebnisse",
+          "withCalendar": "Auch einen Kalender verbinden:",
+          "connect": "Verbinden",
+          "connecting": "Verbinde…",
+          "created": "{name} ist verbunden.",
+          "createFailed": "Die Verbindung konnte nicht erstellt werden. Prüfe die Adresse und versuche es erneut.",
+          "folderName": "{host}-Ordner ({user})",
+          "calendarName": "{host}-Kalender ({calendar})"
         }
       }
     },
