@@ -49,7 +49,7 @@ Print this section. Tick every box. Do **not** start Sprint 1 until every row is
 | 7 | Plugin tools (Synamail, Synasort, Synaform, Synafastbill, …) join the graph **only when installed** for that user, via a new optional manifest key (`graphNodes`). `chatCommands` stay the slash-command seam. | Manifest seam, later | ✅ |
 | 8 | Feature flag: `SAVEDTASKS.ENABLED` in `BCONFIG` (default **off** for existing installs; seed **on** for new installs — same grandfather pattern as `MULTITASK.ROUTING_ENABLED`). Widget chat **does not** run Saved Tasks. | Flag + widget invariant | ✅ |
 | 9 | Schema is additive only. Galera-safe migrations (`addSql`, `IF NOT EXISTS`). No `doctrine:schema:update --force`. Ask again before the first migration lands. | **Decided 2026-08-15:** `BSAVEDTASKS`, `BSAVEDTASK_RUNS`, `BCONNECTIONS`, `BCREDENTIALS` | ✅ |
-| 10 | Office 365 / Microsoft Graph is **out of v1**. Track as a connector epic after Saved Tasks Run-now + schedule work. Note the hard reason: Exchange Online no longer accepts Basic auth, so O365 mail needs an **outbound OAuth2 framework** we do not have — [`07_connectors.md` Finding B](./07_connectors.md#11-four-findings-that-change-the-plan). | Deferred | ✅ |
+| 10 | ~~Office 365 / Microsoft Graph is **out of v1**~~ **Revised 2026-08-16:** the outbound OAuth2 framework (F3) and the M365 **mail-read** connection (consent flow, token store/refresh, `GraphClient` `me`/`listMessages`) were pulled forward and shipped together with the connections foundation on `feat/saved-task-workflows`. Still deferred: Graph **calendar read/write** (K4), OneDrive/SharePoint drop (K5a), and any Graph mutating action — [`07_connectors.md` Finding B](./07_connectors.md#11-four-findings-that-change-the-plan). | Mail read shipped early; writes deferred | ✅ |
 | 11 | **Production scheduling = the existing `synaplan-platform` host-cron family, expanded.** A new `cron-saved-tasks.sh` (same pattern as `cron-gmail.sh` / `cron-media-reaper.sh`: web1-only, `docker compose exec -T backend php bin/console …`, log to `/var/log/synaplan-*.log`, covered by `synaplan-cron.logrotate`). The tick command self-locks via a cross-node Redis lock (like `app:media:reap-jobs`) so the dev/self-host Docker scheduler role and host cron can both run it safely. Details: [Sprint 3 §1](./04_sprint_3_scheduler.md#1-where-schedules-actually-run-production-reality). | Expand platform crons | ✅ |
 | 12 | **Run results live in one dedicated conversation per Saved Task** (created on first run, named after the task). Runs list links into it. Scheduled failures notify the user; **3 consecutive failures auto-pause the task** with a visible reason. | One home per task + auto-pause | ✅ |
 | 13 | **Connections are prepared before the engine needs them.** Build the five foundations (connection registry, credential vault, OAuth2 framework, destination seam, connection-health UX) **before** any individual connector; no connector ships its own credential store, status widget or delivery endpoint. Full inventory and per-connector sign-off: [`07_connectors.md`](./07_connectors.md). | **Decided 2026-08-15: foundations first (not parallel)** | ✅ |
@@ -93,7 +93,7 @@ The Chat widget’s connect-the-boxes UI is the closest interaction pattern we a
 | Synaplan → n8n | **Gap** | No outbound webhook / event emitter |
 | Platform host crons | Shipped (prod) | `synaplan-platform`: `cron-gmail.sh` (mail handlers + smart@ pickup — **currently the only inbound pickup**), `cron-media-reaper.sh` (Redis cross-node lock), `cron-disk-watchdog.sh`, `cron-model-pricing.sh`, shared `synaplan-cron.logrotate`. **This is the scheduling backbone we expand** — see checklist row 11 |
 | User scheduler | **Missing** | Docker `SYNAPLAN_ROLE=scheduler` is maintenance only (dev/self-host); prod uses host crons above |
-| Office 365 / Graph | **Missing** | No connector, and no outbound OAuth2 framework to build one on |
+| Office 365 / Graph | Shipped, **read-only mail** (2026-08-16) | Outbound OAuth2 framework + M365 connection with `Mail.Read`; calendar and any write path still missing (checklist row 10) |
 | Document parsing (PPTX/XLSX/DOCX/PDF) | Shipped | Tika via `FileProcessor` / `TikaClient`. Needs coverage inside *scheduled* runs, not new code |
 | Document generation (DOCX/XLSX/PPTX/ICS/CSV) | Shipped | `DocumentGeneratorService`. Already the honest v1 output of a Saved Task |
 | Nextcloud | Shipped, **inbound only** | External NC app (`synaplan-nextcloud`) that **pulls** from Synaplan with an admin API key and writes via `IRootFolder`. No push path from Synaplan |
@@ -344,7 +344,7 @@ Same pattern as multitask routing:
 ## 9. Out of scope (v1)
 
 - Embedding or operating n8n / Make / Zapier.
-- Microsoft Graph / Google Calendar write (blocked on the OAuth2 framework — [`07_connectors.md`](./07_connectors.md) F3).
+- Microsoft Graph / Google Calendar **write** (the OAuth2 framework F3 and Graph mail-read now exist — see checklist row 10 — but every mutating Graph call stays out of v1).
 - Google Workspace connectors (deferred until a customer requires them).
 - Bespoke Jira / Confluence / CRM clients — the MCP connection and the outbound webhook are the escape hatches.
 - Mutating MCP tools.

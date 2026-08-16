@@ -1210,7 +1210,7 @@ import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
 import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useConfigStore } from '@/stores/config'
+import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
@@ -1255,7 +1255,6 @@ const dialog = useDialog()
 const { t, locale } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 const authStore = useAuthStore()
-const configStore = useConfigStore()
 const isAdmin = computed(() => authStore.isAdmin)
 const savedTasks = ref<SavedTask[]>([])
 
@@ -1265,14 +1264,14 @@ const currentSavedTask = computed(
 
 const showSaveAsTask = computed(
   () =>
-    configStore.features.savedTasks &&
+    isSavedTasksEnabled() &&
     currentPrompt.value !== null &&
     currentSavedTask.value === null &&
     (!currentPrompt.value.isDefault || currentPrompt.value.isUserOverride === true)
 )
 
 const loadSavedTasks = async () => {
-  if (!configStore.features.savedTasks) {
+  if (!isSavedTasksEnabled()) {
     savedTasks.value = []
     return
   }

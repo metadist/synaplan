@@ -12,6 +12,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { getFeaturesStatus } from '../services/featuresService'
+import { isSavedTasksEnabled } from './useSavedTasksFeature'
 
 export interface NavChild {
   /** Stable identifier used for data-testid — never derived from the route path */
@@ -102,7 +103,7 @@ export function useNavItems() {
       { key: 'chat-widget', path: '/channels/widgets', label: t('nav.toolsChatWidget') },
       { key: 'mail-handler', path: '/channels/email', label: t('nav.toolsMailHandler') },
       { key: 'mcp-servers', path: '/channels/mcp', label: t('nav.mcpServers') },
-      ...(configStore.features.savedTasks
+      ...(isSavedTasksEnabled()
         ? [{ key: 'connections', path: '/channels/connections', label: t('nav.connections') }]
         : []),
       { key: 'ai-agents', path: '/channels/agents', label: t('nav.aiAgents') },

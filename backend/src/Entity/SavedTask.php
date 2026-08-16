@@ -19,12 +19,16 @@ class SavedTask
     public const TRIGGER_INBOUND_EMAIL = 'inbound_email';
     public const TRIGGER_WEBHOOK = 'webhook';
 
+    /**
+     * TRIGGER_WEBHOOK is deliberately excluded: no ingress endpoint exists yet
+     * (Sprint 4, work breakdown E22+). Accepting it would store a task that can
+     * never fire. Add it back together with the webhook route.
+     */
     public const TRIGGER_TYPES = [
         self::TRIGGER_MANUAL,
         self::TRIGGER_CHAT,
         self::TRIGGER_SCHEDULE,
         self::TRIGGER_INBOUND_EMAIL,
-        self::TRIGGER_WEBHOOK,
     ];
 
     public const AUTO_PAUSE_AFTER = 3;
