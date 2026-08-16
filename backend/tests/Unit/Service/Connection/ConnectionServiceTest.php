@@ -46,4 +46,30 @@ final class ConnectionServiceTest extends TestCase
         $this->assertArrayNotHasKey('secret', $payload);
         $this->assertTrue($payload['has_secret']);
     }
+
+    /**
+     * An OAuth connection's credential is a token set issued by the provider.
+     * Accepting one here would let a client plant an arbitrary value that the
+     * Graph client would then send as a Bearer token.
+     */
+    public function testOauthConnectionsCannotBeCreatedThroughTheGenericEndpoint(): void
+    {
+        $vault = $this->createMock(CredentialVaultInterface::class);
+        $vault->expects($this->never())->method('store');
+
+        $service = new ConnectionService(
+            $this->createStub(ConnectionRepository::class),
+            $vault,
+            $this->createStub(InboundEmailHandlerRepository::class),
+            $this->createStub(McpServerConfigRepository::class),
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $service->create(3, [
+            'name' => 'Fake Microsoft',
+            'type' => Connection::TYPE_M365,
+            'secret' => 'planted-token',
+        ]);
+    }
 }

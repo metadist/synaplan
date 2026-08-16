@@ -183,7 +183,11 @@ const loadRuns = async () => {
       <p class="text-amber-800/80 dark:text-amber-200/80 mt-1">
         {{ $t('config.savedTasks.autoPauseBody') }}
       </p>
-      <button type="button" class="btn-primary text-sm mt-2" @click="onResume">
+      <button
+        type="button"
+        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium mt-2"
+        @click="onResume"
+      >
         {{ $t('config.savedTasks.resume') }}
       </button>
     </div>
@@ -191,7 +195,7 @@ const loadRuns = async () => {
     <div class="flex flex-wrap items-center gap-2">
       <button
         type="button"
-        class="btn-primary text-sm"
+        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
         :disabled="running"
         data-testid="btn-run-now"
         @click="onRunNow"
@@ -200,7 +204,7 @@ const loadRuns = async () => {
       </button>
       <select
         v-model="scheduleKind"
-        class="text-sm"
+        class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid="saved-task-schedule"
         :disabled="!task.enabled"
         @change="onSchedule"
@@ -214,7 +218,7 @@ const loadRuns = async () => {
         v-if="scheduleKind === 'daily' || scheduleKind === 'weekly'"
         v-model="scheduleAt"
         type="time"
-        class="text-sm"
+        class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         @change="onSchedule"
       />
       <span class="text-xs txt-secondary">{{ scheduleTz }}</span>
@@ -222,7 +226,7 @@ const loadRuns = async () => {
 
     <button
       type="button"
-      class="text-xs txt-secondary"
+      class="text-xs txt-secondary hover:txt-primary transition-colors"
       data-testid="btn-view-runs"
       @click="loadRuns"
     >
@@ -239,7 +243,7 @@ const loadRuns = async () => {
 
     <button
       type="button"
-      class="text-xs txt-secondary"
+      class="text-xs txt-secondary hover:txt-primary transition-colors"
       data-testid="btn-advanced-steps"
       @click="showAdvanced = !showAdvanced"
     >

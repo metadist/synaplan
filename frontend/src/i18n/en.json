@@ -516,6 +516,20 @@
         "title": "Configuration Updated — Restart Required",
         "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",
         "copyCommand": "Copy Command"
+      },
+      "m365": {
+        "title": "Before these fields work: register an app in Azure",
+        "intro": "Microsoft 365 sign-in needs an app registration in Azure. You do this once, it takes about five minutes, and afterwards every user can connect their own account.",
+        "portalLink": "Azure portal → App registrations",
+        "step1": "Open {portal} and choose “New registration”. Any name works, for example “Synaplan”.",
+        "step2": "Under “Redirect URI”, pick the platform type Web (not SPA) and paste this address exactly:",
+        "step3": "Go to “API permissions” → “Add a permission” → “Microsoft Graph” → “Delegated permissions” and add all of these:",
+        "step3Note": "offline_access is not optional: without it Microsoft issues no refresh token and every scheduled run stops working after an hour.",
+        "step4": "Go to “Certificates & secrets” → “New client secret” and copy the Value column — not the Secret ID. It is shown only this once.",
+        "step5": "Paste the client ID and the secret into the fields below, set the tenant, and switch M365_ENABLED on. Users then connect their own account under Channels → Connections.",
+        "ready": "Ready — users can connect their Microsoft 365 account under Channels → Connections.",
+        "notReady": "Not active yet. Fill in the fields below and switch M365_ENABLED on.",
+        "copyFailed": "Could not copy. Select the text and copy it manually."
       }
     }
   },
@@ -1725,8 +1739,8 @@
     },
     "connections": {
       "title": "Connections",
-      "subtitle": "Mailboxes, folders and other systems this workspace can read or send to.",
-      "empty": "No connections yet. Email and MCP accounts you already set up appear here automatically.",
+      "subtitle": "The outside systems Synaplan may read from and write to on your behalf.",
+      "empty": "Nothing connected yet. Pick one of the options below to get started — it takes about a minute.",
       "loading": "Loading connections…",
       "loadFailed": "Could not load connections.",
       "test": "Test connection",
@@ -1745,7 +1759,8 @@
         "webdav": "Folder",
         "webhook": "Webhook",
         "caldav": "Calendar",
-        "generic": "Connection"
+        "generic": "Connection",
+        "m365": "Microsoft 365"
       },
       "failure": {
         "unauthorized": "{connection} rejected the login. Reconnect it to continue.",
@@ -1755,6 +1770,46 @@
         "unreachable": "{connection} could not be reached. Synaplan will try again at the next run.",
         "conflict": "A file with that name already exists; saved as {newName} instead.",
         "rate_limited": "Your usage limit was reached, so this run was skipped."
+      },
+      "explainer": "Connect a system once here. Saved tasks and the AI can then use it — for example to read your latest Outlook mail. Your password is never stored: Microsoft 365 asks you to sign in and gives Synaplan a token you can revoke at any time.",
+      "yourConnections": "Your connections",
+      "addTitle": "Add a connection",
+      "addSubtitle": "What each option does, and where it takes you.",
+      "lastChecked": "checked {when}",
+      "reauthHint": "Microsoft no longer accepts the saved sign-in. Reconnect to let scheduled tasks run again.",
+      "reconnect": "Reconnect",
+      "testing": "Testing…",
+      "testOkAccount": "Connection works — signed in as {account}.",
+      "providers": {
+        "m365": {
+          "name": "Microsoft 365",
+          "description": "Sign in with your Microsoft work or personal account so Synaplan can read your Outlook mail. Read-only, and you can disconnect at any time.",
+          "connect": "Connect Microsoft 365",
+          "connecting": "Opening Microsoft…",
+          "connected": "Microsoft 365 is connected.",
+          "startFailed": "Could not open the Microsoft sign-in page. Please try again.",
+          "unavailable": "Not available yet — Microsoft 365 has to be set up once for this installation.",
+          "adminLink": "Set it up in system settings.",
+          "askAdmin": "Ask an administrator to enable it.",
+          "errors": {
+            "access_denied": "You cancelled the Microsoft sign-in, so nothing was connected.",
+            "missing_code": "Microsoft sent an incomplete answer. Please start the connection again.",
+            "exchange_failed": "Microsoft accepted the sign-in but the token could not be collected. Check the client secret in system settings, then try again.",
+            "invalid_state": "The sign-in took too long or was started in another tab. Please try again.",
+            "unknown": "Microsoft 365 could not be connected. Please try again."
+          },
+          "hosting": "Your mail stays with Microsoft, a cloud provider based in the USA."
+        },
+        "mailbox": {
+          "name": "Mailbox (IMAP)",
+          "description": "Any mailbox that speaks IMAP, with user name and password — for example a Gmail account with an app password, or your own mail server.",
+          "action": "Set up mailbox"
+        },
+        "mcp": {
+          "name": "Connected system (MCP)",
+          "description": "Give the AI tools from an external MCP server, such as a ticket system or your own service.",
+          "action": "Add system"
+        }
       }
     },
     "routing": {

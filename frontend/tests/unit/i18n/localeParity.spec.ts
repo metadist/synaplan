@@ -18,6 +18,9 @@ const GATED_NAMESPACES = ['config.savedTasks', 'config.connections'] as const
 const LOANWORD_OPT_OUT = new Set<string>([
   // Add dotted keys here when a DE/ES/TR string is intentionally identical
   // to English (e.g. "API", "IMAP", "WebDAV").
+  // Microsoft spells the product the same way in all four markets.
+  'config.connections.providers.m365.name',
+  'config.connections.types.m365',
 ])
 
 const BANNED_JARGON = [

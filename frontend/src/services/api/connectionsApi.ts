@@ -22,6 +22,16 @@ export interface ConnectionItem {
   config?: Record<string, unknown> | null
 }
 
+export interface ConnectionTestResult {
+  connection: ConnectionItem
+  /** Null for types without a tester: those only confirm a stored credential. */
+  succeeded: boolean | null
+  /** Readable reason when the test failed, straight from the tester. */
+  error: string | null
+  /** Remote account the connection points at, when the tester can report one. */
+  account: string | null
+}
+
 function asConnection(raw: RawConnection | undefined): ConnectionItem {
   if (!raw || !raw.id || !raw.name) {
     throw new Error('Malformed connection response')
@@ -61,12 +71,17 @@ export const connectionsApi = {
     return asConnection(data.connection)
   },
 
-  async test(id: string): Promise<ConnectionItem> {
+  async test(id: string): Promise<ConnectionTestResult> {
     const data = await httpClient(`/api/v1/connections/${id}/test`, {
       method: 'POST',
       schema: PostApiConnectionsTestResponseSchema,
     })
-    return asConnection(data.connection)
+    return {
+      connection: asConnection(data.connection),
+      succeeded: data.connection?.test_succeeded ?? null,
+      error: data.connection?.test_error ?? null,
+      account: data.connection?.account ?? null,
+    }
   },
 
   async remove(id: string): Promise<void> {

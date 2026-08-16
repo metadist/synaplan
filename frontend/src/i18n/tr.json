@@ -505,6 +505,20 @@
         "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
         "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",
         "copyCommand": "Komutu Kopyala"
+      },
+      "m365": {
+        "title": "Bu alanlar işe yaramadan önce: Azure’da bir uygulama kaydet",
+        "intro": "Microsoft 365 oturum açma, Azure’da bir uygulama kaydı gerektirir. Bunu bir kez yaparsın, yaklaşık beş dakika sürer ve sonrasında herkes kendi hesabını bağlayabilir.",
+        "portalLink": "Azure portalı → Uygulama kayıtları",
+        "step1": "{portal} bağlantısını aç ve “Yeni kayıt” seçeneğini seç. Ad serbesttir, örneğin “Synaplan”.",
+        "step2": "“Yeniden yönlendirme URI’si” altında platform türü olarak Web (SPA değil) seç ve tam olarak şu adresi yapıştır:",
+        "step3": "“API izinleri” → “İzin ekle” → “Microsoft Graph” → “Temsilci izinleri” yolunu izle ve şu izinlerin tümünü ekle:",
+        "step3Note": "offline_access isteğe bağlı değildir: onsuz Microsoft yenileme belirteci vermez ve zamanlanmış her çalışma bir saat sonra durur.",
+        "step4": "“Sertifikalar ve gizli diziler” → “Yeni istemci gizli dizisi” yolunu izle ve Değer sütununu kopyala — Gizli Dizi Kimliğini değil. Yalnızca bu bir kez gösterilir.",
+        "step5": "İstemci kimliğini ve gizli diziyi aşağıdaki alanlara yapıştır, kiracıyı ayarla ve M365_ENABLED seçeneğini aç. Kullanıcılar sonra kendi hesaplarını Kanallar → Bağlantılar altından bağlar.",
+        "ready": "Hazır — kullanıcılar Microsoft 365 hesaplarını Kanallar → Bağlantılar altından bağlayabilir.",
+        "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve M365_ENABLED seçeneğini aç.",
+        "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala."
       }
     }
   },
@@ -2296,8 +2310,8 @@
     },
     "connections": {
       "title": "Bağlantılar",
-      "subtitle": "Bu çalışma alanının okuyabileceği veya gönderebileceği posta kutuları, klasörler ve diğer sistemler.",
-      "empty": "Henüz bağlantı yok. Kurduğun e-posta ve MCP hesapları burada kendiliğinden görünür.",
+      "subtitle": "Synaplan’ın senin adına okuyabileceği ve yazabileceği dış sistemler.",
+      "empty": "Henüz hiçbir şey bağlı değil. Başlamak için aşağıdaki seçeneklerden birini seç; yaklaşık bir dakika sürer.",
       "loading": "Bağlantılar yükleniyor…",
       "loadFailed": "Bağlantılar yüklenemedi.",
       "test": "Bağlantıyı test et",
@@ -2316,7 +2330,8 @@
         "webdav": "Klasör",
         "webhook": "Bildirim adresi",
         "caldav": "Takvim",
-        "generic": "Bağlantı"
+        "generic": "Bağlantı",
+        "m365": "Microsoft 365"
       },
       "failure": {
         "unauthorized": "{connection} oturum açmayı reddetti. Devam etmek için yeniden bağla.",
@@ -2326,6 +2341,46 @@
         "unreachable": "{connection} ulaşılabilir değil. Synaplan bir sonraki çalışmada yeniden deneyecek.",
         "conflict": "Bu adda bir dosya zaten var; {newName} olarak kaydedildi.",
         "rate_limited": "Kullanım sınırına ulaşıldı, bu çalışma atlandı."
+      },
+      "explainer": "Bir sistemi burada bir kez bağla. Kaydedilmiş görevler ve yapay zekâ sonrasında onu kullanabilir; örneğin en son Outlook postalarını okuyabilir. Parolan hiçbir zaman saklanmaz: Microsoft 365 oturum açmanı ister ve Synaplan’a istediğin an geri alabileceğin bir belirteç verir.",
+      "yourConnections": "Bağlantıların",
+      "addTitle": "Bağlantı ekle",
+      "addSubtitle": "Her seçeneğin ne yaptığı ve seni nereye götürdüğü.",
+      "lastChecked": "{when} tarihinde kontrol edildi",
+      "reauthHint": "Microsoft kayıtlı oturumu artık kabul etmiyor. Zamanlanmış görevlerin yeniden çalışması için yeniden bağlan.",
+      "reconnect": "Yeniden bağlan",
+      "testing": "Test ediliyor…",
+      "testOkAccount": "Bağlantı çalışıyor — {account} olarak oturum açıldı.",
+      "providers": {
+        "m365": {
+          "name": "Microsoft 365",
+          "description": "Synaplan’ın Outlook postalarını okuyabilmesi için iş veya kişisel Microsoft hesabınla oturum aç. Yalnızca okuma yapar ve istediğin an bağlantıyı kesebilirsin.",
+          "connect": "Microsoft 365’i bağla",
+          "connecting": "Microsoft açılıyor…",
+          "connected": "Microsoft 365 bağlandı.",
+          "startFailed": "Microsoft oturum açma sayfası açılamadı. Lütfen tekrar dene.",
+          "unavailable": "Henüz kullanılamıyor — Microsoft 365’in bu kurulum için bir kez ayarlanması gerekiyor.",
+          "adminLink": "Sistem ayarlarında yapılandır.",
+          "askAdmin": "Etkinleştirmesi için bir yöneticiye başvur.",
+          "errors": {
+            "access_denied": "Microsoft oturum açmayı iptal ettin, bu yüzden hiçbir şey bağlanmadı.",
+            "missing_code": "Microsoft eksik bir yanıt gönderdi. Lütfen bağlantıyı yeniden başlat.",
+            "exchange_failed": "Microsoft oturumu kabul etti ancak belirteç alınamadı. Sistem ayarlarındaki istemci parolasını kontrol edip tekrar dene.",
+            "invalid_state": "Oturum açma çok uzun sürdü veya başka bir sekmede başlatıldı. Lütfen tekrar dene.",
+            "unknown": "Microsoft 365 bağlanamadı. Lütfen tekrar dene."
+          },
+          "hosting": "Postaların, merkezi ABD’de bulunan bir bulut sağlayıcısı olan Microsoft’ta kalır."
+        },
+        "mailbox": {
+          "name": "Posta kutusu (IMAP)",
+          "description": "Kullanıcı adı ve parolayla çalışan her IMAP posta kutusu — örneğin uygulama parolası olan bir Gmail hesabı veya kendi posta sunucun.",
+          "action": "Posta kutusu kur"
+        },
+        "mcp": {
+          "name": "Bağlı sistem (MCP)",
+          "description": "Yapay zekâya harici bir MCP sunucusundan araçlar ver; örneğin bir talep sistemi veya kendi servisin.",
+          "action": "Sistem ekle"
+        }
       }
     },
     "aiModels": {

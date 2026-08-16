@@ -119,6 +119,12 @@ security:
         - { path: ^/api/v1/auth/apple/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/apple/native, roles: PUBLIC_ACCESS }
 
+        # Outbound connector consent: Microsoft redirects the browser here
+        # cross-site, where the SameSite=Strict auth cookie is not sent. The
+        # HMAC-signed OAuth state identifies the user instead; /start (which
+        # mints that state) stays authenticated.
+        - { path: ^/api/v1/connections/m365/callback, roles: PUBLIC_ACCESS }
+
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
 

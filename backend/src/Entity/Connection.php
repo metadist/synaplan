@@ -29,7 +29,17 @@ class Connection
         self::STATUS_DISCONNECTED,
     ];
 
-    public const TYPES = ['generic', 'mailbox', 'mcp', 'webdav', 'webhook', 'caldav'];
+    /**
+     * Microsoft 365 (Graph). Its secret is an OAuth token set in the vault, so
+     * it is never creatable through the generic connection API — only the
+     * consent callback may write it.
+     */
+    public const TYPE_M365 = 'm365';
+
+    public const TYPES = ['generic', 'mailbox', 'mcp', 'webdav', 'webhook', 'caldav', self::TYPE_M365];
+
+    /** Types whose credentials are issued by an OAuth consent flow. */
+    public const OAUTH_TYPES = [self::TYPE_M365];
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

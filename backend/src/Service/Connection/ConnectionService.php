@@ -12,11 +12,15 @@ use App\Service\Credential\CredentialVaultInterface;
 
 final readonly class ConnectionService
 {
+    /**
+     * @param iterable<ConnectionTester> $testers
+     */
     public function __construct(
         private ConnectionRepository $connections,
         private CredentialVaultInterface $vault,
         private InboundEmailHandlerRepository $mailHandlers,
         private McpServerConfigRepository $mcpServers,
+        private iterable $testers = [],
     ) {
     }
 
@@ -81,6 +85,13 @@ final readonly class ConnectionService
         $name = is_string($data['name'] ?? null) ? $data['name'] : '';
         if (!in_array($type, Connection::TYPES, true)) {
             throw new \InvalidArgumentException(sprintf('Unsupported connection type "%s"', $type));
+        }
+
+        // An OAuth connection's secret is a token set the authorization server
+        // issues; accepting one here would let a client plant an arbitrary
+        // "token" that the Graph client would then send as a Bearer credential.
+        if (in_array($type, Connection::OAUTH_TYPES, true)) {
+            throw new \InvalidArgumentException(sprintf('Connections of type "%s" are created by signing in with the provider, not through this endpoint', $type));
         }
 
         $connection = new Connection($ownerId, $type, $name);
@@ -158,6 +169,22 @@ final readonly class ConnectionService
             return null;
         }
 
+        foreach ($this->testers as $tester) {
+            if (!$tester->supports($connection->getType())) {
+                continue;
+            }
+
+            $result = $tester->test($connection);
+
+            return $this->serialize($connection, 'registry') + [
+                'test_succeeded' => $result['success'],
+                'test_error' => $result['error'] ?? null,
+                'account' => $result['account'] ?? null,
+            ];
+        }
+
+        // No tester for this type yet: the only honest statement is whether a
+        // credential is stored at all.
         $status = null !== $connection->getCredentialId()
             ? Connection::STATUS_CONNECTED
             : Connection::STATUS_ERROR;

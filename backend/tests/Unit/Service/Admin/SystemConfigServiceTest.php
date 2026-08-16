@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Admin;
 
 use App\AI\Credential\ProviderKeyStore;
+use App\Entity\Config;
 use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfigService;
 use App\Service\EncryptionService;
 use App\Service\Message\ConversationSummaryConstants;
+use App\Service\Microsoft\MicrosoftOAuthConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -29,9 +31,10 @@ final class SystemConfigServiceTest extends TestCase
 
         // ProviderKeyStore is final (not mockable); a real instance over the
         // same repository mock is inert for these multitask-focused tests.
+        $encryption = new EncryptionService('test-secret', new NullLogger());
         $providerKeyStore = new ProviderKeyStore(
             $this->configRepository,
-            new EncryptionService('test-secret', new NullLogger()),
+            $encryption,
             new NullLogger(),
         );
 
@@ -41,6 +44,7 @@ final class SystemConfigServiceTest extends TestCase
             configRepository: $this->configRepository,
             defaultTtsUrl: 'http://localhost:10200',
             providerKeyStore: $providerKeyStore,
+            encryption: $encryption,
         );
     }
 
@@ -60,6 +64,51 @@ final class SystemConfigServiceTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertFalse($result['requiresRestart']);
+    }
+
+    /**
+     * A database-backed secret must never reach BCONFIG in plain text — the row
+     * is readable by anyone with DB access and by every other config reader.
+     */
+    public function testM365ClientSecretIsEncryptedBeforeItIsStored(): void
+    {
+        $stored = null;
+        $this->configRepository->expects($this->once())
+            ->method('setValue')
+            ->willReturnCallback(function (int $owner, string $group, string $setting, string $value) use (&$stored) {
+                self::assertSame(0, $owner);
+                self::assertSame(MicrosoftOAuthConfig::CONFIG_GROUP, $group);
+                self::assertSame(MicrosoftOAuthConfig::KEY_CLIENT_SECRET, $setting);
+                $stored = $value;
+
+                return new Config();
+            });
+
+        $result = $this->service->setValue('M365_CLIENT_SECRET', 'super-secret');
+
+        self::assertTrue($result['success']);
+        self::assertIsString($stored);
+        self::assertNotSame('super-secret', $stored);
+        self::assertSame(
+            'super-secret',
+            (new EncryptionService('test-secret', new NullLogger()))->decrypt($stored),
+        );
+    }
+
+    public function testM365ClientSecretIsMaskedWhenRead(): void
+    {
+        $this->configRepository->expects($this->atLeastOnce())->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => MicrosoftOAuthConfig::CONFIG_GROUP === $group
+                && MicrosoftOAuthConfig::KEY_CLIENT_SECRET === $setting
+                    ? 'some-ciphertext'
+                    : null
+        );
+
+        $secret = $this->service->getValues()['M365_CLIENT_SECRET'];
+
+        self::assertTrue($secret['isSet']);
+        self::assertTrue($secret['isMasked']);
+        self::assertStringNotContainsString('some-ciphertext', $secret['value']);
     }
 
     /**

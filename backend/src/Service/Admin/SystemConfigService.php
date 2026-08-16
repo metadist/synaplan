@@ -10,10 +10,12 @@ use App\AI\Credential\SecretValueGuard;
 use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
+use App\Service\EncryptionService;
 use App\Service\FeedbackConstants;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Message\ConversationSummaryConstants;
+use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\UsageTaximeterConfig;
@@ -32,7 +34,7 @@ final readonly class SystemConfigService
     private const DB_GROUP = 'QDRANT_SEARCH';
     private const DB_OWNER_ID = 0;
 
-    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}> */
+    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string}> */
     private array $schema;
 
     public function __construct(
@@ -41,6 +43,7 @@ final readonly class SystemConfigService
         private readonly ConfigRepository $configRepository,
         private readonly string $defaultTtsUrl,
         private readonly ProviderKeyStore $providerKeyStore,
+        private readonly EncryptionService $encryption,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -48,7 +51,7 @@ final readonly class SystemConfigService
     /**
      * Get the configuration schema with field definitions.
      *
-     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}>}
+     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string}>}
      */
     public function getSchema(): array
     {
@@ -103,6 +106,9 @@ final readonly class SystemConfigService
                 'sections' => [
                     'whatsapp' => ['label' => 'WhatsApp Business API', 'fields' => ['WHATSAPP_ENABLED', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_WEBHOOK_VERIFY_TOKEN']],
                     'gmail' => ['label' => 'Smart Mail (Gmail IMAP)', 'fields' => ['GMAIL_USERNAME', 'GMAIL_PASSWORD']],
+                    'm365' => ['label' => 'Microsoft 365 (Graph)', 'fields' => [
+                        'M365_ENABLED', 'M365_CLIENT_ID', 'M365_CLIENT_SECRET', 'M365_TENANT', 'M365_REDIRECT_URI',
+                    ]],
                 ],
             ],
             'processing' => [
@@ -200,6 +206,19 @@ final readonly class SystemConfigService
                     $field['dbKey'] ?? $key,
                 );
                 $isSet = null !== $rawValue && '' !== $rawValue;
+
+                // A database-backed secret (e.g. an OAuth client secret) is
+                // stored encrypted and must be masked here for the same reason
+                // an env secret is: this response reaches the admin UI.
+                if ($field['sensitive']) {
+                    $values[$key] = [
+                        'value' => $isSet ? self::MASK : $field['default'],
+                        'isSet' => $isSet,
+                        'isMasked' => $isSet,
+                    ];
+                    continue;
+                }
+
                 $values[$key] = [
                     'value' => $rawValue ?? $field['default'],
                     'isSet' => $isSet,
@@ -358,7 +377,7 @@ final readonly class SystemConfigService
     /**
      * Save a database-backed configuration value with validation.
      *
-     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string} $field
+     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string, encrypted?: bool} $field
      *
      * @return array{success: bool, requiresRestart: bool, message?: string}
      */
@@ -398,8 +417,14 @@ final readonly class SystemConfigService
         $group = $field['dbGroup'] ?? self::DB_GROUP;
         $setting = $field['dbKey'] ?? $key;
 
+        // Encrypted fields hold a real credential; clearing one means storing
+        // an empty row, not an empty ciphertext nobody can distinguish.
+        $stored = ($field['encrypted'] ?? false) && '' !== $value
+            ? $this->encryption->encrypt($value)
+            : $value;
+
         try {
-            $this->configRepository->setValue(self::DB_OWNER_ID, $group, $setting, $value);
+            $this->configRepository->setValue(self::DB_OWNER_ID, $group, $setting, $stored);
             $this->logChange($key, $value);
 
             $this->applyConfigSideEffects($group, $setting, $value, $actingUserId);
@@ -831,7 +856,7 @@ final readonly class SystemConfigService
     /**
      * Build the configuration schema.
      *
-     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}>
+     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string}>
      */
     private function buildSchema(): array
     {
@@ -847,6 +872,62 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
+            ],
+            // === Microsoft 365 app registration (database-backed) ===
+            // BCONFIG group M365 (ownerId=0), read by MicrosoftOAuthConfig.
+            // Operator-owned and install-wide: Synaplan Cloud runs a
+            // multi-tenant registration, self-hosters register their own
+            // (connector plan 07 §S3). Users never see these values — they only
+            // click "Connect Microsoft 365" and consent.
+            'M365_ENABLED' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Offer Microsoft 365 as a connection. Requires a client ID and client secret from an Azure app registration; the "Connect Microsoft 365" action stays hidden until all three are set.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_ENABLED,
+            ],
+            'M365_CLIENT_ID' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Application (client) ID of the Azure app registration. Azure portal → App registrations → your app → Overview.',
+                'default' => '',
+                'placeholder' => '11111111-2222-3333-4444-555555555555',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_CLIENT_ID,
+            ],
+            'M365_CLIENT_SECRET' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'password',
+                'sensitive' => true,
+                'encrypted' => true,
+                'description' => 'Client secret from Azure portal → your app → Certificates & secrets → New client secret. Copy the "Value" column, NOT the "Secret ID". Stored encrypted and never shown again; leave the field untouched to keep the current one.',
+                'default' => '',
+                'placeholder' => 'Example: 8Qm~aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_CLIENT_SECRET,
+            ],
+            'M365_TENANT' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Which accounts may sign in: "common" (work, school and personal accounts), "organizations" (work and school only), or a single tenant GUID to allow only your own organisation. Self-hosters normally use their own tenant GUID (Azure portal → your app → Overview → Directory (tenant) ID).',
+                'default' => MicrosoftOAuthConfig::DEFAULT_TENANT,
+                'placeholder' => 'common — or 11111111-2222-3333-4444-555555555555',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_TENANT,
+            ],
+            'M365_REDIRECT_URI' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Only needed when a proxy changes the public URL. Leave empty to use APP_URL + '.MicrosoftOAuthConfig::CALLBACK_PATH.'. Whatever is used here must be registered in Azure character for character.',
+                'default' => '',
+                'placeholder' => 'https://your-synaplan-host'.MicrosoftOAuthConfig::CALLBACK_PATH,
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_REDIRECT_URI,
             ],
             'SAVEDTASKS_ENABLED' => [
                 'tab' => 'routing', 'section' => 'saved_tasks', 'type' => 'boolean',

@@ -340,7 +340,7 @@
             <button
               v-if="showSaveAsTask"
               type="button"
-              class="btn-secondary text-sm whitespace-nowrap"
+              class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
               data-testid="btn-save-as-task"
               @click="onSaveAsTask"
             >

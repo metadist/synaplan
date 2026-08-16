@@ -36,6 +36,15 @@ class ConnectionRepository extends ServiceEntityRepository
         return $this->findOneBy(['id' => $id, 'ownerId' => $ownerId]);
     }
 
+    /**
+     * Oldest connection of a type for one owner. Re-running an OAuth consent
+     * updates that row instead of leaving a trail of half-authorized copies.
+     */
+    public function findOneByOwnerAndType(int $ownerId, string $type): ?Connection
+    {
+        return $this->findOneBy(['ownerId' => $ownerId, 'type' => $type], ['id' => 'ASC']);
+    }
+
     public function save(Connection $connection, bool $flush = true): void
     {
         $this->getEntityManager()->persist($connection);

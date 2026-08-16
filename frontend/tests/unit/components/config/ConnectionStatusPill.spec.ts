@@ -7,6 +7,8 @@ const STATUSES = ['connected', 'error', 'reauth_required', 'never_tested', 'disc
 describe('ConnectionStatusPill', () => {
   it.each(STATUSES)('renders the %s status', (status) => {
     const wrapper = mount(ConnectionStatusPill, { props: { status } })
-    expect(wrapper.get(`[data-testid="connection-status-${status}"]`).text().length).toBeGreaterThan(0)
+    expect(
+      wrapper.get(`[data-testid="connection-status-${status}"]`).text().length
+    ).toBeGreaterThan(0)
   })
 })

@@ -170,6 +170,10 @@ services:
             tags: ['app.realtime.authorizer']
         App\Service\Destination\DestinationProvider:
             tags: ['app.destination.provider']
+        App\Service\OAuth\OAuthProviderSource:
+            tags: ['app.oauth.provider_source']
+        App\Service\Connection\ConnectionTester:
+            tags: ['app.connection.tester']
 
     App\:
         resource: '../src/'
@@ -644,6 +648,25 @@ services:
     App\Service\Destination\DestinationRegistry:
         arguments:
             $providers: !tagged_iterator app.destination.provider
+
+    # Outbound OAuth2 (connector plan 07 F3). The app registration itself lives
+    # in BCONFIG so an operator can set it in the Admin UI without a restart;
+    # only APP_URL (for the default redirect URI) comes from the environment.
+    App\Service\OAuth\OAuthProviderRegistry:
+        arguments:
+            $sources: !tagged_iterator app.oauth.provider_source
+
+    App\Service\Connection\ConnectionService:
+        arguments:
+            $testers: !tagged_iterator app.connection.tester
+
+    App\Service\Microsoft\MicrosoftOAuthConfig:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Controller\MicrosoftConnectionController:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
 
     # Social Login Controllers (Google & GitHub OAuth)
     App\Controller\GoogleAuthController:

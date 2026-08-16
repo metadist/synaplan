@@ -52,12 +52,17 @@ const inputType = computed(() => {
   return 'text'
 })
 
-// Placeholder for masked fields
+/**
+ * An example value beats repeating the description inside the input: the
+ * description is already shown above the field, and "what does a valid value
+ * look like?" is the question an admin actually has. Fields without an example
+ * keep the previous behaviour.
+ */
 const placeholder = computed(() => {
-  if (props.value.isMasked && !isDirty.value) {
-    return props.value.isSet ? '••••••••' : props.schema.description
+  if (props.value.isMasked && !isDirty.value && props.value.isSet) {
+    return '••••••••'
   }
-  return props.schema.description
+  return props.schema.placeholder || props.schema.description
 })
 
 // Handle input change

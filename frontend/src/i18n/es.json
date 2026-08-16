@@ -505,6 +505,20 @@
         "title": "Configuración Actualizada — Reinicio Requerido",
         "message": "Sus cambios se han guardado en el archivo .env. Para que los cambios surtan efecto, debe reiniciar sus contenedores Docker.",
         "copyCommand": "Copiar Comando"
+      },
+      "m365": {
+        "title": "Antes de que estos campos sirvan: registra una aplicación en Azure",
+        "intro": "El inicio de sesión de Microsoft 365 necesita un registro de aplicación en Azure. Se hace una sola vez, lleva unos cinco minutos y después cada persona podrá conectar su propia cuenta.",
+        "portalLink": "Portal de Azure → Registros de aplicaciones",
+        "step1": "Abre {portal} y elige «Nuevo registro». El nombre da igual, por ejemplo «Synaplan».",
+        "step2": "En «URI de redirección», elige el tipo de plataforma Web (no SPA) y pega exactamente esta dirección:",
+        "step3": "Ve a «Permisos de API» → «Agregar un permiso» → «Microsoft Graph» → «Permisos delegados» y añade todos estos:",
+        "step3Note": "offline_access no es opcional: sin él Microsoft no emite un token de actualización y toda ejecución programada deja de funcionar al cabo de una hora.",
+        "step4": "Ve a «Certificados y secretos» → «Nuevo secreto de cliente» y copia la columna Valor, no el Id. de secreto. Solo se muestra esta vez.",
+        "step5": "Pega el ID de cliente y el secreto en los campos de abajo, indica el inquilino y activa M365_ENABLED. Después, cada persona conecta su cuenta en Canales → Conexiones.",
+        "ready": "Listo: ya se puede conectar una cuenta de Microsoft 365 en Canales → Conexiones.",
+        "notReady": "Todavía no está activo. Rellena los campos de abajo y activa M365_ENABLED.",
+        "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente."
       }
     }
   },
@@ -2295,8 +2309,8 @@
     },
     "connections": {
       "title": "Conexiones",
-      "subtitle": "Buzones, carpetas y otros sistemas que este espacio puede leer o usar para enviar.",
-      "empty": "Aún no hay conexiones. Las cuentas de correo y MCP que ya configuraste aparecen aquí solas.",
+      "subtitle": "Los sistemas externos de los que Synaplan puede leer y en los que puede escribir en tu nombre.",
+      "empty": "Todavía no hay nada conectado. Elige una de las opciones de abajo para empezar; tarda aproximadamente un minuto.",
       "loading": "Cargando conexiones…",
       "loadFailed": "No se pudieron cargar las conexiones.",
       "test": "Probar conexión",
@@ -2315,7 +2329,8 @@
         "webdav": "Carpeta",
         "webhook": "Dirección de aviso",
         "caldav": "Calendario",
-        "generic": "Conexión"
+        "generic": "Conexión",
+        "m365": "Microsoft 365"
       },
       "failure": {
         "unauthorized": "{connection} rechazó el inicio de sesión. Vuelve a conectarlo para continuar.",
@@ -2325,6 +2340,46 @@
         "unreachable": "No se pudo alcanzar {connection}. Synaplan lo intentará de nuevo en la próxima ejecución.",
         "conflict": "Ya existe un archivo con ese nombre; se guardó como {newName}.",
         "rate_limited": "Se alcanzó tu límite de uso, así que se omitió esta ejecución."
+      },
+      "explainer": "Configura un sistema aquí una sola vez. Después, las tareas guardadas y la IA podrán usarlo, por ejemplo para leer tus últimos correos de Outlook. Tu contraseña nunca se guarda: Microsoft 365 te pide iniciar sesión y le da a Synaplan un token que puedes revocar cuando quieras.",
+      "yourConnections": "Tus conexiones",
+      "addTitle": "Añadir una conexión",
+      "addSubtitle": "Qué hace cada opción y adónde te lleva.",
+      "lastChecked": "comprobada {when}",
+      "reauthHint": "Microsoft ya no acepta el inicio de sesión guardado. Vuelve a conectar para que las tareas programadas funcionen de nuevo.",
+      "reconnect": "Reconectar",
+      "testing": "Probando…",
+      "testOkAccount": "La conexión funciona: sesión iniciada como {account}.",
+      "providers": {
+        "m365": {
+          "name": "Microsoft 365",
+          "description": "Inicia sesión con tu cuenta de Microsoft (de trabajo o personal) para que Synaplan pueda leer tu correo de Outlook. Solo lectura, y puedes desconectarla cuando quieras.",
+          "connect": "Conectar Microsoft 365",
+          "connecting": "Abriendo Microsoft…",
+          "connected": "Microsoft 365 está conectado.",
+          "startFailed": "No se pudo abrir la página de inicio de sesión de Microsoft. Inténtalo de nuevo.",
+          "unavailable": "Todavía no disponible: Microsoft 365 debe configurarse una vez para esta instalación.",
+          "adminLink": "Configúralo en los ajustes del sistema.",
+          "askAdmin": "Pide a una persona administradora que lo active.",
+          "errors": {
+            "access_denied": "Cancelaste el inicio de sesión de Microsoft, así que no se conectó nada.",
+            "missing_code": "Microsoft envió una respuesta incompleta. Vuelve a iniciar la conexión.",
+            "exchange_failed": "Microsoft aceptó el inicio de sesión, pero no se pudo obtener el token. Revisa el secreto de cliente en los ajustes del sistema e inténtalo de nuevo.",
+            "invalid_state": "El inicio de sesión tardó demasiado o se empezó en otra pestaña. Inténtalo de nuevo.",
+            "unknown": "No se pudo conectar Microsoft 365. Inténtalo de nuevo."
+          },
+          "hosting": "Tu correo permanece en Microsoft, un proveedor de nube con sede en EE. UU."
+        },
+        "mailbox": {
+          "name": "Buzón (IMAP)",
+          "description": "Cualquier buzón compatible con IMAP, con usuario y contraseña: por ejemplo una cuenta de Gmail con contraseña de aplicación o tu propio servidor de correo.",
+          "action": "Configurar buzón"
+        },
+        "mcp": {
+          "name": "Sistema conectado (MCP)",
+          "description": "Dale a la IA herramientas de un servidor MCP externo, como un sistema de tickets o tu propio servicio.",
+          "action": "Añadir sistema"
+        }
       }
     },
     "aiModels": {

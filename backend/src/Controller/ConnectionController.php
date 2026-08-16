@@ -206,6 +206,7 @@ final class ConnectionController extends AbstractController
     #[OA\Post(
         path: '/api/v1/connections/{id}/test',
         summary: 'Test a registry connection',
+        description: 'Types with a tester (currently Microsoft 365) are verified against the real system and report test_succeeded plus a readable error; other types only confirm that a credential is stored.',
         tags: ['Connections'],
         responses: [
             new OA\Response(
@@ -213,7 +214,7 @@ final class ConnectionController extends AbstractController
                 description: 'Test result',
                 content: new OA\JsonContent(
                     properties: [
-                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'success', type: 'boolean', example: true, description: 'The request was handled; see test_succeeded for the outcome'),
                         new OA\Property(
                             property: 'connection',
                             type: 'object',
@@ -222,10 +223,13 @@ final class ConnectionController extends AbstractController
                                 new OA\Property(property: 'source', type: 'string', example: 'registry'),
                                 new OA\Property(property: 'type', type: 'string', example: 'webdav'),
                                 new OA\Property(property: 'name', type: 'string'),
-                                new OA\Property(property: 'status', type: 'string', example: 'connected'),
+                                new OA\Property(property: 'status', type: 'string', example: 'connected', enum: ['never_tested', 'connected', 'error', 'reauth_required', 'disconnected']),
                                 new OA\Property(property: 'last_checked', type: 'integer', nullable: true),
                                 new OA\Property(property: 'has_secret', type: 'boolean', example: true),
                                 new OA\Property(property: 'config', type: 'object', nullable: true),
+                                new OA\Property(property: 'test_succeeded', type: 'boolean', nullable: true, description: 'Present only for types with a tester'),
+                                new OA\Property(property: 'test_error', type: 'string', nullable: true, description: 'Readable reason when test_succeeded is false'),
+                                new OA\Property(property: 'account', type: 'string', nullable: true, description: 'Remote account the connection points at, when the tester can report one'),
                             ]
                         ),
                     ]
