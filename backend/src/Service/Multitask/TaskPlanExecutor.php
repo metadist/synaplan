@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\Entity\Message;
+use App\Repository\PromptRepository;
+use App\Repository\SavedTaskRepository;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\DagExecutor;
@@ -12,6 +14,8 @@ use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\PerfTimer;
+use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
+use App\Service\SavedTask\SavedTaskConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -74,6 +78,10 @@ final readonly class TaskPlanExecutor
         private ModelConfigService $modelConfigService,
         private MultitaskRoutingConfig $multitaskConfig,
         private LoggerInterface $logger,
+        private ?SavedTaskConfig $savedTaskConfig = null,
+        private ?SavedTaskRepository $savedTasks = null,
+        private ?PromptRepository $prompts = null,
+        private ?SavedTaskPlanFactory $savedTaskPlanFactory = null,
     ) {
     }
 
@@ -254,6 +262,11 @@ final readonly class TaskPlanExecutor
             return null;
         }
 
+        $authored = $this->authoredSavedTaskPlan($message, $classification);
+        if (null !== $authored) {
+            return $authored;
+        }
+
         if ($this->sorterVotedSingleStep($message, $classification)) {
             $this->logger->info('TaskPlanExecutor: sorter voted single step, skipping planner', [
                 'message_id' => $message->getId(),
@@ -322,6 +335,71 @@ final readonly class TaskPlanExecutor
 
             return null;
         }
+    }
+
+    /**
+     * Flag-gated short-circuit: an enabled Saved Task with an authored graph
+     * replaces the planner. No graph ⇒ identical to today (invariant C3).
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function authoredSavedTaskPlan(Message $message, array $classification): ?TaskPlanResult
+    {
+        if (null === $this->savedTaskConfig || null === $this->savedTasks || null === $this->prompts || null === $this->savedTaskPlanFactory) {
+            return null;
+        }
+
+        $topic = $classification['topic'] ?? null;
+        if (!is_string($topic) || '' === $topic) {
+            return null;
+        }
+
+        try {
+            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        // Anonymous channels (e.g. WhatsApp senders without an account) have no
+        // per-user Saved Tasks; without this bail-out the null user id fatals in
+        // findByTopicAndUser() and 500s the whole webhook.
+        if (null === $userId) {
+            return null;
+        }
+
+        if (!$this->savedTaskConfig->isEnabled($userId)) {
+            return null;
+        }
+
+        $prompt = $this->prompts->findByTopicAndUser($topic, $userId);
+        if (null === $prompt || null === $prompt->getId()) {
+            return null;
+        }
+
+        $task = $this->savedTasks->findEnabledChatTaskForPrompt($prompt->getId(), $userId);
+        if (null === $task || null === $task->getGraph()) {
+            return null;
+        }
+
+        try {
+            $plan = $this->savedTaskPlanFactory->fromTask($task, is_string($classification['language'] ?? null) ? $classification['language'] : 'en');
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanExecutor: authored Saved Task graph rejected', [
+                'message_id' => $message->getId(),
+                'task_id' => $task->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        $this->logger->info('TaskPlanExecutor: using authored Saved Task steps', [
+            'message_id' => $message->getId(),
+            'task_id' => $task->getId(),
+            'task_name' => $task->getName(),
+        ]);
+
+        return new TaskPlanResult($plan, fallback: false);
     }
 
     /**

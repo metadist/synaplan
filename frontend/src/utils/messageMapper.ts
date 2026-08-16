@@ -296,6 +296,7 @@ export interface ApiLoadedMessageRow {
       capability: string
       kind: string
       state: string
+      depends_on?: string[]
       text?: string
       url?: string
       type?: string
@@ -444,6 +445,9 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         capability: c.capability,
         kind,
         state,
+        dependsOn: Array.isArray(c.depends_on)
+          ? c.depends_on.filter((id): id is string => typeof id === 'string')
+          : [],
         text: c.text ?? '',
         url: cardUrl,
         mediaType: c.type,

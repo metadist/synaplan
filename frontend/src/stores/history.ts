@@ -235,6 +235,8 @@ export interface TaskCard {
   capability: string
   kind: TaskCardKind
   state: TaskCardState
+  /** Upstream step ids this step waited on (empty/undefined for roots). */
+  dependsOn?: string[]
   text?: string
   url?: string
   mediaType?: string

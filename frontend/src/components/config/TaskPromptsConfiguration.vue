@@ -337,6 +337,15 @@
               </div>
               <p class="text-xs txt-secondary font-mono truncate">{{ currentPrompt.topic }}</p>
             </div>
+            <button
+              v-if="showSaveAsTask"
+              type="button"
+              class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+              data-testid="btn-save-as-task"
+              @click="onSaveAsTask"
+            >
+              {{ $t('config.savedTasks.saveAsTask') }}
+            </button>
           </div>
 
           <!-- System prompt info banner -->
@@ -376,6 +385,20 @@
               </p>
             </div>
           </div>
+
+          <p
+            v-if="showSaveAsTask && !currentSavedTask"
+            class="text-xs txt-secondary mb-4"
+            data-testid="saved-task-empty-hint"
+          >
+            {{ $t('config.savedTasks.emptyHint') }}
+          </p>
+          <SavedTaskCard
+            v-if="currentSavedTask"
+            class="mb-4"
+            :task="currentSavedTask"
+            @updated="onSavedTaskUpdated"
+          />
 
           <!-- Tab nav -->
           <div class="tab-nav !mb-4" role="tablist" data-testid="section-prompt-tabs">
@@ -1187,7 +1210,10 @@ import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
 import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
 import { useAuthStore } from '@/stores/auth'
+import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
+import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
+import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 import { ApiError } from '@/services/api/httpClient'
 
 const SELECTION_RULES_TEMPLATE =
@@ -1230,6 +1256,48 @@ const { t, locale } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
+const savedTasks = ref<SavedTask[]>([])
+
+const currentSavedTask = computed(
+  () => savedTasks.value.find((task) => task.promptId === currentPrompt.value?.id) ?? null
+)
+
+const showSaveAsTask = computed(
+  () =>
+    isSavedTasksEnabled() &&
+    currentPrompt.value !== null &&
+    currentSavedTask.value === null &&
+    (!currentPrompt.value.isDefault || currentPrompt.value.isUserOverride === true)
+)
+
+const loadSavedTasks = async () => {
+  if (!isSavedTasksEnabled()) {
+    savedTasks.value = []
+    return
+  }
+  try {
+    savedTasks.value = await savedTasksApi.list()
+  } catch {
+    savedTasks.value = []
+  }
+}
+
+const onSavedTaskUpdated = (task: SavedTask) => {
+  savedTasks.value = savedTasks.value.map((row) => (row.id === task.id ? task : row))
+}
+
+const onSaveAsTask = async () => {
+  if (!currentPrompt.value) {
+    return
+  }
+  try {
+    const task = await savedTasksApi.create(currentPrompt.value.id, currentPrompt.value.name)
+    savedTasks.value = [...savedTasks.value.filter((row) => row.id !== task.id), task]
+    success(t('config.savedTasks.created'))
+  } catch {
+    showError(t('config.savedTasks.createFailed'))
+  }
+}
 
 const PROMPT_LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -2178,7 +2246,7 @@ watch(locale, () => {
 
 onMounted(() => {
   cleanupGuard = setupNavigationGuard()
-  Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles()]).then(() => {
+  Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles(), loadSavedTasks()]).then(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const topicParam = urlParams.get('topic')
     if (topicParam) {

@@ -13,6 +13,8 @@ commands** for production-essential catalog data. Demo/test data lives in DataFi
 | Rate-limit config (`BCONFIG`)    | `App\Seed\RateLimitConfigSeeder` / `app:ratelimit:seed-defaults` | dev + prod      |
 | Subscription budgets (`BSUBSCRIPTIONS`) | `App\Seed\SubscriptionPlanSeeder`                         | dev + prod      |
 | Multitask routing flags (`BCONFIG`) | `App\Seed\MultitaskConfigSeeder`                              | dev + prod      |
+| Saved Tasks flag (`BCONFIG`)     | `App\Seed\SavedTaskConfigSeeder` / `app:seed`                | dev + prod      |
+| Saved Tasks + connections (`BSAVEDTASKS`, `BSAVEDTASK_RUNS`, `BCONNECTIONS`, `BCREDENTIALS`) | Doctrine migration `Version20260815140000` | dev + prod      |
 | Demo widget config (`BCONFIG`)   | `App\Seed\DemoWidgetConfigSeeder`                                | dev + test only |
 | Demo users (`BUSER`)             | `App\DataFixtures\UserFixtures`                                  | dev + test only |
 

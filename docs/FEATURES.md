@@ -20,11 +20,19 @@ Complex requests are decomposed into a plan instead of a single AI call:
 
 - **AI planner** — splits a message into capability nodes (extract → summarize → generate media → compose reply) as a small task DAG
 - **Live task cards** — each step streams its progress into the chat UI while it runs
+- **Step graph** — a completed multi-step plan can be viewed as a simple step list in chat
 - **Smart classification** — rule-based routing (per-topic task prompts) plus an AI sorter for topic + language detection
 - **Multi-file delivery** — a single request can return several generated files, across chat, WhatsApp, email, and webhooks
 - **Safe rollout** — shadow mode plans without executing; existing installs keep the classic single-handler path until enabled
+- **Step graph** — completed multi-task turns can show the executed plan as a read-only step graph in chat (disclosure next to the task cards)
 
 Configuration: [CONFIGURATION.md → Multi-Task Routing](CONFIGURATION.md#multi-task-routing-bconfig)
+
+## Saved Tasks
+
+Pin a Task Prompt as a **Saved Task** and run it on demand or on a weekday / daily / hourly schedule. Lives on **AI Instructions** — not a new product name. Behind `SAVEDTASKS / ENABLED` (off when no BCONFIG row exists; seeded on for new/local installs). Three consecutive failures auto-pause the task. The chat widget never runs Saved Tasks. Connections (mailboxes, MCP, folders) are listed under **Channels → Connections**.
+
+Configuration: [CONFIGURATION.md → Saved Tasks](CONFIGURATION.md#saved-tasks-bconfig)
 
 ## RAG System
 

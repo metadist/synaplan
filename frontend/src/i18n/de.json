@@ -121,7 +121,8 @@
     "accountDeletion": "Konto löschen",
     "onboarding": "Willkommen",
     "mcpServers": "MCP-Server",
-    "aiAgents": "KI-Agenten"
+    "aiAgents": "KI-Agenten",
+    "connections": "Verbindungen"
   },
   "addinConnect": {
     "title": "Mit Synaplan verbinden",
@@ -510,6 +511,20 @@
         "title": "Konfiguration aktualisiert — Neustart erforderlich",
         "message": "Ihre Änderungen wurden in der .env-Datei gespeichert. Damit die Änderungen wirksam werden, müssen Sie Ihre Docker-Container neu starten.",
         "copyCommand": "Befehl kopieren"
+      },
+      "m365": {
+        "title": "Damit diese Felder wirken: App in Azure registrieren",
+        "intro": "Die Microsoft-365-Anmeldung braucht eine App-Registrierung in Azure. Das machst du einmal, es dauert etwa fünf Minuten, und danach kann jede Person ihr eigenes Konto verbinden.",
+        "portalLink": "Azure-Portal → App-Registrierungen",
+        "step1": "Öffne {portal} und wähle „Neue Registrierung“. Der Name ist frei, zum Beispiel „Synaplan“.",
+        "step2": "Wähle unter „Umleitungs-URI“ den Plattformtyp Web (nicht SPA) und füge genau diese Adresse ein:",
+        "step3": "Gehe zu „API-Berechtigungen“ → „Berechtigung hinzufügen“ → „Microsoft Graph“ → „Delegierte Berechtigungen“ und füge alle diese hinzu:",
+        "step3Note": "offline_access ist Pflicht: Ohne diese Berechtigung stellt Microsoft kein Refresh-Token aus, und jeder geplante Lauf hört nach einer Stunde auf zu funktionieren.",
+        "step4": "Gehe zu „Zertifikate & Geheimnisse“ → „Neuer Geheimer Clientschlüssel“ und kopiere die Spalte Wert – nicht die Geheimnis-ID. Sie wird nur dieses eine Mal angezeigt.",
+        "step5": "Trage Client-ID und Secret unten ein, setze den Mandanten und schalte M365_ENABLED ein. Danach verbinden die Nutzer ihr eigenes Konto unter Kanäle → Verbindungen.",
+        "ready": "Fertig eingerichtet – Nutzer können ihr Microsoft-365-Konto unter Kanäle → Verbindungen verbinden.",
+        "notReady": "Noch nicht aktiv. Fülle die Felder unten aus und schalte M365_ENABLED ein.",
+        "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell."
       }
     }
   },
@@ -529,6 +544,7 @@
     "toolsDocSummary": "Zusammenfasser",
     "toolsMailHandler": "E-Mail-Automatisierung",
     "mcpServers": "MCP-Server",
+    "connections": "Verbindungen",
     "plugins": "Plugins",
     "files": "Quellen",
     "filesDescription": "Quellen für deine Chats",
@@ -1142,6 +1158,8 @@
   },
   "taskPlan": {
     "title": "Aufgabenplan",
+    "showSteps": "Schritte anzeigen",
+    "hideSteps": "Schritte ausblenden",
     "download": "Herunterladen",
     "failedBody": "Dieser Schritt konnte nicht abgeschlossen werden.",
     "cancelledBody": "Du hast diesen Schritt gestoppt.",
@@ -1716,6 +1734,148 @@
       "listCount": "keine Topics | {n} Topic | {n} Topics",
       "expandAll": "Alle ausklappen",
       "collapseAll": "Alle einklappen"
+    },
+    "savedTasks": {
+      "saveAsTask": "Als Aufgabe speichern",
+      "comingSoonTitle": "Gespeicherte Aufgabe",
+      "comingSoonBody": "Damit kannst du diese Anweisung nach einem Zeitplan oder über einen Kanal ausführen. Folgt in einem späteren Update.",
+      "emptyHint": "Eine gespeicherte Aufgabe führt diese Anweisung aus, wenn du sie startest — später auch nach Zeitplan.",
+      "title": "Gespeicherte Aufgabe",
+      "on": "An",
+      "off": "Aus",
+      "runNow": "Jetzt ausführen",
+      "runNowHint": "Was soll diese Aufgabe in diesem Durchlauf tun?",
+      "runStarted": "Die Aufgabe läuft in einem eigenen Gespräch.",
+      "runFailed": "Die Ausführung konnte nicht abgeschlossen werden.",
+      "updateFailed": "Die gespeicherte Aufgabe konnte nicht aktualisiert werden.",
+      "runsFailed": "Ausführungen konnten nicht geladen werden.",
+      "scheduleSaved": "Zeitplan gespeichert.",
+      "resumed": "Die Aufgabe läuft wieder.",
+      "resume": "Fortsetzen",
+      "viewRuns": "Ausführungen anzeigen",
+      "hideRuns": "Ausführungen ausblenden",
+      "advancedSteps": "Erweiterte Schritte",
+      "advancedHint": "Nur öffnen, wenn du genaue Schritte festlegen willst. Die meisten Aufgaben brauchen nur „Jetzt ausführen“ und einen Zeitplan.",
+      "autoPauseTitle": "Automatisch pausiert",
+      "autoPauseBody": "Diese Aufgabe ist dreimal hintereinander fehlgeschlagen. Behebe das Problem und setze sie fort.",
+      "createFailed": "Konnte nicht als Aufgabe gespeichert werden.",
+      "created": "Als Aufgabe gespeichert. Du kannst sie jetzt ausführen.",
+      "state": {
+        "off": "Läuft nicht",
+        "neverRun": "Gespeichert — noch nicht ausgeführt",
+        "scheduled": "Geplant — erste Ausführung {when}",
+        "running": "Läuft gerade",
+        "lastRun": "Letzte Ausführung: {when}",
+        "autoPaused": "Automatisch pausiert"
+      },
+      "schedule": {
+        "off": "Kein Zeitplan",
+        "hourly": "Jede Stunde",
+        "daily": "Jeden Tag",
+        "weekdays": "Jeden Werktag"
+      },
+      "summary": {
+        "template": "Läuft {when}. Liest {reads} → Speichert {saves}."
+      }
+    },
+    "connections": {
+      "title": "Verbindungen",
+      "subtitle": "Die externen Systeme, aus denen Synaplan für dich lesen und in die es schreiben darf.",
+      "empty": "Noch nichts verbunden. Wähle unten eine Option – das dauert etwa eine Minute.",
+      "loading": "Verbindungen werden geladen…",
+      "loadFailed": "Verbindungen konnten nicht geladen werden.",
+      "test": "Verbindung testen",
+      "testOk": "Die Verbindung sieht gut aus.",
+      "testFailed": "Der Verbindungstest ist fehlgeschlagen.",
+      "status": {
+        "connected": "Verbunden",
+        "error": "Fehler",
+        "reauth_required": "Neu verbinden erforderlich",
+        "never_tested": "Noch nicht getestet",
+        "disconnected": "Getrennt"
+      },
+      "types": {
+        "mailbox": "Postfach",
+        "mcp": "Verbundenes System",
+        "webdav": "Ordner",
+        "webhook": "Aufruf-Adresse",
+        "caldav": "Kalender",
+        "generic": "Verbindung",
+        "m365": "Microsoft 365"
+      },
+      "failure": {
+        "unauthorized": "{connection} hat die Anmeldung abgelehnt. Verbinde es erneut, um fortzufahren.",
+        "not_found": "Der Ordner {target} existiert in {connection} nicht mehr.",
+        "quota_exceeded": "{connection} hat keinen Speicherplatz mehr.",
+        "too_large": "Die Datei ist größer, als {connection} akzeptiert.",
+        "unreachable": "{connection} war nicht erreichbar. Synaplan versucht es beim nächsten Lauf erneut.",
+        "conflict": "Eine Datei mit diesem Namen existiert bereits; gespeichert als {newName}.",
+        "rate_limited": "Dein Nutzungslimit wurde erreicht, daher wurde dieser Lauf übersprungen.",
+        "unsupported": "Dieser Dateityp kann nicht an {connection} übergeben werden."
+      },
+      "explainer": "Richte ein System hier einmal ein. Gespeicherte Aufgaben und die KI können es danach nutzen – zum Beispiel, um deine neuesten Outlook-Mails zu lesen. Dein Passwort wird nie gespeichert: Microsoft 365 fragt dich nach der Anmeldung und gibt Synaplan ein Token, das du jederzeit zurückziehen kannst.",
+      "yourConnections": "Deine Verbindungen",
+      "addTitle": "Verbindung hinzufügen",
+      "addSubtitle": "Was die einzelnen Optionen tun und wohin sie dich führen.",
+      "lastChecked": "geprüft {when}",
+      "reauthHint": "Microsoft akzeptiert die gespeicherte Anmeldung nicht mehr. Verbinde neu, damit geplante Aufgaben wieder laufen.",
+      "reconnect": "Neu verbinden",
+      "testing": "Wird getestet…",
+      "testOkAccount": "Verbindung funktioniert – angemeldet als {account}.",
+      "providers": {
+        "m365": {
+          "name": "Microsoft 365",
+          "description": "Melde dich mit deinem geschäftlichen oder privaten Microsoft-Konto an, damit Synaplan deine Outlook-Mails lesen kann. Nur lesend, und du kannst die Verbindung jederzeit trennen.",
+          "connect": "Microsoft 365 verbinden",
+          "connecting": "Microsoft wird geöffnet…",
+          "connected": "Microsoft 365 ist verbunden.",
+          "startFailed": "Die Microsoft-Anmeldeseite konnte nicht geöffnet werden. Bitte versuche es erneut.",
+          "unavailable": "Noch nicht verfügbar – Microsoft 365 muss für diese Installation einmalig eingerichtet werden.",
+          "adminLink": "In den Systemeinstellungen einrichten.",
+          "askAdmin": "Bitte eine Administratorin oder einen Administrator, es zu aktivieren.",
+          "errors": {
+            "access_denied": "Du hast die Microsoft-Anmeldung abgebrochen, es wurde nichts verbunden.",
+            "missing_code": "Microsoft hat eine unvollständige Antwort geschickt. Bitte starte die Verbindung erneut.",
+            "exchange_failed": "Microsoft hat die Anmeldung akzeptiert, aber das Token konnte nicht abgeholt werden. Prüfe den Client Secret in den Systemeinstellungen und versuche es erneut.",
+            "invalid_state": "Die Anmeldung hat zu lange gedauert oder wurde in einem anderen Tab gestartet. Bitte versuche es erneut.",
+            "unknown": "Microsoft 365 konnte nicht verbunden werden. Bitte versuche es erneut."
+          },
+          "hosting": "Deine Mails bleiben bei Microsoft, einem Cloud-Anbieter mit Sitz in den USA."
+        },
+        "mailbox": {
+          "name": "Postfach (IMAP)",
+          "description": "Jedes Postfach mit IMAP, per Benutzername und Passwort – zum Beispiel ein Gmail-Konto mit App-Passwort oder dein eigener Mailserver.",
+          "action": "Postfach einrichten"
+        },
+        "mcp": {
+          "name": "Verbundenes System (MCP)",
+          "description": "Gib der KI Werkzeuge von einem externen MCP-Server, etwa einem Ticketsystem oder deinem eigenen Dienst.",
+          "action": "System hinzufügen"
+        },
+        "dav": {
+          "name": "Nextcloud-Ordner & -Kalender (WebDAV)",
+          "description": "Speichert Aufgaben-Ergebnisse in deinem Cloud-Ordner und trägt Termine in deinen Kalender ein. Funktioniert mit Nextcloud, ownCloud und jedem WebDAV-Server.",
+          "hosting": "Verbindet sich mit einem Server deiner Wahl — deine Dateien bleiben in deiner eigenen Cloud.",
+          "action": "Verbinden",
+          "kind": {
+            "nextcloud": "Nextcloud / ownCloud",
+            "webdav": "Andere WebDAV-Adresse"
+          },
+          "serverUrl": "Server-Adresse",
+          "davUrl": "WebDAV-Adresse (vollständige URL)",
+          "username": "Benutzername",
+          "appPassword": "App-Passwort",
+          "appPasswordHint": "Erstelle eines in Nextcloud unter Einstellungen → Sicherheit → Geräte & Sitzungen. Dein Konto-Passwort wird nie gespeichert.",
+          "folder": "Ordner für Ergebnisse",
+          "withCalendar": "Auch einen Kalender verbinden:",
+          "connect": "Verbinden",
+          "connecting": "Verbinde…",
+          "created": "{name} ist verbunden.",
+          "createFailed": "Die Verbindung konnte nicht erstellt werden. Prüfe die Adresse und versuche es erneut.",
+          "folderName": "{host}-Ordner ({user})",
+          "calendarName": "{host}-Kalender ({calendar})"
+        }
+      }
     },
     "routing": {
       "title": "Routing",

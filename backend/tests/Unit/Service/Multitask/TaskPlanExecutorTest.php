@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask;
 
 use App\Entity\Message;
+use App\Repository\ConfigRepository;
+use App\Repository\PromptRepository;
+use App\Repository\SavedTaskRepository;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\ClassificationPlanMapper;
@@ -16,6 +19,9 @@ use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanResult;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\PerfTimer;
+use App\Service\SavedTask\Graph\SavedTaskGraphValidator;
+use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
+use App\Service\SavedTask\SavedTaskConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -591,6 +597,46 @@ final class TaskPlanExecutorTest extends TestCase
         );
 
         self::assertNotContains('planning', $statuses);
+    }
+
+    public function testAnonymousMessageSkipsSavedTaskLookupInsteadOfFatalling(): void
+    {
+        // Regression: WhatsApp senders without an account have no effective
+        // user id. The Saved-Task short-circuit must bail out instead of
+        // passing null into PromptRepository::findByTopicAndUser(int) — that
+        // TypeError 500'd every inbound WhatsApp webhook.
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->expects(self::never())->method('findByTopicAndUser');
+
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(null);
+
+        $executor = new TaskPlanExecutor(
+            $this->router,
+            new ClassificationPlanMapper(),
+            $this->store,
+            $this->planner,
+            $this->dagExecutor,
+            $this->modelConfigService,
+            $this->multitaskConfig,
+            $this->createMock(LoggerInterface::class),
+            new SavedTaskConfig($this->createMock(ConfigRepository::class)),
+            $this->createMock(SavedTaskRepository::class),
+            $prompts,
+            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+        );
+
+        $this->planner->method('plan')
+            ->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: false, modelId: 76));
+        $this->router->expects(self::once())->method('routeStream')->willReturn(['content' => 'router answer']);
+
+        $result = $executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'general', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => true],
+            static function (): void {},
+        );
+
+        self::assertSame(['content' => 'router answer'], $result);
     }
 
     public function testPlannerCallIsRecordedAsItsOwnPerfPhase(): void

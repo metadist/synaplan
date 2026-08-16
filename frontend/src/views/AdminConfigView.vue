@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
+import M365SetupGuide from '@/components/admin/M365SetupGuide.vue'
 import UpdatePanel from '@/components/admin/UpdatePanel.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUpdatesStore } from '@/stores/updates'
@@ -21,6 +22,7 @@ import {
 } from '@/services/api/adminConfigApi'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const updatesStore = useUpdatesStore()
@@ -113,9 +115,45 @@ function toggleGroup(groupId: string) {
   openGroup.value = openGroup.value === groupId ? null : groupId
 }
 
+/** Section a deep link pointed at, ringed until the admin moves to another tab. */
+const highlightedSection = ref<string | null>(null)
+
 function selectTab(tabId: string) {
   activeTab.value = tabId
   openGroup.value = null
+  syncTabToUrl(tabId)
+}
+
+/**
+ * Keep the tab in the URL so a setting can be linked to directly — the tabs
+ * live inside two dropdowns, and "open Settings and look for it" is not a
+ * usable instruction.
+ */
+function syncTabToUrl(tabId: string) {
+  highlightedSection.value = null
+  if (route.query.tab === tabId) {
+    return
+  }
+  void router.replace({ query: { ...route.query, tab: tabId, section: undefined } })
+}
+
+async function applyDeepLink() {
+  const wantedTab = route.query.tab
+  if (typeof wantedTab === 'string' && schema.value?.tabs[wantedTab]) {
+    activeTab.value = wantedTab
+  }
+
+  const wantedSection = route.query.section
+  if (typeof wantedSection !== 'string' || '' === wantedSection) {
+    return
+  }
+  await nextTick()
+  const target = document.getElementById(`config-section-${wantedSection}`)
+  if (!target) {
+    return
+  }
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  highlightedSection.value = wantedSection
 }
 
 // Mobile tab dropdown: a single dropdown replaces the 3-group bar (same
@@ -138,6 +176,7 @@ function closeMobileTabMenu() {
 function selectMobileTab(tabId: string) {
   closeMobileTabMenu()
   activeTab.value = tabId
+  syncTabToUrl(tabId)
 }
 
 function handleTabBarOutsideClick(event: MouseEvent) {
@@ -291,6 +330,7 @@ onMounted(async () => {
     return
   }
   await loadConfig()
+  await applyDeepLink()
 })
 
 onBeforeUnmount(() => {
@@ -543,8 +583,14 @@ onBeforeUnmount(() => {
           <div class="space-y-8">
             <div
               v-for="section in currentSections"
+              :id="`config-section-${section.id}`"
               :key="section.id"
-              class="surface-card rounded-xl p-6"
+              class="surface-card rounded-xl p-6 scroll-mt-6"
+              :class="
+                highlightedSection === section.id
+                  ? 'outline outline-2 outline-offset-2 outline-[var(--brand)]'
+                  : ''
+              "
             >
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
@@ -563,6 +609,7 @@ onBeforeUnmount(() => {
               <p v-if="section.isLive" class="text-xs txt-secondary mb-4 -mt-2">
                 {{ $t('admin.config.liveHint') }}
               </p>
+              <M365SetupGuide v-if="section.id === 'm365'" />
               <div class="space-y-4">
                 <ConfigField
                   v-for="field in section.fields"

@@ -77,6 +77,7 @@ final class ConfigControllerPlannerModelTest extends TestCase
             $this->createStub(MarketingNewsConfig::class),
             $this->createStub(UsageTaximeterConfig::class),
             $this->createStub(RegistrationConfig::class),
+            $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
             $this->createStub(ChatReadinessService::class),
             $this->createStub(AiProviderDisclosure::class),
             $this->createStub(LocalAiDownloadStatusService::class),

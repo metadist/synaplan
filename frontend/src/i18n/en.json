@@ -121,7 +121,8 @@
     "accountDeletion": "Account Deletion",
     "onboarding": "Welcome",
     "mcpServers": "MCP Servers",
-    "aiAgents": "AI Agents"
+    "aiAgents": "AI Agents",
+    "connections": "Connections"
   },
   "addinConnect": {
     "title": "Connect to Synaplan",
@@ -515,6 +516,20 @@
         "title": "Configuration Updated — Restart Required",
         "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",
         "copyCommand": "Copy Command"
+      },
+      "m365": {
+        "title": "Before these fields work: register an app in Azure",
+        "intro": "Microsoft 365 sign-in needs an app registration in Azure. You do this once, it takes about five minutes, and afterwards every user can connect their own account.",
+        "portalLink": "Azure portal → App registrations",
+        "step1": "Open {portal} and choose “New registration”. Any name works, for example “Synaplan”.",
+        "step2": "Under “Redirect URI”, pick the platform type Web (not SPA) and paste this address exactly:",
+        "step3": "Go to “API permissions” → “Add a permission” → “Microsoft Graph” → “Delegated permissions” and add all of these:",
+        "step3Note": "offline_access is not optional: without it Microsoft issues no refresh token and every scheduled run stops working after an hour.",
+        "step4": "Go to “Certificates & secrets” → “New client secret” and copy the Value column — not the Secret ID. It is shown only this once.",
+        "step5": "Paste the client ID and the secret into the fields below, set the tenant, and switch M365_ENABLED on. Users then connect their own account under Channels → Connections.",
+        "ready": "Ready — users can connect their Microsoft 365 account under Channels → Connections.",
+        "notReady": "Not active yet. Fill in the fields below and switch M365_ENABLED on.",
+        "copyFailed": "Could not copy. Select the text and copy it manually."
       }
     }
   },
@@ -534,6 +549,7 @@
     "toolsDocSummary": "Summarizer",
     "toolsMailHandler": "Email Automation",
     "mcpServers": "MCP Servers",
+    "connections": "Connections",
     "plugins": "Plugins",
     "files": "Sources",
     "filesDescription": "Sources for your chats",
@@ -1677,6 +1693,148 @@
       "listCount": "no topics | {n} topic | {n} topics",
       "expandAll": "Expand all",
       "collapseAll": "Collapse all"
+    },
+    "savedTasks": {
+      "saveAsTask": "Save as task",
+      "comingSoonTitle": "Saved Task",
+      "comingSoonBody": "This will let you run this instruction on a schedule or from a channel. Coming in a later update.",
+      "emptyHint": "A Saved Task runs this instruction when you ask, or later on a schedule.",
+      "title": "Saved Task",
+      "on": "On",
+      "off": "Off",
+      "runNow": "Run now",
+      "runNowHint": "What should this task do in this run?",
+      "runStarted": "The task is running in its own conversation.",
+      "runFailed": "The run could not finish.",
+      "updateFailed": "Could not update this Saved Task.",
+      "runsFailed": "Could not load runs.",
+      "scheduleSaved": "Schedule saved.",
+      "resumed": "The task will run again.",
+      "resume": "Resume",
+      "viewRuns": "View runs",
+      "hideRuns": "Hide runs",
+      "advancedSteps": "Advanced steps",
+      "advancedHint": "Leave this closed unless you want to pin exact steps. Most tasks only need Run now and a schedule.",
+      "autoPauseTitle": "Paused automatically",
+      "autoPauseBody": "This task failed three times in a row. Fix the issue, then resume.",
+      "createFailed": "Could not save this as a task.",
+      "created": "Saved as a task. You can run it now.",
+      "state": {
+        "off": "Not running",
+        "neverRun": "Saved — not run yet",
+        "scheduled": "Scheduled — first run {when}",
+        "running": "Running now",
+        "lastRun": "Last run: {when}",
+        "autoPaused": "Paused automatically"
+      },
+      "schedule": {
+        "off": "No schedule",
+        "hourly": "Every hour",
+        "daily": "Every day",
+        "weekdays": "Every weekday"
+      },
+      "summary": {
+        "template": "Runs {when}. Reads {reads} → Saves {saves}."
+      }
+    },
+    "connections": {
+      "title": "Connections",
+      "subtitle": "The outside systems Synaplan may read from and write to on your behalf.",
+      "empty": "Nothing connected yet. Pick one of the options below to get started — it takes about a minute.",
+      "loading": "Loading connections…",
+      "loadFailed": "Could not load connections.",
+      "test": "Test connection",
+      "testOk": "Connection looks good.",
+      "testFailed": "The connection test failed.",
+      "status": {
+        "connected": "Connected",
+        "error": "Error",
+        "reauth_required": "Reconnect needed",
+        "never_tested": "Never tested",
+        "disconnected": "Disconnected"
+      },
+      "types": {
+        "mailbox": "Mailbox",
+        "mcp": "Connected system",
+        "webdav": "Folder",
+        "webhook": "Webhook",
+        "caldav": "Calendar",
+        "generic": "Connection",
+        "m365": "Microsoft 365"
+      },
+      "failure": {
+        "unauthorized": "{connection} rejected the login. Reconnect it to continue.",
+        "not_found": "The folder {target} no longer exists in {connection}.",
+        "quota_exceeded": "{connection} is out of space.",
+        "too_large": "The file is larger than {connection} accepts.",
+        "unreachable": "{connection} could not be reached. Synaplan will try again at the next run.",
+        "conflict": "A file with that name already exists; saved as {newName} instead.",
+        "rate_limited": "Your usage limit was reached, so this run was skipped.",
+        "unsupported": "This file type cannot be delivered to {connection}."
+      },
+      "explainer": "Connect a system once here. Saved tasks and the AI can then use it — for example to read your latest Outlook mail. Your password is never stored: Microsoft 365 asks you to sign in and gives Synaplan a token you can revoke at any time.",
+      "yourConnections": "Your connections",
+      "addTitle": "Add a connection",
+      "addSubtitle": "What each option does, and where it takes you.",
+      "lastChecked": "checked {when}",
+      "reauthHint": "Microsoft no longer accepts the saved sign-in. Reconnect to let scheduled tasks run again.",
+      "reconnect": "Reconnect",
+      "testing": "Testing…",
+      "testOkAccount": "Connection works — signed in as {account}.",
+      "providers": {
+        "m365": {
+          "name": "Microsoft 365",
+          "description": "Sign in with your Microsoft work or personal account so Synaplan can read your Outlook mail. Read-only, and you can disconnect at any time.",
+          "connect": "Connect Microsoft 365",
+          "connecting": "Opening Microsoft…",
+          "connected": "Microsoft 365 is connected.",
+          "startFailed": "Could not open the Microsoft sign-in page. Please try again.",
+          "unavailable": "Not available yet — Microsoft 365 has to be set up once for this installation.",
+          "adminLink": "Set it up in system settings.",
+          "askAdmin": "Ask an administrator to enable it.",
+          "errors": {
+            "access_denied": "You cancelled the Microsoft sign-in, so nothing was connected.",
+            "missing_code": "Microsoft sent an incomplete answer. Please start the connection again.",
+            "exchange_failed": "Microsoft accepted the sign-in but the token could not be collected. Check the client secret in system settings, then try again.",
+            "invalid_state": "The sign-in took too long or was started in another tab. Please try again.",
+            "unknown": "Microsoft 365 could not be connected. Please try again."
+          },
+          "hosting": "Your mail stays with Microsoft, a cloud provider based in the USA."
+        },
+        "mailbox": {
+          "name": "Mailbox (IMAP)",
+          "description": "Any mailbox that speaks IMAP, with user name and password — for example a Gmail account with an app password, or your own mail server.",
+          "action": "Set up mailbox"
+        },
+        "mcp": {
+          "name": "Connected system (MCP)",
+          "description": "Give the AI tools from an external MCP server, such as a ticket system or your own service.",
+          "action": "Add system"
+        },
+        "dav": {
+          "name": "Nextcloud folder & calendar (WebDAV)",
+          "description": "Save task results into your cloud folder and put meetings into your calendar. Works with Nextcloud, ownCloud and any WebDAV server.",
+          "hosting": "Connects to a server you choose — your files stay on your own cloud.",
+          "action": "Connect",
+          "kind": {
+            "nextcloud": "Nextcloud / ownCloud",
+            "webdav": "Other WebDAV address"
+          },
+          "serverUrl": "Server address",
+          "davUrl": "WebDAV address (full URL)",
+          "username": "Username",
+          "appPassword": "App password",
+          "appPasswordHint": "Create one in Nextcloud under Settings → Security → Devices & sessions. Your account password is never stored.",
+          "folder": "Folder for results",
+          "withCalendar": "Also connect a calendar:",
+          "connect": "Connect",
+          "connecting": "Connecting…",
+          "created": "{name} is connected.",
+          "createFailed": "The connection could not be created. Check the address and try again.",
+          "folderName": "{host} folder ({user})",
+          "calendarName": "{host} calendar ({calendar})"
+        }
+      }
     },
     "routing": {
       "title": "Routing",
@@ -3638,6 +3796,8 @@
   },
   "taskPlan": {
     "title": "Task plan",
+    "showSteps": "Show steps",
+    "hideSteps": "Hide steps",
     "download": "Download",
     "failedBody": "This step couldn't be completed.",
     "cancelledBody": "You stopped this step.",

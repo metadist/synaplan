@@ -16,6 +16,7 @@ use App\Seed\ModelSeeder;
 use App\Seed\MultitaskConfigSeeder;
 use App\Seed\PromptSeeder;
 use App\Seed\RateLimitConfigSeeder;
+use App\Seed\SavedTaskConfigSeeder;
 use App\Seed\SeedResult;
 use App\Seed\SubscriptionPlanSeeder;
 use App\Seed\UpdateConfigSeeder;
@@ -44,7 +45,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  12. usage-taximeter (BCONFIG: USAGE_TAXIMETER display switch, ownerId=0 — default ON)
  *  13. updates       (BCONFIG: UPDATES release-notice switch + manifest URL, ownerId=0 — default ON)
  *  14. messages-gateway (BCONFIG: MESSAGES_GATEWAY Anthropic-compatible API flags, ownerId=0 — default OFF)
- *  15. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *  15. saved-tasks   (BCONFIG: SAVEDTASKS.ENABLED, ownerId=0 — default ON for new/local installs)
+ *  16. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -71,6 +73,7 @@ final class SeedAllCommand extends Command
         private readonly UsageTaximeterConfigSeeder $usageTaximeterConfigSeeder,
         private readonly UpdateConfigSeeder $updateConfigSeeder,
         private readonly MessagesGatewayConfigSeeder $messagesGatewayConfigSeeder,
+        private readonly SavedTaskConfigSeeder $savedTaskConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -93,7 +96,8 @@ final class SeedAllCommand extends Command
             "  12. usage taximeter switch      (BCONFIG, group=USAGE_TAXIMETER, ownerId=0 — default ON)\n".
             "  13. update notice config       (BCONFIG, group=UPDATES, ownerId=0 — default ON)\n".
             "  14. messages gateway flags     (BCONFIG, group=MESSAGES_GATEWAY, ownerId=0 — default OFF)\n".
-            "  15. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  15. saved-tasks flag           (BCONFIG, group=SAVEDTASKS, ownerId=0 — default ON for new/local)\n".
+            "  16. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }
@@ -118,6 +122,7 @@ final class SeedAllCommand extends Command
             ['usage-taximeter', fn (): SeedResult => $this->usageTaximeterConfigSeeder->seed()],
             ['updates',      fn (): SeedResult => $this->updateConfigSeeder->seed()],
             ['messages-gateway', fn (): SeedResult => $this->messagesGatewayConfigSeeder->seed()],
+            ['saved-tasks', fn (): SeedResult => $this->savedTaskConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 

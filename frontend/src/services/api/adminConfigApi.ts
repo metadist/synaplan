@@ -17,6 +17,8 @@ const ConfigFieldSchemaZ = z.object({
   default: z.string(),
   source: z.enum(['env', 'database']).optional(),
   options: z.array(z.string()).optional(),
+  /** Example value shown inside the input; the description stays above it as help text. */
+  placeholder: z.string().optional(),
 })
 
 const ConfigSectionZ = z.object({
