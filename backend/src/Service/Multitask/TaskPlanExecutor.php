@@ -360,6 +360,13 @@ final readonly class TaskPlanExecutor
             return null;
         }
 
+        // Anonymous channels (e.g. WhatsApp senders without an account) have no
+        // per-user Saved Tasks; without this bail-out the null user id fatals in
+        // findByTopicAndUser() and 500s the whole webhook.
+        if (null === $userId) {
+            return null;
+        }
+
         if (!$this->savedTaskConfig->isEnabled($userId)) {
             return null;
         }
