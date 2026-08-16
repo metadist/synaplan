@@ -26,10 +26,10 @@ class SavedTaskRun
     #[ORM\Column(name: 'BSAVEDTASKID', type: 'bigint')]
     private int $savedTaskId;
 
-    #[ORM\Column(name: 'BSTATUS', length: 16)]
+    #[ORM\Column(name: 'BSTATUS', length: 16, options: ['default' => self::STATUS_QUEUED])]
     private string $status = self::STATUS_QUEUED;
 
-    #[ORM\Column(name: 'BTRIGGER', length: 32)]
+    #[ORM\Column(name: 'BTRIGGER', length: 32, options: ['default' => 'manual'])]
     private string $trigger = 'manual';
 
     #[ORM\Column(name: 'BMESSAGEID', type: 'bigint', nullable: true)]
@@ -39,7 +39,8 @@ class SavedTaskRun
     #[ORM\Column(name: 'BPLANSNAPSHOT', type: 'json', nullable: true)]
     private ?array $planSnapshot = null;
 
-    #[ORM\Column(name: 'BERROR', type: 'text', nullable: true)]
+    /** length 65535 pins the DBAL comparator to TEXT — the migration DDL — instead of LONGTEXT. */
+    #[ORM\Column(name: 'BERROR', type: 'text', length: 65535, nullable: true)]
     private ?string $error = null;
 
     #[ORM\Column(name: 'BSTARTED', type: 'datetime_immutable', nullable: true)]

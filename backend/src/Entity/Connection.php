@@ -55,7 +55,7 @@ class Connection
     #[ORM\Column(name: 'BNAME', length: 191)]
     private string $name;
 
-    #[ORM\Column(name: 'BSTATUS', length: 32)]
+    #[ORM\Column(name: 'BSTATUS', length: 32, options: ['default' => self::STATUS_NEVER_TESTED])]
     private string $status = self::STATUS_NEVER_TESTED;
 
     #[ORM\Column(name: 'BLASTCHECKED', type: 'bigint', nullable: true)]

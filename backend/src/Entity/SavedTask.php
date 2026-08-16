@@ -47,10 +47,10 @@ class SavedTask
     #[ORM\Column(name: 'BNAME', length: 191)]
     private string $name;
 
-    #[ORM\Column(name: 'BENABLED', type: 'boolean')]
+    #[ORM\Column(name: 'BENABLED', type: 'boolean', options: ['default' => 1])]
     private bool $enabled = true;
 
-    #[ORM\Column(name: 'BTRIGGERTYPE', length: 32)]
+    #[ORM\Column(name: 'BTRIGGERTYPE', length: 32, options: ['default' => self::TRIGGER_MANUAL])]
     private string $triggerType = self::TRIGGER_MANUAL;
 
     /** @var array<string, mixed>|null */
@@ -61,7 +61,7 @@ class SavedTask
     #[ORM\Column(name: 'BGRAPH', type: 'json', nullable: true)]
     private ?array $graph = null;
 
-    #[ORM\Column(name: 'BALLOWUNATTENDED', type: 'boolean')]
+    #[ORM\Column(name: 'BALLOWUNATTENDED', type: 'boolean', options: ['default' => 0])]
     private bool $allowUnattended = false;
 
     #[ORM\Column(name: 'BCHATID', type: 'bigint', nullable: true)]
@@ -73,7 +73,7 @@ class SavedTask
     #[ORM\Column(name: 'BLASTRUNAT', type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $lastRunAt = null;
 
-    #[ORM\Column(name: 'BCONSECUTIVEFAILURES', type: 'integer')]
+    #[ORM\Column(name: 'BCONSECUTIVEFAILURES', type: 'integer', options: ['default' => 0])]
     private int $consecutiveFailures = 0;
 
     #[ORM\Column(name: 'BCREATED', type: 'bigint')]
