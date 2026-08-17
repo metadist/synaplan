@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "stable": {
-    "version": "4.1.2",
-    "releasedAt": "2026-08-12T09:26:43Z",
-    "notesUrl": "https://github.com/metadist/synaplan/releases/tag/v4.1.2",
+    "version": "4.2.0",
+    "releasedAt": "2026-08-17T17:14:23Z",
+    "notesUrl": "https://github.com/metadist/synaplan/releases/tag/v4.2.0",
     "severity": "normal"
   },
   "yanked": []
