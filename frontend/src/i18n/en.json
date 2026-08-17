@@ -1713,7 +1713,6 @@
       "on": "On",
       "off": "Off",
       "runNow": "Run now",
-      "runNowHint": "What should this task do in this run?",
       "runStarted": "The task is running in its own conversation.",
       "runFailed": "The run could not finish.",
       "updateFailed": "Could not update this Saved Task.",
@@ -1721,8 +1720,23 @@
       "scheduleSaved": "Schedule saved.",
       "resumed": "The task will run again.",
       "resume": "Resume",
-      "viewRuns": "View runs",
-      "hideRuns": "Hide runs",
+      "viewRuns": "Run history",
+      "hideRuns": "Hide history",
+      "runsRetention": "Older runs are removed automatically.",
+      "runsEmpty": "No runs yet.",
+      "runStatus": {
+        "queued": "Waiting",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "runTrigger": {
+        "manual": "started by you",
+        "schedule": "scheduled run",
+        "chat": "from chat",
+        "inbound_email": "incoming email"
+      },
       "advancedSteps": "Advanced steps",
       "advancedHint": "Leave this closed unless you want to pin exact steps. Most tasks only need Run now and a schedule.",
       "autoPauseTitle": "Paused automatically",

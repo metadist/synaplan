@@ -3,12 +3,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import type { SavedTask, SavedTaskRun } from '@/services/api/savedTasksApi'
 
-const { mockUpdate, mockRun, mockRuns, mockResume, mockPrompt, mockPush } = vi.hoisted(() => ({
+const { mockUpdate, mockRun, mockRuns, mockResume, mockPush } = vi.hoisted(() => ({
   mockUpdate: vi.fn(),
   mockRun: vi.fn(),
   mockRuns: vi.fn(),
   mockResume: vi.fn(),
-  mockPrompt: vi.fn(),
   mockPush: vi.fn(),
 }))
 
@@ -19,10 +18,6 @@ vi.mock('@/services/api/savedTasksApi', () => ({
     runs: mockRuns,
     resume: mockResume,
   },
-}))
-
-vi.mock('@/composables/useDialog', () => ({
-  useDialog: () => ({ prompt: mockPrompt }),
 }))
 
 vi.mock('@/composables/useNotification', () => ({
@@ -83,7 +78,6 @@ const mountCard = (value: SavedTask) =>
 describe('SavedTaskCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockPrompt.mockResolvedValue('Look for meeting requests')
     mockUpdate.mockImplementation(async (_id: number, patch: Record<string, unknown>) =>
       task({ ...patch } as Partial<SavedTask>)
     )
@@ -163,7 +157,7 @@ describe('SavedTaskCard', () => {
     expect(wrapper.text()).toContain('Runs when you start it.')
   })
 
-  it('shows running copy while Run now is in flight', async () => {
+  it('runs immediately without asking for a message', async () => {
     let resolveRun: (value: { task: SavedTask; run: SavedTaskRun }) => void = () => undefined
     mockRun.mockReturnValue(
       new Promise((resolve) => {
@@ -173,6 +167,8 @@ describe('SavedTaskCard', () => {
     const wrapper = mountCard(task())
     await wrapper.get('[data-testid="btn-run-now"]').trigger('click')
     await flushPromises()
+    // One click, one run — the stored instruction is used, no dialog.
+    expect(mockRun).toHaveBeenCalledWith(7)
     expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain('Running now')
     resolveRun({
       task: task({ lastRunAt: '2026-08-15T12:00:00+00:00', chatId: 44 }),
@@ -204,5 +200,21 @@ describe('SavedTaskCard', () => {
     expect(wrapper.get('[data-testid="saved-task-runs"]').text()).toContain(
       'Your usage limit was reached, so this run was skipped.'
     )
+  })
+
+  it('localizes run status and trigger instead of raw enum codes', async () => {
+    mockRuns.mockResolvedValue({
+      runs: [run({ status: 'completed', trigger: 'schedule' })],
+      retention: 'ignored backend prose',
+    })
+    const wrapper = mountCard(task({ lastRunAt: '2026-08-15T12:00:00+00:00' }))
+    await wrapper.get('[data-testid="btn-view-runs"]').trigger('click')
+    await flushPromises()
+    const text = wrapper.get('[data-testid="saved-task-runs"]').text()
+    expect(text).toContain('Completed')
+    expect(text).toContain('scheduled run')
+    // The English retention prose from the backend is never shown raw.
+    expect(text).not.toContain('ignored backend prose')
+    expect(text).toContain('Older runs are removed automatically.')
   })
 })

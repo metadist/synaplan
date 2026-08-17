@@ -3177,6 +3177,13 @@ const streamAIResponse = async (
             if (message) {
               applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
 
+              // Multitask: the DAG finished — freeze the task cards so the plan
+              // renders as final and the schedule clock appears immediately
+              // (canSchedule requires !plan.active), without a page reload.
+              if (message.taskPlan) {
+                message.taskPlan.active = false
+              }
+
               // Mark as truncated so the Continue button appears
               if (data.truncated) {
                 message.truncated = true
@@ -3427,6 +3434,10 @@ const streamAIResponse = async (
             {
               const message = historyStore.messages.find((m) => m.id === messageId)
               if (message) {
+                // Multitask: stop the cards from animating on a failed turn.
+                if (message.taskPlan) {
+                  message.taskPlan.active = false
+                }
                 if (data.messageId) {
                   message.backendMessageId = data.messageId
                 }
@@ -3973,12 +3984,11 @@ const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => 
 // and signal the backend so the provider poll aborts and stops billing.
 const handleTaskCancel = async (nodeId: string) => {
   // Resolve the CURRENT turn's task-plan message via the streaming flag, mirroring
-  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …) and
-  // taskPlan.active is only cleared on local teardown (not on a normal/error
-  // completion), so finding the FIRST active plan can match a stale earlier turn and
-  // cancel the wrong card / send the wrong trackId. The streaming message is the
-  // unambiguous active turn; fall back to the active-plan lookup only if none is
-  // currently streaming.
+  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …), so
+  // finding the FIRST active plan could match a stale earlier turn and cancel the
+  // wrong card / send the wrong trackId. The streaming message is the unambiguous
+  // active turn; fall back to the active-plan lookup only if none is currently
+  // streaming.
   const message =
     historyStore.messages.find((m) => m.isStreaming && m.taskPlan?.active) ??
     historyStore.messages.find((m) => m.taskPlan?.active)

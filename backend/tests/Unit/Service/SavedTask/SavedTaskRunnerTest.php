@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\SavedTask;
 
+use App\Entity\Chat;
+use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\SavedTask;
 use App\Entity\User;
@@ -93,6 +95,74 @@ final class SavedTaskRunnerTest extends TestCase
         $this->assertSame('failed', $result['run']->getStatus());
         $this->assertSame('Your usage limit was reached, so this run was skipped.', $result['run']->getError());
         $this->assertSame(1, $result['task']->getConsecutiveFailures());
+    }
+
+    public function testBlankMessageFallsBackToTheStoredInstruction(): void
+    {
+        $task = new SavedTask(9, 4, 'Katzenbild');
+        $this->setId($task, 11);
+        $task->setChatId(77);
+
+        $user = $this->createMock(User::class);
+        $user->method('isActive')->willReturn(true);
+        $user->method('getId')->willReturn(9);
+        $user->method('getMail')->willReturn('demo@synaplan.com');
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('isEnabled')->willReturn(true);
+        $prompt->method('getTopic')->willReturn('saved-1');
+        $prompt->method('getPrompt')->willReturn('Erstelle ein realistisches Bild einer Katze');
+
+        $chat = $this->createMock(Chat::class);
+        $chat->method('getUserId')->willReturn(9);
+        $chat->method('getId')->willReturn(77);
+
+        $chats = $this->createMock(ChatRepository::class);
+        $chats->method('find')->willReturn($chat);
+
+        $tasks = $this->createMock(SavedTaskRepository::class);
+        $tasks->method('findByIdAndOwner')->willReturn($task);
+
+        $config = $this->createMock(SavedTaskConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        $users = $this->createMock(UserRepository::class);
+        $users->method('find')->willReturn($user);
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->method('find')->willReturn($prompt);
+
+        $rateLimits = $this->createMock(RateLimitService::class);
+        $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
+
+        $captured = null;
+        $processor = $this->createMock(MessageProcessor::class);
+        $processor->method('process')->willReturnCallback(function (Message $message) use (&$captured): array {
+            $captured = $message;
+
+            return ['success' => true];
+        });
+
+        $runner = new SavedTaskRunner(
+            $config,
+            $tasks,
+            $this->createStub(SavedTaskRunRepository::class),
+            $prompts,
+            $users,
+            $chats,
+            $this->createStub(EntityManagerInterface::class),
+            $processor,
+            $rateLimits,
+            $this->createStub(TaskPlanStore::class),
+            $this->createStub(InternalEmailService::class),
+            $this->createStub(LoggerInterface::class),
+        );
+
+        $result = $runner->run(9, 11, '', 'manual');
+
+        $this->assertSame('completed', $result['run']->getStatus());
+        $this->assertInstanceOf(Message::class, $captured);
+        $this->assertSame('Erstelle ein realistisches Bild einer Katze', $captured->getText());
     }
 
     private function setId(SavedTask $task, int $id): void

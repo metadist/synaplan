@@ -267,10 +267,9 @@ final class SavedTaskController extends AbstractController
         summary: 'Run a Saved Task now',
         tags: ['Saved Tasks'],
         requestBody: new OA\RequestBody(
-            required: true,
+            required: false,
             content: new OA\JsonContent(
-                required: ['message'],
-                properties: [new OA\Property(property: 'message', type: 'string')]
+                properties: [new OA\Property(property: 'message', type: 'string', description: 'Optional extra instruction for this run. When omitted, the task runs its stored instruction.')]
             )
         ),
         responses: [
@@ -322,7 +321,7 @@ final class SavedTaskController extends AbstractController
                     ]
                 )
             ),
-            new OA\Response(response: 400, description: 'message is required'),
+            new OA\Response(response: 400, description: 'Invalid payload'),
             new OA\Response(response: 403, description: 'Task is disabled'),
             new OA\Response(response: 404, description: 'Not found'),
         ]
@@ -335,12 +334,14 @@ final class SavedTaskController extends AbstractController
         }
         \assert($user instanceof User);
 
-        $message = $request->toArray()['message'] ?? '';
-        if (!is_string($message) || '' === trim($message)) {
-            return $this->json(['error' => 'message is required'], Response::HTTP_BAD_REQUEST);
+        $payload = '' !== $request->getContent() ? $request->toArray() : [];
+        $message = $payload['message'] ?? '';
+        if (!is_string($message)) {
+            return $this->json(['error' => 'message must be a string'], Response::HTTP_BAD_REQUEST);
         }
 
         try {
+            // Blank message → the runner falls back to the task's stored instruction.
             $result = $this->runner->run((int) $user->getId(), $id, $message, 'manual');
         } catch (SavedTaskNotFoundException) {
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);

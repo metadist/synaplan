@@ -133,10 +133,14 @@ export const savedTasksApi = {
     return asTask(data.task)
   },
 
-  async run(id: number, message: string): Promise<{ task: SavedTask; run: SavedTaskRun }> {
+  /**
+   * Runs the task now. `message` is an optional EXTRA instruction — when
+   * omitted, the backend runs the task's stored instruction.
+   */
+  async run(id: number, message = ''): Promise<{ task: SavedTask; run: SavedTaskRun }> {
     const data = await httpClient(`/api/v1/saved-tasks/${id}/run`, {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify(message ? { message } : {}),
       schema: PostApiSavedTasksRunResponseSchema,
     })
     return { task: asTask(data.task), run: asRun(data.run) }

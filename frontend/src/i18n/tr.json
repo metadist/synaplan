@@ -2287,7 +2287,6 @@
       "on": "Açık",
       "off": "Kapalı",
       "runNow": "Şimdi çalıştır",
-      "runNowHint": "Bu çalıştırmada görev ne yapsın?",
       "runStarted": "Görev kendi sohbetinde çalışıyor.",
       "runFailed": "Çalıştırma tamamlanamadı.",
       "updateFailed": "Kayıtlı görev güncellenemedi.",
@@ -2295,8 +2294,23 @@
       "scheduleSaved": "Zamanlama kaydedildi.",
       "resumed": "Görev yeniden çalışacak.",
       "resume": "Devam et",
-      "viewRuns": "Çalıştırmaları gör",
-      "hideRuns": "Çalıştırmaları gizle",
+      "viewRuns": "Geçmiş",
+      "hideRuns": "Geçmişi gizle",
+      "runsRetention": "Eski çalıştırmalar otomatik olarak silinir.",
+      "runsEmpty": "Henüz çalıştırma yok.",
+      "runStatus": {
+        "queued": "Bekliyor",
+        "running": "Çalışıyor",
+        "completed": "Tamamlandı",
+        "failed": "Başarısız",
+        "cancelled": "İptal edildi"
+      },
+      "runTrigger": {
+        "manual": "senin tarafından başlatıldı",
+        "schedule": "zamanlanmış",
+        "chat": "sohbetten",
+        "inbound_email": "gelen e-posta"
+      },
       "advancedSteps": "Gelişmiş adımlar",
       "advancedHint": "Tam adımları sabitlemek istemiyorsan kapalı bırak. Çoğu görev için Şimdi çalıştır ve bir zamanlama yeter.",
       "autoPauseTitle": "Otomatik olarak duraklatıldı",

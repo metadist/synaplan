@@ -1757,7 +1757,6 @@
       "on": "An",
       "off": "Aus",
       "runNow": "Jetzt ausführen",
-      "runNowHint": "Was soll diese Aufgabe in diesem Durchlauf tun?",
       "runStarted": "Die Aufgabe läuft in einem eigenen Gespräch.",
       "runFailed": "Die Ausführung konnte nicht abgeschlossen werden.",
       "updateFailed": "Die gespeicherte Aufgabe konnte nicht aktualisiert werden.",
@@ -1765,8 +1764,23 @@
       "scheduleSaved": "Zeitplan gespeichert.",
       "resumed": "Die Aufgabe läuft wieder.",
       "resume": "Fortsetzen",
-      "viewRuns": "Ausführungen anzeigen",
-      "hideRuns": "Ausführungen ausblenden",
+      "viewRuns": "Verlauf",
+      "hideRuns": "Verlauf ausblenden",
+      "runsRetention": "Ältere Ausführungen werden automatisch entfernt.",
+      "runsEmpty": "Noch keine Ausführungen.",
+      "runStatus": {
+        "queued": "Wartet",
+        "running": "Läuft",
+        "completed": "Abgeschlossen",
+        "failed": "Fehlgeschlagen",
+        "cancelled": "Abgebrochen"
+      },
+      "runTrigger": {
+        "manual": "von dir gestartet",
+        "schedule": "per Zeitplan",
+        "chat": "aus dem Chat",
+        "inbound_email": "eingehende E-Mail"
+      },
       "advancedSteps": "Erweiterte Schritte",
       "advancedHint": "Nur öffnen, wenn du genaue Schritte festlegen willst. Die meisten Aufgaben brauchen nur „Jetzt ausführen“ und einen Zeitplan.",
       "autoPauseTitle": "Automatisch pausiert",

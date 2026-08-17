@@ -45,9 +45,14 @@ final readonly class SavedTaskRunner
     }
 
     /**
+     * Runs the task as its owner. `$messageText` is an OPTIONAL extra
+     * instruction for this one run — when blank, the task's stored instruction
+     * (the pinned prompt body) is used, so "Run now" and scheduled runs never
+     * need a synthetic message.
+     *
      * @return array{run: SavedTaskRun, task: SavedTask}
      */
-    public function run(int $ownerId, int $taskId, string $messageText, string $trigger = 'manual'): array
+    public function run(int $ownerId, int $taskId, string $messageText = '', string $trigger = 'manual'): array
     {
         if (!$this->config->isEnabled($ownerId)) {
             throw new SavedTaskDisabledException();
@@ -82,7 +87,10 @@ final readonly class SavedTaskRunner
 
         $text = trim($messageText);
         if ('' === $text) {
-            return $this->fail($task, $run, 'Nothing to do — write a short instruction for this run.');
+            $text = trim($prompt->getPrompt());
+        }
+        if ('' === $text) {
+            return $this->fail($task, $run, 'The AI instruction for this task is empty.');
         }
 
         try {

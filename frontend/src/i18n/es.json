@@ -2286,7 +2286,6 @@
       "on": "Activada",
       "off": "Desactivada",
       "runNow": "Ejecutar ahora",
-      "runNowHint": "¿Qué debe hacer esta tarea en esta ejecución?",
       "runStarted": "La tarea se está ejecutando en su propia conversación.",
       "runFailed": "La ejecución no pudo terminar.",
       "updateFailed": "No se pudo actualizar esta tarea guardada.",
@@ -2294,8 +2293,23 @@
       "scheduleSaved": "Programación guardada.",
       "resumed": "La tarea volverá a ejecutarse.",
       "resume": "Reanudar",
-      "viewRuns": "Ver ejecuciones",
-      "hideRuns": "Ocultar ejecuciones",
+      "viewRuns": "Historial",
+      "hideRuns": "Ocultar historial",
+      "runsRetention": "Las ejecuciones antiguas se eliminan automáticamente.",
+      "runsEmpty": "Aún no hay ejecuciones.",
+      "runStatus": {
+        "queued": "En espera",
+        "running": "En curso",
+        "completed": "Completada",
+        "failed": "Fallida",
+        "cancelled": "Cancelada"
+      },
+      "runTrigger": {
+        "manual": "iniciada por ti",
+        "schedule": "programada",
+        "chat": "desde el chat",
+        "inbound_email": "correo entrante"
+      },
       "advancedSteps": "Pasos avanzados",
       "advancedHint": "Déjalo cerrado salvo que quieras fijar pasos exactos. La mayoría de las tareas solo necesitan Ejecutar ahora y una programación.",
       "autoPauseTitle": "Pausada automáticamente",
