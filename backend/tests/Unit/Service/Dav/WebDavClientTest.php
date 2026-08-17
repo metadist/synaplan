@@ -94,6 +94,31 @@ final class WebDavClientTest extends TestCase
         $client->exists($target, '');
     }
 
+    public function testInsecureLocalIsIgnoredOutsideDev(): void
+    {
+        $client = $this->client([], allowInsecureLocal: true, environment: 'prod');
+        $target = new DavTarget('http://127.0.0.1/remote.php/dav/files/ada', 'ada', self::PASSWORD);
+
+        $this->expectException(DavException::class);
+        $this->expectExceptionMessage('https');
+        $client->exists($target, '');
+    }
+
+    public function testInsecureLocalAllowsHttpAndPrivateHostsInDev(): void
+    {
+        $captured = [];
+        $client = $this->client(
+            [new MockResponse('<multistatus/>', ['http_code' => 207])],
+            $captured,
+            allowInsecureLocal: true,
+            environment: 'dev',
+        );
+        $target = new DavTarget('http://nextcloud/remote.php/dav/files/ada', 'ada', self::PASSWORD);
+
+        self::assertTrue($client->exists($target, ''));
+        self::assertSame('http://nextcloud/remote.php/dav/files/ada', $captured[0]['url']);
+    }
+
     private function target(): DavTarget
     {
         return new DavTarget(self::BASE_URL, 'ada', self::PASSWORD);
@@ -103,8 +128,12 @@ final class WebDavClientTest extends TestCase
      * @param list<MockResponse>                                                   $responses
      * @param list<array{method: string, url: string, options: array<mixed>}>|null $captured
      */
-    private function client(array $responses, ?array &$captured = null): WebDavClient
-    {
+    private function client(
+        array $responses,
+        ?array &$captured = null,
+        bool $allowInsecureLocal = false,
+        string $environment = 'prod',
+    ): WebDavClient {
         $http = new MockHttpClient(function (string $method, string $url, array $options) use (&$responses, &$captured) {
             if (null !== $captured) {
                 $captured[] = ['method' => $method, 'url' => $url, 'options' => $options];
@@ -113,6 +142,6 @@ final class WebDavClientTest extends TestCase
             return array_shift($responses) ?? new MockResponse('', ['http_code' => 500]);
         });
 
-        return new WebDavClient($http, new SsrfGuard());
+        return new WebDavClient($http, new SsrfGuard(), $allowInsecureLocal, $environment);
     }
 }

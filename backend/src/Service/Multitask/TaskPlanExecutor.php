@@ -248,8 +248,15 @@ final readonly class TaskPlanExecutor
         //     to the legacy router with the original analyzefile classification,
         //     i.e. identical behaviour. Only genuinely multi-intent messages run
         //     the DAG (issue #1192).
+        //   - `saved_task`: Saved Task runs (manual "Run now" and the scheduler
+        //     tick). They pin their prompt and skip the sorter, but the stored
+        //     instruction is a full user turn ("make an image of a cat and save
+        //     it to Nextcloud", "create a calendar entry", …) — without planning
+        //     every rerun degraded to a single chat answer that only TALKED
+        //     about the steps. A single-intent instruction still collapses to a
+        //     one-node plan → legacy path, identical to a normal chat turn.
         $source = $classification['source'] ?? null;
-        if (!in_array($source, ['ai_sorting', 'attachment_document_or_audio'], true)) {
+        if (!in_array($source, ['ai_sorting', 'attachment_document_or_audio', 'saved_task'], true)) {
             return null;
         }
 
@@ -376,7 +383,15 @@ final readonly class TaskPlanExecutor
             return null;
         }
 
-        $task = $this->savedTasks->findEnabledChatTaskForPrompt($prompt->getId(), $userId);
+        // Chat turns pin authored steps only for chat-trigger tasks (typing the
+        // matching instruction re-runs the pinned steps). A Saved Task RUN
+        // (source=saved_task: manual "Run now", scheduler tick, inbound email)
+        // executes the task's own authored graph regardless of trigger type —
+        // falling back to the free-form planner could produce different steps
+        // than the user explicitly authored.
+        $task = 'saved_task' === ($classification['source'] ?? null)
+            ? $this->savedTasks->findEnabledGraphTaskForPrompt($prompt->getId(), $userId)
+            : $this->savedTasks->findEnabledChatTaskForPrompt($prompt->getId(), $userId);
         if (null === $task || null === $task->getGraph()) {
             return null;
         }

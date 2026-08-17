@@ -9,6 +9,7 @@ import { m365Api } from '@/services/api/m365Api'
 import { useAuthStore } from '@/stores/auth'
 import ConnectionStatusPill from '@/components/config/ConnectionStatusPill.vue'
 import DavConnectionForm from '@/components/config/DavConnectionForm.vue'
+import RegistryConnectionRow from '@/components/config/RegistryConnectionRow.vue'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -18,11 +19,12 @@ const { success, error: showError } = useNotification()
 
 const items = ref<ConnectionItem[]>([])
 const loading = ref(true)
-const testingId = ref<string | null>(null)
 const m365Available = ref(false)
 const m365Connecting = ref(false)
 
 const isAdmin = computed(() => auth.isAdmin)
+const registryItems = computed(() => items.value.filter((row) => row.source === 'registry'))
+const adapterItems = computed(() => items.value.filter((row) => row.source !== 'registry'))
 
 const load = async () => {
   loading.value = true
@@ -46,33 +48,18 @@ const loadM365 = async () => {
 const formatChecked = (timestamp: number | null): string =>
   timestamp ? new Date(timestamp * 1000).toLocaleString(locale.value) : ''
 
-const onTest = async (item: ConnectionItem) => {
-  if (item.source !== 'registry') {
-    if (item.manage_path) {
-      await router.push(item.manage_path)
-    }
-    return
+const onAdapterOpen = async (item: ConnectionItem) => {
+  if (item.manage_path) {
+    await router.push(item.manage_path)
   }
-  testingId.value = item.id
-  try {
-    const result = await connectionsApi.test(item.id)
-    items.value = items.value.map((row) => (row.id === item.id ? result.connection : row))
-    if (false === result.succeeded) {
-      // The tester knows why it failed; a generic "test failed" would send the
-      // user back to guessing.
-      showError(result.error || t('config.connections.testFailed'))
-      return
-    }
-    success(
-      result.account
-        ? t('config.connections.testOkAccount', { account: result.account })
-        : t('config.connections.testOk')
-    )
-  } catch {
-    showError(t('config.connections.testFailed'))
-  } finally {
-    testingId.value = null
-  }
+}
+
+const onRegistryChanged = (updated: ConnectionItem) => {
+  items.value = items.value.map((row) => (row.id === updated.id ? updated : row))
+}
+
+const onRegistryRemoved = (id: string) => {
+  items.value = items.value.filter((row) => row.id !== id)
 }
 
 const connectM365 = async () => {
@@ -138,8 +125,17 @@ onMounted(async () => {
         {{ $t('config.connections.empty') }}
       </div>
       <ul v-else class="space-y-3">
+        <RegistryConnectionRow
+          v-for="item in registryItems"
+          :key="item.id"
+          :item="item"
+          :locale="locale"
+          @changed="onRegistryChanged"
+          @removed="onRegistryRemoved"
+          @reconnect="connectM365"
+        />
         <li
-          v-for="item in items"
+          v-for="item in adapterItems"
           :key="item.id"
           class="surface-card p-4 flex flex-wrap items-center gap-3"
           data-testid="connection-row"
@@ -155,40 +151,16 @@ onMounted(async () => {
                 }}
               </span>
             </p>
-            <p
-              v-if="item.status === 'reauth_required'"
-              class="text-xs text-[var(--status-warning)] mt-1"
-            >
-              {{ $t('config.connections.reauthHint') }}
-            </p>
           </div>
           <ConnectionStatusPill :status="item.status" />
           <button
-            v-if="item.type === 'm365' && item.status === 'reauth_required'"
-            type="button"
-            class="btn-primary inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
-            :disabled="m365Connecting"
-            @click="connectM365"
-          >
-            <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
-            {{ $t('config.connections.reconnect') }}
-          </button>
-          <button
             type="button"
             class="btn-secondary inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
-            :disabled="testingId === item.id"
             data-testid="btn-test-connection"
-            @click="onTest(item)"
+            @click="onAdapterOpen(item)"
           >
-            <Icon
-              :icon="testingId === item.id ? 'heroicons:arrow-path' : 'heroicons:signal'"
-              :class="['w-4 h-4', testingId === item.id && 'animate-spin']"
-            />
-            {{
-              testingId === item.id
-                ? $t('config.connections.testing')
-                : $t('config.connections.test')
-            }}
+            <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4" />
+            {{ $t('config.connections.manage') }}
           </button>
         </li>
       </ul>

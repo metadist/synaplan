@@ -74,10 +74,13 @@ final readonly class SavedTaskTickService
             }
 
             try {
+                // Blank message → the runner uses the task's stored instruction,
+                // exactly like a manual "Run now". A synthetic English message
+                // here used to leak into the run's chat as the user turn.
                 $result = $this->runner->run(
                     $task->getOwnerId(),
                     $id,
-                    'Run scheduled Saved Task: '.$task->getName(),
+                    '',
                     'schedule',
                 );
                 if ('failed' === $result['run']->getStatus()) {

@@ -65,11 +65,25 @@ final readonly class GeneratedFileRegistrar
             // inline + async media paths both reaching the same file).
             $existing = $this->files->findOneBy(['userId' => $userId, 'filePath' => $relativePath]);
             if ($existing instanceof File) {
+                $dirty = false;
+
                 // Backfill source text on an existing row that was registered
                 // before #1251 (empty BFILETEXT) so "Add to knowledge base"
                 // / describe can use the script without Whisper.
                 if (null !== $fileText && '' !== trim($fileText) && '' === trim($existing->getFileText())) {
                     $existing->setFileText($fileText);
+                    $dirty = true;
+                }
+
+                // Backfill the originating message on a row the generator
+                // created itself (e.g. ChatHandler documents) — it powers the
+                // Generated gallery's "Open in chat" jump.
+                if (null !== $messageId && null === $existing->getMessageId()) {
+                    $existing->setMessageId($messageId);
+                    $dirty = true;
+                }
+
+                if ($dirty) {
                     $this->files->save($existing);
                 }
 

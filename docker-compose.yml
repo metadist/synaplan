@@ -134,6 +134,8 @@ services:
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
     environment:
       APP_ENV: dev
+      # Local Docker Nextcloud (http://nextcloud) — ignored unless APP_ENV=dev.
+      DAV_ALLOW_INSECURE_LOCAL: "1"
       # APP_SECRET loaded from backend/.env (env_file above)
       APP_URL: http://localhost:8000
       PLUGINS_DIR: /plugins
@@ -287,6 +289,7 @@ services:
       # overrides both to prod for production.
       APP_ENV: ${APP_ENV:-dev}
       APP_DEBUG: "0"
+      DAV_ALLOW_INSECURE_LOCAL: "1"
       APP_URL: http://backend
       PLUGINS_DIR: /plugins
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4

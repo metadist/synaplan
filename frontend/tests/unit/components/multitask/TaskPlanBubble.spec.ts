@@ -6,6 +6,26 @@ import type { TaskPlanState } from '@/stores/history'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 
+const { mockSavedTasksEnabled } = vi.hoisted(() => ({
+  mockSavedTasksEnabled: vi.fn(() => false),
+}))
+
+vi.mock('@/composables/useSavedTasksFeature', () => ({
+  isSavedTasksEnabled: () => mockSavedTasksEnabled(),
+}))
+
+vi.mock('@/composables/useDialog', () => ({
+  useDialog: () => ({ prompt: vi.fn() }),
+}))
+
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
+}))
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}))
+
 // `MessageText` is stubbed because the real component pulls in Pinia stores
 // and the markdown pipeline; both are tested elsewhere. The stub preserves
 // the visible text so the existing `text()` assertions still pass after
@@ -53,6 +73,7 @@ describe('TaskPlanBubble', () => {
   // cards) — give every mount a fresh Pinia so specs stay isolated.
   beforeEach(() => {
     setActivePinia(createPinia())
+    mockSavedTasksEnabled.mockReturnValue(false)
   })
   it('renders one card per task node', () => {
     const wrapper = mount(TaskPlanBubble, {
@@ -502,5 +523,35 @@ describe('TaskPlanBubble', () => {
     const card = wrapper.find('[data-testid="task-card-n5"]')
     expect(card.exists()).toBe(true)
     expect(card.text()).toContain('Sent to a***@example.com')
+  })
+
+  it('shows the clock after a finished plan when Saved Tasks are on', () => {
+    mockSavedTasksEnabled.mockReturnValue(true)
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: {
+          active: false,
+          replyNode: 'n1',
+          cards: [{ nodeId: 'n1', capability: 'image_generation', kind: 'image', state: 'done' }],
+        },
+      },
+      ...mountOptions,
+    })
+
+    expect(wrapper.find('[data-testid="btn-schedule-plan"]').exists()).toBe(true)
+  })
+
+  it('hides the clock while the plan is still running', () => {
+    mockSavedTasksEnabled.mockReturnValue(true)
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          { nodeId: 'n1', capability: 'image_generation', kind: 'image', state: 'done' },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    expect(wrapper.find('[data-testid="btn-schedule-plan"]').exists()).toBe(false)
   })
 })

@@ -66,6 +66,9 @@ enum Capability: string
     /** Mail the assembled results to the account owner as one multi-MIME email (InternalEmailService, no model). */
     case EmailMe = 'email_me';
 
+    /** Put generated files into a connected WebDAV/Nextcloud folder (FileSendService / WebDavDestinationProvider). */
+    case SaveToFolder = 'save_to_folder';
+
     /** Final assembly of text + N file attachments into one OUT message (ResultAssembler, no model). */
     case ComposeReply = 'compose_reply';
 
@@ -93,6 +96,7 @@ enum Capability: string
             self::DocumentGeneration => 'document',
             self::CalendarEvent => 'document',
             self::EmailMe => 'email',
+            self::SaveToFolder => 'folder',
             self::ComposeReply => 'hidden',
         };
     }

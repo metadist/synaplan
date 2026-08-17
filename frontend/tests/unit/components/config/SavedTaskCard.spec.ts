@@ -3,12 +3,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import type { SavedTask, SavedTaskRun } from '@/services/api/savedTasksApi'
 
-const { mockUpdate, mockRun, mockRuns, mockResume, mockPrompt, mockPush } = vi.hoisted(() => ({
+const { mockUpdate, mockRun, mockRuns, mockResume, mockPush } = vi.hoisted(() => ({
   mockUpdate: vi.fn(),
   mockRun: vi.fn(),
   mockRuns: vi.fn(),
   mockResume: vi.fn(),
-  mockPrompt: vi.fn(),
   mockPush: vi.fn(),
 }))
 
@@ -19,10 +18,6 @@ vi.mock('@/services/api/savedTasksApi', () => ({
     runs: mockRuns,
     resume: mockResume,
   },
-}))
-
-vi.mock('@/composables/useDialog', () => ({
-  useDialog: () => ({ prompt: mockPrompt }),
 }))
 
 vi.mock('@/composables/useNotification', () => ({
@@ -49,9 +44,10 @@ function task(overrides: Partial<SavedTask> = {}): SavedTask {
     consecutiveFailures: 0,
     autoPaused: false,
     summary: {
-      key: 'config.savedTasks.summary.template',
-      params: { when: 'when you run it', reads: 'this instruction', saves: 'a calendar file' },
+      key: 'config.savedTasks.summary.simple',
+      params: { when: 'manual' },
     },
+    instructionPreview: 'Create a realistic picture of a cat, soft natural light',
     ...overrides,
   }
 }
@@ -82,7 +78,6 @@ const mountCard = (value: SavedTask) =>
 describe('SavedTaskCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockPrompt.mockResolvedValue('Look for meeting requests')
     mockUpdate.mockImplementation(async (_id: number, patch: Record<string, unknown>) =>
       task({ ...patch } as Partial<SavedTask>)
     )
@@ -102,7 +97,7 @@ describe('SavedTaskCard', () => {
     )
   })
 
-  it('shows the scheduled first-run line', () => {
+  it('shows the scheduled first-run line with a readable date', () => {
     const wrapper = mountCard(
       task({
         triggerType: 'schedule',
@@ -110,13 +105,70 @@ describe('SavedTaskCard', () => {
         triggerConfig: { kind: 'weekly', at: '07:00', tz: 'Europe/Berlin', days: [1, 2, 3, 4, 5] },
       })
     )
-    expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain('Scheduled')
-    expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain(
-      '2026-08-17T05:00:00+00:00'
+    const text = wrapper.get('[data-testid="saved-task-last-run"]').text()
+    expect(text).toContain('Scheduled')
+    // Raw ISO strings are formatted for humans, never shown verbatim.
+    expect(text).not.toContain('2026-08-17T05:00:00+00:00')
+    expect(text).toContain('2026')
+  })
+
+  it('shows the start of the instruction so users know what runs', () => {
+    const wrapper = mountCard(task())
+    expect(wrapper.get('[data-testid="saved-task-preview"]').text()).toContain(
+      'Create a realistic picture of a cat'
     )
   })
 
-  it('shows running copy while Run now is in flight', async () => {
+  it('hides the preview line when the instruction is unavailable', () => {
+    const wrapper = mountCard(task({ instructionPreview: null }))
+    expect(wrapper.find('[data-testid="saved-task-preview"]').exists()).toBe(false)
+  })
+
+  it('renders the summary in one language from part codes', () => {
+    const wrapper = mountCard(
+      task({
+        summary: {
+          key: 'config.savedTasks.summary.template',
+          params: {
+            when: 'daily',
+            at: '07:00',
+            tz: 'Europe/Berlin',
+            reads: 'mailbox',
+            saves: 'email',
+          },
+        },
+      })
+    )
+    const text = wrapper.text()
+    expect(text).toContain('Runs every day at 07:00 (Europe/Berlin)')
+    expect(text).toContain('the connected mailbox')
+    expect(text).toContain('an email to you')
+  })
+
+  it('falls back to safe wording for unknown summary codes', () => {
+    const wrapper = mountCard(
+      task({
+        summary: {
+          key: 'config.savedTasks.summary.simple',
+          params: { when: 'some_future_code' },
+        },
+      })
+    )
+    expect(wrapper.text()).toContain('Runs when you start it.')
+  })
+
+  it('opens the task chat via Show results so users see the run output', async () => {
+    const wrapper = mountCard(task({ chatId: 44 }))
+    await wrapper.get('[data-testid="btn-show-results"]').trigger('click')
+    expect(mockPush).toHaveBeenCalledWith({ path: '/', query: { chat: '44' } })
+  })
+
+  it('hides Show results until the task has a chat', () => {
+    const wrapper = mountCard(task({ chatId: null }))
+    expect(wrapper.find('[data-testid="btn-show-results"]').exists()).toBe(false)
+  })
+
+  it('runs immediately without asking for a message', async () => {
     let resolveRun: (value: { task: SavedTask; run: SavedTaskRun }) => void = () => undefined
     mockRun.mockReturnValue(
       new Promise((resolve) => {
@@ -126,6 +178,8 @@ describe('SavedTaskCard', () => {
     const wrapper = mountCard(task())
     await wrapper.get('[data-testid="btn-run-now"]').trigger('click')
     await flushPromises()
+    // One click, one run — the stored instruction is used, no dialog.
+    expect(mockRun).toHaveBeenCalledWith(7)
     expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain('Running now')
     resolveRun({
       task: task({ lastRunAt: '2026-08-15T12:00:00+00:00', chatId: 44 }),
@@ -157,5 +211,21 @@ describe('SavedTaskCard', () => {
     expect(wrapper.get('[data-testid="saved-task-runs"]').text()).toContain(
       'Your usage limit was reached, so this run was skipped.'
     )
+  })
+
+  it('localizes run status and trigger instead of raw enum codes', async () => {
+    mockRuns.mockResolvedValue({
+      runs: [run({ status: 'completed', trigger: 'schedule' })],
+      retention: 'ignored backend prose',
+    })
+    const wrapper = mountCard(task({ lastRunAt: '2026-08-15T12:00:00+00:00' }))
+    await wrapper.get('[data-testid="btn-view-runs"]').trigger('click')
+    await flushPromises()
+    const text = wrapper.get('[data-testid="saved-task-runs"]').text()
+    expect(text).toContain('Completed')
+    expect(text).toContain('scheduled run')
+    // The English retention prose from the backend is never shown raw.
+    expect(text).not.toContain('ignored backend prose')
+    expect(text).toContain('Older runs are removed automatically.')
   })
 })

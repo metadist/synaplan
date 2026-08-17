@@ -129,7 +129,8 @@
     "onboarding": "Hoş geldin",
     "mcpServers": "MCP Sunucuları",
     "aiAgents": "Yapay zeka ajanları",
-    "connections": "Bağlantılar"
+    "connections": "Bağlantılar",
+    "savedTasks": "Kayıtlı görevler"
   },
   "addinConnect": {
     "title": "Synaplan'a bağlan",
@@ -546,6 +547,7 @@
     "toolsMailHandler": "E-posta Otomasyonu",
     "mcpServers": "MCP Sunucuları",
     "connections": "Bağlantılar",
+    "savedTasks": "Kayıtlı görevler",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
     "filesDescription": "Sohbetleriniz için kaynaklar",
@@ -1601,6 +1603,7 @@
     "title": "Görev planı",
     "showSteps": "Adımları göster",
     "hideSteps": "Adımları gizle",
+    "scheduleThis": "Bunu daha sonra bir zamanlamayla tekrarla",
     "download": "İndir",
     "failedBody": "Bu adım tamamlanamadı.",
     "cancelledBody": "Bu adımı durdurdunuz.",
@@ -1624,7 +1627,8 @@
       "document": "Belge",
       "search": "Web araması",
       "extract": "Metin çıkarma",
-      "email": "E-posta"
+      "email": "E-posta",
+      "folder": "Klasör"
     },
     "capability": {
       "extract_text": "Metin çıkarılıyor",
@@ -1642,7 +1646,8 @@
       "text2sound": "Ses",
       "document_generation": "Belge",
       "calendar_event": "Takvim daveti",
-      "email_me": "E-posta gönderimi"
+      "email_me": "E-posta gönderimi",
+      "save_to_folder": "Klasöre kaydet"
     },
     "copyText": "İçeriği kopyala",
     "copied": "Panoya kopyalandı",
@@ -2234,7 +2239,15 @@
     },
     "generated": {
       "title": "Üretilen",
-      "subtitle": "Sohbetlerinizde oluşturulan görseller, video ve ses.",
+      "subtitle": "Sohbetlerinizde ve görevlerinizde oluşturulan görseller, videolar, ses, belgeler ve takvim davetleri.",
+      "kinds": {
+        "all": "Tümü",
+        "image": "Görseller",
+        "video": "Videolar",
+        "audio": "Ses",
+        "document": "Belgeler",
+        "calendar": "Takvim"
+      },
       "openInChat": "Sohbette aç",
       "download": "İndir",
       "autoGroup": "Klasörü yapay zekâ seçsin",
@@ -2282,7 +2295,6 @@
       "on": "Açık",
       "off": "Kapalı",
       "runNow": "Şimdi çalıştır",
-      "runNowHint": "Bu çalıştırmada görev ne yapsın?",
       "runStarted": "Görev kendi sohbetinde çalışıyor.",
       "runFailed": "Çalıştırma tamamlanamadı.",
       "updateFailed": "Kayıtlı görev güncellenemedi.",
@@ -2290,14 +2302,38 @@
       "scheduleSaved": "Zamanlama kaydedildi.",
       "resumed": "Görev yeniden çalışacak.",
       "resume": "Devam et",
-      "viewRuns": "Çalıştırmaları gör",
-      "hideRuns": "Çalıştırmaları gizle",
+      "showResults": "Sonuçları göster",
+      "viewRuns": "Geçmiş",
+      "hideRuns": "Geçmişi gizle",
+      "runsRetention": "Eski çalıştırmalar otomatik olarak silinir.",
+      "runsEmpty": "Henüz çalıştırma yok.",
+      "runStatus": {
+        "queued": "Bekliyor",
+        "running": "Çalışıyor",
+        "completed": "Tamamlandı",
+        "failed": "Başarısız",
+        "cancelled": "İptal edildi"
+      },
+      "runTrigger": {
+        "manual": "senin tarafından başlatıldı",
+        "schedule": "zamanlanmış",
+        "chat": "sohbetten",
+        "inbound_email": "gelen e-posta"
+      },
       "advancedSteps": "Gelişmiş adımlar",
       "advancedHint": "Tam adımları sabitlemek istemiyorsan kapalı bırak. Çoğu görev için Şimdi çalıştır ve bir zamanlama yeter.",
       "autoPauseTitle": "Otomatik olarak duraklatıldı",
       "autoPauseBody": "Bu görev üst üste üç kez başarısız oldu. Sorunu gider, sonra devam et.",
       "createFailed": "Görev olarak kaydedilemedi.",
       "created": "Görev olarak kaydedildi. Şimdi çalıştırabilirsin.",
+      "overviewTitle": "Kayıtlı görevler",
+      "overviewSubtitle": "İstediğinde veya daha sonra bir zamanlamayla çalışan talimatlar.",
+      "overviewLoading": "Kayıtlı görevler yükleniyor…",
+      "overviewEmpty": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya özel bir talimat kaydet:",
+      "loadFailed": "Kayıtlı görevler yüklenemedi.",
+      "scheduleThis": "Bunu daha sonra tekrar çalıştır",
+      "scheduleThisHint": "Bu göreve bir ad ver. Zamanlamayı sonraki ekranda seçersin.",
+      "scheduledFromChat": "Kaydedildi. Ne zaman çalışacağını seç.",
       "state": {
         "off": "Çalışmıyor",
         "neverRun": "Kaydedildi — henüz çalışmadı",
@@ -2313,7 +2349,27 @@
         "weekdays": "Her iş günü"
       },
       "summary": {
-        "template": "{when} çalışır. {reads} okur → {saves} kaydeder."
+        "simple": "Ne zaman çalışır: {when}.",
+        "template": "Ne zaman çalışır: {when}. Okuduğu: {reads}. Ürettiği: {saves}.",
+        "when": {
+          "manual": "sen başlatınca",
+          "interval": "her {minutes} dakikada bir",
+          "daily": "her gün {at} ({tz})",
+          "weekly": "hafta içi her gün {at} ({tz})",
+          "schedule": "zamanlamaya göre",
+          "inboundEmail": "yeni e-posta gelince",
+          "chat": "eşleşen bir sohbet mesajı gelince"
+        },
+        "reads": {
+          "instruction": "bu talimat",
+          "mailbox": "bağlı posta kutusu"
+        },
+        "saves": {
+          "email": "sana bir e-posta",
+          "folder": "bağlı klasörde bir dosya",
+          "calendar": "bir takvim girişi",
+          "reply": "sohbette bir yanıt"
+        }
       }
     },
     "connections": {
@@ -2360,6 +2416,17 @@
       "reconnect": "Yeniden bağlan",
       "testing": "Test ediliyor…",
       "testOkAccount": "Bağlantı çalışıyor — {account} olarak oturum açıldı.",
+      "manage": "Yönet",
+      "editName": "Ad",
+      "keepPassword": "Mevcut uygulama parolasını korumak için boş bırak.",
+      "updated": "Bağlantı güncellendi.",
+      "updateFailed": "Bağlantı güncellenemedi.",
+      "deleteTitle": "Bu bağlantı kaldırılsın mı?",
+      "deleteMessage": "Synaplan bundan sonra {name} kullanmaz. Orada duran dosyalar silinmez.",
+      "deleteConfirm": "Kaldır",
+      "deleted": "{name} kaldırıldı.",
+      "deleteFailed": "Bağlantı kaldırılamadı.",
+      "channelHint": "Sohbette bu kanala {channel} deyin",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -2404,6 +2471,7 @@
           "username": "Kullanıcı adı",
           "appPassword": "Uygulama parolası",
           "appPasswordHint": "Nextcloud'da Ayarlar → Güvenlik → Cihazlar ve oturumlar altında oluştur. Hesap parolan asla saklanmaz.",
+          "localHttpHint": "Bu geliştirme kurulumunda http://nextcloud gibi yerel bir adres de kullanabilirsiniz.",
           "folder": "Sonuçlar için klasör",
           "withCalendar": "Bir takvimi de bağla:",
           "connect": "Bağlan",

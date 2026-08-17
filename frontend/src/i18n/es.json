@@ -129,7 +129,8 @@
     "onboarding": "Bienvenida",
     "mcpServers": "Servidores MCP",
     "aiAgents": "Agentes de IA",
-    "connections": "Conexiones"
+    "connections": "Conexiones",
+    "savedTasks": "Tareas guardadas"
   },
   "addinConnect": {
     "title": "Conectar a Synaplan",
@@ -546,6 +547,7 @@
     "toolsMailHandler": "Automatización de correo",
     "mcpServers": "Servidores MCP",
     "connections": "Conexiones",
+    "savedTasks": "Tareas guardadas",
     "plugins": "Plugins",
     "files": "Fuentes",
     "filesDescription": "Fuentes para tus chats",
@@ -1601,6 +1603,7 @@
     "title": "Plan de tareas",
     "showSteps": "Mostrar pasos",
     "hideSteps": "Ocultar pasos",
+    "scheduleThis": "Repetir esto más tarde según un horario",
     "download": "Descargar",
     "failedBody": "Este paso no se pudo completar.",
     "cancelledBody": "Has detenido este paso.",
@@ -1624,7 +1627,8 @@
       "document": "Documento",
       "search": "Búsqueda web",
       "extract": "Extracción de texto",
-      "email": "Correo"
+      "email": "Correo",
+      "folder": "Carpeta"
     },
     "capability": {
       "extract_text": "Extrayendo texto",
@@ -1642,7 +1646,8 @@
       "text2sound": "Audio",
       "document_generation": "Documento",
       "calendar_event": "Invitación de calendario",
-      "email_me": "Envío por correo"
+      "email_me": "Envío por correo",
+      "save_to_folder": "Guardar en carpeta"
     },
     "copyText": "Copiar contenido",
     "copied": "Copiado al portapapeles",
@@ -2233,7 +2238,15 @@
     },
     "generated": {
       "title": "Generados",
-      "subtitle": "Imágenes, vídeo y audio creados en tus chats.",
+      "subtitle": "Imágenes, vídeos, audio, documentos e invitaciones de calendario creados en tus chats y tareas.",
+      "kinds": {
+        "all": "Todos",
+        "image": "Imágenes",
+        "video": "Vídeos",
+        "audio": "Audio",
+        "document": "Documentos",
+        "calendar": "Calendario"
+      },
       "openInChat": "Abrir en el chat",
       "download": "Descargar",
       "autoGroup": "Dejar que la IA elija una carpeta",
@@ -2281,7 +2294,6 @@
       "on": "Activada",
       "off": "Desactivada",
       "runNow": "Ejecutar ahora",
-      "runNowHint": "¿Qué debe hacer esta tarea en esta ejecución?",
       "runStarted": "La tarea se está ejecutando en su propia conversación.",
       "runFailed": "La ejecución no pudo terminar.",
       "updateFailed": "No se pudo actualizar esta tarea guardada.",
@@ -2289,14 +2301,38 @@
       "scheduleSaved": "Programación guardada.",
       "resumed": "La tarea volverá a ejecutarse.",
       "resume": "Reanudar",
-      "viewRuns": "Ver ejecuciones",
-      "hideRuns": "Ocultar ejecuciones",
+      "showResults": "Ver resultados",
+      "viewRuns": "Historial",
+      "hideRuns": "Ocultar historial",
+      "runsRetention": "Las ejecuciones antiguas se eliminan automáticamente.",
+      "runsEmpty": "Aún no hay ejecuciones.",
+      "runStatus": {
+        "queued": "En espera",
+        "running": "En curso",
+        "completed": "Completada",
+        "failed": "Fallida",
+        "cancelled": "Cancelada"
+      },
+      "runTrigger": {
+        "manual": "iniciada por ti",
+        "schedule": "programada",
+        "chat": "desde el chat",
+        "inbound_email": "correo entrante"
+      },
       "advancedSteps": "Pasos avanzados",
       "advancedHint": "Déjalo cerrado salvo que quieras fijar pasos exactos. La mayoría de las tareas solo necesitan Ejecutar ahora y una programación.",
       "autoPauseTitle": "Pausada automáticamente",
       "autoPauseBody": "Esta tarea falló tres veces seguidas. Corrige el problema y reanúdala.",
       "createFailed": "No se pudo guardar como tarea.",
       "created": "Guardada como tarea. Ya puedes ejecutarla.",
+      "overviewTitle": "Tareas guardadas",
+      "overviewSubtitle": "Instrucciones que se ejecutan cuando las pides, o más tarde según un horario.",
+      "overviewLoading": "Cargando tareas guardadas…",
+      "overviewEmpty": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o guarda una instrucción propia en",
+      "loadFailed": "No se pudieron cargar las tareas guardadas.",
+      "scheduleThis": "Volver a ejecutar esto más tarde",
+      "scheduleThisHint": "Ponle un nombre a esta tarea. El horario lo eliges en la siguiente pantalla.",
+      "scheduledFromChat": "Guardada. Elige cuándo debe ejecutarse.",
       "state": {
         "off": "No se está ejecutando",
         "neverRun": "Guardada — aún no se ha ejecutado",
@@ -2312,7 +2348,27 @@
         "weekdays": "Cada día laborable"
       },
       "summary": {
-        "template": "Se ejecuta {when}. Lee {reads} → Guarda {saves}."
+        "simple": "Se ejecuta {when}.",
+        "template": "Se ejecuta {when}. Lee {reads} y entrega {saves}.",
+        "when": {
+          "manual": "cuando la inicias",
+          "interval": "cada {minutes} minutos",
+          "daily": "cada día a las {at} ({tz})",
+          "weekly": "los días laborables a las {at} ({tz})",
+          "schedule": "según un horario",
+          "inboundEmail": "cuando llega correo nuevo",
+          "chat": "cuando llega un mensaje de chat coincidente"
+        },
+        "reads": {
+          "instruction": "esta instrucción",
+          "mailbox": "el buzón conectado"
+        },
+        "saves": {
+          "email": "un correo para ti",
+          "folder": "un archivo en la carpeta conectada",
+          "calendar": "una entrada de calendario",
+          "reply": "una respuesta en el chat"
+        }
       }
     },
     "connections": {
@@ -2359,6 +2415,17 @@
       "reconnect": "Reconectar",
       "testing": "Probando…",
       "testOkAccount": "La conexión funciona: sesión iniciada como {account}.",
+      "manage": "Gestionar",
+      "editName": "Nombre",
+      "keepPassword": "Déjalo vacío para conservar la contraseña de aplicación actual.",
+      "updated": "Conexión actualizada.",
+      "updateFailed": "No se pudo actualizar la conexión.",
+      "deleteTitle": "¿Quitar esta conexión?",
+      "deleteMessage": "Synaplan dejará de usar {name}. Los archivos que ya estén allí no se borran.",
+      "deleteConfirm": "Quitar",
+      "deleted": "Se quitó {name}.",
+      "deleteFailed": "No se pudo quitar la conexión.",
+      "channelHint": "En el chat, usa el nombre {channel}",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -2403,6 +2470,7 @@
           "username": "Nombre de usuario",
           "appPassword": "Contraseña de aplicación",
           "appPasswordHint": "Créala en Nextcloud en Ajustes → Seguridad → Dispositivos y sesiones. Tu contraseña de la cuenta nunca se guarda.",
+          "localHttpHint": "En esta instalación de desarrollo también puedes usar una dirección local como http://nextcloud.",
           "folder": "Carpeta para los resultados",
           "withCalendar": "Conectar también un calendario:",
           "connect": "Conectar",

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { httpClient } from './httpClient'
 import {
   GetApiConnectionsListResponseSchema,
+  PatchApiConnectionsUpdateResponseSchema,
   PostApiConnectionsCreateResponseSchema,
   PostApiConnectionsTestResponseSchema,
 } from '@/generated/api-schemas'
@@ -20,6 +21,8 @@ export interface ConnectionItem {
   has_secret: boolean
   manage_path?: string
   config?: Record<string, unknown> | null
+  /** Prompt-safe name the planner and the user use ("nextcloud", "calendar"). */
+  channel?: string
 }
 
 export interface ConnectionTestResult {
@@ -30,6 +33,14 @@ export interface ConnectionTestResult {
   error: string | null
   /** Remote account the connection points at, when the tester can report one. */
   account: string | null
+}
+
+function channelName(raw: RawConnection): string | undefined {
+  if (typeof raw.channel === 'string' && raw.channel.trim() !== '') {
+    return raw.channel
+  }
+  const fromConfig = raw.config && typeof raw.config === 'object' ? raw.config.channel : undefined
+  return typeof fromConfig === 'string' && fromConfig.trim() !== '' ? fromConfig : undefined
 }
 
 function asConnection(raw: RawConnection | undefined): ConnectionItem {
@@ -46,6 +57,7 @@ function asConnection(raw: RawConnection | undefined): ConnectionItem {
     has_secret: raw.has_secret === true,
     manage_path: raw.manage_path,
     config: raw.config ?? null,
+    channel: channelName(raw),
   }
 }
 
@@ -82,6 +94,18 @@ export const connectionsApi = {
       error: data.connection?.test_error ?? null,
       account: data.connection?.account ?? null,
     }
+  },
+
+  async update(
+    id: string,
+    payload: { name?: string; secret?: string; config?: Record<string, unknown> }
+  ): Promise<ConnectionItem> {
+    const data = await httpClient(`/api/v1/connections/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      schema: PatchApiConnectionsUpdateResponseSchema,
+    })
+    return asConnection(data.connection)
   },
 
   async remove(id: string): Promise<void> {

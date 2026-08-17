@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { savedTasksApi, type SavedTask, type SavedTaskRun } from '@/services/api/savedTasksApi'
 
@@ -14,16 +13,14 @@ const emit = defineEmits<{
   updated: [task: SavedTask]
 }>()
 
-const { t } = useI18n()
+const { t, te, locale } = useI18n()
 const router = useRouter()
-const dialog = useDialog()
 const { success, error: showError } = useNotification()
 
 const running = ref(false)
 const showRuns = ref(false)
 const showAdvanced = ref(false)
 const runs = ref<SavedTaskRun[]>([])
-const retention = ref('')
 const scheduleKind = ref('off')
 const scheduleAt = ref('07:00')
 const scheduleTz = ref(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin')
@@ -45,7 +42,41 @@ watch(
   { immediate: true }
 )
 
-const summaryText = computed(() => t(props.task.summary.key, props.task.summary.params))
+/**
+ * Translates one summary part code (e.g. when=daily → "every day at 07:00").
+ * Unknown codes (older/newer backend) fall back to a safe default so the card
+ * never renders a raw i18n key.
+ */
+const summaryPart = (group: string, code: string, fallback: string): string => {
+  const key = `config.savedTasks.summary.${group}.${code || fallback}`
+  return t(te(key) ? key : `config.savedTasks.summary.${group}.${fallback}`, {
+    at: props.task.summary.params.at ?? '',
+    tz: props.task.summary.params.tz ?? '',
+    minutes: props.task.summary.params.minutes ?? '',
+  })
+}
+
+const summaryText = computed(() => {
+  const params = props.task.summary.params
+  const when = summaryPart('when', params.when, 'manual')
+  if (props.task.summary.key === 'config.savedTasks.summary.template') {
+    return t('config.savedTasks.summary.template', {
+      when,
+      reads: summaryPart('reads', params.reads, 'instruction'),
+      saves: summaryPart('saves', params.saves, 'reply'),
+    })
+  }
+  return t('config.savedTasks.summary.simple', { when })
+})
+
+/** ISO timestamps from the API become locale-formatted dates on the card. */
+const formatWhen = (iso: string): string => {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(
+    date
+  )
+}
 
 const lastRunLine = computed(() => {
   if (running.value) return t('config.savedTasks.state.running')
@@ -53,10 +84,10 @@ const lastRunLine = computed(() => {
   if (!props.task.enabled) return t('config.savedTasks.state.off')
   if (!props.task.lastRunAt) {
     return props.task.nextRunAt
-      ? t('config.savedTasks.state.scheduled', { when: props.task.nextRunAt })
+      ? t('config.savedTasks.state.scheduled', { when: formatWhen(props.task.nextRunAt) })
       : t('config.savedTasks.state.neverRun')
   }
-  return t('config.savedTasks.state.lastRun', { when: props.task.lastRunAt })
+  return t('config.savedTasks.state.lastRun', { when: formatWhen(props.task.lastRunAt) })
 })
 
 const onToggle = async () => {
@@ -67,16 +98,15 @@ const onToggle = async () => {
   }
 }
 
+/**
+ * Runs the task immediately with its stored instruction — no dialog. The
+ * backend falls back to the saved prompt when no message is sent, so the
+ * user never has to re-type what the task already knows.
+ */
 const onRunNow = async () => {
-  const message = await dialog.prompt({
-    title: t('config.savedTasks.runNow'),
-    message: t('config.savedTasks.runNowHint'),
-    confirmText: t('config.savedTasks.runNow'),
-  })
-  if (!message || !message.trim()) return
   running.value = true
   try {
-    const result = await savedTasksApi.run(props.task.id, message.trim())
+    const result = await savedTasksApi.run(props.task.id)
     emit('updated', result.task)
     if (result.run.status === 'failed') {
       showError(result.run.error || t('config.savedTasks.runFailed'))
@@ -144,19 +174,29 @@ const loadRuns = async () => {
   showRuns.value = !showRuns.value
   if (!showRuns.value) return
   try {
-    const result = await savedTasksApi.runs(props.task.id)
-    runs.value = result.runs
-    retention.value = result.retention
+    runs.value = (await savedTasksApi.runs(props.task.id)).runs
   } catch {
     showError(t('config.savedTasks.runsFailed'))
   }
+}
+
+/** Localizes a run status/trigger code; unknown codes render as-is. */
+const runLabel = (group: 'runStatus' | 'runTrigger', code: string): string => {
+  const key = `config.savedTasks.${group}.${code}`
+  return te(key) ? t(key) : code
+}
+
+/** Opens the task's chat — every run appends its reply (text, images, files) there. */
+const openResults = () => {
+  if (!props.task.chatId) return
+  void router.push({ path: '/', query: { chat: String(props.task.chatId) } })
 }
 </script>
 
 <template>
   <section class="surface-card p-4 space-y-3" data-testid="saved-task-card">
     <div class="flex items-center justify-between gap-3">
-      <h3 class="font-semibold txt-primary">{{ $t('config.savedTasks.title') }}</h3>
+      <h3 class="font-semibold txt-primary">{{ task.name }}</h3>
       <label class="flex items-center gap-2 text-sm txt-secondary">
         <input
           type="checkbox"
@@ -169,6 +209,14 @@ const loadRuns = async () => {
       </label>
     </div>
 
+    <p
+      v-if="task.instructionPreview"
+      class="text-sm txt-secondary italic truncate"
+      :title="task.instructionPreview"
+      data-testid="saved-task-preview"
+    >
+      “{{ task.instructionPreview }}”
+    </p>
     <p class="text-sm txt-primary">{{ summaryText }}</p>
     <p class="text-xs txt-secondary" data-testid="saved-task-last-run">{{ lastRunLine }}</p>
 
@@ -224,31 +272,57 @@ const loadRuns = async () => {
       <span class="text-xs txt-secondary">{{ scheduleTz }}</span>
     </div>
 
-    <button
-      type="button"
-      class="text-xs txt-secondary hover:txt-primary transition-colors"
-      data-testid="btn-view-runs"
-      @click="loadRuns"
+    <div
+      class="flex flex-wrap items-center gap-3 pt-3 border-t border-light-border/20 dark:border-dark-border/20"
     >
-      {{ showRuns ? $t('config.savedTasks.hideRuns') : $t('config.savedTasks.viewRuns') }}
-    </button>
+      <button
+        v-if="task.chatId"
+        type="button"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        data-testid="btn-show-results"
+        @click="openResults"
+      >
+        {{ $t('config.savedTasks.showResults') }}
+      </button>
+      <button
+        type="button"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        data-testid="btn-view-runs"
+        @click="loadRuns"
+      >
+        {{ showRuns ? $t('config.savedTasks.hideRuns') : $t('config.savedTasks.viewRuns') }}
+      </button>
+      <button
+        type="button"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        data-testid="btn-advanced-steps"
+        @click="showAdvanced = !showAdvanced"
+      >
+        {{ $t('config.savedTasks.advancedSteps') }}
+      </button>
+    </div>
+
     <ul v-if="showRuns" class="space-y-2 text-sm" data-testid="saved-task-runs">
-      <li v-for="run in runs" :key="run.id" class="border-b border-light-border/20 pb-2">
-        <span class="font-medium txt-primary">{{ run.status }}</span>
-        <span class="txt-secondary"> · {{ run.trigger }}</span>
-        <p v-if="run.error" class="txt-secondary mt-1">{{ run.error }}</p>
+      <li
+        v-for="run in runs"
+        :key="run.id"
+        class="flex items-start justify-between gap-3 border-b border-light-border/20 dark:border-dark-border/20 pb-2"
+      >
+        <div class="min-w-0">
+          <span class="font-medium txt-primary">{{ runLabel('runStatus', run.status) }}</span>
+          <span class="txt-secondary"> · {{ runLabel('runTrigger', run.trigger) }}</span>
+          <p v-if="run.error" class="txt-secondary mt-1">{{ run.error }}</p>
+        </div>
+        <span v-if="run.started" class="text-xs txt-secondary whitespace-nowrap">
+          {{ formatWhen(run.started) }}
+        </span>
       </li>
-      <li class="text-xs txt-secondary">{{ retention }}</li>
+      <li v-if="runs.length" class="text-xs txt-secondary">
+        {{ $t('config.savedTasks.runsRetention') }}
+      </li>
+      <li v-else class="text-xs txt-secondary">{{ $t('config.savedTasks.runsEmpty') }}</li>
     </ul>
 
-    <button
-      type="button"
-      class="text-xs txt-secondary hover:txt-primary transition-colors"
-      data-testid="btn-advanced-steps"
-      @click="showAdvanced = !showAdvanced"
-    >
-      {{ $t('config.savedTasks.advancedSteps') }}
-    </button>
     <p v-if="showAdvanced" class="text-xs txt-secondary">
       {{ $t('config.savedTasks.advancedHint') }}
     </p>

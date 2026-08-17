@@ -471,6 +471,8 @@
           <TaskPlanBubble
             v-if="displayTaskPlan && displayTaskPlan.cards.length > 0"
             :plan="displayTaskPlan"
+            :schedule-source="scheduleSource"
+            :guest="isGuestMode"
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
           />
@@ -1197,6 +1199,8 @@ interface Props {
   usageTaximeterActive?: boolean
   // Status for failed/pending messages
   isGuestMode?: boolean
+  /** User text that produced this plan — used to save it as a scheduled task. */
+  scheduleSource?: string
   status?: 'sent' | 'failed' | 'rate_limited'
   errorType?: 'rate_limit' | 'connection' | 'unknown'
   errorData?: {

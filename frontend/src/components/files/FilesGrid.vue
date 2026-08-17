@@ -5,6 +5,25 @@
       <p class="text-sm txt-secondary">{{ $t('files.generated.subtitle') }}</p>
     </div>
 
+    <!-- Kind filter: server-side origin_kind facet (image/video/audio/document/calendar) -->
+    <div class="flex flex-wrap gap-1.5 mb-4" data-testid="generated-kind-filter">
+      <button
+        v-for="option in kindOptions"
+        :key="option.value || 'all'"
+        type="button"
+        class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors border"
+        :class="
+          kindFilter === option.value
+            ? 'bg-[var(--brand)]/15 text-[var(--brand)] border-[var(--brand)]/40'
+            : 'txt-secondary hover:txt-primary border-light-border/30 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5'
+        "
+        :data-testid="`btn-kind-${option.value || 'all'}`"
+        @click="setKindFilter(option.value)"
+      >
+        {{ $t(option.labelKey) }}
+      </button>
+    </div>
+
     <!-- Loading skeletons -->
     <div
       v-if="loading"
@@ -257,6 +276,23 @@ const totalCount = ref(0)
 const itemsPerPage = 30
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / itemsPerPage)))
 
+// Kind filter — '' means all kinds; other values map to BORIGINKIND server-side.
+const kindFilter = ref<FileOriginKind | ''>('')
+const kindOptions: Array<{ value: FileOriginKind | ''; labelKey: string }> = [
+  { value: '', labelKey: 'files.generated.kinds.all' },
+  { value: 'image', labelKey: 'files.generated.kinds.image' },
+  { value: 'video', labelKey: 'files.generated.kinds.video' },
+  { value: 'audio', labelKey: 'files.generated.kinds.audio' },
+  { value: 'document', labelKey: 'files.generated.kinds.document' },
+  { value: 'calendar', labelKey: 'files.generated.kinds.calendar' },
+]
+
+const setKindFilter = (kind: FileOriginKind | '') => {
+  if (kindFilter.value === kind) return
+  kindFilter.value = kind
+  void load(1)
+}
+
 // Knowledge-base menu + per-file busy state for index/delete actions.
 const folders = ref<Array<{ name: string; count: number }>>([])
 const kbMenuOpen = ref<number | null>(null)
@@ -288,6 +324,7 @@ const load = async (page = currentPage.value) => {
   try {
     const list = await filesService.listFiles({
       source: 'generated',
+      originKind: kindFilter.value || undefined,
       sort: 'date_desc',
       page,
       limit: itemsPerPage,

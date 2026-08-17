@@ -21,6 +21,7 @@ final readonly class ConnectionService
         private InboundEmailHandlerRepository $mailHandlers,
         private McpServerConfigRepository $mcpServers,
         private iterable $testers = [],
+        private ?PlannerChannelCatalog $channels = null,
     ) {
     }
 
@@ -95,9 +96,9 @@ final readonly class ConnectionService
         }
 
         $connection = new Connection($ownerId, $type, $name);
-        if (isset($data['config']) && is_array($data['config'])) {
-            $connection->setConfig($data['config']);
-        }
+        $config = isset($data['config']) && is_array($data['config']) ? $data['config'] : [];
+        $config['channel'] = $this->assignChannel($ownerId, $type, $name, $config);
+        $connection->setConfig($config);
         $this->connections->save($connection);
 
         $secret = $data['secret'] ?? '';
@@ -130,7 +131,12 @@ final readonly class ConnectionService
             $connection->setName($data['name']);
         }
         if (isset($data['config']) && is_array($data['config'])) {
-            $connection->setConfig($data['config']);
+            $config = $data['config'];
+            $existing = $connection->getConfig() ?? [];
+            if (!isset($config['channel']) && isset($existing['channel'])) {
+                $config['channel'] = $existing['channel'];
+            }
+            $connection->setConfig($config);
         }
         $secret = $data['secret'] ?? null;
         if (is_string($secret) && '' !== $secret) {
@@ -199,15 +205,53 @@ final readonly class ConnectionService
      */
     private function serialize(Connection $connection, string $source): array
     {
+        $config = $connection->getConfig();
+        $channel = is_array($config) && is_string($config['channel'] ?? null)
+            ? PlannerChannelCatalog::sanitize($config['channel'])
+            : PlannerChannelCatalog::preferredKey($connection->getType(), $connection->getName(), $config ?? []);
+
         return [
             'id' => (string) $connection->getId(),
             'source' => $source,
             'type' => $connection->getType(),
             'name' => $connection->getName(),
+            'channel' => $channel,
             'status' => $connection->getStatus(),
             'last_checked' => $connection->getLastChecked(),
             'has_secret' => null !== $connection->getCredentialId(),
-            'config' => $connection->getConfig(),
+            'config' => $config,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function assignChannel(int $ownerId, string $type, string $name, array $config): string
+    {
+        $requested = is_string($config['channel'] ?? null)
+            ? PlannerChannelCatalog::sanitize($config['channel'])
+            : '';
+        if (null !== $this->channels) {
+            return '' !== $requested
+                ? PlannerChannelCatalog::unique($requested, $this->usedKeys($ownerId))
+                : $this->channels->suggest($ownerId, $type, $name, $config);
+        }
+
+        return '' !== $requested ? $requested : PlannerChannelCatalog::preferredKey($type, $name, $config);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function usedKeys(int $ownerId): array
+    {
+        if (null === $this->channels) {
+            return [];
+        }
+
+        return array_map(
+            static fn (PlannerChannel $channel): string => $channel->key,
+            $this->channels->forUser($ownerId),
+        );
     }
 }

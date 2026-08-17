@@ -74,6 +74,24 @@ final class ResultAssemblerTest extends TestCase
         $this->assertNotContains('n3', $cardIds);
     }
 
+    public function testEmptySuccessfulReplyNodeRecoversTextFromTheOtherNodes(): void
+    {
+        // An authored compose_reply without wired inputs can SUCCEED with no
+        // text and no files. The answer must recover the other nodes' output
+        // instead of returning a blank reply (surfaced by Saved Task graphs).
+        $plan = $this->plan();
+        $ctx = $this->context();
+
+        $ctx->setResult('n1', NodeResult::ok('Summary text'));
+        $ctx->setResult('n2', NodeResult::ok(null, [['path' => 'uploads/tts.mp3', 'type' => 'audio']]));
+        $ctx->setResult('n3', NodeResult::ok(''));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertSame('Summary text', $result['content']);
+        $this->assertSame('uploads/tts.mp3', $result['files'][0]['path']);
+    }
+
     public function testUsageIncludesEarlierNodesWhenReplyNodeAlreadyHasUsage(): void
     {
         $plan = $this->plan();

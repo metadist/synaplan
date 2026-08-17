@@ -196,6 +196,7 @@
               :error-data="message.errorData"
               :truncated="message.truncated"
               :task-plan="message.taskPlan"
+              :schedule-source="userTextBefore(message.id)"
               :media-job="message.mediaJob"
               :was-multitask="message.wasMultitask"
               :usage="message.usage"
@@ -825,6 +826,17 @@ onMounted(async () => {
   // Load chats first
   await chatsStore.loadChats()
 
+  // Deep link from Saved Tasks ("Run now" / "Show results"): /?chat=<id>
+  // opens the task's chat so the user sees the run's result. Without this
+  // the query was silently ignored and the view reopened the LAST ACTIVE
+  // chat — for a task saved from a chat turn that was the original prompt
+  // with the old output.
+  const requestedChatId = Number(route.query.chat)
+  if (Number.isInteger(requestedChatId) && requestedChatId > 0) {
+    chatsStore.setActiveChat(requestedChatId)
+    router.replace({ query: { ...route.query, chat: undefined } })
+  }
+
   // If no active chat, create one
   if (!chatsStore.activeChatId) {
     await chatsStore.createChat('New Chat')
@@ -1093,6 +1105,20 @@ async function generateChatTitleFromFirstMessage(firstMessage: string) {
 
   // Update chat title
   await chatsStore.updateChatTitle(chat.id, title)
+}
+
+const userTextBefore = (messageId: string | number): string => {
+  const list = historyStore.messages
+  const idx = list.findIndex((row) => row.id === messageId)
+  for (let i = idx - 1; i >= 0; i--) {
+    if (list[i].role !== 'user') continue
+    return list[i].parts
+      .filter((part) => part.type === 'text' && typeof part.content === 'string')
+      .map((part) => part.content)
+      .join('\n')
+      .trim()
+  }
+  return ''
 }
 
 const groupedMessages = computed(() => {
@@ -3162,6 +3188,13 @@ const streamAIResponse = async (
             if (message) {
               applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
 
+              // Multitask: the DAG finished — freeze the task cards so the plan
+              // renders as final and the schedule clock appears immediately
+              // (canSchedule requires !plan.active), without a page reload.
+              if (message.taskPlan) {
+                message.taskPlan.active = false
+              }
+
               // Mark as truncated so the Continue button appears
               if (data.truncated) {
                 message.truncated = true
@@ -3412,6 +3445,10 @@ const streamAIResponse = async (
             {
               const message = historyStore.messages.find((m) => m.id === messageId)
               if (message) {
+                // Multitask: stop the cards from animating on a failed turn.
+                if (message.taskPlan) {
+                  message.taskPlan.active = false
+                }
                 if (data.messageId) {
                   message.backendMessageId = data.messageId
                 }
@@ -3958,12 +3995,11 @@ const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => 
 // and signal the backend so the provider poll aborts and stops billing.
 const handleTaskCancel = async (nodeId: string) => {
   // Resolve the CURRENT turn's task-plan message via the streaming flag, mirroring
-  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …) and
-  // taskPlan.active is only cleared on local teardown (not on a normal/error
-  // completion), so finding the FIRST active plan can match a stale earlier turn and
-  // cancel the wrong card / send the wrong trackId. The streaming message is the
-  // unambiguous active turn; fall back to the active-plan lookup only if none is
-  // currently streaming.
+  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …), so
+  // finding the FIRST active plan could match a stale earlier turn and cancel the
+  // wrong card / send the wrong trackId. The streaming message is the unambiguous
+  // active turn; fall back to the active-plan lookup only if none is currently
+  // streaming.
   const message =
     historyStore.messages.find((m) => m.isStreaming && m.taskPlan?.active) ??
     historyStore.messages.find((m) => m.taskPlan?.active)

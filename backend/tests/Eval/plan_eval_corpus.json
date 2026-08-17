@@ -387,6 +387,23 @@
     }
   },
   {
+    "id": "image_to_nextcloud",
+    "text": "Erstelle das Bild einer Katze und lege es in meinen Nextcloud-Account.",
+    "language": "de",
+    "expect": {
+      "capabilities": [
+        "image_generation",
+        "save_to_folder"
+      ],
+      "edges": [
+        "image_generation->save_to_folder"
+      ],
+      "forbid": [
+        "email_me"
+      ]
+    }
+  },
+  {
     "id": "email_explicit",
     "text": "Fasse die wichtigsten Regeln für gutes Zeitmanagement zusammen und schicke mir das Ergebnis per E-Mail.",
     "language": "de",

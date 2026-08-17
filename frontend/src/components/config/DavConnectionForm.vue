@@ -44,10 +44,18 @@ const host = computed(() => {
   }
 })
 
+/** Vite DEV (and Vitest) only — production builds still require https://. */
+const allowInsecureLocal = import.meta.env.DEV
+
+const isAllowedUrl = (value: string): boolean => {
+  if (value.startsWith('https://')) return true
+  return allowInsecureLocal && value.startsWith('http://')
+}
+
 const canSubmit = computed(() => {
   if (!username.value.trim() || !appPassword.value) return false
   const base = kind.value === 'nextcloud' ? normalizedServer.value : filesBaseUrl.value
-  return base.startsWith('https://')
+  return isAllowedUrl(base)
 })
 
 const reset = () => {
@@ -93,6 +101,7 @@ const submit = async () => {
         username: username.value.trim(),
         folder: folder.value.trim() || 'Synaplan',
         on_conflict: 'rename',
+        channel: kind.value === 'nextcloud' ? 'nextcloud' : 'folder',
       },
     })
 
@@ -107,6 +116,7 @@ const submit = async () => {
         config: {
           base_url: calendarBaseUrl.value,
           username: username.value.trim(),
+          channel: 'calendar',
         },
       })
     }
@@ -164,10 +174,13 @@ const submit = async () => {
           v-model="serverUrl"
           type="url"
           required
-          placeholder="https://cloud.example.com"
+          :placeholder="allowInsecureLocal ? 'http://nextcloud' : 'https://cloud.example.com'"
           class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="dav-server-url"
         />
+        <p v-if="allowInsecureLocal" class="text-xs txt-secondary mt-1">
+          {{ $t('config.connections.providers.dav.localHttpHint') }}
+        </p>
       </label>
       <label v-else class="block text-sm">
         <span class="txt-secondary">{{ $t('config.connections.providers.dav.davUrl') }}</span>

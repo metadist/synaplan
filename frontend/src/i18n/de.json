@@ -130,7 +130,8 @@
     "onboarding": "Willkommen",
     "mcpServers": "MCP-Server",
     "aiAgents": "KI-Agenten",
-    "connections": "Verbindungen"
+    "connections": "Verbindungen",
+    "savedTasks": "Gespeicherte Aufgaben"
   },
   "addinConnect": {
     "title": "Mit Synaplan verbinden",
@@ -553,6 +554,7 @@
     "toolsMailHandler": "E-Mail-Automatisierung",
     "mcpServers": "MCP-Server",
     "connections": "Verbindungen",
+    "savedTasks": "Gespeicherte Aufgaben",
     "plugins": "Plugins",
     "files": "Quellen",
     "filesDescription": "Quellen für deine Chats",
@@ -1168,6 +1170,7 @@
     "title": "Aufgabenplan",
     "showSteps": "Schritte anzeigen",
     "hideSteps": "Schritte ausblenden",
+    "scheduleThis": "Das später nach Zeitplan wiederholen",
     "download": "Herunterladen",
     "failedBody": "Dieser Schritt konnte nicht abgeschlossen werden.",
     "cancelledBody": "Du hast diesen Schritt gestoppt.",
@@ -1191,7 +1194,8 @@
       "document": "Dokument",
       "search": "Websuche",
       "extract": "Textextraktion",
-      "email": "E-Mail"
+      "email": "E-Mail",
+      "folder": "Ordner"
     },
     "capability": {
       "extract_text": "Text wird extrahiert",
@@ -1209,7 +1213,8 @@
       "text2sound": "Audio",
       "document_generation": "Dokument",
       "calendar_event": "Kalendereinladung",
-      "email_me": "E-Mail-Versand"
+      "email_me": "E-Mail-Versand",
+      "save_to_folder": "Im Ordner speichern"
     },
     "copyText": "Inhalt kopieren",
     "copied": "In die Zwischenablage kopiert",
@@ -1752,7 +1757,6 @@
       "on": "An",
       "off": "Aus",
       "runNow": "Jetzt ausführen",
-      "runNowHint": "Was soll diese Aufgabe in diesem Durchlauf tun?",
       "runStarted": "Die Aufgabe läuft in einem eigenen Gespräch.",
       "runFailed": "Die Ausführung konnte nicht abgeschlossen werden.",
       "updateFailed": "Die gespeicherte Aufgabe konnte nicht aktualisiert werden.",
@@ -1760,14 +1764,38 @@
       "scheduleSaved": "Zeitplan gespeichert.",
       "resumed": "Die Aufgabe läuft wieder.",
       "resume": "Fortsetzen",
-      "viewRuns": "Ausführungen anzeigen",
-      "hideRuns": "Ausführungen ausblenden",
+      "showResults": "Ergebnisse anzeigen",
+      "viewRuns": "Verlauf",
+      "hideRuns": "Verlauf ausblenden",
+      "runsRetention": "Ältere Ausführungen werden automatisch entfernt.",
+      "runsEmpty": "Noch keine Ausführungen.",
+      "runStatus": {
+        "queued": "Wartet",
+        "running": "Läuft",
+        "completed": "Abgeschlossen",
+        "failed": "Fehlgeschlagen",
+        "cancelled": "Abgebrochen"
+      },
+      "runTrigger": {
+        "manual": "von dir gestartet",
+        "schedule": "per Zeitplan",
+        "chat": "aus dem Chat",
+        "inbound_email": "eingehende E-Mail"
+      },
       "advancedSteps": "Erweiterte Schritte",
       "advancedHint": "Nur öffnen, wenn du genaue Schritte festlegen willst. Die meisten Aufgaben brauchen nur „Jetzt ausführen“ und einen Zeitplan.",
       "autoPauseTitle": "Automatisch pausiert",
       "autoPauseBody": "Diese Aufgabe ist dreimal hintereinander fehlgeschlagen. Behebe das Problem und setze sie fort.",
       "createFailed": "Konnte nicht als Aufgabe gespeichert werden.",
       "created": "Als Aufgabe gespeichert. Du kannst sie jetzt ausführen.",
+      "overviewTitle": "Gespeicherte Aufgaben",
+      "overviewSubtitle": "Anweisungen, die auf Zuruf oder später nach Zeitplan laufen.",
+      "overviewLoading": "Gespeicherte Aufgaben werden geladen…",
+      "overviewEmpty": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder eine eigene Anweisung speichern unter",
+      "loadFailed": "Gespeicherte Aufgaben konnten nicht geladen werden.",
+      "scheduleThis": "Später erneut ausführen",
+      "scheduleThisHint": "Gib der Aufgabe einen Namen. Den Zeitplan setzt du auf der nächsten Seite.",
+      "scheduledFromChat": "Gespeichert. Lege fest, wann sie laufen soll.",
       "state": {
         "off": "Läuft nicht",
         "neverRun": "Gespeichert — noch nicht ausgeführt",
@@ -1783,7 +1811,27 @@
         "weekdays": "Jeden Werktag"
       },
       "summary": {
-        "template": "Läuft {when}. Liest {reads} → Speichert {saves}."
+        "simple": "Läuft {when}.",
+        "template": "Läuft {when}. Liest {reads} und liefert {saves}.",
+        "when": {
+          "manual": "wenn du sie startest",
+          "interval": "alle {minutes} Minuten",
+          "daily": "täglich um {at} ({tz})",
+          "weekly": "an Werktagen um {at} ({tz})",
+          "schedule": "nach Zeitplan",
+          "inboundEmail": "wenn neue E-Mails eintreffen",
+          "chat": "wenn eine passende Chat-Nachricht eintrifft"
+        },
+        "reads": {
+          "instruction": "diese Anweisung",
+          "mailbox": "das verbundene Postfach"
+        },
+        "saves": {
+          "email": "eine E-Mail an dich",
+          "folder": "eine Datei im verbundenen Ordner",
+          "calendar": "einen Kalendereintrag",
+          "reply": "eine Antwort im Chat"
+        }
       }
     },
     "connections": {
@@ -1830,6 +1878,17 @@
       "reconnect": "Neu verbinden",
       "testing": "Wird getestet…",
       "testOkAccount": "Verbindung funktioniert – angemeldet als {account}.",
+      "manage": "Verwalten",
+      "editName": "Bezeichnung",
+      "keepPassword": "Leer lassen, um das aktuelle App-Passwort zu behalten.",
+      "updated": "Verbindung aktualisiert.",
+      "updateFailed": "Die Verbindung konnte nicht aktualisiert werden.",
+      "deleteTitle": "Diese Verbindung entfernen?",
+      "deleteMessage": "Synaplan verwendet {name} danach nicht mehr. Dateien, die schon dort liegen, bleiben erhalten.",
+      "deleteConfirm": "Entfernen",
+      "deleted": "{name} wurde entfernt.",
+      "deleteFailed": "Die Verbindung konnte nicht entfernt werden.",
+      "channelHint": "Im Chat heißt dieser Kanal {channel}",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -1874,6 +1933,7 @@
           "username": "Benutzername",
           "appPassword": "App-Passwort",
           "appPasswordHint": "Erstelle eines in Nextcloud unter Einstellungen → Sicherheit → Geräte & Sitzungen. Dein Konto-Passwort wird nie gespeichert.",
+          "localHttpHint": "Auf dieser Entwicklungsinstallation kannst du auch eine lokale Adresse wie http://nextcloud verwenden.",
           "folder": "Ordner für Ergebnisse",
           "withCalendar": "Auch einen Kalender verbinden:",
           "connect": "Verbinden",
@@ -2859,7 +2919,15 @@
     },
     "generated": {
       "title": "Erzeugt",
-      "subtitle": "Bilder, Video und Audio aus deinen Chats.",
+      "subtitle": "Bilder, Videos, Audio, Dokumente und Kalendereinladungen aus deinen Chats und Aufgaben.",
+      "kinds": {
+        "all": "Alle",
+        "image": "Bilder",
+        "video": "Videos",
+        "audio": "Audio",
+        "document": "Dokumente",
+        "calendar": "Kalender"
+      },
       "openInChat": "Im Chat öffnen",
       "download": "Herunterladen",
       "autoGroup": "KI wählt einen Ordner",

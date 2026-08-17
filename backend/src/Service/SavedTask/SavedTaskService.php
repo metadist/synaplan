@@ -146,13 +146,13 @@ final readonly class SavedTaskService
                 continue;
             }
             $capability = (string) ($node['capability'] ?? '');
-            if (in_array($capability, ['email_me', 'outbound_webhook'], true)) {
+            if (in_array($capability, ['email_me', 'save_to_folder', 'outbound_webhook'], true)) {
                 $mutating = true;
                 break;
             }
         }
         if ($mutating && !$task->allowsUnattended()) {
-            throw new \InvalidArgumentException('This schedule would send email on its own. Confirm “runs on its own” first.');
+            throw new \InvalidArgumentException('This schedule would send or save files on its own. Confirm “runs on its own” first.');
         }
     }
 }
