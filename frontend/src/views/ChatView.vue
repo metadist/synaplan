@@ -196,6 +196,7 @@
               :error-data="message.errorData"
               :truncated="message.truncated"
               :task-plan="message.taskPlan"
+              :schedule-source="userTextBefore(message.id)"
               :media-job="message.mediaJob"
               :was-multitask="message.wasMultitask"
               :usage="message.usage"
@@ -1093,6 +1094,20 @@ async function generateChatTitleFromFirstMessage(firstMessage: string) {
 
   // Update chat title
   await chatsStore.updateChatTitle(chat.id, title)
+}
+
+const userTextBefore = (messageId: string | number): string => {
+  const list = historyStore.messages
+  const idx = list.findIndex((row) => row.id === messageId)
+  for (let i = idx - 1; i >= 0; i--) {
+    if (list[i].role !== 'user') continue
+    return list[i].parts
+      .filter((part) => part.type === 'text' && typeof part.content === 'string')
+      .map((part) => part.content)
+      .join('\n')
+      .trim()
+  }
+  return ''
 }
 
 const groupedMessages = computed(() => {

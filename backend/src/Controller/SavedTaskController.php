@@ -65,6 +65,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'key', type: 'string'),
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
+                                new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
                             ]
                         )),
                     ]
@@ -133,6 +134,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'key', type: 'string'),
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
+                                new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
                             ]
                         ),
                     ]
@@ -200,6 +202,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'key', type: 'string'),
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
+                                new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
                             ]
                         ),
                     ]
@@ -298,6 +301,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'key', type: 'string'),
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
+                                new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
                             ]
                         ),
                         new OA\Property(
@@ -446,6 +450,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'key', type: 'string'),
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
+                                new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
                             ]
                         ),
                     ]

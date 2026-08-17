@@ -129,7 +129,8 @@
     "onboarding": "Bienvenida",
     "mcpServers": "Servidores MCP",
     "aiAgents": "Agentes de IA",
-    "connections": "Conexiones"
+    "connections": "Conexiones",
+    "savedTasks": "Tareas guardadas"
   },
   "addinConnect": {
     "title": "Conectar a Synaplan",
@@ -546,6 +547,7 @@
     "toolsMailHandler": "Automatización de correo",
     "mcpServers": "Servidores MCP",
     "connections": "Conexiones",
+    "savedTasks": "Tareas guardadas",
     "plugins": "Plugins",
     "files": "Fuentes",
     "filesDescription": "Fuentes para tus chats",
@@ -1601,6 +1603,7 @@
     "title": "Plan de tareas",
     "showSteps": "Mostrar pasos",
     "hideSteps": "Ocultar pasos",
+    "scheduleThis": "Repetir esto más tarde según un horario",
     "download": "Descargar",
     "failedBody": "Este paso no se pudo completar.",
     "cancelledBody": "Has detenido este paso.",
@@ -2299,6 +2302,14 @@
       "autoPauseBody": "Esta tarea falló tres veces seguidas. Corrige el problema y reanúdala.",
       "createFailed": "No se pudo guardar como tarea.",
       "created": "Guardada como tarea. Ya puedes ejecutarla.",
+      "overviewTitle": "Tareas guardadas",
+      "overviewSubtitle": "Instrucciones que se ejecutan cuando las pides, o más tarde según un horario.",
+      "overviewLoading": "Cargando tareas guardadas…",
+      "overviewEmpty": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o guarda una instrucción propia en",
+      "loadFailed": "No se pudieron cargar las tareas guardadas.",
+      "scheduleThis": "Volver a ejecutar esto más tarde",
+      "scheduleThisHint": "Ponle un nombre a esta tarea. El horario lo eliges en la siguiente pantalla.",
+      "scheduledFromChat": "Guardada. Elige cuándo debe ejecutarse.",
       "state": {
         "off": "No se está ejecutando",
         "neverRun": "Guardada — aún no se ha ejecutado",
@@ -2314,7 +2325,27 @@
         "weekdays": "Cada día laborable"
       },
       "summary": {
-        "template": "Se ejecuta {when}. Lee {reads} → Guarda {saves}."
+        "simple": "Se ejecuta {when}.",
+        "template": "Se ejecuta {when}. Lee {reads} y entrega {saves}.",
+        "when": {
+          "manual": "cuando la inicias",
+          "interval": "cada {minutes} minutos",
+          "daily": "cada día a las {at} ({tz})",
+          "weekly": "los días laborables a las {at} ({tz})",
+          "schedule": "según un horario",
+          "inboundEmail": "cuando llega correo nuevo",
+          "chat": "cuando llega un mensaje de chat coincidente"
+        },
+        "reads": {
+          "instruction": "esta instrucción",
+          "mailbox": "el buzón conectado"
+        },
+        "saves": {
+          "email": "un correo para ti",
+          "folder": "un archivo en la carpeta conectada",
+          "calendar": "una entrada de calendario",
+          "reply": "una respuesta en el chat"
+        }
       }
     },
     "connections": {

@@ -130,7 +130,8 @@
     "onboarding": "Welcome",
     "mcpServers": "MCP Servers",
     "aiAgents": "AI Agents",
-    "connections": "Connections"
+    "connections": "Connections",
+    "savedTasks": "Saved Tasks"
   },
   "addinConnect": {
     "title": "Connect to Synaplan",
@@ -558,6 +559,7 @@
     "toolsMailHandler": "Email Automation",
     "mcpServers": "MCP Servers",
     "connections": "Connections",
+    "savedTasks": "Saved Tasks",
     "plugins": "Plugins",
     "files": "Sources",
     "filesDescription": "Sources for your chats",
@@ -1727,6 +1729,14 @@
       "autoPauseBody": "This task failed three times in a row. Fix the issue, then resume.",
       "createFailed": "Could not save this as a task.",
       "created": "Saved as a task. You can run it now.",
+      "overviewTitle": "Saved Tasks",
+      "overviewSubtitle": "Instructions that run when you ask, or later on a schedule.",
+      "overviewLoading": "Loading saved tasks…",
+      "overviewEmpty": "Nothing scheduled yet. After a chat plan finishes, use the clock — or save a custom instruction under",
+      "loadFailed": "Could not load saved tasks.",
+      "scheduleThis": "Run this again later",
+      "scheduleThisHint": "Name this task. You can set the schedule on the next screen.",
+      "scheduledFromChat": "Saved. Set when it should run.",
       "state": {
         "off": "Not running",
         "neverRun": "Saved — not run yet",
@@ -1742,7 +1752,27 @@
         "weekdays": "Every weekday"
       },
       "summary": {
-        "template": "Runs {when}. Reads {reads} → Saves {saves}."
+        "simple": "Runs {when}.",
+        "template": "Runs {when}. Reads {reads} and delivers {saves}.",
+        "when": {
+          "manual": "when you start it",
+          "interval": "every {minutes} minutes",
+          "daily": "every day at {at} ({tz})",
+          "weekly": "every weekday at {at} ({tz})",
+          "schedule": "on a schedule",
+          "inboundEmail": "when new mail arrives",
+          "chat": "when a matching chat message arrives"
+        },
+        "reads": {
+          "instruction": "this instruction",
+          "mailbox": "the connected mailbox"
+        },
+        "saves": {
+          "email": "an email to you",
+          "folder": "a file in the connected folder",
+          "calendar": "a calendar entry",
+          "reply": "a reply in the chat"
+        }
       }
     },
     "connections": {
@@ -3818,6 +3848,7 @@
     "title": "Task plan",
     "showSteps": "Show steps",
     "hideSteps": "Hide steps",
+    "scheduleThis": "Run this again on a schedule",
     "download": "Download",
     "failedBody": "This step couldn't be completed.",
     "cancelledBody": "You stopped this step.",

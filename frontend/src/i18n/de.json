@@ -130,7 +130,8 @@
     "onboarding": "Willkommen",
     "mcpServers": "MCP-Server",
     "aiAgents": "KI-Agenten",
-    "connections": "Verbindungen"
+    "connections": "Verbindungen",
+    "savedTasks": "Gespeicherte Aufgaben"
   },
   "addinConnect": {
     "title": "Mit Synaplan verbinden",
@@ -553,6 +554,7 @@
     "toolsMailHandler": "E-Mail-Automatisierung",
     "mcpServers": "MCP-Server",
     "connections": "Verbindungen",
+    "savedTasks": "Gespeicherte Aufgaben",
     "plugins": "Plugins",
     "files": "Quellen",
     "filesDescription": "Quellen für deine Chats",
@@ -1168,6 +1170,7 @@
     "title": "Aufgabenplan",
     "showSteps": "Schritte anzeigen",
     "hideSteps": "Schritte ausblenden",
+    "scheduleThis": "Das später nach Zeitplan wiederholen",
     "download": "Herunterladen",
     "failedBody": "Dieser Schritt konnte nicht abgeschlossen werden.",
     "cancelledBody": "Du hast diesen Schritt gestoppt.",
@@ -1770,6 +1773,14 @@
       "autoPauseBody": "Diese Aufgabe ist dreimal hintereinander fehlgeschlagen. Behebe das Problem und setze sie fort.",
       "createFailed": "Konnte nicht als Aufgabe gespeichert werden.",
       "created": "Als Aufgabe gespeichert. Du kannst sie jetzt ausführen.",
+      "overviewTitle": "Gespeicherte Aufgaben",
+      "overviewSubtitle": "Anweisungen, die auf Zuruf oder später nach Zeitplan laufen.",
+      "overviewLoading": "Gespeicherte Aufgaben werden geladen…",
+      "overviewEmpty": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder eine eigene Anweisung speichern unter",
+      "loadFailed": "Gespeicherte Aufgaben konnten nicht geladen werden.",
+      "scheduleThis": "Später erneut ausführen",
+      "scheduleThisHint": "Gib der Aufgabe einen Namen. Den Zeitplan setzt du auf der nächsten Seite.",
+      "scheduledFromChat": "Gespeichert. Lege fest, wann sie laufen soll.",
       "state": {
         "off": "Läuft nicht",
         "neverRun": "Gespeichert — noch nicht ausgeführt",
@@ -1785,7 +1796,27 @@
         "weekdays": "Jeden Werktag"
       },
       "summary": {
-        "template": "Läuft {when}. Liest {reads} → Speichert {saves}."
+        "simple": "Läuft {when}.",
+        "template": "Läuft {when}. Liest {reads} und liefert {saves}.",
+        "when": {
+          "manual": "wenn du sie startest",
+          "interval": "alle {minutes} Minuten",
+          "daily": "täglich um {at} ({tz})",
+          "weekly": "an Werktagen um {at} ({tz})",
+          "schedule": "nach Zeitplan",
+          "inboundEmail": "wenn neue E-Mails eintreffen",
+          "chat": "wenn eine passende Chat-Nachricht eintrifft"
+        },
+        "reads": {
+          "instruction": "diese Anweisung",
+          "mailbox": "das verbundene Postfach"
+        },
+        "saves": {
+          "email": "eine E-Mail an dich",
+          "folder": "eine Datei im verbundenen Ordner",
+          "calendar": "einen Kalendereintrag",
+          "reply": "eine Antwort im Chat"
+        }
       }
     },
     "connections": {

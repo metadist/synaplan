@@ -14,7 +14,7 @@ const emit = defineEmits<{
   updated: [task: SavedTask]
 }>()
 
-const { t } = useI18n()
+const { t, te, locale } = useI18n()
 const router = useRouter()
 const dialog = useDialog()
 const { success, error: showError } = useNotification()
@@ -45,7 +45,41 @@ watch(
   { immediate: true }
 )
 
-const summaryText = computed(() => t(props.task.summary.key, props.task.summary.params))
+/**
+ * Translates one summary part code (e.g. when=daily → "every day at 07:00").
+ * Unknown codes (older/newer backend) fall back to a safe default so the card
+ * never renders a raw i18n key.
+ */
+const summaryPart = (group: string, code: string, fallback: string): string => {
+  const key = `config.savedTasks.summary.${group}.${code || fallback}`
+  return t(te(key) ? key : `config.savedTasks.summary.${group}.${fallback}`, {
+    at: props.task.summary.params.at ?? '',
+    tz: props.task.summary.params.tz ?? '',
+    minutes: props.task.summary.params.minutes ?? '',
+  })
+}
+
+const summaryText = computed(() => {
+  const params = props.task.summary.params
+  const when = summaryPart('when', params.when, 'manual')
+  if (props.task.summary.key === 'config.savedTasks.summary.template') {
+    return t('config.savedTasks.summary.template', {
+      when,
+      reads: summaryPart('reads', params.reads, 'instruction'),
+      saves: summaryPart('saves', params.saves, 'reply'),
+    })
+  }
+  return t('config.savedTasks.summary.simple', { when })
+})
+
+/** ISO timestamps from the API become locale-formatted dates on the card. */
+const formatWhen = (iso: string): string => {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(
+    date
+  )
+}
 
 const lastRunLine = computed(() => {
   if (running.value) return t('config.savedTasks.state.running')
@@ -53,10 +87,10 @@ const lastRunLine = computed(() => {
   if (!props.task.enabled) return t('config.savedTasks.state.off')
   if (!props.task.lastRunAt) {
     return props.task.nextRunAt
-      ? t('config.savedTasks.state.scheduled', { when: props.task.nextRunAt })
+      ? t('config.savedTasks.state.scheduled', { when: formatWhen(props.task.nextRunAt) })
       : t('config.savedTasks.state.neverRun')
   }
-  return t('config.savedTasks.state.lastRun', { when: props.task.lastRunAt })
+  return t('config.savedTasks.state.lastRun', { when: formatWhen(props.task.lastRunAt) })
 })
 
 const onToggle = async () => {
@@ -156,7 +190,7 @@ const loadRuns = async () => {
 <template>
   <section class="surface-card p-4 space-y-3" data-testid="saved-task-card">
     <div class="flex items-center justify-between gap-3">
-      <h3 class="font-semibold txt-primary">{{ $t('config.savedTasks.title') }}</h3>
+      <h3 class="font-semibold txt-primary">{{ task.name }}</h3>
       <label class="flex items-center gap-2 text-sm txt-secondary">
         <input
           type="checkbox"
@@ -169,6 +203,14 @@ const loadRuns = async () => {
       </label>
     </div>
 
+    <p
+      v-if="task.instructionPreview"
+      class="text-sm txt-secondary italic truncate"
+      :title="task.instructionPreview"
+      data-testid="saved-task-preview"
+    >
+      “{{ task.instructionPreview }}”
+    </p>
     <p class="text-sm txt-primary">{{ summaryText }}</p>
     <p class="text-xs txt-secondary" data-testid="saved-task-last-run">{{ lastRunLine }}</p>
 

@@ -220,7 +220,12 @@ const onDelete = async () => {
       </button>
     </div>
 
-    <form v-if="editing" class="space-y-3 pt-1" data-testid="connection-edit-form" @submit.prevent="onSave">
+    <form
+      v-if="editing"
+      class="space-y-3 pt-1"
+      data-testid="connection-edit-form"
+      @submit.prevent="onSave"
+    >
       <label class="block text-sm">
         <span class="txt-secondary">{{ $t('config.connections.editName') }}</span>
         <input
@@ -278,7 +283,9 @@ const onDelete = async () => {
           />
         </label>
         <label v-else class="block text-sm">
-          <span class="txt-secondary">{{ $t('config.connections.providers.dav.withCalendar') }}</span>
+          <span class="txt-secondary">{{
+            $t('config.connections.providers.dav.withCalendar')
+          }}</span>
           <input
             v-model="calendar"
             type="text"

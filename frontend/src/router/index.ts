@@ -242,6 +242,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.connections' },
     },
     {
+      path: '/channels/tasks',
+      name: 'channels-saved-tasks',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.savedTasks' },
+    },
+    {
       path: '/channels/agents',
       name: 'channels-agents',
       component: () => import('@/views/ConfigView.vue'),

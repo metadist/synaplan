@@ -78,9 +78,9 @@ final class SaveToFolderRunnerTest extends TestCase
             'ok' => false,
             'message' => 'no folder is connected — add one under Settings → Connections',
             'sent' => 0,
-                'connection' => null,
-                'channel' => null,
-            ]);
+            'connection' => null,
+            'channel' => null,
+        ]);
 
         $result = $this->runner($delivery)->run($this->node(), $this->context());
 

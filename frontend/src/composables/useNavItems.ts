@@ -104,7 +104,10 @@ export function useNavItems() {
       { key: 'mail-handler', path: '/channels/email', label: t('nav.toolsMailHandler') },
       { key: 'mcp-servers', path: '/channels/mcp', label: t('nav.mcpServers') },
       ...(isSavedTasksEnabled()
-        ? [{ key: 'connections', path: '/channels/connections', label: t('nav.connections') }]
+        ? [
+            { key: 'connections', path: '/channels/connections', label: t('nav.connections') },
+            { key: 'saved-tasks', path: '/channels/tasks', label: t('nav.savedTasks') },
+          ]
         : []),
       { key: 'ai-agents', path: '/channels/agents', label: t('nav.aiAgents') },
       { key: 'api-keys', path: '/channels/api', label: t('nav.configApiKeys') },

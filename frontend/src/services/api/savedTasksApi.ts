@@ -12,6 +12,12 @@ import {
 type RawTask = NonNullable<z.infer<typeof GetApiSavedTasksListResponseSchema>['tasks']>[number]
 type RawRun = NonNullable<z.infer<typeof GetApiSavedTasksRunsResponseSchema>['runs']>[number]
 
+/**
+ * Language-neutral summary contract (see backend SavedTaskSummary): `key`
+ * selects the sentence template, `params` holds CODES (when/reads/saves) plus
+ * raw interpolation values (at/tz/minutes). The card translates every part —
+ * the backend never sends prose, so the sentence is single-language.
+ */
 export interface SavedTaskSummary {
   key: string
   params: Record<string, string>
@@ -32,6 +38,8 @@ export interface SavedTask {
   consecutiveFailures: number
   autoPaused: boolean
   summary: SavedTaskSummary
+  /** First ~60 characters of the underlying instruction ("what runs"). */
+  instructionPreview: string | null
 }
 
 export interface SavedTaskRun {
@@ -72,11 +80,12 @@ function asTask(raw: RawTask | undefined): SavedTask {
     consecutiveFailures: raw.consecutiveFailures ?? 0,
     autoPaused: raw.autoPaused === true,
     summary: {
-      key: raw.summary?.key ?? 'config.savedTasks.summary.template',
+      key: raw.summary?.key ?? 'config.savedTasks.summary.simple',
       params: Object.fromEntries(
         Object.entries(params).map(([key, value]) => [key, String(value ?? '')])
       ),
     },
+    instructionPreview: raw.instructionPreview ?? null,
   }
 }
 

@@ -129,7 +129,8 @@
     "onboarding": "Hoş geldin",
     "mcpServers": "MCP Sunucuları",
     "aiAgents": "Yapay zeka ajanları",
-    "connections": "Bağlantılar"
+    "connections": "Bağlantılar",
+    "savedTasks": "Kayıtlı görevler"
   },
   "addinConnect": {
     "title": "Synaplan'a bağlan",
@@ -546,6 +547,7 @@
     "toolsMailHandler": "E-posta Otomasyonu",
     "mcpServers": "MCP Sunucuları",
     "connections": "Bağlantılar",
+    "savedTasks": "Kayıtlı görevler",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
     "filesDescription": "Sohbetleriniz için kaynaklar",
@@ -1601,6 +1603,7 @@
     "title": "Görev planı",
     "showSteps": "Adımları göster",
     "hideSteps": "Adımları gizle",
+    "scheduleThis": "Bunu daha sonra bir zamanlamayla tekrarla",
     "download": "İndir",
     "failedBody": "Bu adım tamamlanamadı.",
     "cancelledBody": "Bu adımı durdurdunuz.",
@@ -2300,6 +2303,14 @@
       "autoPauseBody": "Bu görev üst üste üç kez başarısız oldu. Sorunu gider, sonra devam et.",
       "createFailed": "Görev olarak kaydedilemedi.",
       "created": "Görev olarak kaydedildi. Şimdi çalıştırabilirsin.",
+      "overviewTitle": "Kayıtlı görevler",
+      "overviewSubtitle": "İstediğinde veya daha sonra bir zamanlamayla çalışan talimatlar.",
+      "overviewLoading": "Kayıtlı görevler yükleniyor…",
+      "overviewEmpty": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya özel bir talimat kaydet:",
+      "loadFailed": "Kayıtlı görevler yüklenemedi.",
+      "scheduleThis": "Bunu daha sonra tekrar çalıştır",
+      "scheduleThisHint": "Bu göreve bir ad ver. Zamanlamayı sonraki ekranda seçersin.",
+      "scheduledFromChat": "Kaydedildi. Ne zaman çalışacağını seç.",
       "state": {
         "off": "Çalışmıyor",
         "neverRun": "Kaydedildi — henüz çalışmadı",
@@ -2315,7 +2326,27 @@
         "weekdays": "Her iş günü"
       },
       "summary": {
-        "template": "{when} çalışır. {reads} okur → {saves} kaydeder."
+        "simple": "Ne zaman çalışır: {when}.",
+        "template": "Ne zaman çalışır: {when}. Okuduğu: {reads}. Ürettiği: {saves}.",
+        "when": {
+          "manual": "sen başlatınca",
+          "interval": "her {minutes} dakikada bir",
+          "daily": "her gün {at} ({tz})",
+          "weekly": "hafta içi her gün {at} ({tz})",
+          "schedule": "zamanlamaya göre",
+          "inboundEmail": "yeni e-posta gelince",
+          "chat": "eşleşen bir sohbet mesajı gelince"
+        },
+        "reads": {
+          "instruction": "bu talimat",
+          "mailbox": "bağlı posta kutusu"
+        },
+        "saves": {
+          "email": "sana bir e-posta",
+          "folder": "bağlı klasörde bir dosya",
+          "calendar": "bir takvim girişi",
+          "reply": "sohbette bir yanıt"
+        }
       }
     },
     "connections": {

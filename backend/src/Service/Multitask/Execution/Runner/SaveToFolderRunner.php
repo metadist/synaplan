@@ -44,9 +44,7 @@ final readonly class SaveToFolderRunner implements TaskRunner
             new SkillDescriptor(
                 Capability::SaveToFolder,
                 'Save generated files into a connected folder channel from the Connected channels list (kind folder). ONLY when the user explicitly asks to put/save/file the result there ("save it to my Nextcloud", "lege es in nextcloud"). Inputs: attachments. params.channel MUST be a folder name from that list (e.g. "nextcloud"). Never invent a name. Never the reply node.',
-                dynamicNote: fn (?int $userId, array $context): ?string => null !== $userId && $this->delivery->hasFolderChannel($userId)
-                    ? '  Use a folder channel from the Connected channels list as params.channel.'
-                    : null,
+                dynamicNote: fn (?int $userId, array $context): ?string => $this->renderAvailabilityNote($userId),
                 requiresDynamicNote: true,
             ),
         ];
@@ -78,6 +76,28 @@ final readonly class SaveToFolderRunner implements TaskRunner
             'folder_channel' => $result['channel'],
             'files_saved' => $result['sent'],
         ]);
+    }
+
+    /**
+     * The try/catch mirrors EmailSearchRunner: SkillCatalogFactory builds
+     * runners without constructors for DB-free tests, so touching an injected
+     * dependency here must degrade to "no note", never fatal.
+     */
+    private function renderAvailabilityNote(?int $userId): ?string
+    {
+        if (null === $userId || $userId <= 0) {
+            return null;
+        }
+
+        try {
+            if (!$this->delivery->hasFolderChannel($userId)) {
+                return null;
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return '  Use a folder channel from the Connected channels list as params.channel.';
     }
 
     /**

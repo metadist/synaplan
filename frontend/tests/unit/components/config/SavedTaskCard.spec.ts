@@ -49,9 +49,10 @@ function task(overrides: Partial<SavedTask> = {}): SavedTask {
     consecutiveFailures: 0,
     autoPaused: false,
     summary: {
-      key: 'config.savedTasks.summary.template',
-      params: { when: 'when you run it', reads: 'this instruction', saves: 'a calendar file' },
+      key: 'config.savedTasks.summary.simple',
+      params: { when: 'manual' },
     },
+    instructionPreview: 'Create a realistic picture of a cat, soft natural light',
     ...overrides,
   }
 }
@@ -102,7 +103,7 @@ describe('SavedTaskCard', () => {
     )
   })
 
-  it('shows the scheduled first-run line', () => {
+  it('shows the scheduled first-run line with a readable date', () => {
     const wrapper = mountCard(
       task({
         triggerType: 'schedule',
@@ -110,10 +111,56 @@ describe('SavedTaskCard', () => {
         triggerConfig: { kind: 'weekly', at: '07:00', tz: 'Europe/Berlin', days: [1, 2, 3, 4, 5] },
       })
     )
-    expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain('Scheduled')
-    expect(wrapper.get('[data-testid="saved-task-last-run"]').text()).toContain(
-      '2026-08-17T05:00:00+00:00'
+    const text = wrapper.get('[data-testid="saved-task-last-run"]').text()
+    expect(text).toContain('Scheduled')
+    // Raw ISO strings are formatted for humans, never shown verbatim.
+    expect(text).not.toContain('2026-08-17T05:00:00+00:00')
+    expect(text).toContain('2026')
+  })
+
+  it('shows the start of the instruction so users know what runs', () => {
+    const wrapper = mountCard(task())
+    expect(wrapper.get('[data-testid="saved-task-preview"]').text()).toContain(
+      'Create a realistic picture of a cat'
     )
+  })
+
+  it('hides the preview line when the instruction is unavailable', () => {
+    const wrapper = mountCard(task({ instructionPreview: null }))
+    expect(wrapper.find('[data-testid="saved-task-preview"]').exists()).toBe(false)
+  })
+
+  it('renders the summary in one language from part codes', () => {
+    const wrapper = mountCard(
+      task({
+        summary: {
+          key: 'config.savedTasks.summary.template',
+          params: {
+            when: 'daily',
+            at: '07:00',
+            tz: 'Europe/Berlin',
+            reads: 'mailbox',
+            saves: 'email',
+          },
+        },
+      })
+    )
+    const text = wrapper.text()
+    expect(text).toContain('Runs every day at 07:00 (Europe/Berlin)')
+    expect(text).toContain('the connected mailbox')
+    expect(text).toContain('an email to you')
+  })
+
+  it('falls back to safe wording for unknown summary codes', () => {
+    const wrapper = mountCard(
+      task({
+        summary: {
+          key: 'config.savedTasks.summary.simple',
+          params: { when: 'some_future_code' },
+        },
+      })
+    )
+    expect(wrapper.text()).toContain('Runs when you start it.')
   })
 
   it('shows running copy while Run now is in flight', async () => {

@@ -7,11 +7,11 @@ namespace App\Tests\Unit\Service\Destination;
 use App\Entity\Connection;
 use App\Repository\ConnectionRepository;
 use App\Service\Connection\PlannerChannelCatalog;
+use App\Service\Destination\DestinationProvider;
 use App\Service\Destination\DestinationRegistry;
 use App\Service\Destination\DestinationResult;
 use App\Service\Destination\RequestedFolderDelivery;
 use App\Service\Destination\ShareableFile;
-use App\Service\Destination\DestinationProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 

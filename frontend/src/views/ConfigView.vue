@@ -40,6 +40,10 @@
           <ConnectionsConfiguration />
         </div>
 
+        <div v-else-if="currentPage === 'saved-tasks'" data-testid="section-saved-tasks">
+          <SavedTasksOverview />
+        </div>
+
         <div v-else-if="currentPage === 'ai-agents'" data-testid="section-ai-agents">
           <MessagesGatewayConfiguration />
         </div>
@@ -68,6 +72,7 @@ import APIKeysConfiguration from '@/components/config/APIKeysConfiguration.vue'
 import ApiDocumentation from '@/components/config/ApiDocumentation.vue'
 import McpServersConfiguration from '@/components/config/McpServersConfiguration.vue'
 import ConnectionsConfiguration from '@/components/config/ConnectionsConfiguration.vue'
+import SavedTasksOverview from '@/components/config/SavedTasksOverview.vue'
 import MessagesGatewayConfiguration from '@/components/config/MessagesGatewayConfiguration.vue'
 
 const route = useRoute()
@@ -81,6 +86,7 @@ const currentPage = computed(() => {
   if (path.startsWith('/channels/agents')) return 'ai-agents'
   if (path.startsWith('/channels/mcp')) return 'mcp-servers'
   if (path.startsWith('/channels/connections')) return 'connections'
+  if (path.startsWith('/channels/tasks')) return 'saved-tasks'
   if (path.startsWith('/channels')) return 'inbound'
   if (path.startsWith('/ai/providers/higgsfield')) return 'ai-provider-higgsfield'
   if (path.startsWith('/ai/models')) return 'ai-models'
