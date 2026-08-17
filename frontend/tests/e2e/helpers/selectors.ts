@@ -525,6 +525,10 @@ export const selectors = {
     sectionUsers: '[data-testid="section-users"]',
     userSearch: '[data-testid="input-user-search"]',
     impersonateUser: (userId: number) => `[data-testid="btn-impersonate-user-${userId}"]`,
+    /** Per-user level <select> — one row per user; also used as a stable row marker */
+    userLevelSelect: (userId: number) => `[data-testid="select-user-level-${userId}"]`,
+    /** Any user row's level <select> — count these to assert list size / search results */
+    userLevelSelectAny: '[data-testid^="select-user-level-"]',
   },
   impersonation: {
     banner: '[data-testid="banner-impersonation"]',
