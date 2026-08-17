@@ -161,6 +161,18 @@ useEscapeKey(close, isOpen)
 // around behind them.
 let lockedScroll = false
 
+function lockScroll(): void {
+  // Someone else is already holding it. Claiming it a second time would make
+  // this modal responsible for giving it back, and the page would start moving
+  // behind whatever is still open.
+  if ('hidden' === document.body.style.overflow) {
+    return
+  }
+
+  document.body.style.overflow = 'hidden'
+  lockedScroll = true
+}
+
 function releaseScroll(): void {
   if (lockedScroll) {
     document.body.style.overflow = ''
@@ -171,8 +183,7 @@ function releaseScroll(): void {
 watch(isOpen, async (open) => {
   if (open) {
     previouslyFocused = document.activeElement as HTMLElement | null
-    document.body.style.overflow = 'hidden'
-    lockedScroll = true
+    lockScroll()
     await nextTick()
     closeButton.value?.focus()
     return

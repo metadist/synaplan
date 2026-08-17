@@ -177,6 +177,16 @@ describe('AnnouncementModal', () => {
     expect(document.body.style.overflow).toBe('')
   })
 
+  it('leaves a scroll lock alone when another overlay is already holding it', async () => {
+    document.body.style.overflow = 'hidden'
+
+    const wrapper = await mountModal()
+    await wrapper.find('[data-testid="btn-announcement-close"]').trigger('click')
+
+    // The dialog underneath is still open, so the page must stay put.
+    expect(document.body.style.overflow).toBe('hidden')
+  })
+
   it('ignores a corrupt dismissal list instead of breaking', async () => {
     localStorage.setItem(SEEN_KEY, 'not json')
 
