@@ -59,6 +59,26 @@ class SavedTaskRepository extends ServiceEntityRepository
     }
 
     /**
+     * Trigger-agnostic variant of {@see findEnabledChatTaskForPrompt} for Saved
+     * Task RUNS: when the task itself is executed (manual, schedule, inbound
+     * email), its authored step graph must be used no matter which trigger type
+     * the task is configured with.
+     */
+    public function findEnabledGraphTaskForPrompt(int $promptId, int $ownerId): ?SavedTask
+    {
+        return $this->createQueryBuilder('t')
+            ->where('t.promptId = :promptId')
+            ->andWhere('t.ownerId = :ownerId')
+            ->andWhere('t.enabled = true')
+            ->andWhere('t.graph IS NOT NULL')
+            ->setParameter('promptId', $promptId)
+            ->setParameter('ownerId', $ownerId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * @return list<SavedTask>
      */
     public function findDueScheduled(int $limit, \DateTimeImmutable $now): array

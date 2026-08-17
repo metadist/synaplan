@@ -108,13 +108,20 @@ final readonly class SavedTaskRunner
             $this->em->persist($message);
             $this->em->flush();
 
+            // `saved_task` marks the classification source so TaskPlanExecutor
+            // still PLANS the instruction (multi-step tasks like "make an image
+            // and save it to Nextcloud" must run their DAG, not degrade to chat).
             $result = $this->processor->process($message, [
                 'fixed_task_prompt' => $prompt->getTopic(),
+                'saved_task' => true,
             ]);
 
             $ok = !empty($result['success']);
             $messageId = $message->getId();
             $snapshot = null !== $messageId ? $this->planStore->loadCards($messageId) : [];
+
+            $message->setStatus($ok ? 'complete' : 'failed');
+            $this->em->flush();
 
             if (!$ok) {
                 $reason = is_string($result['error'] ?? null)
@@ -123,6 +130,8 @@ final readonly class SavedTaskRunner
 
                 return $this->fail($task, $run, $reason, $messageId, $snapshot);
             }
+
+            $this->persistReply($message, $chat, $result);
 
             $this->rateLimits->recordUsage($user, 'MESSAGES', [
                 'source' => 'SAVED_TASK',
@@ -167,6 +176,59 @@ final readonly class SavedTaskRunner
         }
 
         return ['run' => $run, 'task' => $task];
+    }
+
+    /**
+     * Persists the assistant reply into the task's chat. Every channel persists
+     * its own OUT message (web streaming, WhatsApp, queue worker) — without
+     * this, the task chat showed the incoming instruction and nothing else.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function persistReply(Message $incoming, Chat $chat, array $result): void
+    {
+        $response = is_array($result['response'] ?? null) ? $result['response'] : [];
+        $content = is_string($response['content'] ?? null) ? trim($response['content']) : '';
+        $metadata = is_array($response['metadata'] ?? null) ? $response['metadata'] : [];
+        $file = is_array($metadata['file'] ?? null) ? $metadata['file'] : null;
+
+        // Persist as long as there is ANY output — a generated file without
+        // accompanying text must still show up in the task's chat.
+        if ('' === $content && null === $file) {
+            return;
+        }
+        $classification = is_array($result['classification'] ?? null) ? $result['classification'] : [];
+        $language = is_string($classification['language'] ?? null) && '' !== $classification['language']
+            ? $classification['language']
+            : 'en';
+
+        $out = new Message();
+        $out->setUserId($incoming->getUserId());
+        $out->setChat($chat);
+        $out->setTrackingId($incoming->getTrackingId());
+        $out->setProviderIndex('WEB');
+        $out->setMessageType('WEB');
+        $out->setTopic('CHAT');
+        $out->setLanguage($language);
+        $out->setText($content);
+        $out->setDirection('OUT');
+        $out->setStatus('complete');
+        $out->setFile(null !== $file ? 1 : 0);
+        $out->setFilePath(is_string($file['path'] ?? null) ? $file['path'] : '');
+        $out->setFileType(is_string($file['type'] ?? null) ? $file['type'] : '');
+        $this->em->persist($out);
+        // MessageMeta copies the message id on setMeta(), so the OUT message
+        // must be flushed (id assigned) BEFORE any metadata is attached.
+        $this->em->flush();
+
+        if (!empty($metadata['provider'])) {
+            $out->setMeta('ai_chat_provider', (string) $metadata['provider']);
+        }
+        if (!empty($metadata['model'])) {
+            $out->setMeta('ai_chat_model', (string) $metadata['model']);
+        }
+
+        $this->em->flush();
     }
 
     private function ensureChat(SavedTask $task, User $user): Chat

@@ -136,11 +136,40 @@ final class SavedTaskRunnerTest extends TestCase
         $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
 
         $captured = null;
+        $capturedOptions = null;
         $processor = $this->createMock(MessageProcessor::class);
-        $processor->method('process')->willReturnCallback(function (Message $message) use (&$captured): array {
+        $processor->method('process')->willReturnCallback(function (Message $message, array $options) use (&$captured, &$capturedOptions): array {
             $captured = $message;
+            $capturedOptions = $options;
 
-            return ['success' => true];
+            return [
+                'success' => true,
+                'response' => [
+                    'content' => 'Bild erstellt und in Nextcloud gespeichert.',
+                    'metadata' => [
+                        'provider' => 'google',
+                        'model' => 'imagen',
+                        'file' => ['path' => '/api/v1/files/uploads/01/cat.png', 'type' => 'image'],
+                    ],
+                ],
+                'classification' => ['language' => 'de'],
+            ];
+        });
+
+        $persisted = [];
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('persist')->willReturnCallback(function (object $entity) use (&$persisted): void {
+            $persisted[] = $entity;
+        });
+        // Like the real flush: assign ids to new messages, because setMeta()
+        // copies the message id into MessageMeta (non-nullable int).
+        $em->method('flush')->willReturnCallback(function () use (&$persisted): void {
+            foreach ($persisted as $i => $entity) {
+                if ($entity instanceof Message && null === $entity->getId()) {
+                    $ref = new \ReflectionProperty(Message::class, 'id');
+                    $ref->setValue($entity, 1000 + $i);
+                }
+            }
         });
 
         $runner = new SavedTaskRunner(
@@ -150,7 +179,7 @@ final class SavedTaskRunnerTest extends TestCase
             $prompts,
             $users,
             $chats,
-            $this->createStub(EntityManagerInterface::class),
+            $em,
             $processor,
             $rateLimits,
             $this->createStub(TaskPlanStore::class),
@@ -160,9 +189,24 @@ final class SavedTaskRunnerTest extends TestCase
 
         $result = $runner->run(9, 11, '', 'manual');
 
-        $this->assertSame('completed', $result['run']->getStatus());
+        $this->assertSame('completed', $result['run']->getStatus(), 'run error: '.(string) $result['run']->getError());
         $this->assertInstanceOf(Message::class, $captured);
         $this->assertSame('Erstelle ein realistisches Bild einer Katze', $captured->getText());
+        // The classification source must mark this as a Saved Task run so
+        // TaskPlanExecutor still plans multi-step instructions.
+        $this->assertTrue($capturedOptions['saved_task'] ?? false);
+        // The incoming message must not stay stuck in "processing".
+        $this->assertSame('complete', $captured->getStatus());
+
+        // The assistant reply is persisted into the task's chat (text + file).
+        $replies = array_values(array_filter(
+            $persisted,
+            static fn (object $e): bool => $e instanceof Message && 'OUT' === $e->getDirection(),
+        ));
+        $this->assertCount(1, $replies);
+        $this->assertSame('Bild erstellt und in Nextcloud gespeichert.', $replies[0]->getText());
+        $this->assertSame('/api/v1/files/uploads/01/cat.png', $replies[0]->getFilePath());
+        $this->assertSame('de', $replies[0]->getLanguage());
     }
 
     private function setId(SavedTask $task, int $id): void

@@ -113,7 +113,11 @@ final readonly class MessageProcessor
 
             if ($hasFixedPrompt) {
                 $isWidget = !empty($options['is_widget_mode']);
-                $source = $isWidget ? 'widget' : 'api';
+                // Saved Task runs get their own source: they skip the AI sorter
+                // like widget/API turns, but TaskPlanExecutor must still PLAN them
+                // — otherwise a multi-step task ("make an image and save it to
+                // Nextcloud") silently degrades to a plain chat answer.
+                $source = $isWidget ? 'widget' : (!empty($options['saved_task']) ? 'saved_task' : 'api');
 
                 $this->logger->info('MessageProcessor: Fixed task prompt mode', [
                     'task_prompt' => $options['fixed_task_prompt'],
@@ -701,7 +705,8 @@ final readonly class MessageProcessor
 
             if ($hasFixedPrompt) {
                 $isWidget = !empty($options['is_widget_mode']);
-                $source = $isWidget ? 'widget' : 'api';
+                // See processStream(): Saved Task runs must stay plannable.
+                $source = $isWidget ? 'widget' : (!empty($options['saved_task']) ? 'saved_task' : 'api');
 
                 $this->logger->info('MessageProcessor: Using fixed task prompt', [
                     'task_prompt' => $options['fixed_task_prompt'],
