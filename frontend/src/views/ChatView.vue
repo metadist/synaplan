@@ -826,6 +826,17 @@ onMounted(async () => {
   // Load chats first
   await chatsStore.loadChats()
 
+  // Deep link from Saved Tasks ("Run now" / "Show results"): /?chat=<id>
+  // opens the task's chat so the user sees the run's result. Without this
+  // the query was silently ignored and the view reopened the LAST ACTIVE
+  // chat — for a task saved from a chat turn that was the original prompt
+  // with the old output.
+  const requestedChatId = Number(route.query.chat)
+  if (Number.isInteger(requestedChatId) && requestedChatId > 0) {
+    chatsStore.setActiveChat(requestedChatId)
+    router.replace({ query: { ...route.query, chat: undefined } })
+  }
+
   // If no active chat, create one
   if (!chatsStore.activeChatId) {
     await chatsStore.createChat('New Chat')

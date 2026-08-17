@@ -185,6 +185,12 @@ const runLabel = (group: 'runStatus' | 'runTrigger', code: string): string => {
   const key = `config.savedTasks.${group}.${code}`
   return te(key) ? t(key) : code
 }
+
+/** Opens the task's chat — every run appends its reply (text, images, files) there. */
+const openResults = () => {
+  if (!props.task.chatId) return
+  void router.push({ path: '/', query: { chat: String(props.task.chatId) } })
+}
 </script>
 
 <template>
@@ -269,6 +275,15 @@ const runLabel = (group: 'runStatus' | 'runTrigger', code: string): string => {
     <div
       class="flex flex-wrap items-center gap-3 pt-3 border-t border-light-border/20 dark:border-dark-border/20"
     >
+      <button
+        v-if="task.chatId"
+        type="button"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        data-testid="btn-show-results"
+        @click="openResults"
+      >
+        {{ $t('config.savedTasks.showResults') }}
+      </button>
       <button
         type="button"
         class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"

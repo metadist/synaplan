@@ -2239,7 +2239,15 @@
     },
     "generated": {
       "title": "Üretilen",
-      "subtitle": "Sohbetlerinizde oluşturulan görseller, video ve ses.",
+      "subtitle": "Sohbetlerinizde ve görevlerinizde oluşturulan görseller, videolar, ses, belgeler ve takvim davetleri.",
+      "kinds": {
+        "all": "Tümü",
+        "image": "Görseller",
+        "video": "Videolar",
+        "audio": "Ses",
+        "document": "Belgeler",
+        "calendar": "Takvim"
+      },
       "openInChat": "Sohbette aç",
       "download": "İndir",
       "autoGroup": "Klasörü yapay zekâ seçsin",
@@ -2294,6 +2302,7 @@
       "scheduleSaved": "Zamanlama kaydedildi.",
       "resumed": "Görev yeniden çalışacak.",
       "resume": "Devam et",
+      "showResults": "Sonuçları göster",
       "viewRuns": "Geçmiş",
       "hideRuns": "Geçmişi gizle",
       "runsRetention": "Eski çalıştırmalar otomatik olarak silinir.",

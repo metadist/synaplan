@@ -2307,6 +2307,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
             // exact current content instead of re-deriving it.
             $file->setFileText($content);
             $file->setStatus('generated');
+            // Issue #1190 parity with StreamController::storeGeneratedFile:
+            // mark provenance so the artefact shows in the Generated gallery
+            // (/files/generated filters BSOURCE) instead of posing as an upload.
+            $file->setSource('generated');
+            $file->setOriginKind('document');
             $file->setEphemeral($ephemeral);
 
             $this->em->persist($file);

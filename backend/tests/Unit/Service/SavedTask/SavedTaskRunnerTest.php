@@ -15,6 +15,7 @@ use App\Repository\SavedTaskRepository;
 use App\Repository\SavedTaskRunRepository;
 use App\Repository\UserRepository;
 use App\Service\InternalEmailService;
+use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Message\MessageProcessor;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\RateLimitService;
@@ -87,6 +88,7 @@ final class SavedTaskRunnerTest extends TestCase
             $processor,
             $rateLimits,
             $this->createStub(TaskPlanStore::class),
+            $this->createStub(GeneratedFileRegistrar::class),
             $this->createStub(InternalEmailService::class),
             $this->createStub(LoggerInterface::class),
         );
@@ -172,6 +174,15 @@ final class SavedTaskRunnerTest extends TestCase
             }
         });
 
+        // The run's output file must be registered as a generated BFILES row
+        // so it appears in the file manager's Generated gallery — scheduled
+        // and manual runs bypass the SSE channel that normally does this.
+        $registrar = $this->createMock(GeneratedFileRegistrar::class);
+        $registrar->expects($this->once())
+            ->method('register')
+            ->with(9, '/api/v1/files/uploads/01/cat.png', 'image')
+            ->willReturn(null);
+
         $runner = new SavedTaskRunner(
             $config,
             $tasks,
@@ -183,6 +194,7 @@ final class SavedTaskRunnerTest extends TestCase
             $processor,
             $rateLimits,
             $this->createStub(TaskPlanStore::class),
+            $registrar,
             $this->createStub(InternalEmailService::class),
             $this->createStub(LoggerInterface::class),
         );

@@ -16,6 +16,7 @@ use App\Repository\SavedTaskRepository;
 use App\Repository\SavedTaskRunRepository;
 use App\Repository\UserRepository;
 use App\Service\InternalEmailService;
+use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Message\MessageProcessor;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\RateLimitService;
@@ -39,6 +40,7 @@ final readonly class SavedTaskRunner
         private MessageProcessor $processor,
         private RateLimitService $rateLimits,
         private TaskPlanStore $planStore,
+        private GeneratedFileRegistrar $generatedFiles,
         private InternalEmailService $mail,
         private LoggerInterface $logger,
     ) {
@@ -229,6 +231,51 @@ final readonly class SavedTaskRunner
         }
 
         $this->em->flush();
+
+        $this->registerGeneratedFiles($out, $metadata);
+    }
+
+    /**
+     * Registers every DAG output file as a BFILES row so it shows in the file
+     * manager's Generated gallery. The web streaming channel does this in
+     * StreamController::persistTaskPlanFiles — scheduled/manual Saved Task runs
+     * bypass SSE entirely, so without this an audio or .ics artefact from a
+     * task run existed only as a chat download link. Registration is
+     * idempotent per (user, path), so files whose generators already created a
+     * row (images, documents) are simply found, never duplicated.
+     *
+     * @param array<string, mixed> $metadata handler response metadata
+     */
+    private function registerGeneratedFiles(Message $out, array $metadata): void
+    {
+        $taskFiles = is_array($metadata['files'] ?? null) ? $metadata['files'] : [];
+        if ([] === $taskFiles && is_array($metadata['file'] ?? null)) {
+            $taskFiles = [$metadata['file']];
+        }
+
+        $provider = is_string($metadata['provider'] ?? null) ? $metadata['provider'] : null;
+
+        foreach ($taskFiles as $taskFile) {
+            if (!is_array($taskFile)) {
+                continue;
+            }
+            $path = is_string($taskFile['local_path'] ?? null) && '' !== $taskFile['local_path']
+                ? $taskFile['local_path']
+                : (is_string($taskFile['path'] ?? null) ? $taskFile['path'] : null);
+            if (null === $path || '' === $path) {
+                continue;
+            }
+
+            $this->generatedFiles->register(
+                $out->getUserId(),
+                $path,
+                is_string($taskFile['type'] ?? null) ? $taskFile['type'] : '',
+                $out->getId(),
+                $provider,
+                false,
+                is_string($taskFile['source_text'] ?? null) ? $taskFile['source_text'] : null,
+            );
+        }
     }
 
     private function ensureChat(SavedTask $task, User $user): Chat

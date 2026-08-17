@@ -1170,7 +1170,15 @@
     },
     "generated": {
       "title": "Generated",
-      "subtitle": "Images, video and audio created in your chats.",
+      "subtitle": "Images, videos, audio, documents and calendar invites created in your chats and tasks.",
+      "kinds": {
+        "all": "All",
+        "image": "Images",
+        "video": "Videos",
+        "audio": "Audio",
+        "document": "Documents",
+        "calendar": "Calendar"
+      },
       "openInChat": "Open in chat",
       "download": "Download",
       "autoGroup": "Let AI choose a folder",
@@ -1720,6 +1728,7 @@
       "scheduleSaved": "Schedule saved.",
       "resumed": "The task will run again.",
       "resume": "Resume",
+      "showResults": "Show results",
       "viewRuns": "Run history",
       "hideRuns": "Hide history",
       "runsRetention": "Older runs are removed automatically.",

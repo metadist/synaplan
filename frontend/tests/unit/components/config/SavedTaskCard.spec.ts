@@ -157,6 +157,17 @@ describe('SavedTaskCard', () => {
     expect(wrapper.text()).toContain('Runs when you start it.')
   })
 
+  it('opens the task chat via Show results so users see the run output', async () => {
+    const wrapper = mountCard(task({ chatId: 44 }))
+    await wrapper.get('[data-testid="btn-show-results"]').trigger('click')
+    expect(mockPush).toHaveBeenCalledWith({ path: '/', query: { chat: '44' } })
+  })
+
+  it('hides Show results until the task has a chat', () => {
+    const wrapper = mountCard(task({ chatId: null }))
+    expect(wrapper.find('[data-testid="btn-show-results"]').exists()).toBe(false)
+  })
+
   it('runs immediately without asking for a message', async () => {
     let resolveRun: (value: { task: SavedTask; run: SavedTaskRun }) => void = () => undefined
     mockRun.mockReturnValue(

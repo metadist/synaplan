@@ -3325,6 +3325,9 @@ class StreamController extends AbstractController
             // from uploads (default 'web_upload') and can be regenerated from
             // BFILETEXT on download when the on-disk binary goes missing.
             $file->setSource('generated');
+            // Kind powers the Generated gallery's type filter (BORIGINKIND);
+            // everything this path writes is a document format (docx/xlsx/…).
+            $file->setOriginKind('document');
             $file->setEphemeral($ephemeral);
 
             $this->em->persist($file);

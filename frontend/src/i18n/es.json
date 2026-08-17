@@ -2238,7 +2238,15 @@
     },
     "generated": {
       "title": "Generados",
-      "subtitle": "Imágenes, vídeo y audio creados en tus chats.",
+      "subtitle": "Imágenes, vídeos, audio, documentos e invitaciones de calendario creados en tus chats y tareas.",
+      "kinds": {
+        "all": "Todos",
+        "image": "Imágenes",
+        "video": "Vídeos",
+        "audio": "Audio",
+        "document": "Documentos",
+        "calendar": "Calendario"
+      },
       "openInChat": "Abrir en el chat",
       "download": "Descargar",
       "autoGroup": "Dejar que la IA elija una carpeta",
@@ -2293,6 +2301,7 @@
       "scheduleSaved": "Programación guardada.",
       "resumed": "La tarea volverá a ejecutarse.",
       "resume": "Reanudar",
+      "showResults": "Ver resultados",
       "viewRuns": "Historial",
       "hideRuns": "Ocultar historial",
       "runsRetention": "Las ejecuciones antiguas se eliminan automáticamente.",

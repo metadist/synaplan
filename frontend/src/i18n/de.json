@@ -1764,6 +1764,7 @@
       "scheduleSaved": "Zeitplan gespeichert.",
       "resumed": "Die Aufgabe läuft wieder.",
       "resume": "Fortsetzen",
+      "showResults": "Ergebnisse anzeigen",
       "viewRuns": "Verlauf",
       "hideRuns": "Verlauf ausblenden",
       "runsRetention": "Ältere Ausführungen werden automatisch entfernt.",
@@ -2918,7 +2919,15 @@
     },
     "generated": {
       "title": "Erzeugt",
-      "subtitle": "Bilder, Video und Audio aus deinen Chats.",
+      "subtitle": "Bilder, Videos, Audio, Dokumente und Kalendereinladungen aus deinen Chats und Aufgaben.",
+      "kinds": {
+        "all": "Alle",
+        "image": "Bilder",
+        "video": "Videos",
+        "audio": "Audio",
+        "document": "Dokumente",
+        "calendar": "Kalender"
+      },
       "openInChat": "Im Chat öffnen",
       "download": "Herunterladen",
       "autoGroup": "KI wählt einen Ordner",
