@@ -245,15 +245,6 @@
                 <span>{{ $t('nav.statistics') }}</span>
               </button>
               <button
-                role="menuitem"
-                class="dropdown-item"
-                data-testid="btn-sidebar-v2-preferences"
-                @click="handleNavigate('/settings')"
-              >
-                <Cog6ToothIcon class="w-4 h-4" />
-                <span>{{ $t('nav.preferences') }}</span>
-              </button>
-              <button
                 v-if="
                   !authStore.isAdmin &&
                   configStore.billing.enabled &&
@@ -269,28 +260,46 @@
                 <span>{{ $t('nav.subscription') }}</span>
               </button>
             </div>
-            <!--
-              Logout is intentionally hidden while impersonating: clicking
-              it would clear the admin's session entirely (cookies + stash)
-              instead of just ending the impersonation, which is almost
-              never what the operator means. The "Exit" button on the
-              floating impersonation pill is the correct action here.
-            -->
-            <div
-              v-if="!isImpersonating"
-              class="border-t border-light-border/10 dark:border-dark-border/10"
-            >
-              <button
-                role="menuitem"
-                class="dropdown-item text-red-500 dark:text-red-400"
-                data-testid="btn-sidebar-v2-logout"
-                @click="handleLogout"
-              >
-                <ArrowRightOnRectangleIcon class="w-4 h-4" />
-                <span>{{ $t('settings.logout') }}</span>
-              </button>
-            </div>
           </template>
+
+          <!--
+            Preferences holds the language and the theme, both stored on the
+            device rather than on the account, so it stays outside the
+            guest/authenticated split and is offered to everyone.
+          -->
+          <div class="border-t border-light-border/10 dark:border-dark-border/10">
+            <button
+              role="menuitem"
+              class="dropdown-item"
+              data-testid="btn-sidebar-v2-preferences"
+              @click="handleNavigate('/settings')"
+            >
+              <Cog6ToothIcon class="w-4 h-4" />
+              <span>{{ $t('nav.preferences') }}</span>
+            </button>
+          </div>
+
+          <!--
+            Logout is intentionally hidden while impersonating: clicking
+            it would clear the admin's session entirely (cookies + stash)
+            instead of just ending the impersonation, which is almost
+            never what the operator means. The "Exit" button on the
+            floating impersonation pill is the correct action here.
+          -->
+          <div
+            v-if="!isGuestMode && !isImpersonating"
+            class="border-t border-light-border/10 dark:border-dark-border/10"
+          >
+            <button
+              role="menuitem"
+              class="dropdown-item text-red-500 dark:text-red-400"
+              data-testid="btn-sidebar-v2-logout"
+              @click="handleLogout"
+            >
+              <ArrowRightOnRectangleIcon class="w-4 h-4" />
+              <span>{{ $t('settings.logout') }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </Transition>

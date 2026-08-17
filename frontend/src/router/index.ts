@@ -402,10 +402,13 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.statistics' },
     },
     {
+      // Language and theme are stored on the device, not on the account, so a
+      // guest can reach this page. The account block inside it hides itself
+      // when nobody is signed in.
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.settings' },
+      meta: { requiresAuth: false, titleKey: 'pageTitles.settings' },
     },
     {
       path: '/testv',
