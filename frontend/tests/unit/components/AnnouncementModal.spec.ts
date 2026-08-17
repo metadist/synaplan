@@ -110,6 +110,14 @@ describe('AnnouncementModal', () => {
     )
   })
 
+  it('shows the illustration the announcement carries', async () => {
+    const wrapper = await mountModal()
+
+    expect(wrapper.find('[data-testid="img-announcement"]').attributes('src')).toBe(
+      '/announcements/iphone-app.webp'
+    )
+  })
+
   it('stays away from an instance that has no app to offer', async () => {
     runtime.iosAppUrl = ''
 

@@ -64,5 +64,6 @@ export const announcements: Announcement[] = [
     // and the reader is not already looking at this from inside it.
     applies: ({ iosAppUrl, isNativeApp }) => '' !== iosAppUrl && !isNativeApp,
     actionUrl: ({ iosAppUrl }) => withCampaign(iosAppUrl, 'web-announcement'),
+    image: '/announcements/iphone-app.webp',
   },
 ]

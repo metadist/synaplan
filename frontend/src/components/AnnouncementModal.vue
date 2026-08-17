@@ -13,7 +13,8 @@
         ></div>
 
         <div
-          class="announcement-panel relative surface-card shadow-2xl rounded-2xl max-w-md w-full overflow-hidden"
+          class="announcement-panel modal-panel relative surface-card shadow-2xl rounded-2xl w-full overflow-hidden overflow-y-auto"
+          :class="announcement.image ? 'max-w-3xl' : 'max-w-md'"
           role="dialog"
           aria-modal="true"
           aria-labelledby="announcement-title"
@@ -29,46 +30,58 @@
             <XMarkIcon class="w-5 h-5" />
           </button>
 
-          <img
-            v-if="announcement.image"
-            :src="announcement.image"
-            alt=""
-            class="h-40 w-full object-cover object-top"
-          />
-          <div
-            v-else
-            class="flex h-32 items-center justify-center bg-gradient-to-br from-[var(--brand)]/20 to-[var(--brand)]/5"
-          >
-            <img :src="iconSrc" alt="" class="h-16 w-16" />
-          </div>
+          <!-- Illustrated announcements read as a spread: words on one side, the
+               picture on the other. Without a picture the panel stays narrow. -->
+          <div :class="announcement.image ? 'grid md:grid-cols-[1.15fr_1fr]' : ''">
+            <!-- The device is shown whole on a phone and deliberately runs past
+                 the lower edge on a wide screen, where there is room for it. -->
+            <div
+              v-if="announcement.image"
+              class="relative flex items-end justify-center overflow-hidden bg-gradient-to-br from-[var(--brand)]/25 via-[var(--brand)]/10 to-transparent pt-8 md:order-2 md:min-h-[21rem] md:pt-0"
+            >
+              <img
+                :src="announcement.image"
+                alt=""
+                class="h-52 w-auto md:h-[22rem] md:translate-y-10"
+                data-testid="img-announcement"
+              />
+            </div>
 
-          <div class="p-6">
-            <h2 id="announcement-title" class="text-lg font-bold txt-primary">
-              {{ $t(`${announcement.i18nKey}.title`) }}
-            </h2>
-            <p class="mt-2 text-sm txt-secondary leading-relaxed">
-              {{ $t(`${announcement.i18nKey}.body`) }}
-            </p>
+            <div
+              v-else
+              class="flex h-32 items-center justify-center bg-gradient-to-br from-[var(--brand)]/20 to-[var(--brand)]/5"
+            >
+              <img :src="iconSrc" alt="" class="h-16 w-16" />
+            </div>
 
-            <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
-                data-testid="btn-announcement-later"
-                @click="close"
-              >
-                {{ $t('announcements.later') }}
-              </button>
-              <a
-                v-if="announcement.actionUrl"
-                :href="announcement.actionUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="btn-primary px-4 py-2.5 rounded-xl text-sm font-semibold text-center"
-                data-testid="link-announcement-action"
-                @click="close"
-              >
-                {{ $t(`${announcement.i18nKey}.action`) }}
-              </a>
+            <div class="flex flex-col justify-center p-6 sm:p-8 md:order-1">
+              <h2 id="announcement-title" class="text-lg font-bold txt-primary sm:text-xl">
+                {{ $t(`${announcement.i18nKey}.title`) }}
+              </h2>
+              <p class="mt-2 text-sm txt-secondary leading-relaxed">
+                {{ $t(`${announcement.i18nKey}.body`) }}
+              </p>
+
+              <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+                  data-testid="btn-announcement-later"
+                  @click="close"
+                >
+                  {{ $t('announcements.later') }}
+                </button>
+                <a
+                  v-if="announcement.actionUrl"
+                  :href="announcement.actionUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="btn-primary px-4 py-2.5 rounded-xl text-sm font-semibold text-center"
+                  data-testid="link-announcement-action"
+                  @click="close"
+                >
+                  {{ $t(`${announcement.i18nKey}.action`) }}
+                </a>
+              </div>
             </div>
           </div>
         </div>
