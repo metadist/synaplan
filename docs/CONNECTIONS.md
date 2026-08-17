@@ -25,6 +25,19 @@ integration.
    WebDAV servers, paste the full DAV collection URL instead.
 3. The connection is tested immediately (a `PROPFIND` on the collection).
 
+**Channel name (what the planner uses):** every connection gets a short,
+prompt-safe name stored as `config.channel`. Nextcloud folders are `nextcloud`,
+generic WebDAV folders are `folder`, CalDAV is `calendar`. That name is the
+only identifier the planner may put in `params.channel` — never a numeric id
+and never the display label (`nextcloud-Ordner (admin)`). In chat, say
+*nextcloud*; the Connections page shows the name as a pill so you can see
+exactly what to ask for.
+
+**In chat:** after the connection tests successfully, you can ask Synaplan to
+generate something and file it there — for example *“create a picture of a cat
+and put it in nextcloud”*. The image still appears in chat; a copy is
+uploaded to the connected folder.
+
 **Behaviour:**
 
 - Files land in the configured folder (default `Synaplan`); missing folders are
@@ -33,6 +46,13 @@ integration.
   `overwrite` can be set in the connection config.
 - HTTPS is required, redirects are not followed, and private/reserved network
   addresses are blocked (SSRF guard).
+- **Local development only:** a Nextcloud on the Synaplan Docker network
+  (`synaplan-nextcloud/docker-compose.dev.yml`, [http://localhost:8081](http://localhost:8081))
+  is reached from the backend as `http://nextcloud`. Set
+  `DAV_ALLOW_INSECURE_LOCAL=1` (already on in the local compose) while
+  `APP_ENV=dev`. Production ignores that flag. Server address in the form:
+  `http://nextcloud` — not `http://localhost:8081` (that is the host browser
+  URL; inside the backend container `localhost` is the backend itself).
 - Failure modes map to the shared vocabulary: a revoked app password reports
   *unauthorized* (and sets the connection to needs-reattention), a full server
   *quota exceeded*, a deleted folder *not found*.

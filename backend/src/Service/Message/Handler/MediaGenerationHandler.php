@@ -11,6 +11,7 @@ use App\Message\ExtractMemoriesCommand;
 use App\Service\File\FileHelper;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Destination\RequestedFolderDelivery;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJob;
@@ -67,6 +68,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // an absolute, internet-reachable URL — not a local filesystem path.
         #[Autowire('%env(APP_URL)%')]
         private string $publicBaseUrl = '',
+        private ?RequestedFolderDelivery $folderDelivery = null,
     ) {
     }
 
@@ -880,6 +882,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // Stream response with revised prompt
             $revisedPrompt = $media[0]['revised_prompt'] ?? $prompt;
             $responseText = "Generated {$mediaType}: {$revisedPrompt}";
+            $folderNote = $this->maybeDeliverToFolder($message, $localPath, $options);
+            if (null !== $folderNote) {
+                $responseText .= "\n\n".$folderNote;
+            }
 
             // Stream the response
             $streamCallback($responseText);
@@ -937,6 +943,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'path' => $displayUrl,
                         'type' => $mediaType,
                     ],
+                    'folder_delivery' => $folderNote,
                 ],
             ];
         } catch (ProviderCancelledException $e) {
@@ -2034,5 +2041,35 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         }
 
         return null;
+    }
+
+    /**
+     * When the user asked to file the result in Nextcloud and the multitask
+     * plan did not already take that step, upload the just-generated file.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function maybeDeliverToFolder(Message $message, string $localPath, array $options): ?string
+    {
+        if (!empty($options['skip_folder_delivery']) || null === $this->folderDelivery) {
+            return null;
+        }
+
+        $text = (string) $message->getText();
+        if (!$this->folderDelivery->userAskedToSaveToFolder($text)) {
+            return null;
+        }
+
+        $absolute = $this->uploadDir.'/'.ltrim($localPath, '/');
+        if (!is_file($absolute)) {
+            return null;
+        }
+
+        $result = $this->folderDelivery->send(
+            $message->getUserId(),
+            [['path' => $absolute, 'name' => basename($localPath)]],
+        );
+
+        return $result['message'];
     }
 }

@@ -1191,7 +1191,8 @@
       "document": "Dokument",
       "search": "Websuche",
       "extract": "Textextraktion",
-      "email": "E-Mail"
+      "email": "E-Mail",
+      "folder": "Ordner"
     },
     "capability": {
       "extract_text": "Text wird extrahiert",
@@ -1209,7 +1210,8 @@
       "text2sound": "Audio",
       "document_generation": "Dokument",
       "calendar_event": "Kalendereinladung",
-      "email_me": "E-Mail-Versand"
+      "email_me": "E-Mail-Versand",
+      "save_to_folder": "Im Ordner speichern"
     },
     "copyText": "Inhalt kopieren",
     "copied": "In die Zwischenablage kopiert",
@@ -1830,6 +1832,17 @@
       "reconnect": "Neu verbinden",
       "testing": "Wird getestet…",
       "testOkAccount": "Verbindung funktioniert – angemeldet als {account}.",
+      "manage": "Verwalten",
+      "editName": "Bezeichnung",
+      "keepPassword": "Leer lassen, um das aktuelle App-Passwort zu behalten.",
+      "updated": "Verbindung aktualisiert.",
+      "updateFailed": "Die Verbindung konnte nicht aktualisiert werden.",
+      "deleteTitle": "Diese Verbindung entfernen?",
+      "deleteMessage": "Synaplan verwendet {name} danach nicht mehr. Dateien, die schon dort liegen, bleiben erhalten.",
+      "deleteConfirm": "Entfernen",
+      "deleted": "{name} wurde entfernt.",
+      "deleteFailed": "Die Verbindung konnte nicht entfernt werden.",
+      "channelHint": "Im Chat heißt dieser Kanal {channel}",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -1874,6 +1887,7 @@
           "username": "Benutzername",
           "appPassword": "App-Passwort",
           "appPasswordHint": "Erstelle eines in Nextcloud unter Einstellungen → Sicherheit → Geräte & Sitzungen. Dein Konto-Passwort wird nie gespeichert.",
+          "localHttpHint": "Auf dieser Entwicklungsinstallation kannst du auch eine lokale Adresse wie http://nextcloud verwenden.",
           "folder": "Ordner für Ergebnisse",
           "withCalendar": "Auch einen Kalender verbinden:",
           "connect": "Verbinden",

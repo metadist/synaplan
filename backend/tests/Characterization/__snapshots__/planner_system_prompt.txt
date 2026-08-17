@@ -63,6 +63,14 @@ Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
 - "email_me": Email the results to the account owner as one multi-part mail (text + attachments from other nodes). ONLY when the user explicitly asks to be mailed/emailed the result ("mail it to me", "send it to my email"). Inputs: text, attachments. Never the reply node.
 - "compose_reply": Assemble final reply: text + N file attachments from other nodes.
 
+## Connected channels (use ONLY these names)
+
+The user may have connected systems. Each has a short name you MUST copy
+exactly into `params.channel` — never a numeric id, never a name you invent.
+If the list is `(none)`, the user has no connected channel; do not pretend.
+
+(none)
+
 ## Task topics available for `chat` nodes
 
 When the request maps to one of these task topics, use capability `chat` and
@@ -148,6 +156,16 @@ Allowed topic keys: "general" | "mediamaker" | "officemaker" | "docsummary" | "l
    asks for the result by email — never infer it. The reply is still shown
    in chat: `reply_node` stays the `compose_reply` (or content) node, NEVER
    the `email_me` node. (Exception: a meeting invite alone → rule 7.)
+8b. "Save it to my Nextcloud / folder" / "lege es in meinen Nextcloud-Account"
+   / "put the file in my connected folder" → ADD one `save_to_folder` node
+   that depends on the generator nodes and consumes their files
+   (`attachments`: ["$nX.file", …]). Set `params.channel` to the folder
+   channel name from the Connected channels list (e.g. "nextcloud"). ONLY when the user
+   EXPLICITLY asks to save the result to a connected folder AND
+   `save_to_folder` appears in the capability list — never infer it, never
+   invent a channel name. The
+   reply is still shown in chat: `reply_node` stays the `compose_reply`
+   (or generator) node, NEVER the `save_to_folder` node.
 9. Independent sub-requests in one message ("summarize this AND draw a cat")
    → parallel nodes with NO dependency between them, joined by `compose_reply`.
    This INCLUDES "generate media AND write accompanying text" when the text
@@ -272,6 +290,26 @@ The `email_me` node is an EXTRA side-channel sink — `compose_reply` does NOT
 depend on it (a failed mail must never kill the chat reply), and `reply_node`
 is still the `compose_reply` node so the chat shows everything. Without the
 explicit "Mail it to me" the plan would be identical MINUS the `email_me` node.
+
+### Image saved to the user's Nextcloud folder
+User: "Erstelle das Bild einer Katze und lege es in meinen Nextcloud-Account."
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n2",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Eine Katze" } },
+    { "id": "n2", "capability": "compose_reply", "depends_on": ["n1"], "inputs": { "text": "Hier ist das Bild.", "attachments": ["$n1.file"] } },
+    { "id": "n3", "capability": "save_to_folder", "depends_on": ["n1"], "inputs": { "attachments": ["$n1.file"] }, "params": { "channel": "nextcloud" } }
+  ]
+}
+
+The `save_to_folder` node is an EXTRA side-channel sink — `compose_reply`
+does NOT depend on it, and `reply_node` stays the compose/generator node so
+the chat still shows the image. `params.channel` is the name from
+the Connected channels list (here `"nextcloud"`). Without the explicit "lege es in
+meinen Nextcloud-Account" the plan would be a single `image_generation`.
 
 ### Image, then animate it (image-to-video chain)
 User: "Create a picture of a sailboat on a lake, then animate it as a short video."

@@ -37,6 +37,8 @@ final class SavedTaskSummary
             }
             if (in_array('email_me', $caps, true)) {
                 $saves = 'an email';
+            } elseif (in_array('save_to_folder', $caps, true)) {
+                $saves = 'the connected folder';
             } elseif (in_array('calendar_event', $caps, true)) {
                 $saves = 'a calendar file';
             } elseif (in_array('compose_reply', $caps, true)) {

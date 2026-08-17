@@ -36,6 +36,8 @@ const iconForKind = computed(() => {
       return 'mdi:text-box-search-outline'
     case 'email':
       return 'mdi:email-outline'
+    case 'folder':
+      return 'mdi:folder-outline'
     default:
       return 'mdi:text-box-outline'
   }

@@ -1624,7 +1624,8 @@
       "document": "Documento",
       "search": "Búsqueda web",
       "extract": "Extracción de texto",
-      "email": "Correo"
+      "email": "Correo",
+      "folder": "Carpeta"
     },
     "capability": {
       "extract_text": "Extrayendo texto",
@@ -1642,7 +1643,8 @@
       "text2sound": "Audio",
       "document_generation": "Documento",
       "calendar_event": "Invitación de calendario",
-      "email_me": "Envío por correo"
+      "email_me": "Envío por correo",
+      "save_to_folder": "Guardar en carpeta"
     },
     "copyText": "Copiar contenido",
     "copied": "Copiado al portapapeles",
@@ -2359,6 +2361,17 @@
       "reconnect": "Reconectar",
       "testing": "Probando…",
       "testOkAccount": "La conexión funciona: sesión iniciada como {account}.",
+      "manage": "Gestionar",
+      "editName": "Nombre",
+      "keepPassword": "Déjalo vacío para conservar la contraseña de aplicación actual.",
+      "updated": "Conexión actualizada.",
+      "updateFailed": "No se pudo actualizar la conexión.",
+      "deleteTitle": "¿Quitar esta conexión?",
+      "deleteMessage": "Synaplan dejará de usar {name}. Los archivos que ya estén allí no se borran.",
+      "deleteConfirm": "Quitar",
+      "deleted": "Se quitó {name}.",
+      "deleteFailed": "No se pudo quitar la conexión.",
+      "channelHint": "En el chat, usa el nombre {channel}",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -2403,6 +2416,7 @@
           "username": "Nombre de usuario",
           "appPassword": "Contraseña de aplicación",
           "appPasswordHint": "Créala en Nextcloud en Ajustes → Seguridad → Dispositivos y sesiones. Tu contraseña de la cuenta nunca se guarda.",
+          "localHttpHint": "En esta instalación de desarrollo también puedes usar una dirección local como http://nextcloud.",
           "folder": "Carpeta para los resultados",
           "withCalendar": "Conectar también un calendario:",
           "connect": "Conectar",

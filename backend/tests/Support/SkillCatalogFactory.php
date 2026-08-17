@@ -9,6 +9,7 @@ use App\Service\Multitask\Execution\Runner\ChatRunner;
 use App\Service\Multitask\Execution\Runner\ComposeReplyRunner;
 use App\Service\Multitask\Execution\Runner\DocumentGenerationRunner;
 use App\Service\Multitask\Execution\Runner\EmailMeRunner;
+use App\Service\Multitask\Execution\Runner\SaveToFolderRunner;
 use App\Service\Multitask\Execution\Runner\EmailSearchRunner;
 use App\Service\Multitask\Execution\Runner\ExtractTextRunner;
 use App\Service\Multitask\Execution\Runner\FileAnalysisRunner;
@@ -49,6 +50,7 @@ final class SkillCatalogFactory
         DocumentGenerationRunner::class,
         CalendarEventRunner::class,
         EmailMeRunner::class,
+        SaveToFolderRunner::class,
         ComposeReplyRunner::class,
     ];
 

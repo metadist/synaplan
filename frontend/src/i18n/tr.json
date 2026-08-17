@@ -1624,7 +1624,8 @@
       "document": "Belge",
       "search": "Web araması",
       "extract": "Metin çıkarma",
-      "email": "E-posta"
+      "email": "E-posta",
+      "folder": "Klasör"
     },
     "capability": {
       "extract_text": "Metin çıkarılıyor",
@@ -1642,7 +1643,8 @@
       "text2sound": "Ses",
       "document_generation": "Belge",
       "calendar_event": "Takvim daveti",
-      "email_me": "E-posta gönderimi"
+      "email_me": "E-posta gönderimi",
+      "save_to_folder": "Klasöre kaydet"
     },
     "copyText": "İçeriği kopyala",
     "copied": "Panoya kopyalandı",
@@ -2360,6 +2362,17 @@
       "reconnect": "Yeniden bağlan",
       "testing": "Test ediliyor…",
       "testOkAccount": "Bağlantı çalışıyor — {account} olarak oturum açıldı.",
+      "manage": "Yönet",
+      "editName": "Ad",
+      "keepPassword": "Mevcut uygulama parolasını korumak için boş bırak.",
+      "updated": "Bağlantı güncellendi.",
+      "updateFailed": "Bağlantı güncellenemedi.",
+      "deleteTitle": "Bu bağlantı kaldırılsın mı?",
+      "deleteMessage": "Synaplan bundan sonra {name} kullanmaz. Orada duran dosyalar silinmez.",
+      "deleteConfirm": "Kaldır",
+      "deleted": "{name} kaldırıldı.",
+      "deleteFailed": "Bağlantı kaldırılamadı.",
+      "channelHint": "Sohbette bu kanala {channel} deyin",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -2404,6 +2417,7 @@
           "username": "Kullanıcı adı",
           "appPassword": "Uygulama parolası",
           "appPasswordHint": "Nextcloud'da Ayarlar → Güvenlik → Cihazlar ve oturumlar altında oluştur. Hesap parolan asla saklanmaz.",
+          "localHttpHint": "Bu geliştirme kurulumunda http://nextcloud gibi yerel bir adres de kullanabilirsiniz.",
           "folder": "Sonuçlar için klasör",
           "withCalendar": "Bir takvimi de bağla:",
           "connect": "Bağlan",

@@ -11,6 +11,7 @@ use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\Plan\TaskPlanValidator;
+use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Multitask\Skill\SkillCatalog;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
@@ -56,6 +57,7 @@ final readonly class TaskPlanner
         private SkillCatalog $skillCatalog,
         private PromptService $promptService,
         private RateLimitService $rateLimitService,
+        private ?PlannerChannelCatalog $channelCatalog = null,
     ) {
     }
 
@@ -205,7 +207,7 @@ final readonly class TaskPlanner
 
     /**
      * Render a planner prompt template the same way the live planner does
-     * ([CAPABILITYLIST]/[DYNAMICLIST]/[KEYLIST] substitution). Exposed so the
+     * ([CAPABILITYLIST]/[CHANNELLIST]/[DYNAMICLIST]/[KEYLIST] substitution). Exposed so the
      * admin config UI can show an accurate preview of what the model receives.
      */
     public function renderSystemPrompt(string $template, ?int $userId): string
@@ -235,7 +237,12 @@ final readonly class TaskPlanner
 
         $keyList = implode(' | ', array_map(static fn (string $t): string => '"'.$t.'"', $topics));
 
+        $channelList = null !== $this->channelCatalog
+            ? $this->channelCatalog->renderForPlanner($userId)
+            : '(none)';
+
         $text = str_replace('[CAPABILITYLIST]', $capabilityList, $template);
+        $text = str_replace('[CHANNELLIST]', $channelList, $text);
         $text = str_replace('[DYNAMICLIST]', implode("\n", $dynamicList), $text);
         $text = str_replace('[KEYLIST]', $keyList, $text);
 

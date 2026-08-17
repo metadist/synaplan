@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Dav;
 
 use App\Service\Security\SsrfGuard;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -17,6 +18,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * request (the base URL is user-supplied), no redirects (a cross-host redirect
  * would replay the Basic credential elsewhere), and the credential never
  * appears in an exception message.
+ *
+ * Local Docker Nextcloud is the exception: both {@see $allowInsecureLocal}
+ * and {@see $environment} === `dev` must be true. Production ignores the
+ * flag even if an operator sets it by mistake.
  */
 final readonly class WebDavClient
 {
@@ -25,6 +30,10 @@ final readonly class WebDavClient
     public function __construct(
         private HttpClientInterface $httpClient,
         private SsrfGuard $ssrfGuard,
+        #[Autowire(env: 'default::bool:DAV_ALLOW_INSECURE_LOCAL')]
+        private bool $allowInsecureLocal = false,
+        #[Autowire('%kernel.environment%')]
+        private string $environment = 'prod',
     ) {
     }
 
@@ -107,11 +116,13 @@ final readonly class WebDavClient
     private function request(DavTarget $target, string $method, string $path, array $headers = [], ?string $body = null): array
     {
         $url = $this->buildUrl($target->baseUrl, $path);
+        $insecureLocal = $this->allowsInsecureLocal();
 
-        if ('https' !== strtolower((string) parse_url($url, \PHP_URL_SCHEME))) {
+        $scheme = strtolower((string) parse_url($url, \PHP_URL_SCHEME));
+        if ('https' !== $scheme && !($insecureLocal && 'http' === $scheme)) {
             throw new DavException(0, 'Only https:// WebDAV addresses are allowed');
         }
-        if ($this->ssrfGuard->isBlockedUrl($url)) {
+        if (!$insecureLocal && $this->ssrfGuard->isBlockedUrl($url)) {
             throw new DavException(0, 'This WebDAV address points at a private or reserved network and was blocked');
         }
 
@@ -131,6 +142,16 @@ final readonly class WebDavClient
         } catch (TransportExceptionInterface $e) {
             throw new DavException(0, sprintf('Could not reach %s: %s', $target->host(), $e->getMessage()));
         }
+    }
+
+    /**
+     * Dev-only: a local Nextcloud on the Docker network is http + private-IP.
+     * Both the env flag and kernel environment must agree — a leaked
+     * DAV_ALLOW_INSECURE_LOCAL=1 in production is a no-op.
+     */
+    private function allowsInsecureLocal(): bool
+    {
+        return $this->allowInsecureLocal && 'dev' === $this->environment;
     }
 
     /**

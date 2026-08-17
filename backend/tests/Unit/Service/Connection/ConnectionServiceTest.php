@@ -45,6 +45,8 @@ final class ConnectionServiceTest extends TestCase
         $this->assertStringNotContainsString('hunter2', $encoded);
         $this->assertArrayNotHasKey('secret', $payload);
         $this->assertTrue($payload['has_secret']);
+        $this->assertSame('nextcloud', $payload['channel']);
+        $this->assertSame('nextcloud', $payload['config']['channel'] ?? null);
     }
 
     /**

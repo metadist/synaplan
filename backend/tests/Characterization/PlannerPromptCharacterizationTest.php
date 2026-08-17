@@ -26,7 +26,7 @@ use Symfony\Component\Clock\MockClock;
  * Golden snapshot of the FULLY RENDERED planner system prompt.
  *
  * The planner prompt is the routing contract of the multitask engine: every
- * `[CAPABILITYLIST]` / `[DYNAMICLIST]` / `[KEYLIST]` substitution, every
+ * `[CAPABILITYLIST]` / `[CHANNELLIST]` / `[DYNAMICLIST]` / `[KEYLIST]` substitution, every
  * routing rule and every canonical example influences which DAGs the model
  * emits. This snapshot makes any change to that surface an EXPLICIT, reviewed
  * diff instead of an invisible side effect — and it is the equivalence proof

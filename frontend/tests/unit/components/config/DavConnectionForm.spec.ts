@@ -49,6 +49,7 @@ describe('DavConnectionForm', () => {
         username: 'ada',
         folder: 'Synaplan',
         on_conflict: 'rename',
+        channel: 'nextcloud',
       },
     })
     expect(mockCreate.mock.calls[1][0]).toMatchObject({
@@ -56,6 +57,7 @@ describe('DavConnectionForm', () => {
       config: {
         base_url: 'https://cloud.example.com/remote.php/dav/calendars/ada/personal',
         username: 'ada',
+        channel: 'calendar',
       },
     })
     // Every new connection is proven with a live test right away.
@@ -75,12 +77,21 @@ describe('DavConnectionForm', () => {
     expect(mockCreate.mock.calls[0][0].type).toBe('webdav')
   })
 
-  it('refuses to submit a plain-http server address', async () => {
+  it('accepts a local http address in development', async () => {
     const wrapper = mountForm()
     await fillNextcloudForm(wrapper)
-    await wrapper.find('[data-testid="dav-server-url"]').setValue('http://cloud.example.com')
+    await wrapper.find('[data-testid="dav-server-url"]').setValue('http://nextcloud')
+    await wrapper.find('[data-testid="dav-with-calendar"]').setValue(false)
 
-    expect(wrapper.find('[data-testid="btn-dav-submit"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="btn-dav-submit"]').attributes('disabled')).toBeUndefined()
+
+    await wrapper.find('[data-testid="dav-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+    expect(mockCreate.mock.calls[0][0].config.base_url).toBe(
+      'http://nextcloud/remote.php/dav/files/ada'
+    )
   })
 
   it('surfaces the tester error when the live check fails', async () => {

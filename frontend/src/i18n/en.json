@@ -1789,6 +1789,17 @@
       "reconnect": "Reconnect",
       "testing": "Testing…",
       "testOkAccount": "Connection works — signed in as {account}.",
+      "manage": "Manage",
+      "editName": "Name",
+      "keepPassword": "Leave empty to keep the current app password.",
+      "updated": "Connection updated.",
+      "updateFailed": "The connection could not be updated.",
+      "deleteTitle": "Remove this connection?",
+      "deleteMessage": "Synaplan will no longer use {name}. Files already saved there stay where they are.",
+      "deleteConfirm": "Remove",
+      "deleted": "{name} was removed.",
+      "deleteFailed": "The connection could not be removed.",
+      "channelHint": "In chat, ask for {channel}",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -1833,6 +1844,7 @@
           "username": "Username",
           "appPassword": "App password",
           "appPasswordHint": "Create one in Nextcloud under Settings → Security → Devices & sessions. Your account password is never stored.",
+          "localHttpHint": "On this development install you can also use a local address such as http://nextcloud.",
           "folder": "Folder for results",
           "withCalendar": "Also connect a calendar:",
           "connect": "Connect",
@@ -3829,7 +3841,8 @@
       "document": "Document",
       "search": "Web search",
       "extract": "Text extraction",
-      "email": "Email"
+      "email": "Email",
+      "folder": "Folder"
     },
     "capability": {
       "extract_text": "Extracting text",
@@ -3847,7 +3860,8 @@
       "text2sound": "Audio",
       "document_generation": "Document",
       "calendar_event": "Calendar invite",
-      "email_me": "Email result"
+      "email_me": "Email result",
+      "save_to_folder": "Save to folder"
     },
     "copyText": "Copy content",
     "copied": "Copied to clipboard",
