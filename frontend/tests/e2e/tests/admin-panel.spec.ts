@@ -6,17 +6,23 @@ import { TIMEOUTS, getApiUrl } from '../config/config'
 
 /**
  * Admin dashboard coverage beyond impersonation (covered separately in
- * `admin-impersonation-chat.spec.ts`): user search, the registration analytics
- * chart controls, and the subscriptions panel edit wiring.
+ * `admin-impersonation-chat.spec.ts`): the server-side user search, which spans
+ * the debounced frontend input, the admin API and the rendered result list —
+ * genuine end-to-end territory.
  *
- * All three are deterministic and provider-free (@ci). None mutate persistent
- * state — the subscriptions test opens and cancels edit mode without saving —
- * so no teardown is required.
+ * Two other admin surfaces are covered by cheaper component tests instead of
+ * E2E (they are pure client-side wiring with no server round-trip worth an
+ * end-to-end run): the registration chart controls (period/group-by emit +
+ * line/bar toggle) in `tests/unit/components/admin/RegistrationChart.spec.ts`,
+ * and the subscriptions panel edit/cancel/save wiring in
+ * `tests/unit/components/AdminSubscriptionsPanel.spec.ts`.
  *
- * Auth: the worker `storageState` is a non-admin user, so these specs log in as
- * the seeded admin (`admin@synaplan.com`) via the UI, same as the impersonation
- * spec. UI paging (prev/next) is intentionally not exercised: it only renders
- * with >50 users (`totalPages > 1`), which cannot be forced deterministically.
+ * Deterministic and provider-free (@ci); no persistent state is mutated, so no
+ * teardown is required. Auth: the worker `storageState` is a non-admin user, so
+ * this spec logs in as the seeded admin (`admin@synaplan.com`) via the UI, same
+ * as the impersonation spec. UI paging (prev/next) is intentionally not
+ * exercised: it only renders with >50 users (`totalPages > 1`), which cannot be
+ * forced deterministically.
  */
 test.describe('@ci Admin panel', () => {
   test.beforeEach(async ({ page }) => {
@@ -31,54 +37,6 @@ test.describe('@ci Admin panel', () => {
       state: 'visible',
       timeout: TIMEOUTS.STANDARD,
     })
-  })
-
-  test('overview: registration chart controls re-query on period/group-by change', async ({
-    page,
-  }) => {
-    // Overview is the default tab; the chart renders once the initial
-    // /analytics/registrations load resolves (onMounted).
-    await expect(page.locator(selectors.admin.sectionOverview)).toBeVisible({
-      timeout: TIMEOUTS.STANDARD,
-    })
-    await expect(page.locator(selectors.admin.chartTypeLine)).toBeVisible({
-      timeout: TIMEOUTS.STANDARD,
-    })
-    await expect(page.locator(selectors.admin.chartPeriod)).toBeVisible()
-    await expect(page.locator(selectors.admin.chartGroupBy)).toBeVisible()
-
-    await test.step('Changing the period issues a new analytics query', async () => {
-      const analyticsResponse = page.waitForResponse(
-        (res) =>
-          res.url().includes('/api/v1/admin/analytics/registrations') &&
-          res.url().includes('period=90d') &&
-          res.request().method() === 'GET',
-        { timeout: TIMEOUTS.STANDARD }
-      )
-      await page.locator(selectors.admin.chartPeriod).selectOption('90d')
-      const res = await analyticsResponse
-      expect(res.ok()).toBeTruthy()
-    })
-
-    await test.step('Changing the grouping issues a new analytics query', async () => {
-      const analyticsResponse = page.waitForResponse(
-        (res) =>
-          res.url().includes('/api/v1/admin/analytics/registrations') &&
-          res.url().includes('groupBy=month') &&
-          res.request().method() === 'GET',
-        { timeout: TIMEOUTS.STANDARD }
-      )
-      await page.locator(selectors.admin.chartGroupBy).selectOption('month')
-      const res = await analyticsResponse
-      expect(res.ok()).toBeTruthy()
-    })
-
-    await test.step('Switching to the bar chart keeps the chart rendered', async () => {
-      await page.locator(selectors.admin.chartTypeBar).click()
-      await expect(page.locator(selectors.admin.chartTypeBar)).toBeVisible()
-    })
-
-    await expect(page.locator(selectors.notification.error)).toHaveCount(0)
   })
 
   test('users: server-side search narrows and clears the list', async ({ page, request }) => {
@@ -124,26 +82,5 @@ test.describe('@ci Admin panel', () => {
         timeout: TIMEOUTS.STANDARD,
       })
     })
-  })
-
-  test('subscriptions: plan row edit mode opens and cancels without saving', async ({ page }) => {
-    await page.locator(selectors.admin.tabSubscriptions).click()
-
-    const panel = page.locator(selectors.admin.subscriptionsPanel)
-    await expect(panel).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await expect(panel.locator(selectors.admin.subscriptionsTable)).toBeVisible({
-      timeout: TIMEOUTS.STANDARD,
-    })
-
-    // Seeded plans (PRO/TEAM/BUSINESS) → at least one editable row exists.
-    await panel.locator(selectors.admin.subscriptionEditAny).first().click()
-
-    const priceInput = panel.locator(selectors.admin.subscriptionPriceMonthly)
-    await expect(priceInput).toBeVisible()
-
-    // Cancel leaves edit mode without persisting anything (idempotent).
-    await panel.locator(selectors.admin.subscriptionCancel).click()
-    await expect(priceInput).toBeHidden()
-    await expect(page.locator(selectors.notification.error)).toHaveCount(0)
   })
 })

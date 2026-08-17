@@ -521,31 +521,14 @@ export const selectors = {
     modalLogin: '[data-testid="guest-modal-login"]',
   },
   admin: {
-    tabOverview: '[data-testid="tab-overview"]',
     tabUsers: '[data-testid="tab-users"]',
-    tabSubscriptions: '[data-testid="tab-subscriptions"]',
-    sectionOverview: '[data-testid="section-overview"]',
     sectionUsers: '[data-testid="section-users"]',
-    sectionSubscriptions: '[data-testid="section-subscriptions"]',
     userSearch: '[data-testid="input-user-search"]',
     impersonateUser: (userId: number) => `[data-testid="btn-impersonate-user-${userId}"]`,
     /** Per-user level <select> — one row per user; also used as a stable row marker */
     userLevelSelect: (userId: number) => `[data-testid="select-user-level-${userId}"]`,
     /** Any user row's level <select> — count these to assert list size / search results */
     userLevelSelectAny: '[data-testid^="select-user-level-"]',
-    // Registration analytics chart (overview tab)
-    chartTypeLine: '[data-testid="btn-chart-type-line"]',
-    chartTypeBar: '[data-testid="btn-chart-type-bar"]',
-    chartPeriod: '[data-testid="select-period"]',
-    chartGroupBy: '[data-testid="select-group-by"]',
-    // Subscriptions panel (subscriptions tab)
-    subscriptionsPanel: '[data-testid="admin-subscriptions-panel"]',
-    subscriptionsTable: '[data-testid="subscriptions-table"]',
-    /** Any plan row's edit button — scope to subscriptionsPanel and take .first() */
-    subscriptionEditAny: '[data-testid^="btn-edit-"]',
-    subscriptionPriceMonthly: '[data-testid="input-price-monthly"]',
-    subscriptionSave: '[data-testid="btn-save"]',
-    subscriptionCancel: '[data-testid="btn-cancel"]',
   },
   impersonation: {
     banner: '[data-testid="banner-impersonation"]',
