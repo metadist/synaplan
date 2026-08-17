@@ -14,7 +14,6 @@ import { isNativeApp, getNativeApiBaseUrl } from './services/api/nativeRuntime'
 import { setApiBaseUrl } from './services/api/httpClient'
 import { loadNativeTokens } from './services/api/nativeAuth'
 import { applyBrandingTheme } from './utils/brandingTheme'
-import { installSmartAppBanner } from './services/smartAppBanner'
 
 // Bootstrap app - load config before mounting.
 // We MUST install global error handlers and mount the app even when bootstrap
@@ -58,10 +57,6 @@ import { installSmartAppBanner } from './services/smartAppBanner'
   // MOBILE-APP SEAM (Epic 4): apply white-label color/font from runtime branding
   // config. No-op for the default brand; re-runs when the app switches servers.
   applyBrandingTheme()
-
-  // MOBILE-APP SEAM: point iPhone visitors at the operator's App Store listing.
-  // No-op unless IOS_APP_URL is configured, so self-hosted instances are unaffected.
-  installSmartAppBanner(config.mobile.iosAppUrl)
 
   const recaptchaEnabled = config.recaptcha.enabled
   const recaptchaSiteKey = config.recaptcha.siteKey

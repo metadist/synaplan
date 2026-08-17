@@ -1,4 +1,12 @@
 {
+  "announcements": {
+    "later": "Später",
+    "iosApp": {
+      "title": "Synaplan gibt es jetzt fürs iPhone",
+      "body": "Die App bringt deine Chats, Dokumente und Assistenten aufs Handy. Gleicher Zugang, gleiche Daten — unterwegs sprichst du deine Frage einfach ein und setzt jedes Gespräch dort fort, wo du aufgehört hast.",
+      "action": "Im App Store laden"
+    }
+  },
   "updates": {
     "runningVersion": "Version {version}",
     "badge": {
