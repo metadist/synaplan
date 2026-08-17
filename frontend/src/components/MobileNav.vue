@@ -206,16 +206,6 @@
                     <span>{{ $t('nav.statistics') }}</span>
                   </button>
                   <button
-                    class="v2-drawer-account"
-                    :class="isPathActive('/settings') ? 'v2-drawer-account--active' : 'txt-primary'"
-                    :data-nav-active="isPathActive('/settings') ? 'true' : undefined"
-                    data-testid="btn-mobile-more-preferences"
-                    @click="handleNavigate('/settings')"
-                  >
-                    <Cog6ToothIcon class="w-5 h-5" />
-                    <span>{{ $t('nav.preferences') }}</span>
-                  </button>
-                  <button
                     v-if="
                       !authStore.isAdmin &&
                       configStore.billing.enabled &&
@@ -247,16 +237,33 @@
                     <RocketLaunchIcon class="w-5 h-5" />
                     <span>{{ $t('nav.upgrade') }}</span>
                   </button>
-                  <button
-                    v-if="!isImpersonating"
-                    class="v2-drawer-account text-red-500 dark:text-red-400"
-                    data-testid="btn-mobile-more-logout"
-                    @click="handleLogout"
-                  >
-                    <ArrowRightOnRectangleIcon class="w-5 h-5" />
-                    <span>{{ $t('settings.logout') }}</span>
-                  </button>
                 </template>
+
+                <!--
+                  Preferences holds the language and the theme, both stored on
+                  the device rather than on the account, so it stays outside the
+                  guest/authenticated split and is offered to everyone.
+                -->
+                <button
+                  class="v2-drawer-account"
+                  :class="isPathActive('/settings') ? 'v2-drawer-account--active' : 'txt-primary'"
+                  :data-nav-active="isPathActive('/settings') ? 'true' : undefined"
+                  data-testid="btn-mobile-more-preferences"
+                  @click="handleNavigate('/settings')"
+                >
+                  <Cog6ToothIcon class="w-5 h-5" />
+                  <span>{{ $t('nav.preferences') }}</span>
+                </button>
+
+                <button
+                  v-if="!isGuestMode && !isImpersonating"
+                  class="v2-drawer-account text-red-500 dark:text-red-400"
+                  data-testid="btn-mobile-more-logout"
+                  @click="handleLogout"
+                >
+                  <ArrowRightOnRectangleIcon class="w-5 h-5" />
+                  <span>{{ $t('settings.logout') }}</span>
+                </button>
               </div>
             </div>
           </div>

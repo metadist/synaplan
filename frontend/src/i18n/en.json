@@ -1,4 +1,12 @@
 {
+  "announcements": {
+    "later": "Not now",
+    "iosApp": {
+      "title": "Synaplan is now on iPhone",
+      "body": "The app puts your chats, documents and assistants in your pocket. Same account, same data — you can dictate a question on the way and pick up any conversation where you left it.",
+      "action": "Get it on the App Store"
+    }
+  },
   "updates": {
     "runningVersion": "Version {version}",
     "badge": {

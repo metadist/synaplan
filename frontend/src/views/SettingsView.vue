@@ -98,8 +98,12 @@
             </div>
           </div>
 
-          <!-- Account Info -->
-          <div class="surface-card p-6" data-testid="section-account-info">
+          <!-- Account Info (signed-in users only — a guest has nothing to show here) -->
+          <div
+            v-if="authStore.isAuthenticated"
+            class="surface-card p-6"
+            data-testid="section-account-info"
+          >
             <h2 class="text-lg font-semibold txt-primary mb-4">
               {{ $t('settings.account.title') }}
             </h2>

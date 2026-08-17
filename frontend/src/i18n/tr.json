@@ -1,4 +1,12 @@
 {
+  "announcements": {
+    "later": "Şimdi değil",
+    "iosApp": {
+      "title": "Synaplan artık iPhone'da",
+      "body": "Uygulama sohbetlerinizi, belgelerinizi ve asistanlarınızı cebinize taşır. Aynı hesap, aynı veriler — yolda sorunuzu sesli olarak söyleyin ve her sohbete kaldığınız yerden devam edin.",
+      "action": "App Store'dan indirin"
+    }
+  },
   "updates": {
     "runningVersion": "Sürüm {version}",
     "badge": {
