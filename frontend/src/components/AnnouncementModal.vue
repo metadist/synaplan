@@ -33,16 +33,14 @@
           <!-- Illustrated announcements read as a spread: words on one side, the
                picture on the other. Without a picture the panel stays narrow. -->
           <div :class="announcement.image ? 'grid md:grid-cols-[1.15fr_1fr]' : ''">
-            <!-- The device is shown whole on a phone and deliberately runs past
-                 the lower edge on a wide screen, where there is room for it. -->
             <div
               v-if="announcement.image"
-              class="relative flex items-end justify-center overflow-hidden bg-gradient-to-br from-[var(--brand)]/25 via-[var(--brand)]/10 to-transparent pt-8 md:order-2 md:min-h-[21rem] md:pt-0"
+              class="relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-[var(--brand)]/25 via-[var(--brand)]/10 to-transparent pt-8 md:order-2 md:p-8 md:pt-8"
             >
               <img
                 :src="announcement.image"
                 alt=""
-                class="h-52 w-auto md:h-[22rem] md:translate-y-10"
+                class="h-56 w-auto md:h-96"
                 data-testid="img-announcement"
               />
             </div>
@@ -55,21 +53,15 @@
             </div>
 
             <div class="flex flex-col justify-center p-6 sm:p-8 md:order-1">
-              <h2 id="announcement-title" class="text-lg font-bold txt-primary sm:text-xl">
+              <h2 id="announcement-title" class="text-lg font-bold txt-primary sm:text-2xl">
                 {{ $t(`${announcement.i18nKey}.title`) }}
               </h2>
-              <p class="mt-2 text-sm txt-secondary leading-relaxed">
+              <p class="mt-3 text-sm txt-secondary leading-relaxed">
                 {{ $t(`${announcement.i18nKey}.body`) }}
               </p>
 
-              <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <button
-                  class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
-                  data-testid="btn-announcement-later"
-                  @click="close"
-                >
-                  {{ $t('announcements.later') }}
-                </button>
+              <!-- Left-aligned with the text above it, so the main action leads. -->
+              <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-start">
                 <a
                   v-if="announcement.actionUrl"
                   :href="announcement.actionUrl"
@@ -81,6 +73,13 @@
                 >
                   {{ $t(`${announcement.i18nKey}.action`) }}
                 </a>
+                <button
+                  class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+                  data-testid="btn-announcement-later"
+                  @click="close"
+                >
+                  {{ $t('announcements.later') }}
+                </button>
               </div>
             </div>
           </div>
