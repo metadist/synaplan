@@ -162,6 +162,7 @@ final readonly class PlannerChannelCatalog
                 ? 'nextcloud'
                 : 'folder',
             'caldav' => 'calendar',
+            Connection::TYPE_DROPBOX => 'dropbox',
             Connection::TYPE_M365 => 'm365',
             'mailbox' => 'mailbox',
             default => self::sanitize($type) ?: 'channel',
@@ -171,7 +172,7 @@ final readonly class PlannerChannelCatalog
     public static function kindForType(string $type): ?string
     {
         return match ($type) {
-            'webdav' => PlannerChannel::KIND_FOLDER,
+            'webdav', Connection::TYPE_DROPBOX => PlannerChannel::KIND_FOLDER,
             'caldav' => PlannerChannel::KIND_CALENDAR,
             Connection::TYPE_M365, 'mailbox' => PlannerChannel::KIND_MAIL,
             default => null,

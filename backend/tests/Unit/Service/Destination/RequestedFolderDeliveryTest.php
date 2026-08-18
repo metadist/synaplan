@@ -25,8 +25,10 @@ final class RequestedFolderDeliveryTest extends TestCase
             'Erstelle das Bild einer Katze und lege es in meinen Nextcloud-Account'
         ));
         self::assertTrue($delivery->userAskedToSaveToFolder('save this image to my Nextcloud'));
+        self::assertTrue($delivery->userAskedToSaveToFolder('create a document and put it into my Dropbox'));
         self::assertFalse($delivery->userAskedToSaveToFolder('Erstelle das Bild einer Katze'));
         self::assertFalse($delivery->userAskedToSaveToFolder('What is Nextcloud?'));
+        self::assertFalse($delivery->userAskedToSaveToFolder('Do you support Dropbox?'));
     }
 
     public function testSendsToTheOnlyWebDavConnection(): void
@@ -112,9 +114,52 @@ final class RequestedFolderDeliveryTest extends TestCase
     }
 
     /**
+     * The provider is picked by connection TYPE: a `dropbox` connection must
+     * go through the dropbox provider, never through webdav.
+     */
+    public function testRoutesADropboxChannelToTheDropboxProvider(): void
+    {
+        $dropbox = $this->connection(9, 'user@example.com', ['channel' => 'dropbox'], Connection::TYPE_DROPBOX);
+        $nextcloud = $this->connection(7, 'nextcloud-Ordner (admin)', ['channel' => 'nextcloud']);
+
+        $dropboxProvider = new class implements DestinationProvider {
+            public bool $called = false;
+
+            public function id(): string
+            {
+                return 'dropbox';
+            }
+
+            public function send(ShareableFile $file, array $params): DestinationResult
+            {
+                $this->called = true;
+                TestCase::assertSame(9, $params['connection_id']);
+
+                return DestinationResult::success('Synaplan/plan.docx', ['newName' => 'plan.docx']);
+            }
+        };
+
+        $dir = sys_get_temp_dir().'/folder_delivery_'.uniqid();
+        mkdir($dir, 0777, true);
+        $path = $dir.'/plan.docx';
+        file_put_contents($path, 'docx');
+
+        $result = $this->delivery([$nextcloud, $dropbox], null, $dropboxProvider)->send(1, [
+            ['path' => $path, 'name' => 'plan.docx'],
+        ], 'dropbox');
+
+        self::assertTrue($result['ok']);
+        self::assertTrue($dropboxProvider->called);
+        self::assertSame('dropbox', $result['channel']);
+
+        @unlink($path);
+        @rmdir($dir);
+    }
+
+    /**
      * @param list<Connection> $connections
      */
-    private function delivery(array $connections = [], ?DestinationProvider $provider = null): RequestedFolderDelivery
+    private function delivery(array $connections = [], ?DestinationProvider $provider = null, ?DestinationProvider $dropboxProvider = null): RequestedFolderDelivery
     {
         $repo = $this->createMock(ConnectionRepository::class);
         $repo->method('findByOwner')->willReturn($connections);
@@ -131,9 +176,14 @@ final class RequestedFolderDeliveryTest extends TestCase
             }
         };
 
+        $providers = [$webdav];
+        if (null !== $dropboxProvider) {
+            $providers[] = $dropboxProvider;
+        }
+
         return new RequestedFolderDelivery(
             $repo,
-            new DestinationRegistry([$webdav]),
+            new DestinationRegistry($providers),
             $this->createMock(LoggerInterface::class),
             new PlannerChannelCatalog($repo),
         );
@@ -142,9 +192,9 @@ final class RequestedFolderDeliveryTest extends TestCase
     /**
      * @param array<string, mixed> $config
      */
-    private function connection(int $id, string $name, array $config = []): Connection
+    private function connection(int $id, string $name, array $config = [], string $type = 'webdav'): Connection
     {
-        $connection = new Connection(1, 'webdav', $name);
+        $connection = new Connection(1, $type, $name);
         $ref = new \ReflectionProperty(Connection::class, 'id');
         $ref->setValue($connection, $id);
         if ([] !== $config) {

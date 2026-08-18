@@ -1,6 +1,6 @@
 # Phase M — Chat actions: M365 mail search, Outlook calendar write, multi-destination documents
 
-**Status:** In progress 2026-08-18 — M1, M0, M3a–M3d implemented (full backend gate green); next up M2 (scope tiers), then M4/M5 (Graph calendar). **Branch:** `feat/m365-flow`.
+**Status:** In progress 2026-08-18 — M1, M0, M3a–M3d and M10 (Dropbox, pulled forward from C13 on product-owner request) implemented (full backend + frontend gate green); next up M2 (scope tiers), then M4/M5 (Graph calendar). **Branch:** `feat/m365-flow`.
 **Depends on:** everything merged via PR #1497 (foundations F1/F2/F3/F4/F5, Saved Tasks E1–E19, M365 mail-read connection, `GraphClient`) and PR #1502 (WebDAV/CalDAV delivery, `save_to_folder`, planner channels).
 **Gates:** [`07_connectors.md` §7](./07_connectors.md#7-sign-off-gate-tick-before-any-connector-code) per-connector readiness rows for C3 (remainder), C4, C5/OneDrive, C11. S6 (mutating external actions) was decided 2026-08-18 with this phase; S5 (live test accounts, named owners) is **still open and blocks the live-verification steps**.
 
@@ -63,6 +63,7 @@ Each utterance is an acceptance test, an E2E test, and a documentation example. 
 | Target word | Maps to | State |
 | ----------- | ------- | ----- |
 | "Nextcloud" | `save_to_folder` → WebDAV provider (`nextcloud` channel) | ✅ Shipped |
+| "Dropbox" | `save_to_folder` → Dropbox provider (`dropbox` channel, OAuth, C13) | ✅ Step **M10** (2026-08-18) |
 | "openCloud" | OpenCloud write — mechanism decided by the **C11 spike** (WebDAV app token / CS3 upload / token exchange) | ❌ Step **M8** (spike first, then adapter) |
 | "Outlook" | See decision **D1** below | ❌ Step **M7** |
 | "solid TOC" | DOCX generation renders a real, updatable Word TOC via the `{{TOC}}` content directive | ✅ Step **M0** (2026-08-18) |
@@ -138,8 +139,9 @@ Follows the step-size rules of [`09_work_breakdown.md` §1](./09_work_breakdown.
 | **M7** | U4 "into Outlook" = `email_me` mapping (per D1 option 1) + copy | — | S | M1 | Utterance delivers the DOCX to the inbox; copy says "sent to your inbox", not "saved to Outlook" |
 | **M8** | OpenCloud write **spike**, then adapter on the F4 seam | K11/C11 | M | S5 owner | Spike result recorded in 07 §4.3; chosen mechanism ships as one more `DestinationProvider`; if token-exchange wins, the S11 security approval happens **before** code |
 | **M9** | OneDrive file drop (`Files.ReadWrite`, channel `onedrive`) | K5a/C5 | M | M2, M5 | Optional in this phase; own channel word; US-cloud label (S7) |
+| **M10** ✅ 2026-08-18 | Dropbox folder destination (pulled forward from C13 on product-owner request) | C13 | M | — | Full OAuth connector on the F3 framework (`DROPBOX` BCONFIG group, `token_access_type=offline`, admin setup guide); `DropboxClient` + `DropboxDestinationProvider` on the F4 seam (autorename/overwrite, shared failure vocabulary, 401-refresh, bounded 429 retries); planner channel `dropbox` (kind folder), US-cloud label (S7/S15); details in [07 §4.7](./07_connectors.md). Live-account verification still open (S5) |
 
-**Merge order:** M1 → M0 → M2 → (M3a–M3d) → M4 → M5 → M6 → M7 → M8 → M9. M1 first is non-negotiable — it is the safety net under every planner change in this phase.
+**Merge order:** M1 → M0 → M2 → (M3a–M3d) → M4 → M5 → M6 → M7 → M8 → M9. M1 first is non-negotiable — it is the safety net under every planner change in this phase. (M10 had no planner-graph impact — it adds a channel, not a capability — and was merged ad hoc after M3d.)
 
 ---
 

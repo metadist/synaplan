@@ -39,6 +39,12 @@ docker compose exec -T frontend npm run check:types
 
 Prefer the `make` targets (they wrap `docker compose exec` correctly).
 
+The database is **MariaDB, not MySQL** — the `db` container has no `mysql` binary. Use the `mariadb` client with the app credentials from `docker-compose.yml`:
+
+```bash
+docker compose exec -T db mariadb -usynaplan_user -psynaplan_password synaplan -e "SELECT ..."
+```
+
 ### Git — allowed, but NEVER on main
 
 - Git operations (branch, add, commit, push) are allowed.

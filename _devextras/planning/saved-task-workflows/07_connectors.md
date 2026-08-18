@@ -205,7 +205,16 @@ Three candidate mechanisms, to be decided by the spike:
 - **OpenCloud caveat:** OCIS has no CalDAV server to our knowledge. Verify during the C11 spike; if confirmed, the UI simply never offers a calendar for OpenCloud connections — do not fake it.
 - **Test plan:** unit against a fake CalDAV client (query/put/each error); fixture round-trip (create → query finds it → re-run skips); **manual against a live Nextcloud calendar**; negative: deleted calendar, revoked app password, duplicate UID.
 
-### 4.7 C13 — Dropbox folder (OAuth family, not WebDAV)
+### 4.7 C13 — Dropbox folder (OAuth family, not WebDAV) — ✅ shipped 2026-08-18
+
+Implemented on `feat/m365-flow` exactly as scoped below: `DropboxOAuthConfig`
+(BCONFIG group `DROPBOX`) on the shared F3 OAuth framework,
+`DropboxConnectionController` (status/start/callback), `DropboxClient`
+(`/2/files/upload` with `autorename`, 401-refresh-once, bounded 429 retries),
+`DropboxDestinationProvider` (id `dropbox`), connection type `dropbox` in
+`OAUTH_TYPES`, planner channel `dropbox` (kind folder), US-cloud label in the
+connection card (S7/S15), admin setup guide, four locales. Remaining manual
+step: live-account test + Dropbox production approval for the Cloud app.
 
 - **Direction:** OUT. One more `DestinationProvider`; no bespoke UI.
 - **Auth:** OAuth2 authorization code + PKCE against Dropbox; scoped app (`files.content.write`), refresh token in the F2 vault. **Dropbox has no WebDAV endpoint — do not try to route it through C10.**

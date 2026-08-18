@@ -10,6 +10,7 @@ use App\AI\Credential\SecretValueGuard;
 use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
+use App\Service\Dropbox\DropboxOAuthConfig;
 use App\Service\EncryptionService;
 use App\Service\FeedbackConstants;
 use App\Service\MarketingNews\MarketingNewsConfig;
@@ -108,6 +109,9 @@ final readonly class SystemConfigService
                     'gmail' => ['label' => 'Smart Mail (Gmail IMAP)', 'fields' => ['GMAIL_USERNAME', 'GMAIL_PASSWORD']],
                     'm365' => ['label' => 'Microsoft 365 (Graph)', 'fields' => [
                         'M365_ENABLED', 'M365_CLIENT_ID', 'M365_CLIENT_SECRET', 'M365_TENANT', 'M365_REDIRECT_URI',
+                    ]],
+                    'dropbox' => ['label' => 'Dropbox', 'fields' => [
+                        'DROPBOX_ENABLED', 'DROPBOX_APP_KEY', 'DROPBOX_APP_SECRET', 'DROPBOX_REDIRECT_URI',
                     ]],
                 ],
             ],
@@ -928,6 +932,51 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
                 'dbKey' => MicrosoftOAuthConfig::KEY_REDIRECT_URI,
+            ],
+            // === Dropbox app (database-backed) ===
+            // BCONFIG group DROPBOX (ownerId=0), read by DropboxOAuthConfig.
+            // Operator-owned and install-wide, exactly like the M365 block
+            // above (connector plan 07 C13). Users never see these values —
+            // they only click "Connect Dropbox" and consent.
+            'DROPBOX_ENABLED' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Offer Dropbox as a connection. Requires an app key and app secret from a Dropbox app; the "Connect Dropbox" action stays hidden until all three are set.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_ENABLED,
+            ],
+            'DROPBOX_APP_KEY' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'App key of the Dropbox app. Dropbox App Console (dropbox.com/developers/apps) → your app → Settings.',
+                'default' => '',
+                'placeholder' => 'a1b2c3d4e5f6g7h',
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_APP_KEY,
+            ],
+            'DROPBOX_APP_SECRET' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'password',
+                'sensitive' => true,
+                'encrypted' => true,
+                'description' => 'App secret from the Dropbox App Console → your app → Settings → App secret (click "Show"). Stored encrypted and never shown again; leave the field untouched to keep the current one.',
+                'default' => '',
+                'placeholder' => 'Example: z9y8x7w6v5u4t3s',
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_APP_SECRET,
+            ],
+            'DROPBOX_REDIRECT_URI' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Only needed when a proxy changes the public URL. Leave empty to use APP_URL + '.DropboxOAuthConfig::CALLBACK_PATH.'. Whatever is used here must be registered in the Dropbox App Console character for character.',
+                'default' => '',
+                'placeholder' => 'https://your-synaplan-host'.DropboxOAuthConfig::CALLBACK_PATH,
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_REDIRECT_URI,
             ],
             'SAVEDTASKS_ENABLED' => [
                 'tab' => 'routing', 'section' => 'saved_tasks', 'type' => 'boolean',

@@ -273,6 +273,34 @@ grant (consent revoked, refresh token expired), the connection flips to
 
 ---
 
+## Dropbox connector (BCONFIG)
+
+Lets a user connect their Dropbox account as a file destination
+(`save_to_folder`, channel `dropbox`) from **Channels → Connections**. Same
+model as Microsoft 365: the Dropbox app is **operator-owned and install-wide**
+(`BOWNERID=0`), tokens live per user in the encrypted credential vault, and a
+rejected refresh flips the connection to `reauth_required`. Admins manage it
+in **Settings → Inbound Channels → Dropbox**; no restart is required.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `DROPBOX / ENABLED` | `false` | Offer Dropbox as a connection. The connect action stays hidden until app key **and** secret are also set. |
+| `DROPBOX / APP_KEY` | — | App key from the Dropbox App Console. |
+| `DROPBOX / APP_SECRET` | — | App secret, **stored AES-encrypted** (`APP_SECRET` derived) and masked in every API response. |
+| `DROPBOX / REDIRECT_URI` | `APP_URL` + `/api/v1/connections/dropbox/callback` | Override only when a proxy changes the public URL. Must match the App Console exactly. |
+
+**Dropbox app** — create a *Scoped access* / *Full Dropbox* app at
+[dropbox.com/developers/apps](https://www.dropbox.com/developers/apps), enable
+the permissions `account_info.read` and `files.content.write`, and register
+the redirect URI above. The consent flow requests
+`token_access_type=offline` — without it Dropbox issues no refresh token and
+every scheduled run stops working after four hours.
+
+The same steps are shown inside the admin UI above the fields, with the
+resolved redirect URI and the permission list as copyable values.
+
+---
+
 ## Async Media Jobs (BCONFIG)
 
 Media generation (image, video, audio) can run as **background jobs** instead of

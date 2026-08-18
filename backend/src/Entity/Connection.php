@@ -36,10 +36,13 @@ class Connection
      */
     public const TYPE_M365 = 'm365';
 
-    public const TYPES = ['generic', 'mailbox', 'mcp', 'webdav', 'webhook', 'caldav', self::TYPE_M365];
+    /** Dropbox folder (connector plan 07 C13). Same OAuth-only rule as M365. */
+    public const TYPE_DROPBOX = 'dropbox';
+
+    public const TYPES = ['generic', 'mailbox', 'mcp', 'webdav', 'webhook', 'caldav', self::TYPE_M365, self::TYPE_DROPBOX];
 
     /** Types whose credentials are issued by an OAuth consent flow. */
-    public const OAUTH_TYPES = [self::TYPE_M365];
+    public const OAUTH_TYPES = [self::TYPE_M365, self::TYPE_DROPBOX];
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

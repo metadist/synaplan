@@ -528,6 +528,19 @@
         "ready": "Listo: ya se puede conectar una cuenta de Microsoft 365 en Canales → Conexiones.",
         "notReady": "Todavía no está activo. Rellena los campos de abajo y activa M365_ENABLED.",
         "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente."
+      },
+      "dropbox": {
+        "title": "Antes de que estos campos funcionen: crea una aplicación en la Dropbox App Console",
+        "intro": "La conexión con Dropbox necesita una aplicación de Dropbox. Se hace una sola vez, tarda unos cinco minutos y después cada usuario puede conectar su propia cuenta.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "Abre la {console} y elige «Create app». Selecciona «Scoped access» y «Full Dropbox». El nombre da igual, por ejemplo «Synaplan».",
+        "step2": "En la pestaña «Permissions», activa estos dos permisos y haz clic en «Submit»:",
+        "step3": "En la pestaña «Settings», en «OAuth 2 → Redirect URIs», añade exactamente esta dirección:",
+        "step4": "También en la pestaña «Settings», copia el App key y el App secret (haz clic en «Show»).",
+        "step5": "Pega la clave y el secreto en los campos de abajo y activa DROPBOX_ENABLED. Después, los usuarios conectan su cuenta en Canales → Conexiones.",
+        "ready": "Listo: los usuarios pueden conectar su cuenta de Dropbox en Canales → Conexiones.",
+        "notReady": "Todavía no está activo. Rellena los campos de abajo y activa DROPBOX_ENABLED.",
+        "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente."
       }
     }
   },
@@ -2394,7 +2407,8 @@
         "webhook": "Dirección de aviso",
         "caldav": "Calendario",
         "generic": "Conexión",
-        "m365": "Microsoft 365"
+        "m365": "Microsoft 365",
+        "dropbox": "Dropbox"
       },
       "failure": {
         "unauthorized": "{connection} rechazó el inicio de sesión. Vuelve a conectarlo para continuar.",
@@ -2431,6 +2445,8 @@
           "name": "Microsoft 365",
           "description": "Inicia sesión con tu cuenta de Microsoft (de trabajo o personal) para que Synaplan pueda leer tu correo de Outlook. Solo lectura, y puedes desconectarla cuando quieras.",
           "connect": "Conectar Microsoft 365",
+          "connectAnother": "Conectar otra cuenta",
+          "connectedAs": "Conectado como {account}.",
           "connecting": "Abriendo Microsoft…",
           "connected": "Microsoft 365 está conectado.",
           "startFailed": "No se pudo abrir la página de inicio de sesión de Microsoft. Inténtalo de nuevo.",
@@ -2445,6 +2461,27 @@
             "unknown": "No se pudo conectar Microsoft 365. Inténtalo de nuevo."
           },
           "hosting": "Tu correo permanece en Microsoft, un proveedor de nube con sede en EE. UU."
+        },
+        "dropbox": {
+          "name": "Dropbox",
+          "description": "Inicia sesión con tu cuenta de Dropbox para que Synaplan pueda guardar los archivos generados en una carpeta de Dropbox; por ejemplo, «crea un documento y guárdalo en mi Dropbox». Puedes desconectarla cuando quieras.",
+          "connect": "Conectar Dropbox",
+          "connectAnother": "Conectar otra cuenta",
+          "connectedAs": "Conectado como {account}.",
+          "connecting": "Abriendo Dropbox…",
+          "connected": "Dropbox está conectado.",
+          "startFailed": "No se pudo abrir la página de inicio de sesión de Dropbox. Inténtalo de nuevo.",
+          "unavailable": "Aún no disponible: Dropbox debe configurarse una vez para esta instalación.",
+          "adminLink": "Configúralo en los ajustes del sistema.",
+          "askAdmin": "Pide a un administrador que lo active.",
+          "errors": {
+            "access_denied": "Cancelaste el inicio de sesión de Dropbox, así que no se conectó nada.",
+            "missing_code": "Dropbox envió una respuesta incompleta. Inicia la conexión de nuevo.",
+            "exchange_failed": "Dropbox aceptó el inicio de sesión pero no se pudo obtener el token. Comprueba el secreto de la aplicación en los ajustes del sistema e inténtalo de nuevo.",
+            "invalid_state": "El inicio de sesión tardó demasiado o se inició en otra pestaña. Inténtalo de nuevo.",
+            "unknown": "No se pudo conectar Dropbox. Inténtalo de nuevo."
+          },
+          "hosting": "Tus archivos permanecen en Dropbox, un proveedor de nube con sede en EE. UU."
         },
         "mailbox": {
           "name": "Buzón (IMAP)",

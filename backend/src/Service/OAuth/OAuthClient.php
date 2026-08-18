@@ -47,23 +47,23 @@ final readonly class OAuthClient
     }
 
     /**
-     * Consent URL the browser is sent to. `prompt=consent` is deliberate on the
-     * first grant: without it Microsoft may silently reuse an existing consent
-     * that lacks `offline_access`, leaving us with no refresh token.
+     * Consent URL the browser is sent to. Provider-specific requirements (e.g.
+     * Microsoft's `prompt=consent` to force a grant that includes
+     * `offline_access`, Dropbox's `token_access_type=offline` to be issued a
+     * refresh token at all) come in through the provider config's
+     * extraAuthorizeParams — the base params here are plain RFC 6749 + PKCE.
      */
     public function authorizationUrl(OAuthProviderConfig $provider, string $state, string $codeChallenge): string
     {
-        $query = [
+        $query = array_merge([
             'client_id' => $provider->clientId,
             'response_type' => 'code',
             'redirect_uri' => $provider->redirectUri,
-            'response_mode' => 'query',
             'scope' => $provider->scopeString(),
             'state' => $state,
             'code_challenge' => $codeChallenge,
             'code_challenge_method' => 'S256',
-            'prompt' => 'consent',
-        ];
+        ], $provider->extraAuthorizeParams);
 
         return $provider->authorizeUrl.'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
     }
