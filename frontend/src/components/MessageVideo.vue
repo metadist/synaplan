@@ -31,7 +31,7 @@
       <video
         ref="videoRef"
         :src="videoSrc"
-        :poster="poster"
+        :poster="posterSrc"
         class="w-full h-full bg-black"
         preload="metadata"
         data-testid="media-video-player"
@@ -126,6 +126,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { authenticatedMediaSrc } from '@/services/api/mediaAuth'
 
 interface Props {
   url: string
@@ -148,14 +149,19 @@ const retryDelays = [1000, 2000, 3000] // Increasing delays: 1s, 2s, 3s
 const isRetrying = ref(false)
 const cacheBuster = ref(0)
 
-// Add cache buster to URL on retries to bypass browser cache
+// Add cache buster to URL on retries to bypass browser cache.
+// authenticatedMediaSrc is a no-op on web; on native it appends the Bearer
+// token as `?token=` because the <video> element can't send auth headers.
 const videoSrc = computed(() => {
+  const src = authenticatedMediaSrc(props.url)
   if (cacheBuster.value === 0) {
-    return props.url
+    return src
   }
-  const separator = props.url.includes('?') ? '&' : '?'
-  return `${props.url}${separator}_retry=${cacheBuster.value}`
+  const separator = src.includes('?') ? '&' : '?'
+  return `${src}${separator}_retry=${cacheBuster.value}`
 })
+
+const posterSrc = computed(() => (props.poster ? authenticatedMediaSrc(props.poster) : undefined))
 
 const handleVideoError = () => {
   if (retryCount.value < maxRetries) {

@@ -363,6 +363,7 @@ import filesService, {
   UploadFailedError,
 } from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
+import { authenticatedMediaSrc } from '@/services/api/mediaAuth'
 import { useNotification } from '@/composables/useNotification'
 import FileContentModal from './FileContentModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
@@ -822,8 +823,11 @@ const isImageFile = (fileType: string): boolean => {
   return type.includes('image') || /jpg|jpeg|png|gif|webp/.test(type)
 }
 
+// Used for the bare <img> thumbnail: authenticatedMediaSrc is a no-op on web,
+// on native it appends the Bearer token as `?token=` because <img> can't send
+// auth headers (MOBILE-APP SEAM, see mediaAuth.ts).
 const getDownloadUrl = (fileId: number): string => {
-  return `${getApiBaseUrl()}/api/v1/files/${fileId}/download`
+  return authenticatedMediaSrc(`${getApiBaseUrl()}/api/v1/files/${fileId}/download`)
 }
 
 const getFileIcon = (fileType: string): string => {

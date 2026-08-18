@@ -115,6 +115,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useConfigStore } from '@/stores/config'
+import { fetchMediaBlob, needsAuthenticatedMediaFetch } from '@/services/api/mediaAuth'
+import { saveOrDownloadBlob } from '@/services/api/nativeDownload'
 
 interface Props {
   url: string
@@ -126,30 +128,26 @@ const config = useConfigStore()
 
 const isFullscreen = ref(false)
 const blobUrl = ref<string>('')
+const loadedBlob = ref<Blob | null>(null)
 
-// Load image with auth header
+// Load image with auth (web: session cookie, native: Bearer via fetchMediaBlob)
 const loadImage = async () => {
   try {
-    // External URLs (e.g. from OpenAI) don't need auth
-    if (props.url.startsWith('http://') || props.url.startsWith('https://')) {
+    // External URLs (e.g. from OpenAI) don't need auth. On native, absolute
+    // URLs pointing at our own backend are NOT external — they need the
+    // Bearer-authenticated fetch below (media URLs arrive absolute there).
+    if (
+      (props.url.startsWith('http://') || props.url.startsWith('https://')) &&
+      !needsAuthenticatedMediaFetch(props.url)
+    ) {
       blobUrl.value = props.url
       return
     }
 
-    // Internal API URLs need authentication via cookies
     const fullUrl = props.url.startsWith('/') ? `${config.appBaseUrl}${props.url}` : props.url
 
-    const response = await fetch(fullUrl, {
-      method: 'GET',
-      credentials: 'include',
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    // Convert response to blob
-    const blob = await response.blob()
+    const blob = await fetchMediaBlob(fullUrl)
+    loadedBlob.value = blob
     blobUrl.value = URL.createObjectURL(blob)
   } catch (error) {
     console.error('Failed to load image:', error)
@@ -164,38 +162,21 @@ const downloadFilename = (): string => {
   return name && name.includes('.') ? name : 'image.png'
 }
 
-// Internal images load as blob: URLs (authenticated via cookies), so native
-// "Save image as…" fails. Trigger a real download from the already-loaded blob;
-// for external/not-yet-loaded URLs, fetch a fresh blob so the download still
-// produces a valid file (issue #1071).
+// Download from the already-loaded blob when available; for external /
+// not-yet-loaded URLs, fetch a fresh blob so the download still produces a
+// valid file (issue #1071). Saving goes through saveOrDownloadBlob: web keeps
+// the anchor download, the native shell persists via Filesystem + Share
+// because an `<a download>` click is a silent no-op inside the WebView.
 const downloadImage = async () => {
-  let tempUrl: string | null = null
   try {
-    let href = blobUrl.value
-
-    if (!href || !href.startsWith('blob:')) {
+    let blob = loadedBlob.value
+    if (!blob) {
       const fullUrl = props.url.startsWith('/') ? `${config.appBaseUrl}${props.url}` : props.url
-      const response = await fetch(fullUrl, { method: 'GET', credentials: 'include' })
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-      const blob = await response.blob()
-      tempUrl = URL.createObjectURL(blob)
-      href = tempUrl
+      blob = await fetchMediaBlob(fullUrl)
     }
-
-    const link = document.createElement('a')
-    link.href = href
-    link.download = downloadFilename()
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    await saveOrDownloadBlob(blob, downloadFilename())
   } catch (error) {
     console.error('Failed to download image:', error)
-  } finally {
-    if (tempUrl) {
-      URL.revokeObjectURL(tempUrl)
-    }
   }
 }
 
@@ -233,6 +214,7 @@ watch(
     if (blobUrl.value && blobUrl.value.startsWith('blob:')) {
       URL.revokeObjectURL(blobUrl.value)
     }
+    loadedBlob.value = null
     loadImage()
   }
 )

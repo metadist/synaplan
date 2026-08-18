@@ -3,7 +3,7 @@
     <!-- Image: click → lightbox, hover → download -->
     <div v-if="kind === 'image'" class="relative inline-block group">
       <img
-        :src="url"
+        :src="mediaSrc"
         :alt="$t('taskPlan.kind.image')"
         class="rounded-lg max-h-72 w-auto cursor-zoom-in"
         data-testid="task-card-image"
@@ -23,11 +23,11 @@
 
     <!-- Video / audio players with a download affordance -->
     <template v-else-if="kind === 'video'">
-      <video :src="url" controls class="rounded-lg max-h-72 w-auto" />
+      <video :src="mediaSrc" controls class="rounded-lg max-h-72 w-auto" />
       <DownloadLink @download="download" />
     </template>
     <template v-else-if="kind === 'audio'">
-      <audio :src="url" controls class="w-full" />
+      <audio :src="mediaSrc" controls class="w-full" />
       <DownloadLink @download="download" />
     </template>
 
@@ -69,7 +69,7 @@
           <Icon icon="mdi:close" class="w-7 h-7" />
         </button>
         <img
-          :src="url"
+          :src="mediaSrc"
           :alt="$t('taskPlan.kind.image')"
           class="max-w-full max-h-full object-contain z-10"
           @click.stop
@@ -80,9 +80,10 @@
 </template>
 
 <script setup lang="ts">
-import { defineComponent, h, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineComponent, h, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { authenticatedMediaSrc, downloadMediaUrl } from '@/services/api/mediaAuth'
 
 /**
  * Media body of a completed task card (#1229): image with lightbox +
@@ -98,6 +99,10 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const lightboxOpen = ref(false)
+
+// No-op on web; on native it appends the Bearer token as `?token=` because
+// media elements can't send auth headers (MOBILE-APP SEAM, see mediaAuth.ts).
+const mediaSrc = computed(() => authenticatedMediaSrc(props.url))
 
 // Small inline helper so video/audio share one download affordance without a
 // third component file.
@@ -127,23 +132,13 @@ const downloadFilename = (): string => {
 
 // Authenticated blob download (the MessageImage pattern, issue #1071): a bare
 // anchor to an API URL would save an HTML error page for cookie-authed media.
+// downloadMediaUrl authenticates per platform (cookie / Bearer) and saves via
+// anchor on web or Filesystem + Share in the native shell.
 const download = async () => {
-  let tempUrl: string | null = null
   try {
-    const response = await fetch(props.url, { method: 'GET', credentials: 'include' })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    tempUrl = URL.createObjectURL(await response.blob())
-
-    const link = document.createElement('a')
-    link.href = tempUrl
-    link.download = downloadFilename()
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    await downloadMediaUrl(props.url, downloadFilename())
   } catch (error) {
     console.error('Failed to download task media:', error)
-  } finally {
-    if (tempUrl) URL.revokeObjectURL(tempUrl)
   }
 }
 
