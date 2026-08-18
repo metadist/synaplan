@@ -64,6 +64,88 @@ final class GraphClientTest extends TestCase
         self::assertStringNotContainsString('body,', $query['$select'], 'bodies are not pulled during a poll');
     }
 
+    public function testSearchMessagesBuildsKqlAndSortsNewestFirst(): void
+    {
+        $captured = [];
+        $client = $this->client([
+            new MockResponse(json_encode(['value' => [
+                [
+                    'id' => 'old',
+                    'subject' => 'FPSenergy draft',
+                    'from' => ['emailAddress' => ['address' => 'oliver@fps.test']],
+                    'receivedDateTime' => '2026-08-01T09:00:00Z',
+                    'bodyPreview' => 'first draft',
+                ],
+                [
+                    'id' => 'new',
+                    'subject' => 'FPSenergy final',
+                    'from' => ['emailAddress' => ['address' => 'oliver@fps.test']],
+                    'receivedDateTime' => '2026-08-15T09:00:00Z',
+                    'bodyPreview' => 'final version',
+                ],
+            ]]), ['http_code' => 200]),
+        ], $captured);
+
+        $messages = $client->searchMessages($this->connection(), 'FPSenergy', 'Oliver Braun', '2026-01-01', 5);
+
+        // $search is relevance-ranked — the client must re-sort by date.
+        self::assertSame(['new', 'old'], array_column($messages, 'id'));
+
+        $query = $captured[0]['options']['query'];
+        // One quoted KQL string: terms + escaped multi-word from: + since.
+        self::assertSame('"FPSenergy from:\"Oliver Braun\" received>=2026-01-01"', $query['$search']);
+        self::assertArrayNotHasKey('$orderby', $query, '$orderby cannot be combined with $search');
+        self::assertStringNotContainsString('body,', $query['$select'], 'search never pulls bodies');
+    }
+
+    public function testSearchMessagesSingleWordFromIsNotQuoted(): void
+    {
+        $captured = [];
+        $client = $this->client([new MockResponse(json_encode(['value' => []]), ['http_code' => 200])], $captured);
+
+        $client->searchMessages($this->connection(), 'report', 'oliver@fps.test');
+
+        self::assertSame('"report from:oliver@fps.test"', $captured[0]['options']['query']['$search']);
+    }
+
+    public function testMessageBodyConvertsHtmlToReadableText(): void
+    {
+        $captured = [];
+        $client = $this->client([
+            new MockResponse(json_encode([
+                'subject' => 'FPSenergy final',
+                'from' => ['emailAddress' => ['address' => 'oliver@fps.test']],
+                'receivedDateTime' => '2026-08-15T09:00:00Z',
+                'body' => [
+                    'contentType' => 'html',
+                    'content' => '<html><style>p{color:red}</style><body><p>Hello&nbsp;team,</p><p>the numbers are <b>up</b>.</p></body></html>',
+                ],
+            ]), ['http_code' => 200]),
+        ], $captured);
+
+        $message = $client->messageBody($this->connection(), 'msg-1');
+
+        self::assertSame('oliver@fps.test', $message['from']);
+        self::assertStringContainsString('Hello team,', $message['body']);
+        self::assertStringContainsString('the numbers are up.', $message['body']);
+        self::assertStringNotContainsString('<p>', $message['body']);
+        self::assertStringNotContainsString('color:red', $message['body'], 'style blocks must not leak into the text');
+        self::assertStringContainsString('/me/messages/msg-1', $captured[0]['url']);
+    }
+
+    public function testMessageBodyKeepsPlainTextVerbatim(): void
+    {
+        $client = $this->client([
+            new MockResponse(json_encode([
+                'subject' => 's',
+                'receivedDateTime' => '2026-08-15T09:00:00Z',
+                'body' => ['contentType' => 'text', 'content' => "Line one\nLine two"],
+            ]), ['http_code' => 200]),
+        ]);
+
+        self::assertSame("Line one\nLine two", $client->messageBody($this->connection(), 'msg-2')['body']);
+    }
+
     public function testMessageLimitIsClamped(): void
     {
         $captured = [];

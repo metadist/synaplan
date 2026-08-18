@@ -1,6 +1,6 @@
 # Phase M — Chat actions: M365 mail search, Outlook calendar write, multi-destination documents
 
-**Status:** Planned 2026-08-18 (product decision recorded, no code yet). **Branch:** `feat/m365-flow`.
+**Status:** In progress 2026-08-18 — M1, M0, M3a–M3d implemented (full backend gate green); next up M2 (scope tiers), then M4/M5 (Graph calendar). **Branch:** `feat/m365-flow`.
 **Depends on:** everything merged via PR #1497 (foundations F1/F2/F3/F4/F5, Saved Tasks E1–E19, M365 mail-read connection, `GraphClient`) and PR #1502 (WebDAV/CalDAV delivery, `save_to_folder`, planner channels).
 **Gates:** [`07_connectors.md` §7](./07_connectors.md#7-sign-off-gate-tick-before-any-connector-code) per-connector readiness rows for C3 (remainder), C4, C5/OneDrive, C11. S6 (mutating external actions) was decided 2026-08-18 with this phase; S5 (live test accounts, named owners) is **still open and blocks the live-verification steps**.
 
@@ -49,10 +49,10 @@ Each utterance is an acceptance test, an E2E test, and a documentation example. 
 | ----- | ----- |
 | `email_search` over IMAP (`ImapMailboxSearcher`, read-only) | ✅ Shipped (flag `MULTITASK.EMAIL_SEARCH_ENABLED`, default **off**) |
 | `MailboxSearcher` interface | ✅ Exists — the seam for the Graph implementation |
-| Graph mail search (`GET /me/messages` with `$search`/`$filter`) | ❌ Step **M3a** |
-| Graph message **body** fetch (search returns previews only; summarize needs the body) | ❌ Step **M3b** |
-| `EmailSearchRunner` iterates M365 connections alongside IMAP handlers; availability note lists both | ❌ Step **M3c** |
-| Flag default: seed `EMAIL_SEARCH_ENABLED = 1` (insert-if-missing, operator `0` survives) | ❌ Step **M3d** — without this the story is dead on arrival on every install |
+| Graph mail search (`GET /me/messages` with `$search`/`$filter`) | ✅ Step **M3a** (2026-08-18: `GraphClient::searchMessages` + `GraphMailboxSearcher`) |
+| Graph message **body** fetch (search returns previews only; summarize needs the body) | ✅ Step **M3b** (2026-08-18: top-hit only, HTML→text, 2000-char cap) |
+| `EmailSearchRunner` iterates M365 connections alongside IMAP handlers; availability note lists both | ✅ Step **M3c** (2026-08-18) |
+| Flag default: seed `EMAIL_SEARCH_ENABLED = 1` (insert-if-missing, operator `0` survives) | ✅ Step **M3d** (2026-08-18) |
 
 ### U4 — Generate a document and push it to a named target
 
@@ -65,7 +65,7 @@ Each utterance is an acceptance test, an E2E test, and a documentation example. 
 | "Nextcloud" | `save_to_folder` → WebDAV provider (`nextcloud` channel) | ✅ Shipped |
 | "openCloud" | OpenCloud write — mechanism decided by the **C11 spike** (WebDAV app token / CS3 upload / token exchange) | ❌ Step **M8** (spike first, then adapter) |
 | "Outlook" | See decision **D1** below | ❌ Step **M7** |
-| "solid TOC" | DOCX generation keeps headings but emits **no TOC field** today | ❌ Step **M0** |
+| "solid TOC" | DOCX generation renders a real, updatable Word TOC via the `{{TOC}}` content directive | ✅ Step **M0** (2026-08-18) |
 
 **Decision D1 — what does "put a document into Outlook" mean?** Outlook is a mailbox, not a file store. Two honest interpretations:
 
@@ -125,13 +125,13 @@ Follows the step-size rules of [`09_work_breakdown.md` §1](./09_work_breakdown.
 
 | # | Step | Maps to | Size | Depends on | Acceptance (3 bullets max) |
 | - | ---- | ------- | ---- | ---------- | -------------------------- |
-| **M1** | Lock U2 + current U1/U3/U4 fallback behavior in characterization + E2E | — | S | — | The four utterances have recorded plans; `.ics`+`email_me` path green; snapshots reviewed |
-| **M0** | DOCX table of contents in `DocumentGeneratorService` | K2 | S | — | `toc` param renders a real TOC field; OOXML unit-asserted; planner prompt mentions the param |
+| **M1** ✅ 2026-08-18 | Lock U2 + current U1/U3/U4 fallback behavior in characterization + E2E | — | S | — | The four utterances have recorded plans (routing corpus + `UtterancePlanCharacterizationTest` with `utterance_plans.json` baseline); `.ics`+`email_me` path locked end-to-end in `CalendarEmailChainTest` (real ICS through the shared NodeContext); snapshots reviewed (additive only). Playwright E2E deferred: the planner is a live model, so the deterministic locks are characterization-level. |
+| **M0** ✅ 2026-08-18 | DOCX table of contents in `DocumentGeneratorService` | K2 | S | — | Implemented as a `{{TOC}}` content directive (same pattern as `{{PPTX:…}}`, no signature threading through 3 `write()` call sites): DOCX renders a real `TOC \o 1-3 \h \z \u` field + headings as Title elements with built-in Heading styles; OOXML unit-asserted; officemaker prompt documents the directive; planner descriptor mentions TOC (snapshot re-recorded). Marker stripped in every non-DOCX format and both fallback paths; a marker without headings is dropped (an empty TOC field would be malformed). |
 | **M2** | Scope tiers + incremental consent + "Upgrade access" UX | F3 ext. | M | — | Default install unchanged; enabling the calendar tier re-consents cleanly; missing scope → readable state, never a Graph 403 in the user's face |
-| **M3a** | `GraphMailboxSearcher` (search, newest-first, caps, 429 discipline) | K3c | M | — | Fake-Graph unit tests; same result shape as IMAP searcher |
-| **M3b** | Graph message body fetch for summarize | K3c | S | M3a | Top-hit body retrieved on demand; bodies never bulk-fetched |
-| **M3c** | `EmailSearchRunner` merges IMAP + M365 sources | K3c | M | M3a | U3 works with either or both sources; availability note lists both; per-source failure degrades that source only |
-| **M3d** | Seed `MULTITASK.EMAIL_SEARCH_ENABLED = 1` (insert-if-missing) | — | S | M3c | New installs get mail search on; explicit operator `0` survives deploys; docs updated |
+| **M3a** ✅ 2026-08-18 | `GraphMailboxSearcher` (search, newest-first, caps, 429 discipline) | K3c | M | — | `GraphClient::searchMessages` (KQL `$search`: terms + `from:` + `received>=`, client-side newest-first re-sort since `$orderby` can't combine with `$search`); `GraphMailboxSearcher` returns the exact IMAP hit shape; MockHttpClient unit tests; 429/401 discipline inherited from `GraphClient::get()` |
+| **M3b** ✅ 2026-08-18 | Graph message body fetch for summarize | K3c | S | M3a | `GraphClient::messageBody` (HTML→text); full body fetched for the TOP hit only, capped at the IMAP 2000-char snippet budget; failed body fetch degrades to the preview |
+| **M3c** ✅ 2026-08-18 | `EmailSearchRunner` merges IMAP + M365 sources | K3c | M | M3a | U3 works with either or both sources (unit-tested); availability note lists both; per-source failure degrades that source only; disconnected/reauth-required connections are never searched |
+| **M3d** ✅ 2026-08-18 | Seed `MULTITASK.EMAIL_SEARCH_ENABLED = 1` (insert-if-missing) | — | S | M3c | `MultitaskConfigSeeder` row added; explicit operator `0` survives deploys; `docs/CONFIGURATION.md`, `docs/CONNECTIONS.md`, `docs/MULTITASK_DATA_NODES.md` updated |
 | **M4** | Graph calendar **read** + shared dedup (`Calendars.Read`) | K4a | M | M2 | Time-window query finds our UID; duplicate check shares one implementation with CalDAV (two backends, one contract) |
 | **M5** | Graph calendar **write** (mutating, confirm + `allow_unattended` + audit) | K4b | M | M4, S6 ✅ | U1 creates a real event with `webLink` in the reply; re-run creates nothing; unattended path tested without session |
 | **M6** | Planner channel: m365-with-calendar-tier → `outlook` calendar channel | — | S | M4 | "into my Outlook" plans `calendar_event` + delivery to that channel; D2 naming decided in this PR |

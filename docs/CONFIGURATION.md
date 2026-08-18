@@ -213,10 +213,16 @@ group in the `BCONFIG` table.
 | `MULTITASK / PARALLEL_ENABLED` | `false` | Execute independent media nodes concurrently (subprocess offload) |
 | `MULTITASK / MAX_PARALLEL` | `3` | Concurrency cap for parallel media nodes |
 | `MULTITASK / NODE_TIMEOUT` | `120` | Per-node subprocess timeout (seconds) |
+| `MULTITASK / EMAIL_SEARCH_ENABLED` | `true` (seeded)² | `email_search` DAG node: live read-only search over the user's IMAP accounts and Microsoft 365 connections |
 | `CLASSIFIER / FAST_PATH_ENABLED` | `false` | Skip the AI sorter for trivial chat messages (heuristic) |
 
 ¹ Existing installations are grandfathered to `0` by migration so behavior
 doesn't change on upgrade — enable it per user or globally when ready.
+
+² Seeded `1` insert-if-missing by `MultitaskConfigSeeder` (runs in `app:seed`
+on container start); an operator's explicit `0` row survives every deploy.
+The built-in code default stays `false` when no row exists. The capability is
+only offered to the planner when the user has a connected mail source.
 
 ## Saved Tasks (BCONFIG)
 

@@ -79,6 +79,17 @@ See the in-app setup guide under *Admin → Configuration → Channels → Micro
 365*. Content read through this connection comes from a US-hosted cloud —
 the connection UI labels it accordingly.
 
+**What a connected account unlocks in chat:**
+
+- **Mail search** (`email_search`): "What is the latest mail of X regarding
+  Y, summarize that for me" searches the connected mailbox live via Microsoft
+  Graph (delegated `Mail.Read`, read-only). Search results carry short
+  previews; only the newest matching mail's full body is fetched so a
+  summarize step has real content. Nothing is stored on the server — mail
+  content exists only inside that one answer. IMAP accounts (Channels →
+  Email Automation) are searched the same way; a user can have both, and the
+  results are merged newest-first.
+
 ## Status of a connection
 
 | Status | Meaning |
