@@ -39,6 +39,12 @@ final readonly class MultitaskConfigSeeder
             // single-step turns. ON so the latency win is the default;
             // the row exists so it can be flipped without a deploy.
             ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_PLAN_ONLY_MULTI_STEP, 'value' => '1'],
+            // email_search rollout (Phase M step M3d): ON so "what did X mail
+            // me about…" works out of the box — the capability is still
+            // invisible to the planner until the user actually connects a
+            // mailbox or Microsoft 365 account (dynamic availability note).
+            // Insert-if-missing: an operator's explicit OFF row survives.
+            ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_EMAIL_SEARCH_ENABLED, 'value' => '1'],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'multitask_config', $rows);

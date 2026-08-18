@@ -10,6 +10,8 @@ const {
   mockRemove,
   mockStatus,
   mockAuthorizeUrl,
+  mockDropboxStatus,
+  mockDropboxAuthorizeUrl,
   mockSuccess,
   mockError,
   mockConfirm,
@@ -23,6 +25,8 @@ const {
   mockRemove: vi.fn(),
   mockStatus: vi.fn(),
   mockAuthorizeUrl: vi.fn(),
+  mockDropboxStatus: vi.fn(),
+  mockDropboxAuthorizeUrl: vi.fn(),
   mockSuccess: vi.fn(),
   mockError: vi.fn(),
   mockConfirm: vi.fn(),
@@ -41,6 +45,10 @@ vi.mock('@/composables/useDialog', () => ({
 
 vi.mock('@/services/api/m365Api', () => ({
   m365Api: { status: mockStatus, authorizeUrl: mockAuthorizeUrl },
+}))
+
+vi.mock('@/services/api/dropboxApi', () => ({
+  dropboxApi: { status: mockDropboxStatus, authorizeUrl: mockDropboxAuthorizeUrl },
 }))
 
 vi.mock('@/composables/useNotification', () => ({
@@ -92,6 +100,7 @@ describe('ConnectionsConfiguration', () => {
     vi.clearAllMocks()
     mockList.mockResolvedValue([])
     mockStatus.mockResolvedValue({ available: false, redirectUri: '' })
+    mockDropboxStatus.mockResolvedValue({ available: false, redirectUri: '' })
     isAdmin.value = false
     route.query = {}
     Object.defineProperty(window, 'location', { value: { href: '' }, writable: true })
@@ -239,6 +248,54 @@ describe('ConnectionsConfiguration', () => {
     await mountPage()
 
     expect(mockError).toHaveBeenCalledWith(expect.stringContaining('cancelled'))
+    expect(mockReplace).toHaveBeenCalledWith({ query: {} })
+  })
+
+  it('explains why Dropbox cannot be connected yet, and points admins at the setting', async () => {
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="btn-connect-dropbox"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="provider-dropbox"]').text()).toContain('Not available yet')
+
+    isAdmin.value = true
+    const adminWrapper = await mountPage()
+    const card = adminWrapper.get('[data-testid="provider-dropbox"]')
+    expect(JSON.parse(card.get('a').attributes('data-to') ?? '{}')).toEqual({
+      path: '/admin/config',
+      query: { tab: 'channels', section: 'dropbox' },
+    })
+  })
+
+  it('sends the user to Dropbox when the connector is configured', async () => {
+    mockDropboxStatus.mockResolvedValue({ available: true, redirectUri: 'https://app/callback' })
+    mockDropboxAuthorizeUrl.mockResolvedValue('https://www.dropbox.com/oauth2/authorize')
+
+    const wrapper = await mountPage()
+    await wrapper.get('[data-testid="btn-connect-dropbox"]').trigger('click')
+    await flushPromises()
+
+    expect(window.location.href).toBe('https://www.dropbox.com/oauth2/authorize')
+  })
+
+  it('shows the connected Dropbox account on the provider card', async () => {
+    mockDropboxStatus.mockResolvedValue({ available: true, redirectUri: 'https://app/callback' })
+    mockList.mockResolvedValue([
+      connection({ id: '9', type: 'dropbox', name: 'ada@example.com', status: 'connected' }),
+    ])
+
+    const wrapper = await mountPage()
+    expect(wrapper.get('[data-testid="dropbox-connected-hint"]').text()).toContain(
+      'ada@example.com'
+    )
+    expect(wrapper.get('[data-testid="btn-connect-dropbox"]').text()).toContain(
+      'Connect another account'
+    )
+  })
+
+  it('turns the Dropbox callback result into a message and clears it from the URL', async () => {
+    route.query = { dropbox: 'connected' }
+    await mountPage()
+
+    expect(mockSuccess).toHaveBeenCalledWith(expect.stringContaining('Dropbox is connected'))
     expect(mockReplace).toHaveBeenCalledWith({ query: {} })
   })
 })

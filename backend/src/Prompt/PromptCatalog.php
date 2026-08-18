@@ -1248,6 +1248,13 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
    - Existing `{{IMAGE:file:123}}` markers represent images already embedded in
      the current document. Keep each marker unchanged unless the user explicitly
      asks to remove or replace that image.
+   - When the user asks for a table of contents (TOC, "Inhaltsverzeichnis",
+     "índice", "içindekiler"), put the directive `{{TOC}}` on its own line at
+     the exact position where the table of contents belongs — usually right
+     after the document title. The server renders a real, updatable Word table
+     of contents there from the document's headings. Do NOT additionally write
+     the chapter list as plain text; structure the document with `#`/`##`/`###`
+     headings instead so the TOC has entries.
 
 3. **PowerPoint** (.pptx):
    - Provide BFILETEXT as Markdown. Every `#` or `##` heading starts a NEW

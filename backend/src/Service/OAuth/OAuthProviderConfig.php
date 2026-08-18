@@ -14,7 +14,11 @@ namespace App\Service\OAuth;
 final readonly class OAuthProviderConfig
 {
     /**
-     * @param list<string> $scopes
+     * @param list<string>          $scopes
+     * @param array<string, string> $extraAuthorizeParams provider-specific query
+     *                                                    params for the consent URL (Microsoft: `prompt=consent`,
+     *                                                    Dropbox: `token_access_type=offline`); never sent to the
+     *                                                    token endpoint
      */
     public function __construct(
         public string $provider,
@@ -24,6 +28,7 @@ final readonly class OAuthProviderConfig
         public string $clientSecret,
         public string $redirectUri,
         public array $scopes,
+        public array $extraAuthorizeParams = [],
     ) {
     }
 

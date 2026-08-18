@@ -23,6 +23,9 @@ const LOANWORD_OPT_OUT = new Set<string>([
   'config.connections.types.m365',
   // Product names: "Nextcloud / ownCloud" is the same brand pair everywhere.
   'config.connections.providers.dav.kind.nextcloud',
+  // "Dropbox" is the same brand name in all four markets.
+  'config.connections.providers.dropbox.name',
+  'config.connections.types.dropbox',
 ])
 
 const BANNED_JARGON = [

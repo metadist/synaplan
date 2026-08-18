@@ -205,7 +205,16 @@ Three candidate mechanisms, to be decided by the spike:
 - **OpenCloud caveat:** OCIS has no CalDAV server to our knowledge. Verify during the C11 spike; if confirmed, the UI simply never offers a calendar for OpenCloud connections — do not fake it.
 - **Test plan:** unit against a fake CalDAV client (query/put/each error); fixture round-trip (create → query finds it → re-run skips); **manual against a live Nextcloud calendar**; negative: deleted calendar, revoked app password, duplicate UID.
 
-### 4.7 C13 — Dropbox folder (OAuth family, not WebDAV)
+### 4.7 C13 — Dropbox folder (OAuth family, not WebDAV) — ✅ shipped 2026-08-18
+
+Implemented on `feat/m365-flow` exactly as scoped below: `DropboxOAuthConfig`
+(BCONFIG group `DROPBOX`) on the shared F3 OAuth framework,
+`DropboxConnectionController` (status/start/callback), `DropboxClient`
+(`/2/files/upload` with `autorename`, 401-refresh-once, bounded 429 retries),
+`DropboxDestinationProvider` (id `dropbox`), connection type `dropbox` in
+`OAUTH_TYPES`, planner channel `dropbox` (kind folder), US-cloud label in the
+connection card (S7/S15), admin setup guide, four locales. Remaining manual
+step: live-account test + Dropbox production approval for the Cloud app.
 
 - **Direction:** OUT. One more `DestinationProvider`; no bespoke UI.
 - **Auth:** OAuth2 authorization code + PKCE against Dropbox; scoped app (`files.content.write`), refresh token in the F2 vault. **Dropbox has no WebDAV endpoint — do not try to route it through C10.**
@@ -296,9 +305,9 @@ Product and engineering both sign. An unticked row blocks its connector, not the
 | S1 | Build the **five foundations (F1–F5) before any Tier-1 connector**; no connector ships its own credential store, status widget or delivery endpoint. **Sequencing is foundations-first, not parallel** — the engine waits rather than building against a seam that does not exist yet | **Decided 2026-08-15: foundations first** | ✅ |
 | S2 | **Generic WebDAV (C10) is the first connector**; Nextcloud ships as a preset of it, not as a bespoke integration | **Decided 2026-08-16: implemented that way** — `WebDavClient` + `webdav`/`caldav` destination providers; the connection UI offers Nextcloud as a preset (`DavConnectionForm.vue`). Live-instance verification (S5) still pending | ✅ |
 | S3 | **Microsoft 365 requires F3 plus an Azure app registration.** | **Decided 2026-08-15: Synaplan Cloud runs a multi-tenant app; self-hosters register their own.** Two consequences to honour: (a) the self-host registration path is **documented and supported**, never a second-class fallback — O365 must work on a self-hosted install; (b) the multi-tenant app needs a named owner for the admin-consent conversation and for credential rotation, recorded in the F3 PR | ✅ |
-| S4 | **Graph API for M365 mail**, not IMAP-XOAUTH2 | Agree | ☐ |
+| S4 | **Graph API for M365 mail**, not IMAP-XOAUTH2 | **Decided by implementation 2026-08-16:** `GraphClient` ships Graph (`Mail.Read`); no `imap_open` in the M365 path | ✅ |
 | S5 | **Test accounts exist before the build starts**: live Nextcloud, live OpenCloud/OCIS, an M365 test tenant, a Jira/Confluence instance — named owner per system. **A connector without a test account is not scheduled** | Agree | ☐ |
-| S6 | **Mutating external actions** (Jira create, Graph calendar write, MCP write) require: authored-graph only (the planner never emits them), confirmation on interactive runs, `allow_unattended` for scheduled runs, and a per-call audit record | Agree | ☐ |
+| S6 | **Mutating external actions** (Jira create, Graph calendar write, MCP write) require: confirmation on interactive runs, `allow_unattended` for scheduled runs, and a per-call audit record | **Decided 2026-08-18 with the Phase M scope** ([`10_m365_actions_and_destinations.md`](./10_m365_actions_and_destinations.md)) — Graph calendar write is the first mutating action; one confirm pattern shared with CalDAV delivery and every future write. Amendment: the planner *may* propose a mutating delivery when the user's utterance asks for it ("put it into my Outlook"); the confirmation gate, not planner invisibility, is the safety boundary for calendar writes. Jira/MCP writes stay authored-graph-only | ✅ |
 | S7 | **Sovereignty labelling**: connectors that send content to US-hosted clouds (M365, Google, Atlassian Cloud) are documented as such and visibly labelled in the connection UI — required for the public-sector positioning of `synaplan.eu` | Agree | ☐ |
 | S8 | **Jira/Confluence go through MCP first.** Native clients only after MCP is shown insufficient, with the reason recorded here | Agree | ☐ |
 | S9 | **Google Workspace (C6) is deferred** until a customer requires it | Agree | ☐ |

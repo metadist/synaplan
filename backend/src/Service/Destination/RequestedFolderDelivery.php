@@ -11,13 +11,21 @@ use App\Service\Connection\PlannerChannelCatalog;
 use Psr\Log\LoggerInterface;
 
 /**
- * Puts generated files into a user's connected WebDAV/Nextcloud folder.
+ * Puts generated files into a user's connected folder — WebDAV/Nextcloud or
+ * Dropbox, whichever the resolved connection is.
  *
  * Used by the `save_to_folder` multitask runner and as a chat fallback when
  * the user asked to file the result but the planner did not emit that node.
  */
 final readonly class RequestedFolderDelivery
 {
+    /**
+     * Connection types that count as a folder target. The type doubles as the
+     * {@see DestinationProvider} id, so adding a type here requires a provider
+     * with the same id.
+     */
+    private const FOLDER_TYPES = ['webdav', Connection::TYPE_DROPBOX];
+
     public function __construct(
         private ConnectionRepository $connections,
         private DestinationRegistry $destinations,
@@ -37,6 +45,7 @@ final readonly class RequestedFolderDelivery
             || str_contains($haystack, 'owncloud')
             || str_contains($haystack, 'webdav')
             || str_contains($haystack, 'opencloud')
+            || str_contains($haystack, 'dropbox')
             || (bool) preg_match('/\b(folder|ordner|carpeta|klasör)\b/u', $haystack);
 
         if (!$mentionsFolder) {
@@ -54,7 +63,7 @@ final readonly class RequestedFolderDelivery
      */
     public function hasFolderChannel(int $ownerId): bool
     {
-        return [] !== $this->webDavConnections($ownerId);
+        return [] !== $this->folderConnections($ownerId);
     }
 
     /**
@@ -96,7 +105,9 @@ final readonly class RequestedFolderDelivery
             ];
         }
 
-        $provider = $this->destinations->get('webdav');
+        // The connection type doubles as the destination provider id
+        // (webdav → WebDavDestinationProvider, dropbox → DropboxDestinationProvider).
+        $provider = $this->destinations->get($connection->getType());
         $sent = 0;
         $lastReference = null;
         $lastError = null;
@@ -160,11 +171,11 @@ final readonly class RequestedFolderDelivery
     /**
      * @return list<Connection>
      */
-    public function webDavConnections(int $ownerId): array
+    public function folderConnections(int $ownerId): array
     {
         $out = [];
         foreach ($this->connections->findByOwner($ownerId) as $connection) {
-            if ('webdav' === $connection->getType()) {
+            if (in_array($connection->getType(), self::FOLDER_TYPES, true)) {
                 $out[] = $connection;
             }
         }
@@ -174,7 +185,7 @@ final readonly class RequestedFolderDelivery
 
     private function resolveConnection(int $ownerId, string|int|null $channel): ?Connection
     {
-        $folders = $this->webDavConnections($ownerId);
+        $folders = $this->folderConnections($ownerId);
         if ([] === $folders) {
             return null;
         }

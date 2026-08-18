@@ -33,6 +33,27 @@ final class OAuthClientTest extends TestCase
         self::assertStringNotContainsString($verifier, $url, 'the verifier must never leave the server');
     }
 
+    public function testAuthorizationUrlCarriesProviderSpecificExtras(): void
+    {
+        $client = $this->client([]);
+        $dropbox = new OAuthProviderConfig(
+            provider: 'dropbox',
+            authorizeUrl: 'https://www.dropbox.com/oauth2/authorize',
+            tokenUrl: 'https://api.dropboxapi.com/oauth2/token',
+            clientId: 'app-key',
+            clientSecret: 'app-secret',
+            redirectUri: 'https://app.example/callback',
+            scopes: ['files.content.write'],
+            extraAuthorizeParams: ['token_access_type' => 'offline'],
+        );
+
+        $url = $client->authorizationUrl($dropbox, 'signed-state', 'challenge');
+
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        self::assertSame('offline', $query['token_access_type'], 'without it Dropbox issues no refresh token');
+        self::assertArrayNotHasKey('prompt', $query, 'Microsoft-only params must not leak to other providers');
+    }
+
     public function testCodeChallengeIsUrlSafeBase64OfSha256(): void
     {
         $client = $this->client([]);

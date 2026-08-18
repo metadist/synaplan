@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
+import DropboxSetupGuide from '@/components/admin/DropboxSetupGuide.vue'
 import M365SetupGuide from '@/components/admin/M365SetupGuide.vue'
 import UpdatePanel from '@/components/admin/UpdatePanel.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -610,6 +611,7 @@ onBeforeUnmount(() => {
                 {{ $t('admin.config.liveHint') }}
               </p>
               <M365SetupGuide v-if="section.id === 'm365'" />
+              <DropboxSetupGuide v-if="section.id === 'dropbox'" />
               <div class="space-y-4">
                 <ConfigField
                   v-for="field in section.fields"

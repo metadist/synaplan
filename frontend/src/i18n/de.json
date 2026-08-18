@@ -534,6 +534,19 @@
         "ready": "Fertig eingerichtet – Nutzer können ihr Microsoft-365-Konto unter Kanäle → Verbindungen verbinden.",
         "notReady": "Noch nicht aktiv. Fülle die Felder unten aus und schalte M365_ENABLED ein.",
         "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell."
+      },
+      "dropbox": {
+        "title": "Bevor diese Felder funktionieren: eine App in der Dropbox App Console anlegen",
+        "intro": "Die Dropbox-Verbindung braucht eine Dropbox-App. Das machst du einmal, es dauert etwa fünf Minuten, und danach kann jeder Nutzer sein eigenes Konto verbinden.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "Öffne die {console} und wähle „Create app“. Wähle „Scoped access“ und „Full Dropbox“. Der Name ist egal, zum Beispiel „Synaplan“.",
+        "step2": "Aktiviere im Tab „Permissions“ diese beiden Berechtigungen und klicke auf „Submit“:",
+        "step3": "Füge im Tab „Settings“ unter „OAuth 2 → Redirect URIs“ genau diese Adresse hinzu:",
+        "step4": "Kopiere ebenfalls im Tab „Settings“ den App key und das App secret (auf „Show“ klicken).",
+        "step5": "Trage App key und Secret in die Felder unten ein und schalte DROPBOX_ENABLED ein. Nutzer verbinden ihr Konto dann unter Kanäle → Verbindungen.",
+        "ready": "Fertig eingerichtet – Nutzer können ihr Dropbox-Konto unter Kanäle → Verbindungen verbinden.",
+        "notReady": "Noch nicht aktiv. Fülle die Felder unten aus und schalte DROPBOX_ENABLED ein.",
+        "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell."
       }
     }
   },
@@ -1857,7 +1870,8 @@
         "webhook": "Aufruf-Adresse",
         "caldav": "Kalender",
         "generic": "Verbindung",
-        "m365": "Microsoft 365"
+        "m365": "Microsoft 365",
+        "dropbox": "Dropbox"
       },
       "failure": {
         "unauthorized": "{connection} hat die Anmeldung abgelehnt. Verbinde es erneut, um fortzufahren.",
@@ -1894,6 +1908,8 @@
           "name": "Microsoft 365",
           "description": "Melde dich mit deinem geschäftlichen oder privaten Microsoft-Konto an, damit Synaplan deine Outlook-Mails lesen kann. Nur lesend, und du kannst die Verbindung jederzeit trennen.",
           "connect": "Microsoft 365 verbinden",
+          "connectAnother": "Weiteres Konto verbinden",
+          "connectedAs": "Verbunden als {account}.",
           "connecting": "Microsoft wird geöffnet…",
           "connected": "Microsoft 365 ist verbunden.",
           "startFailed": "Die Microsoft-Anmeldeseite konnte nicht geöffnet werden. Bitte versuche es erneut.",
@@ -1908,6 +1924,27 @@
             "unknown": "Microsoft 365 konnte nicht verbunden werden. Bitte versuche es erneut."
           },
           "hosting": "Deine Mails bleiben bei Microsoft, einem Cloud-Anbieter mit Sitz in den USA."
+        },
+        "dropbox": {
+          "name": "Dropbox",
+          "description": "Melde dich mit deinem Dropbox-Konto an, damit Synaplan erzeugte Dateien in einem Dropbox-Ordner ablegen kann – zum Beispiel „erstelle ein Dokument und lege es in meine Dropbox“. Du kannst die Verbindung jederzeit trennen.",
+          "connect": "Dropbox verbinden",
+          "connectAnother": "Weiteres Konto verbinden",
+          "connectedAs": "Verbunden als {account}.",
+          "connecting": "Dropbox wird geöffnet…",
+          "connected": "Dropbox ist verbunden.",
+          "startFailed": "Die Dropbox-Anmeldeseite konnte nicht geöffnet werden. Bitte versuche es erneut.",
+          "unavailable": "Noch nicht verfügbar – Dropbox muss für diese Installation einmalig eingerichtet werden.",
+          "adminLink": "In den Systemeinstellungen einrichten.",
+          "askAdmin": "Bitte einen Administrator, es zu aktivieren.",
+          "errors": {
+            "access_denied": "Du hast die Dropbox-Anmeldung abgebrochen, es wurde nichts verbunden.",
+            "missing_code": "Dropbox hat eine unvollständige Antwort gesendet. Bitte starte die Verbindung erneut.",
+            "exchange_failed": "Dropbox hat die Anmeldung akzeptiert, aber das Token konnte nicht abgeholt werden. Prüfe das App-Secret in den Systemeinstellungen und versuche es erneut.",
+            "invalid_state": "Die Anmeldung hat zu lange gedauert oder wurde in einem anderen Tab gestartet. Bitte versuche es erneut.",
+            "unknown": "Dropbox konnte nicht verbunden werden. Bitte versuche es erneut."
+          },
+          "hosting": "Deine Dateien bleiben bei Dropbox, einem Cloud-Anbieter mit Sitz in den USA."
         },
         "mailbox": {
           "name": "Postfach (IMAP)",

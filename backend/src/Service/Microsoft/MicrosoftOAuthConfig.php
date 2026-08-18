@@ -137,6 +137,10 @@ final readonly class MicrosoftOAuthConfig implements OAuthProviderSource
             clientSecret: $this->clientSecret(),
             redirectUri: $this->redirectUri(),
             scopes: self::SCOPES,
+            // `prompt=consent` is deliberate on the first grant: without it
+            // Microsoft may silently reuse an existing consent that lacks
+            // `offline_access`, leaving us with no refresh token.
+            extraAuthorizeParams: ['response_mode' => 'query', 'prompt' => 'consent'],
         );
     }
 

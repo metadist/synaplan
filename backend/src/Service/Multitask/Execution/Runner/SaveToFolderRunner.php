@@ -43,7 +43,7 @@ final readonly class SaveToFolderRunner implements TaskRunner
         return [
             new SkillDescriptor(
                 Capability::SaveToFolder,
-                'Save generated files into a connected folder channel from the Connected channels list (kind folder). ONLY when the user explicitly asks to put/save/file the result there ("save it to my Nextcloud", "lege es in nextcloud"). Inputs: attachments. params.channel MUST be a folder name from that list (e.g. "nextcloud"). Never invent a name. Never the reply node.',
+                'Save generated files into a connected folder channel from the Connected channels list (kind folder). ONLY when the user explicitly asks to put/save/file the result there ("save it to my Nextcloud", "put it into my Dropbox", "lege es in nextcloud"). Inputs: attachments. params.channel MUST be a folder name from that list (e.g. "nextcloud", "dropbox"). Never invent a name. Never the reply node.',
                 dynamicNote: fn (?int $userId, array $context): ?string => $this->renderAvailabilityNote($userId),
                 requiresDynamicNote: true,
             ),

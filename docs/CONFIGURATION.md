@@ -213,10 +213,16 @@ group in the `BCONFIG` table.
 | `MULTITASK / PARALLEL_ENABLED` | `false` | Execute independent media nodes concurrently (subprocess offload) |
 | `MULTITASK / MAX_PARALLEL` | `3` | Concurrency cap for parallel media nodes |
 | `MULTITASK / NODE_TIMEOUT` | `120` | Per-node subprocess timeout (seconds) |
+| `MULTITASK / EMAIL_SEARCH_ENABLED` | `true` (seeded)² | `email_search` DAG node: live read-only search over the user's IMAP accounts and Microsoft 365 connections |
 | `CLASSIFIER / FAST_PATH_ENABLED` | `false` | Skip the AI sorter for trivial chat messages (heuristic) |
 
 ¹ Existing installations are grandfathered to `0` by migration so behavior
 doesn't change on upgrade — enable it per user or globally when ready.
+
+² Seeded `1` insert-if-missing by `MultitaskConfigSeeder` (runs in `app:seed`
+on container start); an operator's explicit `0` row survives every deploy.
+The built-in code default stays `false` when no row exists. The capability is
+only offered to the planner when the user has a connected mail source.
 
 ## Saved Tasks (BCONFIG)
 
@@ -264,6 +270,34 @@ Tokens are stored per user as one encrypted JSON blob in the credential vault
 including from cron, with no user session. When Microsoft finally rejects the
 grant (consent revoked, refresh token expired), the connection flips to
 `reauth_required` instead of failing silently.
+
+---
+
+## Dropbox connector (BCONFIG)
+
+Lets a user connect their Dropbox account as a file destination
+(`save_to_folder`, channel `dropbox`) from **Channels → Connections**. Same
+model as Microsoft 365: the Dropbox app is **operator-owned and install-wide**
+(`BOWNERID=0`), tokens live per user in the encrypted credential vault, and a
+rejected refresh flips the connection to `reauth_required`. Admins manage it
+in **Settings → Inbound Channels → Dropbox**; no restart is required.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `DROPBOX / ENABLED` | `false` | Offer Dropbox as a connection. The connect action stays hidden until app key **and** secret are also set. |
+| `DROPBOX / APP_KEY` | — | App key from the Dropbox App Console. |
+| `DROPBOX / APP_SECRET` | — | App secret, **stored AES-encrypted** (`APP_SECRET` derived) and masked in every API response. |
+| `DROPBOX / REDIRECT_URI` | `APP_URL` + `/api/v1/connections/dropbox/callback` | Override only when a proxy changes the public URL. Must match the App Console exactly. |
+
+**Dropbox app** — create a *Scoped access* / *Full Dropbox* app at
+[dropbox.com/developers/apps](https://www.dropbox.com/developers/apps), enable
+the permissions `account_info.read` and `files.content.write`, and register
+the redirect URI above. The consent flow requests
+`token_access_type=offline` — without it Dropbox issues no refresh token and
+every scheduled run stops working after four hours.
+
+The same steps are shown inside the admin UI above the fields, with the
+resolved redirect URI and the permission list as copyable values.
 
 ---
 

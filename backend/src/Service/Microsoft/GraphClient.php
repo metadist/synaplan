@@ -83,6 +83,89 @@ final readonly class GraphClient
             '$select' => 'id,subject,from,receivedDateTime,bodyPreview,hasAttachments,isRead',
         ]);
 
+        return $this->mapMessages($data);
+    }
+
+    /**
+     * Live message search (delegated `Mail.Read`), newest first.
+     *
+     * Uses Graph `$search` (KQL): free-text terms plus `from:` and
+     * `received>=` qualifiers. `$search` results are relevance-ranked and
+     * cannot be combined with `$orderby`, so we over-fetch a little and sort
+     * by receivedDateTime client-side. Read-only; bodies are excluded — the
+     * caller fetches a body per message via {@see messageBody()}.
+     *
+     * @param string|null $from  sender name or address (KQL `from:` qualifier)
+     * @param string|null $since ISO date (YYYY-MM-DD) lower bound
+     *
+     * @return list<array{id: string, subject: string, from: string, receivedAt: string, preview: string, hasAttachments: bool, isRead: bool}>
+     */
+    public function searchMessages(Connection $connection, string $query, ?string $from = null, ?string $since = null, int $limit = 10): array
+    {
+        $limit = max(1, min($limit, self::MAX_MESSAGES));
+
+        $kql = trim($query);
+        if (null !== $from && '' !== trim($from)) {
+            $kql .= ' from:'.$this->kqlValue(trim($from));
+        }
+        if (null !== $since && 1 === preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($since))) {
+            $kql .= ' received>='.trim($since);
+        }
+
+        $data = $this->get($connection, '/me/messages', [
+            // The whole KQL string is one quoted $search value; embedded
+            // quotes (multi-word from:) are backslash-escaped per Graph rules.
+            '$search' => '"'.$kql.'"',
+            '$top' => (string) min($limit * 2, self::MAX_MESSAGES),
+            '$select' => 'id,subject,from,receivedDateTime,bodyPreview,hasAttachments,isRead',
+        ]);
+
+        $messages = $this->mapMessages($data);
+        usort(
+            $messages,
+            static fn (array $a, array $b): int => strcmp($b['receivedAt'], $a['receivedAt']),
+        );
+
+        return array_slice($messages, 0, $limit);
+    }
+
+    /**
+     * Full body of one message (delegated `Mail.Read`), HTML converted to
+     * plain text. Fetched per message on demand — never in bulk (privacy +
+     * token budget).
+     *
+     * @return array{subject: string, from: string, receivedAt: string, body: string}
+     */
+    public function messageBody(Connection $connection, string $messageId): array
+    {
+        $data = $this->get($connection, '/me/messages/'.rawurlencode($messageId), [
+            '$select' => 'subject,from,receivedDateTime,body',
+        ]);
+
+        $body = '';
+        $rawBody = $data['body'] ?? null;
+        if (is_array($rawBody) && is_string($rawBody['content'] ?? null)) {
+            $body = $rawBody['content'];
+            if ('html' === strtolower($this->str($rawBody, 'contentType'))) {
+                $body = $this->htmlToText($body);
+            }
+        }
+
+        return [
+            'subject' => $this->str($data, 'subject'),
+            'from' => $this->senderAddress($data),
+            'receivedAt' => $this->str($data, 'receivedDateTime'),
+            'body' => trim($body),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $data a Graph collection payload (`value` list)
+     *
+     * @return list<array{id: string, subject: string, from: string, receivedAt: string, preview: string, hasAttachments: bool, isRead: bool}>
+     */
+    private function mapMessages(array $data): array
+    {
         $value = $data['value'] ?? null;
         if (!is_array($value)) {
             return [];
@@ -105,6 +188,30 @@ final readonly class GraphClient
         }
 
         return $messages;
+    }
+
+    /**
+     * Quote a KQL qualifier value when it contains whitespace; the quotes are
+     * backslash-escaped because they sit inside the quoted `$search` string.
+     */
+    private function kqlValue(string $value): string
+    {
+        $value = str_replace('"', '', $value);
+
+        return 1 === preg_match('/\s/', $value) ? '\\"'.$value.'\\"' : $value;
+    }
+
+    /** Plain-text rendering of an HTML mail body, whitespace normalized. */
+    private function htmlToText(string $html): string
+    {
+        // Keep paragraph/line structure readable before stripping tags.
+        $html = preg_replace('/<(br|\/p|\/div|\/tr|\/li)[^>]*>/i', "$0\n", $html) ?? $html;
+        $html = preg_replace('/<(style|script)\b[^>]*>.*?<\/\1>/is', '', $html) ?? $html;
+        $text = html_entity_decode(strip_tags($html), \ENT_QUOTES | \ENT_HTML5, 'UTF-8');
+        $text = str_replace("\u{00a0}", ' ', $text); // &nbsp; → plain space
+        $text = preg_replace('/[ \t]+/', ' ', $text) ?? $text;
+
+        return preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
     }
 
     /**

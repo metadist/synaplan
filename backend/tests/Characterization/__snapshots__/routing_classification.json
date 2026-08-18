@@ -364,5 +364,57 @@
         "source": "ai_sorting",
         "topic": "general",
         "web_search": true
+    },
+    "u1_outlook_calendar_write": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": null,
+        "model_name": null,
+        "multi_step": true,
+        "provider": null,
+        "skip_sorting": false,
+        "sorting_usage": null,
+        "source": "ai_sorting",
+        "topic": "general",
+        "web_search": false
+    },
+    "u2_mail_me_the_invite": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": null,
+        "model_name": null,
+        "multi_step": true,
+        "provider": null,
+        "skip_sorting": false,
+        "sorting_usage": null,
+        "source": "ai_sorting",
+        "topic": "general",
+        "web_search": false
+    },
+    "u3_mail_search_summarize": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": null,
+        "model_name": null,
+        "multi_step": true,
+        "provider": null,
+        "skip_sorting": false,
+        "sorting_usage": null,
+        "source": "ai_sorting",
+        "topic": "general",
+        "web_search": false
+    },
+    "u4_document_to_target": {
+        "intent": "document_generation",
+        "language": "en",
+        "model_id": null,
+        "model_name": null,
+        "multi_step": true,
+        "provider": null,
+        "skip_sorting": false,
+        "sorting_usage": null,
+        "source": "ai_sorting",
+        "topic": "officemaker",
+        "web_search": false
     }
 }

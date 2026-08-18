@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useNotification } from '@/composables/useNotification'
 import { connectionsApi, type ConnectionItem } from '@/services/api/connectionsApi'
+import { dropboxApi } from '@/services/api/dropboxApi'
 import { m365Api } from '@/services/api/m365Api'
 import { useAuthStore } from '@/stores/auth'
 import ConnectionStatusPill from '@/components/config/ConnectionStatusPill.vue'
@@ -21,10 +22,23 @@ const items = ref<ConnectionItem[]>([])
 const loading = ref(true)
 const m365Available = ref(false)
 const m365Connecting = ref(false)
+const dropboxAvailable = ref(false)
+const dropboxConnecting = ref(false)
 
 const isAdmin = computed(() => auth.isAdmin)
 const registryItems = computed(() => items.value.filter((row) => row.source === 'registry'))
 const adapterItems = computed(() => items.value.filter((row) => row.source !== 'registry'))
+
+/** Healthy connections per OAuth provider — drive the "already connected" state on the provider cards. */
+const connectedAccounts = (type: string): string[] =>
+  items.value
+    .filter((row) => row.type === type && row.status === 'connected')
+    .map((row) => row.name)
+
+const m365Accounts = computed(() => connectedAccounts('m365'))
+const m365Connected = computed(() => m365Accounts.value.length > 0)
+const dropboxAccounts = computed(() => connectedAccounts('dropbox'))
+const dropboxConnected = computed(() => dropboxAccounts.value.length > 0)
 
 const load = async () => {
   loading.value = true
@@ -42,6 +56,14 @@ const loadM365 = async () => {
     m365Available.value = (await m365Api.status()).available
   } catch {
     m365Available.value = false
+  }
+}
+
+const loadDropbox = async () => {
+  try {
+    dropboxAvailable.value = (await dropboxApi.status()).available
+  } catch {
+    dropboxAvailable.value = false
   }
 }
 
@@ -72,30 +94,51 @@ const connectM365 = async () => {
   }
 }
 
-/** Read the outcome Microsoft's callback redirected us back with, then clean the URL. */
+const connectDropbox = async () => {
+  dropboxConnecting.value = true
+  try {
+    window.location.href = await dropboxApi.authorizeUrl()
+  } catch {
+    showError(t('config.connections.providers.dropbox.startFailed'))
+    dropboxConnecting.value = false
+  }
+}
+
+const onReconnect = (item: ConnectionItem) => {
+  if (item.type === 'dropbox') {
+    void connectDropbox()
+  } else {
+    void connectM365()
+  }
+}
+
+/** Read the outcome an OAuth callback redirected us back with, then clean the URL. */
 const consumeConsentResult = async () => {
-  const result = route.query.m365
-  if (typeof result !== 'string') {
+  for (const provider of ['m365', 'dropbox'] as const) {
+    const result = route.query[provider]
+    if (typeof result !== 'string') {
+      continue
+    }
+    if ('connected' === result) {
+      success(t(`config.connections.providers.${provider}.connected`))
+    } else {
+      const reason = typeof route.query.reason === 'string' ? route.query.reason : 'unknown'
+      const known = ['access_denied', 'missing_code', 'exchange_failed', 'invalid_state']
+      showError(
+        t(
+          known.includes(reason)
+            ? `config.connections.providers.${provider}.errors.${reason}`
+            : `config.connections.providers.${provider}.errors.unknown`
+        )
+      )
+    }
+    await router.replace({ query: {} })
     return
   }
-  if ('connected' === result) {
-    success(t('config.connections.providers.m365.connected'))
-  } else {
-    const reason = typeof route.query.reason === 'string' ? route.query.reason : 'unknown'
-    const known = ['access_denied', 'missing_code', 'exchange_failed', 'invalid_state']
-    showError(
-      t(
-        known.includes(reason)
-          ? `config.connections.providers.m365.errors.${reason}`
-          : 'config.connections.providers.m365.errors.unknown'
-      )
-    )
-  }
-  await router.replace({ query: {} })
 }
 
 onMounted(async () => {
-  await Promise.all([load(), loadM365()])
+  await Promise.all([load(), loadM365(), loadDropbox()])
   await consumeConsentResult()
 })
 </script>
@@ -132,7 +175,7 @@ onMounted(async () => {
           :locale="locale"
           @changed="onRegistryChanged"
           @removed="onRegistryRemoved"
-          @reconnect="connectM365"
+          @reconnect="onReconnect(item)"
         />
         <li
           v-for="item in adapterItems"
@@ -188,6 +231,18 @@ onMounted(async () => {
               <Icon icon="heroicons:globe-alt" class="w-3.5 h-3.5 flex-shrink-0" />
               {{ $t('config.connections.providers.m365.hosting') }}
             </p>
+            <p
+              v-if="m365Connected"
+              class="text-sm mt-2 flex items-center gap-1.5 text-[var(--status-success)]"
+              data-testid="m365-connected-hint"
+            >
+              <Icon icon="heroicons:check-circle" class="w-4 h-4 flex-shrink-0" />
+              {{
+                $t('config.connections.providers.m365.connectedAs', {
+                  account: m365Accounts.join(', '),
+                })
+              }}
+            </p>
             <p v-if="!m365Available" class="text-sm txt-secondary mt-2">
               {{ $t('config.connections.providers.m365.unavailable') }}
               <router-link
@@ -203,7 +258,10 @@ onMounted(async () => {
           <button
             v-if="m365Available"
             type="button"
-            class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+            :class="[
+              m365Connected ? 'btn-secondary' : 'btn-primary',
+              'inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap',
+            ]"
             :disabled="m365Connecting"
             data-testid="btn-connect-m365"
             @click="connectM365"
@@ -211,7 +269,71 @@ onMounted(async () => {
             {{
               m365Connecting
                 ? $t('config.connections.providers.m365.connecting')
-                : $t('config.connections.providers.m365.connect')
+                : m365Connected
+                  ? $t('config.connections.providers.m365.connectAnother')
+                  : $t('config.connections.providers.m365.connect')
+            }}
+          </button>
+        </li>
+
+        <!-- Dropbox -->
+        <li
+          class="surface-card p-4 flex flex-wrap items-start gap-3"
+          data-testid="provider-dropbox"
+        >
+          <Icon icon="simple-icons:dropbox" class="w-6 h-6 text-[var(--brand)] mt-0.5" />
+          <div class="flex-1 min-w-0">
+            <p class="font-medium txt-primary">
+              {{ $t('config.connections.providers.dropbox.name') }}
+            </p>
+            <p class="text-sm txt-secondary mt-0.5">
+              {{ $t('config.connections.providers.dropbox.description') }}
+            </p>
+            <p class="text-xs txt-secondary mt-1 flex items-center gap-1">
+              <Icon icon="heroicons:globe-alt" class="w-3.5 h-3.5 flex-shrink-0" />
+              {{ $t('config.connections.providers.dropbox.hosting') }}
+            </p>
+            <p
+              v-if="dropboxConnected"
+              class="text-sm mt-2 flex items-center gap-1.5 text-[var(--status-success)]"
+              data-testid="dropbox-connected-hint"
+            >
+              <Icon icon="heroicons:check-circle" class="w-4 h-4 flex-shrink-0" />
+              {{
+                $t('config.connections.providers.dropbox.connectedAs', {
+                  account: dropboxAccounts.join(', '),
+                })
+              }}
+            </p>
+            <p v-if="!dropboxAvailable" class="text-sm txt-secondary mt-2">
+              {{ $t('config.connections.providers.dropbox.unavailable') }}
+              <router-link
+                v-if="isAdmin"
+                :to="{ path: '/admin/config', query: { tab: 'channels', section: 'dropbox' } }"
+                class="text-[var(--brand)] hover:underline"
+              >
+                {{ $t('config.connections.providers.dropbox.adminLink') }}
+              </router-link>
+              <span v-else>{{ $t('config.connections.providers.dropbox.askAdmin') }}</span>
+            </p>
+          </div>
+          <button
+            v-if="dropboxAvailable"
+            type="button"
+            :class="[
+              dropboxConnected ? 'btn-secondary' : 'btn-primary',
+              'inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap',
+            ]"
+            :disabled="dropboxConnecting"
+            data-testid="btn-connect-dropbox"
+            @click="connectDropbox"
+          >
+            {{
+              dropboxConnecting
+                ? $t('config.connections.providers.dropbox.connecting')
+                : dropboxConnected
+                  ? $t('config.connections.providers.dropbox.connectAnother')
+                  : $t('config.connections.providers.dropbox.connect')
             }}
           </button>
         </li>

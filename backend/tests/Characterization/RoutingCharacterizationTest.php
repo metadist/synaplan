@@ -171,6 +171,17 @@ final class RoutingCharacterizationTest extends TestCase
             // planner keeps deciding — this is the safe fallback.
             ['id' => 'sort_no_step_vote', 'text' => 'tell me about the weather on mars', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en']],
 
+            // ---- Phase M acceptance utterances (plan 10 §1) — VERBATIM ----
+            // These four sentences are the product acceptance bar for the
+            // chat-actions phase. They are quoted word for word so any change
+            // to how the classifier treats them is an explicit, reviewed diff.
+            // All four are multi-deliverable requests: the sorter votes
+            // multi_step=true and the planner builds the DAG.
+            ['id' => 'u1_outlook_calendar_write', 'text' => "Create a meeting reminder for tomorrow at 10am for 'Marketing Strategy' and put it into my Outlook", 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => true]],
+            ['id' => 'u2_mail_me_the_invite', 'text' => "Create a meeting reminder for tomorrow at 10am for 'Marketing Strategy' and mail the calendar entry to me", 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => true]],
+            ['id' => 'u3_mail_search_summarize', 'text' => 'What is the latest mail of Oliver Braun regarding FPSenergy, summarize that for me', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => true]],
+            ['id' => 'u4_document_to_target', 'text' => 'Create a marketing plan document with a solid TOC for my company and put it into: Nextcloud', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'officemaker', 'language' => 'en', 'multi_step' => true]],
+
             // ---- Sorter-driven: CUSTOM user topic — migration-risk #1 ----
             // A user-authored BPROMPTS topic (BOWNERID>0) is NOT in the canonical
             // map, so today it falls back to the chat intent. This baseline proves

@@ -539,6 +539,19 @@
         "ready": "Ready — users can connect their Microsoft 365 account under Channels → Connections.",
         "notReady": "Not active yet. Fill in the fields below and switch M365_ENABLED on.",
         "copyFailed": "Could not copy. Select the text and copy it manually."
+      },
+      "dropbox": {
+        "title": "Before these fields work: create an app in the Dropbox App Console",
+        "intro": "The Dropbox connection needs a Dropbox app. You do this once, it takes about five minutes, and afterwards every user can connect their own account.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "Open the {console} and choose “Create app”. Pick “Scoped access” and “Full Dropbox”. Any name works, for example “Synaplan”.",
+        "step2": "On the “Permissions” tab, enable both of these and click “Submit”:",
+        "step3": "On the “Settings” tab, under “OAuth 2 → Redirect URIs”, add this address exactly:",
+        "step4": "Still on the “Settings” tab, copy the App key and the App secret (click “Show”).",
+        "step5": "Paste the app key and the secret into the fields below and switch DROPBOX_ENABLED on. Users then connect their own account under Channels → Connections.",
+        "ready": "Ready — users can connect their Dropbox account under Channels → Connections.",
+        "notReady": "Not active yet. Fill in the fields below and switch DROPBOX_ENABLED on.",
+        "copyFailed": "Could not copy. Select the text and copy it manually."
       }
     }
   },
@@ -1821,7 +1834,8 @@
         "webhook": "Webhook",
         "caldav": "Calendar",
         "generic": "Connection",
-        "m365": "Microsoft 365"
+        "m365": "Microsoft 365",
+        "dropbox": "Dropbox"
       },
       "failure": {
         "unauthorized": "{connection} rejected the login. Reconnect it to continue.",
@@ -1858,6 +1872,8 @@
           "name": "Microsoft 365",
           "description": "Sign in with your Microsoft work or personal account so Synaplan can read your Outlook mail. Read-only, and you can disconnect at any time.",
           "connect": "Connect Microsoft 365",
+          "connectAnother": "Connect another account",
+          "connectedAs": "Connected as {account}.",
           "connecting": "Opening Microsoft…",
           "connected": "Microsoft 365 is connected.",
           "startFailed": "Could not open the Microsoft sign-in page. Please try again.",
@@ -1872,6 +1888,27 @@
             "unknown": "Microsoft 365 could not be connected. Please try again."
           },
           "hosting": "Your mail stays with Microsoft, a cloud provider based in the USA."
+        },
+        "dropbox": {
+          "name": "Dropbox",
+          "description": "Sign in with your Dropbox account so Synaplan can save generated files into a Dropbox folder — for example \"create a document and put it into my Dropbox\". You can disconnect at any time.",
+          "connect": "Connect Dropbox",
+          "connectAnother": "Connect another account",
+          "connectedAs": "Connected as {account}.",
+          "connecting": "Opening Dropbox…",
+          "connected": "Dropbox is connected.",
+          "startFailed": "Could not open the Dropbox sign-in page. Please try again.",
+          "unavailable": "Not available yet — Dropbox has to be set up once for this installation.",
+          "adminLink": "Set it up in system settings.",
+          "askAdmin": "Ask an administrator to enable it.",
+          "errors": {
+            "access_denied": "You cancelled the Dropbox sign-in, so nothing was connected.",
+            "missing_code": "Dropbox sent an incomplete answer. Please start the connection again.",
+            "exchange_failed": "Dropbox accepted the sign-in but the token could not be collected. Check the app secret in system settings, then try again.",
+            "invalid_state": "The sign-in took too long or was started in another tab. Please try again.",
+            "unknown": "Dropbox could not be connected. Please try again."
+          },
+          "hosting": "Your files stay with Dropbox, a cloud provider based in the USA."
         },
         "mailbox": {
           "name": "Mailbox (IMAP)",

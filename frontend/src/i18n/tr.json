@@ -528,6 +528,19 @@
         "ready": "Hazır — kullanıcılar Microsoft 365 hesaplarını Kanallar → Bağlantılar altından bağlayabilir.",
         "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve M365_ENABLED seçeneğini aç.",
         "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala."
+      },
+      "dropbox": {
+        "title": "Bu alanlar çalışmadan önce: Dropbox App Console’da bir uygulama oluştur",
+        "intro": "Dropbox bağlantısı bir Dropbox uygulaması gerektirir. Bunu bir kez yaparsın, yaklaşık beş dakika sürer ve sonrasında her kullanıcı kendi hesabını bağlayabilir.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "{console} sayfasını aç ve “Create app”i seç. “Scoped access” ve “Full Dropbox” seçeneklerini seç. İsim fark etmez, örneğin “Synaplan”.",
+        "step2": "“Permissions” sekmesinde şu iki izni etkinleştir ve “Submit”e tıkla:",
+        "step3": "“Settings” sekmesinde “OAuth 2 → Redirect URIs” altına tam olarak bu adresi ekle:",
+        "step4": "Yine “Settings” sekmesinde App key ve App secret değerlerini kopyala (“Show”a tıkla).",
+        "step5": "App key ve secret’ı aşağıdaki alanlara yapıştır ve DROPBOX_ENABLED seçeneğini aç. Kullanıcılar hesaplarını Kanallar → Bağlantılar altında bağlar.",
+        "ready": "Hazır — kullanıcılar Dropbox hesaplarını Kanallar → Bağlantılar altında bağlayabilir.",
+        "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve DROPBOX_ENABLED seçeneğini aç.",
+        "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala."
       }
     }
   },
@@ -2395,7 +2408,8 @@
         "webhook": "Bildirim adresi",
         "caldav": "Takvim",
         "generic": "Bağlantı",
-        "m365": "Microsoft 365"
+        "m365": "Microsoft 365",
+        "dropbox": "Dropbox"
       },
       "failure": {
         "unauthorized": "{connection} oturum açmayı reddetti. Devam etmek için yeniden bağla.",
@@ -2432,6 +2446,8 @@
           "name": "Microsoft 365",
           "description": "Synaplan’ın Outlook postalarını okuyabilmesi için iş veya kişisel Microsoft hesabınla oturum aç. Yalnızca okuma yapar ve istediğin an bağlantıyı kesebilirsin.",
           "connect": "Microsoft 365’i bağla",
+          "connectAnother": "Başka bir hesap bağla",
+          "connectedAs": "{account} olarak bağlandı.",
           "connecting": "Microsoft açılıyor…",
           "connected": "Microsoft 365 bağlandı.",
           "startFailed": "Microsoft oturum açma sayfası açılamadı. Lütfen tekrar dene.",
@@ -2446,6 +2462,27 @@
             "unknown": "Microsoft 365 bağlanamadı. Lütfen tekrar dene."
           },
           "hosting": "Postaların, merkezi ABD’de bulunan bir bulut sağlayıcısı olan Microsoft’ta kalır."
+        },
+        "dropbox": {
+          "name": "Dropbox",
+          "description": "Synaplan’ın oluşturulan dosyaları bir Dropbox klasörüne kaydedebilmesi için Dropbox hesabınla oturum aç — örneğin “bir belge oluştur ve Dropbox’ıma koy”. İstediğin an bağlantıyı kesebilirsin.",
+          "connect": "Dropbox’ı bağla",
+          "connectAnother": "Başka bir hesap bağla",
+          "connectedAs": "{account} olarak bağlandı.",
+          "connecting": "Dropbox açılıyor…",
+          "connected": "Dropbox bağlandı.",
+          "startFailed": "Dropbox oturum açma sayfası açılamadı. Lütfen tekrar dene.",
+          "unavailable": "Henüz kullanılamıyor — Dropbox’ın bu kurulum için bir kez ayarlanması gerekiyor.",
+          "adminLink": "Sistem ayarlarında yapılandır.",
+          "askAdmin": "Etkinleştirmesi için bir yöneticiye başvur.",
+          "errors": {
+            "access_denied": "Dropbox oturum açmayı iptal ettin, bu yüzden hiçbir şey bağlanmadı.",
+            "missing_code": "Dropbox eksik bir yanıt gönderdi. Lütfen bağlantıyı yeniden başlat.",
+            "exchange_failed": "Dropbox oturum açmayı kabul etti ancak belirteç alınamadı. Sistem ayarlarındaki uygulama gizli anahtarını kontrol edip tekrar dene.",
+            "invalid_state": "Oturum açma çok uzun sürdü veya başka bir sekmede başlatıldı. Lütfen tekrar dene.",
+            "unknown": "Dropbox bağlanamadı. Lütfen tekrar dene."
+          },
+          "hosting": "Dosyaların, merkezi ABD’de bulunan bir bulut sağlayıcısı olan Dropbox’ta kalır."
         },
         "mailbox": {
           "name": "Posta kutusu (IMAP)",

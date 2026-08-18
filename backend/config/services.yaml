@@ -668,6 +668,14 @@ services:
         arguments:
             $frontendUrl: '%env(FRONTEND_URL)%'
 
+    App\Service\Dropbox\DropboxOAuthConfig:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Controller\DropboxConnectionController:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
+
     # Social Login Controllers (Google & GitHub OAuth)
     App\Controller\GoogleAuthController:
         arguments:
