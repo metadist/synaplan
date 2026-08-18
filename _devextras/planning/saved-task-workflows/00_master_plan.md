@@ -1,6 +1,6 @@
 # Saved Task Workflows — Master Plan
 
-**Status:** Planning (draft 2026-08-14). **No code until the [decision checklist](#0-decision-checklist-check-before-any-code) is signed off.**
+**Status:** Shipping (updated 2026-08-18). Foundations, Sprints 0–3, M365 mail-read consent and WebDAV/CalDAV/Nextcloud delivery are **merged to `main`** (PRs #1497, #1502). The decision checklist below is fully signed off; the current work is **Phase M** ([`10_m365_actions_and_destinations.md`](./10_m365_actions_and_destinations.md)) on branch `feat/m365-flow`.
 **Owner surface:** AI Instructions / Task Prompts (`/ai/instructions`), extended — not a new product name.
 **Related:**
 
@@ -22,6 +22,7 @@
 | 2 | [`03_sprint_2_graph_and_triggers.md`](./03_sprint_2_graph_and_triggers.md) | Authored graph + channel triggers (manual + inbound) |
 | 3 | [`04_sprint_3_scheduler.md`](./04_sprint_3_scheduler.md) | User-facing cron / schedules |
 | 4 | [`05_sprint_4_connectors_plugins_n8n.md`](./05_sprint_4_connectors_plugins_n8n.md) | Outbound actions, plugin nodes, n8n interface |
+| **M** | [`10_m365_actions_and_destinations.md`](./10_m365_actions_and_destinations.md) | **Current phase (2026-08-18):** Outlook calendar write, M365 mail search in chat, multi-destination documents (Outlook/Nextcloud/openCloud), DOCX TOC |
 | — | [`06_testing_and_documentation.md`](./06_testing_and_documentation.md) | Gate, characterization, E2E, docs inventory (applies to every sprint) |
 
 **Cross-cutting files (read before starting any sprint):**
@@ -44,12 +45,12 @@ Print this section. Tick every box. Do **not** start Sprint 1 until every row is
 | 2 | **Evolve Task Prompts**, do not replace `BPROMPTS` / `BPROMPTMETA`. A Saved Task *references* a Task Prompt (topic + tools + model + RAG group). | **Extend** | ✅ |
 | 3 | User-facing name: **Saved Task** (EN). Keep nav **AI Instructions**. Do not introduce “workflow / DAG / n8n / node” in primary copy. | Canonical term locked | ✅ |
 | 4 | Two graphs stay distinct: **runtime DAG** (planner, per turn, `BMESSAGE_TASKS`) vs **authored graph** (user-saved, durable). Never compile `tools:plan` / `tools:sort` text into the authored canvas. | Distinct models | ✅ |
-| 5 | First vertical (acceptance story): *“Look into my connected mailbox and create calendar entries for meeting requests.”* Honest v1 output is **`.ics` + optional `email_me`**, not Office 365 write-back. Graph/Outlook write is Sprint 4+ and a separate connector. | Mail in → Task Prompt → `.ics` | ✅ |
+| 5 | First vertical (acceptance story): *“Look into my connected mailbox and create calendar entries for meeting requests.”* Honest v1 output is **`.ics` + optional `email_me`**, not Office 365 write-back. ~~Graph/Outlook write is Sprint 4+ and a separate connector.~~ **Revised 2026-08-18:** the `.ics`/`email_me` vertical shipped and stays the fallback; the product owner raised the bar to real write-back — the four acceptance utterances (Outlook calendar write, M365/IMAP mail search + summarize, multi-destination documents) are now Phase M, [`10_m365_actions_and_destinations.md`](./10_m365_actions_and_destinations.md). | Shipped; bar raised → Phase M | ✅ |
 | 6 | Mutating outbound (calendar write, MCP write, FastBill, mail send) **always confirms** on first interactive run; scheduled runs use an explicit “allow unattended” flag per action node. | Confirm-then-automate | ✅ |
 | 7 | Plugin tools (Synamail, Synasort, Synaform, Synafastbill, …) join the graph **only when installed** for that user, via a new optional manifest key (`graphNodes`). `chatCommands` stay the slash-command seam. | Manifest seam, later | ✅ |
 | 8 | Feature flag: `SAVEDTASKS.ENABLED` in `BCONFIG` (default **off** for existing installs; seed **on** for new installs — same grandfather pattern as `MULTITASK.ROUTING_ENABLED`). Widget chat **does not** run Saved Tasks. | Flag + widget invariant | ✅ |
 | 9 | Schema is additive only. Galera-safe migrations (`addSql`, `IF NOT EXISTS`). No `doctrine:schema:update --force`. Ask again before the first migration lands. | **Decided 2026-08-15:** `BSAVEDTASKS`, `BSAVEDTASK_RUNS`, `BCONNECTIONS`, `BCREDENTIALS` | ✅ |
-| 10 | ~~Office 365 / Microsoft Graph is **out of v1**~~ **Revised 2026-08-16:** the outbound OAuth2 framework (F3) and the M365 **mail-read** connection (consent flow, token store/refresh, `GraphClient` `me`/`listMessages`) were pulled forward and shipped together with the connections foundation on `feat/saved-task-workflows`. Still deferred: Graph **calendar read/write** (K4), OneDrive/SharePoint drop (K5a), and any Graph mutating action — [`07_connectors.md` Finding B](./07_connectors.md#11-four-findings-that-change-the-plan). | Mail read shipped early; writes deferred | ✅ |
+| 10 | ~~Office 365 / Microsoft Graph is **out of v1**~~ **Revised 2026-08-16:** the outbound OAuth2 framework (F3) and the M365 **mail-read** connection (consent flow, token store/refresh, `GraphClient` `me`/`listMessages`) were pulled forward and shipped together with the connections foundation (merged in PR #1497). **Revised again 2026-08-18:** Graph **calendar read/write** (K4a/K4b), M365 as an `email_search` backend (K3c remainder), and optionally OneDrive drop (K5a) are pulled **into scope** as Phase M — with incremental consent (scope tiers), the S6 confirmation/audit machinery, and the same S13 dedup contract as CalDAV. See [`10_m365_actions_and_destinations.md`](./10_m365_actions_and_destinations.md). | Mail read shipped; calendar/search/writes = Phase M | ✅ |
 | 11 | **Production scheduling = the existing `synaplan-platform` host-cron family, expanded.** A new `cron-saved-tasks.sh` (same pattern as `cron-gmail.sh` / `cron-media-reaper.sh`: web1-only, `docker compose exec -T backend php bin/console …`, log to `/var/log/synaplan-*.log`, covered by `synaplan-cron.logrotate`). The tick command self-locks via a cross-node Redis lock (like `app:media:reap-jobs`) so the dev/self-host Docker scheduler role and host cron can both run it safely. Details: [Sprint 3 §1](./04_sprint_3_scheduler.md#1-where-schedules-actually-run-production-reality). | Expand platform crons | ✅ |
 | 12 | **Run results live in one dedicated conversation per Saved Task** (created on first run, named after the task). Runs list links into it. Scheduled failures notify the user; **3 consecutive failures auto-pause the task** with a visible reason. | One home per task + auto-pause | ✅ |
 | 13 | **Connections are prepared before the engine needs them.** Build the five foundations (connection registry, credential vault, OAuth2 framework, destination seam, connection-health UX) **before** any individual connector; no connector ships its own credential store, status widget or delivery endpoint. Full inventory and per-connector sign-off: [`07_connectors.md`](./07_connectors.md). | **Decided 2026-08-15: foundations first (not parallel)** | ✅ |
@@ -85,23 +86,24 @@ The Chat widget’s connect-the-boxes UI is the closest interaction pattern we a
 | `TaskPlanner` / `DagExecutor` / `Capability` | Shipped | Runtime DAG for one message. Capabilities include `email_search`, `calendar_event`, `email_me`, `mcp_fetch`, `compose_reply` |
 | `BMESSAGE_TASKS` | Shipped | Observability of *executed* plans — input to Sprint 0 visualization |
 | Widget `FlowData` | Shipped | UX reference only (triggers / responses / SVG links). Persistence is prompt compilation — **do not extend this for Saved Tasks** |
-| Inbound email | Shipped | `app:process-emails`, mail handlers, `email_search` (read-only IMAP). Pickup is **ops cron**, not a user schedule |
-| `calendar_event` | Shipped | RFC 5545 `.ics` download — **not** Graph/Outlook write |
+| Inbound email | Shipped | `app:process-emails`, mail handlers, `email_search` (read-only IMAP). Pickup is **ops cron**, not a user schedule. M365 as a second search backend = Phase M step M3 |
+| `calendar_event` | Shipped | RFC 5545 `.ics` download **plus CalDAV delivery** (Nextcloud/ownCloud, S13-idempotent, PR #1502). Graph/Outlook write = Phase M steps M4/M5 |
 | MCP client + server | Shipped | Client: `mcp_fetch` (read-only). Server: `/mcp` tools including `list_prompts`, `synaplan_chat` |
 | Plugin `chatCommands` | Shipped | Slash commands (e.g. `/fastbill`). **Not** graph nodes yet |
 | n8n → Synaplan | Works today | OpenAI-compat `/v1`, MCP `/mcp`, generic webhook, REST — see n8n research |
 | Synaplan → n8n | **Gap** | No outbound webhook / event emitter |
 | Platform host crons | Shipped (prod) | `synaplan-platform`: `cron-gmail.sh` (mail handlers + smart@ pickup — **currently the only inbound pickup**), `cron-media-reaper.sh` (Redis cross-node lock), `cron-disk-watchdog.sh`, `cron-model-pricing.sh`, shared `synaplan-cron.logrotate`. **This is the scheduling backbone we expand** — see checklist row 11 |
-| User scheduler | **Missing** | Docker `SYNAPLAN_ROLE=scheduler` is maintenance only (dev/self-host); prod uses host crons above |
-| Office 365 / Graph | Shipped, **read-only mail** (2026-08-16) | Outbound OAuth2 framework + M365 connection with `Mail.Read`; calendar and any write path still missing (checklist row 10) |
+| User scheduler | Shipped (app side) | `app:saved-tasks:tick` with Redis self-lock, schedule picker, auto-pause (E13–E19). **Prod cron `cron-saved-tasks.sh` (E17) is still a pending `synaplan-platform` PR** — scheduled tasks have no production trigger until it lands |
+| Office 365 / Graph | Shipped, **read-only mail** (2026-08-16, merged PR #1497) | Outbound OAuth2 framework + M365 connection with `Mail.Read`; calendar read/write, mail search in chat, and OneDrive are Phase M (checklist row 10) |
+| Saved Tasks + connections + delivery | Shipped (PRs #1497, #1502) | `BSAVEDTASKS`/`BSAVEDTASK_RUNS`, connection registry + credential vault (F1/F2), destination seam (F4) with email/share-link/WebDAV/CalDAV providers, `save_to_folder` capability, planner channels (`nextcloud`, `calendar`, …) |
 | Document parsing (PPTX/XLSX/DOCX/PDF) | Shipped | Tika via `FileProcessor` / `TikaClient`. Needs coverage inside *scheduled* runs, not new code |
 | Document generation (DOCX/XLSX/PPTX/ICS/CSV) | Shipped | `DocumentGeneratorService`. Already the honest v1 output of a Saved Task |
-| Nextcloud | Shipped, **inbound only** | External NC app (`synaplan-nextcloud`) that **pulls** from Synaplan with an admin API key and writes via `IRootFolder`. No push path from Synaplan |
-| OpenCloud | Shipped, **inbound + read-only** | `synaplan-opencloud`: web extension + Go backend, reads user files over the **CS3/reva gateway**, authenticates via **RFC 8693 token exchange** against the shared Keycloak. No upload path |
-| File destination seam | **Missing** | `ShareableFile` / `DestinationProvider` / `POST /files/{id}/send` are planning only (`release4.0/07_file-sharing-destinations.md` Phase B). This is what "put the result in a folder" depends on |
+| Nextcloud | Shipped, **both directions** | Pull: external NC app (`synaplan-nextcloud`, admin API key, `IRootFolder`). **Push: shipped via the generic WebDAV provider + Nextcloud preset (`DavConnectionForm.vue`, PR #1502)** |
+| OpenCloud | Shipped, **inbound + read-only** | `synaplan-opencloud`: web extension + Go backend, reads user files over the **CS3/reva gateway**, authenticates via **RFC 8693 token exchange** against the shared Keycloak. No upload path — write mechanism decided by the C11 spike (Phase M step M8) |
+| File destination seam | **Shipped** (F4, PR #1497/#1502) | `ShareableFile` / `DestinationProvider` registry / `POST /api/v1/files/{id}/send` with email, share-link, WebDAV and CalDAV providers and the shared failure vocabulary |
 | Jira / Confluence | **Missing** | Intended via MCP, not bespoke clients — and MCP is read-only until the mutating decision lands |
 
-**Known gap to fix inside Sprint 1 (not optional):** `ChatRunner` documents `params.topic_id` but multi-node intermediate `chat` nodes still use a generic system prompt. Saved Tasks that “run this Task Prompt” will silently ignore the prompt until that binding is complete. Characterization tests must lock the fix.
+**Known gap — fixed:** the `ChatRunner` `params.topic_id` binding shipped as step E1 with a unit-level lock (`RunnersTest::testChatRunnerUsesTopicIdSystemPrompt` + fallback + pinned-model tests); characterization snapshots stayed unchanged. Recorded here because the fix's absence was the plan's single biggest silent-failure risk.
 
 ---
 
@@ -344,7 +346,7 @@ Same pattern as multitask routing:
 ## 9. Out of scope (v1)
 
 - Embedding or operating n8n / Make / Zapier.
-- Microsoft Graph / Google Calendar **write** (the OAuth2 framework F3 and Graph mail-read now exist — see checklist row 10 — but every mutating Graph call stays out of v1).
+- ~~Microsoft Graph **write**~~ — **no longer out of scope (2026-08-18):** Graph calendar read/write is Phase M, under the S6 confirmation/audit contract. Google Calendar write stays out.
 - Google Workspace connectors (deferred until a customer requires them).
 - Bespoke Jira / Confluence / CRM clients — the MCP connection and the outbound webhook are the escape hatches.
 - Mutating MCP tools.
@@ -366,7 +368,9 @@ A user who has connected an IMAP mailbox can:
 5. Optionally add an action “Send to webhook” and have n8n receive the structured result (Sprint 4).
 6. Disable the task; no further runs. Flag-off restores the product as if this epic did not exist (minus empty tables).
 
-**Connector checkpoint (first genuinely new capability):** once the destination seam and the WebDAV client land ([`09_work_breakdown.md`](./09_work_breakdown.md) K10a–K10d), the same user can add “Save to folder” and have the result filed in Nextcloud by a run nobody was watching. That is the moment the feature stops being a nicer chat and starts being an agent.
+**Connector checkpoint (first genuinely new capability):** once the destination seam and the WebDAV client land ([`09_work_breakdown.md`](./09_work_breakdown.md) K10a–K10d), the same user can add “Save to folder” and have the result filed in Nextcloud by a run nobody was watching. That is the moment the feature stops being a nicer chat and starts being an agent. **Status: reached** — the seam, WebDAV/Nextcloud and CalDAV delivery are merged (PR #1502); live-instance verification (S5) is the remaining tick.
+
+**Phase M acceptance (2026-08-18, the current bar):** the four utterances in [`10_m365_actions_and_destinations.md` §1](./10_m365_actions_and_destinations.md#1-the-four-acceptance-utterances) — Outlook calendar write with a `webLink` proof, mail-me-the-invite (regression), mail search + summarize across IMAP *and* M365, and document generation pushed to a spoken target (Outlook/Nextcloud/openCloud) — each verbatim in characterization and E2E.
 
 **Comprehension criterion (equally binding):** a user who speaks only German, Spanish or Turkish can answer all five questions in [`08_ux_and_i18n.md` §1](./08_ux_and_i18n.md#1-the-five-questions-every-screen-must-answer) from the screen alone, and can understand and act on a failure message without support.
 

@@ -6,10 +6,16 @@ The sprint files say *what* and *why*. This file says *how big*, *in what order*
 
 ---
 
-## 0. Status (2026-08-16, branch `feat/saved-task-workflows`)
+## 0. Status (2026-08-16, branch `feat/saved-task-workflows` — **merged to `main` as PR #1497; WebDAV/CalDAV delivery followed as PR #1502**)
 
 Recorded per the working agreement (§7.5). The branch was built as one feature branch rather than
 one PR per step — noted here so the deviation is explicit, not repeated.
+
+> **Next phase (2026-08-18):** the open K3c remainder, K4a/K4b, K5a and K11 rows below are re-cut as
+> steps **M0–M9** in [`10_m365_actions_and_destinations.md`](./10_m365_actions_and_destinations.md)
+> (branch `feat/m365-flow`), together with the new scope-tier/incremental-consent work and the DOCX
+> TOC step. That file is the authoritative order for the current work; this section stays as the
+> merge record.
 
 **Done on this branch:**
 
