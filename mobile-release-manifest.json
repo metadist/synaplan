@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "repository": "metadist/synaplan",
+  "baseSha": "127a0c6802cf9000d32a8fb27e9d14139fae6cec",
+  "headSha": "60251ccccd411e1ef4f6363a45f4ecf5fd9db7f3",
+  "tag": null,
+  "apiContractHash": null,
+  "classification": "ota-candidate",
+  "reasons": [
+    {
+      "classification": "ota-candidate",
+      "reason": "The change is limited to the web layer delivered inside the app bundle (Vue/TypeScript application code, styling, translations, static assets, or web build configuration), which Apple ADPLA 3.3.2 and Google Play permit over the air because it runs in the system WebView.",
+      "files": [
+        "frontend/src/components/FileSelectionModal.vue",
+        "frontend/src/components/MessageAudio.vue",
+        "frontend/src/components/MessageImage.vue",
+        "frontend/src/components/MessageVideo.vue",
+        "frontend/src/components/files/FilesGrid.vue",
+        "frontend/src/components/multitask/TaskCardMedia.vue",
+        "frontend/src/services/api/mediaAuth.ts"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "frontend/src/components/FileSelectionModal.vue",
+      "status": "M",
+      "classification": "ota-candidate"
+    },
+    {
+      "path": "frontend/src/components/MessageAudio.vue",
+      "status": "M",
+      "classification": "ota-candidate"
+    },
+    {
+      "path": "frontend/src/components/MessageImage.vue",
+      "status": "M",
+      "classification": "ota-candidate"
+    },
+    {
+      "path": "frontend/src/components/MessageVideo.vue",
+      "status": "M",
+      "classification": "ota-candidate"
+    },
+    {
+      "path": "frontend/src/components/files/FilesGrid.vue",
+      "status": "M",
+      "classification": "ota-candidate"
+    },
+    {
+      "path": "frontend/src/components/multitask/TaskCardMedia.vue",
+      "status": "M",
+      "classification": "ota-candidate"
+    },
+    {
+      "path": "frontend/src/services/api/mediaAuth.ts",
+      "status": "A",
+      "classification": "ota-candidate"
+    }
+  ],
+  "createdAt": "2026-08-18T22:16:10.000Z"
+}
