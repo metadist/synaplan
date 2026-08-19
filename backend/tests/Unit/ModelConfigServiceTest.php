@@ -8,6 +8,7 @@ use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
+use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
@@ -15,6 +16,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
+use Psr\Log\NullLogger;
 
 class ModelConfigServiceTest extends TestCase
 {
@@ -28,6 +30,7 @@ class ModelConfigServiceTest extends TestCase
     private CacheItemPoolInterface&MockObject $cache;
     private ProviderRegistry&MockObject $providerRegistry;
     private OllamaModelInventory&MockObject $ollamaModelInventory;
+    private ModelHealthRepository&MockObject $modelHealthRepository;
     private ModelConfigService $service;
     private CacheItemInterface&MockObject $cacheItem;
 
@@ -46,13 +49,18 @@ class ModelConfigServiceTest extends TestCase
 
         $this->ollamaModelInventory = $this->createMock(OllamaModelInventory::class);
 
+        $this->modelHealthRepository = $this->createMock(ModelHealthRepository::class);
+        $this->modelHealthRepository->method('findOfflineModelIds')->willReturn([]);
+
         $this->service = new ModelConfigService(
             $this->configRepository,
             $this->modelRepository,
             $this->userRepository,
             $this->cache,
             $this->providerRegistry,
-            $this->ollamaModelInventory
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
         );
     }
 

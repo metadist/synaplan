@@ -4,6 +4,7 @@ namespace App\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
+use App\AI\Health\ModelHealthRecorder;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Interface\SupportsAsyncVideo;
@@ -56,6 +57,7 @@ class AiFacade
         private CacheItemPoolInterface $cachePool,
         private HiggsfieldCredentialResolver $higgsfieldCredentials,
         private TranscriptionUsageRecorder $transcriptionUsageRecorder,
+        private ModelHealthRecorder $health,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private string $embeddingFallbackProvider = '',
     ) {
@@ -169,9 +171,13 @@ class AiFacade
 
         // Execute with Circuit Breaker protection
         try {
-            $response = $this->circuitBreaker->execute(
+            $response = $this->executeWithHealth(
                 callback: fn () => $provider->chat($messages, $options),
                 serviceName: 'ai_provider_'.$provider->getName(),
+                capability: 'chat',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
                 fallback: null // NO FALLBACK - let ProviderException bubble up
             );
         } catch (ProviderException $e) {
@@ -231,7 +237,7 @@ class AiFacade
         // Execute streaming with Circuit Breaker protection
         $streamResult = null;
         try {
-            $this->circuitBreaker->execute(
+            $this->executeWithHealth(
                 callback: function () use ($provider, $messages, $streamCallback, $options, &$streamResult) {
                     $this->logger->info('🟢 AiFacade: Calling provider chatStream');
                     $streamResult = $provider->chatStream($messages, $streamCallback, $options);
@@ -240,6 +246,9 @@ class AiFacade
                     return null;
                 },
                 serviceName: 'ai_provider_'.$provider->getName(),
+                capability: 'chat',
+                provider: $provider,
+                options: $options,
                 fallback: null // NO FALLBACK - let ProviderException bubble up
             );
         } catch (ProviderException|StreamCancelledException $e) {
@@ -320,7 +329,13 @@ class AiFacade
                         'text_length' => strlen($text),
                     ]);
 
-                    return $provider->embed($text, $options);
+                    return $this->observing(
+                        'embedding',
+                        $provider->getName(),
+                        $resolvedModel,
+                        $userId,
+                        fn () => $provider->embed($text, $options),
+                    );
                 }
             );
         } catch (ProviderException $primaryError) {
@@ -505,7 +520,13 @@ class AiFacade
         $missingIndexes = array_keys($missingByIndex);
 
         try {
-            $batch = $provider->embedBatch($missingTexts, $options);
+            $batch = $this->observing(
+                'embedding',
+                $provider->getName(),
+                $resolvedModel,
+                $userId,
+                fn () => $provider->embedBatch($missingTexts, $options),
+            );
         } catch (\Throwable $primaryError) {
             // The fallback covers the FULL original text list (not just the
             // misses). Mixing cached primary vectors with fallback vectors
@@ -802,9 +823,13 @@ class AiFacade
             ]);
 
             try {
-                $response = $this->circuitBreaker->execute(
+                $response = $this->executeWithHealth(
                     callback: fn () => $provider->explainImage($imagePath, $prompt, $candidateOptions),
                     serviceName: 'ai_provider_vision_'.$provider->getName(),
+                    capability: 'vision',
+                    provider: $provider,
+                    options: $candidateOptions,
+                    userId: $userId,
                     fallback: null // NO FALLBACK
                 );
 
@@ -876,9 +901,13 @@ class AiFacade
         ]);
 
         try {
-            $images = $this->circuitBreaker->execute(
+            $images = $this->executeWithHealth(
                 callback: fn () => $provider->generateImage($prompt, $options),
                 serviceName: 'ai_provider_image_'.$provider->getName(),
+                capability: 'image_generation',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
                 fallback: null // NO FALLBACK
             );
         } catch (ProviderException $e) {
@@ -926,9 +955,13 @@ class AiFacade
         ]);
 
         try {
-            $videos = $this->circuitBreaker->execute(
+            $videos = $this->executeWithHealth(
                 callback: fn () => $provider->generateVideo($prompt, $options),
                 serviceName: 'ai_provider_video_'.$provider->getName(),
+                capability: 'video_generation',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
                 fallback: null // NO FALLBACK
             );
         } catch (ProviderException $e) {
@@ -1152,6 +1185,57 @@ class AiFacade
         return 'unknown';
     }
 
+    /**
+     * Run a provider call through the circuit breaker and tell the health
+     * monitor how it ended.
+     *
+     * This is the single choke point for passive detection: every capability
+     * already goes through the circuit breaker, so wrapping it here observes
+     * real traffic without adding a single extra provider request. Recording
+     * never throws — {@see ModelHealthRecorder} swallows its own errors — so a
+     * broken counter cannot take down the call it is watching.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function executeWithHealth(
+        callable $callback,
+        string $serviceName,
+        string $capability,
+        ProviderMetadataInterface $provider,
+        array $options,
+        ?int $userId = null,
+        ?callable $fallback = null,
+    ): mixed {
+        return $this->observing(
+            $capability,
+            $provider->getName(),
+            $this->reportedModel($provider, $options, $capability),
+            $userId,
+            fn () => $this->circuitBreaker->execute($callback, $serviceName, $fallback),
+        );
+    }
+
+    /**
+     * Report how a provider call ended to the health monitor and pass the
+     * result (or the exception) straight through.
+     *
+     * Used directly by the embedding path, which caches and falls back instead
+     * of going through the circuit breaker.
+     */
+    private function observing(string $capability, string $providerName, ?string $model, ?int $userId, callable $callback): mixed
+    {
+        try {
+            $result = $callback();
+        } catch (\Throwable $e) {
+            $this->health->recordFailure($capability, $providerName, $model, $e, $userId);
+            throw $e;
+        }
+
+        $this->health->recordSuccess($capability, $providerName, $model);
+
+        return $result;
+    }
+
     public function transcribe(string $audioPath, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
@@ -1190,9 +1274,13 @@ class AiFacade
         ]);
 
         try {
-            $result = $this->circuitBreaker->execute(
+            $result = $this->executeWithHealth(
                 callback: fn () => $provider->transcribe($audioPath, $options),
                 serviceName: 'ai_provider_stt_'.$provider->getName(),
+                capability: 'speech_to_text',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
                 fallback: null // NO FALLBACK
             );
         } catch (ProviderException $e) {
@@ -1291,9 +1379,13 @@ class AiFacade
         ]);
 
         try {
-            $filename = $this->circuitBreaker->execute(
+            $filename = $this->executeWithHealth(
                 callback: fn () => $provider->synthesize($text, $options),
                 serviceName: 'ai_provider_tts_'.$provider->getName(),
+                capability: 'text_to_speech',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
                 fallback: null // NO FALLBACK
             );
         } catch (ProviderException $e) {

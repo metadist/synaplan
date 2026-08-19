@@ -6,6 +6,7 @@ namespace App\Tests\Unit\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
+use App\AI\Health\ModelHealthRecorder;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderRegistry;
@@ -59,6 +60,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(HiggsfieldCredentialResolver::class),
             $this->createMock(TranscriptionUsageRecorder::class),
+            $this->createMock(ModelHealthRecorder::class),
             '/tmp'
         );
     }

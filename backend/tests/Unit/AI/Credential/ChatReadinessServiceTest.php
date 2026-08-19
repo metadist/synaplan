@@ -11,6 +11,7 @@ use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
+use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
@@ -59,6 +60,8 @@ class ChatReadinessServiceTest extends TestCase
             new ArrayAdapter(),
             $this->providerRegistry,
             $ollamaModelInventory,
+            $this->createMock(ModelHealthRepository::class),
+            new NullLogger(),
             'test',
         );
 

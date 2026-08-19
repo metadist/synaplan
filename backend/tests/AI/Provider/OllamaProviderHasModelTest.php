@@ -34,7 +34,7 @@ final class OllamaProviderHasModelTest extends TestCase
                 parent::__construct($logger, $baseUrl, $httpClient);
             }
 
-            protected function getAvailableModels(): array
+            public function getAvailableModels(): array
             {
                 return $this->models;
             }
