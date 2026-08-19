@@ -105,6 +105,7 @@ echo "Case 2: scheduler runs every slot's command initially and writes a heartbe
 assert_contains "app:media:reap-jobs --no-interaction" "$COMMAND_LOG" "scheduler runs media reaper"
 assert_contains "app:files:reap-ephemeral --no-interaction" "$COMMAND_LOG" "scheduler runs ephemeral-file reaper"
 assert_contains "app:updates:check --no-interaction" "$COMMAND_LOG" "scheduler runs the daily update check"
+assert_contains "app:models:check-availability --notify --no-interaction" "$COMMAND_LOG" "scheduler runs the daily model availability check"
 if [ -s "$TMP_DIR/runtime/scheduler.heartbeat" ]; then
     assert_eq 1 1 "scheduler writes liveness heartbeat"
 else

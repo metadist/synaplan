@@ -582,6 +582,11 @@ services:
     App\Service\MediaGenerationServiceInterface:
         alias: App\Service\MediaGenerationService
 
+    # Model availability detection talks to provider listing endpoints; the
+    # interface keeps the diff logic testable without credentials or network.
+    App\AI\Service\ProviderModelInventoryInterface:
+        alias: App\AI\Service\ProviderModelInventory
+
     App\Service\Media\GeneratedFileRegistrar:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'

@@ -352,7 +352,7 @@ run_scheduler_role() {
     mkdir -p "$SYNAPLAN_RUNTIME_DIR"
     trap stop_scheduler TERM INT
 
-    runtime_log "Starting scheduler (media reaper every ${tick_seconds}s, ephemeral-file reaper every ${hourly_seconds}s, update check every ${daily_seconds}s)."
+    runtime_log "Starting scheduler (media reaper every ${tick_seconds}s, ephemeral-file reaper every ${hourly_seconds}s, update + model-availability check every ${daily_seconds}s)."
     while [ "$_scheduler_stopping" -eq 0 ]; do
         now="$(date +%s)"
         printf '%s\n' "$now" > "${SYNAPLAN_RUNTIME_DIR}/scheduler.heartbeat"
@@ -380,6 +380,15 @@ run_scheduler_role() {
             if ! run_scheduler_command bin/console --env="$env" app:updates:check --no-interaction; then
                 runtime_log "Update check failed; it will be retried on the next daily interval." >&2
             fi
+
+            # Discontinued-model detection. Read-only and reports only: it asks
+            # the providers the operator already configured a key for which
+            # models they still serve, and never changes a row. Installs without
+            # cloud keys make no outbound request at all.
+            if ! run_scheduler_command bin/console --env="$env" app:models:check-availability --notify --no-interaction; then
+                runtime_log "Model availability check failed; it will be retried on the next daily interval." >&2
+            fi
+
             next_daily=$((now + daily_seconds))
         fi
 

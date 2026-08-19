@@ -93,6 +93,36 @@ Provider billing-mechanics cheat-sheet (verified 2026-07-13):
 
 Catalog now set to DeepInfra rates. Note K2.7 was previously $0.95/$4.00 (ABOVE DeepInfra) → we had been overcharging customers; K2.5/K2.6 were below → we had been losing money.
 
+## Discontinuation detection — `app:models:check-availability`
+
+Providers retire models without telling us, and until now we found out when a user hit a provider error. This command finds it first.
+
+```bash
+docker compose exec -T backend php bin/console app:models:check-availability --fail-on-drift; echo $?
+```
+
+It runs in **two stages, and the second one is the point**: the provider's model list is only a cheap pre-filter, then every model missing from that list is confirmed individually via `GET {listUrl}/{modelId}`. Only a model the provider itself answers `404`/`400` for is reported. Judging by list membership alone is wrong in both directions, verified against the live APIs on 2026-08-19:
+
+- **False alarm** — Gemini serves `imagen-4.0-generate-001` through `:predict` and leaves it out of `models.list`, but answers `200` when asked directly. A list-only check reports all three Imagen rows as dead.
+- **Blind spot** — xAI's `grok-tts` is also absent from `/v1/models`, and there it really is gone (`404`). Any heuristic that excused the Imagen case (per-capability coverage, tag families) hid this one.
+
+What it deliberately does **not** do: change anything. No `BACTIVE=0`, no default repointing. A model also disappears from a listing through a rename, a region gate or an account tier, and an unattended deactivation on a false positive takes a working model away from every user of the install. Retirement stays a reviewed migration (see the retirement policy below).
+
+Reporting rules that keep it trustworthy:
+
+- Providers with no key, no listing endpoint (HuggingFace validates via `whoami-v2`; Ollama et al. are per-install) or an unreachable API are **unchecked** — never read as "serves nothing".
+- A probe that answers `401`/`429`/`5xx` leaves the model **unconfirmed**: shown in the console, excluded from the alert and the exit code.
+- Findings carry both scopes independently: `database` (this install's active `BMODELS` rows) and `catalog` (what new installs still get). An operator who cleaned up locally must still learn that fresh installs keep receiving the dead model.
+- A finding on a `ProviderDefaultsService` recommendation is marked and sorted first — `app:provider:apply-defaults --auto` assigns those unattended at container start.
+
+Exit codes match `app:sync-model-prices`: `0` clean, `1` the command broke, `2` confirmed findings (only with `--fail-on-drift`). The scheduler role runs it daily with `--notify`, which posts to Discord when `DISCORD_WEBHOOK_URL` is set. Installs without cloud keys make no outbound request at all.
+
+### First run against live APIs (2026-08-19)
+
+Six confirmed retirements, each re-verified by hand: Groq dropped `llama-3.3-70b-versatile` (BID 9), `llama-3.1-8b-instant` (236), `qwen/qwen3-32b` (53) and `meta-llama/llama-4-scout-17b-16e-instruct` (17 — the Groq `PIC2TEXT` default), xAI dropped `grok-stt` (321 — the xAI `SOUND2TEXT` default) and `grok-tts` (320). Groq's current list is 13 models; `whisper-large-v3` and `openai/gpt-oss-*` are unaffected.
+
+The four Groq rows were retired in `Version20260819080000` (#1513), which also added Groq Qwen 3.6 27B (324/325) as their successor. Re-running the check after that migration reports Groq at `7/7 matched`: the retired rows are out of the active set and the freshly added successor BIDs produce no false positive. The two xAI rows stay open (#1514) — the catalog has no xAI replacement for either capability, so the `SOUND2TEXT` recommendation has to move to another provider or be dropped rather than repointed within xAI.
+
 ## Maintenance links
 
 **Official provider price pages** (use these first — step 2 of the playbook):
