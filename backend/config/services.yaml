@@ -827,6 +827,12 @@ services:
         arguments:
             $appSecret: '%env(APP_SECRET)%'
 
+    # Read-only media credential for <img>/<audio>/<video>, which cannot send
+    # an Authorization header. Derives its own signing key from APP_SECRET.
+    App\Service\Media\MediaAccessTokenService:
+        arguments:
+            $appSecret: '%env(APP_SECRET)%'
+
     # OAuth login responder (web cookies vs native deep-link handoff)
     App\Service\OAuthLoginResponder:
         arguments:

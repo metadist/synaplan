@@ -7,6 +7,18 @@ const auth = vi.hoisted(() => ({ token: null as string | null }))
 const refreshAccessToken = vi.hoisted(() => vi.fn(async () => ({ success: true })))
 const saveOrDownloadBlob = vi.hoisted(() => vi.fn(async () => undefined))
 
+/** Stand-in for httpClient's ApiError; mediaAuth branches on `instanceof`. */
+const ApiError = vi.hoisted(
+  () =>
+    class ApiError extends Error {
+      constructor(public readonly status: number) {
+        super(`HTTP ${status}`)
+      }
+    }
+)
+
+const httpClientMock = vi.hoisted(() => vi.fn(async () => ({ token: 'mtok', expiresIn: 1800 })))
+
 vi.mock('@/services/api/nativeRuntime', () => ({
   isNativeApp: () => runtime.native,
   getNativeApiBaseUrl: () => runtime.baseUrl,
@@ -14,10 +26,15 @@ vi.mock('@/services/api/nativeRuntime', () => ({
 
 vi.mock('@/services/api/nativeAuth', () => ({ getNativeAccessToken: () => auth.token }))
 
-vi.mock('@/services/api/httpClient', () => ({ refreshAccessToken }))
+vi.mock('@/services/api/httpClient', () => ({
+  refreshAccessToken,
+  httpClient: httpClientMock,
+  ApiError,
+}))
 vi.mock('@/services/api/nativeDownload', () => ({ saveOrDownloadBlob }))
 
 import {
+  __resetMediaCredentialCache,
   authenticatedMediaSrc,
   downloadMediaUrl,
   fetchMediaBlob,
@@ -53,6 +70,9 @@ describe('mediaAuth', () => {
     refreshAccessToken.mockClear()
     refreshAccessToken.mockResolvedValue({ success: true })
     saveOrDownloadBlob.mockClear()
+    httpClientMock.mockClear()
+    httpClientMock.mockResolvedValue({ token: 'mtok', expiresIn: 1800 })
+    __resetMediaCredentialCache()
   })
 
   describe('resolveMediaUrl', () => {
@@ -250,7 +270,57 @@ describe('mediaAuth', () => {
   })
 
   describe('useMediaSrc', () => {
-    it('does not rebuild the URL when the token rotates, which would restart playback', async () => {
+    it('puts the purpose-scoped media token in the URL, never the session token', async () => {
+      runtime.native = true
+      auth.token = 'session-tok'
+      const { mediaSrc } = useMediaSrc()
+      const src = computed(() => mediaSrc(UPLOAD_PATH))
+      await flushPromises()
+
+      expect(httpClientMock).toHaveBeenCalledWith(
+        '/api/v1/files/media-token',
+        expect.objectContaining({ schema: expect.anything() })
+      )
+      expect(src.value).toContain('media_token=mtok')
+      expect(src.value).not.toContain('session-tok')
+    })
+
+    it('falls back to the session token on a server without the media-token endpoint', async () => {
+      runtime.native = true
+      auth.token = 'session-tok'
+      httpClientMock.mockRejectedValue(new ApiError(404))
+
+      const { mediaSrc } = useMediaSrc()
+      const src = computed(() => mediaSrc(UPLOAD_PATH))
+      await flushPromises()
+
+      expect(src.value).toContain('token=session-tok')
+    })
+
+    it('probes an old server only once, not on every media element', async () => {
+      runtime.native = true
+      auth.token = 'session-tok'
+      httpClientMock.mockRejectedValue(new ApiError(404))
+
+      useMediaSrc()
+      await flushPromises()
+      useMediaSrc()
+      await flushPromises()
+
+      expect(httpClientMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('is a no-op on web, where the session cookie authenticates media', async () => {
+      auth.token = 'session-tok'
+      const { mediaSrc } = useMediaSrc()
+      const src = computed(() => mediaSrc(UPLOAD_PATH))
+      await flushPromises()
+
+      expect(httpClientMock).not.toHaveBeenCalled()
+      expect(src.value).toBe(UPLOAD_PATH)
+    })
+
+    it('does not rebuild the URL when the session token rotates, which would restart playback', async () => {
       runtime.native = true
       auth.token = 'tok'
       const { mediaSrc } = useMediaSrc()
@@ -258,8 +328,6 @@ describe('mediaAuth', () => {
       await flushPromises()
 
       const first = src.value
-      expect(first).toContain('token=tok')
-
       auth.token = 'rotated'
 
       expect(src.value).toBe(first)
@@ -273,15 +341,15 @@ describe('mediaAuth', () => {
       await flushPromises()
       expect(src.value).not.toContain('_retry=')
 
-      auth.token = 'rotated'
+      httpClientMock.mockResolvedValue({ token: 'mtok2', expiresIn: 1800 })
       await reloadMedia()
 
       expect(refreshAccessToken).toHaveBeenCalledTimes(1)
-      expect(src.value).toContain('token=rotated')
+      expect(src.value).toContain('media_token=mtok2')
       expect(src.value).toContain('_retry=')
     })
 
-    it('refreshes an expiring token once at setup so the first render is usable', async () => {
+    it('refreshes an expiring session token before minting, so the mint itself succeeds', async () => {
       runtime.native = true
       auth.token = signedToken(5)
 
@@ -289,6 +357,7 @@ describe('mediaAuth', () => {
       await flushPromises()
 
       expect(refreshAccessToken).toHaveBeenCalledTimes(1)
+      expect(httpClientMock).toHaveBeenCalledTimes(1)
     })
   })
 })

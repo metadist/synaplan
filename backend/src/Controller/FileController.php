@@ -16,6 +16,7 @@ use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
 use App\Service\File\FileUploadService;
 use App\Service\File\UploadOptions;
+use App\Service\Media\MediaAccessTokenService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\StorageQuotaService;
@@ -48,9 +49,52 @@ class FileController extends AbstractController
         private VectorMigrationService $migrationService,
         private DocumentGeneratorService $documentGenerator,
         private DocumentImageReferenceResolver $documentImageReferenceResolver,
+        private MediaAccessTokenService $mediaAccessTokenService,
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
+    }
+
+    /**
+     * Mint a short-lived, read-only credential for loading the caller's media.
+     *
+     * MOBILE-APP SEAM (Epic 7): media elements cannot send an `Authorization`
+     * header, and the native shell has no cookie because it runs cross-origin
+     * on `capacitor://localhost`. Clients attach this token to media URLs
+     * instead of the session access token, so a URL that leaks cannot be used
+     * for anything but reading that user's own media, and only briefly.
+     */
+    #[Route('/media-token', name: 'media_token', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/media-token',
+        summary: 'Issue a short-lived read-only token for loading media URLs',
+        tags: ['Files'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Media access token',
+                content: new OA\JsonContent(
+                    required: ['token', 'expiresIn'],
+                    properties: [
+                        new OA\Property(property: 'token', type: 'string', description: 'Attach as the media_token query parameter', example: 'eyJ1aWQiOjF9.9f86d0818...'),
+                        new OA\Property(property: 'expiresIn', type: 'integer', description: 'Lifetime in seconds', example: 1800),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function mediaToken(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        return $this->json([
+            'token' => $this->mediaAccessTokenService->generate($user),
+            'expiresIn' => MediaAccessTokenService::TTL,
+        ]);
     }
 
     #[Route('/upload', name: 'upload', methods: ['POST'])]
@@ -427,7 +471,10 @@ class FileController extends AbstractController
         path: '/api/v1/files/{id}/download',
         summary: 'Download a file',
         tags: ['Files'],
-        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: MediaAccessTokenService::QUERY_PARAM, in: 'query', required: false, description: 'Read-only media token from /api/v1/files/media-token, for clients that cannot send an Authorization header', schema: new OA\Schema(type: 'string')),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'File content'),
             new OA\Response(response: 401, description: 'Not authenticated'),
@@ -435,8 +482,13 @@ class FileController extends AbstractController
             new OA\Response(response: 404, description: 'File not found'),
         ]
     )]
-    public function downloadFile(int $id, #[CurrentUser] ?User $user): Response
+    public function downloadFile(int $id, Request $request, #[CurrentUser] ?User $user): Response
     {
+        // An <img>/<video> pointing at this route carries a media token in the
+        // URL instead of a header; it grants nothing but reading this user's
+        // own files (see MediaAccessTokenService).
+        $user ??= $this->mediaAccessTokenService->resolveUser($request);
+
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }

@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\File\FileHelper;
+use App\Service\Media\MediaAccessTokenService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -27,6 +28,7 @@ class StaticUploadController extends AbstractController
     public function __construct(
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
+        private MediaAccessTokenService $mediaAccessTokenService,
         private string $uploadDir,
         private LoggerInterface $logger,
     ) {
@@ -55,6 +57,13 @@ class StaticUploadController extends AbstractController
         // Extract filename from path (last segment)
         $filename = basename($path);
 
+        // A media element cannot send an Authorization header, so clients that
+        // have no cookie either (the native shell is cross-origin) identify
+        // themselves with a read-only media token in the query string. It only
+        // ever stands in for the owner of a media read — see
+        // MediaAccessTokenService.
+        $user ??= $this->mediaAccessTokenService->resolveUser($request);
+
         // Check if this is an OG image for social media sharing
         // OG images are public and stored in og/{shard}/{token}.{ext}
         $isOgImage = str_starts_with($path, 'og/');
@@ -74,26 +83,35 @@ class StaticUploadController extends AbstractController
             return $this->serveFile($path, $request);
         }
 
-        // Check if this is an AI-generated file that should bypass strict auth
-        // Browser <audio> and <video> tags can't send Authorization headers,
-        // so we identify AI-generated files by their naming patterns:
-        // - tts_*, generated_*, ai_* (legacy patterns)
-        // - {messageId}_{provider}_{timestamp}.{ext} (media generation pattern, e.g., 3092_google_1767702325.mp4)
-        $isTemporaryAiFile = preg_match('/^(tts_|generated_|ai_)/', $filename);
-        $isMediaGeneratedFile = preg_match('/^\d+_[a-z]+_\d+\.[a-z0-9]+$/i', $filename);
+        // Filename patterns that are served without any permission check.
+        //
+        // These are NOT a convenience for our own UI — authenticated clients
+        // have the cookie, the Bearer header or a media token. They exist
+        // because third parties fetch these URLs anonymously and cannot be
+        // given a credential:
+        //
+        // - `tts_*` and `{messageId}_{provider}_{timestamp}.{ext}`: Meta's
+        //   WhatsApp servers fetch the `link` we hand them
+        //   (`WhatsAppService::sendMedia`), and the public widget/guest chat
+        //   renders them in anonymous browsers.
+        // - `ai_i2vsrc_*`: `MediaGenerationHandler::publishInputImageForRemoteFetch`
+        //   hands the URL to image-to-video providers, which fetch it directly.
+        //
+        // Do not widen this list. Anything reachable only from our own
+        // authenticated UI must go through the ownership check below.
+        $isRemoteFetchedSource = str_starts_with($filename, 'ai_i2vsrc_');
+        $isOutboundChannelMedia = str_starts_with($filename, 'tts_')
+            || 1 === preg_match('/^\d+_[a-z]+_\d+\.[a-z0-9]+$/i', $filename);
 
-        if ($isTemporaryAiFile || $isMediaGeneratedFile) {
-            // For AI-generated files: Allow access without strict auth
-            // Security is provided by:
-            // 1. Files are in user-specific directories (path contains user ID hash)
-            // 2. Filenames include message ID, provider, and timestamp (hard to guess)
-            // 3. Files are ephemeral and can be cleaned up periodically
-
-            $this->logger->info('StaticUploadController: Serving AI-generated file', [
+        if ($isRemoteFetchedSource || $isOutboundChannelMedia) {
+            // Security rests on the path being unguessable (user-specific
+            // directory plus a filename carrying ids and a timestamp) and on
+            // these files being ephemeral.
+            $this->logger->info('StaticUploadController: Serving anonymously fetchable media', [
                 'path' => $path,
                 'filename' => $filename,
-                'is_temporary' => $isTemporaryAiFile,
-                'is_media_generated' => $isMediaGeneratedFile,
+                'remote_fetched_source' => $isRemoteFetchedSource,
+                'outbound_channel_media' => $isOutboundChannelMedia,
                 'user_id' => $user?->getId(),
             ]);
 
