@@ -30,7 +30,7 @@ class ModelEnableCommand extends Command
     {
         $this
             ->addArgument('models', InputArgument::IS_ARRAY | InputArgument::REQUIRED,
-                'Model keys to enable (e.g. groq:llama-3.3-70b-versatile ollama:bge-m3)')
+                'Model keys to enable (e.g. groq:qwen/qwen3.6-27b ollama:bge-m3)')
             ->addOption('system', null, InputOption::VALUE_NONE,
                 'Mark enabled models as system models (locked, users cannot change)')
             ->setHelp(

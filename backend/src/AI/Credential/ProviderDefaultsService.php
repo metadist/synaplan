@@ -36,14 +36,14 @@ final readonly class ProviderDefaultsService
      */
     private const PROVIDER_DEFAULTS = [
         'groq' => [
-            'CHAT' => 'groq:llama-3.3-70b-versatile:chat',
-            'TOOLS' => 'groq:llama-3.3-70b-versatile:chat',
-            'ANALYZE' => 'groq:llama-3.3-70b-versatile:chat',
+            'CHAT' => 'groq:qwen/qwen3.6-27b:chat',
+            'TOOLS' => 'groq:qwen/qwen3.6-27b:chat',
+            'ANALYZE' => 'groq:qwen/qwen3.6-27b:chat',
             'SORT' => 'groq:openai/gpt-oss-120b:chat',
             'PLAN' => 'groq:openai/gpt-oss-120b:chat',
             'SUMMARIZE' => 'groq:openai/gpt-oss-120b:chat',
             'MEM' => 'groq:openai/gpt-oss-120b:mem',
-            'PIC2TEXT' => 'groq:meta-llama/llama-4-scout-17b-16e-instruct:pic2text',
+            'PIC2TEXT' => 'groq:qwen/qwen3.6-27b:pic2text',
             'SOUND2TEXT' => 'groq:whisper-large-v3:sound2text',
         ],
         'openai' => [
