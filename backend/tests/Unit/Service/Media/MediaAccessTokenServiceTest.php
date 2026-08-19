@@ -23,6 +23,13 @@ final class MediaAccessTokenServiceTest extends TestCase
         $this->assertSame(42, $service->resolveUserId($token));
     }
 
+    public function testGenerateRejectsAnUnsavedUser(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service()->generate(new User());
+    }
+
     public function testRejectsATamperedPayload(): void
     {
         $service = $this->service();

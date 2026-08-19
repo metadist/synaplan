@@ -78,8 +78,13 @@ final readonly class MediaAccessTokenService
 
     public function generate(User $user): string
     {
+        $uid = $user->getId();
+        if (null === $uid) {
+            throw new \InvalidArgumentException('Cannot mint a media token for an unsaved user');
+        }
+
         $payload = [
-            'uid' => $user->getId(),
+            'uid' => $uid,
             'purpose' => self::PURPOSE,
             'exp' => time() + self::TTL,
         ];

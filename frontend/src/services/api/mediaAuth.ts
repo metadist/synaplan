@@ -109,12 +109,16 @@ const SESSION_TOKEN_PARAM = 'token'
 
 /**
  * Pick the credential to put in a media URL: the purpose-scoped media token
- * when we hold one, otherwise the session token so a server without the
- * media-token endpoint keeps working.
+ * when we hold one. The session token is only used after we have confirmed
+ * the server has no media-token endpoint — never as a first-paint fallback,
+ * because that would put a full API credential in every media `src`.
  */
 function mediaUrlCredential(): { param: string; value: string } | null {
   if (null !== mediaToken && Date.now() < mediaToken.expiresAt) {
     return { param: MEDIA_TOKEN_PARAM, value: mediaToken.value }
+  }
+  if (mediaTokenUnsupportedFor !== getNativeApiBaseUrl()) {
+    return null
   }
   const session = getNativeAccessToken()
   return session ? { param: SESSION_TOKEN_PARAM, value: session } : null
@@ -160,9 +164,10 @@ let mediaTokenUnsupportedFor: string | null = null
 /**
  * Mint a media token, or give up quietly.
  *
- * Any failure is non-fatal: `mediaUrlCredential()` then falls back to the
- * session token, which every supported server accepts. Concurrent callers
- * share one request so opening a chat full of images mints a single token.
+ * Concurrent callers share one request so opening a chat full of images
+ * mints a single token. A 404 is remembered so we fall back to the session
+ * token; other errors leave `mediaUrlCredential()` empty so a transient mint
+ * failure cannot leak the session token into a URL.
  */
 async function requestMediaToken(): Promise<void> {
   const server = getNativeApiBaseUrl()
@@ -298,10 +303,17 @@ export function useMediaSrc(): {
 } {
   const revision = ref(0)
   const cacheBuster = ref(0)
+  // On native we must not emit a requestable backend URL until we know which
+  // credential to put in it. An empty first paint is a loading state; a
+  // first paint with `?token=` would leak the session access token.
+  const ready = ref(!(isNativeApp() && Boolean(getNativeAccessToken())))
 
   const mediaSrc = (url: string | null | undefined): string => {
     // Read both refs so the calling computed/render re-runs on reload.
     void revision.value
+    if (!ready.value) {
+      return ''
+    }
     const base = authenticatedMediaSrc(url)
     if ('' === base || 0 === cacheBuster.value) {
       return base
@@ -317,6 +329,7 @@ export function useMediaSrc(): {
     invalidateMediaToken()
     await forceSessionTokenRefresh()
     await ensureMediaCredential()
+    ready.value = true
     cacheBuster.value = Date.now()
     revision.value++
   }
@@ -325,6 +338,7 @@ export function useMediaSrc(): {
   // it is fresh. When nothing changed the rebuilt URL is identical and Vue
   // skips the update, so the common case costs no extra request.
   void ensureMediaCredential().then(() => {
+    ready.value = true
     revision.value++
   })
 
@@ -335,8 +349,9 @@ export function useMediaSrc(): {
  * Fetch a media URL as a Blob with the right auth transport per platform:
  * session cookie on web, `Authorization: Bearer` (cookies omitted) on native.
  *
- * A rejected credential is refreshed and retried once — the access token
- * outlives neither an idle chat nor a backgrounded app.
+ * A 401 is refreshed and retried once — the access token outlives neither
+ * an idle chat nor a backgrounded app. A 403 is a permission denial, not an
+ * expired credential, so it is not retried.
  */
 export async function fetchMediaBlob(url: string): Promise<Blob> {
   const target = resolveMediaUrl(url)
@@ -344,7 +359,7 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
 
   let response = await requestMedia(target)
 
-  if (401 === response.status || 403 === response.status) {
+  if (401 === response.status) {
     await forceSessionTokenRefresh()
     // Mirror httpClient: give a refreshed cookie a moment to land before the
     // retry, otherwise the second request can race it into another 401.

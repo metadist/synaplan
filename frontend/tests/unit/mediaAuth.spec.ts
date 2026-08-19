@@ -138,21 +138,14 @@ describe('mediaAuth', () => {
       expect(authenticatedMediaSrc(UPLOAD_PATH)).toBe(UPLOAD_PATH)
     })
 
-    it('appends the access token for backend URLs on native', () => {
+    it('does not put the session token in the URL before the media-token probe', () => {
       runtime.native = true
       auth.token = 'tok en/+'
-      expect(authenticatedMediaSrc(UPLOAD_PATH)).toBe(
-        `https://web.synaplan.com${UPLOAD_PATH}?token=${encodeURIComponent('tok en/+')}`
-      )
+      expect(authenticatedMediaSrc(UPLOAD_PATH)).toBe(`https://web.synaplan.com${UPLOAD_PATH}`)
+      expect(authenticatedMediaSrc(UPLOAD_PATH)).not.toContain('token=')
     })
 
-    it('uses & when the URL already carries a query', () => {
-      runtime.native = true
-      auth.token = 'tok'
-      expect(authenticatedMediaSrc(`${UPLOAD_PATH}?v=2`)).toContain('?v=2&token=tok')
-    })
-
-    it('never leaks the token to an external host', () => {
+    it('never leaks a credential to an external host', () => {
       runtime.native = true
       auth.token = 'tok'
       expect(authenticatedMediaSrc('https://cdn.example.com/a.png')).toBe(
@@ -260,6 +253,15 @@ describe('mediaAuth', () => {
       expect(refreshAccessToken).not.toHaveBeenCalled()
     })
 
+    it('does not retry a 403 — permission denied is not an expired credential', async () => {
+      const fetchMock = vi.fn(async () => mediaResponse(403))
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(fetchMediaBlob(UPLOAD_PATH)).rejects.toThrow('HTTP 403')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(refreshAccessToken).not.toHaveBeenCalled()
+    })
+
     it('throws when the retry is rejected too', async () => {
       vi.useFakeTimers()
       vi.stubGlobal(
@@ -288,6 +290,33 @@ describe('mediaAuth', () => {
   })
 
   describe('useMediaSrc', () => {
+    it('emits no src until the media token is minted, so the session token never lands in the URL', async () => {
+      runtime.native = true
+      auth.token = 'session-tok'
+      const { mediaSrc } = useMediaSrc()
+      const src = computed(() => mediaSrc(UPLOAD_PATH))
+
+      expect(src.value).toBe('')
+
+      await flushPromises()
+
+      expect(httpClientMock).toHaveBeenCalledWith(
+        '/api/v1/files/media-token',
+        expect.objectContaining({ schema: expect.anything() })
+      )
+      expect(src.value).toContain('media_token=mtok')
+      expect(src.value).not.toContain('session-tok')
+    })
+
+    it('uses & when the URL already carries a query', async () => {
+      runtime.native = true
+      auth.token = 'tok'
+      const { mediaSrc } = useMediaSrc()
+      await flushPromises()
+
+      expect(mediaSrc(`${UPLOAD_PATH}?v=2`)).toContain('?v=2&media_token=mtok')
+    })
+
     it('puts the purpose-scoped media token in the URL, never the session token', async () => {
       runtime.native = true
       auth.token = 'session-tok'
@@ -295,10 +324,6 @@ describe('mediaAuth', () => {
       const src = computed(() => mediaSrc(UPLOAD_PATH))
       await flushPromises()
 
-      expect(httpClientMock).toHaveBeenCalledWith(
-        '/api/v1/files/media-token',
-        expect.objectContaining({ schema: expect.anything() })
-      )
       expect(src.value).toContain('media_token=mtok')
       expect(src.value).not.toContain('session-tok')
     })

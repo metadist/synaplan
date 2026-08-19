@@ -196,6 +196,10 @@ class StaticUploadControllerTest extends WebTestCase
         );
 
         $this->assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        $this->assertStringContainsString(
+            'private',
+            (string) $this->client->getResponse()->headers->get('Cache-Control'),
+        );
     }
 
     public function testRejectsAnInvalidMediaToken(): void
@@ -227,6 +231,10 @@ class StaticUploadControllerTest extends WebTestCase
         $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
 
         $this->assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        $this->assertStringContainsString(
+            'public',
+            (string) $this->client->getResponse()->headers->get('Cache-Control'),
+        );
     }
 
     /**

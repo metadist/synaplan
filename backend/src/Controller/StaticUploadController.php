@@ -204,8 +204,11 @@ class StaticUploadController extends AbstractController
             ], Response::HTTP_GONE);
         }
 
-        // 5. Serve the file
-        return $this->serveFile($path, $request);
+        // 5. Serve the file. Owner-checked (and media-token) responses must
+        // not sit in a shared cache: the credential lives in the URL, and a
+        // public max-age longer than the token TTL would keep serving the
+        // file after the token has died.
+        return $this->serveFile($path, $request, publicCache: false);
     }
 
     /**
@@ -288,10 +291,11 @@ class StaticUploadController extends AbstractController
      * Supports HTTP Range requests for video/audio seeking and resumable downloads.
      * Uses NFS-aware file checks to handle multi-server deployments with shared storage.
      *
-     * @param string  $path    Relative path from uploads dir (can include subdirectories)
-     * @param Request $request The HTTP request (for range header processing)
+     * @param string  $path        Relative path from uploads dir (can include subdirectories)
+     * @param Request $request     The HTTP request (for range header processing)
+     * @param bool    $publicCache True for assets third parties fetch anonymously
      */
-    private function serveFile(string $path, Request $request): Response
+    private function serveFile(string $path, Request $request, bool $publicCache = true): Response
     {
         // Build absolute path with security checks
         $absolutePath = $this->uploadDir.'/'.$path;
@@ -334,9 +338,13 @@ class StaticUploadController extends AbstractController
             $response->headers->set('Content-Type', $mimeType);
         }
 
-        // Cache headers for better performance
-        $response->setPublic();
-        $response->setMaxAge(3600); // 1 hour
+        if ($publicCache) {
+            $response->setPublic();
+            $response->setMaxAge(3600);
+        } else {
+            $response->setPrivate();
+            $response->headers->set('Cache-Control', 'private, no-cache, must-revalidate');
+        }
 
         // Security headers
         $response->headers->set('X-Content-Type-Options', 'nosniff');

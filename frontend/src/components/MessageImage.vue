@@ -6,7 +6,7 @@
       @click="openFullscreen"
     >
       <img
-        v-if="!hasFailed"
+        v-if="imageSrc && !hasFailed"
         :src="imageSrc"
         :alt="alt"
         class="w-full h-full object-cover transition-transform group-hover:scale-105"
@@ -136,7 +136,7 @@
           </svg>
         </button>
         <img
-          v-if="!hasFailed"
+          v-if="imageSrc && !hasFailed"
           :src="imageSrc"
           :alt="alt"
           class="max-w-full max-h-full object-contain z-10"
@@ -217,6 +217,9 @@ const downloadImage = async () => {
 }
 
 const openFullscreen = () => {
+  if (hasFailed.value || !imageSrc.value) {
+    return
+  }
   isFullscreen.value = true
 }
 

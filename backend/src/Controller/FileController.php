@@ -520,6 +520,10 @@ class FileController extends AbstractController
 
         $response = new BinaryFileResponse($absolutePath);
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $file->getFileName());
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'private, no-cache, must-revalidate');
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
 
         return $response;
     }
