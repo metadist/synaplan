@@ -487,10 +487,9 @@ class GuestChatController extends AbstractController
     #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'fileId', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\Response(response: 200, description: 'File content')]
-    #[OA\Response(response: 403, description: 'File not associated with this session')]
+    #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false), or file not associated with this session')]
     #[OA\Response(response: 404, description: 'Session or file not found')]
     #[OA\Response(response: 410, description: 'Session expired')]
-    #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false)')]
     public function downloadFile(string $sessionId, int $fileId): Response
     {
         if ($denied = $this->denyWhenDisabled()) {
