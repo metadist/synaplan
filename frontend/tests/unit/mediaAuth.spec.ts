@@ -232,6 +232,15 @@ describe('mediaAuth', () => {
       expect(refreshAccessToken).not.toHaveBeenCalled()
     })
 
+    it('does not retry a 403 — permission denied is not an expired credential', async () => {
+      const fetchMock = vi.fn(async () => mediaResponse(403))
+      global.fetch = fetchMock as unknown as typeof fetch
+
+      await expect(fetchMediaBlob(UPLOAD_PATH)).rejects.toThrow('HTTP 403')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(refreshAccessToken).not.toHaveBeenCalled()
+    })
+
     it('throws when the retry is rejected too', async () => {
       vi.useFakeTimers()
       global.fetch = vi.fn(async () => mediaResponse(401)) as unknown as typeof fetch

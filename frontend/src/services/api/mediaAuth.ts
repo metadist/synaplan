@@ -226,8 +226,9 @@ export function useMediaSrc(): {
  * Fetch a media URL as a Blob with the right auth transport per platform:
  * session cookie on web, `Authorization: Bearer` (cookies omitted) on native.
  *
- * A rejected credential is refreshed and retried once — the access token
- * outlives neither an idle chat nor a backgrounded app.
+ * A 401 is refreshed and retried once — the access token outlives neither
+ * an idle chat nor a backgrounded app. A 403 is a permission denial, not an
+ * expired credential, so it is not retried.
  */
 export async function fetchMediaBlob(url: string): Promise<Blob> {
   const target = resolveMediaUrl(url)
@@ -235,7 +236,7 @@ export async function fetchMediaBlob(url: string): Promise<Blob> {
 
   let response = await requestMedia(target)
 
-  if (401 === response.status || 403 === response.status) {
+  if (401 === response.status) {
     await forceMediaTokenRefresh()
     // Mirror httpClient: give a refreshed cookie a moment to land before the
     // retry, otherwise the second request can race it into another 401.

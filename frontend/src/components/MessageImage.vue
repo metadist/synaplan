@@ -224,6 +224,9 @@ const downloadImage = async () => {
 }
 
 const openFullscreen = () => {
+  if (hasFailed.value || !blobUrl.value) {
+    return
+  }
   isFullscreen.value = true
 }
 
