@@ -119,7 +119,9 @@ Exit codes match `app:sync-model-prices`: `0` clean, `1` the command broke, `2` 
 
 ### First run against live APIs (2026-08-19)
 
-Six confirmed retirements, each re-verified by hand: Groq dropped `llama-3.3-70b-versatile` (BID 9), `llama-3.1-8b-instant` (236), `qwen/qwen3-32b` (53) and `meta-llama/llama-4-scout-17b-16e-instruct` (17 — the Groq `PIC2TEXT` default), xAI dropped `grok-stt` (321 — the xAI `SOUND2TEXT` default) and `grok-tts` (320). Groq's current list is 13 models; `whisper-large-v3` and `openai/gpt-oss-*` are unaffected. Retirement migrations are tracked separately per provider.
+Six confirmed retirements, each re-verified by hand: Groq dropped `llama-3.3-70b-versatile` (BID 9), `llama-3.1-8b-instant` (236), `qwen/qwen3-32b` (53) and `meta-llama/llama-4-scout-17b-16e-instruct` (17 — the Groq `PIC2TEXT` default), xAI dropped `grok-stt` (321 — the xAI `SOUND2TEXT` default) and `grok-tts` (320). Groq's current list is 13 models; `whisper-large-v3` and `openai/gpt-oss-*` are unaffected.
+
+The four Groq rows were retired in `Version20260819080000` (#1513), which also added Groq Qwen 3.6 27B (324/325) as their successor. Re-running the check after that migration reports Groq at `7/7 matched`: the retired rows are out of the active set and the freshly added successor BIDs produce no false positive. The two xAI rows stay open (#1514) — the catalog has no xAI replacement for either capability, so the `SOUND2TEXT` recommendation has to move to another provider or be dropped rather than repointed within xAI.
 
 ## Maintenance links
 
