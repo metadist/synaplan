@@ -174,6 +174,10 @@ const imageSrc = computed(() => mediaSrc(props.url))
 const onLoaded = () => {
   isLoaded.value = true
   hasFailed.value = false
+  // A later error (token aged out after a successful paint) must get its own
+  // silent credential refresh — otherwise the first retry "uses up" the
+  // allowance for the whole lifetime of this element.
+  hasRetried.value = false
 }
 
 // The most common cause of a rejected media URL is an aged-out credential, so

@@ -136,7 +136,7 @@ security:
         # an Authorization header, so the native shell identifies the owner
         # with a read-only media_token query param. The controller still
         # rejects unauthenticated requests (cookie, Bearer, or media token).
-        - { path: ^/api/v1/files/\d+/download, methods: [GET, HEAD], roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/files/\d+/download$, methods: [GET, HEAD], roles: PUBLIC_ACCESS }
 
         # Plugin assets (static JS/CSS files, served without auth for ES module loading)
         - { path: ^/api/v1/user/[^/]+/plugins/[^/]+/assets/, roles: PUBLIC_ACCESS }

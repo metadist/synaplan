@@ -181,5 +181,20 @@ describe('MessageImage', () => {
       expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(false)
       expect(wrapper.find('img').exists()).toBe(true)
     })
+
+    it('gives a later error its own silent retry after a successful load', async () => {
+      const wrapper = mount(MessageImage, { props: { url } })
+      await flushPromises()
+
+      await wrapper.find('img').trigger('error')
+      await flushPromises()
+      await wrapper.find('img').trigger('load')
+
+      await wrapper.find('img').trigger('error')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(false)
+      expect(wrapper.find('img').exists()).toBe(true)
+    })
   })
 })
