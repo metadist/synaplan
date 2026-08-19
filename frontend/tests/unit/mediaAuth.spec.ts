@@ -7,6 +7,18 @@ const auth = vi.hoisted(() => ({ token: null as string | null }))
 const refreshAccessToken = vi.hoisted(() => vi.fn(async () => ({ success: true })))
 const saveOrDownloadBlob = vi.hoisted(() => vi.fn(async () => undefined))
 
+/** Stand-in for httpClient's ApiError; mediaAuth branches on `instanceof`. */
+const ApiError = vi.hoisted(
+  () =>
+    class ApiError extends Error {
+      constructor(public readonly status: number) {
+        super(`HTTP ${status}`)
+      }
+    }
+)
+
+const httpClientMock = vi.hoisted(() => vi.fn(async () => ({ token: 'mtok', expiresIn: 1800 })))
+
 vi.mock('@/services/api/nativeRuntime', () => ({
   isNativeApp: () => runtime.native,
   getNativeApiBaseUrl: () => runtime.baseUrl,
@@ -14,10 +26,15 @@ vi.mock('@/services/api/nativeRuntime', () => ({
 
 vi.mock('@/services/api/nativeAuth', () => ({ getNativeAccessToken: () => auth.token }))
 
-vi.mock('@/services/api/httpClient', () => ({ refreshAccessToken }))
+vi.mock('@/services/api/httpClient', () => ({
+  refreshAccessToken,
+  httpClient: httpClientMock,
+  ApiError,
+}))
 vi.mock('@/services/api/nativeDownload', () => ({ saveOrDownloadBlob }))
 
 import {
+  __resetMediaCredentialCache,
   authenticatedMediaSrc,
   downloadMediaUrl,
   fetchMediaBlob,
@@ -53,12 +70,17 @@ describe('mediaAuth', () => {
     refreshAccessToken.mockClear()
     refreshAccessToken.mockResolvedValue({ success: true })
     saveOrDownloadBlob.mockClear()
+    httpClientMock.mockClear()
+    httpClientMock.mockResolvedValue({ token: 'mtok', expiresIn: 1800 })
+    __resetMediaCredentialCache()
   })
 
-  // Fake timers have to be undone even when an assertion throws mid-test,
-  // otherwise every later test in the file inherits a frozen clock.
+  // Stubs have to be undone even when an assertion throws mid-test, otherwise
+  // every later test in the file inherits a frozen clock or someone else's
+  // fetch.
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
   })
 
   describe('resolveMediaUrl', () => {
@@ -116,21 +138,14 @@ describe('mediaAuth', () => {
       expect(authenticatedMediaSrc(UPLOAD_PATH)).toBe(UPLOAD_PATH)
     })
 
-    it('appends the access token for backend URLs on native', () => {
+    it('does not put the session token in the URL before the media-token probe', () => {
       runtime.native = true
       auth.token = 'tok en/+'
-      expect(authenticatedMediaSrc(UPLOAD_PATH)).toBe(
-        `https://web.synaplan.com${UPLOAD_PATH}?token=${encodeURIComponent('tok en/+')}`
-      )
+      expect(authenticatedMediaSrc(UPLOAD_PATH)).toBe(`https://web.synaplan.com${UPLOAD_PATH}`)
+      expect(authenticatedMediaSrc(UPLOAD_PATH)).not.toContain('token=')
     })
 
-    it('uses & when the URL already carries a query', () => {
-      runtime.native = true
-      auth.token = 'tok'
-      expect(authenticatedMediaSrc(`${UPLOAD_PATH}?v=2`)).toContain('?v=2&token=tok')
-    })
-
-    it('never leaks the token to an external host', () => {
+    it('never leaks a credential to an external host', () => {
       runtime.native = true
       auth.token = 'tok'
       expect(authenticatedMediaSrc('https://cdn.example.com/a.png')).toBe(
@@ -160,7 +175,7 @@ describe('mediaAuth', () => {
   describe('fetchMediaBlob', () => {
     it('sends cookies on web and no Authorization header', async () => {
       const fetchMock = vi.fn(async () => mediaResponse(200))
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       await fetchMediaBlob(UPLOAD_PATH)
 
@@ -174,7 +189,7 @@ describe('mediaAuth', () => {
       runtime.native = true
       auth.token = 'tok'
       const fetchMock = vi.fn(async () => mediaResponse(200))
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       await fetchMediaBlob(UPLOAD_PATH)
 
@@ -190,7 +205,10 @@ describe('mediaAuth', () => {
     it('refreshes the credential before the request when its exp claim is near', async () => {
       runtime.native = true
       auth.token = signedToken(5)
-      global.fetch = vi.fn(async () => mediaResponse(200)) as unknown as typeof fetch
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => mediaResponse(200))
+      )
 
       await fetchMediaBlob(UPLOAD_PATH)
 
@@ -200,7 +218,10 @@ describe('mediaAuth', () => {
     it('leaves a token with plenty of life alone', async () => {
       runtime.native = true
       auth.token = signedToken(600)
-      global.fetch = vi.fn(async () => mediaResponse(200)) as unknown as typeof fetch
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => mediaResponse(200))
+      )
 
       await fetchMediaBlob(UPLOAD_PATH)
 
@@ -213,7 +234,7 @@ describe('mediaAuth', () => {
         .fn()
         .mockResolvedValueOnce(mediaResponse(401))
         .mockResolvedValueOnce(mediaResponse(200))
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       const pending = fetchMediaBlob(UPLOAD_PATH)
       await vi.runAllTimersAsync()
@@ -225,7 +246,7 @@ describe('mediaAuth', () => {
 
     it('does not retry a 404 — a missing file is not an auth problem', async () => {
       const fetchMock = vi.fn(async () => mediaResponse(404))
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       await expect(fetchMediaBlob(UPLOAD_PATH)).rejects.toThrow('HTTP 404')
       expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -234,7 +255,7 @@ describe('mediaAuth', () => {
 
     it('does not retry a 403 — permission denied is not an expired credential', async () => {
       const fetchMock = vi.fn(async () => mediaResponse(403))
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       await expect(fetchMediaBlob(UPLOAD_PATH)).rejects.toThrow('HTTP 403')
       expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -243,7 +264,10 @@ describe('mediaAuth', () => {
 
     it('throws when the retry is rejected too', async () => {
       vi.useFakeTimers()
-      global.fetch = vi.fn(async () => mediaResponse(401)) as unknown as typeof fetch
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => mediaResponse(401))
+      )
 
       const pending = fetchMediaBlob(UPLOAD_PATH)
       const assertion = expect(pending).rejects.toThrow('HTTP 401')
@@ -254,7 +278,10 @@ describe('mediaAuth', () => {
 
   describe('downloadMediaUrl', () => {
     it('hands the authenticated blob to the platform saver', async () => {
-      global.fetch = vi.fn(async () => mediaResponse(200)) as unknown as typeof fetch
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => mediaResponse(200))
+      )
 
       await downloadMediaUrl(UPLOAD_PATH, 'cat.png')
 
@@ -263,7 +290,80 @@ describe('mediaAuth', () => {
   })
 
   describe('useMediaSrc', () => {
-    it('does not rebuild the URL when the token rotates, which would restart playback', async () => {
+    it('emits no src until the media token is minted, so the session token never lands in the URL', async () => {
+      runtime.native = true
+      auth.token = 'session-tok'
+      const { mediaSrc } = useMediaSrc()
+      const src = computed(() => mediaSrc(UPLOAD_PATH))
+
+      expect(src.value).toBe('')
+
+      await flushPromises()
+
+      expect(httpClientMock).toHaveBeenCalledWith(
+        '/api/v1/files/media-token',
+        expect.objectContaining({ schema: expect.anything() })
+      )
+      expect(src.value).toContain('media_token=mtok')
+      expect(src.value).not.toContain('session-tok')
+    })
+
+    it('uses & when the URL already carries a query', async () => {
+      runtime.native = true
+      auth.token = 'tok'
+      const { mediaSrc } = useMediaSrc()
+      await flushPromises()
+
+      expect(mediaSrc(`${UPLOAD_PATH}?v=2`)).toContain('?v=2&media_token=mtok')
+    })
+
+    it('puts the purpose-scoped media token in the URL, never the session token', async () => {
+      runtime.native = true
+      auth.token = 'session-tok'
+      const { mediaSrc } = useMediaSrc()
+      const src = computed(() => mediaSrc(UPLOAD_PATH))
+      await flushPromises()
+
+      expect(src.value).toContain('media_token=mtok')
+      expect(src.value).not.toContain('session-tok')
+    })
+
+    it('falls back to the session token on a server without the media-token endpoint', async () => {
+      runtime.native = true
+      auth.token = 'session-tok'
+      httpClientMock.mockRejectedValue(new ApiError(404))
+
+      const { mediaSrc } = useMediaSrc()
+      const src = computed(() => mediaSrc(UPLOAD_PATH))
+      await flushPromises()
+
+      expect(src.value).toContain('token=session-tok')
+    })
+
+    it('probes an old server only once, not on every media element', async () => {
+      runtime.native = true
+      auth.token = 'session-tok'
+      httpClientMock.mockRejectedValue(new ApiError(404))
+
+      useMediaSrc()
+      await flushPromises()
+      useMediaSrc()
+      await flushPromises()
+
+      expect(httpClientMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('is a no-op on web, where the session cookie authenticates media', async () => {
+      auth.token = 'session-tok'
+      const { mediaSrc } = useMediaSrc()
+      const src = computed(() => mediaSrc(UPLOAD_PATH))
+      await flushPromises()
+
+      expect(httpClientMock).not.toHaveBeenCalled()
+      expect(src.value).toBe(UPLOAD_PATH)
+    })
+
+    it('does not rebuild the URL when the session token rotates, which would restart playback', async () => {
       runtime.native = true
       auth.token = 'tok'
       const { mediaSrc } = useMediaSrc()
@@ -271,8 +371,6 @@ describe('mediaAuth', () => {
       await flushPromises()
 
       const first = src.value
-      expect(first).toContain('token=tok')
-
       auth.token = 'rotated'
 
       expect(src.value).toBe(first)
@@ -286,15 +384,15 @@ describe('mediaAuth', () => {
       await flushPromises()
       expect(src.value).not.toContain('_retry=')
 
-      auth.token = 'rotated'
+      httpClientMock.mockResolvedValue({ token: 'mtok2', expiresIn: 1800 })
       await reloadMedia()
 
       expect(refreshAccessToken).toHaveBeenCalledTimes(1)
-      expect(src.value).toContain('token=rotated')
+      expect(src.value).toContain('media_token=mtok2')
       expect(src.value).toContain('_retry=')
     })
 
-    it('refreshes an expiring token once at setup so the first render is usable', async () => {
+    it('refreshes an expiring session token before minting, so the mint itself succeeds', async () => {
       runtime.native = true
       auth.token = signedToken(5)
 
@@ -302,6 +400,7 @@ describe('mediaAuth', () => {
       await flushPromises()
 
       expect(refreshAccessToken).toHaveBeenCalledTimes(1)
+      expect(httpClientMock).toHaveBeenCalledTimes(1)
     })
   })
 })

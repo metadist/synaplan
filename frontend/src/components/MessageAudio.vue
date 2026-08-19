@@ -58,7 +58,7 @@
         <button
           class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[var(--brand)] text-white flex items-center justify-center hover:bg-[var(--brand)]/90 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           :aria-label="isPlaying ? 'Pause' : 'Play'"
-          :disabled="isRetrying"
+          :disabled="isRetrying || !audioSrc"
           data-testid="btn-audio-play"
           @click="togglePlay"
         >
@@ -176,7 +176,7 @@
 
       <!-- Hidden Audio Element -->
       <audio
-        v-if="!hasFailed"
+        v-if="!hasFailed && audioSrc"
         ref="audioRef"
         :src="audioSrc"
         class="hidden"
@@ -205,8 +205,9 @@ interface Props {
 const props = defineProps<Props>()
 
 // No-op on web; on native this resolves the URL against the configured server
-// and appends the Bearer token as `?token=` because <audio> can't send auth
-// headers. `reloadMedia()` mints a fresh token for the retry path.
+// and appends a read-only media token (falling back to `?token=` only on
+// servers that predate that endpoint) because <audio> can't send auth headers.
+// `reloadMedia()` mints a fresh credential for the retry path.
 const { mediaSrc, reloadMedia } = useMediaSrc()
 
 // Only one inline audio player may play at a time (issue #1078): starting this

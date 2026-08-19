@@ -6,14 +6,16 @@
       @click="openFullscreen"
     >
       <img
-        v-if="blobUrl"
-        :src="blobUrl"
+        v-if="imageSrc && !hasFailed"
+        :src="imageSrc"
         :alt="alt"
         class="w-full h-full object-cover transition-transform group-hover:scale-105"
         loading="lazy"
+        @load="onLoaded"
+        @error="onError"
       />
       <div
-        v-else-if="hasFailed"
+        v-if="hasFailed"
         class="w-full h-full flex flex-col items-center justify-center gap-2 p-4 text-center"
         data-testid="image-load-error"
       >
@@ -37,12 +39,15 @@
           type="button"
           class="btn-secondary text-xs px-3 py-1 relative z-10"
           data-testid="btn-image-retry"
-          @click.stop="loadImage"
+          @click.stop="retryManually"
         >
           {{ $t('common.retry') }}
         </button>
       </div>
-      <div v-else class="w-full h-full flex items-center justify-center">
+      <div
+        v-else-if="!isLoaded"
+        class="absolute inset-0 flex items-center justify-center pointer-events-none"
+      >
         <div class="text-sm txt-secondary">{{ $t('common.loading') }}</div>
       </div>
       <div
@@ -62,7 +67,7 @@
         </div>
       </div>
       <button
-        v-if="blobUrl"
+        v-if="!hasFailed"
         class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity surface-card p-2 rounded-full txt-primary"
         :aria-label="$t('message.downloadImage')"
         :title="$t('message.downloadImage')"
@@ -99,7 +104,7 @@
         @click="closeFullscreen"
       >
         <button
-          v-if="blobUrl"
+          v-if="!hasFailed"
           class="absolute top-4 right-16 text-white/80 hover:text-white transition-colors p-2 z-10"
           :aria-label="$t('message.downloadImage')"
           :title="$t('message.downloadImage')"
@@ -131,8 +136,8 @@
           </svg>
         </button>
         <img
-          v-if="blobUrl"
-          :src="blobUrl"
+          v-if="imageSrc && !hasFailed"
+          :src="imageSrc"
           :alt="alt"
           class="max-w-full max-h-full object-contain z-10"
           @click.stop
@@ -143,12 +148,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import {
-  fetchMediaBlob,
-  needsAuthenticatedMediaFetch,
-  resolveMediaUrl,
-} from '@/services/api/mediaAuth'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { fetchMediaBlob, resolveMediaUrl, useMediaSrc } from '@/services/api/mediaAuth'
 import { saveOrDownloadBlob } from '@/services/api/nativeDownload'
 
 interface Props {
@@ -158,44 +159,42 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const isFullscreen = ref(false)
-const blobUrl = ref<string>('')
-const loadedBlob = ref<Blob | null>(null)
-const hasFailed = ref(false)
+const { mediaSrc, reloadMedia } = useMediaSrc()
 
-const releaseBlobUrl = () => {
-  if (blobUrl.value && blobUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(blobUrl.value)
-  }
-  blobUrl.value = ''
+const isFullscreen = ref(false)
+const isLoaded = ref(false)
+const hasFailed = ref(false)
+const hasRetried = ref(false)
+
+// A plain `src` instead of a blob: the browser caches it, `loading="lazy"`
+// actually defers the request, and no decoded copy is pinned in JS memory.
+// On native the URL carries a purpose-scoped media credential (see mediaAuth).
+const imageSrc = computed(() => mediaSrc(props.url))
+
+const onLoaded = () => {
+  isLoaded.value = true
+  hasFailed.value = false
+  // A later error (token aged out after a successful paint) must get its own
+  // silent credential refresh — otherwise the first retry "uses up" the
+  // allowance for the whole lifetime of this element.
+  hasRetried.value = false
 }
 
-// Load image with auth (web: session cookie, native: Bearer via fetchMediaBlob)
-const loadImage = async () => {
-  hasFailed.value = false
-  try {
-    // External URLs (e.g. from OpenAI) don't need auth. On native, absolute
-    // URLs pointing at our own backend are NOT external — they need the
-    // Bearer-authenticated fetch below (media URLs arrive absolute there).
-    if (
-      (props.url.startsWith('http://') || props.url.startsWith('https://')) &&
-      !needsAuthenticatedMediaFetch(props.url)
-    ) {
-      blobUrl.value = props.url
-      return
-    }
-
-    const blob = await fetchMediaBlob(resolveMediaUrl(props.url))
-    loadedBlob.value = blob
-    blobUrl.value = URL.createObjectURL(blob)
-  } catch (error) {
-    // Surface a retryable error instead of an endless spinner: the most common
-    // cause is an access token that aged out, and fetchMediaBlob has already
-    // refreshed and retried once by the time we get here.
-    releaseBlobUrl()
+// The most common cause of a rejected media URL is an aged-out credential, so
+// mint a fresh one and let the element try again before blaming the server.
+const onError = async () => {
+  if (hasRetried.value) {
     hasFailed.value = true
-    console.error('Failed to load image:', error)
+    return
   }
+  hasRetried.value = true
+  await reloadMedia()
+}
+
+const retryManually = async () => {
+  hasFailed.value = false
+  hasRetried.value = false
+  await reloadMedia()
 }
 
 // Derive a sensible filename from the source URL, falling back to image.png
@@ -206,17 +205,15 @@ const downloadFilename = (): string => {
   return name && name.includes('.') ? name : 'image.png'
 }
 
-// Download from the already-loaded blob when available; for external /
-// not-yet-loaded URLs, fetch a fresh blob so the download still produces a
-// valid file (issue #1071). Saving goes through saveOrDownloadBlob: web keeps
-// the anchor download, the native shell persists via Filesystem + Share
-// because an `<a download>` click is a silent no-op inside the WebView.
+// Downloads always fetch their own blob (issue #1071): the displayed image is
+// a plain `src`, so there is nothing in JS to reuse, and the request goes out
+// with `Authorization: Bearer` rather than a credential in a URL. Saving goes
+// through saveOrDownloadBlob: web keeps the anchor download, the native shell
+// persists via Filesystem + Share because an `<a download>` click is a silent
+// no-op inside the WebView.
 const downloadImage = async () => {
   try {
-    let blob = loadedBlob.value
-    if (!blob) {
-      blob = await fetchMediaBlob(resolveMediaUrl(props.url))
-    }
+    const blob = await fetchMediaBlob(resolveMediaUrl(props.url))
     await saveOrDownloadBlob(blob, downloadFilename())
   } catch (error) {
     console.error('Failed to download image:', error)
@@ -224,7 +221,7 @@ const downloadImage = async () => {
 }
 
 const openFullscreen = () => {
-  if (hasFailed.value || !blobUrl.value) {
+  if (hasFailed.value || !imageSrc.value) {
     return
   }
   isFullscreen.value = true
@@ -242,22 +239,18 @@ const handleEscape = (e: KeyboardEvent) => {
 
 onMounted(() => {
   window.addEventListener('keydown', handleEscape)
-  loadImage()
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleEscape)
-  releaseBlobUrl()
-  loadedBlob.value = null
 })
 
-// Reload image if URL changes
 watch(
   () => props.url,
   () => {
-    releaseBlobUrl()
-    loadedBlob.value = null
-    loadImage()
+    isLoaded.value = false
+    hasFailed.value = false
+    hasRetried.value = false
   }
 )
 </script>

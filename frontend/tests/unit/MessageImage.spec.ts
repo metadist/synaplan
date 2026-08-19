@@ -91,7 +91,7 @@ describe('MessageImage', () => {
       expect(wrapper.find('[data-testid="btn-image-download"]').exists()).toBe(true)
     })
 
-    it('triggers a real download from the loaded blob for internal images', async () => {
+    it('fetches an authenticated blob for the download of an internal image', async () => {
       vi.spyOn(global.URL, 'createObjectURL').mockReturnValue('blob:mock-url')
       vi.spyOn(global.URL, 'revokeObjectURL').mockImplementation(() => undefined)
       const fetchMock = vi.fn((url: RequestInfo | URL) => {
@@ -129,54 +129,72 @@ describe('MessageImage', () => {
       await button.trigger('click')
       await flushPromises()
 
-      // Internal image is fetched once (during load); the download reuses that
-      // blob, so the anchor is clicked without a second network round-trip.
+      // The visible image is a plain `src`, so the download fetches its own
+      // blob over the Bearer-authenticated path before saving it.
       expect(clickSpy).toHaveBeenCalledTimes(1)
     })
   })
 
   describe('load failure', () => {
-    it('shows a retryable error instead of an endless loading state', async () => {
-      vi.spyOn(console, 'error').mockImplementation(() => undefined)
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(() => Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' }))
-      )
+    const url = '/api/v1/files/uploads/1/000/gone.png'
 
-      const wrapper = mount(MessageImage, {
-        props: { url: '/api/v1/files/uploads/1/000/gone.png' },
-      })
+    // The element reports the failure, so a stale credential gets one silent
+    // retry before the user is told anything.
+    const failTwice = async (wrapper: ReturnType<typeof mount>) => {
+      await wrapper.find('img').trigger('error')
       await flushPromises()
+      await wrapper.find('img').trigger('error')
+      await flushPromises()
+    }
+
+    it('shows a retryable error instead of an endless loading state', async () => {
+      const wrapper = mount(MessageImage, { props: { url } })
+      await flushPromises()
+
+      await failTwice(wrapper)
 
       expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(true)
       expect(wrapper.find('[data-testid="btn-image-retry"]').exists()).toBe(true)
       expect(wrapper.find('img').exists()).toBe(false)
     })
 
-    it('recovers when the retry succeeds', async () => {
-      vi.spyOn(console, 'error').mockImplementation(() => undefined)
-      vi.spyOn(global.URL, 'createObjectURL').mockReturnValue('blob:mock-url')
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' })
-        .mockResolvedValue({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          blob: () => Promise.resolve(new Blob(['image-bytes'])),
-        })
-      vi.stubGlobal('fetch', fetchMock)
-
-      const wrapper = mount(MessageImage, {
-        props: { url: '/api/v1/files/uploads/1/000/late.png' },
-      })
+    it('retries once on its own before surfacing an error', async () => {
+      const wrapper = mount(MessageImage, { props: { url } })
       await flushPromises()
 
-      await wrapper.find('[data-testid="btn-image-retry"]').trigger('click')
+      await wrapper.find('img').trigger('error')
       await flushPromises()
 
       expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(false)
-      expect(wrapper.find('img').attributes('src')).toBe('blob:mock-url')
+      expect(wrapper.find('img').exists()).toBe(true)
+    })
+
+    it('recovers when the retry succeeds', async () => {
+      const wrapper = mount(MessageImage, { props: { url } })
+      await flushPromises()
+      await failTwice(wrapper)
+
+      await wrapper.find('[data-testid="btn-image-retry"]').trigger('click')
+      await flushPromises()
+      await wrapper.find('img').trigger('load')
+
+      expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(false)
+      expect(wrapper.find('img').exists()).toBe(true)
+    })
+
+    it('gives a later error its own silent retry after a successful load', async () => {
+      const wrapper = mount(MessageImage, { props: { url } })
+      await flushPromises()
+
+      await wrapper.find('img').trigger('error')
+      await flushPromises()
+      await wrapper.find('img').trigger('load')
+
+      await wrapper.find('img').trigger('error')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(false)
+      expect(wrapper.find('img').exists()).toBe(true)
     })
   })
 })

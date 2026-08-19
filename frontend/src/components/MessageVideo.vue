@@ -5,7 +5,7 @@
     >
       <!-- Loading/Retry indicator -->
       <div
-        v-if="isRetrying"
+        v-if="isRetrying || (!hasFailed && !videoSrc)"
         class="absolute inset-0 flex items-center justify-center bg-black/50 z-10"
       >
         <div class="text-white text-sm flex items-center gap-2">
@@ -61,7 +61,7 @@
       </div>
 
       <video
-        v-else
+        v-else-if="videoSrc"
         ref="videoRef"
         :src="videoSrc"
         :poster="posterSrc"
@@ -79,7 +79,7 @@
 
       <!-- Custom Controls -->
       <div
-        v-if="!hasFailed"
+        v-if="!hasFailed && videoSrc"
         class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <div class="flex items-center gap-3">
@@ -172,8 +172,9 @@ interface Props {
 const props = defineProps<Props>()
 
 // No-op on web; on native this resolves the URL against the configured server
-// and appends the Bearer token as `?token=` because <video> can't send auth
-// headers. `reloadMedia()` mints a fresh token for the retry path.
+// and appends a read-only media token (falling back to `?token=` only on
+// servers that predate that endpoint) because <video> can't send auth headers.
+// `reloadMedia()` mints a fresh credential for the retry path.
 const { mediaSrc, reloadMedia } = useMediaSrc()
 
 const videoRef = ref<HTMLVideoElement | null>(null)
