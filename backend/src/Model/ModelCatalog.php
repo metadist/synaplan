@@ -16,7 +16,7 @@ use Doctrine\DBAL\Connection;
  * To target a specific variant, append the tag: "service:providerId:tag"
  *
  * Usage:
- *   ModelCatalog::find('groq:llama-3.3-70b-versatile')  → [model]
+ *   ModelCatalog::find('groq:openai/gpt-oss-20b')        → [model]
  *   ModelCatalog::find('openai:gpt-4o')                  → [chat, pic2text]
  *   ModelCatalog::find('openai:gpt-4o:chat')             → [chat only]
  */
@@ -419,49 +419,58 @@ class ModelCatalog
             ],
         ],
         // ==================== GROQ MODELS ====================
+        // Retired 2026-08 (Groq shutdowns, https://console.groq.com/docs/deprecations):
+        //   - BID 9   llama-3.3-70b-versatile                    (chat)     → 324
+        //   - BID 17  meta-llama/llama-4-scout-17b-16e-instruct  (pic2text) → 325
+        //   - BID 53  qwen/qwen3-32b                             (chat)     → 324
+        //   - BID 236 llama-3.1-8b-instant                       (chat)     → 75
+        // Deactivated in existing installs by Version20260819080000; the BIDs
+        // must never be reused (BMESSAGES rows reference them).
         [
-            'id' => 9,
+            // Snapshot 2026-08-19 (https://console.groq.com/docs/model/qwen/qwen3.6-27b).
+            'id' => 324,
             'service' => 'Groq',
-            'name' => 'Llama 3.3 70b versatile',
+            'name' => 'Qwen 3.6 27B',
             'tag' => 'chat',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'llama-3.3-70b-versatile',
-            'priceIn' => 0.59,
+            'providerId' => 'qwen/qwen3.6-27b',
+            'priceIn' => 0.60,
             'inUnit' => 'per1M',
-            'priceOut' => 0.79,
+            'priceOut' => 3.00,
             'outUnit' => 'per1M',
             'quality' => 9,
-            'rating' => 1,
+            'rating' => 5,
             'json' => [
-                'description' => 'Fast API service via groq',
-                'max_tokens' => 32768,
+                'description' => 'Groq Qwen 3.6 27B - flagship-level reasoning and agentic coding in a compact dense model (~500 t/s). Successor to Llama 3.3 70B and Qwen3 32B on Groq. Supports tool use and JSON mode; reasoning is hidden from the output.',
+                'max_tokens' => 16384,
                 'params' => [
-                    'model' => 'llama-3.3-70b-versatile',
+                    'model' => 'qwen/qwen3.6-27b',
                     'reasoning_format' => 'hidden',
-                    'messages' => [],
                 ],
-                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
+                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'quantization' => 'TruePoint Numerics'],
             ],
         ],
         [
-            'id' => 17,
+            // Vision variant of the row above (same upstream model id). Groq's
+            // recommended replacement for the retired Llama 4 Scout.
+            'id' => 325,
             'service' => 'Groq',
-            'name' => 'Llama 4 Scout Vision',
+            'name' => 'Qwen 3.6 27B Vision',
             'tag' => 'pic2text',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'meta-llama/llama-4-scout-17b-16e-instruct',
-            'priceIn' => 0.11,
+            'providerId' => 'qwen/qwen3.6-27b',
+            'priceIn' => 0.60,
             'inUnit' => 'per1M',
-            'priceOut' => 0.34,
+            'priceOut' => 3.00,
             'outUnit' => 'per1M',
             'quality' => 8,
             'rating' => 0,
             'json' => [
-                'description' => 'Groq Llama 4 Scout vision model - 128K context, up to 5 images, supports tool use and JSON mode',
+                'description' => 'Groq Qwen 3.6 27B vision - 131K context, up to 3 images (20 MB each), supports tool use and JSON mode. Replaces Llama 4 Scout.',
                 'params' => [
-                    'model' => 'meta-llama/llama-4-scout-17b-16e-instruct',
+                    'model' => 'qwen/qwen3.6-27b',
                     'max_completion_tokens' => 1024,
                 ],
             ],
@@ -519,28 +528,6 @@ class ModelCatalog
             ],
         ],
         [
-            'id' => 53,
-            'service' => 'Groq',
-            'name' => 'Qwen3 32B (Reasoning)',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'qwen/qwen3-32b',
-            'priceIn' => 0.29,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.59,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 5,
-            'json' => [
-                'description' => 'Groq Qwen3 32B mit Reasoning - 32B-Parameter Reasoning-Modell von Qwen. Zeigt Denkprozess mit <think> Tags. Optimiert für logisches Denken und Problemlösung. Sehr schnell durch Groq Hardware.',
-                'max_tokens' => 32768,
-                'params' => ['model' => 'qwen/qwen3-32b'],
-                'features' => ['reasoning'],
-                'meta' => ['context_window' => '131072', 'max_output' => '32768', 'reasoning_format' => 'raw'],
-            ],
-        ],
-        [
             'id' => 75,
             'service' => 'Groq',
             'name' => 'gpt-oss-20b',
@@ -580,34 +567,6 @@ class ModelCatalog
                 'max_tokens' => 16384,
                 'params' => ['model' => 'openai/gpt-oss-120b'],
                 'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
-            ],
-        ],
-        [
-            // Snapshot 2026-05-27 (https://console.groq.com/docs/models).
-            'id' => 236,
-            'service' => 'Groq',
-            'name' => 'Llama 3.1 8B Instant',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'llama-3.1-8b-instant',
-            'priceIn' => 0.05,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.08,
-            'outUnit' => 'per1M',
-            'quality' => 7,
-            'rating' => 1,
-            'json' => [
-                'description' => 'Groq Llama 3.1 8B Instant - fastest production-grade chat model on Groq (~560 t/s). 131K context, best for high-throughput / low-cost routing.',
-                'max_tokens' => 32768,
-                'params' => [
-                    'model' => 'llama-3.1-8b-instant',
-                    'reasoning_format' => 'hidden',
-                    'messages' => [],
-                ],
-                // max_output mirrors max_tokens (32768) — the model accepts
-                // 131K context in total but caps generated output at 32K.
-                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
             ],
         ],
         // Phase 2d: dedicated MEM-tagged models for backgrounded memory

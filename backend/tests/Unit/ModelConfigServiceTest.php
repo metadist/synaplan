@@ -157,6 +157,8 @@ class ModelConfigServiceTest extends TestCase
         $userId = 1;
         $expectedModelId = 42;
 
+        $this->givenModels([$expectedModelId => 'Ollama']);
+
         // Mock user-specific config
         $config = $this->createMock(Config::class);
         $config->method('getValue')->willReturn((string) $expectedModelId);
@@ -272,14 +274,39 @@ class ModelConfigServiceTest extends TestCase
 
     /**
      * The test catalog binds capabilities to negative placeholder BIDs that
-     * have no BMODELS row. Those must resolve unchanged.
+     * have no BMODELS row. Those mean "let the provider registry decide" and
+     * must resolve unchanged.
      */
-    public function testGetDefaultModelKeepsAnOverridePointingAtAnUnknownModel(): void
+    public function testGetDefaultModelKeepsAnOverridePointingAtAPlaceholderId(): void
     {
         $this->givenModels([]);
         $this->givenDefaultModelRows([1 => -1, 0 => 9]);
 
         self::assertSame(-1, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * A positive BID with no row is a deleted model, not a placeholder. Passing
+     * it on leaves the caller with a model id but no provider and no model
+     * name, so the registry quietly answers from its own default — the user
+     * gets a different model than the one configured and nothing says so.
+     */
+    public function testGetDefaultModelSkipsABindingWhoseModelRowIsGone(): void
+    {
+        $this->givenModels([255 => 'OpenAI']);
+        $this->givenUsableProviders(['openai']);
+        $this->givenDefaultModelRows([1 => 9, 0 => 255]);
+
+        self::assertSame(255, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    public function testResolveUsableModelIdSwapsAnOverrideWhoseModelRowIsGone(): void
+    {
+        $this->givenModels([255 => 'OpenAI']);
+        $this->givenUsableProviders(['openai']);
+        $this->givenDefaultModelRows([0 => 255]);
+
+        self::assertSame(255, $this->service->resolveUsableModelId(9, 'CHAT', 1));
     }
 
     /**
@@ -326,14 +353,107 @@ class ModelConfigServiceTest extends TestCase
     }
 
     /**
+     * The production failure this guards against: Groq shut down
+     * llama-3.3-70b-versatile (BID 9), Version20260819080000 deactivated the
+     * row, and every account still bound to it kept sending the dead upstream
+     * id — one hard "model_not_found" per message, including for anonymous
+     * visitors on the guest path.
+     */
+    public function testGetDefaultModelSkipsADeactivatedUserOverride(): void
+    {
+        $this->givenModels([9 => 'Groq', 255 => 'OpenAI'], [], inactiveModelIds: [9]);
+        $this->givenUsableProviders(['groq', 'openai']);
+        $this->givenDefaultModelRows([1 => 9, 0 => 255]);
+
+        self::assertSame(255, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * The global row used to be returned unchecked, so a whole install could
+     * sit on a retired model with no per-user binding to save it.
+     */
+    public function testGetDefaultModelSkipsADeactivatedGlobalBinding(): void
+    {
+        $this->givenModels([9 => 'Groq', 324 => 'Groq'], [], inactiveModelIds: [9]);
+        $this->givenUsableProviders(['groq']);
+        $this->givenDefaultModelRows([0 => 9]);
+        $this->givenCapabilityCatalog('chat', [324 => 'Groq']);
+
+        self::assertSame(324, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * Both bindings dead: rather than fail the request, pick a live model of
+     * the same capability.
+     */
+    public function testGetDefaultModelFallsBackToALiveModelWhenEveryBindingIsDeactivated(): void
+    {
+        $this->givenModels([9 => 'Groq', 17 => 'Groq', 324 => 'Groq'], [], inactiveModelIds: [9, 17]);
+        $this->givenUsableProviders(['groq']);
+        $this->givenDefaultModelRows([1 => 9, 0 => 17]);
+        $this->givenCapabilityCatalog('chat', [324 => 'Groq']);
+
+        self::assertSame(324, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * No live candidate either — keep reporting the configured binding instead
+     * of returning null, so callers can still name the model they meant to use.
+     */
+    public function testGetDefaultModelKeepsTheDeadBindingWhenNoLiveModelExists(): void
+    {
+        $this->givenModels([9 => 'Groq'], [], inactiveModelIds: [9]);
+        $this->givenUsableProviders(['groq']);
+        $this->givenDefaultModelRows([1 => 9]);
+
+        self::assertSame(9, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * A widget's aiModelId or a prompt's aiModel override is read AHEAD of the
+     * default, so it has to be revalidated on its own.
+     */
+    public function testResolveUsableModelIdSwapsADeactivatedOverrideForTheDefault(): void
+    {
+        $this->givenModels([9 => 'Groq', 255 => 'OpenAI'], [], inactiveModelIds: [9]);
+        $this->givenUsableProviders(['groq', 'openai']);
+        $this->givenDefaultModelRows([0 => 255]);
+
+        self::assertSame(255, $this->service->resolveUsableModelId(9, 'CHAT', 1));
+    }
+
+    public function testResolveUsableModelIdKeepsAnOverrideThatStillWorks(): void
+    {
+        $this->givenModels([255 => 'OpenAI']);
+        $this->givenUsableProviders(['openai']);
+
+        self::assertSame(255, $this->service->resolveUsableModelId(255, 'CHAT', 1));
+    }
+
+    /**
+     * Nothing to validate — a caller that never picked a model must not be
+     * handed one behind its back.
+     */
+    public function testResolveUsableModelIdPassesNullThrough(): void
+    {
+        $this->givenModels([]);
+
+        self::assertNull($this->service->resolveUsableModelId(null, 'CHAT', 1));
+    }
+
+    /**
      * @param array<int, string> $servicesByModelId
      * @param array<int, string> $providerIdsByModelId
+     * @param list<int>          $inactiveModelIds     BIDs to hand back with BACTIVE = 0
      */
-    private function givenModels(array $servicesByModelId, array $providerIdsByModelId = []): void
-    {
+    private function givenModels(
+        array $servicesByModelId,
+        array $providerIdsByModelId = [],
+        array $inactiveModelIds = [],
+    ): void {
         $this->modelRepository
             ->method('find')
-            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId): ?Model {
+            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds): ?Model {
                 if (!isset($servicesByModelId[$modelId])) {
                     return null;
                 }
@@ -341,9 +461,34 @@ class ModelConfigServiceTest extends TestCase
                 $model = $this->createMock(Model::class);
                 $model->method('getService')->willReturn($servicesByModelId[$modelId]);
                 $model->method('getProviderId')->willReturn($providerIdsByModelId[$modelId] ?? '');
+                $model->method('getActive')->willReturn(in_array($modelId, $inactiveModelIds, true) ? 0 : 1);
 
                 return $model;
             });
+    }
+
+    /**
+     * Catalog rows the last-resort capability pick can choose from. Without
+     * this, findByTag() returns an empty list and getDefaultModel() falls
+     * through to the configured binding.
+     *
+     * @param array<int, string> $servicesByModelId
+     */
+    private function givenCapabilityCatalog(string $tag, array $servicesByModelId): void
+    {
+        $models = [];
+        foreach ($servicesByModelId as $modelId => $service) {
+            $model = $this->createMock(Model::class);
+            $model->method('getId')->willReturn($modelId);
+            $model->method('getService')->willReturn($service);
+            $model->method('getProviderId')->willReturn('');
+            $model->method('getActive')->willReturn(1);
+            $models[] = $model;
+        }
+
+        $this->modelRepository
+            ->method('findByTag')
+            ->willReturnCallback(static fn (string $requested): array => $requested === $tag ? $models : []);
     }
 
     /**
@@ -820,6 +965,7 @@ class ModelConfigServiceTest extends TestCase
         $model = $this->createMock(Model::class);
         $model->method('getService')->willReturn('Groq');
         $model->method('getProviderId')->willReturn('gpt-oss-120b');
+        $model->method('getActive')->willReturn(1);
 
         $this->modelRepository
             ->expects(self::any())
@@ -934,6 +1080,7 @@ class ModelConfigServiceTest extends TestCase
         $model = $this->createMock(Model::class);
         $model->method('getService')->willReturn('Groq');
         $model->method('getProviderId')->willReturn('gpt-oss-120b');
+        $model->method('getActive')->willReturn(1);
 
         $this->modelRepository
             ->expects(self::any())
@@ -981,7 +1128,8 @@ class ModelConfigServiceTest extends TestCase
 
         $model = $this->createMock(Model::class);
         $model->method('getService')->willReturn('Groq');
-        $model->method('getProviderId')->willReturn('llama-3.3-70b');
+        $model->method('getProviderId')->willReturn('qwen/qwen3.6-27b');
+        $model->method('getActive')->willReturn(1);
 
         $this->modelRepository
             ->expects(self::any())
@@ -990,7 +1138,7 @@ class ModelConfigServiceTest extends TestCase
             ->willReturn($model);
 
         $this->assertSame([
-            'model' => 'llama-3.3-70b',
+            'model' => 'qwen/qwen3.6-27b',
             'provider' => 'groq',
             'model_id' => $sortModelId,
         ], $this->service->getSummaryModelConfig($userId));

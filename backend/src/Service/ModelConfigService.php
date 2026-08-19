@@ -5,6 +5,7 @@ namespace App\Service;
 use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Message;
+use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
@@ -21,6 +22,36 @@ final readonly class ModelConfigService
 {
     private const USABLE_PROVIDERS_CACHE_KEY = 'model_config.usable_providers';
     private const USABLE_PROVIDERS_CACHE_TTL_SECONDS = 60;
+
+    /**
+     * DEFAULTMODEL capability => BMODELS.BTAG, for the last-resort pick in
+     * {@see firstUsableModelForCapability()}. Several capabilities share a tag
+     * because they differ in role, not in what the model has to be able to do:
+     * SORT/PLAN/SUMMARIZE/TOOLS/ANALYZE are all chat completions.
+     *
+     * A capability missing here simply has no emergency fallback.
+     *
+     * @var array<string, string>
+     */
+    private const CAPABILITY_TAGS = [
+        'ANALYZE' => 'chat',
+        'CHAT' => 'chat',
+        'PLAN' => 'chat',
+        'SORT' => 'chat',
+        'SUMMARIZE' => 'chat',
+        'TOOLS' => 'chat',
+        'MEM' => 'mem',
+        'EMBEDDING' => 'vectorize',
+        'SYNAPSE_VECTORIZE' => 'vectorize',
+        'VECTORIZE' => 'vectorize',
+        'PIC2TEXT' => 'pic2text',
+        'PIC2PIC' => 'text2pic',
+        'TEXT2PIC' => 'text2pic',
+        'IMG2VID' => 'text2vid',
+        'TEXT2VID' => 'text2vid',
+        'SOUND2TEXT' => 'sound2text',
+        'TEXT2SOUND' => 'text2sound',
+    ];
 
     public function __construct(
         private ConfigRepository $configRepository,
@@ -354,7 +385,7 @@ final readonly class ModelConfigService
     /**
      * Get default model ID for a specific capability.
      *
-     * Priority: User Config > Global Config > null.
+     * Priority: User Config > Global Config > live model for the capability.
      * In test env, ConfigFixtures seeds global defaults pointing to TestProvider models.
      *
      * A per-user binding whose provider currently has no credentials is skipped
@@ -367,28 +398,88 @@ final readonly class ModelConfigService
      * otherwise keep routing that user at a provider they never configured.
      * The override stays stored and takes effect again as soon as its provider
      * has credentials.
+     *
+     * The global row is checked the same way. It used to be returned unchecked,
+     * which is how a whole install kept routing at Groq llama-3.3-70b-versatile
+     * (BID 9) after the model was shut down upstream: every message — including
+     * the ones anonymous visitors send through the guest path — died on a
+     * provider "model_not_found" that no amount of data migration could prevent
+     * for the NEXT retirement. When neither binding resolves, a live model of
+     * the same capability is picked over failing the request.
      */
     public function getDefaultModel(string $capability, ?int $userId = null): ?int
     {
         $setting = strtoupper($capability);
+        $preferred = null;
 
-        if ($userId) {
-            $userModelId = $this->readDefaultModel($userId, $setting);
+        // Read lazily: a usable per-user binding must not cost a global lookup.
+        foreach ($userId ? [$userId, 0] : [0] as $ownerId) {
+            $modelId = $this->readDefaultModel($ownerId, $setting);
+            if (null === $modelId) {
+                continue;
+            }
 
-            if (null !== $userModelId) {
-                if ($this->isModelProviderUsable($userModelId)) {
-                    return $userModelId;
+            if ($this->isModelProviderUsable($modelId)) {
+                return $modelId;
+            }
+
+            $preferred ??= $modelId;
+        }
+
+        $fallback = $this->firstUsableModelForCapability($setting);
+        if (null !== $fallback) {
+            return $fallback;
+        }
+
+        // Nothing usable anywhere — hand back the configured binding rather than
+        // null, so an install without a single reachable provider behaves as it
+        // always did and the caller can report the model it was meant to use.
+        return $preferred;
+    }
+
+    /**
+     * Best live model for a DEFAULTMODEL capability, used only when no binding
+     * resolves. Selectable models win over hidden ones so an emergency pick
+     * lands on something the user could have chosen themselves; the MEM tag has
+     * no selectable rows at all, which is why the hidden pass exists.
+     */
+    private function firstUsableModelForCapability(string $setting): ?int
+    {
+        $tag = self::CAPABILITY_TAGS[$setting] ?? null;
+        if (null === $tag) {
+            return null;
+        }
+
+        foreach ([true, false] as $selectableOnly) {
+            // findByTag() orders by quality DESC, id ASC.
+            foreach ($this->modelRepository->findByTag($tag, $selectableOnly) as $model) {
+                if ($this->isModelUsable($model)) {
+                    return $model->getId();
                 }
-
-                $globalModelId = $this->readDefaultModel(0, $setting);
-
-                return null !== $globalModelId && $this->isModelProviderUsable($globalModelId)
-                    ? $globalModelId
-                    : $userModelId;
             }
         }
 
-        return $this->readDefaultModel(0, $setting);
+        return null;
+    }
+
+    /**
+     * Re-resolve a model id that came from somewhere other than the DEFAULTMODEL
+     * chain — a widget's `aiModelId`, a prompt's `aiModel` override, an id the
+     * caller carried along. Those bindings are stored copies of a BID and go
+     * stale exactly like a default does, but they are read AHEAD of the default,
+     * so an unchecked one keeps a retired model in play even after a migration
+     * repointed BCONFIG.
+     *
+     * Returns the id unchanged when it can still serve, otherwise the capability
+     * default.
+     */
+    public function resolveUsableModelId(?int $modelId, string $capability, ?int $userId = null): ?int
+    {
+        if (null !== $modelId && $modelId > 0 && !$this->isModelProviderUsable($modelId)) {
+            return $this->getDefaultModel($capability, $userId);
+        }
+
+        return $modelId;
     }
 
     private function readDefaultModel(int $ownerId, string $setting): ?int
@@ -416,15 +507,37 @@ final readonly class ModelConfigService
      * does while holding nothing but the embedding model — so a provider-level
      * answer would happily route chat at a model nobody downloaded.
      *
-     * Unknown models — the negative placeholder BIDs of the test catalog, or a
-     * binding left behind by a catalog reshuffle — count as usable so this
-     * check never becomes the reason a configured default is dropped.
+     * A binding with no BMODELS row at all is judged by its sign. Negative ids
+     * are the catalog's placeholder convention ("let the provider registry
+     * decide") and must keep working. A missing POSITIVE id is a model that was
+     * deleted or never seeded, and routing it is worse than it looks: the
+     * caller ends up with a model id but no provider and no model name, so the
+     * registry answers from its own default and the user silently gets a
+     * different model than the one configured. Treating it as unusable turns
+     * that into a deliberate, logged fallback.
      */
     private function isModelProviderUsable(int $modelId): bool
     {
         $model = $this->modelRepository->find($modelId);
         if (!$model) {
-            return true;
+            return $modelId < 0;
+        }
+
+        return $this->isModelUsable($model);
+    }
+
+    /**
+     * Can this concrete row serve a request right now?
+     */
+    private function isModelUsable(Model $model): bool
+    {
+        // BACTIVE = 0 is how this codebase records "do not route here anymore" —
+        // an operator switching a model off in the admin UI, or a retire
+        // migration reacting to a provider shutdown. Handing such a row to the
+        // provider produces a hard mid-request error, so it never counts as
+        // usable, no matter how healthy the credentials behind it are.
+        if (1 !== $model->getActive()) {
+            return false;
         }
 
         $usable = $this->usableProviders();
