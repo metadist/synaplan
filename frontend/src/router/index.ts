@@ -662,7 +662,8 @@ router.beforeEach(async (to, from, next) => {
   }
 
   const { isAuthenticated, isAdmin } = useAuth()
-  const requiresAuth = to.meta.requiresAuth !== false // Default to true
+  const guestTrialOff = to.meta.allowGuest === true && !useConfigStore().auth.guestChatEnabled
+  const requiresAuth = to.meta.requiresAuth !== false || guestTrialOff // Default to true
   const requiresAdminAccess = to.meta.requiresAdmin === true
   const isPublicRoute = to.meta.public === true
 

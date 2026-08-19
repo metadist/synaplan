@@ -74,6 +74,16 @@ const config = {
     get registrationEnabled(): boolean {
       return getConfigSync().auth?.registrationEnabled ?? true
     },
+    /**
+     * False when the operator disabled the anonymous guest trial
+     * (GUEST_CHAT_ENABLED=false, issue #1517): guest-allowed routes then
+     * require authentication like any other route. Defaults to true so
+     * unconfigured/older backends keep the trial. The backend refuses the
+     * guest endpoints regardless.
+     */
+    get guestChatEnabled(): boolean {
+      return getConfigSync().auth?.guestChatEnabled ?? true
+    },
   },
 
   /**

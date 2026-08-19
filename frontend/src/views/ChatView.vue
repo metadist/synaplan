@@ -121,11 +121,17 @@
                 >
                   {{ $t('guest.retry') }}
                 </button>
+                <!-- Sign-in fallback: /register is unreachable when
+                     registration is disabled (#462 route guard). -->
                 <router-link
-                  :to="{ name: 'register' }"
+                  :to="{ name: configStore.auth.registrationEnabled ? 'register' : 'login' }"
                   class="px-4 py-2 rounded-lg border border-[var(--border)] txt-secondary text-sm font-medium hover:bg-[var(--bg-secondary)] transition-colors"
                 >
-                  {{ $t('guest.createAccount') }}
+                  {{
+                    configStore.auth.registrationEnabled
+                      ? $t('guest.createAccount')
+                      : $t('auth.signIn')
+                  }}
                 </router-link>
               </div>
             </div>
