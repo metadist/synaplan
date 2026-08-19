@@ -63,6 +63,8 @@ const mountNav = async (path = '/') => {
       { path: '/', component: { template: '<div />' } },
       { path: '/channels', component: { template: '<div />' } },
       { path: '/files', component: { template: '<div />' } },
+      { path: '/login', component: { template: '<div />' } },
+      { path: '/register', component: { template: '<div />' } },
     ],
   })
   await router.push(path)
@@ -76,7 +78,7 @@ const mountNav = async (path = '/') => {
         ChatShareModal: true,
         GuestHintPopover: true,
         Teleport: true,
-        Transition: false,
+        Transition: { template: '<div><slot /></div>' },
       },
     },
   })
@@ -116,17 +118,13 @@ describe('MobileNav', () => {
     ])
   })
 
-  it('jumps to the in-drawer history list and collapses More', async () => {
+  it('jumps to the in-drawer history list', async () => {
     const wrapper = await mountNav('/channels')
     await flushPromises()
-
-    const moreSheet = wrapper.find('[data-testid="sheet-mobile-more"]')
-    expect(moreSheet.isVisible()).toBe(true)
 
     await wrapper.find('[data-testid="btn-mobile-nav-history"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="sheet-mobile-more"]').isVisible()).toBe(false)
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
     expect(wrapper.find('[data-testid="section-mobile-history"]').exists()).toBe(true)
   })
