@@ -66,7 +66,7 @@ final class Version20260819120000 extends AbstractMigration
                 BSTATE VARCHAR(16) NOT NULL DEFAULT 'unknown',
                 BSOURCE VARCHAR(16) NOT NULL DEFAULT 'probe',
                 BKIND VARCHAR(16) DEFAULT NULL,
-                BMESSAGE TEXT DEFAULT NULL,
+                BMESSAGE LONGTEXT DEFAULT NULL,
                 BLASTCHECK BIGINT NOT NULL DEFAULT 0,
                 BLASTSUCCESS BIGINT NOT NULL DEFAULT 0,
                 BLASTFAILURE BIGINT NOT NULL DEFAULT 0,

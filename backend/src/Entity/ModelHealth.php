@@ -42,10 +42,13 @@ class ModelHealth
     #[ORM\Column(name: 'BMODELID', type: 'bigint')]
     private int $modelId = 0;
 
-    #[ORM\Column(name: 'BSTATE', length: 16)]
+    // Spelled out rather than read from the enum because an attribute argument
+    // must be a constant expression. Must stay equal to the migration's DEFAULT
+    // and to ModelHealthState::Unknown->value, or doctrine:schema:validate fails.
+    #[ORM\Column(name: 'BSTATE', length: 16, options: ['default' => 'unknown'])]
     private string $state = ModelHealthState::Unknown->value;
 
-    #[ORM\Column(name: 'BSOURCE', length: 16)]
+    #[ORM\Column(name: 'BSOURCE', length: 16, options: ['default' => self::SOURCE_PROBE])]
     private string $source = self::SOURCE_PROBE;
 
     /** {@see \App\AI\Health\FailureKind} value, or null while healthy. */
