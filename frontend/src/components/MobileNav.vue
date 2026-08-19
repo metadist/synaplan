@@ -131,6 +131,7 @@
 
                 <template v-if="isGuestMode">
                   <router-link
+                    v-if="configStore.auth.registrationEnabled"
                     to="/register"
                     class="v2-drawer-account font-medium"
                     style="color: var(--brand)"

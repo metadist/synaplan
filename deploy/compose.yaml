@@ -43,6 +43,10 @@ x-app-environment: &app-environment
   AUTH_COOKIE_SECURE: "${AUTH_COOKIE_SECURE:-}"
   BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
   BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
+  # Auth-surface switches (issues #462 / #1517). Empty keeps the default
+  # (enabled); SSO-/OIDC-only deployments set both to "false".
+  REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
+  GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
   DB_HOST: db
   DB_PORT: "3306"
   DB_NAME: "${MARIADB_DATABASE:-synaplan}"

@@ -4653,6 +4653,8 @@
     },
     "errorTitle": "Trial currently unavailable",
     "errorDescription": "We couldn't start your guest session. Please try again or create a free account.",
+    "disabledTitle": "Guest chat is not available",
+    "disabledDescription": "This instance does not offer an anonymous trial. Please sign in to start chatting.",
     "expiredTitle": "Your session has expired",
     "expiredDescription": "Guest sessions last 24 hours. Start a new trial or create a free account to keep your chat history.",
     "rateLimitedTitle": "Too many sessions",

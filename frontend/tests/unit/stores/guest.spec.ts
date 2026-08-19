@@ -22,6 +22,7 @@ describe('Guest Store', () => {
     expect(store.maxMessages).toBe(5)
     expect(store.limitReached).toBe(false)
     expect(store.initialized).toBe(false)
+    expect(store.guestChatDisabled).toBe(false)
     expect(store.bannerDismissed).toBe(false)
   })
 
@@ -101,6 +102,7 @@ describe('Guest Store', () => {
     store.maxMessages = 10
     store.limitReached = true
     store.initialized = true
+    store.guestChatDisabled = true
     store.bannerDismissed = true
 
     store.$reset()
@@ -111,6 +113,7 @@ describe('Guest Store', () => {
     expect(store.maxMessages).toBe(5)
     expect(store.limitReached).toBe(false)
     expect(store.initialized).toBe(false)
+    expect(store.guestChatDisabled).toBe(false)
     expect(store.bannerDismissed).toBe(false)
   })
 
@@ -214,6 +217,42 @@ describe('Guest Store', () => {
       expect(store.initialized).toBe(true)
       expect(store.initFailed).toBe(true)
       expect(store.sessionId).toBeNull()
+    })
+
+    it('should clear storage and flag disabled on 403 GUEST_CHAT_DISABLED', async () => {
+      localStorage.setItem('synaplan_guest_session', 'stale-id')
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({
+          error: 'Guest chat is disabled on this instance.',
+          code: 'GUEST_CHAT_DISABLED',
+        }),
+      })
+
+      const store = useGuestStore()
+      await store.initSession()
+
+      expect(store.initialized).toBe(true)
+      expect(store.initFailed).toBe(true)
+      expect(store.guestChatDisabled).toBe(true)
+      expect(store.sessionId).toBeNull()
+      expect(store.isGuestMode).toBe(false)
+      expect(localStorage.getItem('synaplan_guest_session')).toBeNull()
+    })
+
+    it('should treat a 403 without the disabled code as a generic failure', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: 'nope' }),
+      })
+
+      const store = useGuestStore()
+      await store.initSession()
+
+      expect(store.initFailed).toBe(true)
+      expect(store.guestChatDisabled).toBe(false)
     })
 
     it('should set rateLimited on 429 response', async () => {
