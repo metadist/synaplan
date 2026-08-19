@@ -83,7 +83,7 @@
 import { computed, defineComponent, h, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
-import { authenticatedMediaSrc, downloadMediaUrl } from '@/services/api/mediaAuth'
+import { downloadMediaUrl, resolveMediaUrl, useMediaSrc } from '@/services/api/mediaAuth'
 
 /**
  * Media body of a completed task card (#1229): image with lightbox +
@@ -100,9 +100,11 @@ const props = defineProps<{
 const { t } = useI18n()
 const lightboxOpen = ref(false)
 
-// No-op on web; on native it appends the Bearer token as `?token=` because
-// media elements can't send auth headers (MOBILE-APP SEAM, see mediaAuth.ts).
-const mediaSrc = computed(() => authenticatedMediaSrc(props.url))
+// No-op on web; on native it resolves the URL against the configured server
+// and appends the Bearer token as `?token=` because media elements can't send
+// auth headers (MOBILE-APP SEAM, see mediaAuth.ts).
+const { mediaSrc: buildMediaSrc } = useMediaSrc()
+const mediaSrc = computed(() => buildMediaSrc(props.url))
 
 // Small inline helper so video/audio share one download affordance without a
 // third component file.
@@ -136,7 +138,7 @@ const downloadFilename = (): string => {
 // anchor on web or Filesystem + Share in the native shell.
 const download = async () => {
   try {
-    await downloadMediaUrl(props.url, downloadFilename())
+    await downloadMediaUrl(resolveMediaUrl(props.url), downloadFilename())
   } catch (error) {
     console.error('Failed to download task media:', error)
   }
