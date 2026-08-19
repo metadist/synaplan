@@ -92,7 +92,7 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->createStub(MarketingNewsConfig::class),
             $this->createStub(UsageTaximeterConfig::class),
             $this->createStub(RegistrationConfig::class),
-            new GuestChatConfig(),
+            $this->createStub(GuestChatConfig::class),
             $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
             $this->createStub(ChatReadinessService::class),
             $this->createStub(AiProviderDisclosure::class),

@@ -61,7 +61,7 @@ class StreamControllerTaskPlanFilesTest extends TestCase
             $this->createMock(WidgetService::class),
             $this->createMock(WidgetSessionService::class),
             $this->createMock(GuestSessionService::class),
-            new GuestChatConfig(),
+            $this->createStub(GuestChatConfig::class),
             $this->createMock(RateLimitService::class),
             '/tmp/upload',
             $this->createMock(UserUploadPathBuilder::class),

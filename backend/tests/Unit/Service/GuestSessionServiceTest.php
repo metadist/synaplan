@@ -29,13 +29,17 @@ class GuestSessionServiceTest extends TestCase
         ?UserRepository $userRepo = null,
         ?LoggerInterface $logger = null,
         ?int $maxSessionsPerIp = null,
+        bool $guestChatEnabled = true,
     ): GuestSessionService {
+        $guestChatConfig = $this->createStub(GuestChatConfig::class);
+        $guestChatConfig->method('isEnabled')->willReturn($guestChatEnabled);
+
         $args = [
             $em ?? $this->createStub(EntityManagerInterface::class),
             $sessionRepo ?? $this->createStub(GuestSessionRepository::class),
             $userRepo ?? $this->createStub(UserRepository::class),
             $logger ?? $this->createStub(LoggerInterface::class),
-            new GuestChatConfig(),
+            $guestChatConfig,
         ];
 
         if (null !== $maxSessionsPerIp) {
@@ -50,13 +54,9 @@ class GuestSessionServiceTest extends TestCase
         $sessionRepo = $this->createStub(GuestSessionRepository::class);
         $sessionRepo->method('findBySessionId')->willReturn(new GuestSession());
 
-        $_ENV['GUEST_CHAT_ENABLED'] = 'false';
+        $service = $this->createService(sessionRepo: $sessionRepo, guestChatEnabled: false);
 
-        try {
-            self::assertNull($this->createService(sessionRepo: $sessionRepo)->getSession('any-id'));
-        } finally {
-            unset($_ENV['GUEST_CHAT_ENABLED']);
-        }
+        self::assertNull($service->getSession('any-id'));
     }
 
     public function testCreateSessionWithCloudflareHeaders(): void
