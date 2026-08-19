@@ -46,6 +46,25 @@ class ModelRepository extends ServiceEntityRepository
     }
 
     /**
+     * Every row this install currently offers, regardless of capability.
+     *
+     * Used by the model-availability check, which must judge what the running
+     * database serves rather than what the catalog declares — an install can
+     * hold active rows the catalog dropped long ago.
+     *
+     * @return Model[] Array of active models sorted by service, then id
+     */
+    public function findAllActive(): array
+    {
+        return $this->createQueryBuilder('m')
+            ->where('m.active = 1')
+            ->orderBy('m.service', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Get model by service and provider ID.
      *
      * @param string $service    Service name (e.g., 'Ollama', 'OpenAI')

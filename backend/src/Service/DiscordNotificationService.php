@@ -18,12 +18,15 @@ final readonly class DiscordNotificationService
     // Discord embed colors
     private const COLOR_SUCCESS = 0x00FF00; // Green
     private const COLOR_ERROR = 0xFF0000;   // Red
+    private const COLOR_WARNING = 0xFFA500; // Orange
 
     // Truncation limits (Discord API: field value max 1024, total embed max 6000)
     // @see https://discord.com/developers/docs/resources/channel#embed-object-embed-limits
     private const MAX_USER_MESSAGE = 200;  // Truncate user message preview
     private const MAX_RESPONSE = 300;      // Truncate response preview
     private const MAX_ERROR = 450;         // Truncate error (leaves room for code block formatting)
+    private const MAX_FIELD_VALUE = 1024;  // Hard Discord limit for a single field value
+    private const MAX_DRIFT_ENTRIES = 15;  // Model-availability findings listed before "… and N more"
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -711,6 +714,80 @@ final readonly class DiscordNotificationService
             footer: 'Synaplan Embedding · throttled to 1/hour per provider pair',
             mentionEveryone: true,
         );
+    }
+
+    /**
+     * Notify that we still offer models a provider no longer lists.
+     *
+     * Deliberately not an `@everyone` incident: the finding is advisory and the
+     * models are still installed and selectable, so there is nothing to ack at
+     * 3am. It is a standing reminder that a retirement migration is due before
+     * users start seeing provider errors.
+     *
+     * @param list<string> $missingModels      human-readable lines, most urgent first
+     * @param list<string> $uncheckedProviders providers that could not be verified
+     */
+    public function notifyModelAvailabilityDrift(array $missingModels, array $uncheckedProviders): void
+    {
+        if (!$this->isEnabled() || [] === $missingModels) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => sprintf('Missing upstream (%d)', count($missingModels)),
+                'value' => $this->bulletList($missingModels, self::MAX_DRIFT_ENTRIES),
+                'inline' => false,
+            ],
+            [
+                'name' => 'Action required',
+                'value' => 'Confirm on the provider deprecation page, then retire via migration (deactivate, never delete) — docs/PRICING_MAINTENANCE.md.',
+                'inline' => false,
+            ],
+        ];
+
+        if ([] !== $uncheckedProviders) {
+            $fields[] = [
+                'name' => 'Not verified',
+                'value' => $this->truncate(implode(', ', $uncheckedProviders), self::MAX_ERROR),
+                'inline' => false,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: '⚠️ Discontinued AI models detected',
+            color: self::COLOR_WARNING,
+            fields: $fields,
+            footer: 'Synaplan model availability check · daily',
+        );
+    }
+
+    /**
+     * Render lines as a Discord field value, capped at both the entry count and
+     * the API's 1024-character field limit.
+     *
+     * @param list<string> $lines
+     */
+    private function bulletList(array $lines, int $maxEntries): string
+    {
+        $shown = array_slice($lines, 0, $maxEntries);
+        $value = '';
+        $rendered = 0;
+        foreach ($shown as $line) {
+            $candidate = $value.'• '.$line."\n";
+            if (mb_strlen($candidate) > self::MAX_FIELD_VALUE - 40) {
+                break;
+            }
+            $value = $candidate;
+            ++$rendered;
+        }
+
+        $omitted = count($lines) - $rendered;
+        if ($omitted > 0) {
+            $value .= sprintf('… and %d more', $omitted);
+        }
+
+        return '' === $value ? '(none)' : $value;
     }
 
     /**
