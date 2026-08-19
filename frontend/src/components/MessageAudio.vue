@@ -27,6 +27,14 @@
           </p>
         </div>
         <button
+          type="button"
+          class="btn-secondary flex-shrink-0 text-xs px-3 py-1"
+          data-testid="btn-audio-retry"
+          @click.stop="retryManually"
+        >
+          {{ $t('common.retry') }}
+        </button>
+        <button
           v-if="canDownload"
           type="button"
           class="flex-shrink-0 txt-primary hover:text-[var(--brand)] transition-colors"
@@ -184,10 +192,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onUnmounted } from 'vue'
 import { useAudioPlayback } from '@/composables/useAudioPlayback'
-import { useConfigStore } from '@/stores/config'
-import { authenticatedMediaSrc, downloadMediaUrl } from '@/services/api/mediaAuth'
+import { downloadMediaUrl, resolveMediaUrl, useMediaSrc } from '@/services/api/mediaAuth'
 
 interface Props {
   url: string
@@ -197,7 +204,10 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const config = useConfigStore()
+// No-op on web; on native this resolves the URL against the configured server
+// and appends the Bearer token as `?token=` because <audio> can't send auth
+// headers. `reloadMedia()` mints a fresh token for the retry path.
+const { mediaSrc, reloadMedia } = useMediaSrc()
 
 // Only one inline audio player may play at a time (issue #1078): starting this
 // one pauses any other that is currently playing.
@@ -224,18 +234,8 @@ const maxRetries = 3
 const retryDelays = [1000, 2000, 3000]
 const isRetrying = ref(false)
 const hasFailed = ref(false)
-const cacheBuster = ref(0)
 
-// authenticatedMediaSrc is a no-op on web; on native it appends the Bearer
-// token as `?token=` because the <audio> element can't send auth headers.
-const audioSrc = computed(() => {
-  const src = authenticatedMediaSrc(props.url)
-  if (cacheBuster.value === 0) {
-    return src
-  }
-  const separator = src.includes('?') ? '&' : '?'
-  return `${src}${separator}_retry=${cacheBuster.value}`
-})
+const audioSrc = computed(() => mediaSrc(props.url))
 
 const fileName = computed(() => {
   const parts = props.url.split('?')[0].split('/')
@@ -258,8 +258,7 @@ const canDownload = computed(() => {
 // transport, mirroring `MessageImage.downloadImage` (issue #1071).
 const downloadAudio = async () => {
   try {
-    const fullUrl = props.url.startsWith('/') ? `${config.appBaseUrl}${props.url}` : props.url
-    await downloadMediaUrl(fullUrl, fileName.value)
+    await downloadMediaUrl(resolveMediaUrl(props.url), fileName.value)
   } catch (error) {
     console.error('Failed to download audio:', error)
   }
@@ -283,6 +282,14 @@ const stopSelf = (): void => {
   isPlaying.value = false
 }
 
+// The <audio> element reports a rejected credential and a missing file the
+// same way, so every retry mints a fresh token as well as busting the cache.
+const reloadSource = async () => {
+  await reloadMedia()
+  await nextTick()
+  audioRef.value?.load()
+}
+
 const handleAudioError = () => {
   if (retryCount.value < maxRetries) {
     isRetrying.value = true
@@ -293,11 +300,7 @@ const handleAudioError = () => {
 
     setTimeout(() => {
       retryCount.value++
-      cacheBuster.value = Date.now()
-      // Force the <audio> element to re-fetch the (cache-busted) URL.
-      if (audioRef.value) {
-        audioRef.value.load()
-      }
+      void reloadSource()
     }, delay)
   } else {
     // All retries exhausted — degrade to a non-crashing error state with a
@@ -307,6 +310,13 @@ const handleAudioError = () => {
     hasFailed.value = true
     console.error('Audio failed to load after all retries:', props.url)
   }
+}
+
+const retryManually = async () => {
+  retryCount.value = 0
+  hasFailed.value = false
+  isRetrying.value = true
+  await reloadSource()
 }
 
 const handleLoadSuccess = () => {

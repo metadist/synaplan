@@ -12,11 +12,41 @@
         class="w-full h-full object-cover transition-transform group-hover:scale-105"
         loading="lazy"
       />
+      <div
+        v-else-if="hasFailed"
+        class="w-full h-full flex flex-col items-center justify-center gap-2 p-4 text-center"
+        data-testid="image-load-error"
+      >
+        <svg
+          class="w-8 h-8 text-red-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01M4.93 19h14.14a2 2 0 001.74-3l-7.07-12.25a2 2 0 00-3.48 0L3.19 16a2 2 0 001.74 3z"
+          />
+        </svg>
+        <p class="text-sm font-medium txt-primary">{{ $t('chat.imageUnavailable') }}</p>
+        <p class="text-xs txt-secondary">{{ $t('chat.imageUnavailableDescription') }}</p>
+        <button
+          type="button"
+          class="btn-secondary text-xs px-3 py-1 relative z-10"
+          data-testid="btn-image-retry"
+          @click.stop="loadImage"
+        >
+          {{ $t('common.retry') }}
+        </button>
+      </div>
       <div v-else class="w-full h-full flex items-center justify-center">
-        <div class="text-sm txt-secondary">Loading image...</div>
+        <div class="text-sm txt-secondary">{{ $t('common.loading') }}</div>
       </div>
       <div
-        class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center"
+        class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center pointer-events-none"
       >
         <div
           class="opacity-0 group-hover:opacity-100 transition-opacity surface-card p-3 rounded-full"
@@ -114,8 +144,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { useConfigStore } from '@/stores/config'
-import { fetchMediaBlob, needsAuthenticatedMediaFetch } from '@/services/api/mediaAuth'
+import {
+  fetchMediaBlob,
+  needsAuthenticatedMediaFetch,
+  resolveMediaUrl,
+} from '@/services/api/mediaAuth'
 import { saveOrDownloadBlob } from '@/services/api/nativeDownload'
 
 interface Props {
@@ -124,14 +157,22 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-const config = useConfigStore()
 
 const isFullscreen = ref(false)
 const blobUrl = ref<string>('')
 const loadedBlob = ref<Blob | null>(null)
+const hasFailed = ref(false)
+
+const releaseBlobUrl = () => {
+  if (blobUrl.value && blobUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(blobUrl.value)
+  }
+  blobUrl.value = ''
+}
 
 // Load image with auth (web: session cookie, native: Bearer via fetchMediaBlob)
 const loadImage = async () => {
+  hasFailed.value = false
   try {
     // External URLs (e.g. from OpenAI) don't need auth. On native, absolute
     // URLs pointing at our own backend are NOT external — they need the
@@ -144,12 +185,15 @@ const loadImage = async () => {
       return
     }
 
-    const fullUrl = props.url.startsWith('/') ? `${config.appBaseUrl}${props.url}` : props.url
-
-    const blob = await fetchMediaBlob(fullUrl)
+    const blob = await fetchMediaBlob(resolveMediaUrl(props.url))
     loadedBlob.value = blob
     blobUrl.value = URL.createObjectURL(blob)
   } catch (error) {
+    // Surface a retryable error instead of an endless spinner: the most common
+    // cause is an access token that aged out, and fetchMediaBlob has already
+    // refreshed and retried once by the time we get here.
+    releaseBlobUrl()
+    hasFailed.value = true
     console.error('Failed to load image:', error)
   }
 }
@@ -171,8 +215,7 @@ const downloadImage = async () => {
   try {
     let blob = loadedBlob.value
     if (!blob) {
-      const fullUrl = props.url.startsWith('/') ? `${config.appBaseUrl}${props.url}` : props.url
-      blob = await fetchMediaBlob(fullUrl)
+      blob = await fetchMediaBlob(resolveMediaUrl(props.url))
     }
     await saveOrDownloadBlob(blob, downloadFilename())
   } catch (error) {
@@ -201,19 +244,15 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleEscape)
-  // Clean up blob URL
-  if (blobUrl.value && blobUrl.value.startsWith('blob:')) {
-    URL.revokeObjectURL(blobUrl.value)
-  }
+  releaseBlobUrl()
+  loadedBlob.value = null
 })
 
 // Reload image if URL changes
 watch(
   () => props.url,
   () => {
-    if (blobUrl.value && blobUrl.value.startsWith('blob:')) {
-      URL.revokeObjectURL(blobUrl.value)
-    }
+    releaseBlobUrl()
     loadedBlob.value = null
     loadImage()
   }

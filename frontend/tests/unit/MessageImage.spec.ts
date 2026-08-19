@@ -137,4 +137,55 @@ describe('MessageImage', () => {
       expect(clickSpy).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('load failure', () => {
+    const originalFetch = global.fetch
+
+    afterEach(() => {
+      global.fetch = originalFetch
+      vi.restoreAllMocks()
+    })
+
+    it('shows a retryable error instead of an endless loading state', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      global.fetch = vi.fn(() =>
+        Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' })
+      ) as unknown as typeof fetch
+
+      const wrapper = mount(MessageImage, {
+        props: { url: '/api/v1/files/uploads/1/000/gone.png' },
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="btn-image-retry"]').exists()).toBe(true)
+      expect(wrapper.find('img').exists()).toBe(false)
+    })
+
+    it('recovers when the retry succeeds', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' })
+        .mockResolvedValue({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          blob: () => Promise.resolve(new Blob(['image-bytes'])),
+        })
+      global.fetch = fetchMock as unknown as typeof fetch
+
+      const wrapper = mount(MessageImage, {
+        props: { url: '/api/v1/files/uploads/1/000/late.png' },
+      })
+      await flushPromises()
+
+      await wrapper.find('[data-testid="btn-image-retry"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(false)
+      expect(wrapper.find('img').attributes('src')).toBe('blob:mock-url')
+    })
+  })
 })
