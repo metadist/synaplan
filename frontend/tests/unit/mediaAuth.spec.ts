@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { computed } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 
@@ -73,6 +73,14 @@ describe('mediaAuth', () => {
     httpClientMock.mockClear()
     httpClientMock.mockResolvedValue({ token: 'mtok', expiresIn: 1800 })
     __resetMediaCredentialCache()
+  })
+
+  // Stubs have to be undone even when an assertion throws mid-test, otherwise
+  // every later test in the file inherits a frozen clock or someone else's
+  // fetch.
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
   })
 
   describe('resolveMediaUrl', () => {
@@ -174,7 +182,7 @@ describe('mediaAuth', () => {
   describe('fetchMediaBlob', () => {
     it('sends cookies on web and no Authorization header', async () => {
       const fetchMock = vi.fn(async () => mediaResponse(200))
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       await fetchMediaBlob(UPLOAD_PATH)
 
@@ -188,7 +196,7 @@ describe('mediaAuth', () => {
       runtime.native = true
       auth.token = 'tok'
       const fetchMock = vi.fn(async () => mediaResponse(200))
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       await fetchMediaBlob(UPLOAD_PATH)
 
@@ -204,7 +212,10 @@ describe('mediaAuth', () => {
     it('refreshes the credential before the request when its exp claim is near', async () => {
       runtime.native = true
       auth.token = signedToken(5)
-      global.fetch = vi.fn(async () => mediaResponse(200)) as unknown as typeof fetch
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => mediaResponse(200))
+      )
 
       await fetchMediaBlob(UPLOAD_PATH)
 
@@ -214,7 +225,10 @@ describe('mediaAuth', () => {
     it('leaves a token with plenty of life alone', async () => {
       runtime.native = true
       auth.token = signedToken(600)
-      global.fetch = vi.fn(async () => mediaResponse(200)) as unknown as typeof fetch
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => mediaResponse(200))
+      )
 
       await fetchMediaBlob(UPLOAD_PATH)
 
@@ -227,7 +241,7 @@ describe('mediaAuth', () => {
         .fn()
         .mockResolvedValueOnce(mediaResponse(401))
         .mockResolvedValueOnce(mediaResponse(200))
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       const pending = fetchMediaBlob(UPLOAD_PATH)
       await vi.runAllTimersAsync()
@@ -235,12 +249,11 @@ describe('mediaAuth', () => {
 
       expect(refreshAccessToken).toHaveBeenCalledTimes(1)
       expect(fetchMock).toHaveBeenCalledTimes(2)
-      vi.useRealTimers()
     })
 
     it('does not retry a 404 — a missing file is not an auth problem', async () => {
       const fetchMock = vi.fn(async () => mediaResponse(404))
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       await expect(fetchMediaBlob(UPLOAD_PATH)).rejects.toThrow('HTTP 404')
       expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -249,19 +262,24 @@ describe('mediaAuth', () => {
 
     it('throws when the retry is rejected too', async () => {
       vi.useFakeTimers()
-      global.fetch = vi.fn(async () => mediaResponse(401)) as unknown as typeof fetch
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => mediaResponse(401))
+      )
 
       const pending = fetchMediaBlob(UPLOAD_PATH)
       const assertion = expect(pending).rejects.toThrow('HTTP 401')
       await vi.runAllTimersAsync()
       await assertion
-      vi.useRealTimers()
     })
   })
 
   describe('downloadMediaUrl', () => {
     it('hands the authenticated blob to the platform saver', async () => {
-      global.fetch = vi.fn(async () => mediaResponse(200)) as unknown as typeof fetch
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => mediaResponse(200))
+      )
 
       await downloadMediaUrl(UPLOAD_PATH, 'cat.png')
 

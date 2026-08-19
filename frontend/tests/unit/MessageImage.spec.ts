@@ -14,6 +14,14 @@ describe('MessageImage', () => {
     }
   })
 
+  // One teardown for the whole file. Restoring per describe block invites
+  // order-dependent failures, because a block that stubs a global the block
+  // above it did not has to remember to undo it.
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
   it('should render image with correct src', async () => {
     const wrapper = mount(MessageImage, {
       props: {
@@ -74,17 +82,6 @@ describe('MessageImage', () => {
   })
 
   describe('download (issue #1071)', () => {
-    const originalFetch = global.fetch
-    const originalCreate = global.URL.createObjectURL
-    const originalRevoke = global.URL.revokeObjectURL
-
-    afterEach(() => {
-      global.fetch = originalFetch
-      global.URL.createObjectURL = originalCreate
-      global.URL.revokeObjectURL = originalRevoke
-      vi.restoreAllMocks()
-    })
-
     it('renders a download button once the image has loaded', async () => {
       const wrapper = mount(MessageImage, {
         props: { url: 'https://example.com/image.jpg' },
@@ -95,8 +92,8 @@ describe('MessageImage', () => {
     })
 
     it('fetches an authenticated blob for the download of an internal image', async () => {
-      global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
-      global.URL.revokeObjectURL = vi.fn()
+      vi.spyOn(global.URL, 'createObjectURL').mockReturnValue('blob:mock-url')
+      vi.spyOn(global.URL, 'revokeObjectURL').mockImplementation(() => undefined)
       const fetchMock = vi.fn((url: RequestInfo | URL) => {
         if (typeof url === 'string' && url.includes('/config/runtime')) {
           return Promise.resolve({
@@ -115,7 +112,7 @@ describe('MessageImage', () => {
           blob: () => Promise.resolve(new Blob(['image-bytes'])),
         })
       })
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       const clickSpy = vi
         .spyOn(HTMLAnchorElement.prototype, 'click')
@@ -140,10 +137,6 @@ describe('MessageImage', () => {
 
   describe('load failure', () => {
     const url = '/api/v1/files/uploads/1/000/gone.png'
-
-    afterEach(() => {
-      vi.restoreAllMocks()
-    })
 
     // The element reports the failure, so a stale credential gets one silent
     // retry before the user is told anything.
