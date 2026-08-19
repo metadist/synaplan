@@ -231,37 +231,29 @@ final class ProviderDefaultsServiceTest extends TestCase
     }
 
     /**
-     * PROVIDER_DEFAULTS splits each provider into a MAIN tier (CHAT, TOOLS,
-     * ANALYZE) and a cheaper FAST tier (SORT, PLAN, SUMMARIZE). Nothing used to
-     * enforce that ordering, so the map could keep recommending a former
-     * flagship long after the catalog ranked a FAST-tier model above it — the
-     * shape a stale binding takes before anyone notices it is also dead.
+     * A CHAT recommendation is what a user actually talks to, so it must be a
+     * model the provider can answer with rather than a media or embedding row.
+     * Cheap structural check; it cannot tell whether the model still exists
+     * upstream — only a live provider query can.
      */
-    public function testFlagshipTierIsNotRankedBelowTheFastTier(): void
+    public function testRecommendedChatDefaultsAreChatCapable(): void
     {
         $byId = $this->catalogById();
 
         foreach ([...ProviderKeyStore::SUPPORTED_PROVIDERS, 'ollama'] as $provider) {
             $defaults = $this->service->getRecommendedDefaults($provider);
-            if (!isset($defaults['CHAT'], $defaults['SORT'])) {
-                continue;
+
+            foreach (['CHAT', 'TOOLS', 'ANALYZE', 'SORT', 'PLAN', 'SUMMARIZE'] as $capability) {
+                if (!isset($defaults[$capability])) {
+                    continue;
+                }
+
+                self::assertSame(
+                    'chat',
+                    $byId[$defaults[$capability]]['tag'],
+                    sprintf('%s/%s must recommend a chat-tagged model', $provider, $capability)
+                );
             }
-
-            $main = $byId[$defaults['CHAT']];
-            $fast = $byId[$defaults['SORT']];
-
-            self::assertGreaterThanOrEqual(
-                (float) $fast['quality'],
-                (float) $main['quality'],
-                sprintf(
-                    'Provider "%s" recommends %s (quality %s) as its flagship CHAT model while using %s (quality %s) for the cheap SORT tier',
-                    $provider,
-                    $main['providerId'],
-                    $main['quality'],
-                    $fast['providerId'],
-                    $fast['quality']
-                )
-            );
         }
     }
 

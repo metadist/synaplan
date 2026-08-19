@@ -33,9 +33,19 @@ use Doctrine\Migrations\AbstractMigration;
  * idempotent, and DEFAULTMODEL bindings are repointed for every owner behind an
  * EXISTS subquery so an install without the successor is left untouched.
  *
- * Successor: Groq gpt-oss-120b (BID 76) — already the SORT/PLAN/SUMMARIZE/MEM
- * binding for Groq and ranked above the retired row on every catalog axis
- * (quality 10 vs 9, rating 4 vs 1, and cheaper at 0.15/0.60 vs 0.59/0.79).
+ * Successor: Groq gpt-oss-120b (BID 76). Note what this costs, because the
+ * retired row was deliberately the MAIN tier while 76 was the cheap FAST tier
+ * (see #1392 and _devextras/planning/archive/20260606_multitask-routing.md):
+ * Groq's remaining catalog no longer holds a chat model above its router, so
+ * MAIN and FAST collapse onto one model, and the per-answer output budget drops
+ * from 32768 to 16384 tokens because that is 76's catalog max_tokens. No Groq
+ * chat row combines the higher budget with a comparable tier.
+ *
+ * Unlike the earlier retirements this one refuses to touch VECTORIZE: swapping
+ * an embedding binding without re-vectorising corrupts every stored vector
+ * (issue #948), and docs/PRICING_MAINTENANCE.md forbids it. The retired row is
+ * chat-tagged, so a VECTORIZE binding on it can only come from operator error —
+ * which is exactly when a silent repoint would do the most damage.
  */
 final class Version20260819090000 extends AbstractMigration
 {
@@ -54,8 +64,11 @@ final class Version20260819090000 extends AbstractMigration
             UPDATE BCONFIG
                SET BVALUE = :successor
              WHERE BGROUP = 'DEFAULTMODEL'
+               AND BSETTING <> 'VECTORIZE'
                AND BVALUE = :retiredValue
-               AND EXISTS (SELECT 1 FROM BMODELS WHERE BID = :successor)
+               AND EXISTS (
+                   SELECT 1 FROM BMODELS WHERE BID = :successor AND BACTIVE = 1
+               )
         SQL, [
             'retiredValue' => (string) self::RETIRED_BID,
             'successor' => (string) self::SUCCESSOR_BID,

@@ -313,7 +313,11 @@ Groq decommissioned `llama-3.3-70b-versatile` (BID 9) — every request now come
 
 What made this one worse than a stale catalog row: BID 9 was also the recommended `CHAT`/`TOOLS`/`ANALYZE` binding for Groq in `ProviderDefaultsService`, and Groq is **first** in `PREFERENCE_ORDER`. `app:provider:apply-defaults --auto` runs on every container start and `ChatReadinessService` calls the same path at runtime, so any install holding a Groq key while its current default provider had none was repointed at a dead model **without anyone choosing it**. The migration repairs existing bindings for every owner; the catalog and map changes stop it recurring.
 
-The catalog already ranked the successor above the retired row on every axis (quality 10 vs 9, rating 4 vs 1, price 0.15/0.60 vs 0.59/0.79) — the map had simply drifted. `ProviderDefaultsServiceTest::testFlagshipTierIsNotRankedBelowTheFastTier()` now fails the build when a provider's MAIN tier ranks below its FAST tier, and `testEveryRecommendedDefaultPointsAtAnActiveCatalogEntry()` fails when a recommendation points at a deactivated row.
+**What the retirement costs.** BID 9 was deliberately Groq's MAIN tier while BID 76 was the cheap FAST tier used for routing (#1392, `_devextras/planning/archive/20260606_multitask-routing.md`). Groq's remaining chat rows hold nothing above the router, so MAIN and FAST now collapse onto one model, and the per-answer output budget drops from 32768 to 16384 tokens (BID 76's `max_tokens`). The only Groq chat rows that keep the 32768 budget are Qwen3 32B (53) and Llama 3.1 8B Instant (236); neither is an obvious drop-in, so the collapse is the deliberate choice and worth revisiting when Groq ships a new top-tier model.
+
+**Do not use `BQUALITY`/`BRATING` to justify a successor.** They are hand-authored and currently unmaintained; a comparison between two rows says nothing reliable. Pick successors from verifiable facts — upstream availability, price, output budget, declared features — and state which one you used.
+
+`ProviderDefaultsServiceTest::testEveryRecommendedDefaultPointsAtAnActiveCatalogEntry()` now fails the build when a recommendation points at a deactivated row, and `testRecommendedChatDefaultsAreChatCapable()` when it points at a non-chat row. Neither can detect an upstream removal — only a live provider query can.
 
 ### A non-zero price under a "free" unit is silently free
 
