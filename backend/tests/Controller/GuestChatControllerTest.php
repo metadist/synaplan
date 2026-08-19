@@ -8,6 +8,7 @@ use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\GuestSession;
 use App\Entity\Message;
+use App\Service\GuestChatConfig;
 use App\Service\Media\MediaCancellationStore;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
@@ -121,7 +122,7 @@ class GuestChatControllerTest extends WebTestCase
 
                 $this->assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN, "$method $url");
                 $data = json_decode($this->client->getResponse()->getContent(), true);
-                $this->assertSame('GUEST_CHAT_DISABLED', $data['code'] ?? null, "$method $url");
+                $this->assertSame(GuestChatConfig::DISABLED_CODE, $data['code'] ?? null, "$method $url");
             }
         } finally {
             unset($_ENV['GUEST_CHAT_ENABLED']);

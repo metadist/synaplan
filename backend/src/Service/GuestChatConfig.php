@@ -24,6 +24,13 @@ namespace App\Service;
  */
 final readonly class GuestChatConfig
 {
+    /**
+     * Machine-readable code carried by every 403 the disabled trial produces
+     * (guest endpoints and the stream endpoint's guest path alike), mirroring
+     * REGISTRATION_DISABLED from issue #462.
+     */
+    public const DISABLED_CODE = 'GUEST_CHAT_DISABLED';
+
     public function isEnabled(): bool
     {
         $raw = trim((string) ($_ENV['GUEST_CHAT_ENABLED'] ?? ''));

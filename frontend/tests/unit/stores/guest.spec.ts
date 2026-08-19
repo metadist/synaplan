@@ -22,6 +22,7 @@ describe('Guest Store', () => {
     expect(store.maxMessages).toBe(5)
     expect(store.limitReached).toBe(false)
     expect(store.initialized).toBe(false)
+    expect(store.guestChatDisabled).toBe(false)
     expect(store.bannerDismissed).toBe(false)
   })
 
@@ -101,6 +102,7 @@ describe('Guest Store', () => {
     store.maxMessages = 10
     store.limitReached = true
     store.initialized = true
+    store.guestChatDisabled = true
     store.bannerDismissed = true
 
     store.$reset()
@@ -111,6 +113,7 @@ describe('Guest Store', () => {
     expect(store.maxMessages).toBe(5)
     expect(store.limitReached).toBe(false)
     expect(store.initialized).toBe(false)
+    expect(store.guestChatDisabled).toBe(false)
     expect(store.bannerDismissed).toBe(false)
   })
 
@@ -221,7 +224,10 @@ describe('Guest Store', () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 403,
-        json: async () => ({ error: 'Guest chat is disabled on this instance.', code: 'GUEST_CHAT_DISABLED' }),
+        json: async () => ({
+          error: 'Guest chat is disabled on this instance.',
+          code: 'GUEST_CHAT_DISABLED',
+        }),
       })
 
       const store = useGuestStore()

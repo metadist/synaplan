@@ -208,6 +208,7 @@ export const useGuestStore = defineStore('guest', () => {
     initFailed.value = false
     rateLimited.value = false
     sessionExpired.value = false
+    guestChatDisabled.value = false
     bannerDismissed.value = false
     try {
       localStorage.removeItem(GUEST_STORAGE_KEY)

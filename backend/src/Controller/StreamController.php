@@ -473,7 +473,7 @@ class StreamController extends AbstractController
                         // instance cannot serve (issue #1517).
                         return $this->json([
                             'error' => 'Guest chat is disabled on this instance.',
-                            'code' => 'GUEST_CHAT_DISABLED',
+                            'code' => GuestChatConfig::DISABLED_CODE,
                         ], Response::HTTP_FORBIDDEN);
                     }
 
