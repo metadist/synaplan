@@ -11,6 +11,7 @@ use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
@@ -61,6 +62,7 @@ final class StreamControllerRagGroupKeyTest extends TestCase
             $this->createMock(WidgetService::class),
             $this->createMock(WidgetSessionService::class),
             $this->createMock(GuestSessionService::class),
+            new GuestChatConfig(),
             $this->createMock(RateLimitService::class),
             '/tmp/upload',
             $this->createMock(UserUploadPathBuilder::class),

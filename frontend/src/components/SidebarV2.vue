@@ -182,6 +182,7 @@
               </p>
             </div>
             <router-link
+              v-if="configStore.auth.registrationEnabled"
               to="/register"
               class="dropdown-item font-medium"
               style="color: var(--brand)"

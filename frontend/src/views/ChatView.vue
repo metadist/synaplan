@@ -98,24 +98,30 @@
               </div>
               <h2 class="text-xl font-semibold txt-primary mb-2">
                 {{
-                  guestStore.sessionExpired
-                    ? $t('guest.expiredTitle')
-                    : guestStore.rateLimited
-                      ? $t('guest.rateLimitedTitle')
-                      : $t('guest.errorTitle')
+                  guestStore.guestChatDisabled
+                    ? $t('guest.disabledTitle')
+                    : guestStore.sessionExpired
+                      ? $t('guest.expiredTitle')
+                      : guestStore.rateLimited
+                        ? $t('guest.rateLimitedTitle')
+                        : $t('guest.errorTitle')
                 }}
               </h2>
               <p class="txt-secondary mb-4">
                 {{
-                  guestStore.sessionExpired
-                    ? $t('guest.expiredDescription')
-                    : guestStore.rateLimited
-                      ? $t('guest.rateLimitedDescription')
-                      : $t('guest.errorDescription')
+                  guestStore.guestChatDisabled
+                    ? $t('guest.disabledDescription')
+                    : guestStore.sessionExpired
+                      ? $t('guest.expiredDescription')
+                      : guestStore.rateLimited
+                        ? $t('guest.rateLimitedDescription')
+                        : $t('guest.errorDescription')
                 }}
               </p>
               <div class="flex gap-3 justify-center">
+                <!-- Retrying a disabled trial can never succeed. -->
                 <button
+                  v-if="!guestStore.guestChatDisabled"
                   class="px-4 py-2 rounded-lg btn-brand text-sm font-medium"
                   @click="guestStore.retryInit()"
                 >
