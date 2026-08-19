@@ -11,7 +11,7 @@ namespace App\Service;
  * install-shape decision, not a runtime admin preference: an operator running
  * an SSO-/OIDC-only instance sets `GUEST_CHAT_ENABLED=false` so anonymous
  * visitors cannot consume AI (or upload files) without signing in, and the
- * trial's sign-up funnel — which such instances cannot serve — never shows
+ * trial's sign-up funnel (which such instances cannot serve) never shows
  * (issue #1517).
  *
  * Read at two seams:

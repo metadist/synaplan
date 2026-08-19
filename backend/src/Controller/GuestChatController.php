@@ -57,7 +57,10 @@ class GuestChatController extends AbstractController
             return null;
         }
 
-        return $this->json(['error' => 'Guest chat is disabled on this instance'], Response::HTTP_FORBIDDEN);
+        return $this->json([
+            'error' => 'Guest chat is disabled on this instance.',
+            'code' => 'GUEST_CHAT_DISABLED',
+        ], Response::HTTP_FORBIDDEN);
     }
 
     /**
@@ -166,8 +169,8 @@ class GuestChatController extends AbstractController
             ]
         )
     )]
-    #[OA\Response(response: 404, description: 'Session not found or expired')]
     #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false)')]
+    #[OA\Response(response: 404, description: 'Session not found or expired')]
     public function getSessionStatus(string $sessionId): JsonResponse
     {
         if ($denied = $this->denyWhenDisabled()) {
@@ -338,9 +341,9 @@ class GuestChatController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Missing or invalid sessionId/trackId')]
+    #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false)')]
     #[OA\Response(response: 404, description: 'Session not found, or no turn with this trackId in this session')]
     #[OA\Response(response: 410, description: 'Session expired')]
-    #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false)')]
     public function stopStream(Request $request): JsonResponse
     {
         if ($denied = $this->denyWhenDisabled()) {
@@ -418,8 +421,8 @@ class GuestChatController extends AbstractController
             ]
         )
     )]
-    #[OA\Response(response: 404, description: 'Session not found or has no chat')]
     #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false)')]
+    #[OA\Response(response: 404, description: 'Session not found or has no chat')]
     public function getMessages(string $sessionId): JsonResponse
     {
         if ($denied = $this->denyWhenDisabled()) {

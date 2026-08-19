@@ -80,6 +80,16 @@ export const useGuestStore = defineStore('guest', () => {
         return
       }
 
+      if (response.status === 403) {
+        // Guest chat disabled on this instance (GUEST_CHAT_ENABLED=false):
+        // drop the stored key so future navigations route to login instead
+        // of retrying a trial that no longer exists.
+        clearExpiredStorage()
+        initFailed.value = true
+        initialized.value = true
+        return
+      }
+
       if (!response.ok) throw new Error('Failed to init guest session')
 
       const data = await response.json()

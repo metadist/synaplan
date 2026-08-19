@@ -94,6 +94,40 @@ class GuestChatControllerTest extends WebTestCase
         return json_decode($this->client->getResponse()->getContent(), true);
     }
 
+    public function testEveryEndpointReturns403WhenGuestChatIsDisabled(): void
+    {
+        $_ENV['GUEST_CHAT_ENABLED'] = 'false';
+
+        try {
+            $sessionId = Uuid::v4()->toRfc4122();
+            $requests = [
+                ['POST', '/api/v1/guest/session'],
+                ['GET', '/api/v1/guest/session/'.$sessionId],
+                ['POST', '/api/v1/guest/chat'],
+                ['POST', '/api/v1/guest/stop-stream'],
+                ['GET', '/api/v1/guest/messages/'.$sessionId],
+                ['GET', '/api/v1/guest/files/'.$sessionId.'/1/download'],
+            ];
+
+            foreach ($requests as [$method, $url]) {
+                $this->client->request(
+                    $method,
+                    $url,
+                    [],
+                    [],
+                    ['CONTENT_TYPE' => 'application/json'],
+                    '{}'
+                );
+
+                $this->assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN, "$method $url");
+                $data = json_decode($this->client->getResponse()->getContent(), true);
+                $this->assertSame('GUEST_CHAT_DISABLED', $data['code'] ?? null, "$method $url");
+            }
+        } finally {
+            unset($_ENV['GUEST_CHAT_ENABLED']);
+        }
+    }
+
     public function testCreateSessionReturnsNewSession(): void
     {
         $data = $this->createGuestSession();
