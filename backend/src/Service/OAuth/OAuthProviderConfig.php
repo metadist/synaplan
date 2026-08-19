@@ -19,6 +19,15 @@ final readonly class OAuthProviderConfig
      *                                                    params for the consent URL (Microsoft: `prompt=consent`,
      *                                                    Dropbox: `token_access_type=offline`); never sent to the
      *                                                    token endpoint
+     * @param bool                  $includeScopeInTokenRequests Microsoft wants `scope` on
+     *                                                           exchange/refresh (to keep
+     *                                                           `offline_access`). Dropbox's
+     *                                                           token endpoint does not list
+     *                                                           `scope` and treating the
+     *                                                           space-separated value as a
+     *                                                           downscope leaves a token that
+     *                                                           can read the account but cannot
+     *                                                           upload files
      */
     public function __construct(
         public string $provider,
@@ -29,6 +38,7 @@ final readonly class OAuthProviderConfig
         public string $redirectUri,
         public array $scopes,
         public array $extraAuthorizeParams = [],
+        public bool $includeScopeInTokenRequests = true,
     ) {
     }
 

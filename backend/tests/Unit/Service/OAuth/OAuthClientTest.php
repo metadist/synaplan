@@ -81,7 +81,39 @@ final class OAuthClientTest extends TestCase
         self::assertSame('the-code', $body['code']);
         self::assertSame('the-verifier', $body['code_verifier']);
         self::assertSame('https://app.example/callback', $body['redirect_uri']);
+        self::assertSame('offline_access Mail.Read', $body['scope']);
         self::assertSame('POST', $captured[0]['method']);
+    }
+
+    public function testDropboxTokenRequestsOmitScope(): void
+    {
+        $captured = [];
+        $client = $this->client([
+            new MockResponse(json_encode(['access_token' => 'at', 'refresh_token' => 'rt', 'expires_in' => 14400]), [
+                'http_code' => 200,
+            ]),
+            new MockResponse(json_encode(['access_token' => 'at-2', 'expires_in' => 14400]), ['http_code' => 200]),
+        ], $captured);
+
+        $dropbox = new OAuthProviderConfig(
+            provider: 'dropbox',
+            authorizeUrl: 'https://www.dropbox.com/oauth2/authorize',
+            tokenUrl: 'https://api.dropboxapi.com/oauth2/token',
+            clientId: 'app-key',
+            clientSecret: 'app-secret',
+            redirectUri: 'https://app.example/callback',
+            scopes: ['account_info.read', 'files.content.write'],
+            extraAuthorizeParams: ['token_access_type' => 'offline'],
+            includeScopeInTokenRequests: false,
+        );
+
+        $client->exchangeCode($dropbox, 'the-code', 'the-verifier');
+        $client->refresh($dropbox, 'rt-1');
+
+        parse_str($captured[0]['options']['body'], $exchange);
+        parse_str($captured[1]['options']['body'], $refresh);
+        self::assertArrayNotHasKey('scope', $exchange, 'Dropbox downscopes a token when scope is repeated on exchange');
+        self::assertArrayNotHasKey('scope', $refresh, 'Dropbox downscopes a token when scope is repeated on refresh');
     }
 
     public function testRefreshSendsTheRefreshGrant(): void
@@ -99,6 +131,7 @@ final class OAuthClientTest extends TestCase
         parse_str($captured[0]['options']['body'], $body);
         self::assertSame('refresh_token', $body['grant_type']);
         self::assertSame('rt-1', $body['refresh_token']);
+        self::assertSame('offline_access Mail.Read', $body['scope']);
     }
 
     public function testExpiredGrantAsksForConsentAgainInsteadOfRetrying(): void

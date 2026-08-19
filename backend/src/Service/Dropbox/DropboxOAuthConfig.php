@@ -125,6 +125,11 @@ final readonly class DropboxOAuthConfig implements OAuthProviderSource
             // access token and NO refresh token — every scheduled run would
             // die after four hours.
             extraAuthorizeParams: ['token_access_type' => 'offline'],
+            // Dropbox's token endpoint does not accept `scope`. Sending the
+            // space-separated list (form-encoded as `+`) downscopes the grant
+            // so account_info.read still works and files.content.write does
+            // not — connect succeeds, upload then fails as unauthorized.
+            includeScopeInTokenRequests: false,
         );
     }
 
