@@ -14,6 +14,14 @@ describe('MessageImage', () => {
     }
   })
 
+  // One teardown for the whole file. Restoring per describe block invites
+  // order-dependent failures, because a block that stubs a global the block
+  // above it did not has to remember to undo it.
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
   it('should render image with correct src', async () => {
     const wrapper = mount(MessageImage, {
       props: {
@@ -74,17 +82,6 @@ describe('MessageImage', () => {
   })
 
   describe('download (issue #1071)', () => {
-    const originalFetch = global.fetch
-    const originalCreate = global.URL.createObjectURL
-    const originalRevoke = global.URL.revokeObjectURL
-
-    afterEach(() => {
-      global.fetch = originalFetch
-      global.URL.createObjectURL = originalCreate
-      global.URL.revokeObjectURL = originalRevoke
-      vi.restoreAllMocks()
-    })
-
     it('renders a download button once the image has loaded', async () => {
       const wrapper = mount(MessageImage, {
         props: { url: 'https://example.com/image.jpg' },
@@ -95,8 +92,8 @@ describe('MessageImage', () => {
     })
 
     it('triggers a real download from the loaded blob for internal images', async () => {
-      global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
-      global.URL.revokeObjectURL = vi.fn()
+      vi.spyOn(global.URL, 'createObjectURL').mockReturnValue('blob:mock-url')
+      vi.spyOn(global.URL, 'revokeObjectURL').mockImplementation(() => undefined)
       const fetchMock = vi.fn((url: RequestInfo | URL) => {
         if (typeof url === 'string' && url.includes('/config/runtime')) {
           return Promise.resolve({
@@ -115,7 +112,7 @@ describe('MessageImage', () => {
           blob: () => Promise.resolve(new Blob(['image-bytes'])),
         })
       })
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       const clickSpy = vi
         .spyOn(HTMLAnchorElement.prototype, 'click')
@@ -139,18 +136,12 @@ describe('MessageImage', () => {
   })
 
   describe('load failure', () => {
-    const originalFetch = global.fetch
-
-    afterEach(() => {
-      global.fetch = originalFetch
-      vi.restoreAllMocks()
-    })
-
     it('shows a retryable error instead of an endless loading state', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined)
-      global.fetch = vi.fn(() =>
-        Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' })
-      ) as unknown as typeof fetch
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' }))
+      )
 
       const wrapper = mount(MessageImage, {
         props: { url: '/api/v1/files/uploads/1/000/gone.png' },
@@ -164,7 +155,7 @@ describe('MessageImage', () => {
 
     it('recovers when the retry succeeds', async () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined)
-      global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+      vi.spyOn(global.URL, 'createObjectURL').mockReturnValue('blob:mock-url')
       const fetchMock = vi
         .fn()
         .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' })
@@ -174,7 +165,7 @@ describe('MessageImage', () => {
           statusText: 'OK',
           blob: () => Promise.resolve(new Blob(['image-bytes'])),
         })
-      global.fetch = fetchMock as unknown as typeof fetch
+      vi.stubGlobal('fetch', fetchMock)
 
       const wrapper = mount(MessageImage, {
         props: { url: '/api/v1/files/uploads/1/000/late.png' },

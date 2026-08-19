@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { computed } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 
@@ -53,6 +53,12 @@ describe('mediaAuth', () => {
     refreshAccessToken.mockClear()
     refreshAccessToken.mockResolvedValue({ success: true })
     saveOrDownloadBlob.mockClear()
+  })
+
+  // Fake timers have to be undone even when an assertion throws mid-test,
+  // otherwise every later test in the file inherits a frozen clock.
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   describe('resolveMediaUrl', () => {
@@ -215,7 +221,6 @@ describe('mediaAuth', () => {
 
       expect(refreshAccessToken).toHaveBeenCalledTimes(1)
       expect(fetchMock).toHaveBeenCalledTimes(2)
-      vi.useRealTimers()
     })
 
     it('does not retry a 404 — a missing file is not an auth problem', async () => {
@@ -235,7 +240,6 @@ describe('mediaAuth', () => {
       const assertion = expect(pending).rejects.toThrow('HTTP 401')
       await vi.runAllTimersAsync()
       await assertion
-      vi.useRealTimers()
     })
   })
 
