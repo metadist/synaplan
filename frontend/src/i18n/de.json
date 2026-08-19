@@ -114,6 +114,7 @@
     "profile": "Profil",
     "admin": "Admin-Panel",
     "adminFeatures": "Feature-Status",
+    "adminModelStatus": "Modell-Status",
     "adminConfig": "Systemkonfiguration",
     "adminSetup": "KI-Anbieter einrichten",
     "subscription": "Abonnement",
@@ -132,6 +133,64 @@
     "aiAgents": "KI-Agenten",
     "connections": "Verbindungen",
     "savedTasks": "Gespeicherte Aufgaben"
+  },
+  "adminModelStatus": {
+    "title": "Modell-Status",
+    "subtitle": "Welche KI-Modelle gerade funktionieren und welche nicht.",
+    "loading": "Modell-Status wird geladen…",
+    "loadFailed": "Der Modell-Status konnte nicht geladen werden.",
+    "never": "nie",
+    "noMatches": "Keine Modelle passen zu den gewählten Filtern.",
+    "freeHint": "Die Prüfung ist kostenlos: Es wird nur abgefragt, welche Modelle ein Anbieter veröffentlicht. Dafür wird nie ein KI-Modell ausgeführt.",
+    "states": {
+      "online": "Online",
+      "degraded": "Gestört",
+      "offline": "Offline",
+      "unconfigured": "Nicht eingerichtet",
+      "unknown": "Unbekannt"
+    },
+    "sources": {
+      "probe": "Modell-Liste des Anbieters",
+      "traffic": "echte Nutzung"
+    },
+    "summary": {
+      "allGood": "Alle Modelle antworten",
+      "problems": "{count} Modell(e) brauchen Aufmerksamkeit",
+      "lastCheck": "Zuletzt geprüft",
+      "monitoringOff": "Die automatische Prüfung ist ausgeschaltet, diese Seite zeigt daher nur den zuletzt bekannten Stand."
+    },
+    "filters": {
+      "onlyProblems": "Nur Probleme anzeigen",
+      "capability": "Aufgabe",
+      "allCapabilities": "Alle Aufgaben"
+    },
+    "provider": {
+      "affected": "{count} betroffen"
+    },
+    "model": {
+      "lastSuccess": "Zuletzt funktioniert",
+      "errorRate": "{percent} % der letzten {total} Aufrufe sind fehlgeschlagen",
+      "source": "Grundlage",
+      "autoDisabled": "Automatisch abgeschaltet",
+      "switchedOff": "Abgeschaltet",
+      "exempt": "Von automatischer Abschaltung ausgenommen"
+    },
+    "actions": {
+      "refresh": "Jetzt prüfen",
+      "refreshProvider": "Diesen Anbieter prüfen",
+      "resetCounters": "Fehlerverlauf löschen",
+      "exempt": "Von Automatik ausnehmen",
+      "unexempt": "Automatik wieder erlauben"
+    },
+    "messages": {
+      "refreshed": "{count} Modell(e) geprüft.",
+      "refreshFailed": "Die Prüfung konnte nicht abgeschlossen werden.",
+      "exempted": "Dieses Modell ist jetzt von der automatischen Abschaltung ausgenommen.",
+      "unexempted": "Die automatische Abschaltung gilt für dieses Modell wieder.",
+      "exemptFailed": "Die Ausnahme konnte nicht geändert werden.",
+      "countersReset": "Fehlerverlauf gelöscht.",
+      "countersResetFailed": "Der Fehlerverlauf konnte nicht gelöscht werden."
+    }
   },
   "addinConnect": {
     "title": "Mit Synaplan verbinden",
@@ -594,6 +653,7 @@
     "admin": "Admin",
     "adminDashboard": "Dashboard",
     "adminFeatureStatus": "Feature-Status",
+    "adminModelStatus": "Modell-Status",
     "adminSystemConfig": "Systemkonfiguration",
     "adminProviderSetup": "KI-Anbieter",
     "more": "Mehr",

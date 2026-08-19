@@ -184,6 +184,39 @@ test('classifies all server-side code and server-delivered plugins as backend-on
   }
 })
 
+test('classifies the model status surfaces as backend-only plus ota-candidate', () => {
+  const backendPaths = [
+    'backend/src/AI/Health/ModelHealthEvaluator.php',
+    'backend/src/AI/Health/Probe/PlatformKeyModelListProbe.php',
+    'backend/src/Command/ModelHealthCheckCommand.php',
+    'backend/src/Controller/AdminModelHealthController.php',
+    'backend/src/Entity/ModelHealth.php',
+    'backend/src/Repository/ModelHealthRepository.php'
+  ]
+
+  for (const path of backendPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'backend-only', path)
+  }
+
+  // The status page is ordinary web-layer code and must stay shippable over
+  // the air. A store review for a monitoring screen would be pure friction.
+  const webPaths = [
+    'frontend/src/views/ModelStatusView.vue',
+    'frontend/src/services/api/adminModelStatusApi.ts'
+  ]
+
+  for (const path of webPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'ota-candidate', path)
+  }
+
+  // The scheduler slot that runs the check lives in container tooling and is
+  // never delivered to an installed app.
+  assert.equal(
+    classifyFiles([entry('_docker/backend/lib/container-runtime.sh', 'M')], policy).classification,
+    'no-app-impact'
+  )
+})
+
 test('uses the highest classification for mixed changes', () => {
   assert.equal(classifyFiles([
     entry('README.md'),

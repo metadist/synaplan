@@ -112,6 +112,7 @@
     "profile": "Perfil",
     "admin": "Panel de administración",
     "adminFeatures": "Estado de funciones",
+    "adminModelStatus": "Estado de modelos",
     "adminConfig": "Configuración del Sistema",
     "adminSetup": "Configuración de Proveedores de IA",
     "subscription": "Suscripción",
@@ -131,6 +132,64 @@
     "aiAgents": "Agentes de IA",
     "connections": "Conexiones",
     "savedTasks": "Tareas guardadas"
+  },
+  "adminModelStatus": {
+    "title": "Estado de modelos",
+    "subtitle": "Qué modelos de IA funcionan ahora mismo y cuáles no.",
+    "loading": "Cargando el estado de los modelos…",
+    "loadFailed": "No se pudo cargar el estado de los modelos.",
+    "never": "nunca",
+    "noMatches": "Ningún modelo coincide con los filtros seleccionados.",
+    "freeHint": "La comprobación es gratuita: solo se pregunta qué modelos publica cada proveedor. Nunca se ejecuta un modelo de IA para esto.",
+    "states": {
+      "online": "En línea",
+      "degraded": "Con fallos",
+      "offline": "Fuera de servicio",
+      "unconfigured": "Sin configurar",
+      "unknown": "Desconocido"
+    },
+    "sources": {
+      "probe": "lista de modelos del proveedor",
+      "traffic": "uso real"
+    },
+    "summary": {
+      "allGood": "Todos los modelos responden",
+      "problems": "{count} modelo(s) requieren atención",
+      "lastCheck": "Última comprobación",
+      "monitoringOff": "La comprobación automática está desactivada, por lo que esta página solo muestra el último estado conocido."
+    },
+    "filters": {
+      "onlyProblems": "Mostrar solo problemas",
+      "capability": "Tarea",
+      "allCapabilities": "Todas las tareas"
+    },
+    "provider": {
+      "affected": "{count} afectados"
+    },
+    "model": {
+      "lastSuccess": "Última vez que funcionó",
+      "errorRate": "Falló el {percent} % de las últimas {total} llamadas",
+      "source": "Basado en",
+      "autoDisabled": "Desactivado automáticamente",
+      "switchedOff": "Desactivado",
+      "exempt": "Exento de la desactivación automática"
+    },
+    "actions": {
+      "refresh": "Comprobar ahora",
+      "refreshProvider": "Comprobar este proveedor",
+      "resetCounters": "Borrar historial de errores",
+      "exempt": "Eximir de la automatización",
+      "unexempt": "Permitir la automatización de nuevo"
+    },
+    "messages": {
+      "refreshed": "Se comprobaron {count} modelo(s).",
+      "refreshFailed": "No se pudo completar la comprobación.",
+      "exempted": "Este modelo queda exento de la desactivación automática.",
+      "unexempted": "La desactivación automática vuelve a aplicarse a este modelo.",
+      "exemptFailed": "No se pudo cambiar la exención.",
+      "countersReset": "Historial de errores borrado.",
+      "countersResetFailed": "No se pudo borrar el historial de errores."
+    }
   },
   "addinConnect": {
     "title": "Conectar a Synaplan",
@@ -586,6 +645,7 @@
     "admin": "Admin",
     "adminDashboard": "Panel",
     "adminFeatureStatus": "Estado de Funciones",
+    "adminModelStatus": "Estado de Modelos",
     "adminSystemConfig": "Configuración del Sistema",
     "adminProviderSetup": "Proveedores de IA",
     "profile": "Perfil",
