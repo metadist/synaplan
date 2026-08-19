@@ -595,6 +595,8 @@
     "aiAgents": "Yapay zeka ajanları"
   },
   "guest": {
+    "disabledTitle": "Misafir sohbeti kullanılamıyor",
+    "disabledDescription": "Bu sunucu anonim deneme sunmuyor. Sohbete başlamak için giriş yap.",
     "featureGate": {
       "title": "Bu özellik bir hesap gerektirir",
       "subtitle": "Tüm özellikleri açmak için ücretsiz bir hesap oluşturun",
