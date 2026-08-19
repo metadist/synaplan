@@ -44,6 +44,7 @@ final class GuestSessionService
         private GuestSessionRepository $sessionRepository,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
+        private GuestChatConfig $guestChatConfig,
         private int $maxSessionsPerIp = self::MAX_SESSIONS_PER_IP,
     ) {
     }
@@ -121,6 +122,15 @@ final class GuestSessionService
 
     public function getSession(string $sessionId): ?GuestSession
     {
+        // GUEST_CHAT_ENABLED=false (issue #1517): resolve no session for ANY
+        // consumer - guest turns also flow through StreamController's
+        // guestSession parameter, not only through GuestChatController's own
+        // (separately gated) endpoints. A stale stored session must not keep
+        // consuming AI after the operator turns the trial off.
+        if (!$this->guestChatConfig->isEnabled()) {
+            return null;
+        }
+
         return $this->sessionRepository->findBySessionId($sessionId);
     }
 
