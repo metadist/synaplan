@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Command;
 
 use App\Command\ModelListCommand;
+use App\Model\ModelCatalog;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
@@ -43,9 +44,12 @@ class ModelListCommandTest extends TestCase
 
     public function testListShowsEnabledModelAsYes(): void
     {
-        // Enable the groq llama model (BID=9)
+        // Any catalog BID will do; reading it from the catalog keeps the test
+        // alive when that model is later retired.
+        $enabledBid = (string) ModelCatalog::all()[0]['id'];
+
         // @phpstan-ignore-next-line
-        $this->connection->method('fetchFirstColumn')->willReturn(['9']);
+        $this->connection->method('fetchFirstColumn')->willReturn([$enabledBid]);
 
         $this->commandTester->execute([]);
 

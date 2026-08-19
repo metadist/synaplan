@@ -13,11 +13,11 @@ class ModelCatalogTest extends TestCase
 {
     public function testFindByServiceAndProviderId(): void
     {
-        $results = ModelCatalog::find('groq:llama-3.3-70b-versatile');
+        $results = ModelCatalog::find('groq:llama-3.1-8b-instant');
 
         $this->assertNotEmpty($results);
         $this->assertSame('Groq', $results[0]['service']);
-        $this->assertSame('llama-3.3-70b-versatile', $results[0]['providerId']);
+        $this->assertSame('llama-3.1-8b-instant', $results[0]['providerId']);
     }
 
     /**
@@ -35,9 +35,9 @@ class ModelCatalogTest extends TestCase
 
     public function testFindIsCaseInsensitive(): void
     {
-        $lower = ModelCatalog::find('groq:llama-3.3-70b-versatile');
-        $upper = ModelCatalog::find('GROQ:LLAMA-3.3-70B-VERSATILE');
-        $mixed = ModelCatalog::find('Groq:Llama-3.3-70b-Versatile');
+        $lower = ModelCatalog::find('groq:llama-3.1-8b-instant');
+        $upper = ModelCatalog::find('GROQ:LLAMA-3.1-8B-INSTANT');
+        $mixed = ModelCatalog::find('Groq:Llama-3.1-8b-Instant');
 
         $this->assertSame($lower, $upper);
         $this->assertSame($lower, $mixed);
@@ -111,7 +111,7 @@ class ModelCatalogTest extends TestCase
     public function testUpsertCallsExecuteStatement(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:llama-3.1-8b-instant')[0];
 
         // @phpstan-ignore-next-line
         $connection
@@ -128,7 +128,7 @@ class ModelCatalogTest extends TestCase
     public function testRemoveCallsDeleteById(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:llama-3.1-8b-instant')[0];
 
         // @phpstan-ignore-next-line
         $connection
@@ -142,7 +142,7 @@ class ModelCatalogTest extends TestCase
     public function testUpsertSqlDoesNotOverwriteOperatorOwnedFields(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:llama-3.1-8b-instant')[0];
 
         // @phpstan-ignore-next-line
         $connection
@@ -425,14 +425,14 @@ class ModelCatalogTest extends TestCase
 
     public function testFingerprintIsDeterministic(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:llama-3.1-8b-instant')[0];
 
         $this->assertSame(ModelCatalog::fingerprint($model), ModelCatalog::fingerprint($model));
     }
 
     public function testFingerprintIgnoresOperatorOwnedFields(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:llama-3.1-8b-instant')[0];
         $expected = ModelCatalog::fingerprint($model);
 
         $toggled = array_merge($model, [
@@ -446,7 +446,7 @@ class ModelCatalogTest extends TestCase
 
     public function testFingerprintIgnoresEmbeddedFingerprintKey(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:llama-3.1-8b-instant')[0];
         $expected = ModelCatalog::fingerprint($model);
 
         $stamped = $model;
@@ -457,7 +457,7 @@ class ModelCatalogTest extends TestCase
 
     public function testFingerprintChangesWhenCatalogValueChanges(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:llama-3.1-8b-instant')[0];
         $original = ModelCatalog::fingerprint($model);
 
         $model['priceIn'] = 0.99;
@@ -537,7 +537,7 @@ class ModelCatalogTest extends TestCase
         // Doctrine DBAL hands floats back as native floats; the identity should
         // survive a string round-trip equivalent to what (float) $row['BPRICEIN']
         // produces after JSON encode/decode in the actual seed flow.
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:llama-3.1-8b-instant')[0];
         $original = ModelCatalog::fingerprint($model);
 
         $roundTripped = $model;
@@ -552,7 +552,7 @@ class ModelCatalogTest extends TestCase
     public function testUpsertEmbedsFingerprintInJsonPayload(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:llama-3.1-8b-instant')[0];
         $expectedFingerprint = ModelCatalog::fingerprint($model);
 
         // @phpstan-ignore-next-line

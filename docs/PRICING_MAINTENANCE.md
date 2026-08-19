@@ -288,7 +288,7 @@ Source: https://platform.claude.com/docs/en/about-claude/models/overview
 | Claude Opus 4.8 | 238 / 239 | $5 / $25 |
 | Claude Haiku 4.5 | 162 / 235 | $1 / $5 |
 
-Retired on 2026-07-27 by `Version20260727120000` (rows deactivated, never deleted — `BMESSAGES` FKs; BIDs must never be reused): Claude Sonnet 4.5 (112/109), Claude Opus 4.6 (160/164), Claude Sonnet 4.6 (161/163), Claude Opus 4.7 (165/166), plus the catalog-orphans Claude Opus 4.1 (69/93, deprecated upstream and retired by Anthropic on 2026-08-05) and Claude Opus 4.5 (121).
+Retired on 2026-07-27 by `Version20260727120000` (rows deactivated, never deleted — see "Why retirement means deactivation" below; BIDs must never be reused): Claude Sonnet 4.5 (112/109), Claude Opus 4.6 (160/164), Claude Sonnet 4.6 (161/163), Claude Opus 4.7 (165/166), plus the catalog-orphans Claude Opus 4.1 (69/93, deprecated upstream and retired by Anthropic on 2026-08-05) and Claude Opus 4.5 (121).
 
 The same orphan cleanup continues in `Version20260727180000` for two non-Anthropic rows: **OpenAI `gpt-4.1` (BID 30)** → GPT-5.6 Terra (253) and **Groq `llama-4-maverick-17b-128e-instruct` (BID 49)** → Groq `gpt-oss-120b` (76).
 
@@ -307,6 +307,14 @@ Comparing the production catalog (`GET /api/v1/admin/models`) against `ModelCata
 
 > **Never repoint `DEFAULTMODEL.VECTORIZE` from a migration.** Embedding models are not interchangeable: swapping the binding without re-vectorizing leaves every stored vector in the wrong space, which is exactly the failure mode of issue #948 (Qdrant HTTP 400, memory lost). The admin path pairs the switch with a re-vectorize run via `VectorizeBindingService`; a migration cannot. BID 129 is therefore deactivated only where nothing binds to it, guarded by a `NOT EXISTS` on `BCONFIG` — an install still using it keeps working search and switches through the UI.
 
+### Groq flagship retirement 2026-08-19 (`Version20260819090000`)
+
+Groq decommissioned `llama-3.3-70b-versatile` (BID 9) — every request now comes back as "The model ... does not exist or you do not have access to it". Successor: Groq `gpt-oss-120b` (76), the same successor `Version20260727180000` used for the previous Groq retirement.
+
+What made this one worse than a stale catalog row: BID 9 was also the recommended `CHAT`/`TOOLS`/`ANALYZE` binding for Groq in `ProviderDefaultsService`, and Groq is **first** in `PREFERENCE_ORDER`. `app:provider:apply-defaults --auto` runs on every container start and `ChatReadinessService` calls the same path at runtime, so any install holding a Groq key while its current default provider had none was repointed at a dead model **without anyone choosing it**. The migration repairs existing bindings for every owner; the catalog and map changes stop it recurring.
+
+The catalog already ranked the successor above the retired row on every axis (quality 10 vs 9, rating 4 vs 1, price 0.15/0.60 vs 0.59/0.79) — the map had simply drifted. `ProviderDefaultsServiceTest::testFlagshipTierIsNotRankedBelowTheFastTier()` now fails the build when a provider's MAIN tier ranks below its FAST tier, and `testEveryRecommendedDefaultPointsAtAnActiveCatalogEntry()` fails when a recommendation points at a deactivated row.
+
 ### A non-zero price under a "free" unit is silently free
 
 `normaliseToPerUnit()` maps `-`, `` and `free` to **0**, so a price stored under one of those units is displayed but never billed. Two Ollama rows shipped exactly that — BID 3 (`deepseek-r1:32b`, out 0.91) and BID 6 (`mistral:7b`, out 0.475) had `BOUTUNIT = '-'` while their input side was `per1M`, so their output tokens were free while input was charged. `Version20260727190000` corrects the unit only; the price values stay as they were, since Ollama rows are an operator-hosted synthetic resale basis and re-pricing them is a decision, not a fix.
@@ -314,6 +322,16 @@ Comparing the production catalog (`GET /api/v1/admin/models`) against `ModelCata
 `ModelCatalogTest::testNoCatalogPriceIsAuthoredUnderAUnitThatNormalisesToZero()` now fails the build if a catalog row is ever authored this way again. Note that `per_generation` (Higgsfield video, BIDs 302–308) is *not* this bug — unknown units fall through as per-1, which is what a flat per-clip fee needs.
 
 > **Removing a model from the catalog is only half a retirement.** `ModelSeeder` never deletes or deactivates rows, so a model dropped from `ModelCatalog.php` without a companion migration stays `BACTIVE=1, BSELECTABLE=1` in every existing database — still pickable in the UI and still billed at whatever price the stale row holds. That is how Opus 4.1/4.5 survived several releases. Always pair a catalog removal with a deactivation migration.
+
+### Why retirement means deactivation, not deletion
+
+Earlier notes here justified this with a foreign key from `BMESSAGES` to `BMODELS`. **That FK does not exist** — `BMESSAGES` has no model column at all; messages keep their model as denormalised `BMESSAGEMETA` strings (`ai_chat_model`, `ai_chat_provider`), which is why historical messages still render correctly after a retirement. Only two tables reference `BMODELS.BID`: `BUSELOG` and `BMODEL_PRICE_HISTORY`. The real reasons to deactivate are:
+
+1. **`DELETE` fails on any model that was ever used.** Both FKs are `ON DELETE RESTRICT`, so as soon as usage or a price change was recorded, the delete is rejected by the database — precisely for the long-lived models one actually wants to retire.
+2. **`DELETE` is not durable.** `ModelCatalog::upsert()` writes an explicit `BID`, and `app:seed` runs on every container start (`_docker/backend/docker-entrypoint.sh`). A deleted row whose catalog entry still exists is restored verbatim, with the same BID, on the next deploy. Deactivation survives instead, because `BACTIVE`/`BSELECTABLE`/`BISDEFAULT` are operator-owned and excluded from the `ON DUPLICATE KEY UPDATE` clause.
+3. **BIDs must never be reused**, since `BUSELOG` rows and cost history are keyed by them.
+
+Note that `app:model:disable` does **not** follow this policy — despite its name it issues `DELETE FROM BMODELS`, so it inherits both problems above. Retire models through a migration.
 
 ## Related issues
 

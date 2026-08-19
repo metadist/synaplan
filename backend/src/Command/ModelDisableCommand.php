@@ -29,7 +29,7 @@ class ModelDisableCommand extends Command
     {
         $this
             ->addArgument('models', InputArgument::IS_ARRAY | InputArgument::REQUIRED,
-                'Model keys to disable (e.g. groq:llama-3.3-70b-versatile ollama:bge-m3)')
+                'Model keys to disable (e.g. groq:llama-3.1-8b-instant ollama:bge-m3)')
             ->setHelp(
                 "Remove one or more AI models from the database.\n\n".
                 "Key format: service:providerId (or service:providerId:tag to target a specific variant)\n\n".

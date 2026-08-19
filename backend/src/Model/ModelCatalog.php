@@ -16,7 +16,7 @@ use Doctrine\DBAL\Connection;
  * To target a specific variant, append the tag: "service:providerId:tag"
  *
  * Usage:
- *   ModelCatalog::find('groq:llama-3.3-70b-versatile')  → [model]
+ *   ModelCatalog::find('groq:llama-3.1-8b-instant')      → [model]
  *   ModelCatalog::find('openai:gpt-4o')                  → [chat, pic2text]
  *   ModelCatalog::find('openai:gpt-4o:chat')             → [chat only]
  */
@@ -419,31 +419,8 @@ class ModelCatalog
             ],
         ],
         // ==================== GROQ MODELS ====================
-        [
-            'id' => 9,
-            'service' => 'Groq',
-            'name' => 'Llama 3.3 70b versatile',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'llama-3.3-70b-versatile',
-            'priceIn' => 0.59,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.79,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'Fast API service via groq',
-                'max_tokens' => 32768,
-                'params' => [
-                    'model' => 'llama-3.3-70b-versatile',
-                    'reasoning_format' => 'hidden',
-                    'messages' => [],
-                ],
-                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
-            ],
-        ],
+        // BID 9 (llama-3.3-70b-versatile) was decommissioned by Groq and is
+        // retired by Version20260819090000.
         [
             'id' => 17,
             'service' => 'Groq',

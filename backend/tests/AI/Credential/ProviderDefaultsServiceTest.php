@@ -7,6 +7,7 @@ namespace App\Tests\AI\Credential;
 use App\AI\Credential\ProviderDefaultsService;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
+use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -206,5 +207,74 @@ final class ProviderDefaultsServiceTest extends TestCase
         $this->service->applyGlobalDefaults('groq');
 
         self::assertArrayNotHasKey('0|DEFAULTMODEL|VECTORIZE', $this->written, 'VECTORIZE (local embeddings) must keep its current value');
+    }
+
+    /**
+     * A recommended default is applied unattended by
+     * `app:provider:apply-defaults --auto` at container start, so a binding that
+     * points at a deactivated catalog row hands a fresh install a model its own
+     * UI refuses to offer. Resolving to a unique BID is not enough.
+     */
+    public function testEveryRecommendedDefaultPointsAtAnActiveCatalogEntry(): void
+    {
+        $byId = $this->catalogById();
+
+        foreach ([...ProviderKeyStore::SUPPORTED_PROVIDERS, 'ollama'] as $provider) {
+            foreach ($this->service->getRecommendedDefaults($provider) as $capability => $bid) {
+                self::assertSame(
+                    1,
+                    $byId[$bid]['active'],
+                    sprintf('%s/%s recommends BID %d, which is not active in the catalog', $provider, $capability, $bid)
+                );
+            }
+        }
+    }
+
+    /**
+     * PROVIDER_DEFAULTS splits each provider into a MAIN tier (CHAT, TOOLS,
+     * ANALYZE) and a cheaper FAST tier (SORT, PLAN, SUMMARIZE). Nothing used to
+     * enforce that ordering, so the map could keep recommending a former
+     * flagship long after the catalog ranked a FAST-tier model above it — the
+     * shape a stale binding takes before anyone notices it is also dead.
+     */
+    public function testFlagshipTierIsNotRankedBelowTheFastTier(): void
+    {
+        $byId = $this->catalogById();
+
+        foreach ([...ProviderKeyStore::SUPPORTED_PROVIDERS, 'ollama'] as $provider) {
+            $defaults = $this->service->getRecommendedDefaults($provider);
+            if (!isset($defaults['CHAT'], $defaults['SORT'])) {
+                continue;
+            }
+
+            $main = $byId[$defaults['CHAT']];
+            $fast = $byId[$defaults['SORT']];
+
+            self::assertGreaterThanOrEqual(
+                (float) $fast['quality'],
+                (float) $main['quality'],
+                sprintf(
+                    'Provider "%s" recommends %s (quality %s) as its flagship CHAT model while using %s (quality %s) for the cheap SORT tier',
+                    $provider,
+                    $main['providerId'],
+                    $main['quality'],
+                    $fast['providerId'],
+                    $fast['quality']
+                )
+            );
+        }
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function catalogById(): array
+    {
+        $byId = [];
+        foreach (ModelCatalog::all() as $model) {
+            $byId[(int) $model['id']] = $model;
+        }
+
+        return $byId;
     }
 }

@@ -35,7 +35,7 @@ class ModelDisableCommandTest extends TestCase
         $this->connection->expects($this->once())->method('executeStatement')
             ->with('DELETE FROM BMODELS WHERE BID = ?', new IsType(NativeType::Array));
 
-        $this->commandTester->execute(['models' => ['groq:llama-3.3-70b-versatile']]);
+        $this->commandTester->execute(['models' => ['groq:llama-3.1-8b-instant']]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $this->assertStringContainsString('Disabled 1 model(s)', $this->commandTester->getDisplay());
@@ -68,7 +68,7 @@ class ModelDisableCommandTest extends TestCase
         // @phpstan-ignore-next-line
         $this->connection->expects($this->once())->method('executeStatement');
 
-        $this->commandTester->execute(['models' => ['groq:llama-3.3-70b-versatile', 'fake:nope']]);
+        $this->commandTester->execute(['models' => ['groq:llama-3.1-8b-instant', 'fake:nope']]);
 
         $this->assertSame(Command::FAILURE, $this->commandTester->getStatusCode());
         $output = $this->commandTester->getDisplay();
