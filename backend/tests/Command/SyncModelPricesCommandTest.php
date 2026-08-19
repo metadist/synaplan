@@ -220,10 +220,10 @@ class SyncModelPricesCommandTest extends TestCase
 
     public function testMatchesPrefixedModelKey(): void
     {
-        $model = $this->createModelMock('groq', 'llama-3.3-70b-versatile', 0.5, 0.8);
+        $model = $this->createModelMock('groq', 'qwen/qwen3.6-27b', 0.5, 0.8);
 
         $this->mockLiteLLMResponse([
-            'groq/llama-3.3-70b-versatile' => [
+            'groq/qwen/qwen3.6-27b' => [
                 'input_cost_per_token' => 0.0000006,
                 'output_cost_per_token' => 0.0000008,
                 'mode' => 'chat',
@@ -297,10 +297,10 @@ class SyncModelPricesCommandTest extends TestCase
 
     public function testMatchesCaseInsensitiveServicePrefix(): void
     {
-        $model = $this->createModelMock('Groq', 'llama-3.3-70b-versatile', 0.5, 0.8);
+        $model = $this->createModelMock('Groq', 'qwen/qwen3.6-27b', 0.5, 0.8);
 
         $this->mockLiteLLMResponse([
-            'groq/llama-3.3-70b-versatile' => [
+            'groq/qwen/qwen3.6-27b' => [
                 'input_cost_per_token' => 0.0000006,
                 'output_cost_per_token' => 0.0000008,
                 'mode' => 'chat',

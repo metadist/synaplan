@@ -734,9 +734,9 @@ class ConfigController extends AbstractController
                             type: 'array',
                             items: new OA\Items(
                                 properties: [
-                                    new OA\Property(property: 'id', type: 'integer', example: 53),
+                                    new OA\Property(property: 'id', type: 'integer', example: 324),
                                     new OA\Property(property: 'service', type: 'string', example: 'Groq'),
-                                    new OA\Property(property: 'name', type: 'string', example: 'Qwen3 32B (Reasoning)'),
+                                    new OA\Property(property: 'name', type: 'string', example: 'Qwen 3.6 27B'),
                                     new OA\Property(property: 'quality', type: 'integer', example: 9),
                                     new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning')),
                                 ]

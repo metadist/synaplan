@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DoctrineMigrations;
 
+use Doctrine\DBAL\ParameterType;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
@@ -35,6 +36,15 @@ use Doctrine\Migrations\AbstractMigration;
  *   - qwen/qwen3-32b          → Qwen 3.6 27B        (BID 324)
  *   - llama-4-scout (vision)  → Qwen 3.6 27B Vision (BID 325) — only Groq vision model left
  *   - llama-3.1-8b-instant    → gpt-oss-20b         (BID 75)  — Groq's recommended fast/cheap tier
+ *
+ * DEFAULTMODEL is not the only place a BID is stored, and it is the WEAKEST of
+ * them: {@see \App\Service\Message\Handler\ChatHandler} resolves a widget
+ * override and a per-prompt override BEFORE it falls back to the default, so
+ * repointing BCONFIG alone leaves the two higher-priority bindings pointing at
+ * a dead upstream model. Both are repointed here as well:
+ *
+ *   - BPROMPTMETA.BMETAVALUE where BMETAKEY = 'aiModel' (per-prompt override)
+ *   - BWIDGETS.BCONFIG JSON key $.aiModelId            (per-widget override)
  */
 final class Version20260819080000 extends AbstractMigration
 {
@@ -62,9 +72,9 @@ final class Version20260819080000 extends AbstractMigration
 
     public function getDescription(): string
     {
-        return 'Add Groq Qwen 3.6 27B (chat BID 324 + vision BID 325), repoint DEFAULTMODEL bindings, '
-            .'and deactivate the Groq models shut down upstream (llama-3.3-70b-versatile, '
-            .'llama-3.1-8b-instant, llama-4-scout, qwen3-32b).';
+        return 'Add Groq Qwen 3.6 27B (chat BID 324 + vision BID 325), repoint DEFAULTMODEL, per-prompt '
+            .'and per-widget model bindings, and deactivate the Groq models shut down upstream '
+            .'(llama-3.3-70b-versatile, llama-3.1-8b-instant, llama-4-scout, qwen3-32b).';
     }
 
     public function up(Schema $schema): void
@@ -113,6 +123,34 @@ final class Version20260819080000 extends AbstractMigration
             ]);
 
             $this->addSql(<<<'SQL'
+                UPDATE BPROMPTMETA
+                   SET BMETAVALUE = :successor
+                 WHERE BMETAKEY = 'aiModel'
+                   AND BMETAVALUE = :retired
+                   AND EXISTS (SELECT 1 FROM BMODELS WHERE BID = :successorId)
+            SQL, [
+                'retired' => (string) $retiredBid,
+                'successor' => (string) $successorBid,
+                'successorId' => $successorBid,
+            ]);
+
+            // JSON_SET returns NULL on malformed JSON, which would blank the
+            // whole widget config. The JSON_VALUE comparison in the WHERE only
+            // matches rows that parse AND carry the retired id, so a broken or
+            // unrelated config is never touched.
+            $this->addSql(<<<'SQL'
+                UPDATE BWIDGETS
+                   SET BCONFIG = JSON_SET(BCONFIG, '$.aiModelId', :successorId)
+                 WHERE JSON_VALUE(BCONFIG, '$.aiModelId') = :retired
+                   AND EXISTS (SELECT 1 FROM BMODELS WHERE BID = :successorId)
+            SQL, [
+                'retired' => (string) $retiredBid,
+                'successorId' => $successorBid,
+            ], [
+                'successorId' => ParameterType::INTEGER,
+            ]);
+
+            $this->addSql(<<<'SQL'
                 UPDATE BMODELS
                    SET BACTIVE = 0,
                        BSELECTABLE = 0,
@@ -129,7 +167,7 @@ final class Version20260819080000 extends AbstractMigration
     public function down(Schema $schema): void
     {
         // Reactivate the retired rows so they reappear in the admin UI. We
-        // intentionally do NOT undo the BCONFIG repoints (we cannot tell an
+        // intentionally do NOT undo the binding repoints (we cannot tell an
         // auto-migrated binding from one deliberately set to the successor
         // afterwards) and do NOT delete the Qwen rows (BMESSAGES rows may
         // already reference them). Same contract as Version20260727180000.

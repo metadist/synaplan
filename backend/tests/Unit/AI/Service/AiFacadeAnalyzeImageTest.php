@@ -69,7 +69,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
             ->with(42)
             ->willReturn([
                 'provider' => 'groq',
-                'model' => 'llama-4-scout-17b-16e-instruct',
+                'model' => 'qwen/qwen3.6-27b',
                 'model_id' => 123,
             ]);
 
@@ -84,7 +84,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
                 'describe',
                 $this->callback(function (array $opts): bool {
                     return 'groq' === $opts['provider']
-                        && 'llama-4-scout-17b-16e-instruct' === $opts['model'];
+                        && 'qwen/qwen3.6-27b' === $opts['model'];
                 })
             )
             ->willReturn('a cat');
@@ -97,7 +97,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
 
         $this->assertSame('a cat', $result['content']);
         $this->assertSame('groq', $result['provider']);
-        $this->assertSame('llama-4-scout-17b-16e-instruct', $result['model']);
+        $this->assertSame('qwen/qwen3.6-27b', $result['model']);
     }
 
     public function testAnalyzeImageDoesNotLeakPic2TextModelToFallbackProvider(): void
@@ -106,7 +106,7 @@ class AiFacadeAnalyzeImageTest extends TestCase
             ->with(42)
             ->willReturn([
                 'provider' => 'groq',
-                'model' => 'llama-4-scout-17b-16e-instruct',
+                'model' => 'qwen/qwen3.6-27b',
                 'model_id' => 123,
             ]);
 

@@ -43,9 +43,10 @@ class ModelListCommandTest extends TestCase
 
     public function testListShowsEnabledModelAsYes(): void
     {
-        // Enable the groq llama model (BID=9)
+        // Enable the Groq Qwen 3.6 27B chat model (BID=324). Has to be a BID the
+        // catalog still carries — the command only renders catalog entries.
         // @phpstan-ignore-next-line
-        $this->connection->method('fetchFirstColumn')->willReturn(['9']);
+        $this->connection->method('fetchFirstColumn')->willReturn(['324']);
 
         $this->commandTester->execute([]);
 

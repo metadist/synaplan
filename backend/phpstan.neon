@@ -11,6 +11,11 @@ parameters:
     excludePaths:
         - src/Kernel.php
         - tests/Unit/CookieTokenAuthenticatorTest.php
+    # Doctrine discovers migrations by path, so they are neither autoloaded nor
+    # analysed. Scanning makes the classes known to tests that execute a
+    # migration's SQL, without pulling the migrations themselves into level 5.
+    scanDirectories:
+        - migrations
     ignoreErrors:
         -
             identifiers:
