@@ -2616,10 +2616,12 @@
     }
   },
   "setupBanner": {
-    "title": "Kein KI-Anbieter verbunden",
-    "adminText": "Der Chat braucht einen KI-Anbieter. Verbinde einen in einer Minute — kostenlose Optionen verfügbar.",
-    "userText": "Der Chat ist noch nicht bereit. Bitte deinen Administrator, einen KI-Anbieter zu verbinden.",
-    "cta": "KI-Anbieter einrichten"
+    "adminTitle": "Kein KI-Anbieter eingerichtet",
+    "userTitle": "Der Chat ist noch nicht bereit",
+    "adminText": "Der Chat startet erst, wenn ein KI-Anbieter verbunden ist. Öffne die Einrichtungsseite und hinterlege einen Schlüssel — Groq hat eine kostenlose Option, die in etwa einer Minute funktioniert.",
+    "userText": "Ein Administrator muss noch einen KI-Anbieter verbinden. In der Dokumentation steht, wie das geht.",
+    "cta": "KI-Anbieter einrichten",
+    "docsCta": "Dokumentation öffnen"
   },
   "localAiDownload": {
     "waitingTitle": "Lokale KI startet",

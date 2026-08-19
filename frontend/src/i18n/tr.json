@@ -1019,10 +1019,12 @@
     }
   },
   "setupBanner": {
-    "title": "Bağlı AI sağlayıcısı yok",
-    "adminText": "Sohbet için bir AI sağlayıcısı gerekiyor. Bir dakikada bağlayın — ücretsiz seçenekler mevcut.",
-    "userText": "Sohbet henüz hazır değil. Lütfen yöneticinizden bir AI sağlayıcısı bağlamasını isteyin.",
-    "cta": "AI sağlayıcısını kur"
+    "adminTitle": "AI sağlayıcısı yapılandırılmamış",
+    "userTitle": "Sohbet henüz hazır değil",
+    "adminText": "Bir AI sağlayıcısı bağlanmadan sohbet başlayamaz. Kurulum sayfasını açıp bir anahtar ekleyin — Groq yaklaşık bir dakikada çalışan ücretsiz bir seçenek sunar.",
+    "userText": "Bir yöneticinin hâlâ bir AI sağlayıcısı bağlaması gerekiyor. Bunun nasıl yapılacağı belgelerde anlatılır.",
+    "cta": "AI sağlayıcı kurulumunu aç",
+    "docsCta": "Belgeleri aç"
   },
   "localAiDownload": {
     "waitingTitle": "Yerel AI başlatılıyor",

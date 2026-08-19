@@ -12,7 +12,7 @@
            floats over the top-right of the message area. The mobile instance
            lives in MainLayout (fixed top-right, mirroring the menu button). -->
       <div
-        v-if="authStore.isAuthenticated"
+        v-if="authStore.isAuthenticated && !needsProviderSetup"
         class="hidden md:block absolute top-3 right-3 z-30"
         data-testid="section-incognito-toggle-desktop"
       >
@@ -37,11 +37,19 @@
         </div>
       </Transition>
 
-      <!-- First-run: no usable AI provider yet — admins get a wizard CTA -->
-      <ProviderSetupBanner />
-      <LocalAiDownloadCard class="mx-auto max-w-4xl w-full px-4 pt-4" />
+      <!-- First-run: no usable AI provider — replace the chat, do not let
+           the user send messages that can only fail with HTTP 500. -->
+      <div
+        v-if="needsProviderSetup"
+        class="flex-1 min-h-0 flex flex-col"
+        data-testid="state-provider-setup"
+      >
+        <LocalAiDownloadCard class="mx-auto max-w-4xl w-full px-4 pt-4" />
+        <ProviderSetupBanner />
+      </div>
 
       <div
+        v-else
         ref="chatContainer"
         class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
         :class="{ 'flex flex-col items-center': isEmptyLanding }"
@@ -235,13 +243,14 @@
       <!-- Usage taximeter: desktop rail + mobile ring. Gated by the admin
            master switch and authenticated (non-guest/widget) web usage; the
            two share one store and differ only by CSS breakpoint. -->
-      <template v-if="usageTaximeterStore.active">
+      <template v-if="usageTaximeterStore.active && !needsProviderSetup">
         <ConsumptionBar />
         <ConsumptionRing />
       </template>
 
       <!-- Contextual Promo Tips -->
       <PromoTipBanner
+        v-if="!needsProviderSetup"
         :tip="promoTips.currentTip.value"
         :expanded="promoTips.isExpanded.value"
         @toggle="promoTips.toggleExpand()"
@@ -262,6 +271,7 @@
            means the "+" menu and its dropdowns always open upward with room and
            are never clipped by the chat container's overflow (issue #1285). -->
       <ChatInput
+        v-if="!needsProviderSetup"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
@@ -655,6 +665,13 @@ const isEmptyLanding = computed(
     !(guestStore.initFailed && !authStore.isAuthenticated) &&
     historyStore.messages.length === 0 &&
     !historyStore.isLoadingMessages
+)
+
+// Runtime-config first-run signal: the default chat model has no usable
+// provider. Replace the composer with a tombstone so a fresh install cannot
+// produce the cryptic HTTP 500 the old banner still allowed.
+const needsProviderSetup = computed(
+  () => authStore.isAuthenticated && configStore.setup.chatReady === false
 )
 
 function handleGuestFeatureGate(key: string) {
@@ -1796,6 +1813,10 @@ const handleSendMessage = async (
     quotedMessageId?: number
   }
 ) => {
+  if (needsProviderSetup.value) {
+    return
+  }
+
   // Plugin slash-commands (e.g. "/fastbill show overdue") are handled by the
   // owning plugin, not the AI pipeline. Intercept before any other processing.
   const pluginRoute = matchPluginChatCommand(content)

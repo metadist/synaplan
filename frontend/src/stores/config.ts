@@ -286,7 +286,7 @@ const config = {
    * First-run setup status (authenticated users only).
    * chatReady is false when the provider serving the current user's effective
    * default chat model (per-user override, then global default) has no usable
-   * key/connection — the chat shows a "connect an AI provider" banner and
+   * key/connection — the chat shows a full-page setup tombstone and
    * admins are pointed at /admin/setup.
    * Defaults to true so anonymous pages and the pre-config phase never flash
    * the banner.

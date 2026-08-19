@@ -1019,10 +1019,12 @@
     }
   },
   "setupBanner": {
-    "title": "Ningún proveedor de IA conectado",
-    "adminText": "El chat necesita un proveedor de IA. Conecta uno en un minuto — hay opciones gratuitas.",
-    "userText": "El chat aún no está listo. Pide a tu administrador que conecte un proveedor de IA.",
-    "cta": "Configurar proveedor de IA"
+    "adminTitle": "Ningún proveedor de IA configurado",
+    "userTitle": "El chat aún no está listo",
+    "adminText": "El chat no puede empezar hasta que haya un proveedor de IA conectado. Abre la página de configuración y añade una clave — Groq tiene una opción gratuita que funciona en aproximadamente un minuto.",
+    "userText": "Un administrador todavía tiene que conectar un proveedor de IA. En la documentación se explica cómo se hace.",
+    "cta": "Abrir configuración de IA",
+    "docsCta": "Abrir documentación"
   },
   "localAiDownload": {
     "waitingTitle": "La IA local se está iniciando",

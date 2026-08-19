@@ -2600,10 +2600,12 @@
     }
   },
   "setupBanner": {
-    "title": "No AI provider connected",
-    "adminText": "Chat needs an AI provider. Connect one in a minute — free options available.",
-    "userText": "Chat is not ready yet. Please ask your administrator to connect an AI provider.",
-    "cta": "Set up AI provider"
+    "adminTitle": "No AI provider configured",
+    "userTitle": "Chat is not ready yet",
+    "adminText": "Chat cannot start until an AI provider is connected. Open the setup page to add a key — Groq has a free option that works in about a minute.",
+    "userText": "An administrator still needs to connect an AI provider. You can read how that works in the documentation.",
+    "cta": "Open AI provider setup",
+    "docsCta": "Open documentation"
   },
   "localAiDownload": {
     "waitingTitle": "Local AI is starting",
