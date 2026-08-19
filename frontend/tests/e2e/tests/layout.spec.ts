@@ -150,7 +150,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
 
       const tabs = page.locator('[data-testid^="btn-mobile-nav-"]')
       const count = await tabs.count()
-      expect(count, 'drawer renders New/Files/More buttons').toBe(3)
+      expect(count, 'drawer renders New/History/Files/More buttons').toBe(4)
 
       for (let i = 0; i < count; i++) {
         const tab = tabs.nth(i)
@@ -274,6 +274,8 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     if (isMobileViewport(page)) {
       await page.locator(NAV.mobileDrawerToggle).click()
       await expect(page.locator(NAV.mobileDrawer)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await page.locator(NAV.mobileHistory).click()
+      await expect(page.locator(NAV.mobileHistorySection)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       // The infinite-scroll sentinel is always rendered (empty or not).
       await expect(page.locator(NAV.mobileHistorySentinel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expectNoHorizontalOverflow(page, 'drawer history')

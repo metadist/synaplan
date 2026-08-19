@@ -62,6 +62,7 @@ export const selectors = {
     /** Tap-catcher over the peeking content that closes the drawer */
     mobileDrawerScrim: '[data-testid="btn-mobile-drawer-scrim"]',
     mobileNew: '[data-testid="btn-mobile-nav-new"]',
+    mobileHistory: '[data-testid="btn-mobile-nav-history"]',
     mobileFiles: '[data-testid="btn-mobile-nav-files"]',
     mobileMore: '[data-testid="btn-mobile-nav-more"]',
     /** Inline "More" section that expands under the primary buttons */
@@ -71,6 +72,7 @@ export const selectors = {
     mobileMoreInbound: '[data-testid="link-mobile-more-inbound"]',
     mobileMorePreferences: '[data-testid="btn-mobile-more-preferences"]',
     /** In-drawer chat history (paginated, infinite scroll) */
+    mobileHistorySection: '[data-testid="section-mobile-history"]',
     mobileHistoryList: '[data-testid="list-mobile-history"]',
     mobileHistoryRow: '[data-testid="row-mobile-history"]',
     mobileHistorySentinel: '[data-testid="sentinel-mobile-history"]',
