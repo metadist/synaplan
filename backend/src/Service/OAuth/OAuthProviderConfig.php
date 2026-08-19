@@ -15,10 +15,10 @@ final readonly class OAuthProviderConfig
 {
     /**
      * @param list<string>          $scopes
-     * @param array<string, string> $extraAuthorizeParams provider-specific query
-     *                                                    params for the consent URL (Microsoft: `prompt=consent`,
-     *                                                    Dropbox: `token_access_type=offline`); never sent to the
-     *                                                    token endpoint
+     * @param array<string, string> $extraAuthorizeParams        provider-specific query
+     *                                                           params for the consent URL (Microsoft: `prompt=consent`,
+     *                                                           Dropbox: `token_access_type=offline`); never sent to the
+     *                                                           token endpoint
      * @param bool                  $includeScopeInTokenRequests Microsoft wants `scope` on
      *                                                           exchange/refresh (to keep
      *                                                           `offline_access`). Dropbox's
