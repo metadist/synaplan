@@ -8,6 +8,7 @@ use App\AI\Health\Probe\ModelListProbeInterface;
 use App\AI\Health\Probe\ModelListProbeRegistry;
 use App\AI\Health\Probe\ProbeResult;
 use App\AI\Service\ModelProbeResult;
+use App\AI\Service\ProviderDisplayNames;
 use App\Entity\Model;
 use App\Entity\ModelHealth;
 use App\Repository\ModelHealthRepository;
@@ -56,6 +57,7 @@ final readonly class ModelHealthEvaluator
         private ModelAutoDisabler $autoDisabler,
         private EntityManagerInterface $em,
         private CacheItemPoolInterface $cache,
+        private ProviderDisplayNames $displayNames,
         private LoggerInterface $logger,
     ) {
     }
@@ -270,7 +272,7 @@ final readonly class ModelHealthEvaluator
             return $make(
                 ModelHealthState::Offline,
                 FailureKind::Permanent,
-                sprintf('%s no longer serves this model.', $service),
+                sprintf('%s no longer serves this model.', $this->displayNames->forService($service)),
                 ModelHealth::SOURCE_PROBE,
                 safeToDisable: true,
             );
@@ -283,7 +285,7 @@ final readonly class ModelHealthEvaluator
             return $make(
                 ModelHealthState::Unknown,
                 null,
-                sprintf('%s does not list this model and did not confirm whether it still exists.', $service),
+                sprintf('%s does not list this model and did not confirm whether it still exists.', $this->displayNames->forService($service)),
                 ModelHealth::SOURCE_PROBE,
             );
         }
@@ -366,6 +368,7 @@ final readonly class ModelHealthEvaluator
                     $service,
                     array_map(static fn (ModelHealthVerdict $v): string => $v->modelName, $affected),
                     $affected[0]->message,
+                    $this->displayNames->forService($service),
                 );
 
                 if ($dryRun || $this->alerter->raise($alert)) {
@@ -375,7 +378,7 @@ final readonly class ModelHealthEvaluator
             }
 
             if ($this->alerter->isOpen($service, $kind)) {
-                $alert = new ModelHealthAlert($kind, $service, [], 'All models are answering again.');
+                $alert = new ModelHealthAlert($kind, $service, [], 'All models are answering again.', $this->displayNames->forService($service));
                 if ($dryRun || $this->alerter->resolve($alert)) {
                     $resolved[] = $alert;
                 }

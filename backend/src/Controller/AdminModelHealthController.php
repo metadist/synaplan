@@ -86,9 +86,10 @@ final class AdminModelHealthController extends AbstractController
                     property: 'providers',
                     type: 'array',
                     items: new OA\Items(
-                        required: ['name', 'needsAttention', 'models'],
+                        required: ['name', 'displayName', 'needsAttention', 'models'],
                         properties: [
-                            new OA\Property(property: 'name', type: 'string', example: 'groq'),
+                            new OA\Property(property: 'name', type: 'string', description: 'Internal service key, used to scope a re-check', example: 'xAI'),
+                            new OA\Property(property: 'displayName', type: 'string', description: 'Branded provider name for display', example: 'xAI'),
                             new OA\Property(property: 'needsAttention', type: 'integer', example: 2),
                             new OA\Property(
                                 property: 'models',
@@ -190,9 +191,12 @@ final class AdminModelHealthController extends AbstractController
         ]);
     }
 
-    // Negative ids are the catalog's "let the provider registry decide"
-    // placeholders and are real, routable BMODELS rows, so the pattern has to
-    // allow the sign — a \d+ requirement would 404 on nine of them.
+    // ModelSeeder gives the dev/test mock models negative BIDs so they cannot
+    // collide with the auto-increment range. They are ordinary BMODELS rows and
+    // the status page lists them like any other, so a `\d+` requirement would
+    // make the buttons next to them 404 in the dev and E2E stacks. An id with
+    // no BMODELS row is still a 404 below, sign or not — there is nothing to
+    // exempt for a model that is not in the catalog.
     #[Route('/models/{id}/exempt', name: 'admin_model_health_exempt', requirements: ['id' => '-?\d+'], methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/admin/model-health/models/{id}/exempt',
@@ -258,6 +262,7 @@ final class AdminModelHealthController extends AbstractController
         ]);
     }
 
+    // Negative ids are the seeded mock models — see the note on exempt() above.
     #[Route('/models/{id}/reset', name: 'admin_model_health_reset', requirements: ['id' => '-?\d+'], methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/admin/model-health/models/{id}/reset',

@@ -16,6 +16,8 @@ use App\AI\Health\Probe\ModelListProbeInterface;
 use App\AI\Health\Probe\ModelListProbeRegistry;
 use App\AI\Health\Probe\ProbeResult;
 use App\AI\Service\ModelProbeResult;
+use App\AI\Service\ProviderDisplayNames;
+use App\AI\Service\ProviderRegistry;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelHealthRepository;
@@ -124,6 +126,7 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
             new ModelAutoDisabler($config, new NullLogger()),
             $this->createMock(EntityManagerInterface::class),
             new ArrayAdapter(),
+            new ProviderDisplayNames($this->createStub(ProviderRegistry::class)),
             new NullLogger(),
         );
     }

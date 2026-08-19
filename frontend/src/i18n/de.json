@@ -178,6 +178,7 @@
     "actions": {
       "refresh": "Jetzt prüfen",
       "refreshProvider": "Diesen Anbieter prüfen",
+      "refreshProviderAria": "{provider} jetzt prüfen",
       "resetCounters": "Fehlerverlauf löschen",
       "exempt": "Von Automatik ausnehmen",
       "unexempt": "Automatik wieder erlauben"

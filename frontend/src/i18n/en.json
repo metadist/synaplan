@@ -178,6 +178,7 @@
     "actions": {
       "refresh": "Check now",
       "refreshProvider": "Check this provider",
+      "refreshProviderAria": "Check {provider} now",
       "resetCounters": "Clear error history",
       "exempt": "Exempt from automation",
       "unexempt": "Allow automation again"

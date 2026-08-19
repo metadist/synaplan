@@ -786,7 +786,7 @@ final readonly class DiscordNotificationService
         $fields = [
             [
                 'name' => '🏢 Provider',
-                'value' => $alert->provider,
+                'value' => $alert->name(),
                 'inline' => true,
             ],
             [
@@ -816,7 +816,7 @@ final readonly class DiscordNotificationService
 
         $this->sendEmbed(
             title: $resolved
-                ? '✅ [RESOLVED] '.$alert->provider.' models available again'
+                ? '✅ [RESOLVED] '.$alert->name().' models available again'
                 : '🚨 [INCIDENT] '.$alert->headline(),
             color: $resolved ? self::COLOR_SUCCESS : self::COLOR_ERROR,
             fields: $fields,

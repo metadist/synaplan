@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\AI\Health;
 
+use App\AI\Service\ProviderDisplayNames;
 use App\Entity\Model;
 use App\Entity\ModelHealth;
+use App\Model\ModelCatalog;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 
@@ -24,13 +26,14 @@ final readonly class ModelHealthOverview
         private ModelHealthRepository $healthRepository,
         private ModelHealthRecorder $recorder,
         private ModelHealthConfig $config,
+        private ProviderDisplayNames $displayNames,
     ) {
     }
 
     /**
      * @return array{
      *     summary: array{total: int, online: int, degraded: int, offline: int, unconfigured: int, unknown: int, needsAttention: int, lastCheck: int, autoDisableEnabled: bool, monitoringEnabled: bool},
-     *     providers: list<array{name: string, needsAttention: int, models: list<array<string, mixed>>}>
+     *     providers: list<array{name: string, displayName: string, needsAttention: int, models: list<array<string, mixed>>}>
      * }
      */
     public function build(): array
@@ -38,6 +41,7 @@ final readonly class ModelHealthOverview
         /** @var list<Model> $models */
         $models = $this->models->findBy([], ['service' => 'ASC', 'tag' => 'ASC', 'name' => 'ASC']);
         $healthByModel = $this->healthRepository->findIndexedByModelId();
+        $displayNames = $this->displayNames->all();
 
         $counts = array_fill_keys(array_map(static fn (ModelHealthState $s): string => $s->value, ModelHealthState::cases()), 0);
         $lastCheck = 0;
@@ -53,8 +57,20 @@ final readonly class ModelHealthOverview
             ++$counts[$state->value];
             $lastCheck = max($lastCheck, $health?->getLastCheck() ?? 0);
 
-            $service = $model->getService();
-            $byProvider[$service] ??= ['name' => $service, 'needsAttention' => 0, 'models' => []];
+            // Grouped by the normalised key, not by BSERVICE itself: the
+            // catalog holds both "Ollama" and "ollama", which would otherwise
+            // render as two sections under the same heading. A re-check scoped
+            // to this key still covers both, because the run matches services
+            // case-insensitively.
+            $service = ModelCatalog::normalizeProvider($model->getService());
+            $byProvider[$service] ??= [
+                'name' => $service,
+                // A catalog entry for a provider this build does not register
+                // still has to show something, so the raw service is the fallback.
+                'displayName' => $displayNames[$service] ?? $model->getService(),
+                'needsAttention' => 0,
+                'models' => [],
+            ];
             if ($state->needsAttention()) {
                 ++$byProvider[$service]['needsAttention'];
             }
@@ -82,9 +98,10 @@ final readonly class ModelHealthOverview
 
         $providers = array_values($byProvider);
         // Providers with something wrong float to the top: an operator opening
-        // this page is looking for the problem, not for an alphabet.
+        // this page is looking for the problem, not for an alphabet. Ties are
+        // ordered by the label actually on screen, not by the internal key.
         usort($providers, static function (array $a, array $b): int {
-            return [$b['needsAttention'], $a['name']] <=> [$a['needsAttention'], $b['name']];
+            return [$b['needsAttention'], $a['displayName']] <=> [$a['needsAttention'], $b['displayName']];
         });
 
         return [

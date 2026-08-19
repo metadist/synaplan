@@ -139,4 +139,32 @@ final class ModelHealthAlerterTest extends TestCase
         self::assertStringContainsString('Groq credentials rejected', $alert->headline());
         self::assertStringContainsString('and 15 more', $alert->previewNames());
     }
+
+    /**
+     * The alert carries two different things under similar names: `provider` is
+     * the BSERVICE key that the throttle is keyed on, and `name()` is what the
+     * operator reads. Rendering the key would put "ollama" and "xAI" in the
+     * subject line; keying on the label would silently split the throttle the
+     * day a display name changes.
+     */
+    #[AllowMockObjectsWithoutExpectations]
+    public function testTheAlertRendersTheBrandedNameButThrottlesOnTheKey(): void
+    {
+        $alert = new ModelHealthAlert(ModelHealthAlert::KIND_OFFLINE, 'ollama', ['x'], 'gone', 'Ollama');
+
+        self::assertSame('Ollama', $alert->name());
+        self::assertStringContainsString('Ollama model(s)', $alert->headline());
+        self::assertSame('ollama', $alert->provider);
+
+        self::assertTrue($this->alerter->raise($alert));
+        self::assertTrue($this->alerter->isOpen('ollama', ModelHealthAlert::KIND_OFFLINE));
+    }
+
+    /** Without a display name the key is still better than printing nothing. */
+    public function testTheAlertFallsBackToTheKeyWhenNoNameIsGiven(): void
+    {
+        $alert = new ModelHealthAlert(ModelHealthAlert::KIND_OFFLINE, 'ollama', ['x'], 'gone');
+
+        self::assertSame('ollama', $alert->name());
+    }
 }

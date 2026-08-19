@@ -125,7 +125,7 @@
             data-testid="section-provider"
           >
             <div class="flex items-center gap-3 px-2">
-              <h2 class="text-xl font-semibold txt-primary capitalize">{{ provider.name }}</h2>
+              <h2 class="text-xl font-semibold txt-primary">{{ provider.displayName }}</h2>
               <span
                 v-if="provider.needsAttention > 0"
                 class="px-2.5 py-1 rounded-md text-xs font-semibold"
@@ -137,6 +137,11 @@
               <button
                 class="btn-secondary px-3 py-1.5 rounded-lg text-xs disabled:opacity-60"
                 :disabled="isRefreshing"
+                :aria-label="
+                  $t('adminModelStatus.actions.refreshProviderAria', {
+                    provider: provider.displayName,
+                  })
+                "
                 data-testid="btn-refresh-provider"
                 @click="refresh(provider.name)"
               >

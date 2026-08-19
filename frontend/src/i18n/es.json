@@ -177,6 +177,7 @@
     "actions": {
       "refresh": "Comprobar ahora",
       "refreshProvider": "Comprobar este proveedor",
+      "refreshProviderAria": "Comprobar {provider} ahora",
       "resetCounters": "Borrar historial de errores",
       "exempt": "Eximir de la automatización",
       "unexempt": "Permitir la automatización de nuevo"

@@ -493,7 +493,7 @@ final readonly class InternalEmailService
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
         $timestamp = (new \DateTimeImmutable())->format('Y-m-d H:i:s T');
 
-        $provider = htmlspecialchars($alert->provider, ENT_QUOTES);
+        $provider = htmlspecialchars($alert->name(), ENT_QUOTES);
         $models = htmlspecialchars($alert->previewNames(), ENT_QUOTES);
         $reason = htmlspecialchars($alert->reason, ENT_QUOTES);
         $count = $alert->modelCount();
@@ -503,7 +503,7 @@ final readonly class InternalEmailService
             $title = '✅ RESOLVED — AI models available again';
             $lead = "<p><strong>{$count}</strong> model(s) from <strong>{$provider}</strong> are working again. No action needed.</p>";
             $action = '';
-            $subject = '[RESOLVED][Synaplan] '.$alert->provider.' models available again';
+            $subject = '[RESOLVED][Synaplan] '.$alert->name().' models available again';
         } else {
             $banner = '#c62828';
             $title = '🚨 INCIDENT — AI models unavailable';

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Controller;
 
 use App\AI\Health\ModelHealthState;
+use App\AI\Service\ProviderRegistry;
 use App\Entity\Model;
 use App\Entity\ModelHealth;
 use App\Entity\User;
+use App\Model\ModelCatalog;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -95,6 +97,9 @@ class AdminModelHealthControllerTest extends WebTestCase
         foreach ($data['providers'] as $provider) {
             self::assertArrayHasKey('name', $provider);
             self::assertArrayHasKey('needsAttention', $provider);
+            // The heading has to carry the provider's own spelling. Deriving
+            // it in CSS was tried and turns "xAI" into "XAI".
+            self::assertNotSame('', $provider['displayName'], $provider['name']);
             $listed += count($provider['models']);
 
             foreach ($provider['models'] as $model) {
@@ -108,6 +113,36 @@ class AdminModelHealthControllerTest extends WebTestCase
             }
         }
         self::assertSame($catalogued, $listed);
+    }
+
+    /**
+     * The provider registry, not the BSERVICE column, owns how a provider is
+     * spelled on screen. xAI is the case that catches a regression: the column
+     * says "xAI", any CSS or PHP casing helper would render "XAI", and only
+     * reading the registry gives the brand back.
+     */
+    public function testProviderHeadingsUseTheBrandedName(): void
+    {
+        $data = $this->request('GET', '/api/v1/admin/model-health');
+
+        $byKey = [];
+        foreach ($data['providers'] as $provider) {
+            $byKey[$provider['name']] = $provider['displayName'];
+        }
+
+        $registry = $this->client->getContainer()->get(ProviderRegistry::class);
+        foreach ($byKey as $service => $displayName) {
+            $key = ModelCatalog::normalizeProvider($service);
+            $provider = $registry->getUniqueProviders()[$key] ?? null;
+            if (null === $provider) {
+                // Not every catalogued service is a registered provider; those
+                // fall back to the raw key rather than showing nothing.
+                self::assertSame($service, $displayName);
+                continue;
+            }
+
+            self::assertSame($provider->getDisplayName(), $displayName, $service);
+        }
     }
 
     public function testExemptingAModelPausesAndResumesTheAutomation(): void

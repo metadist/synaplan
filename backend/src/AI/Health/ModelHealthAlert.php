@@ -18,14 +18,26 @@ final readonly class ModelHealthAlert
     public const KIND_CREDENTIAL = 'credential';
 
     /**
-     * @param list<string> $modelNames names of the affected models, for the alert body
+     * @param string       $provider    internal service key; also the throttle key, so it
+     *                                  must stay stable and must not be a display string
+     * @param list<string> $modelNames  names of the affected models, for the alert body
+     * @param string|null  $displayName the provider's branded name, for the alert text
      */
     public function __construct(
         public string $kind,
         public string $provider,
         public array $modelNames,
         public string $reason,
+        public ?string $displayName = null,
     ) {
+    }
+
+    /** The provider as it should appear in the alert, never the raw service key. */
+    public function name(): string
+    {
+        return null === $this->displayName || '' === $this->displayName
+            ? $this->provider
+            : $this->displayName;
     }
 
     public function modelCount(): int
@@ -39,18 +51,18 @@ final readonly class ModelHealthAlert
         return match ($this->kind) {
             self::KIND_CREDENTIAL => sprintf(
                 '%s credentials rejected — %d model(s) unavailable',
-                $this->provider,
+                $this->name(),
                 $this->modelCount()
             ),
             self::KIND_OFFLINE => sprintf(
                 '%d %s model(s) no longer available',
                 $this->modelCount(),
-                $this->provider
+                $this->name()
             ),
             default => sprintf(
                 '%d %s model(s) failing',
                 $this->modelCount(),
-                $this->provider
+                $this->name()
             ),
         };
     }

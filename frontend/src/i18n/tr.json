@@ -177,6 +177,7 @@
     "actions": {
       "refresh": "Şimdi kontrol et",
       "refreshProvider": "Bu sağlayıcıyı kontrol et",
+      "refreshProviderAria": "{provider} sağlayıcısını şimdi kontrol et",
       "resetCounters": "Hata geçmişini temizle",
       "exempt": "Otomasyondan muaf tut",
       "unexempt": "Otomasyona tekrar izin ver"
