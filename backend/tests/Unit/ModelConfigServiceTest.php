@@ -157,6 +157,8 @@ class ModelConfigServiceTest extends TestCase
         $userId = 1;
         $expectedModelId = 42;
 
+        $this->givenModels([$expectedModelId => 'Ollama']);
+
         // Mock user-specific config
         $config = $this->createMock(Config::class);
         $config->method('getValue')->willReturn((string) $expectedModelId);
@@ -272,14 +274,39 @@ class ModelConfigServiceTest extends TestCase
 
     /**
      * The test catalog binds capabilities to negative placeholder BIDs that
-     * have no BMODELS row. Those must resolve unchanged.
+     * have no BMODELS row. Those mean "let the provider registry decide" and
+     * must resolve unchanged.
      */
-    public function testGetDefaultModelKeepsAnOverridePointingAtAnUnknownModel(): void
+    public function testGetDefaultModelKeepsAnOverridePointingAtAPlaceholderId(): void
     {
         $this->givenModels([]);
         $this->givenDefaultModelRows([1 => -1, 0 => 9]);
 
         self::assertSame(-1, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * A positive BID with no row is a deleted model, not a placeholder. Passing
+     * it on leaves the caller with a model id but no provider and no model
+     * name, so the registry quietly answers from its own default — the user
+     * gets a different model than the one configured and nothing says so.
+     */
+    public function testGetDefaultModelSkipsABindingWhoseModelRowIsGone(): void
+    {
+        $this->givenModels([255 => 'OpenAI']);
+        $this->givenUsableProviders(['openai']);
+        $this->givenDefaultModelRows([1 => 9, 0 => 255]);
+
+        self::assertSame(255, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    public function testResolveUsableModelIdSwapsAnOverrideWhoseModelRowIsGone(): void
+    {
+        $this->givenModels([255 => 'OpenAI']);
+        $this->givenUsableProviders(['openai']);
+        $this->givenDefaultModelRows([0 => 255]);
+
+        self::assertSame(255, $this->service->resolveUsableModelId(9, 'CHAT', 1));
     }
 
     /**

@@ -471,9 +471,7 @@ final readonly class ModelConfigService
      * repointed BCONFIG.
      *
      * Returns the id unchanged when it can still serve, otherwise the capability
-     * default. Ids with no BMODELS row are passed through untouched: the test
-     * catalog binds negative placeholder ids, and dropping those would rewrite
-     * behaviour that has nothing to do with retirement.
+     * default.
      */
     public function resolveUsableModelId(?int $modelId, string $capability, ?int $userId = null): ?int
     {
@@ -509,15 +507,20 @@ final readonly class ModelConfigService
      * does while holding nothing but the embedding model — so a provider-level
      * answer would happily route chat at a model nobody downloaded.
      *
-     * Unknown models — the negative placeholder BIDs of the test catalog, or a
-     * binding left behind by a catalog reshuffle — count as usable so this
-     * check never becomes the reason a configured default is dropped.
+     * A binding with no BMODELS row at all is judged by its sign. Negative ids
+     * are the catalog's placeholder convention ("let the provider registry
+     * decide") and must keep working. A missing POSITIVE id is a model that was
+     * deleted or never seeded, and routing it is worse than it looks: the
+     * caller ends up with a model id but no provider and no model name, so the
+     * registry answers from its own default and the user silently gets a
+     * different model than the one configured. Treating it as unusable turns
+     * that into a deliberate, logged fallback.
      */
     private function isModelProviderUsable(int $modelId): bool
     {
         $model = $this->modelRepository->find($modelId);
         if (!$model) {
-            return true;
+            return $modelId < 0;
         }
 
         return $this->isModelUsable($model);
