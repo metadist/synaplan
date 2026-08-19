@@ -5,7 +5,7 @@
     >
       <!-- Loading/Retry indicator -->
       <div
-        v-if="isRetrying"
+        v-if="isRetrying || (!hasFailed && !videoSrc)"
         class="absolute inset-0 flex items-center justify-center bg-black/50 z-10"
       >
         <div class="text-white text-sm flex items-center gap-2">
@@ -24,11 +24,44 @@
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          {{ $t('common.loading') }}...
+          {{ $t('common.loading') }}
         </div>
       </div>
 
+      <!-- Error state: all retries exhausted (404, expired credential, codec) -->
+      <div
+        v-if="hasFailed"
+        class="w-full h-full flex flex-col items-center justify-center gap-2 p-4 text-center"
+        data-testid="video-load-error"
+      >
+        <svg
+          class="w-8 h-8 text-red-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01M4.93 19h14.14a2 2 0 001.74-3l-7.07-12.25a2 2 0 00-3.48 0L3.19 16a2 2 0 001.74 3z"
+          />
+        </svg>
+        <p class="text-sm font-medium txt-primary">{{ $t('chat.videoUnavailable') }}</p>
+        <p class="text-xs txt-secondary">{{ $t('chat.videoUnavailableDescription') }}</p>
+        <button
+          type="button"
+          class="btn-secondary text-xs px-3 py-1"
+          data-testid="btn-video-retry"
+          @click="retryManually"
+        >
+          {{ $t('common.retry') }}
+        </button>
+      </div>
+
       <video
+        v-else-if="videoSrc"
         ref="videoRef"
         :src="videoSrc"
         :poster="posterSrc"
@@ -38,12 +71,15 @@
         @click="togglePlay"
         @error="handleVideoError"
         @loadedmetadata="handleLoadSuccess"
+        @timeupdate="updateProgress"
+        @ended="onEnded"
       >
         {{ $t('commands.videoNotSupported') }}
       </video>
 
       <!-- Custom Controls -->
       <div
+        v-if="!hasFailed && videoSrc"
         class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <div class="flex items-center gap-3">
@@ -125,8 +161,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { authenticatedMediaSrc } from '@/services/api/mediaAuth'
+import { ref, computed, nextTick } from 'vue'
+import { useMediaSrc } from '@/services/api/mediaAuth'
 
 interface Props {
   url: string
@@ -134,6 +170,12 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+// No-op on web; on native this resolves the URL against the configured server
+// and appends a read-only media token (falling back to `?token=` only on
+// servers that predate that endpoint) because <video> can't send auth headers.
+// `reloadMedia()` mints a fresh credential for the retry path.
+const { mediaSrc, reloadMedia } = useMediaSrc()
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const isPlaying = ref(false)
@@ -147,46 +189,49 @@ const retryCount = ref(0)
 const maxRetries = 3
 const retryDelays = [1000, 2000, 3000] // Increasing delays: 1s, 2s, 3s
 const isRetrying = ref(false)
-const cacheBuster = ref(0)
+const hasFailed = ref(false)
 
-// Add cache buster to URL on retries to bypass browser cache.
-// authenticatedMediaSrc is a no-op on web; on native it appends the Bearer
-// token as `?token=` because the <video> element can't send auth headers.
-const videoSrc = computed(() => {
-  const src = authenticatedMediaSrc(props.url)
-  if (cacheBuster.value === 0) {
-    return src
-  }
-  const separator = src.includes('?') ? '&' : '?'
-  return `${src}${separator}_retry=${cacheBuster.value}`
-})
+const videoSrc = computed(() => mediaSrc(props.url))
+const posterSrc = computed(() => (props.poster ? mediaSrc(props.poster) : undefined))
 
-const posterSrc = computed(() => (props.poster ? authenticatedMediaSrc(props.poster) : undefined))
+// The <video> element reports a rejected credential and a missing file the
+// same way, so every retry mints a fresh token as well as busting the cache.
+const reloadSource = async () => {
+  await reloadMedia()
+  await nextTick()
+  videoRef.value?.load()
+}
 
 const handleVideoError = () => {
-  if (retryCount.value < maxRetries) {
-    isRetrying.value = true
-    const delay = retryDelays[retryCount.value]
-    console.log(
-      `Video load failed, retrying in ${delay}ms (attempt ${retryCount.value + 1}/${maxRetries})`
-    )
-
-    setTimeout(() => {
-      retryCount.value++
-      cacheBuster.value = Date.now()
-      // Force video to reload
-      if (videoRef.value) {
-        videoRef.value.load()
-      }
-    }, delay)
-  } else {
+  if (retryCount.value >= maxRetries) {
     isRetrying.value = false
-    console.error('Video failed to load after all retries')
+    hasFailed.value = true
+    console.error('Video failed to load after all retries:', props.url)
+    return
   }
+
+  isRetrying.value = true
+  const delay = retryDelays[retryCount.value]
+  console.warn(
+    `Video load failed, retrying in ${delay}ms (attempt ${retryCount.value + 1}/${maxRetries})`
+  )
+
+  setTimeout(() => {
+    retryCount.value++
+    void reloadSource()
+  }, delay)
+}
+
+const retryManually = async () => {
+  retryCount.value = 0
+  hasFailed.value = false
+  isRetrying.value = true
+  await reloadSource()
 }
 
 const handleLoadSuccess = () => {
   isRetrying.value = false
+  hasFailed.value = false
   updateDuration()
 }
 
@@ -247,18 +292,7 @@ const seek = (e: MouseEvent) => {
   }
 }
 
-onMounted(() => {
-  if (videoRef.value) {
-    videoRef.value.addEventListener('timeupdate', updateProgress)
-    videoRef.value.addEventListener('ended', () => {
-      isPlaying.value = false
-    })
-  }
-})
-
-onUnmounted(() => {
-  if (videoRef.value) {
-    videoRef.value.removeEventListener('timeupdate', updateProgress)
-  }
-})
+const onEnded = () => {
+  isPlaying.value = false
+}
 </script>

@@ -3,6 +3,7 @@
     <!-- Image: click → lightbox, hover → download -->
     <div v-if="kind === 'image'" class="relative inline-block group">
       <img
+        v-if="mediaSrc"
         :src="mediaSrc"
         :alt="$t('taskPlan.kind.image')"
         class="rounded-lg max-h-72 w-auto cursor-zoom-in"
@@ -23,11 +24,11 @@
 
     <!-- Video / audio players with a download affordance -->
     <template v-else-if="kind === 'video'">
-      <video :src="mediaSrc" controls class="rounded-lg max-h-72 w-auto" />
+      <video v-if="mediaSrc" :src="mediaSrc" controls class="rounded-lg max-h-72 w-auto" />
       <DownloadLink @download="download" />
     </template>
     <template v-else-if="kind === 'audio'">
-      <audio :src="mediaSrc" controls class="w-full" />
+      <audio v-if="mediaSrc" :src="mediaSrc" controls class="w-full" />
       <DownloadLink @download="download" />
     </template>
 
@@ -69,6 +70,7 @@
           <Icon icon="mdi:close" class="w-7 h-7" />
         </button>
         <img
+          v-if="mediaSrc"
           :src="mediaSrc"
           :alt="$t('taskPlan.kind.image')"
           class="max-w-full max-h-full object-contain z-10"
@@ -83,7 +85,7 @@
 import { computed, defineComponent, h, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
-import { authenticatedMediaSrc, downloadMediaUrl } from '@/services/api/mediaAuth'
+import { downloadMediaUrl, resolveMediaUrl, useMediaSrc } from '@/services/api/mediaAuth'
 
 /**
  * Media body of a completed task card (#1229): image with lightbox +
@@ -100,9 +102,11 @@ const props = defineProps<{
 const { t } = useI18n()
 const lightboxOpen = ref(false)
 
-// No-op on web; on native it appends the Bearer token as `?token=` because
-// media elements can't send auth headers (MOBILE-APP SEAM, see mediaAuth.ts).
-const mediaSrc = computed(() => authenticatedMediaSrc(props.url))
+// No-op on web; on native it resolves the URL against the configured server
+// and appends a read-only media token because media elements can't send
+// auth headers (MOBILE-APP SEAM, see mediaAuth.ts).
+const { mediaSrc: buildMediaSrc } = useMediaSrc()
+const mediaSrc = computed(() => buildMediaSrc(props.url))
 
 // Small inline helper so video/audio share one download affordance without a
 // third component file.
@@ -136,7 +140,7 @@ const downloadFilename = (): string => {
 // anchor on web or Filesystem + Share in the native shell.
 const download = async () => {
   try {
-    await downloadMediaUrl(props.url, downloadFilename())
+    await downloadMediaUrl(resolveMediaUrl(props.url), downloadFilename())
   } catch (error) {
     console.error('Failed to download task media:', error)
   }
