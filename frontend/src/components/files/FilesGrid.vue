@@ -76,7 +76,7 @@
         >
           <img
             v-if="kindOf(file) === 'image'"
-            :src="downloadUrl(file.id)"
+            :src="thumbnailUrl(file.id)"
             :alt="file.display_name || file.filename"
             class="w-full h-full object-cover transition-transform group-hover:scale-105"
             loading="lazy"
@@ -259,6 +259,7 @@ import MessageAudio from '@/components/MessageAudio.vue'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import filesService, { type FileItem, type FileOriginKind } from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
+import { authenticatedMediaSrc } from '@/services/api/mediaAuth'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { useChatsStore } from '@/stores/chats'
@@ -380,6 +381,11 @@ const kindIcon = (file: FileItem): string => {
 }
 
 const downloadUrl = (id: number): string => `${getApiBaseUrl()}/api/v1/files/${id}/download`
+
+// For the bare <img> thumbnail only: no-op on web, on native it appends the
+// Bearer token as `?token=` because <img> can't send auth headers.
+// MessageVideo/MessageAudio receive the raw URL and wrap it themselves.
+const thumbnailUrl = (id: number): string => authenticatedMediaSrc(downloadUrl(id))
 
 const download = async (file: FileItem) => {
   try {

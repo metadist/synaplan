@@ -187,6 +187,7 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useAudioPlayback } from '@/composables/useAudioPlayback'
 import { useConfigStore } from '@/stores/config'
+import { authenticatedMediaSrc, downloadMediaUrl } from '@/services/api/mediaAuth'
 
 interface Props {
   url: string
@@ -225,12 +226,15 @@ const isRetrying = ref(false)
 const hasFailed = ref(false)
 const cacheBuster = ref(0)
 
+// authenticatedMediaSrc is a no-op on web; on native it appends the Bearer
+// token as `?token=` because the <audio> element can't send auth headers.
 const audioSrc = computed(() => {
+  const src = authenticatedMediaSrc(props.url)
   if (cacheBuster.value === 0) {
-    return props.url
+    return src
   }
-  const separator = props.url.includes('?') ? '&' : '?'
-  return `${props.url}${separator}_retry=${cacheBuster.value}`
+  const separator = src.includes('?') ? '&' : '?'
+  return `${src}${separator}_retry=${cacheBuster.value}`
 })
 
 const fileName = computed(() => {
@@ -249,31 +253,15 @@ const canDownload = computed(() => {
 
 // Internal audio is served from authenticated endpoints, so a plain
 // `<a href>` navigates the current tab to the file (looks like a "redirect")
-// instead of downloading. Fetch the file as a blob and trigger a real
-// download, mirroring `MessageImage.downloadImage` (issue #1071).
+// instead of downloading. downloadMediaUrl fetches an authenticated blob
+// (cookie on web, Bearer on native) and saves it via the platform-appropriate
+// transport, mirroring `MessageImage.downloadImage` (issue #1071).
 const downloadAudio = async () => {
-  let tempUrl: string | null = null
   try {
     const fullUrl = props.url.startsWith('/') ? `${config.appBaseUrl}${props.url}` : props.url
-    const response = await fetch(fullUrl, { method: 'GET', credentials: 'include' })
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-    const blob = await response.blob()
-    tempUrl = URL.createObjectURL(blob)
-
-    const link = document.createElement('a')
-    link.href = tempUrl
-    link.download = fileName.value
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    await downloadMediaUrl(fullUrl, fileName.value)
   } catch (error) {
     console.error('Failed to download audio:', error)
-  } finally {
-    if (tempUrl) {
-      URL.revokeObjectURL(tempUrl)
-    }
   }
 }
 
