@@ -1771,7 +1771,32 @@
     },
     "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
     "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",
-    "continueButton": "Yanıtı sürdür"
+    "continueButton": "Yanıtı sürdür",
+    "jsonViewer": {
+      "title": "Sonuç",
+      "itemCount": "{count} öğe",
+      "chats": "{count} sohbet",
+      "items": "{count} öğe",
+      "results": "{count} sonuç",
+      "records": "{count} kayıt",
+      "messages": "{count} mesaj",
+      "files": "{count} dosya",
+      "documents": "{count} belge",
+      "users": "{count} kullanıcı",
+      "entries": "{count} girdi",
+      "data": "{count} öğe",
+      "empty": "Gösterilecek bir şey yok",
+      "showJson": "JSON'u göster",
+      "hideJson": "JSON'u gizle",
+      "showMore": "{count} tane daha göster",
+      "showLess": "Daha az göster",
+      "shownOf": "{total} kaydın {shown} tanesi gösteriliyor",
+      "truncatedHint": "Sonuç çok uzun olduğu için kesildi — son kayıt eksik olabilir.",
+      "messagesCount": "{count} mesaj",
+      "idLabel": "ID {id}",
+      "expand": "Genişlet",
+      "collapse": "Daralt"
+    }
   },
   "paywall": {
     "title": {

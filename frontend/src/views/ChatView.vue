@@ -1573,7 +1573,9 @@ function renderStreamingContent(content: string, msgId: string): void {
   parsed.parts.forEach((part) => {
     if (part.type === 'text') {
       desired.push({ type: 'text', content: part.content })
-    } else if (part.type === 'code' || part.type === 'json') {
+    } else if (part.type === 'json') {
+      desired.push({ type: 'json', content: part.content, language: part.language ?? 'json' })
+    } else if (part.type === 'code') {
       desired.push({ type: 'code', content: part.content, language: part.language })
     } else if (part.type === 'links' && part.links) {
       desired.push({
@@ -1598,7 +1600,12 @@ function renderStreamingContent(content: string, msgId: string): void {
   // / audio) are pushed by separate SSE events and not part of `desired`;
   // we keep them appended after the structural section.
   const existingStructural = message.parts.filter(
-    (p) => p.type === 'thinking' || p.type === 'text' || p.type === 'code' || p.type === 'links'
+    (p) =>
+      p.type === 'thinking' ||
+      p.type === 'text' ||
+      p.type === 'code' ||
+      p.type === 'json' ||
+      p.type === 'links'
   )
   const existingMedia = extractMediaParts(message.parts)
 
@@ -1624,6 +1631,7 @@ function renderStreamingContent(content: string, msgId: string): void {
           }
           break
         case 'code':
+        case 'json':
           if (have.content !== want.content) have.content = want.content
           if (have.language !== want.language) have.language = want.language
           if (have.filename !== want.filename) have.filename = want.filename
@@ -1659,7 +1667,7 @@ const handleContinueResponse = async (message: Message) => {
   for (const p of message.parts) {
     if (p.type === 'thinking' && p.content) {
       fullContent += `<think>${p.content}</think>\n`
-    } else if (p.type === 'text' && p.content) {
+    } else if ((p.type === 'text' || p.type === 'json') && p.content) {
       fullContent += p.content
     }
   }

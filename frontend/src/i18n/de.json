@@ -1343,7 +1343,32 @@
     },
     "cancelledByUser": "⚠️ Vom Benutzer abgebrochen",
     "truncated": "Diese Antwort wurde abgeschnitten, weil das Modell sein Token-Limit erreicht hat.",
-    "continueButton": "Antwort fortsetzen"
+    "continueButton": "Antwort fortsetzen",
+    "jsonViewer": {
+      "title": "Ergebnis",
+      "itemCount": "{count} Einträge",
+      "chats": "{count} Chats",
+      "items": "{count} Einträge",
+      "results": "{count} Ergebnisse",
+      "records": "{count} Datensätze",
+      "messages": "{count} Nachrichten",
+      "files": "{count} Dateien",
+      "documents": "{count} Dokumente",
+      "users": "{count} Benutzer",
+      "entries": "{count} Einträge",
+      "data": "{count} Einträge",
+      "empty": "Nichts anzuzeigen",
+      "showJson": "JSON anzeigen",
+      "hideJson": "JSON ausblenden",
+      "showMore": "{count} weitere anzeigen",
+      "showLess": "Weniger anzeigen",
+      "shownOf": "{shown} von {total} werden angezeigt",
+      "truncatedHint": "Das Ergebnis war zu lang und wurde abgeschnitten — der letzte Eintrag fehlt möglicherweise.",
+      "messagesCount": "{count} Nachrichten",
+      "idLabel": "ID {id}",
+      "expand": "Aufklappen",
+      "collapse": "Zuklappen"
+    }
   },
   "plugins": {
     "title": "Plugins",

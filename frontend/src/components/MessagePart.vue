@@ -11,6 +11,7 @@ import MessageImage from './MessageImage.vue'
 import MessageVideo from './MessageVideo.vue'
 import MessageAudio from './MessageAudio.vue'
 import MessageCode from './MessageCode.vue'
+import MessageJson from './MessageJson.vue'
 import MessageLinks from './MessageLinks.vue'
 import MessageDocs from './MessageDocs.vue'
 import MessageScreenshot from './MessageScreenshot.vue'
@@ -40,6 +41,8 @@ const componentType = computed(() => {
       return MessageAudio
     case 'code':
       return MessageCode
+    case 'json':
+      return MessageJson
     case 'links':
       return MessageLinks
     case 'docs':
@@ -82,6 +85,8 @@ const componentProps = computed(() => {
         filename: props.part.filename,
         isStreaming: props.isStreaming,
       }
+    case 'json':
+      return { content: props.part.content || '' }
     case 'links':
       return { items: props.part.items || [] }
     case 'docs':

@@ -1771,7 +1771,32 @@
     },
     "cancelledByUser": "⚠️ Cancelado por el usuario",
     "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
-    "continueButton": "Continuar respuesta"
+    "continueButton": "Continuar respuesta",
+    "jsonViewer": {
+      "title": "Resultado",
+      "itemCount": "{count} elementos",
+      "chats": "{count} chats",
+      "items": "{count} elementos",
+      "results": "{count} resultados",
+      "records": "{count} registros",
+      "messages": "{count} mensajes",
+      "files": "{count} archivos",
+      "documents": "{count} documentos",
+      "users": "{count} usuarios",
+      "entries": "{count} entradas",
+      "data": "{count} elementos",
+      "empty": "Nada que mostrar",
+      "showJson": "Mostrar JSON",
+      "hideJson": "Ocultar JSON",
+      "showMore": "Mostrar {count} más",
+      "showLess": "Mostrar menos",
+      "shownOf": "Mostrando {shown} de {total}",
+      "truncatedHint": "El resultado era demasiado largo y se cortó — puede faltar la última entrada.",
+      "messagesCount": "{count} mensajes",
+      "idLabel": "ID {id}",
+      "expand": "Expandir",
+      "collapse": "Contraer"
+    }
   },
   "paywall": {
     "title": {

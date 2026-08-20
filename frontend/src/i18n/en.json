@@ -4070,7 +4070,32 @@
     },
     "cancelledByUser": "⚠️ Cancelled by user",
     "truncated": "This response was cut short because the model reached its token limit.",
-    "continueButton": "Continue response"
+    "continueButton": "Continue response",
+    "jsonViewer": {
+      "title": "Result",
+      "itemCount": "{count} items",
+      "chats": "{count} chats",
+      "items": "{count} items",
+      "results": "{count} results",
+      "records": "{count} records",
+      "messages": "{count} messages",
+      "files": "{count} files",
+      "documents": "{count} documents",
+      "users": "{count} users",
+      "entries": "{count} entries",
+      "data": "{count} items",
+      "empty": "Nothing to show",
+      "showJson": "Show JSON",
+      "hideJson": "Hide JSON",
+      "showMore": "Show {count} more",
+      "showLess": "Show less",
+      "shownOf": "Showing {shown} of {total}",
+      "truncatedHint": "The result was too long and was cut off — the last entry may be missing.",
+      "messagesCount": "{count} messages",
+      "idLabel": "ID {id}",
+      "expand": "Expand",
+      "collapse": "Collapse"
+    }
   },
   "aiProvider": {
     "error": {
