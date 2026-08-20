@@ -7,6 +7,7 @@ namespace App\Tests\AI\Credential;
 use App\AI\Credential\ProviderDefaultsService;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
+use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -59,6 +60,47 @@ final class ProviderDefaultsServiceTest extends TestCase
                 self::assertGreaterThan(0, $bid, sprintf('%s/%s resolved to an invalid BID', $provider, $capability));
             }
         }
+    }
+
+    /**
+     * Resolving is not enough. "Use this provider" writes these bindings
+     * unattended — the first-run wizard, the admin button and
+     * `app:provider:apply-defaults --auto` on container start all go through
+     * here — so a recommendation pointing at a model that has since been
+     * retired or deactivated would silently bind the install to something that
+     * cannot serve a request. That is not hypothetical: the xAI SOUND2TEXT
+     * recommendation outlived `grok-stt` and had to be removed by hand in
+     * #1514, and nothing would have caught it.
+     */
+    public function testNoRecommendedDefaultPointsAtARetiredOrInactiveModel(): void
+    {
+        $byBid = [];
+        foreach (ModelCatalog::all() as $model) {
+            $byBid[(int) $model['id']] = $model;
+        }
+
+        $problems = [];
+        foreach ([...ProviderKeyStore::SUPPORTED_PROVIDERS, 'ollama'] as $provider) {
+            foreach ($this->service->getRecommendedDefaults($provider) as $capability => $bid) {
+                $reasons = [];
+                if (ModelCatalog::isRetired($bid)) {
+                    $reasons[] = 'retired';
+                }
+                if (0 === (int) ($byBid[$bid]['active'] ?? 0)) {
+                    $reasons[] = 'inactive';
+                }
+                if ([] !== $reasons) {
+                    $problems[] = sprintf('%s/%s → BID %d (%s)', $provider, $capability, $bid, implode(' + ', $reasons));
+                }
+            }
+        }
+
+        self::assertSame([], $problems, sprintf(
+            "Recommended default(s) point at a model that can no longer serve a request:\n  %s\n"
+            ."Repoint them at a live model, or drop the capability from PROVIDER_DEFAULTS so it keeps\n"
+            .'whatever the install had instead of being rebound to a dead model.',
+            implode("\n  ", $problems),
+        ));
     }
 
     public function testAutoApplyNoopsWhenCurrentDefaultIsAvailable(): void
