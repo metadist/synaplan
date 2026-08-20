@@ -35,15 +35,32 @@ final readonly class ProviderDefaultsService
      * @var array<string, array<string, string>>
      */
     private const PROVIDER_DEFAULTS = [
+        // gpt-oss-120b for every text tier, main and fast alike. Groq classes it
+        // as a **Production** model, while `qwen/qwen3.6-27b` — the previous
+        // MAIN pick — is **Preview**, which Groq documents as "should not be
+        // used in production environments as they may be discontinued at short
+        // notice". A recommended default is precisely the binding an operator
+        // does not watch, so it should not sit on a model that can vanish. It is
+        // also the cheaper and (per the catalog's own quality score) stronger
+        // row: $0.15/$0.60 vs $0.60/$3.00 per 1M tokens, quality 10 vs 9.
         'groq' => [
-            'CHAT' => 'groq:qwen/qwen3.6-27b:chat',
-            'TOOLS' => 'groq:qwen/qwen3.6-27b:chat',
-            'ANALYZE' => 'groq:qwen/qwen3.6-27b:chat',
+            'CHAT' => 'groq:openai/gpt-oss-120b:chat',
+            'TOOLS' => 'groq:openai/gpt-oss-120b:chat',
+            'ANALYZE' => 'groq:openai/gpt-oss-120b:chat',
             'SORT' => 'groq:openai/gpt-oss-120b:chat',
             'PLAN' => 'groq:openai/gpt-oss-120b:chat',
             'SUMMARIZE' => 'groq:openai/gpt-oss-120b:chat',
             'MEM' => 'groq:openai/gpt-oss-120b:mem',
+            // The one unavoidable Preview binding: qwen3.6-27b is the only
+            // Groq model that accepts images at all (the gpt-oss rows are
+            // text-only). Leaving PIC2TEXT unbound would be worse — it would
+            // fall through to whatever the install had, which on a Groq-only
+            // setup is nothing.
             'PIC2TEXT' => 'groq:qwen/qwen3.6-27b:pic2text',
+            // whisper-large-v3, not the cheaper -turbo ($0.111 vs $0.04 per
+            // hour): Synaplan ships four UI locales and large-v3 is the more
+            // accurate multilingual transcriber. Turbo stays selectable for
+            // operators who would rather have the cheaper run.
             'SOUND2TEXT' => 'groq:whisper-large-v3:sound2text',
         ],
         'openai' => [

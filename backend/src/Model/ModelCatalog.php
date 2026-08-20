@@ -241,22 +241,29 @@ class ModelCatalog
         ],
 
         // --- 2026-08-19 (Version20260819080000) ---
+        // The chat rows point at gpt-oss-120b rather than qwen3.6-27b even
+        // though the retiring migration repointed live bindings at the latter:
+        // qwen3.6-27b is Preview on Groq ("may be discontinued at short
+        // notice"), and a successor is exactly the pointer that must outlive
+        // the model it replaces.
         9 => [
             'providerId' => 'llama-3.3-70b-versatile',
             'retiredOn' => '2026-08-19',
-            'successor' => 'groq:qwen/qwen3.6-27b:chat',
+            'successor' => 'groq:openai/gpt-oss-120b:chat',
             'reason' => 'Removed from the Groq production catalog.',
         ],
         17 => [
             'providerId' => 'meta-llama/llama-4-scout-17b-16e-instruct',
             'retiredOn' => '2026-08-19',
+            // Stays on the Preview row: Groq has no other model that takes
+            // images, so there is nothing more durable to point at.
             'successor' => 'groq:qwen/qwen3.6-27b:pic2text',
             'reason' => 'Removed from the Groq production catalog.',
         ],
         53 => [
             'providerId' => 'qwen/qwen3-32b',
             'retiredOn' => '2026-08-19',
-            'successor' => 'groq:qwen/qwen3.6-27b:chat',
+            'successor' => 'groq:openai/gpt-oss-120b:chat',
             'reason' => 'Superseded by Qwen 3.6 27B.',
         ],
         236 => [
@@ -719,7 +726,11 @@ class ModelCatalog
                     'model' => 'qwen/qwen3.6-27b',
                     'reasoning_format' => 'hidden',
                 ],
-                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'quantization' => 'TruePoint Numerics'],
+                // groq_tier: Groq's own lifecycle class. "preview" carries an
+                // explicit "may be discontinued at short notice" warning, which
+                // is why this row is selectable but is not a recommended text
+                // default (see ProviderDefaultsService).
+                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'quantization' => 'TruePoint Numerics', 'groq_tier' => 'preview'],
             ],
         ],
         [
@@ -744,6 +755,9 @@ class ModelCatalog
                     'model' => 'qwen/qwen3.6-27b',
                     'max_completion_tokens' => 1024,
                 ],
+                // Preview on Groq, and still the recommended PIC2TEXT default:
+                // it is the only Groq model that accepts image input at all.
+                'meta' => ['groq_tier' => 'preview'],
             ],
         ],
         [
