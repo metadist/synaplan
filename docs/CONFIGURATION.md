@@ -21,6 +21,8 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `FRONTEND_URL` | `http://localhost:5173` | Frontend URL for email links |
 | `REDIS_DSN` | `redis://redis:6379` | **Required.** Cache, sessions, locks, queues, realtime engine ([details](#redis-required)) |
 | `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
+| `REGISTRATION_ENABLED` | `true` | Local email/password self-registration; set `false` on SSO-/OIDC-only instances (#462) |
+| `GUEST_CHAT_ENABLED` | `true` | Anonymous guest trial chat; set `false` on SSO-/OIDC-only instances so unauthenticated visitors go to the login page (#1517) |
 
 ---
 

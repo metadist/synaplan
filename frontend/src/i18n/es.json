@@ -656,6 +656,8 @@
     "aiAgents": "Agentes de IA"
   },
   "guest": {
+    "disabledTitle": "El chat de invitados no está disponible",
+    "disabledDescription": "Esta instancia no ofrece una prueba anónima. Inicia sesión para empezar a chatear.",
     "featureGate": {
       "title": "Esta función requiere una cuenta",
       "subtitle": "Crea una cuenta gratuita para desbloquear todas las funciones",

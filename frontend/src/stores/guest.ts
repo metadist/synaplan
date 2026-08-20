@@ -24,6 +24,8 @@ export const useGuestStore = defineStore('guest', () => {
   const initFailed = ref(false)
   const rateLimited = ref(false)
   const sessionExpired = ref(false)
+  // GUEST_CHAT_ENABLED=false on the backend: the trial does not exist here.
+  const guestChatDisabled = ref(false)
   // Persisted so a dismissed banner stays gone across app restarts / reloads
   // for the same browser profile (cleared only on logout / session reset).
   const bannerDismissed = ref(loadBannerDismissed())
@@ -78,6 +80,21 @@ export const useGuestStore = defineStore('guest', () => {
         initFailed.value = true
         initialized.value = true
         return
+      }
+
+      if (response.status === 403) {
+        const body = await response.json().catch(() => null)
+        if (body?.code === 'GUEST_CHAT_DISABLED') {
+          // Guest chat disabled on this instance (GUEST_CHAT_ENABLED=false):
+          // drop the stored key so future navigations route to login instead
+          // of retrying a trial that no longer exists.
+          clearExpiredStorage()
+          guestChatDisabled.value = true
+          initFailed.value = true
+          initialized.value = true
+          return
+        }
+        throw new Error('Failed to init guest session')
       }
 
       if (!response.ok) throw new Error('Failed to init guest session')
@@ -191,6 +208,7 @@ export const useGuestStore = defineStore('guest', () => {
     initFailed.value = false
     rateLimited.value = false
     sessionExpired.value = false
+    guestChatDisabled.value = false
     bannerDismissed.value = false
     try {
       localStorage.removeItem(GUEST_STORAGE_KEY)
@@ -214,6 +232,7 @@ export const useGuestStore = defineStore('guest', () => {
     remainingMessages,
     isGuestMode,
     shouldShowBanner,
+    guestChatDisabled,
     initSession,
     retryInit,
     ensureChat,

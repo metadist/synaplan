@@ -534,9 +534,39 @@ onMounted(async () => {
   const keycloakProvider = socialProviders.value.find((p) => p.id === 'keycloak')
   if (keycloakProvider?.auto_redirect) {
     oidcAutoRedirect.value = true
-    if (!sessionExpired.value) handleSocialLogin('keycloak')
+    if (!sessionExpired.value) {
+      handleSocialLogin('keycloak')
+    } else if (allowExpiredAutoRedirect()) {
+      // An expired session on an auto-redirect instance goes straight back
+      // to the IdP too: a live SSO session silently re-logs the user in, a
+      // dead one shows the IdP's login. Rate-limited so that a token that
+      // keeps failing app-side (e.g. a misconfigured audience) degrades to
+      // the manual sign-in page below instead of a redirect loop.
+      handleSocialLogin('keycloak')
+    }
   }
 })
+
+/**
+ * One auto-redirect per window for expired sessions; bouncing back here
+ * sooner means app-side token validation is failing while the IdP session
+ * is alive, and redirecting again would loop.
+ */
+const EXPIRED_AUTOREDIRECT_KEY = 'synaplan_expired_autoredirect_at'
+const EXPIRED_AUTOREDIRECT_WINDOW_MS = 30_000
+
+function allowExpiredAutoRedirect(): boolean {
+  try {
+    const last = Number(sessionStorage.getItem(EXPIRED_AUTOREDIRECT_KEY) ?? 0)
+    if (Date.now() - last < EXPIRED_AUTOREDIRECT_WINDOW_MS) return false
+    sessionStorage.setItem(EXPIRED_AUTOREDIRECT_KEY, String(Date.now()))
+    return true
+  } catch {
+    // No sessionStorage (rare) - prefer the safe manual page over a
+    // potential loop.
+    return false
+  }
+}
 
 const handleLogin = async () => {
   clearError()

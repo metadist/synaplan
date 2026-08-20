@@ -16,6 +16,7 @@ use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
@@ -80,6 +81,7 @@ class StreamController extends AbstractController
         private WidgetService $widgetService,
         private WidgetSessionService $widgetSessionService,
         private GuestSessionService $guestSessionService,
+        private GuestChatConfig $guestChatConfig,
         private RateLimitService $rateLimitService,
         private string $uploadDir,
         private UserUploadPathBuilder $userUploadPathBuilder,
@@ -465,6 +467,16 @@ class StreamController extends AbstractController
                 // Guest Mode: Check for guest session parameter (query or POST body)
                 $guestSessionId = $params->get('guestSession');
                 if ($guestSessionId) {
+                    if (!$this->guestChatConfig->isEnabled()) {
+                        // Distinguish "trial disabled" from "session expired" so
+                        // clients do not offer a new-trial/sign-up flow that the
+                        // instance cannot serve (issue #1517).
+                        return $this->json([
+                            'error' => 'Guest chat is disabled on this instance.',
+                            'code' => GuestChatConfig::DISABLED_CODE,
+                        ], Response::HTTP_FORBIDDEN);
+                    }
+
                     $guestSession = $this->guestSessionService->getSession($guestSessionId);
                     if ($guestSession && !$guestSession->isExpired()) {
                         if (!$this->guestSessionService->checkLimit($guestSession)) {

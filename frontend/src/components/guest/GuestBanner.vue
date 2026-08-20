@@ -21,16 +21,18 @@
           {{ $t('guest.banner.remaining', { count: remaining }) }}
         </span>
 
-        <span class="w-px h-3.5 bg-gray-400 dark:bg-gray-500" />
+        <template v-if="config.auth.registrationEnabled">
+          <span class="w-px h-3.5 bg-gray-400 dark:bg-gray-500" />
 
-        <router-link
-          to="/register"
-          data-testid="guest-banner-signup"
-          class="group relative text-xs font-semibold text-white whitespace-nowrap px-2.5 py-1 rounded-full bg-brand shadow-sm overflow-hidden transition-shadow duration-300 hover:shadow-md hover:shadow-brand/40 sm:px-3"
-        >
-          <span class="relative z-10">{{ $t('guest.banner.signUp') }}</span>
-          <span class="cta-shimmer" />
-        </router-link>
+          <router-link
+            to="/register"
+            data-testid="guest-banner-signup"
+            class="group relative text-xs font-semibold text-white whitespace-nowrap px-2.5 py-1 rounded-full bg-brand shadow-sm overflow-hidden transition-shadow duration-300 hover:shadow-md hover:shadow-brand/40 sm:px-3"
+          >
+            <span class="relative z-10">{{ $t('guest.banner.signUp') }}</span>
+            <span class="cta-shimmer" />
+          </router-link>
+        </template>
 
         <button
           data-testid="guest-banner-dismiss"
@@ -47,6 +49,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useConfigStore } from '@/stores/config'
+
+const config = useConfigStore()
 
 const props = defineProps<{
   visible: boolean

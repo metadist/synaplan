@@ -19,6 +19,7 @@ use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\GuestChatConfig;
 use App\Service\Infrastructure\RedisService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MarketingNews\MarketingNewsConfig;
@@ -64,6 +65,7 @@ class ConfigController extends AbstractController
         private MarketingNewsConfig $marketingNewsConfig,
         private UsageTaximeterConfig $usageTaximeterConfig,
         private RegistrationConfig $registrationConfig,
+        private GuestChatConfig $guestChatConfig,
         private SavedTaskConfig $savedTaskConfig,
         private ChatReadinessService $chatReadiness,
         private AiProviderDisclosure $aiProviderDisclosure,
@@ -136,6 +138,7 @@ class ConfigController extends AbstractController
                     description: 'Authentication surface flags. Lets the frontend hide sign-up affordances when the operator runs an SSO-/OIDC-only instance.',
                     properties: [
                         new OA\Property(property: 'registrationEnabled', type: 'boolean', example: true, description: 'When false, local email/password self-registration is disabled (set REGISTRATION_ENABLED=false, e.g. for OIDC-only deployments). The /register endpoint is also refused server-side.'),
+                        new OA\Property(property: 'guestChatEnabled', type: 'boolean', example: true, description: 'When false, the anonymous guest trial chat is disabled (set GUEST_CHAT_ENABLED=false, e.g. for OIDC-only deployments): the frontend sends unauthenticated visitors to /login and every /api/v1/guest endpoint is refused server-side.'),
                     ]
                 ),
                 new OA\Property(
@@ -556,6 +559,10 @@ class ConfigController extends AbstractController
                 // Default ON; operators set REGISTRATION_ENABLED=false for
                 // SSO-/OIDC-only instances so no local sign-up is offered.
                 'registrationEnabled' => $this->registrationConfig->isEnabled(),
+                // Default ON; operators set GUEST_CHAT_ENABLED=false so
+                // unauthenticated visitors are sent to /login instead of the
+                // anonymous guest trial (issue #1517).
+                'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
             ],
             'recaptcha' => $recaptchaConfig,
             'branding' => $this->brandingService->getBranding(),

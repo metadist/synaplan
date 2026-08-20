@@ -122,9 +122,35 @@ parameters:
     env(IAP_STORE_PRICE_BUSINESS): '129.99'
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
+    env(WHATSAPP_ENABLED): 'false'
     env(CLOUDFLARE_ACCOUNT_ID): ''
     env(CLOUDFLARE_API_TOKEN): ''
     env(EMBEDDING_FALLBACK_PROVIDER): ''
+
+    # Container-safe defaults for the remaining strictly-bound env vars.
+    # Compose passes these through .env/env_file, but bare images (Kubernetes,
+    # plain docker run) ship no .env, so a missing var used to crash service
+    # instantiation (e.g. /api/v1/messages/stream 500ing on WHATSAPP_ENABLED).
+    # Values mirror backend/.env.example.
+    env(TIKA_TIMEOUT_MS): '30000'
+    env(TIKA_RETRIES): '2'
+    env(TIKA_RETRY_BACKOFF_MS): '1000'
+    env(TIKA_MIN_LENGTH): '10'
+    env(TIKA_MIN_ENTROPY): '3.0'
+    env(RASTERIZE_DPI): '150'
+    env(RASTERIZE_PAGE_CAP): '10'
+    env(RASTERIZE_TIMEOUT_MS): '30000'
+    env(WHISPER_ENABLED): 'true'
+    env(WHISPER_DEFAULT_MODEL): 'base'
+    env(WHISPER_BINARY): '/usr/local/bin/whisper'
+    env(WHISPER_MODELS_PATH): '%kernel.project_dir%/var/whisper'
+    env(FFMPEG_BINARY): '/usr/bin/ffmpeg'
+    env(BRAVE_SEARCH_ENABLED): 'true'
+    env(BRAVE_SEARCH_API_URL): 'https://api.search.brave.com/res/v1'
+    env(BRAVE_SEARCH_COUNT): '10'
+    env(BRAVE_SEARCH_COUNTRY): 'us'
+    env(BRAVE_SEARCH_SEARCH_LANG): 'en'
+    env(STRIPE_AUTOMATIC_TAX): 'false'
 
     # Piper TTS Service default (localhost for native; Docker Compose overrides via env)
     env(SYNAPLAN_TTS_URL): ''
