@@ -93,6 +93,15 @@ Provider billing-mechanics cheat-sheet (verified 2026-07-13):
 
 Catalog now set to DeepInfra rates. Note K2.7 was previously $0.95/$4.00 (ABOVE DeepInfra) → we had been overcharging customers; K2.5/K2.6 were below → we had been losing money.
 
+### Kimi K3 (BIDs 328/329) — snapshot 2026-08-20
+
+Same DeepInfra pin. HF partners serving K3 on 08-20: DeepInfra, Together, Fireworks, Featherless, Baseten.
+
+| Provider | K3 | Notes |
+| -------- | -- | ----- |
+| **DeepInfra (PINNED)** | $2.85 / $14.25 | cache-read $0.285, native MXFP4 |
+| Together / Fireworks / Novita | $3.00 / $15.00 | Moonshot first-party list price |
+
 ## Discontinuation detection — `app:models:check-availability`
 
 Providers retire models without telling us, and until now we found out when a user hit a provider error. This command finds it first.

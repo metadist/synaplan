@@ -1352,7 +1352,7 @@ final readonly class SystemConfigService
             ],
             'HUGGINGFACE_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true, 'description' => 'HuggingFace API token — routes the Kimi K2 models through HF Inference',
+                'sensitive' => true, 'description' => 'HuggingFace API token — routes the Kimi models through HF Inference',
                 'default' => '', 'source' => 'database',
             ],
             'GOOGLE_VERTEX_ACCESS_TOKEN' => [

@@ -2578,6 +2578,56 @@ class ModelCatalog
                 'meta' => ['supports_images' => true, 'routed_via' => 'huggingface', 'forced_thinking' => true],
             ],
         ],
+        [
+            // Snapshot 2026-08-20 (https://huggingface.co/moonshotai/Kimi-K3).
+            // Text/image in, text out only — no text2pic variant is possible.
+            // BIDs 326/327 were taken by Grok 4.6 on the same day.
+            'id' => 328,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K3',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K3:deepinfra',
+            'priceIn' => 2.85,
+            'inUnit' => 'per1M',
+            'priceOut' => 14.25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                // Pinned to DeepInfra via HF router (:deepinfra suffix) for a
+                // deterministic billed price (see PRICING_MAINTENANCE.md).
+                // DeepInfra 2026-08-20: $2.85/$14.25 per 1M, cache-read $0.285;
+                // serves the native MXFP4 weights.
+                'description' => 'Kimi K3 via HuggingFace - 2.8T parameter MoE (104B active) flagship with native vision, always-on thinking, and a 1M-token context window. Pinned to DeepInfra.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'moonshotai/Kimi-K3:deepinfra'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'meta' => ['context_window' => '1048576', 'max_output' => '32768', 'routed_via' => 'huggingface', 'forced_thinking' => true],
+            ],
+        ],
+        [
+            'id' => 329,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K3 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K3:deepinfra',
+            'priceIn' => 2.85,
+            'inUnit' => 'per1M',
+            'priceOut' => 14.25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Kimi K3 via HuggingFace for image analysis and vision tasks. Native multimodal (MoonViT-V2) with strong document and chart reading. Pinned to DeepInfra.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'moonshotai/Kimi-K3:deepinfra'],
+                'meta' => ['supports_images' => true, 'routed_via' => 'huggingface', 'forced_thinking' => true],
+            ],
+        ],
         // ==================== THEHIVE MODELS ====================
         [
             'id' => 130,

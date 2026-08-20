@@ -251,6 +251,34 @@ class HuggingFaceProviderTest extends TestCase
         $this->assertSame('moonshotai/Kimi-K2.7-Code', $captured['model']);
     }
 
+    public function testKimiK3ForcedSamplingParamsOverrideCallerValuesAndReasoningEffortIsForwarded(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return new MockResponse(json_encode([
+                'choices' => [['message' => ['content' => 'ok']]],
+                'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+            ]), ['response_headers' => ['content-type' => 'application/json']]);
+        });
+
+        $this->makeProvider(httpClient: $client)->chat(
+            [['role' => 'user', 'content' => 'hi']],
+            [
+                'model' => 'moonshotai/Kimi-K3:deepinfra',
+                'temperature' => 0.0,
+                'top_p' => 0.1,
+                'reasoning_effort' => 'low',
+            ],
+        );
+
+        $this->assertSame(1.0, $captured['temperature'], 'K3 must enforce temperature=1.0 regardless of caller input');
+        $this->assertSame(0.95, $captured['top_p'], 'K3 must enforce top_p=0.95 regardless of caller input');
+        $this->assertSame('low', $captured['reasoning_effort'], 'reasoning_effort must be forwarded to the router');
+        $this->assertSame('moonshotai/Kimi-K3:deepinfra', $captured['model']);
+    }
+
     public function testChatWrapsHttpErrorsAsProviderException(): void
     {
         $client = new MockHttpClient(static fn () => new MockResponse('err', ['http_code' => 500]));
@@ -317,6 +345,46 @@ class HuggingFaceProviderTest extends TestCase
         $this->assertNotNull($finish, 'A finish signal must be emitted at the end of the stream');
         $this->assertSame('stop', $finish['finish_reason']);
         $this->assertSame(3, $result['usage']['total_tokens']);
+    }
+
+    /**
+     * Always-thinking models (Kimi K3) stream `reasoning_content` deltas before
+     * the answer. They must surface as typed reasoning chunks per the
+     * ChatProviderInterface contract — dropping them leaves the caller staring
+     * at a silent stream for the whole thinking phase.
+     */
+    public function testChatStreamEmitsReasoningChunksBeforeContent(): void
+    {
+        $chunks = [
+            "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"thinking...\"}}]}\n"
+                ."data: {\"choices\":[{\"delta\":{\"content\":\"42\"},\"finish_reason\":null}]}\n"
+                ."data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":1,\"total_tokens\":3}}\n"
+                .'data: [DONE]'."\n",
+        ];
+
+        $client = new MockHttpClient(static fn () => new MockResponse($chunks, [
+            'response_headers' => ['content-type' => 'text/event-stream'],
+        ]));
+
+        $received = [];
+        $callback = static function (mixed $chunk) use (&$received): void {
+            if (is_array($chunk) && 'finish' === ($chunk['type'] ?? null)) {
+                return;
+            }
+            $received[] = $chunk;
+        };
+
+        $this->makeProvider(httpClient: $client)->chatStream(
+            [['role' => 'user', 'content' => 'hi']],
+            $callback,
+            ['model' => 'moonshotai/Kimi-K3:deepinfra'],
+        );
+
+        $this->assertSame(
+            [['type' => 'reasoning', 'content' => 'thinking...'], '42'],
+            $received,
+            'Reasoning deltas must arrive as typed chunks, content deltas as plain strings',
+        );
     }
 
     /**
