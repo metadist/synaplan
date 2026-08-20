@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask\Execution;
 
 use App\Entity\Message;
+use App\Service\Exception\StreamCancelledException;
 use App\Service\Multitask\Execution\DagExecutor;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -20,6 +21,7 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Plan\TaskPlan;
 use Doctrine\Common\Collections\ArrayCollection;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -271,6 +273,34 @@ final class DagExecutorTest extends TestCase
         self::assertSame('failed', $result['node_statuses']['n1']);
         // Best-effort content rather than a crash.
         self::assertNotSame('', $result['content']);
+    }
+
+    /**
+     * A user cancel is the ONE throw that must not be isolated: ending the turn
+     * is the point. Swallowing it into a failed node dropped the `cancelled`
+     * marker, and the caller's failure path then wrote a second assistant card
+     * with raw English text for a single Stop click (#1501).
+     */
+    #[DataProvider('executionModes')]
+    public function testUserCancellationEndsTheWholeTurnInsteadOfFailingOneNode(bool $parallel): void
+    {
+        $runner = $this->runner(function (): NodeResult {
+            throw new StreamCancelledException('Stream cancelled by user');
+        });
+
+        $this->expectException(StreamCancelledException::class);
+
+        $this->executor($runner, parallel: $parallel)
+            ->execute(TaskPlan::singleChatPlan('en'), $this->context());
+    }
+
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function executionModes(): iterable
+    {
+        yield 'sequential' => [false];
+        yield 'parallel' => [true];
     }
 
     public function testProgressCallbackEmitsPerNodeStateUpdates(): void

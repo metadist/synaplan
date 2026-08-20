@@ -99,10 +99,7 @@ final class AdminUpdatesControllerTest extends TestCase
 
     public function testCheckRefreshesAndReturnsTheSamePayloadShape(): void
     {
-        $controller = $this->controller(new MockResponse((string) json_encode([
-            'schema' => 1,
-            'stable' => ['version' => '4.0.13', 'notesUrl' => 'https://example.com/notes'],
-        ])));
+        $controller = $this->controller([$this->manifestResponse('4.0.13')]);
 
         $payload = $this->decode($controller->check()->getContent());
 
@@ -111,6 +108,36 @@ final class AdminUpdatesControllerTest extends TestCase
         self::assertNotNull($payload['lastCheckedAt']);
         self::assertSame(UpdatePlatformGuide::GUIDE_URL_SELFHOST, $payload['guideUrl']);
         self::assertSame('4.0.13', $this->rows[UpdateConfig::KEY_LATEST_VERSION]);
+    }
+
+    /**
+     * "Check now" is the button an operator presses BECAUSE the stored version
+     * looks wrong, so it must re-download the manifest. Answering from the
+     * six-hour cache would keep showing the very number being corrected.
+     */
+    public function testCheckReDownloadsTheManifestInsteadOfServingTheCachedOne(): void
+    {
+        $controller = $this->controller([
+            $this->manifestResponse('4.1.1'),
+            $this->manifestResponse('4.2.2'),
+        ]);
+
+        $controller->check();
+        $payload = $this->decode($controller->check()->getContent());
+
+        self::assertSame('4.2.2', $payload['latestVersion']);
+        self::assertSame('4.2.2', $this->rows[UpdateConfig::KEY_LATEST_VERSION]);
+    }
+
+    private function manifestResponse(string $version): MockResponse
+    {
+        return new MockResponse((string) json_encode([
+            'schema' => 1,
+            'stable' => [
+                'version' => $version,
+                'notesUrl' => 'https://github.com/metadist/synaplan/releases/tag/v'.$version,
+            ],
+        ]));
     }
 
     public function testDismissStoresTheAcknowledgedVersion(): void
@@ -150,9 +177,13 @@ final class AdminUpdatesControllerTest extends TestCase
         return $decoded;
     }
 
-    private function controller(?MockResponse $response = null, string $platform = 'selfhost'): AdminUpdatesController
+    /**
+     * @param list<MockResponse> $responses answered in order, so a test can
+     *                                      assert what a SECOND check sees
+     */
+    private function controller(array $responses = [], string $platform = 'selfhost'): AdminUpdatesController
     {
-        $httpClient = null === $response ? new MockHttpClient() : new MockHttpClient($response);
+        $httpClient = [] === $responses ? new MockHttpClient() : new MockHttpClient($responses);
 
         $controller = new AdminUpdatesController(
             new UpdateStatusService(

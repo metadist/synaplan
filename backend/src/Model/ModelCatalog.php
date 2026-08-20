@@ -3162,8 +3162,11 @@ class ModelCatalog
             'service' => 'xAI',
             'name' => 'Grok TTS',
             'tag' => 'text2sound',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: xAI no longer serves this model (GET /v1/models/grok-tts
+            // answers 404). Deactivated, never deleted — BMESSAGES rows
+            // reference the BID (#1514, see Version20260820120000).
+            'selectable' => 0,
+            'active' => 0,
             // POST /v1/tts takes no `model` field — the endpoint selects the
             // model. This is xAI's documentation name, kept so the row has a
             // stable provider key.
@@ -3198,8 +3201,11 @@ class ModelCatalog
             'service' => 'xAI',
             'name' => 'Grok STT',
             'tag' => 'sound2text',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: xAI no longer serves this model (GET /v1/models/grok-stt
+            // answers 404). Deactivated, never deleted — BMESSAGES rows
+            // reference the BID (#1514, see Version20260820120000).
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'grok-stt',
             // REST transcription is $0.10 per hour of audio. (The streaming
             // WebSocket variant costs $0.20/hour and is not implemented, so no

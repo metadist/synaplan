@@ -7,6 +7,7 @@ namespace App\Service\Multitask\Execution\Runner;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\Entity\Prompt;
+use App\Service\Exception\StreamCancelledException;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\NodeContext;
@@ -119,6 +120,11 @@ final readonly class ChatRunner implements TaskRunner
                     'temperature' => 0.3,
                 ], static fn ($v) => null !== $v),
             );
+        } catch (StreamCancelledException $e) {
+            // Not a model failure: the user pressed Stop. Reporting it as a
+            // failed node would drop the `cancelled` marker and make the turn
+            // persist a second, untranslated cancellation card (#1501).
+            throw $e;
         } catch (\Throwable $e) {
             $this->logger->warning('ChatRunner: model call failed', [
                 'capability' => $node->capability->value,
