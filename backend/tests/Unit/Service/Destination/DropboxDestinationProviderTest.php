@@ -13,6 +13,7 @@ use App\Service\Dropbox\DropboxClient;
 use App\Service\OAuth\ConnectionAccessTokenProvider;
 use App\Service\OAuth\OAuthReauthRequiredException;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -79,11 +80,22 @@ final class DropboxDestinationProviderTest extends TestCase
 
     public function testInsufficientSpaceMapsToQuotaExceeded(): void
     {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Dropbox save failed',
+            self::callback(static function (array $context): bool {
+                return 'quota_exceeded' === ($context['code'] ?? null)
+                    && 'a/b.txt' === ($context['file'] ?? null)
+                    && 'Synaplan/a-b.txt' === ($context['remote'] ?? null)
+                    && isset($context['error']);
+            }),
+        );
+
         $provider = $this->provider($this->connection(), [
             new MockResponse(json_encode(['error_summary' => 'path/insufficient_space/..']), ['http_code' => 409]),
-        ]);
+        ], logger: $logger);
 
-        $result = $provider->send($this->file('x.txt'), ['connection_id' => 5]);
+        $result = $provider->send($this->file('a/b.txt'), ['connection_id' => 5]);
 
         self::assertFalse($result->ok);
         self::assertSame(DestinationFailureCode::QuotaExceeded, $result->code);
@@ -97,10 +109,21 @@ final class DropboxDestinationProviderTest extends TestCase
         $repo = $this->createMock(ConnectionRepository::class);
         $repo->method('findByIdAndOwner')->willReturn($this->connection());
 
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'Dropbox save failed: token exchange rejected',
+            self::callback(static function (array $context): bool {
+                return DestinationFailureCode::Unauthorized->value === ($context['code'] ?? null)
+                    && 'x.txt' === ($context['file'] ?? null)
+                    && 'Synaplan/x.txt' === ($context['remote'] ?? null)
+                    && isset($context['error']);
+            }),
+        );
+
         $provider = new DropboxDestinationProvider(
             new DropboxClient(new MockHttpClient([]), $tokens, new NullLogger()),
             $repo,
-            new NullLogger(),
+            $logger,
         );
 
         $result = $provider->send($this->file('x.txt'), ['connection_id' => 5]);
@@ -149,8 +172,12 @@ final class DropboxDestinationProviderTest extends TestCase
      * @param list<MockResponse>                                              $responses
      * @param list<array{method: string, url: string, options: array<mixed>}> $captured
      */
-    private function provider(Connection $connection, array $responses, array &$captured = []): DropboxDestinationProvider
-    {
+    private function provider(
+        Connection $connection,
+        array $responses,
+        array &$captured = [],
+        ?LoggerInterface $logger = null,
+    ): DropboxDestinationProvider {
         $factory = function (string $method, string $url, array $options) use (&$captured, &$responses): MockResponse {
             $captured[] = ['method' => $method, 'url' => $url, 'options' => $options];
 
@@ -166,7 +193,7 @@ final class DropboxDestinationProviderTest extends TestCase
         return new DropboxDestinationProvider(
             new DropboxClient(new MockHttpClient($factory), $tokens, new NullLogger(), static function (int $seconds): void {}),
             $repo,
-            new NullLogger(),
+            $logger ?? new NullLogger(),
         );
     }
 }

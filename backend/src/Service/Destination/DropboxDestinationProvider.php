@@ -73,12 +73,17 @@ final readonly class DropboxDestinationProvider implements DestinationProvider
         $overwrite = 'overwrite' === ($config['on_conflict'] ?? 'rename');
         $safeName = str_replace(['/', '\\'], '-', $file->name);
 
+        $remoteName = $folder.'/'.$safeName;
+
         try {
-            $stored = $this->dropbox->upload($connection, $content, '/'.$folder.'/'.$safeName, $overwrite);
+            $stored = $this->dropbox->upload($connection, $content, '/'.$remoteName, $overwrite);
         } catch (OAuthReauthRequiredException|OAuthException $e) {
             $this->logger->warning('Dropbox save failed: token exchange rejected', [
                 'connection_id' => $connection->getId(),
+                'file' => $file->name,
+                'remote' => $remoteName,
                 'error' => $e->getMessage(),
+                'code' => DestinationFailureCode::Unauthorized->value,
             ]);
 
             return DestinationResult::failure(DestinationFailureCode::Unauthorized, [
@@ -89,14 +94,16 @@ final readonly class DropboxDestinationProvider implements DestinationProvider
             // this line the real answer ("Dropbox answered HTTP 409
             // (path/malformed_path)", "Could not reach Dropbox: ...") is lost
             // and an "unreachable" report cannot be diagnosed from prod logs.
+            $code = $this->failureCode($e);
             $this->logger->warning('Dropbox save failed', [
                 'connection_id' => $connection->getId(),
                 'file' => $file->name,
+                'remote' => $remoteName,
                 'error' => $e->getMessage(),
-                'code' => $this->failureCode($e)->value,
+                'code' => $code->value,
             ]);
 
-            return DestinationResult::failure($this->failureCode($e), [
+            return DestinationResult::failure($code, [
                 'target' => $file->name,
                 'connection' => $connection->getName(),
             ]);
