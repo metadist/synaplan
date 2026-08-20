@@ -113,7 +113,12 @@ final readonly class ProviderDefaultsService
             'PLAN' => 'xai:grok-4.5:chat',
             'SUMMARIZE' => 'xai:grok-4.5:chat',
             'PIC2TEXT' => 'xai:grok-4.5:pic2text',
-            'SOUND2TEXT' => 'xai:grok-stt:sound2text',
+            // No SOUND2TEXT recommendation: xAI retired grok-stt and offers no
+            // replacement, and there is no cross-provider substitute to
+            // recommend here — a key the operator may not hold cannot be a
+            // default. Without the entry the capability keeps whatever it was
+            // bound to instead of being rebound to a dead model on every
+            // container start by `app:provider:apply-defaults --auto` (#1514).
         ],
         // Local Ollama — last resort when a chat-capable model is already present.
         // providerId "gpt-oss:120b" normalises to "gpt-oss-120b" in ModelCatalog keys.

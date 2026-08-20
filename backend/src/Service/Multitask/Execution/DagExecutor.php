@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution;
 
+use App\Service\Exception\StreamCancelledException;
 use App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher;
 use App\Service\Multitask\Execution\Parallel\MediaNodeRequest;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -229,6 +230,17 @@ final readonly class DagExecutor
 
         try {
             $result = $runner->run($node, $context);
+        } catch (StreamCancelledException $e) {
+            // Pressing Stop ends the whole turn, not one node. Demoting it to a
+            // failed node result would strip the `cancelled` marker the caller
+            // needs, and the failure path then persists a second assistant card
+            // for the same Stop click (#1501).
+            $this->logger->info('DagExecutor: turn cancelled by user', [
+                'node' => $node->id,
+                'capability' => $node->capability->value,
+            ]);
+
+            throw $e;
         } catch (\Throwable $e) {
             $result = NodeResult::failed($e->getMessage());
             $this->logger->warning('DagExecutor: runner threw', [

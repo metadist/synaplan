@@ -3013,11 +3013,26 @@ class StreamController extends AbstractController
      * it as an error would add a second outgoing message for the same tracking
      * id, so the chat showed two cancellation cards for one Stop click.
      *
+     * The `cancelled` marker is the intended signal. The message match is a
+     * safety net for any path that still reports a cancel as a plain failure:
+     * one leaked result would otherwise persist a second card carrying raw
+     * English text (#1501), which no translation layer can repair afterwards.
+     *
      * @param array<string, mixed> $result
      */
     private function isCancelledResult(array $result): bool
     {
-        return true !== ($result['success'] ?? false) && true === ($result['cancelled'] ?? false);
+        if (true === ($result['success'] ?? false)) {
+            return false;
+        }
+
+        if (true === ($result['cancelled'] ?? false)) {
+            return true;
+        }
+
+        $error = $result['error'] ?? null;
+
+        return \is_string($error) && 1 === preg_match('/cancell?ed by user/i', $error);
     }
 
     /**

@@ -95,6 +95,28 @@ class StreamControllerCancelledResultTest extends TestCase
     }
 
     /**
+     * The DAG path used to report a cancel as an ordinary node failure, whose
+     * message was then persisted as a second, raw-English card (#1501). The
+     * marker is fixed at the source; this is the net that keeps a regression
+     * from reaching the chat.
+     */
+    public function testDagFailureThatIsReallyACancellationIsRecognised(): void
+    {
+        $this->assertTrue($this->isCancelledResult([
+            'success' => false,
+            'error' => 'chat failed: Stream cancelled by user',
+        ]));
+    }
+
+    public function testUnrelatedFailureMentioningTheUserIsStillAnError(): void
+    {
+        $this->assertFalse($this->isCancelledResult([
+            'success' => false,
+            'error' => 'chat failed: no input text for user prompt',
+        ]));
+    }
+
+    /**
      * @param array<string, mixed> $result
      */
     private function isCancelledResult(array $result): bool
