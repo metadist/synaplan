@@ -10,6 +10,7 @@ use App\Service\Dropbox\DropboxClient;
 use App\Service\Dropbox\DropboxException;
 use App\Service\OAuth\OAuthException;
 use App\Service\OAuth\OAuthReauthRequiredException;
+use Psr\Log\LoggerInterface;
 
 /**
  * "Save to folder" for a connected Dropbox account (connector plan 07 C13) —
@@ -27,6 +28,7 @@ final readonly class DropboxDestinationProvider implements DestinationProvider
     public function __construct(
         private DropboxClient $dropbox,
         private ConnectionRepository $connections,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -71,14 +73,37 @@ final readonly class DropboxDestinationProvider implements DestinationProvider
         $overwrite = 'overwrite' === ($config['on_conflict'] ?? 'rename');
         $safeName = str_replace(['/', '\\'], '-', $file->name);
 
+        $remoteName = $folder.'/'.$safeName;
+
         try {
-            $stored = $this->dropbox->upload($connection, $content, '/'.$folder.'/'.$safeName, $overwrite);
-        } catch (OAuthReauthRequiredException|OAuthException) {
+            $stored = $this->dropbox->upload($connection, $content, '/'.$remoteName, $overwrite);
+        } catch (OAuthReauthRequiredException|OAuthException $e) {
+            $this->logger->warning('Dropbox save failed: token exchange rejected', [
+                'connection_id' => $connection->getId(),
+                'file' => $file->name,
+                'remote' => $remoteName,
+                'error' => $e->getMessage(),
+                'code' => DestinationFailureCode::Unauthorized->value,
+            ]);
+
             return DestinationResult::failure(DestinationFailureCode::Unauthorized, [
                 'connection' => $connection->getName(),
             ]);
         } catch (DropboxException $e) {
-            return DestinationResult::failure($this->failureCode($e), [
+            // The user-facing message only carries the mapped code; without
+            // this line the real answer ("Dropbox answered HTTP 409
+            // (path/malformed_path)", "Could not reach Dropbox: ...") is lost
+            // and an "unreachable" report cannot be diagnosed from prod logs.
+            $code = $this->failureCode($e);
+            $this->logger->warning('Dropbox save failed', [
+                'connection_id' => $connection->getId(),
+                'file' => $file->name,
+                'remote' => $remoteName,
+                'error' => $e->getMessage(),
+                'code' => $code->value,
+            ]);
+
+            return DestinationResult::failure($code, [
                 'target' => $file->name,
                 'connection' => $connection->getName(),
             ]);

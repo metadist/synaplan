@@ -10,10 +10,12 @@
 import { onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { dropboxApi } from '@/services/api/dropboxApi'
 
 const { t } = useI18n()
+const dialog = useDialog()
 const { success, error: showError } = useNotification()
 
 const DROPBOX_APP_CONSOLE_URL = 'https://www.dropbox.com/developers/apps'
@@ -47,6 +49,28 @@ const copy = async (value: string, which: 'redirect' | 'scopes') => {
     }, 2000)
   } catch {
     showError(t('admin.config.dropbox.copyFailed'))
+  }
+}
+
+const resetting = ref(false)
+
+const resetConnections = async () => {
+  const confirmed = await dialog.confirm({
+    title: t('admin.config.dropbox.resetConfirmTitle'),
+    message: t('admin.config.dropbox.resetConfirmMessage'),
+    confirmText: t('admin.config.dropbox.resetButton'),
+    danger: true,
+  })
+  if (!confirmed) return
+
+  resetting.value = true
+  try {
+    const removed = await dropboxApi.resetAllConnections()
+    success(t('admin.config.dropbox.resetDone', { count: removed }, removed))
+  } catch {
+    showError(t('admin.config.dropbox.resetFailed'))
+  } finally {
+    resetting.value = false
   }
 }
 </script>
@@ -140,6 +164,25 @@ const copy = async (value: string, which: 'redirect' | 'scopes') => {
           />
           {{ available ? $t('admin.config.dropbox.ready') : $t('admin.config.dropbox.notReady') }}
         </p>
+
+        <div class="mt-4 pt-4 border-t border-light-border/30 dark:border-dark-border/20">
+          <h5 class="text-sm font-medium txt-primary mb-1">
+            {{ $t('admin.config.dropbox.resetTitle') }}
+          </h5>
+          <p class="text-sm txt-secondary mb-2">
+            {{ $t('admin.config.dropbox.resetDescription') }}
+          </p>
+          <button
+            type="button"
+            class="btn-danger inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+            :disabled="resetting"
+            data-testid="btn-reset-dropbox-connections"
+            @click="resetConnections"
+          >
+            <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
+            {{ $t('admin.config.dropbox.resetButton') }}
+          </button>
+        </div>
       </div>
     </div>
   </div>

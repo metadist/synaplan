@@ -8,6 +8,7 @@ import { httpClient } from './httpClient'
 import {
   GetApiConnectionsDropboxStartResponseSchema,
   GetApiConnectionsDropboxStatusResponseSchema,
+  PostAdminConnectionsDropboxResetResponseSchema,
 } from '@/generated/api-schemas'
 
 export interface DropboxStatus {
@@ -33,5 +34,17 @@ export const dropboxApi = {
       schema: GetApiConnectionsDropboxStartResponseSchema,
     })
     return data.authorize_url
+  },
+
+  /**
+   * Admin only: delete every Dropbox connection on this installation so all
+   * users can redo the OAuth registration freshly. Returns how many were removed.
+   */
+  async resetAllConnections(): Promise<number> {
+    const data = await httpClient('/api/v1/admin/connections/dropbox/reset', {
+      method: 'POST',
+      schema: PostAdminConnectionsDropboxResetResponseSchema,
+    })
+    return data.removed
   },
 }

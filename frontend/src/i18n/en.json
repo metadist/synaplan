@@ -617,7 +617,14 @@
         "step5": "Paste the app key and the secret into the fields below and switch DROPBOX_ENABLED on. Users then connect their own account under Channels → Connections.",
         "ready": "Ready — users can connect their Dropbox account under Channels → Connections.",
         "notReady": "Not active yet. Fill in the fields below and switch DROPBOX_ENABLED on.",
-        "copyFailed": "Could not copy. Select the text and copy it manually."
+        "copyFailed": "Could not copy. Select the text and copy it manually.",
+        "resetTitle": "Reset all Dropbox connections",
+        "resetDescription": "Removes every user's Dropbox connection on this installation, including the stored tokens. Use this after changing the Dropbox app or its permissions — everyone can then connect their account again freshly.",
+        "resetButton": "Reset connections",
+        "resetConfirmTitle": "Reset all Dropbox connections?",
+        "resetConfirmMessage": "Every user's Dropbox connection will be removed, and each user has to connect their Dropbox account again. This cannot be undone.",
+        "resetDone": "No Dropbox connections to remove | 1 Dropbox connection removed | {count} Dropbox connections removed",
+        "resetFailed": "The reset failed. Please try again."
       }
     }
   },
