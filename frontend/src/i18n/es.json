@@ -606,7 +606,14 @@
         "step5": "Pega la clave y el secreto en los campos de abajo y activa DROPBOX_ENABLED. Después, los usuarios conectan su cuenta en Canales → Conexiones.",
         "ready": "Listo: los usuarios pueden conectar su cuenta de Dropbox en Canales → Conexiones.",
         "notReady": "Todavía no está activo. Rellena los campos de abajo y activa DROPBOX_ENABLED.",
-        "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente."
+        "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente.",
+        "resetTitle": "Restablecer todas las conexiones de Dropbox",
+        "resetDescription": "Elimina la conexión de Dropbox de todos los usuarios de esta instalación, incluidos los tokens guardados. Útil después de cambiar la app de Dropbox o sus permisos: después, todos pueden volver a conectar su cuenta desde cero.",
+        "resetButton": "Restablecer conexiones",
+        "resetConfirmTitle": "¿Restablecer todas las conexiones de Dropbox?",
+        "resetConfirmMessage": "Se eliminará la conexión de Dropbox de todos los usuarios y cada uno tendrá que volver a conectar su cuenta de Dropbox. Esto no se puede deshacer.",
+        "resetDone": "No hay conexiones de Dropbox que eliminar | 1 conexión de Dropbox eliminada | {count} conexiones de Dropbox eliminadas",
+        "resetFailed": "El restablecimiento ha fallado. Inténtalo de nuevo."
       }
     }
   },

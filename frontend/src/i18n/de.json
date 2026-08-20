@@ -612,7 +612,14 @@
         "step5": "Trage App key und Secret in die Felder unten ein und schalte DROPBOX_ENABLED ein. Nutzer verbinden ihr Konto dann unter Kanäle → Verbindungen.",
         "ready": "Fertig eingerichtet – Nutzer können ihr Dropbox-Konto unter Kanäle → Verbindungen verbinden.",
         "notReady": "Noch nicht aktiv. Fülle die Felder unten aus und schalte DROPBOX_ENABLED ein.",
-        "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell."
+        "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell.",
+        "resetTitle": "Alle Dropbox-Verbindungen zurücksetzen",
+        "resetDescription": "Entfernt die Dropbox-Verbindung aller Benutzer dieser Installation, einschließlich der gespeicherten Tokens. Sinnvoll, nachdem die Dropbox-App oder ihre Berechtigungen geändert wurden — danach kann sich jeder frisch neu verbinden.",
+        "resetButton": "Verbindungen zurücksetzen",
+        "resetConfirmTitle": "Alle Dropbox-Verbindungen zurücksetzen?",
+        "resetConfirmMessage": "Die Dropbox-Verbindung aller Benutzer wird entfernt, und jeder Benutzer muss sein Dropbox-Konto neu verbinden. Das kann nicht rückgängig gemacht werden.",
+        "resetDone": "Keine Dropbox-Verbindungen zu entfernen | 1 Dropbox-Verbindung entfernt | {count} Dropbox-Verbindungen entfernt",
+        "resetFailed": "Das Zurücksetzen ist fehlgeschlagen. Bitte erneut versuchen."
       }
     }
   },

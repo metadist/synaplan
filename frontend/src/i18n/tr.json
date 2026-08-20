@@ -606,7 +606,14 @@
         "step5": "App key ve secret’ı aşağıdaki alanlara yapıştır ve DROPBOX_ENABLED seçeneğini aç. Kullanıcılar hesaplarını Kanallar → Bağlantılar altında bağlar.",
         "ready": "Hazır — kullanıcılar Dropbox hesaplarını Kanallar → Bağlantılar altında bağlayabilir.",
         "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve DROPBOX_ENABLED seçeneğini aç.",
-        "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala."
+        "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala.",
+        "resetTitle": "Tüm Dropbox bağlantılarını sıfırla",
+        "resetDescription": "Bu kurulumdaki tüm kullanıcıların Dropbox bağlantısını, kayıtlı token'lar dahil kaldırır. Dropbox uygulaması veya izinleri değiştirildikten sonra kullanışlıdır — ardından herkes hesabını yeniden bağlayabilir.",
+        "resetButton": "Bağlantıları sıfırla",
+        "resetConfirmTitle": "Tüm Dropbox bağlantıları sıfırlansın mı?",
+        "resetConfirmMessage": "Tüm kullanıcıların Dropbox bağlantısı kaldırılacak ve her kullanıcının Dropbox hesabını yeniden bağlaması gerekecek. Bu işlem geri alınamaz.",
+        "resetDone": "Kaldırılacak Dropbox bağlantısı yok | 1 Dropbox bağlantısı kaldırıldı | {count} Dropbox bağlantısı kaldırıldı",
+        "resetFailed": "Sıfırlama başarısız oldu. Lütfen tekrar deneyin."
       }
     }
   },

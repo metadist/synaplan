@@ -2,14 +2,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import DropboxSetupGuide from '@/components/admin/DropboxSetupGuide.vue'
 
-const { mockStatus } = vi.hoisted(() => ({ mockStatus: vi.fn() }))
+const { mockStatus, mockReset, mockConfirm, mockSuccess } = vi.hoisted(() => ({
+  mockStatus: vi.fn(),
+  mockReset: vi.fn(),
+  mockConfirm: vi.fn(),
+  mockSuccess: vi.fn(),
+}))
 
 vi.mock('@/services/api/dropboxApi', () => ({
-  dropboxApi: { status: mockStatus },
+  dropboxApi: { status: mockStatus, resetAllConnections: mockReset },
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
+  useNotification: () => ({ success: mockSuccess, error: vi.fn() }),
+}))
+
+vi.mock('@/composables/useDialog', () => ({
+  useDialog: () => ({ confirm: mockConfirm }),
 }))
 
 const mountGuide = async () => {
@@ -53,5 +62,28 @@ describe('DropboxSetupGuide', () => {
 
   it('lists files.content.write among the permissions to enable', async () => {
     expect((await mountGuide()).text()).toContain('files.content.write')
+  })
+
+  it('resets all Dropbox connections only after a confirmed danger dialog', async () => {
+    mockConfirm.mockResolvedValue(true)
+    mockReset.mockResolvedValue(3)
+
+    const wrapper = await mountGuide()
+    await wrapper.get('[data-testid="btn-reset-dropbox-connections"]').trigger('click')
+    await flushPromises()
+
+    expect(mockConfirm).toHaveBeenCalledWith(expect.objectContaining({ danger: true }))
+    expect(mockReset).toHaveBeenCalledTimes(1)
+    expect(mockSuccess).toHaveBeenCalledWith(expect.stringContaining('3'))
+  })
+
+  it('does not touch any connection when the admin cancels the dialog', async () => {
+    mockConfirm.mockResolvedValue(false)
+
+    const wrapper = await mountGuide()
+    await wrapper.get('[data-testid="btn-reset-dropbox-connections"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReset).not.toHaveBeenCalled()
   })
 })

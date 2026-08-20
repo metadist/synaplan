@@ -99,6 +99,29 @@ final readonly class DropboxConnectionService
     }
 
     /**
+     * Remove every Dropbox connection on this installation — rows and stored
+     * tokens — so all users can redo the OAuth registration from a clean
+     * slate. The admin uses this after the Dropbox app or its permission set
+     * changed, when every existing grant is stale by definition.
+     *
+     * Dropbox keeps its own consent record; users revoke that under
+     * dropbox.com → Settings → Connected apps.
+     *
+     * @return int number of connections removed
+     */
+    public function resetAll(): int
+    {
+        $removed = 0;
+        foreach ($this->connections->findByType(Connection::TYPE_DROPBOX) as $connection) {
+            $this->tokens->forget($connection);
+            $this->connections->remove($connection);
+            ++$removed;
+        }
+
+        return $removed;
+    }
+
+    /**
      * @param array{accountId: string, name: string, email: string} $account
      */
     private function applyAccountIdentity(Connection $connection, array $account): void

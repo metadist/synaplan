@@ -45,6 +45,22 @@ class ConnectionRepository extends ServiceEntityRepository
         return $this->findOneBy(['ownerId' => $ownerId, 'type' => $type], ['id' => 'ASC']);
     }
 
+    /**
+     * Every connection of one type across all owners — the admin-side reset
+     * uses this to wipe an entire connector after its app registration changed.
+     *
+     * @return list<Connection>
+     */
+    public function findByType(string $type): array
+    {
+        return $this->createQueryBuilder('c')
+            ->where('c.type = :type')
+            ->setParameter('type', $type)
+            ->orderBy('c.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function save(Connection $connection, bool $flush = true): void
     {
         $this->getEntityManager()->persist($connection);
