@@ -2522,7 +2522,7 @@
       "reminder": "Hol mehr aus Synaplan heraus"
     },
     "subtitle": {
-      "guest_limit": "Wähle einen Tarif und chatte weiter – mit eigenem Verlauf, Erinnerungen und Dateien.",
+      "guest_limit": "Wähle einen Tarif und chatte weiter. Mit einem Account bekommst du ab dann eigenen Verlauf, Erinnerungen und Dateien.",
       "free_limit": "Dein Gratis-Kontingent ist verbraucht. Wähle einen Tarif und chatte ohne Limit weiter.",
       "quota_exhausted": "Wechsle in einen größeren Tarif und mach sofort weiter, oder warte bis dein Kontingent nächsten Monat zurückgesetzt wird.",
       "reminder": "Mit einem Tarif bekommst du mehr Nachrichten, stärkere KI-Modelle und mehr Speicher."
@@ -4712,7 +4712,7 @@
     "disabledTitle": "Gast-Chat nicht verfügbar",
     "disabledDescription": "Diese Instanz bietet keinen anonymen Testzugang. Bitte melde dich an, um zu chatten.",
     "expiredTitle": "Deine Sitzung ist abgelaufen",
-    "expiredDescription": "Gastsitzungen sind 24 Stunden gültig. Starte einen neuen Test oder erstelle einen kostenlosen Account, um deinen Chatverlauf zu behalten.",
+    "expiredDescription": "Gastsitzungen sind 24 Stunden gültig, und dieses Testgespräch lässt sich nicht wiederherstellen. Starte einen neuen Test oder erstelle einen kostenlosen Account, damit deine Chats ab dann gespeichert werden.",
     "rateLimitedTitle": "Zu viele Sitzungen",
     "rateLimitedDescription": "Du hast das Sitzungslimit erreicht. Bitte versuche es später erneut oder erstelle einen kostenlosen Account.",
     "retry": "Erneut versuchen",

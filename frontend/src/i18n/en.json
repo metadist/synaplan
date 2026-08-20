@@ -2456,7 +2456,7 @@
       "reminder": "Get more out of Synaplan"
     },
     "subtitle": {
-      "guest_limit": "Pick a plan to keep chatting — with your own history, memories and files.",
+      "guest_limit": "Pick a plan to keep chatting. An account gives you your own history, memories and files from here on.",
       "free_limit": "Your free allowance is spent. Pick a plan to keep chatting without limits.",
       "quota_exhausted": "Move up a plan to keep going right away, or wait for your allowance to reset next month.",
       "reminder": "A plan gives you more messages, stronger AI models and more storage."
@@ -4778,7 +4778,7 @@
     "disabledTitle": "Guest chat is not available",
     "disabledDescription": "This instance does not offer an anonymous trial. Please sign in to start chatting.",
     "expiredTitle": "Your session has expired",
-    "expiredDescription": "Guest sessions last 24 hours. Start a new trial or create a free account to keep your chat history.",
+    "expiredDescription": "Guest sessions last 24 hours, and this trial conversation can't be restored. Start a new trial, or create a free account so your chats are saved from now on.",
     "rateLimitedTitle": "Too many sessions",
     "rateLimitedDescription": "You've reached the session limit. Please try again later or create a free account.",
     "retry": "Try again",
