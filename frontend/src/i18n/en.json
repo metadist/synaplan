@@ -3928,6 +3928,31 @@
       "API keys, widgets and credentials"
     ],
     "retention": "Deletion is permanent and takes effect immediately. Backups containing residual data are rotated out within 30 days. Data we are legally required to retain (e.g. invoices) is kept only as long as the law requires.",
+    "partialTitle": "Delete individual data without deleting your account",
+    "partialIntro": "You do not have to give up your account to remove data. While signed in you can delete any of the following yourself, and it takes effect immediately.",
+    "partialItems": [
+      {
+        "name": "Chats and conversations",
+        "how": "Open History, use the ⋯ menu next to a conversation and choose Delete. To remove several at once, open Statistics → All Chats, select them and choose Delete selected."
+      },
+      {
+        "name": "Uploaded files and documents",
+        "how": "Open Sources → Browse and use the delete icon on a file, or select several and choose Delete selected. Deleting a folder also deletes the files inside it."
+      },
+      {
+        "name": "AI-generated images and media",
+        "how": "Open Sources → Generated and use the delete icon on the item."
+      },
+      {
+        "name": "Memories",
+        "how": "Open Memories and delete individual entries, or select several and delete them together."
+      },
+      {
+        "name": "Connections, chat widgets and API keys",
+        "how": "Open Channels and remove the connection, widget or key you no longer need."
+      }
+    ],
+    "partialRetention": "Deleted items disappear from your account immediately. Backups containing residual copies are rotated out within 30 days. Everything else in your account stays untouched.",
     "noAccessTitle": "Can't sign in?",
     "noAccessDesc": "If you no longer have access to your account, contact us through our website and we will process your deletion request.",
     "visitWebsite": "Visit website",
