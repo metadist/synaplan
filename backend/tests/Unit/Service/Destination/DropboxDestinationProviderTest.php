@@ -100,6 +100,7 @@ final class DropboxDestinationProviderTest extends TestCase
         $provider = new DropboxDestinationProvider(
             new DropboxClient(new MockHttpClient([]), $tokens, new NullLogger()),
             $repo,
+            new NullLogger(),
         );
 
         $result = $provider->send($this->file('x.txt'), ['connection_id' => 5]);
@@ -165,6 +166,7 @@ final class DropboxDestinationProviderTest extends TestCase
         return new DropboxDestinationProvider(
             new DropboxClient(new MockHttpClient($factory), $tokens, new NullLogger(), static function (int $seconds): void {}),
             $repo,
+            new NullLogger(),
         );
     }
 }
