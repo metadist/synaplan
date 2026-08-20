@@ -499,11 +499,12 @@ class ConfigController extends AbstractController
             $unavailableProviders = $this->chatReadiness->unavailableProviderNames();
 
             // First-run signal: can a plain chat message work right now for
-            // THIS user? The frontend shows a "connect an AI provider" banner
-            // (admins get a wizard CTA) while this is false — e.g. a fresh
-            // install whose default chat model points at a provider without a
-            // key. Evaluated per user so a working per-user model override is
-            // honoured, exactly like the chat pipeline resolves it.
+            // THIS user? The frontend replaces chat with a setup tombstone
+            // (admins go to /admin/setup; others to the public docs) while
+            // this is false — e.g. a fresh install whose default chat model
+            // points at a provider without a key. Evaluated per user so a
+            // working per-user model override is honoured, exactly like the
+            // chat pipeline resolves it.
             $setup = ['chatReady' => $this->chatReadiness->isChatReady(userId: $user->getId())];
         }
 

@@ -70,15 +70,14 @@ final readonly class OAuthClient
 
     public function exchangeCode(OAuthProviderConfig $provider, string $code, string $codeVerifier): OAuthTokenSet
     {
-        $payload = $this->post($provider, [
+        $payload = $this->post($provider, $this->withOptionalScope($provider, [
             'client_id' => $provider->clientId,
             'client_secret' => $provider->clientSecret,
             'grant_type' => 'authorization_code',
             'code' => $code,
             'redirect_uri' => $provider->redirectUri,
             'code_verifier' => $codeVerifier,
-            'scope' => $provider->scopeString(),
-        ]);
+        ]));
 
         return OAuthTokenSet::fromTokenResponse($payload);
     }
@@ -92,15 +91,32 @@ final readonly class OAuthClient
             throw new OAuthReauthRequiredException('No refresh token stored for this connection');
         }
 
-        $payload = $this->post($provider, [
+        $payload = $this->post($provider, $this->withOptionalScope($provider, [
             'client_id' => $provider->clientId,
             'client_secret' => $provider->clientSecret,
             'grant_type' => 'refresh_token',
             'refresh_token' => $refreshToken,
-            'scope' => $provider->scopeString(),
-        ]);
+        ]));
 
         return OAuthTokenSet::fromTokenResponse($payload, $refreshToken);
+    }
+
+    /**
+     * Scopes are requested on the authorize URL. Repeating them on the token
+     * endpoint is Microsoft's convention and Dropbox's foot-gun — see
+     * {@see OAuthProviderConfig::$includeScopeInTokenRequests}.
+     *
+     * @param array<string, string> $body
+     *
+     * @return array<string, string>
+     */
+    private function withOptionalScope(OAuthProviderConfig $provider, array $body): array
+    {
+        if ($provider->includeScopeInTokenRequests) {
+            $body['scope'] = $provider->scopeString();
+        }
+
+        return $body;
     }
 
     /**

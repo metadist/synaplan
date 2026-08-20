@@ -1082,10 +1082,12 @@
     }
   },
   "setupBanner": {
-    "title": "Bağlı AI sağlayıcısı yok",
-    "adminText": "Sohbet için bir AI sağlayıcısı gerekiyor. Bir dakikada bağlayın — ücretsiz seçenekler mevcut.",
-    "userText": "Sohbet henüz hazır değil. Lütfen yöneticinizden bir AI sağlayıcısı bağlamasını isteyin.",
-    "cta": "AI sağlayıcısını kur"
+    "adminTitle": "AI sağlayıcısı yapılandırılmamış",
+    "userTitle": "Sohbet henüz hazır değil",
+    "adminText": "Bir AI sağlayıcısı bağlanmadan sohbet başlayamaz. Kurulum sayfasını açıp bir anahtar ekleyin — Groq yaklaşık bir dakikada çalışan ücretsiz bir seçenek sunar.",
+    "userText": "Bir yöneticinin hâlâ bir AI sağlayıcısı bağlaması gerekiyor. Bunun nasıl yapılacağı belgelerde anlatılır.",
+    "cta": "AI sağlayıcı kurulumunu aç",
+    "docsCta": "Belgeleri aç"
   },
   "localAiDownload": {
     "waitingTitle": "Yerel AI başlatılıyor",
@@ -1832,7 +1834,32 @@
     },
     "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
     "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",
-    "continueButton": "Yanıtı sürdür"
+    "continueButton": "Yanıtı sürdür",
+    "jsonViewer": {
+      "title": "Sonuç",
+      "itemCount": "{count} öğe",
+      "chats": "{count} sohbet",
+      "items": "{count} öğe",
+      "results": "{count} sonuç",
+      "records": "{count} kayıt",
+      "messages": "{count} mesaj",
+      "files": "{count} dosya",
+      "documents": "{count} belge",
+      "users": "{count} kullanıcı",
+      "entries": "{count} girdi",
+      "data": "{count} öğe",
+      "empty": "Gösterilecek bir şey yok",
+      "showJson": "JSON'u göster",
+      "hideJson": "JSON'u gizle",
+      "showMore": "{count} tane daha göster",
+      "showLess": "Daha az göster",
+      "shownOf": "{total} kaydın {shown} tanesi gösteriliyor",
+      "truncatedHint": "Sonuç çok uzun olduğu için kesildi — son kayıt eksik olabilir.",
+      "messagesCount": "{count} mesaj",
+      "idLabel": "ID {id}",
+      "expand": "Genişlet",
+      "collapse": "Daralt"
+    }
   },
   "paywall": {
     "title": {

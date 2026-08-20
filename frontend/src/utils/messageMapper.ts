@@ -227,6 +227,12 @@ export function parseContentWithThinking(
           content: part.content,
           language: part.language,
         })
+      } else if (part.type === 'json') {
+        parts.push({
+          type: 'json',
+          content: part.content,
+          language: part.language ?? 'json',
+        })
       } else if (part.type === 'text' && part.content.trim()) {
         parts.push({
           type: 'text',

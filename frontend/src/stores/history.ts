@@ -38,6 +38,7 @@ export type PartType =
   | 'video'
   | 'audio'
   | 'code'
+  | 'json'
   | 'links'
   | 'docs'
   | 'screenshot'

@@ -85,6 +85,10 @@ final class DropboxOAuthConfigTest extends TestCase
         self::assertSame('https://api.dropboxapi.com/oauth2/token', $provider->tokenUrl);
         self::assertStringContainsString('files.content.write', $provider->scopeString());
         self::assertSame('offline', $provider->extraAuthorizeParams['token_access_type'] ?? null, 'without it Dropbox issues no refresh token');
+        self::assertFalse(
+            $provider->includeScopeInTokenRequests,
+            'repeating scope on Dropbox token requests strips files.content.write',
+        );
     }
 
     private function configured(): DropboxOAuthConfig

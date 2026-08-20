@@ -1,63 +1,65 @@
 <template>
   <div
     v-if="visible"
-    class="mx-auto max-w-4xl w-full px-4 pt-4"
-    data-testid="provider-setup-banner"
+    class="flex-1 min-h-0 flex flex-col items-center justify-center px-6 py-12"
+    data-testid="provider-setup-tombstone"
+    role="status"
   >
-    <div
-      class="rounded-lg border border-[var(--status-warning)] bg-[var(--status-warning-muted)] p-4 flex items-start gap-3"
-    >
-      <Icon
-        icon="mdi:key-alert-outline"
-        class="w-6 h-6 shrink-0 text-[var(--status-warning)] mt-0.5"
-      />
-      <div class="flex-1 min-w-0">
-        <p class="font-semibold txt-primary">{{ $t('setupBanner.title') }}</p>
-        <p class="text-sm txt-secondary mt-0.5">
-          {{ isAdmin ? $t('setupBanner.adminText') : $t('setupBanner.userText') }}
-        </p>
-        <RouterLink
-          v-if="isAdmin"
-          to="/admin/setup"
-          class="inline-flex items-center gap-1 mt-2 btn-primary text-sm"
-          data-testid="provider-setup-banner-cta"
-        >
-          <Icon icon="mdi:rocket-launch-outline" class="w-4 h-4" />
-          {{ $t('setupBanner.cta') }}
-        </RouterLink>
-      </div>
-      <button
-        class="txt-secondary hover:txt-primary shrink-0"
-        :aria-label="$t('common.close')"
-        data-testid="provider-setup-banner-dismiss"
-        @click="dismissed = true"
+    <div class="w-full max-w-lg text-center">
+      <div
+        class="w-16 h-16 mx-auto mb-5 rounded-full bg-[var(--brand)]/15 flex items-center justify-center"
+        aria-hidden="true"
       >
-        <Icon icon="mdi:close" class="w-5 h-5" />
-      </button>
+        <Icon icon="mdi:key-alert-outline" class="w-8 h-8 text-[var(--brand)]" />
+      </div>
+      <h1 class="text-2xl font-semibold txt-primary mb-3">
+        {{ isAdmin ? $t('setupBanner.adminTitle') : $t('setupBanner.userTitle') }}
+      </h1>
+      <p class="txt-secondary text-base leading-relaxed mb-6">
+        {{ isAdmin ? $t('setupBanner.adminText') : $t('setupBanner.userText') }}
+      </p>
+      <RouterLink
+        v-if="isAdmin"
+        to="/admin/setup"
+        class="inline-flex items-center justify-center gap-2 btn-primary px-5 py-3 rounded-lg font-medium"
+        data-testid="provider-setup-tombstone-cta"
+      >
+        <Icon icon="mdi:cog-outline" class="w-5 h-5" aria-hidden="true" />
+        {{ $t('setupBanner.cta') }}
+      </RouterLink>
+      <a
+        v-else
+        :href="DOCS_URL"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center justify-center gap-2 btn-primary px-5 py-3 rounded-lg font-medium"
+        data-testid="provider-setup-tombstone-docs"
+      >
+        <Icon icon="mdi:book-open-page-variant-outline" class="w-5 h-5" aria-hidden="true" />
+        {{ $t('setupBanner.docsCta') }}
+      </a>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 
+/** Public docs for operators and users when chat has no usable AI provider. */
+const DOCS_URL = 'https://docs.synaplan.com/'
+
 /**
- * "Connect an AI provider" banner for the chat, driven by the runtime-config
- * setup signal (setup.chatReady). Admins get a CTA to the setup wizard;
- * regular users are told to contact their administrator. Dismissable for the
- * session only — the underlying problem persists until a provider is set up.
+ * Full-page first-run gate when `setup.chatReady` is false. Admins get a
+ * button to `/admin/setup`; everyone else is pointed at the public docs.
+ * Not dismissable — sending chat messages would only produce a server error.
  */
 const authStore = useAuthStore()
 const config = useConfigStore()
 
-const dismissed = ref(false)
-
 const isAdmin = computed(() => authStore.isAdmin)
-const visible = computed(
-  () => !dismissed.value && authStore.isAuthenticated && config.setup.chatReady === false
-)
+const visible = computed(() => authStore.isAuthenticated && config.setup.chatReady === false)
 </script>
