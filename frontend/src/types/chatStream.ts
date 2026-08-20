@@ -132,6 +132,11 @@ export interface StreamUpdatePayload {
   topic?: string
   originalTopic?: string | null
   originalMediaType?: string | null
+  /**
+   * Title the server generated for this chat, sent only on the turn that
+   * named it (#1500).
+   */
+  chatTitle?: string
   limit_type?: string
   action_type?: string
   used?: number

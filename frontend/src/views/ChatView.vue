@@ -473,7 +473,7 @@ import {
   type Message,
   type Part,
 } from '@/stores/history'
-import { useChatsStore, isDefaultChatTitle } from '@/stores/chats'
+import { useChatsStore } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
@@ -1107,34 +1107,6 @@ watch(
     }
   }
 )
-
-async function generateChatTitleFromFirstMessage(firstMessage: string) {
-  const chat = chatsStore.activeChat
-  if (!chat) return
-
-  if (chat.title && !isDefaultChatTitle(chat.title)) return
-
-  // Only generate for user messages from this chat
-  const userMessages = historyStore.messages.filter((m) => m.role === 'user')
-  if (userMessages.length !== 1) return
-
-  // Generate title from first message (take first 50 chars). Strip a leading
-  // tool-command prefix ("/pic ", "/vid ", "/search ") first — `firstMessage`
-  // is the raw content sent to the backend, which keeps the prefix for
-  // pic/vid routing (see handleSendMessage), so without this the sidebar
-  // title showed e.g. "/pic Haus" instead of just "Haus".
-  let title = firstMessage.trim()
-  const commandMatch = title.match(/^\/(search|pic|vid)\s+(.*)$/)
-  if (commandMatch) {
-    title = commandMatch[2].trim()
-  }
-  if (title.length > 50) {
-    title = title.substring(0, 47) + '...'
-  }
-
-  // Update chat title
-  await chatsStore.updateChatTitle(chat.id, title)
-}
 
 const userTextBefore = (messageId: string | number): string => {
   const list = historyStore.messages
@@ -3412,8 +3384,13 @@ const streamAIResponse = async (
             // bump, no reconcile against a stored message, no memory-
             // extraction poll (extraction is skipped server-side).
             if (!incognito && chatId) {
-              // Generate chat title from first message
-              generateChatTitleFromFirstMessage(userMessage)
+              // The server names the chat after the first exchange (#1500) and
+              // sends the title on the turn that produced it. Until then the
+              // sidebar shows the first-message preview, so there is nothing to
+              // do when the field is absent.
+              if (data.chatTitle) {
+                chatsStore.applyChatTitle(chatId, data.chatTitle)
+              }
 
               // Bump chat activity so the sidebar reflects the assistant message
               // landing without waiting for a full reload.

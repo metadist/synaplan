@@ -326,6 +326,17 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  /**
+   * Reflect a title the server generated for a chat (#1500). Local-only: the
+   * value is already persisted, so re-sending it would be a redundant PATCH.
+   */
+  function applyChatTitle(chatId: number, title: string) {
+    const chat = chats.value.find((c) => c.id === chatId)
+    if (chat) {
+      chat.title = title
+    }
+  }
+
   async function deleteChat(chatId: number, silent: boolean = false) {
     if (!checkAuthOrRedirect()) return
 
@@ -501,6 +512,7 @@ export const useChatsStore = defineStore('chats', () => {
     createChat,
     findOrCreateEmptyChat,
     updateChatTitle,
+    applyChatTitle,
     deleteChat,
     shareChat,
     getShareInfo,
