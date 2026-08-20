@@ -127,6 +127,43 @@ final class DropboxClientTest extends TestCase
         }
     }
 
+    public function testPlainTextRejectionReasonAndRequestIdSurvive(): void
+    {
+        $client = $this->client([
+            new MockResponse(
+                'Error in call to API function "files/upload": HTTP header "Dropbox-API-Arg": could not decode input as JSON',
+                ['http_code' => 400, 'response_headers' => ['x-dropbox-request-id' => 'req-42']],
+            ),
+        ]);
+
+        try {
+            $client->upload($this->connection(), 'bytes', '/Synaplan/plan.docx');
+            self::fail('Expected a DropboxException');
+        } catch (DropboxException $e) {
+            self::assertStringContainsString('could not decode input as JSON', $e->getMessage());
+            self::assertStringContainsString('req-42', $e->getMessage());
+            self::assertSame(400, $e->getCode());
+        }
+    }
+
+    public function testRejectedBearerTokenIsNotEchoedIntoTheMessage(): void
+    {
+        $client = $this->client([
+            new MockResponse(
+                'Error in call to API function "files/upload": Invalid authorization value in HTTP header "Authorization": "Bearer sl.secret-token".',
+                ['http_code' => 400],
+            ),
+        ]);
+
+        try {
+            $client->upload($this->connection(), 'bytes', '/Synaplan/plan.docx');
+            self::fail('Expected a DropboxException');
+        } catch (DropboxException $e) {
+            self::assertStringNotContainsString('sl.secret-token', $e->getMessage());
+            self::assertStringContainsString('Bearer [redacted]', $e->getMessage());
+        }
+    }
+
     private function connection(): Connection
     {
         $connection = new Connection(7, Connection::TYPE_DROPBOX, 'Dropbox');

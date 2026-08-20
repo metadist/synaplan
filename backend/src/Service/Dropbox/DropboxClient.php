@@ -32,6 +32,9 @@ final readonly class DropboxClient
     /** Single-call upload cap documented by Dropbox is 150 MB; stay well below. */
     public const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
+    /** Enough for Dropbox's plain-text rejection reason, short enough for a log line. */
+    private const MAX_ERROR_BODY_CHARS = 300;
+
     /**
      * @param (\Closure(int): void)|null $sleeper Overridden in tests so the
      *                                            throttling path can be exercised without real delays
@@ -140,7 +143,9 @@ final readonly class DropboxClient
 
                 $status = $response->getStatusCode();
                 $raw = $response->getContent(false);
-                $retryAfter = $response->getHeaders(false)['retry-after'][0] ?? null;
+                $headers = $response->getHeaders(false);
+                $retryAfter = $headers['retry-after'][0] ?? null;
+                $requestId = $headers['x-dropbox-request-id'][0] ?? null;
             } catch (TransportExceptionInterface $e) {
                 throw new DropboxException('Could not reach Dropbox: '.$e->getMessage(), '', 0, $e);
             }
@@ -164,7 +169,7 @@ final readonly class DropboxClient
                 continue;
             }
 
-            throw $this->describeFailure($status, $raw);
+            throw $this->describeFailure($status, $raw, $requestId);
         }
     }
 
@@ -184,17 +189,43 @@ final readonly class DropboxClient
         null !== $this->sleeper ? ($this->sleeper)($delay) : sleep($delay);
     }
 
-    private function describeFailure(int $status, string $raw): DropboxException
+    private function describeFailure(int $status, string $raw, ?string $requestId): DropboxException
     {
         $decoded = json_decode($raw, true);
         $summary = is_array($decoded) && is_string($decoded['error_summary'] ?? null)
             ? rtrim($decoded['error_summary'], '/.')
             : '';
 
+        // Only the endpoint-specific errors answer in JSON. A malformed
+        // request (400) answers in plain text — 'Error in call to API
+        // function "files/upload": …' — which names the actual defect. Without
+        // it the message degrades to a bare "HTTP 400" that cannot be acted on.
+        $detail = '' !== $summary ? $summary : $this->bodySnippet($raw);
+
         return new DropboxException(
-            sprintf('Dropbox answered HTTP %d%s', $status, '' !== $summary ? ' ('.$summary.')' : ''),
+            sprintf(
+                'Dropbox answered HTTP %d%s%s',
+                $status,
+                '' !== $detail ? ' ('.$detail.')' : '',
+                null !== $requestId && '' !== $requestId ? ' [request-id '.$requestId.']' : '',
+            ),
             $summary,
             $status,
         );
+    }
+
+    /**
+     * One-line, bounded excerpt of a non-JSON error body. Dropbox echoes the
+     * offending `Authorization` header back when it rejects it, so the bearer
+     * token is stripped before this text can reach a log.
+     */
+    private function bodySnippet(string $raw): string
+    {
+        $text = trim((string) preg_replace('/\s+/', ' ', $raw));
+        $text = (string) preg_replace('/Bearer\s+\S+/i', 'Bearer [redacted]', $text);
+
+        return mb_strlen($text) > self::MAX_ERROR_BODY_CHARS
+            ? mb_substr($text, 0, self::MAX_ERROR_BODY_CHARS).'…'
+            : $text;
     }
 }
