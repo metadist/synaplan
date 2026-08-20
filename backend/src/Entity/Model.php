@@ -9,6 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'BMODELS')]
 #[ORM\Index(columns: ['BTAG'], name: 'idx_tag')]
 #[ORM\Index(columns: ['BSERVICE'], name: 'idx_service')]
+#[ORM\Index(columns: ['BRETIREDON'], name: 'IDX_BMODELS_RETIREDON')]
 class Model
 {
     #[ORM\Id]
@@ -61,6 +62,27 @@ class Model
 
     #[ORM\Column(name: 'BDESCRIPTION', type: 'text', nullable: true)]
     private ?string $description = null;
+
+    /**
+     * Date the provider retired this model, or null when it is not retired.
+     *
+     * This is what distinguishes an inactive row that is dead upstream from one
+     * an operator switched off on purpose. Written by ModelRetirementSeeder from
+     * {@see \App\Model\ModelCatalog}::RETIREMENTS, never by hand.
+     */
+    #[ORM\Column(name: 'BRETIREDON', type: 'date_immutable', nullable: true)]
+    private ?\DateTimeImmutable $retiredOn = null;
+
+    /**
+     * BID that replaces this retired model, or null when the provider shipped no
+     * replacement (an embedding model, or a capability that simply went away).
+     *
+     * Deliberately a plain int and not a self-referencing association:
+     * successors get retired in turn, and a foreign key would turn a future
+     * retirement into a constraint failure.
+     */
+    #[ORM\Column(name: 'BSUCCESSORID', type: 'integer', nullable: true)]
+    private ?int $successorId = null;
 
     #[ORM\Column(name: 'BJSON', type: 'json')]
     private array $json = [];
@@ -284,6 +306,35 @@ class Model
     public function setDescription(?string $description): self
     {
         $this->description = $description;
+
+        return $this;
+    }
+
+    public function getRetiredOn(): ?\DateTimeImmutable
+    {
+        return $this->retiredOn;
+    }
+
+    public function setRetiredOn(?\DateTimeImmutable $retiredOn): self
+    {
+        $this->retiredOn = $retiredOn;
+
+        return $this;
+    }
+
+    public function isRetired(): bool
+    {
+        return null !== $this->retiredOn;
+    }
+
+    public function getSuccessorId(): ?int
+    {
+        return $this->successorId;
+    }
+
+    public function setSuccessorId(?int $successorId): self
+    {
+        $this->successorId = $successorId;
 
         return $this;
     }

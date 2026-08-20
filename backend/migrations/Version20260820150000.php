@@ -50,17 +50,12 @@ final class Version20260820150000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql(<<<'SQL'
-            ALTER TABLE BMODELS
-                ADD COLUMN IF NOT EXISTS BRETIREDON DATE DEFAULT NULL
-                    COMMENT 'Date this model was retired upstream; NULL = not retired (an inactive row is then an operator choice)'
-        SQL);
-
-        $this->addSql(<<<'SQL'
-            ALTER TABLE BMODELS
-                ADD COLUMN IF NOT EXISTS BSUCCESSORID INT DEFAULT NULL
-                    COMMENT 'BID that replaces this retired model; NULL = the provider shipped no replacement'
-        SQL);
+        // No column COMMENT on purpose: the entity mapping declares none, and
+        // `doctrine:schema:validate` (a CI gate) reports a comment that only
+        // exists in the database as schema drift. The documentation lives on
+        // App\Entity\Model instead.
+        $this->addSql('ALTER TABLE BMODELS ADD COLUMN IF NOT EXISTS BRETIREDON DATE DEFAULT NULL');
+        $this->addSql('ALTER TABLE BMODELS ADD COLUMN IF NOT EXISTS BSUCCESSORID INT DEFAULT NULL');
 
         // Retirement lookups are always "is this BID dead" (single-row, already
         // covered by the PK) or "list what died", which is a small scan today
