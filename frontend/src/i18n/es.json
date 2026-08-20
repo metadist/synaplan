@@ -667,6 +667,32 @@
   "guest": {
     "disabledTitle": "El chat de invitados no está disponible",
     "disabledDescription": "Esta instancia no ofrece una prueba anónima. Inicia sesión para empezar a chatear.",
+    "banner": {
+      "title": "Estás usando Synaplan como invitado",
+      "subtitle": "Regístrate para tener memorias, historial de chats y más",
+      "remaining": "Quedan {count} mensajes",
+      "signUp": "Regístrate gratis"
+    },
+    "limitModal": {
+      "title": "Has alcanzado el límite de invitado",
+      "subtitle": "Crea una cuenta gratuita para seguir chateando con la IA",
+      "features": {
+        "memories": "Una IA que recuerda tus preferencias",
+        "history": "Historial de chats permanente",
+        "files": "Subida de archivos y análisis de documentos",
+        "models": "Elige entre varios modelos de IA"
+      },
+      "registerButton": "Crear cuenta gratuita",
+      "loginButton": "¿Ya tienes una cuenta? Inicia sesión"
+    },
+    "errorTitle": "La prueba no está disponible ahora mismo",
+    "errorDescription": "No hemos podido iniciar tu sesión de invitado. Inténtalo de nuevo o crea una cuenta gratuita.",
+    "expiredTitle": "Tu sesión ha caducado",
+    "expiredDescription": "Las sesiones de invitado duran 24 horas y esta conversación de prueba no se puede recuperar. Empieza una nueva prueba o crea una cuenta gratuita para que tus chats se guarden a partir de ahora.",
+    "rateLimitedTitle": "Demasiadas sesiones",
+    "rateLimitedDescription": "Has alcanzado el límite de sesiones. Inténtalo más tarde o crea una cuenta gratuita.",
+    "retry": "Inténtalo de nuevo",
+    "createAccount": "Crear cuenta",
     "featureGate": {
       "title": "Esta función requiere una cuenta",
       "subtitle": "Crea una cuenta gratuita para desbloquear todas las funciones",
@@ -1901,7 +1927,7 @@
       "reminder": "Saca más partido a Synaplan"
     },
     "subtitle": {
-      "guest_limit": "Elige un plan para seguir chateando, con tu propio historial, memorias y archivos.",
+      "guest_limit": "Elige un plan para seguir chateando. Con una cuenta tendrás, a partir de ahora, tu propio historial, memorias y archivos.",
       "free_limit": "Tu cuota gratuita está agotada. Elige un plan para seguir chateando sin límites.",
       "quota_exhausted": "Cambia a un plan superior para continuar ahora mismo, o espera a que tu cuota se reinicie el mes que viene.",
       "reminder": "Un plan te da más mensajes, modelos de IA más potentes y más almacenamiento."
