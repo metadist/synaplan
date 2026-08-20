@@ -164,10 +164,14 @@ const headerTitle = computed(() => {
 
 const headerSubtitle = computed(() => {
   const list = recordList.value
-  if (!list || list.total === null || list.total === list.records.length) {
+  if (!list || list.total === null) {
     return ''
   }
-  return t('message.jsonViewer.shownOf', { shown: list.records.length, total: list.total })
+  const shown = visibleRecords.value.length
+  if (shown === list.total) {
+    return ''
+  }
+  return t('message.jsonViewer.shownOf', { shown, total: list.total })
 })
 
 const copyJson = async () => {
