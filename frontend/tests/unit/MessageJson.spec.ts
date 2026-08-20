@@ -50,6 +50,22 @@ describe('MessageJson', () => {
     expect(wrapper.find('[data-testid="json-truncated-hint"]').exists()).toBe(true)
   })
 
+  it('reports only the visible rows in the "Showing X of Y" subtitle', async () => {
+    const records = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, title: `Chat ${i + 1}` }))
+    const wrapper = mount(MessageJson, {
+      props: { content: JSON.stringify({ total: 30, chats: records }) },
+    })
+
+    // 20 of the 25 recovered records are rendered initially
+    expect(wrapper.findAll('[data-testid="json-record-row"]')).toHaveLength(20)
+    expect(wrapper.text()).toContain('Showing 20 of 30')
+
+    await wrapper.get('[data-testid="btn-json-show-more"]').trigger('click')
+
+    expect(wrapper.findAll('[data-testid="json-record-row"]')).toHaveLength(25)
+    expect(wrapper.text()).toContain('Showing 25 of 30')
+  })
+
   it('copies pretty JSON', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
