@@ -85,7 +85,7 @@ final readonly class ModelRetirementSeeder
                 continue;
             }
 
-            $this->apply($bid, $record['retiredOn'], $successorBid);
+            $this->apply($bid, $record['providerId'], $record['retiredOn'], $successorBid);
             ++$updated;
 
             $this->logger->info('Model retired', [
@@ -141,7 +141,15 @@ final readonly class ModelRetirementSeeder
             && 0 === $row['BISDEFAULT'];
     }
 
-    private function apply(int $bid, string $retiredOn, ?int $successorBid): void
+    /**
+     * The BPROVID guard is repeated here even though the caller already checked
+     * it against the SELECT. `app:seed` runs on every container start, and
+     * production is a three-node Galera cluster sharing one schema, so another
+     * node writing between our SELECT and this UPDATE is the normal case rather
+     * than a hypothetical. Keying the write on BID alone would let that race
+     * stamp a retirement onto a row that has since become a different model.
+     */
+    private function apply(int $bid, string $providerId, string $retiredOn, ?int $successorBid): void
     {
         $this->connection->executeStatement(<<<'SQL'
             UPDATE BMODELS
@@ -151,10 +159,12 @@ final readonly class ModelRetirementSeeder
                    BSELECTABLE = 0,
                    BISDEFAULT = 0
              WHERE BID = :bid
+               AND BPROVID = :providerId
         SQL, [
             'retiredOn' => $retiredOn,
             'successorBid' => $successorBid,
             'bid' => $bid,
+            'providerId' => $providerId,
         ]);
     }
 }

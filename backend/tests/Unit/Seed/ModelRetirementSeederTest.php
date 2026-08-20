@@ -87,6 +87,28 @@ final class ModelRetirementSeederTest extends TestCase
     }
 
     /**
+     * The in-PHP guard compares against a SELECT that has already returned.
+     * `app:seed` runs on every container start against a shared Galera schema,
+     * so the write itself must carry the guard too — otherwise a concurrent
+     * change between SELECT and UPDATE can retire whatever the row became.
+     */
+    public function testTheWriteItselfIsGuardedOnTheProviderIdNotJustTheBid(): void
+    {
+        $bid = self::aRetiredBidWithSuccessor();
+        $record = ModelCatalog::retirement($bid);
+        self::assertNotNull($record);
+
+        $captured = [];
+        $connection = $this->connection([$this->liveRow($bid, $record['providerId'])], $captured);
+
+        (new ModelRetirementSeeder($connection, new NullLogger()))->seed();
+
+        self::assertCount(1, $captured);
+        self::assertStringContainsString('BPROVID = :providerId', $captured[0]['sql']);
+        self::assertSame($record['providerId'], $captured[0]['providerId']);
+    }
+
+    /**
      * An operator who reused the BID for a different model owns that row now.
      */
     public function testARepurposedBidIsLeftAlone(): void
@@ -182,6 +204,7 @@ final class ModelRetirementSeederTest extends TestCase
                     'retiredOn' => $params['retiredOn'] ?? null,
                     'successorBid' => $params['successorBid'] ?? null,
                     'bid' => $params['bid'] ?? null,
+                    'providerId' => $params['providerId'] ?? null,
                 ];
 
                 return 1;
