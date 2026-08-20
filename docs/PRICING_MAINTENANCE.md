@@ -106,7 +106,7 @@ It runs in **two stages, and the second one is the point**: the provider's model
 - **False alarm** — Gemini serves `imagen-4.0-generate-001` through `:predict` and leaves it out of `models.list`, but answers `200` when asked directly. A list-only check reports all three Imagen rows as dead.
 - **Blind spot** — xAI's `grok-tts` is also absent from `/v1/models`, and there it really is gone (`404`). Any heuristic that excused the Imagen case (per-capability coverage, tag families) hid this one.
 
-What it deliberately does **not** do: change anything. No `BACTIVE=0`, no default repointing. A model also disappears from a listing through a rename, a region gate or an account tier, and an unattended deactivation on a false positive takes a working model away from every user of the install. Retirement stays a reviewed migration (see the retirement policy below).
+What it deliberately does **not** do: change anything. No `BACTIVE=0`, no default repointing. A model also disappears from a listing through a rename, a region gate or an account tier, and an unattended deactivation on a false positive takes a working model away from every user of the install. Retirement stays a reviewed, human decision — now a reviewed registry entry rather than a reviewed migration (see [Retiring a model](#retiring-a-model)).
 
 Reporting rules that keep it trustworthy:
 
@@ -345,7 +345,45 @@ Comparing the production catalog (`GET /api/v1/admin/models`) against `ModelCata
 
 `ModelCatalogTest::testNoCatalogPriceIsAuthoredUnderAUnitThatNormalisesToZero()` now fails the build if a catalog row is ever authored this way again. Note that `per_generation` (Higgsfield video, BIDs 302–308) is *not* this bug — unknown units fall through as per-1, which is what a flat per-clip fee needs.
 
-> **Removing a model from the catalog is only half a retirement.** `ModelSeeder` never deletes or deactivates rows, so a model dropped from `ModelCatalog.php` without a companion migration stays `BACTIVE=1, BSELECTABLE=1` in every existing database — still pickable in the UI and still billed at whatever price the stale row holds. That is how Opus 4.1/4.5 survived several releases. Always pair a catalog removal with a deactivation migration.
+> **Removing a model from the catalog is only half a retirement.** `ModelSeeder` never deletes or deactivates rows, so a model dropped from `ModelCatalog.php` on its own stays `BACTIVE=1, BSELECTABLE=1` in every existing database — still pickable in the UI and still billed at whatever price the stale row holds. That is how Opus 4.1/4.5 survived several releases. Since #1515 the second half is a data entry rather than a migration; see [Retiring a model](#retiring-a-model) below.
+
+## Retiring a model
+
+Every retirement above needed its own hand-written migration, and three of them existed *only* to clean up models an earlier release had dropped from the catalog while leaving them live in every install. #1515 replaced that with a registry: `ModelCatalog::RETIREMENTS`, applied by `ModelRetirementSeeder` on every deploy.
+
+**The whole procedure is now:**
+
+1. Add the entry to `ModelCatalog::RETIREMENTS`, keyed by the retired BID:
+
+```php
+321 => [
+    'providerId' => 'grok-stt',                  // guard: the row is skipped if the BID now holds something else
+    'retiredOn' => '2026-08-20',                 // ships as BMODELS.BRETIREDON
+    'successor' => null,                         // catalog key, or null for "no replacement" on purpose
+    'reason' => 'Retired by xAI with no replacement speech endpoint (#1514).',
+],
+```
+
+2. Set `active` and `selectable` to `0` on the catalog row if you are keeping it, or remove the row entirely. Either is fine — the registry is what carries the retirement.
+3. Run `make -C backend test`. No migration, no SQL.
+
+**What the seeder does**, idempotently and on every container start, for each entry whose row exists and still matches `providerId`: stamps `BRETIREDON` and `BSUCCESSORID`, and forces `BACTIVE = BSELECTABLE = BISDEFAULT = 0`. A re-run writes nothing. A BID an operator repurposed is skipped with a warning. Rows are never deleted — `BMESSAGES` has FKs into `BMODELS` and **BIDs must never be reused**.
+
+**Why a separate seeder from `ModelSeeder`:** that one treats `BACTIVE`/`BSELECTABLE`/`BISDEFAULT` as operator-owned and never overwrites them, which is right for a live model and wrong for a dead one. A retirement outranks an operator preference — "please keep offering this" on a model the provider switched off only produces a failing request. Keeping the override in its own seeder makes it explicit instead of punching a hole in `ModelSeeder`'s preservation rules.
+
+**`successor: null` is a statement, not a gap.** It means no substitution may be made — an embedding model (a different model is a different vector space; see the `VECTORIZE` warning above) or a provider that shipped no replacement at all. Do not fill it with another provider's model to avoid the null: that assumes an API key the operator may not hold.
+
+**The guard that makes this stick:** `ModelCatalogRetirementTest` snapshots every BID the catalog has ever shipped (`tests/Unit/Model/__snapshots__/model_bids.json`). Drop a model without a retirement entry and it fails, naming the BID. Adding models is expected — re-record and review that the diff is additions only:
+
+```bash
+docker compose exec -T -e UPDATE_MODEL_BID_SNAPSHOT=1 backend \
+  ./vendor/bin/phpunit tests/Unit/Model/ModelCatalogRetirementTest.php
+git diff backend/tests/Unit/Model/__snapshots__/
+```
+
+It also enforces that a recorded successor resolves to exactly one live catalog entry and is not itself retired, so a chain of retirements can never repoint an install at another dead model.
+
+**Still open (follows separately, #1515):** consuming `BSUCCESSORID` at resolution time and surfacing retirement state in the admin UI. Until then, `DEFAULTMODEL` bindings that point at a retired BID are handled as before — repointed or deleted by the migration that accompanied that retirement — and a stale binding degrades through `ModelConfigService`'s logged fallback, since it treats a deactivated row as unusable.
 
 ## Related issues
 
