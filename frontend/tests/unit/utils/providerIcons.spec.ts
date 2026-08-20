@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getProviderIcon, getProviderFlag } from '@/utils/providerIcons'
+import { getProviderIcon, getProviderFlag, isLocalSelfHostedProvider } from '@/utils/providerIcons'
 
 describe('Provider Icons Utility', () => {
   it('should return OpenAI icon for openai service', () => {
@@ -73,18 +73,27 @@ describe('Provider Flag Utility', () => {
     expect(getProviderFlag('openai')).toBe('circle-flags:us')
   })
 
-  it('should return a neutral world badge (not the US flag) for OpenAI-compatible', () => {
-    expect(getProviderFlag('OpenAICompatible')).toBe('circle-flags:un')
-    expect(getProviderFlag('openaicompatible')).toBe('circle-flags:un')
-  })
-
-  it('should return the German flag for self-hosted Ollama', () => {
-    expect(getProviderFlag('ollama')).toBe('circle-flags:de')
+  it('should return a local pin (not a country flag) for self-hosted engines', () => {
+    // These run on the operator's machine. A German flag implied Synaplan-DE
+    // hosting and looked wrong on every local Ollama install.
+    expect(getProviderFlag('ollama')).toBe('mdi:map-marker')
+    expect(getProviderFlag('Ollama')).toBe('mdi:map-marker')
+    expect(getProviderFlag('piper')).toBe('mdi:map-marker')
+    expect(getProviderFlag('triton')).toBe('mdi:map-marker')
+    expect(getProviderFlag('OpenAICompatible')).toBe('mdi:map-marker')
+    expect(getProviderFlag('openaicompatible')).toBe('mdi:map-marker')
   })
 
   it('should return the German flag for TrustedTokens', () => {
     expect(getProviderFlag('TrustedTokens')).toBe('circle-flags:de')
     expect(getProviderFlag('trustedtokens')).toBe('circle-flags:de')
     expect(getProviderFlag('trusted-tokens')).toBe('circle-flags:de')
+  })
+
+  it('should classify only self-hosted engines as local', () => {
+    expect(isLocalSelfHostedProvider('ollama')).toBe(true)
+    expect(isLocalSelfHostedProvider('triton')).toBe(true)
+    expect(isLocalSelfHostedProvider('TrustedTokens')).toBe(false)
+    expect(isLocalSelfHostedProvider('openai')).toBe(false)
   })
 })
