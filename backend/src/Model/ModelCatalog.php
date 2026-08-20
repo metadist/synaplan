@@ -324,6 +324,7 @@ class ModelCatalog
         'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0],
         'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
         'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0],
+        'grok-4.6' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0],
     ];
 
     /**
@@ -3250,11 +3251,69 @@ class ModelCatalog
             ],
         ],
         // ==================== xAI (GROK) ====================
-        // Snapshot 2026-07-29 from https://docs.x.ai/developers/pricing.
+        // Snapshot 2026-07-29 from https://docs.x.ai/developers/pricing;
+        // Grok 4.6 rows added from the 2026-08-20 snapshot.
         // Chat rows are covered by the LiteLLM sync (keys `xai/<providerId>`);
         // the Grok Imagine rows are not and must be verified manually.
         // Above 200K prompt tokens xAI bills the whole request at 2x — encoded
         // in self::CONTEXT_PRICING, not here.
+        [
+            'id' => 326,
+            'service' => 'xAI',
+            'name' => 'Grok 4.6',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.6',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 6.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.6 - flagship model for code, agentic tasks and knowledge work with a 500K context window. Reasoning is always on and its depth is not configurable.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'grok-4.6'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                // Official docs price: $0.50/1M — unlike grok-4.5, this matches
+                // what LiteLLM reports, so no sync-drift caveat applies here.
+                'cache_read_price_per_1M' => 0.50,
+                // No reasoning_effort_default: xAI accepts that parameter for
+                // grok-4.3 only, so XaiProvider never sends it for this model.
+                'meta' => [
+                    'context_window' => '500000',
+                    'max_output' => '32768',
+                    'regions' => 'us-east-1, us-west-2',
+                ],
+            ],
+        ],
+        [
+            'id' => 327,
+            'service' => 'xAI',
+            'name' => 'Grok 4.6 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.6',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 6.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.6 image understanding - describe images and extract text (OCR-style) via the chat endpoint. Max 20 MiB per image, JPEG/PNG only.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'grok-4.6'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 0.50,
+                'meta' => [
+                    'supports_images' => true,
+                    'max_image_bytes' => '20971520',
+                ],
+            ],
+        ],
         [
             'id' => 313,
             'service' => 'xAI',

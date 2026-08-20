@@ -53,26 +53,39 @@ export const getProviderIcon = (provider: string): string => {
 }
 
 /**
+ * Self-hosted engines that run on the operator's machine. They have no home
+ * country — a German flag on Ollama made every local install look like a
+ * Synaplan-DE product. The badge is a pin, not a flag.
+ */
+export const isLocalSelfHostedProvider = (provider: string): boolean => {
+  const p = provider.toLowerCase()
+  const compact = p.replace(/[\s_-]/g, '')
+
+  return (
+    p.includes('ollama') ||
+    p.includes('piper') ||
+    p.includes('triton') ||
+    p.includes('synaplan') ||
+    compact.includes('openaicompatible')
+  )
+}
+
+/**
  * Country/region flag shown as a small badge behind a provider's service icon.
  *
  * Uses the circular `circle-flags` Iconify set so every badge shares the same
- * round shape. Providers without a clear home country (or any unlisted service)
- * fall back to the UN "world" emblem.
+ * round shape. Local/self-hosted engines get a pin instead. Providers without
+ * a clear home country (or any unlisted service) fall back to the UN emblem.
  */
 export const getProviderFlag = (provider: string): string => {
   const p = provider.toLowerCase()
 
-  if (p.replace(/[\s_-]/g, '').includes('openaicompatible')) {
-    // Operator-defined, self-hosted endpoint — no fixed country. Use the
-    // neutral "world" badge (and NOT the US flag the `openai` branch returns).
-    return 'circle-flags:un'
-  } else if (
-    p.includes('ollama') ||
-    p.includes('piper') ||
-    p.includes('synaplan') ||
-    p.replace(/[\s_-]/g, '').includes('trustedtokens')
-  ) {
-    // Ollama / Synaplan / Piper TTS and TrustedTokens (TNG) are German-hosted.
+  if (isLocalSelfHostedProvider(provider)) {
+    // Pin on the existing brand icon (the Ollama llama, the Piper speaker…).
+    // Not a country: these models run wherever the operator installed them.
+    return 'mdi:map-marker'
+  } else if (p.replace(/[\s_-]/g, '').includes('trustedtokens')) {
+    // TNG TrustedTokens — German sovereign inference, actually hosted in DE.
     return 'circle-flags:de'
   } else if (p.includes('mistral')) {
     return 'circle-flags:fr'
