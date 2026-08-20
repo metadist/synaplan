@@ -9,6 +9,7 @@ use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
+use App\Service\Chat\ChatTitleService;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
@@ -89,6 +90,7 @@ class StreamController extends AbstractController
         private MessageForwardingService $messageForwardingService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private ConversationSummaryRefreshDispatcher $conversationSummaryRefreshDispatcher,
+        private ChatTitleService $chatTitleService,
         private DocumentGeneratorService $documentGenerator,
         private DocumentImageReferenceResolver $documentImageReferenceResolver,
         private MediaCancellationStore $cancellationStore,
@@ -1904,6 +1906,20 @@ class StreamController extends AbstractController
                     $this->messageForwardingService->forwardIfNeeded($chat, $finalText);
                 }
 
+                // Name the conversation once its first exchange is stored, so
+                // the sidebar stops filling with "Hi" and "New Chat" (#1500).
+                // Runs at most once per chat: titleWebChatIfNeeded() returns
+                // null as soon as a title exists, including one the user typed.
+                // Widget sessions title themselves on their own trigger, and
+                // incognito turns persist nothing to name.
+                $generatedChatTitle = null;
+                if (!$isWidgetMode && !$isGuestMode && !$incognito && $chat) {
+                    $generatedChatTitle = $this->chatTitleService->titleWebChatIfNeeded(
+                        $chat,
+                        (int) $user->getId(),
+                    );
+                }
+
                 $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                     'provider' => $response['metadata']['provider'] ?? 'unknown',
                     'model' => $response['metadata']['model'] ?? 'unknown',
@@ -2044,6 +2060,12 @@ class StreamController extends AbstractController
                     'searchResults' => $searchResults,
                     'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
                 ];
+
+                // Only present on the turn that named the chat, so the sidebar
+                // can pick the title up without refetching the chat list.
+                if (null !== $generatedChatTitle) {
+                    $completeData['chatTitle'] = $generatedChatTitle;
+                }
 
                 // Usage taximeter: per-message usage (switch-independent) and,
                 // only when the display is enabled for authenticated web users,

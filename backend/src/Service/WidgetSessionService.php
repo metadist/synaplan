@@ -2,12 +2,11 @@
 
 namespace App\Service;
 
-use App\AI\Service\AiFacade;
 use App\Entity\Chat;
 use App\Entity\WidgetSession;
 use App\Repository\MessageRepository;
-use App\Repository\UserRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\Chat\ChatTitleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -43,10 +42,7 @@ final class WidgetSessionService
         private EntityManagerInterface $em,
         private WidgetSessionRepository $sessionRepository,
         private MessageRepository $messageRepository,
-        private UserRepository $userRepository,
-        private AiFacade $aiFacade,
-        private ModelConfigService $modelConfigService,
-        private RateLimitService $rateLimitService,
+        private ChatTitleService $chatTitleService,
         private LoggerInterface $logger,
     ) {
     }
@@ -254,86 +250,38 @@ final class WidgetSessionService
             'user_message_count' => $userMessageCount,
         ]);
 
-        try {
-            // Build conversation text for summarization (using already fetched user messages)
-            $conversationText = '';
-            foreach ($userMessages as $message) {
-                $text = mb_substr($message->getText(), 0, 200);
-                $conversationText .= "- {$text}\n";
-            }
+        // Generation itself is shared with the web-chat titles (#1500): same
+        // SUMMARIZE-capability model resolution, same context-free request,
+        // same cleanup. Only the trigger and the target column differ.
+        $title = $this->chatTitleService->generate(
+            $this->chatTitleService->toTurns(array_values($userMessages)),
+            $ownerId,
+            'WIDGET_TITLE',
+        );
 
-            // Resolve a cheap, fast summarization model via the SUMMARIZE
-            // capability default (SUMMARIZE → SORT → CHAT) instead of a
-            // hardcoded model id (#1320).
-            $summaryConfig = $this->modelConfigService->getSummaryModelConfig($ownerId);
-            $titleModelId = $summaryConfig['model_id'];
-            $aiOptions = ['temperature' => 0.3];
-            if ($summaryConfig['provider'] && $summaryConfig['model']) {
-                $aiOptions['provider'] = $summaryConfig['provider'];
-                $aiOptions['model'] = $summaryConfig['model'];
-            }
-
-            $prompt = <<<PROMPT
-Based on these user questions/messages, create a short title (3-5 words) that describes what the user is asking about.
-Only output the title, nothing else. No quotes, no punctuation at the end.
-
-User messages:
-{$conversationText}
-
-Title:
-PROMPT;
-
-            $response = $this->aiFacade->chat(
-                [['role' => 'user', 'content' => $prompt]],
-                $ownerId,
-                $aiOptions
-            );
-
-            $title = trim($response['content'] ?? '');
-
-            $owner = $this->userRepository->find($ownerId);
-            if ($owner) {
-                $this->rateLimitService->recordUsage($owner, 'WIDGET_TITLE', [
-                    'provider' => $response['provider'] ?? 'unknown',
-                    'model' => $response['model'] ?? 'unknown',
-                    'model_id' => $titleModelId,
-                    'usage' => $response['usage'] ?? [],
-                    'response_text' => $title,
-                    'input_text' => $prompt,
-                ]);
-            }
-
-            // Clean up: remove quotes and limit length
-            $title = trim($title, '"\'');
-            $title = mb_substr($title, 0, 50);
-
-            if (!empty($title)) {
-                // Re-fetch session to check for race condition (another request may have set title)
-                $this->em->refresh($session);
-                if (null !== $session->getTitle()) {
-                    $this->logger->debug('Title already set by another process, discarding generated title', [
-                        'session_id' => substr($session->getSessionId(), 0, 12).'...',
-                        'existing_title' => $session->getTitle(),
-                        'discarded_title' => $title,
-                    ]);
-
-                    return;
-                }
-
-                $session->setTitle($title);
-                $this->em->flush();
-
-                $this->logger->info('Generated AI title for widget session', [
-                    'session_id' => substr($session->getSessionId(), 0, 12).'...',
-                    'title' => $title,
-                ]);
-            }
-        } catch (\Exception $e) {
-            $this->logger->warning('Failed to generate AI title for session', [
-                'session_id' => substr($session->getSessionId(), 0, 12).'...',
-                'error' => $e->getMessage(),
-            ]);
+        if (null === $title) {
+            return;
         }
+
+        // Re-fetch session to check for race condition (another request may have set title)
+        $this->em->refresh($session);
+        if (null !== $session->getTitle()) {
+            $this->logger->debug('Title already set by another process, discarding generated title', [
+                'session_id' => substr($session->getSessionId(), 0, 12).'...',
+                'existing_title' => $session->getTitle(),
+                'discarded_title' => $title,
+            ]);
+
+            return;
+        }
+
+        $session->setTitle($title);
+        $this->em->flush();
+
+        $this->logger->info('Generated AI title for widget session', [
+            'session_id' => substr($session->getSessionId(), 0, 12).'...',
+            'title' => $title,
+        ]);
     }
 
     /**

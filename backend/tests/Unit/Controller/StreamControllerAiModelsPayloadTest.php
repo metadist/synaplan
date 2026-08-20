@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
 use App\Entity\Message;
 use App\Repository\FileRepository;
+use App\Service\Chat\ChatTitleService;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
@@ -69,6 +70,7 @@ class StreamControllerAiModelsPayloadTest extends TestCase
             $this->createMock(MessageForwardingService::class),
             $this->createMock(MemoryExtractionDispatcher::class),
             $this->createMock(ConversationSummaryRefreshDispatcher::class),
+            $this->createStub(ChatTitleService::class),
             $this->createMock(DocumentGeneratorService::class),
             $this->createMock(DocumentImageReferenceResolver::class),
             $this->createMock(MediaCancellationStore::class),
