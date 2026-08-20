@@ -307,6 +307,37 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * xAI Grok 4.6 — flagship chat + vision rows added 2026-08-20. Both talk to
+     * the same upstream model id, carry the official $2/$6 per-1M pricing with a
+     * $0.50/1M cache-read rate, and share the >200k long-context 2x tier via
+     * CONTEXT_PRICING (keyed by providerId, so one entry covers both rows).
+     */
+    public function testGrok46ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $grok46 = ModelCatalog::find('xai:grok-4.6');
+
+        $this->assertCount(2, $grok46, 'Expected grok-4.6 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($grok46, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('xai:grok-4.6:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('xai:grok-4.6:pic2text'));
+
+        foreach ($grok46 as $variant) {
+            $this->assertSame('xAI', $variant['service']);
+            $this->assertSame('grok-4.6', $variant['providerId']);
+            $this->assertSame('grok-4.6', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(6.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.50, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+
+        $tier = ModelCatalog::contextPricing('grok-4.6');
+        $this->assertNotNull($tier);
+        $this->assertSame(200000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(4.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(12.0, $tier['price_out_above'], 1e-9);
+    }
+
+    /**
      * The pre-4.8 Claude generations were retired in favour of Opus 4.8 and the
      * 5-series (deactivated in existing installs by Version20260727120000). Their
      * BIDs must never come back: BMESSAGES rows still reference them, and the
