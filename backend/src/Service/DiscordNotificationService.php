@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Health\ModelHealthAlert;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
@@ -759,6 +760,68 @@ final readonly class DiscordNotificationService
             color: self::COLOR_WARNING,
             fields: $fields,
             footer: 'Synaplan model availability check · daily',
+        );
+    }
+
+    /**
+     * Report AI models that stopped working, or that started working again.
+     *
+     * Distinct from {@see self::notifyModelAvailabilityDrift()} on purpose: that
+     * one is a maintenance reminder that our catalog drifted from the provider's,
+     * this one is an incident about models failing right now — including the
+     * account-specific failures a catalog comparison cannot see.
+     *
+     * One message per provider rather than per model — see
+     * {@see ModelHealthAlert}. `@everyone` is reserved for the
+     * credential case: a rejected key or an empty balance takes out every model
+     * behind that provider and only an operator can fix it, whereas a provider
+     * retiring a single model can wait for office hours.
+     */
+    public function notifyModelHealth(ModelHealthAlert $alert, bool $resolved = false): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => '🏢 Provider',
+                'value' => $alert->name(),
+                'inline' => true,
+            ],
+            [
+                'name' => '🔢 Models',
+                'value' => (string) $alert->modelCount(),
+                'inline' => true,
+            ],
+            [
+                'name' => '🧠 Affected',
+                'value' => $this->truncate($alert->previewNames(), self::MAX_RESPONSE),
+                'inline' => false,
+            ],
+            [
+                'name' => $resolved ? 'Recovered after' : '⚠️ Reason',
+                'value' => '```'.$this->truncate($alert->reason, self::MAX_ERROR).'```',
+                'inline' => false,
+            ],
+        ];
+
+        if (!$resolved) {
+            $fields[] = [
+                'name' => 'Action required',
+                'value' => $alert->actionRequired(),
+                'inline' => false,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: $resolved
+                ? '✅ [RESOLVED] '.$alert->name().' models available again'
+                : '🚨 [INCIDENT] '.$alert->headline(),
+            color: $resolved ? self::COLOR_SUCCESS : self::COLOR_ERROR,
+            fields: $fields,
+            footer: 'Synaplan Model Health · one alert per provider',
+            mentionEveryone: !$resolved && ModelHealthAlert::KIND_CREDENTIAL === $alert->kind,
         );
     }
 

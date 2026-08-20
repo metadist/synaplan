@@ -114,6 +114,7 @@
     "profile": "Profile",
     "admin": "Admin Panel",
     "adminFeatures": "Feature Status",
+    "adminModelStatus": "Model Status",
     "adminConfig": "System Configuration",
     "adminSetup": "AI Provider Setup",
     "subscription": "Subscription",
@@ -132,6 +133,67 @@
     "aiAgents": "AI Agents",
     "connections": "Connections",
     "savedTasks": "Saved Tasks"
+  },
+  "adminModelStatus": {
+    "title": "Model Status",
+    "subtitle": "Which AI models are currently working, and which are not.",
+    "loading": "Loading model status…",
+    "loadFailed": "The model status could not be loaded.",
+    "never": "never",
+    "noMatches": "No models match the current filters.",
+    "freeHint": "Checking is free: providers are only asked which models they publish. No AI model is ever run for this.",
+    "states": {
+      "online": "Online",
+      "degraded": "Impaired",
+      "offline": "Offline",
+      "unconfigured": "Not set up",
+      "unknown": "Unknown"
+    },
+    "sources": {
+      "probe": "provider model list",
+      "traffic": "real usage"
+    },
+    "summary": {
+      "allGood": "All models are answering",
+      "problems": "{count} model(s) need attention",
+      "lastCheck": "Last checked",
+      "monitoringOff": "Automatic checking is switched off, so this page only shows the last known state."
+    },
+    "filters": {
+      "onlyProblems": "Only show problems",
+      "capability": "Task",
+      "allCapabilities": "All tasks"
+    },
+    "provider": {
+      "affected": "{count} affected"
+    },
+    "model": {
+      "lastSuccess": "Last worked",
+      "errorRate": "{percent}% of the last {total} calls failed",
+      "source": "Based on",
+      "autoDisabled": "Switched off automatically",
+      "switchedOff": "Switched off",
+      "exempt": "Exempt from automatic switch-off"
+    },
+    "actions": {
+      "refresh": "Check now",
+      "refreshProvider": "Check this provider",
+      "refreshProviderAria": "Check {provider} now",
+      "resetCounters": "Clear error history",
+      "exempt": "Exempt from automation",
+      "unexempt": "Allow automation again"
+    },
+    "confirmResetTitle": "Clear error history?",
+    "confirmResetMessage": "\"{name}\" will then be judged on new usage only. A check that already found this model retired is not undone.",
+    "messages": {
+      "refreshed": "Checked {count} model(s).",
+      "refreshFailed": "The check could not be completed.",
+      "exempted": "This model is now exempt from automatic switch-off.",
+      "unexempted": "Automatic switch-off applies to this model again.",
+      "exemptFailed": "The exemption could not be changed.",
+      "countersReset": "Error history cleared.",
+      "countersResetFailed": "The error history could not be cleared."
+    }
   },
   "addinConnect": {
     "title": "Connect to Synaplan",
@@ -598,6 +660,7 @@
     "admin": "Admin",
     "adminDashboard": "Dashboard",
     "adminFeatureStatus": "Feature Status",
+    "adminModelStatus": "Model Status",
     "adminSystemConfig": "System Config",
     "adminProviderSetup": "AI Providers",
     "more": "More",

@@ -441,6 +441,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminFeatures' },
     },
     {
+      path: '/admin/model-status',
+      name: 'admin-model-status',
+      component: () => import('@/views/ModelStatusView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminModelStatus' },
+    },
+    {
       path: '/admin/config',
       name: 'admin-config',
       component: () => import('@/views/AdminConfigView.vue'),

@@ -83,3 +83,10 @@ plugins/synafastbill/
 
 #local development stuff
 _devextras/local-ignore/
+
+# Local output of scripts/mobile-impact.mjs. Anchored to the repo root on
+# purpose: every workflow passes an explicit --output elsewhere
+# (mobile-impact/manifest.json, mobile-release/mobile-release-manifest.json),
+# and those must stay visible to git. Only a run without --output lands here.
+/mobile-release-manifest.json
+/mobile-impact-manifest.json

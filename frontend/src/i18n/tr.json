@@ -112,6 +112,7 @@
     "profile": "Profil",
     "admin": "Yönetici Paneli",
     "adminFeatures": "Özellik Durumu",
+    "adminModelStatus": "Model Durumu",
     "adminConfig": "Sistem Yapılandırması",
     "adminSetup": "AI Sağlayıcı Kurulumu",
     "subscription": "Abonelik",
@@ -131,6 +132,67 @@
     "aiAgents": "Yapay zeka ajanları",
     "connections": "Bağlantılar",
     "savedTasks": "Kayıtlı görevler"
+  },
+  "adminModelStatus": {
+    "title": "Model Durumu",
+    "subtitle": "Hangi AI modelleri şu anda çalışıyor, hangileri çalışmıyor.",
+    "loading": "Model durumu yükleniyor…",
+    "loadFailed": "Model durumu yüklenemedi.",
+    "never": "hiç",
+    "noMatches": "Seçili filtrelere uyan model yok.",
+    "freeHint": "Kontrol ücretsizdir: sağlayıcılara yalnızca hangi modelleri yayınladıkları sorulur. Bunun için hiçbir zaman bir AI modeli çalıştırılmaz.",
+    "states": {
+      "online": "Çevrimiçi",
+      "degraded": "Sorunlu",
+      "offline": "Çevrimdışı",
+      "unconfigured": "Kurulmamış",
+      "unknown": "Bilinmiyor"
+    },
+    "sources": {
+      "probe": "sağlayıcının model listesi",
+      "traffic": "gerçek kullanım"
+    },
+    "summary": {
+      "allGood": "Tüm modeller yanıt veriyor",
+      "problems": "{count} model ilgi bekliyor",
+      "lastCheck": "Son kontrol",
+      "monitoringOff": "Otomatik kontrol kapalı, bu nedenle bu sayfa yalnızca bilinen son durumu gösterir."
+    },
+    "filters": {
+      "onlyProblems": "Yalnızca sorunları göster",
+      "capability": "Görev",
+      "allCapabilities": "Tüm görevler"
+    },
+    "provider": {
+      "affected": "{count} etkilendi"
+    },
+    "model": {
+      "lastSuccess": "Son çalıştığı zaman",
+      "errorRate": "Son {total} çağrının %{percent} kadarı başarısız oldu",
+      "source": "Dayanak",
+      "autoDisabled": "Otomatik olarak kapatıldı",
+      "switchedOff": "Kapalı",
+      "exempt": "Otomatik kapatmadan muaf"
+    },
+    "actions": {
+      "refresh": "Şimdi kontrol et",
+      "refreshProvider": "Bu sağlayıcıyı kontrol et",
+      "refreshProviderAria": "{provider} sağlayıcısını şimdi kontrol et",
+      "resetCounters": "Hata geçmişini temizle",
+      "exempt": "Otomasyondan muaf tut",
+      "unexempt": "Otomasyona tekrar izin ver"
+    },
+    "confirmResetTitle": "Hata geçmişi temizlensin mi?",
+    "confirmResetMessage": "Bundan sonra \"{name}\" yalnızca yeni kullanıma göre değerlendirilir. Modelin kaldırıldığını zaten tespit eden bir kontrol geri alınmaz.",
+    "messages": {
+      "refreshed": "{count} model kontrol edildi.",
+      "refreshFailed": "Kontrol tamamlanamadı.",
+      "exempted": "Bu model artık otomatik kapatmadan muaf.",
+      "unexempted": "Otomatik kapatma bu model için tekrar geçerli.",
+      "exemptFailed": "Muafiyet değiştirilemedi.",
+      "countersReset": "Hata geçmişi temizlendi.",
+      "countersResetFailed": "Hata geçmişi temizlenemedi."
+    }
   },
   "addinConnect": {
     "title": "Synaplan'a bağlan",
@@ -586,6 +648,7 @@
     "admin": "Yönetici",
     "adminDashboard": "Kontrol Paneli",
     "adminFeatureStatus": "Özellik Durumu",
+    "adminModelStatus": "Model Durumu",
     "adminSystemConfig": "Sistem Yapılandırması",
     "adminProviderSetup": "AI Sağlayıcıları",
     "profile": "Profil",

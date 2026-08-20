@@ -8,20 +8,25 @@ use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Seed\DefaultModelConfigSeeder;
 use Psr\Cache\CacheItemPoolInterface;
+use Psr\Log\LoggerInterface;
 
 /**
- * Service für dynamische AI-Modell-Konfiguration basierend auf User-Einstellungen.
+ * Resolves which AI model a user should get, from their settings.
  *
- * Ermöglicht User-spezifische Default-Modelle aus BCONFIG + BMODELS Tabellen
+ * User-specific defaults live in BCONFIG; the catalog of available models is BMODELS.
  */
 final readonly class ModelConfigService
 {
     private const USABLE_PROVIDERS_CACHE_KEY = 'model_config.usable_providers';
     private const USABLE_PROVIDERS_CACHE_TTL_SECONDS = 60;
+
+    private const OFFLINE_MODELS_CACHE_KEY = 'model_config.offline_models';
+    private const OFFLINE_MODELS_CACHE_TTL_SECONDS = 60;
 
     /**
      * DEFAULTMODEL capability => BMODELS.BTAG, for the last-resort pick in
@@ -60,17 +65,19 @@ final readonly class ModelConfigService
         private CacheItemPoolInterface $cache,
         private ProviderRegistry $providerRegistry,
         private OllamaModelInventory $ollamaModelInventory,
+        private ModelHealthRepository $modelHealthRepository,
+        private LoggerInterface $logger,
         private string $environment = 'prod',
     ) {
     }
 
     /**
-     * Holt Default-Provider für einen User und Capability.
+     * Default provider for a user and capability.
      *
-     * Reihenfolge:
-     * 1. User-spezifische Config (BCONFIG: BOWNERID=userId, BGROUP='ai', BSETTING='default_chat_provider')
-     * 2. Global Default Config (BOWNERID=0)
-     * 3. Smart Fallback from DB
+     * Order:
+     * 1. User-specific config (BCONFIG: BOWNERID=userId, BGROUP='ai', BSETTING='default_chat_provider')
+     * 2. Global default config (BOWNERID=0)
+     * 3. Smart fallback from the database
      */
     public function getDefaultProvider(?int $userId, string $capability = 'chat'): string
     {
@@ -81,7 +88,7 @@ final readonly class ModelConfigService
             return $item->get();
         }
 
-        // 1. User-spezifische Config
+        // 1. User-specific config
         if ($userId) {
             $config = $this->configRepository->findByOwnerGroupAndSetting(
                 $userId,
@@ -92,7 +99,7 @@ final readonly class ModelConfigService
             if ($config) {
                 $provider = $config->getValue();
                 $item->set($provider);
-                $item->expiresAfter(300); // 5 Min Cache
+                $item->expiresAfter(300); // 5 minute cache
                 $this->cache->save($item);
 
                 return $provider;
@@ -173,12 +180,12 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Holt Default-Modell für einen User, Provider und Capability (OLD METHOD - DEPRECATED).
+     * Default model for a user, provider and capability (OLD METHOD - DEPRECATED).
      *
-     * Reihenfolge:
-     * 1. User-spezifische Config (BCONFIG: 'default_chat_model')
-     * 2. BMODELS Tabelle (BPROVIDER, BCAPABILITY, BISDEFAULT=1)
-     * 3. ENV Variable (fallback)
+     * Order:
+     * 1. User-specific config (BCONFIG: 'default_chat_model')
+     * 2. BMODELS table (BPROVIDER, BCAPABILITY, BISDEFAULT=1)
+     * 3. ENV variable (fallback)
      */
     public function getDefaultModelOld(?int $userId, string $provider, string $capability = 'chat'): ?string
     {
@@ -189,7 +196,7 @@ final readonly class ModelConfigService
             return $item->get();
         }
 
-        // 1. User-spezifische Config
+        // 1. User-specific config
         if ($userId) {
             $config = $this->configRepository->findByOwnerGroupAndSetting(
                 $userId,
@@ -207,7 +214,7 @@ final readonly class ModelConfigService
             }
         }
 
-        // 2. BMODELS Tabelle
+        // 2. BMODELS table
         $model = $this->modelRepository->findDefaultByProviderAndCapability($provider, $capability);
 
         if ($model) {
@@ -219,7 +226,7 @@ final readonly class ModelConfigService
             return $modelName;
         }
 
-        // 3. null zurückgeben - Provider nutzt dann seinen eigenen Default
+        // 3. Return null — the provider then uses its own default
         $item->set(null);
         $item->expiresAfter(60);
         $this->cache->save($item);
@@ -228,7 +235,7 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Setzt User-spezifischen Default-Provider.
+     * Set a user-specific default provider.
      */
     public function setDefaultProvider(int $userId, string $capability, string $provider): void
     {
@@ -253,7 +260,7 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Setzt User-spezifisches Default-Modell.
+     * Set a user-specific default model.
      */
     public function setDefaultModel(int $userId, string $capability, string $model): void
     {
@@ -283,7 +290,7 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Holt komplette AI-Config für einen User.
+     * Full AI config for a user.
      */
     public function getUserAiConfig(?int $userId): array
     {
@@ -450,16 +457,67 @@ final readonly class ModelConfigService
             return null;
         }
 
-        foreach ([true, false] as $selectableOnly) {
-            // findByTag() orders by quality DESC, id ASC.
-            foreach ($this->modelRepository->findByTag($tag, $selectableOnly) as $model) {
-                if ($this->isModelUsable($model)) {
+        // Health is a preference, not a veto. Pass one skips the models the
+        // monitor considers dead; pass two accepts them anyway. A wrong health
+        // verdict must never be able to leave a capability with no model at
+        // all — routing at a suspect model beats routing nowhere, and the
+        // status page is there to tell the operator what happened.
+        foreach ([true, false] as $healthyOnly) {
+            foreach ([true, false] as $selectableOnly) {
+                // findByTag() orders by quality DESC, id ASC.
+                foreach ($this->modelRepository->findByTag($tag, $selectableOnly) as $model) {
+                    if (!$this->isModelUsable($model)) {
+                        continue;
+                    }
+                    if ($healthyOnly && $this->isModelOffline((int) $model->getId())) {
+                        continue;
+                    }
+
                     return $model->getId();
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * Has the health monitor seen this model fail permanently?
+     *
+     * Cached like the usable-provider snapshot and for the same reason: this
+     * sits on the model-resolution path, which runs several times per message.
+     */
+    private function isModelOffline(int $modelId): bool
+    {
+        return in_array($modelId, $this->offlineModelIds(), true);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function offlineModelIds(): array
+    {
+        $item = $this->cache->getItem(self::OFFLINE_MODELS_CACHE_KEY);
+        if ($item->isHit()) {
+            /** @var list<int> $cached */
+            $cached = $item->get();
+
+            return $cached;
+        }
+
+        try {
+            $ids = $this->modelHealthRepository->findOfflineModelIds();
+        } catch (\Throwable) {
+            // Before the health table exists (fresh install mid-migration) the
+            // answer is simply "nothing is known to be offline".
+            $ids = [];
+        }
+
+        $item->set($ids);
+        $item->expiresAfter(self::OFFLINE_MODELS_CACHE_TTL_SECONDS);
+        $this->cache->save($item);
+
+        return $ids;
     }
 
     /**
@@ -475,8 +533,29 @@ final readonly class ModelConfigService
      */
     public function resolveUsableModelId(?int $modelId, string $capability, ?int $userId = null): ?int
     {
-        if (null !== $modelId && $modelId > 0 && !$this->isModelProviderUsable($modelId)) {
+        if (null === $modelId || $modelId <= 0) {
+            return $modelId;
+        }
+
+        if (!$this->isModelProviderUsable($modelId)) {
             return $this->getDefaultModel($capability, $userId);
+        }
+
+        // The binding still resolves, but the health monitor saw this model
+        // fail permanently. Move to the capability default only when that
+        // default is not itself under suspicion — swapping one broken model for
+        // another just makes the failure harder to explain.
+        if ($this->isModelOffline($modelId)) {
+            $fallback = $this->getDefaultModel($capability, $userId);
+            if (null !== $fallback && $fallback !== $modelId && !$this->isModelOffline($fallback)) {
+                $this->logger->info('Routing away from a model reported as unavailable', [
+                    'model_id' => $modelId,
+                    'fallback_model_id' => $fallback,
+                    'capability' => $capability,
+                ]);
+
+                return $fallback;
+            }
         }
 
         return $modelId;
@@ -567,6 +646,15 @@ final readonly class ModelConfigService
     public function invalidateUsableProviders(): void
     {
         $this->cache->deleteItem(self::USABLE_PROVIDERS_CACHE_KEY);
+    }
+
+    /**
+     * Drop the cached health snapshot so a re-check or an operator's override
+     * takes effect on the next model resolution instead of after the TTL.
+     */
+    public function invalidateModelHealth(): void
+    {
+        $this->cache->deleteItem(self::OFFLINE_MODELS_CACHE_KEY);
     }
 
     /**

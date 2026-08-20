@@ -12,6 +12,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { getFeaturesStatus } from '../services/featuresService'
+import { modelStatusApi } from '../services/api/adminModelStatusApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
 
 export interface NavChild {
@@ -39,6 +40,7 @@ export interface NavItem {
 
 // Module-scoped so the desktop rail and the mobile nav share one fetch.
 const disabledFeaturesCount = ref(0)
+const offlineModelsCount = ref(0)
 let featureStatusRequested = false
 
 /**
@@ -70,6 +72,16 @@ export function useNavItems() {
       }
     } catch {
       disabledFeaturesCount.value = 0
+    }
+
+    // Both admin badges load together: they share the same trigger, the same
+    // admin guard and the same once-per-session flag, and splitting them would
+    // mean two entry points for callers to remember.
+    try {
+      const status = await modelStatusApi.getStatus()
+      offlineModelsCount.value = status.summary.needsAttention
+    } catch {
+      offlineModelsCount.value = 0
     }
   }
 
@@ -177,6 +189,17 @@ export function useNavItems() {
         featureStatusItem.badge = String(disabledFeaturesCount.value)
       }
       adminChildren.push(featureStatusItem)
+
+      const modelStatusItem: NavChild = {
+        key: 'admin-model-status',
+        path: '/admin/model-status',
+        label: t('nav.adminModelStatus'),
+      }
+      if (offlineModelsCount.value > 0) {
+        modelStatusItem.badge = String(offlineModelsCount.value)
+      }
+      adminChildren.push(modelStatusItem)
+
       adminChildren.push({
         key: 'admin-setup',
         path: '/admin/setup',
