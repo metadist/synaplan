@@ -1638,6 +1638,31 @@
       "Claves de API, widgets y credenciales"
     ],
     "retention": "La eliminación es permanente y surte efecto de inmediato. Las copias de seguridad con datos residuales se rotan en un plazo de 30 días. Los datos que estamos legalmente obligados a conservar (p. ej. facturas) se mantienen solo durante el tiempo que exige la ley.",
+    "partialTitle": "Eliminar datos concretos sin borrar tu cuenta",
+    "partialIntro": "No necesitas renunciar a tu cuenta para eliminar datos. Con la sesión iniciada puedes borrar tú mismo lo siguiente, y surte efecto de inmediato.",
+    "partialItems": [
+      {
+        "name": "Chats y conversaciones",
+        "how": "Abre Historial, usa el menú ⋯ junto a una conversación y elige Eliminar. Para quitar varias a la vez, abre Estadísticas → Todos los Chats, selecciónalas y elige «Eliminar seleccionados»."
+      },
+      {
+        "name": "Archivos y documentos subidos",
+        "how": "Abre Fuentes → Explorar y usa el icono de papelera en un archivo, o selecciona varios y elimina la selección. Al eliminar una carpeta también se eliminan los archivos que contiene."
+      },
+      {
+        "name": "Imágenes y medios generados por IA",
+        "how": "Abre Fuentes → Generados y usa el icono de papelera en el elemento."
+      },
+      {
+        "name": "Recuerdos",
+        "how": "Abre Recuerdos y elimina entradas concretas, o selecciona varias y bórralas juntas."
+      },
+      {
+        "name": "Conexiones, widgets de chat y claves de API",
+        "how": "Abre Canales y elimina la conexión, el widget o la clave que ya no necesites."
+      }
+    ],
+    "partialRetention": "Lo que eliminas desaparece de tu cuenta de inmediato. Las copias de seguridad con copias residuales se rotan en un plazo de 30 días. Todo lo demás de tu cuenta permanece intacto.",
     "noAccessTitle": "¿No puedes iniciar sesión?",
     "noAccessDesc": "Si ya no tienes acceso a tu cuenta, contáctanos a través de nuestro sitio web y procesaremos tu solicitud de eliminación.",
     "visitWebsite": "Visitar el sitio web",

@@ -1638,6 +1638,31 @@
       "API anahtarları, widget'lar ve kimlik bilgileri"
     ],
     "retention": "Silme işlemi kalıcıdır ve anında geçerli olur. Artık veri içeren yedekler 30 gün içinde döngüden çıkarılır. Yasal olarak saklamakla yükümlü olduğumuz veriler (ör. faturalar) yalnızca yasanın gerektirdiği süre boyunca tutulur.",
+    "partialTitle": "Hesabını silmeden tek tek verileri sil",
+    "partialIntro": "Veri silmek için hesabından vazgeçmen gerekmez. Giriş yaptığında aşağıdakileri kendin silebilirsin; işlem anında geçerli olur.",
+    "partialItems": [
+      {
+        "name": "Sohbetler ve konuşmalar",
+        "how": "Geçmiş'i aç, bir konuşmanın yanındaki ⋯ menüsünden Sil'i seç. Birkaçını birden kaldırmak için İstatistikler → Tüm Sohbetler'i aç, seç ve „Seçilenleri sil“e dokun."
+      },
+      {
+        "name": "Yüklenen dosyalar ve belgeler",
+        "how": "Kaynaklar → Gözat'ı aç ve bir dosyadaki çöp kutusu simgesini kullan ya da birkaçını seçip seçimi sil. Bir klasörü silmek içindeki dosyaları da siler."
+      },
+      {
+        "name": "Yapay zekâ ile üretilen görseller ve medya",
+        "how": "Kaynaklar → Üretilen'i aç ve ilgili ögedeki çöp kutusu simgesini kullan."
+      },
+      {
+        "name": "Anılar",
+        "how": "Anılar'ı aç ve tek tek kayıtları sil ya da birkaçını seçip birlikte sil."
+      },
+      {
+        "name": "Bağlantılar, sohbet widget'ları ve API anahtarları",
+        "how": "Kanallar'ı aç ve artık ihtiyacın olmayan bağlantıyı, widget'ı veya anahtarı kaldır."
+      }
+    ],
+    "partialRetention": "Sildiğin ögeler hesabından anında kaybolur. Artık kopya içeren yedekler 30 gün içinde döngüden çıkarılır. Hesabındaki diğer her şey olduğu gibi kalır.",
     "noAccessTitle": "Giriş yapamıyor musun?",
     "noAccessDesc": "Hesabına artık erişemiyorsan, web sitemiz üzerinden bizimle iletişime geç; silme talebini işleme alalım.",
     "visitWebsite": "Web sitesini ziyaret et",

@@ -1048,6 +1048,31 @@
       "API-Schlüssel, Widgets und Zugangsdaten"
     ],
     "retention": "Die Löschung ist endgültig und wirkt sofort. Backups mit verbliebenen Daten werden innerhalb von 30 Tagen rotiert. Gesetzlich aufbewahrungspflichtige Daten (z. B. Rechnungen) werden nur so lange aufbewahrt, wie es das Gesetz verlangt.",
+    "partialTitle": "Einzelne Daten löschen, ohne das Konto aufzugeben",
+    "partialIntro": "Du musst nicht dein ganzes Konto löschen, um Daten zu entfernen. Angemeldet kannst du Folgendes jederzeit selbst löschen – es wirkt sofort.",
+    "partialItems": [
+      {
+        "name": "Chats und Unterhaltungen",
+        "how": "Öffne den Verlauf, nutze das ⋯-Menü neben einer Unterhaltung und wähle Löschen. Mehrere auf einmal entfernst du unter Statistiken → Alle Chats: auswählen und „Ausgewählte löschen“."
+      },
+      {
+        "name": "Hochgeladene Dateien und Dokumente",
+        "how": "Öffne Quellen → Durchsuchen und nutze das Papierkorb-Symbol an einer Datei, oder wähle mehrere aus und lösche die Auswahl. Beim Löschen eines Ordners werden die enthaltenen Dateien mitgelöscht."
+      },
+      {
+        "name": "KI-generierte Bilder und Medien",
+        "how": "Öffne Quellen → Erzeugt und nutze das Papierkorb-Symbol am jeweiligen Eintrag."
+      },
+      {
+        "name": "Erinnerungen",
+        "how": "Öffne Erinnerungen und lösche einzelne Einträge oder mehrere gemeinsam."
+      },
+      {
+        "name": "Verbindungen, Chat-Widgets und API-Schlüssel",
+        "how": "Öffne Kanäle und entferne dort die Verbindung, das Widget oder den Schlüssel, den du nicht mehr brauchst."
+      }
+    ],
+    "partialRetention": "Gelöschte Inhalte verschwinden sofort aus deinem Konto. Backups mit verbliebenen Kopien werden innerhalb von 30 Tagen rotiert. Alles andere in deinem Konto bleibt unberührt.",
     "noAccessTitle": "Keine Anmeldung möglich?",
     "noAccessDesc": "Wenn du keinen Zugriff mehr auf dein Konto hast, kontaktiere uns über unsere Website und wir bearbeiten deine Löschanfrage.",
     "visitWebsite": "Website besuchen",
