@@ -218,22 +218,49 @@ onMounted(async () => {
 
       <ul class="space-y-3">
         <!-- Microsoft 365 -->
-        <li class="surface-card p-4 flex flex-wrap items-start gap-3" data-testid="provider-m365">
-          <Icon icon="simple-icons:microsoftoffice" class="w-6 h-6 text-[var(--brand)] mt-0.5" />
-          <div class="flex-1 min-w-0">
-            <p class="font-medium txt-primary">
-              {{ $t('config.connections.providers.m365.name') }}
-            </p>
-            <p class="text-sm txt-secondary mt-0.5">
+        <li class="surface-card p-4 sm:p-5 space-y-3" data-testid="provider-m365">
+          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div class="flex items-center gap-3 min-w-0">
+              <span
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-alpha-light)]"
+              >
+                <Icon icon="simple-icons:microsoftoffice" class="w-5 h-5 text-[var(--brand)]" />
+              </span>
+              <p class="font-medium txt-primary">
+                {{ $t('config.connections.providers.m365.name') }}
+              </p>
+            </div>
+            <button
+              v-if="m365Available"
+              type="button"
+              :class="[
+                m365Connected ? 'btn-secondary' : 'btn-primary',
+                'inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0',
+              ]"
+              :disabled="m365Connecting"
+              data-testid="btn-connect-m365"
+              @click="connectM365"
+            >
+              {{
+                m365Connecting
+                  ? $t('config.connections.providers.m365.connecting')
+                  : m365Connected
+                    ? $t('config.connections.providers.m365.connectAnother')
+                    : $t('config.connections.providers.m365.connect')
+              }}
+            </button>
+          </div>
+          <div class="space-y-1.5 w-full">
+            <p class="text-sm txt-secondary leading-relaxed">
               {{ $t('config.connections.providers.m365.description') }}
             </p>
-            <p class="text-xs txt-secondary mt-1 flex items-center gap-1">
-              <Icon icon="heroicons:globe-alt" class="w-3.5 h-3.5 flex-shrink-0" />
+            <p class="text-xs txt-secondary flex items-start gap-1">
+              <Icon icon="heroicons:globe-alt" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
               {{ $t('config.connections.providers.m365.hosting') }}
             </p>
             <p
               v-if="m365Connected"
-              class="text-sm mt-2 flex items-center gap-1.5 text-[var(--status-success)]"
+              class="text-sm flex items-center gap-1.5 text-[var(--status-success)]"
               data-testid="m365-connected-hint"
             >
               <Icon icon="heroicons:check-circle" class="w-4 h-4 flex-shrink-0" />
@@ -243,7 +270,7 @@ onMounted(async () => {
                 })
               }}
             </p>
-            <p v-if="!m365Available" class="text-sm txt-secondary mt-2">
+            <p v-if="!m365Available" class="text-sm txt-secondary">
               {{ $t('config.connections.providers.m365.unavailable') }}
               <router-link
                 v-if="isAdmin"
@@ -255,47 +282,52 @@ onMounted(async () => {
               <span v-else>{{ $t('config.connections.providers.m365.askAdmin') }}</span>
             </p>
           </div>
-          <button
-            v-if="m365Available"
-            type="button"
-            :class="[
-              m365Connected ? 'btn-secondary' : 'btn-primary',
-              'inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap',
-            ]"
-            :disabled="m365Connecting"
-            data-testid="btn-connect-m365"
-            @click="connectM365"
-          >
-            {{
-              m365Connecting
-                ? $t('config.connections.providers.m365.connecting')
-                : m365Connected
-                  ? $t('config.connections.providers.m365.connectAnother')
-                  : $t('config.connections.providers.m365.connect')
-            }}
-          </button>
         </li>
 
         <!-- Dropbox -->
-        <li
-          class="surface-card p-4 flex flex-wrap items-start gap-3"
-          data-testid="provider-dropbox"
-        >
-          <Icon icon="simple-icons:dropbox" class="w-6 h-6 text-[var(--brand)] mt-0.5" />
-          <div class="flex-1 min-w-0">
-            <p class="font-medium txt-primary">
-              {{ $t('config.connections.providers.dropbox.name') }}
-            </p>
-            <p class="text-sm txt-secondary mt-0.5">
+        <li class="surface-card p-4 sm:p-5 space-y-3" data-testid="provider-dropbox">
+          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div class="flex items-center gap-3 min-w-0">
+              <span
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-alpha-light)]"
+              >
+                <Icon icon="simple-icons:dropbox" class="w-5 h-5 text-[var(--brand)]" />
+              </span>
+              <p class="font-medium txt-primary">
+                {{ $t('config.connections.providers.dropbox.name') }}
+              </p>
+            </div>
+            <button
+              v-if="dropboxAvailable"
+              type="button"
+              :class="[
+                dropboxConnected ? 'btn-secondary' : 'btn-primary',
+                'inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0',
+              ]"
+              :disabled="dropboxConnecting"
+              data-testid="btn-connect-dropbox"
+              @click="connectDropbox"
+            >
+              {{
+                dropboxConnecting
+                  ? $t('config.connections.providers.dropbox.connecting')
+                  : dropboxConnected
+                    ? $t('config.connections.providers.dropbox.connectAnother')
+                    : $t('config.connections.providers.dropbox.connect')
+              }}
+            </button>
+          </div>
+          <div class="space-y-1.5 w-full">
+            <p class="text-sm txt-secondary leading-relaxed">
               {{ $t('config.connections.providers.dropbox.description') }}
             </p>
-            <p class="text-xs txt-secondary mt-1 flex items-center gap-1">
-              <Icon icon="heroicons:globe-alt" class="w-3.5 h-3.5 flex-shrink-0" />
+            <p class="text-xs txt-secondary flex items-start gap-1">
+              <Icon icon="heroicons:globe-alt" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
               {{ $t('config.connections.providers.dropbox.hosting') }}
             </p>
             <p
               v-if="dropboxConnected"
-              class="text-sm mt-2 flex items-center gap-1.5 text-[var(--status-success)]"
+              class="text-sm flex items-center gap-1.5 text-[var(--status-success)]"
               data-testid="dropbox-connected-hint"
             >
               <Icon icon="heroicons:check-circle" class="w-4 h-4 flex-shrink-0" />
@@ -305,7 +337,7 @@ onMounted(async () => {
                 })
               }}
             </p>
-            <p v-if="!dropboxAvailable" class="text-sm txt-secondary mt-2">
+            <p v-if="!dropboxAvailable" class="text-sm txt-secondary">
               {{ $t('config.connections.providers.dropbox.unavailable') }}
               <router-link
                 v-if="isAdmin"
@@ -317,66 +349,59 @@ onMounted(async () => {
               <span v-else>{{ $t('config.connections.providers.dropbox.askAdmin') }}</span>
             </p>
           </div>
-          <button
-            v-if="dropboxAvailable"
-            type="button"
-            :class="[
-              dropboxConnected ? 'btn-secondary' : 'btn-primary',
-              'inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap',
-            ]"
-            :disabled="dropboxConnecting"
-            data-testid="btn-connect-dropbox"
-            @click="connectDropbox"
-          >
-            {{
-              dropboxConnecting
-                ? $t('config.connections.providers.dropbox.connecting')
-                : dropboxConnected
-                  ? $t('config.connections.providers.dropbox.connectAnother')
-                  : $t('config.connections.providers.dropbox.connect')
-            }}
-          </button>
         </li>
 
         <!-- Nextcloud / WebDAV folder and calendar -->
         <DavConnectionForm @created="load" />
 
         <!-- Mailbox (IMAP) -->
-        <li class="surface-card p-4 flex flex-wrap items-start gap-3">
-          <Icon icon="heroicons:envelope" class="w-6 h-6 text-[var(--brand)] mt-0.5" />
-          <div class="flex-1 min-w-0">
-            <p class="font-medium txt-primary">
-              {{ $t('config.connections.providers.mailbox.name') }}
-            </p>
-            <p class="text-sm txt-secondary mt-0.5">
-              {{ $t('config.connections.providers.mailbox.description') }}
-            </p>
+        <li class="surface-card p-4 sm:p-5 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div class="flex items-center gap-3 min-w-0">
+              <span
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-alpha-light)]"
+              >
+                <Icon icon="heroicons:envelope" class="w-5 h-5 text-[var(--brand)]" />
+              </span>
+              <p class="font-medium txt-primary">
+                {{ $t('config.connections.providers.mailbox.name') }}
+              </p>
+            </div>
+            <router-link
+              to="/channels/email"
+              class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0"
+            >
+              {{ $t('config.connections.providers.mailbox.action') }}
+            </router-link>
           </div>
-          <router-link
-            to="/channels/email"
-            class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
-          >
-            {{ $t('config.connections.providers.mailbox.action') }}
-          </router-link>
+          <p class="text-sm txt-secondary leading-relaxed w-full">
+            {{ $t('config.connections.providers.mailbox.description') }}
+          </p>
         </li>
 
         <!-- MCP server -->
-        <li class="surface-card p-4 flex flex-wrap items-start gap-3">
-          <Icon icon="heroicons:puzzle-piece" class="w-6 h-6 text-[var(--brand)] mt-0.5" />
-          <div class="flex-1 min-w-0">
-            <p class="font-medium txt-primary">
-              {{ $t('config.connections.providers.mcp.name') }}
-            </p>
-            <p class="text-sm txt-secondary mt-0.5">
-              {{ $t('config.connections.providers.mcp.description') }}
-            </p>
+        <li class="surface-card p-4 sm:p-5 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div class="flex items-center gap-3 min-w-0">
+              <span
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-alpha-light)]"
+              >
+                <Icon icon="heroicons:puzzle-piece" class="w-5 h-5 text-[var(--brand)]" />
+              </span>
+              <p class="font-medium txt-primary">
+                {{ $t('config.connections.providers.mcp.name') }}
+              </p>
+            </div>
+            <router-link
+              to="/channels/mcp"
+              class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0"
+            >
+              {{ $t('config.connections.providers.mcp.action') }}
+            </router-link>
           </div>
-          <router-link
-            to="/channels/mcp"
-            class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
-          >
-            {{ $t('config.connections.providers.mcp.action') }}
-          </router-link>
+          <p class="text-sm txt-secondary leading-relaxed w-full">
+            {{ $t('config.connections.providers.mcp.description') }}
+          </p>
         </li>
       </ul>
     </section>

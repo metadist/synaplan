@@ -132,28 +132,34 @@ const submit = async () => {
 </script>
 
 <template>
-  <li class="surface-card p-4 space-y-3" data-testid="provider-dav">
-    <div class="flex flex-wrap items-start gap-3">
-      <Icon icon="heroicons:folder-arrow-down" class="w-6 h-6 text-[var(--brand)] mt-0.5" />
-      <div class="flex-1 min-w-0">
+  <li class="surface-card p-4 sm:p-5 space-y-3" data-testid="provider-dav">
+    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <div class="flex items-center gap-3 min-w-0">
+        <span
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-alpha-light)]"
+        >
+          <Icon icon="heroicons:folder-arrow-down" class="w-5 h-5 text-[var(--brand)]" />
+        </span>
         <p class="font-medium txt-primary">{{ $t('config.connections.providers.dav.name') }}</p>
-        <p class="text-sm txt-secondary mt-0.5">
-          {{ $t('config.connections.providers.dav.description') }}
-        </p>
-        <p class="text-xs txt-secondary mt-1 flex items-center gap-1">
-          <Icon icon="heroicons:shield-check" class="w-3.5 h-3.5 flex-shrink-0" />
-          {{ $t('config.connections.providers.dav.hosting') }}
-        </p>
       </div>
       <button
         v-if="!open"
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0"
         data-testid="btn-open-dav-form"
         @click="open = true"
       >
         {{ $t('config.connections.providers.dav.action') }}
       </button>
+    </div>
+    <div class="space-y-1.5 w-full">
+      <p class="text-sm txt-secondary leading-relaxed">
+        {{ $t('config.connections.providers.dav.description') }}
+      </p>
+      <p class="text-xs txt-secondary flex items-start gap-1">
+        <Icon icon="heroicons:shield-check" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+        {{ $t('config.connections.providers.dav.hosting') }}
+      </p>
     </div>
 
     <form v-if="open" class="space-y-3" data-testid="dav-form" @submit.prevent="submit">
