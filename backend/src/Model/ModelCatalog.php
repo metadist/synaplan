@@ -55,6 +55,243 @@ class ModelCatalog
     public const FINGERPRINT_KEY = '__catalog_fingerprint';
 
     /**
+     * Every model this catalog has ever retired, keyed by its BID.
+     *
+     * A provider shutdown used to mean writing a migration by hand, and three of
+     * the five such migrations existed only to clean up rows that an earlier
+     * release had dropped from the catalog without deactivating them — left
+     * active, selectable and billable in every existing install (#1515). This
+     * registry replaces that: adding an entry here is the whole retirement, and
+     * ModelRetirementSeeder applies it on the next deploy, repeatedly and
+     * safely.
+     *
+     * Entries are permanent. They are what lets the codebase answer "is this
+     * stored BID dead, and what replaced it?" long after the row itself stopped
+     * being interesting, and what lets ModelCatalogRetirementTest fail a release
+     * that drops a model without recording one.
+     *
+     * Fields:
+     *   providerId — the upstream API model id the BID stood for. Required, and
+     *                always known: it comes from the catalog entry being
+     *                removed. Used as a guard so a BID an operator repurposed
+     *                for a different model is never marked dead.
+     *   retiredOn  — the date the retirement shipped (YYYY-MM-DD).
+     *   successor  — catalog key ("service:providerId:tag") of the replacement,
+     *                or null when the provider offers none. Null is a
+     *                deliberate statement, not a missing value: it means an
+     *                implicit binding must report unavailability rather than be
+     *                repointed.
+     *   reason     — why it went away, for the operator reading the log.
+     *
+     * @var array<int, array{providerId: string, retiredOn: string, successor: string|null, reason: string}>
+     */
+    private const RETIREMENTS = [
+        // --- 2026-04-29 (Version20260429120000) ---
+        193 => [
+            'providerId' => 'gpt-5.3',
+            'retiredOn' => '2026-04-29',
+            'successor' => 'openai:gpt-5.4:chat',
+            'reason' => 'Superseded by GPT-5.4.',
+        ],
+        194 => [
+            'providerId' => 'gpt-5.3',
+            'retiredOn' => '2026-04-29',
+            'successor' => 'openai:gpt-5.4:pic2text',
+            'reason' => 'Superseded by GPT-5.4.',
+        ],
+
+        // --- 2026-05-08 (Version20260508120000) ---
+        92 => [
+            'providerId' => 'claude-3-haiku-20240307',
+            'retiredOn' => '2026-05-08',
+            'successor' => 'anthropic:claude-haiku-4-5-20251001:chat',
+            'reason' => 'Superseded by Claude Haiku 4.5.',
+        ],
+
+        // --- 2026-07-27 (Version20260727120000) ---
+        112 => [
+            'providerId' => 'claude-sonnet-4-5-20250929',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-sonnet-5:chat',
+            'reason' => 'Superseded by Claude Sonnet 5.',
+        ],
+        109 => [
+            'providerId' => 'claude-sonnet-4-5-20250929',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-sonnet-5:pic2text',
+            'reason' => 'Superseded by Claude Sonnet 5.',
+        ],
+        161 => [
+            'providerId' => 'claude-sonnet-4-6',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-sonnet-5:chat',
+            'reason' => 'Superseded by Claude Sonnet 5.',
+        ],
+        163 => [
+            'providerId' => 'claude-sonnet-4-6',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-sonnet-5:pic2text',
+            'reason' => 'Superseded by Claude Sonnet 5.',
+        ],
+        160 => [
+            'providerId' => 'claude-opus-4-6',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:chat',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        164 => [
+            'providerId' => 'claude-opus-4-6',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:pic2text',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        165 => [
+            'providerId' => 'claude-opus-4-7',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:chat',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        166 => [
+            'providerId' => 'claude-opus-4-7',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:pic2text',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        // Left the catalog in earlier releases but stayed active in existing
+        // installs until this migration — the failure mode this registry exists
+        // to make impossible.
+        69 => [
+            'providerId' => 'claude-opus-4-1-20250805',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:chat',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        93 => [
+            'providerId' => 'claude-opus-4-1-20250805',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:pic2text',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        121 => [
+            'providerId' => 'claude-opus-4-5',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:chat',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+
+        // --- 2026-07-27 (Version20260727180000) ---
+        30 => [
+            'providerId' => 'gpt-4.1',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'openai:gpt-5.6-terra:chat',
+            'reason' => 'Superseded by GPT-5.6 Terra.',
+        ],
+        49 => [
+            'providerId' => 'meta-llama/llama-4-maverick-17b-128e-instruct',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'groq:openai/gpt-oss-120b:chat',
+            'reason' => 'Removed from the Groq production catalog.',
+        ],
+
+        // --- 2026-07-28 (Version20260728120000) ---
+        70 => [
+            'providerId' => 'gpt-5',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'openai:gpt-5.6-terra:chat',
+            'reason' => 'Superseded by GPT-5.6 Terra.',
+        ],
+        106 => [
+            'providerId' => 'gpt-5.2-2025-12-11',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'openai:gpt-5.6-terra:chat',
+            'reason' => 'Superseded by GPT-5.6 Terra.',
+        ],
+        150 => [
+            'providerId' => 'gpt-5-mini',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'openai:gpt-5.4-mini:chat',
+            'reason' => 'Superseded by GPT-5.4 mini.',
+        ],
+        125 => [
+            'providerId' => 'deepseek-ai/DeepSeek-R1',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'huggingface:moonshotai/kimi-k2.6-deepinfra:chat',
+            'reason' => 'Dropped from the HuggingFace inference catalog.',
+        ],
+        128 => [
+            'providerId' => 'Qwen/Qwen2.5-Coder-32B-Instruct',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'huggingface:moonshotai/kimi-k2.7-code-deepinfra:chat',
+            'reason' => 'Dropped from the HuggingFace inference catalog.',
+        ],
+        126 => [
+            'providerId' => 'stabilityai/stable-diffusion-xl-base-1.0',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'thehive:sdxl:text2pic',
+            'reason' => 'Dropped from the HuggingFace inference catalog.',
+        ],
+        129 => [
+            'providerId' => 'intfloat/multilingual-e5-large',
+            'retiredOn' => '2026-07-28',
+            // An embedding model has no drop-in successor: a different model
+            // means a different vector space, so re-embedding is a decision for
+            // the operator, never an automatic substitution.
+            'successor' => null,
+            'reason' => 'Dropped from the HuggingFace inference catalog; a replacement embedding model requires re-indexing.',
+        ],
+
+        // --- 2026-08-19 (Version20260819080000) ---
+        // The chat rows point at gpt-oss-120b rather than qwen3.6-27b even
+        // though the retiring migration repointed live bindings at the latter:
+        // qwen3.6-27b is Preview on Groq ("may be discontinued at short
+        // notice"), and a successor is exactly the pointer that must outlive
+        // the model it replaces.
+        9 => [
+            'providerId' => 'llama-3.3-70b-versatile',
+            'retiredOn' => '2026-08-19',
+            'successor' => 'groq:openai/gpt-oss-120b:chat',
+            'reason' => 'Removed from the Groq production catalog.',
+        ],
+        17 => [
+            'providerId' => 'meta-llama/llama-4-scout-17b-16e-instruct',
+            'retiredOn' => '2026-08-19',
+            // Stays on the Preview row: Groq has no other model that takes
+            // images, so there is nothing more durable to point at.
+            'successor' => 'groq:qwen/qwen3.6-27b:pic2text',
+            'reason' => 'Removed from the Groq production catalog.',
+        ],
+        53 => [
+            'providerId' => 'qwen/qwen3-32b',
+            'retiredOn' => '2026-08-19',
+            'successor' => 'groq:openai/gpt-oss-120b:chat',
+            'reason' => 'Superseded by Qwen 3.6 27B.',
+        ],
+        236 => [
+            'providerId' => 'llama-3.1-8b-instant',
+            'retiredOn' => '2026-08-19',
+            'successor' => 'groq:openai/gpt-oss-20b:chat',
+            'reason' => 'Removed from the Groq production catalog.',
+        ],
+
+        // --- 2026-08-20 (Version20260820120000) ---
+        320 => [
+            'providerId' => 'grok-tts',
+            'retiredOn' => '2026-08-20',
+            // xAI retired both speech endpoints without a replacement, and
+            // there is no cross-provider substitute we may pick on the
+            // operator's behalf — that would need an API key they may not hold.
+            'successor' => null,
+            'reason' => 'Retired by xAI with no replacement speech endpoint (#1514).',
+        ],
+        321 => [
+            'providerId' => 'grok-stt',
+            'retiredOn' => '2026-08-20',
+            'successor' => null,
+            'reason' => 'Retired by xAI with no replacement speech endpoint (#1514).',
+        ],
+    ];
+
+    /**
      * Number of decimals used to normalise float fields before fingerprinting.
      * Catalog prices are authored with at most 4 decimals (e.g. 0.092); 6 leaves
      * comfortable headroom and shields the hash from float-string round-trips
@@ -299,6 +536,47 @@ class ModelCatalog
     }
 
     /**
+     * Every recorded retirement, keyed by the retired BID.
+     *
+     * @return array<int, array{providerId: string, retiredOn: string, successor: string|null, reason: string}>
+     */
+    public static function retirements(): array
+    {
+        return self::RETIREMENTS;
+    }
+
+    /**
+     * The retirement record for a BID, or null when the model is not retired.
+     *
+     * @return array{providerId: string, retiredOn: string, successor: string|null, reason: string}|null
+     */
+    public static function retirement(int $bid): ?array
+    {
+        return self::RETIREMENTS[$bid] ?? null;
+    }
+
+    public static function isRetired(int $bid): bool
+    {
+        return isset(self::RETIREMENTS[$bid]);
+    }
+
+    /**
+     * The BID that replaces a retired model.
+     *
+     * Null covers three different situations that all mean "do not substitute":
+     * the model is not retired, the retirement deliberately records no successor
+     * (an embedding model, or a provider that shipped no replacement), or the
+     * recorded successor key no longer resolves to exactly one catalog entry
+     * because it was itself retired later.
+     */
+    public static function successorBid(int $bid): ?int
+    {
+        $successor = self::RETIREMENTS[$bid]['successor'] ?? null;
+
+        return null === $successor ? null : self::findBidByKey($successor);
+    }
+
+    /**
      * Compute the lookup key for a model: "service:providerId" (lowercased, colons in providerId replaced with dashes).
      */
     private static function modelKey(array $model): string
@@ -449,7 +727,11 @@ class ModelCatalog
                     'model' => 'qwen/qwen3.6-27b',
                     'reasoning_format' => 'hidden',
                 ],
-                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'quantization' => 'TruePoint Numerics'],
+                // groq_tier: Groq's own lifecycle class. "preview" carries an
+                // explicit "may be discontinued at short notice" warning, which
+                // is why this row is selectable but is not a recommended text
+                // default (see ProviderDefaultsService).
+                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'quantization' => 'TruePoint Numerics', 'groq_tier' => 'preview'],
             ],
         ],
         [
@@ -474,6 +756,9 @@ class ModelCatalog
                     'model' => 'qwen/qwen3.6-27b',
                     'max_completion_tokens' => 1024,
                 ],
+                // Preview on Groq, and still the recommended PIC2TEXT default:
+                // it is the only Groq model that accepts image input at all.
+                'meta' => ['groq_tier' => 'preview'],
             ],
         ],
         [

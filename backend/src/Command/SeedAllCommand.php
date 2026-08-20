@@ -12,6 +12,7 @@ use App\Seed\McpConfigSeeder;
 use App\Seed\MediaJobConfigSeeder;
 use App\Seed\MessagesGatewayConfigSeeder;
 use App\Seed\MobileConfigSeeder;
+use App\Seed\ModelRetirementSeeder;
 use App\Seed\ModelSeeder;
 use App\Seed\MultitaskConfigSeeder;
 use App\Seed\PromptSeeder;
@@ -32,6 +33,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *
  * Order:
  *   1. models        (BMODELS — referenced by DEFAULTMODEL config)
+ *   1b. model-retirements (BMODELS — deactivates models the provider retired;
+ *                    must follow `models` so a freshly inserted retired row is
+ *                    switched off in the same run)
  *   2. prompts       (BPROMPTS)
  *   3. defaults      (BCONFIG: DEFAULTMODEL → references model IDs from step 1)
  *   4. rate-limits   (BCONFIG: SYSTEM_FLAGS, RATELIMITS_*)
@@ -59,6 +63,7 @@ final class SeedAllCommand extends Command
 {
     public function __construct(
         private readonly ModelSeeder $modelSeeder,
+        private readonly ModelRetirementSeeder $modelRetirementSeeder,
         private readonly PromptSeeder $promptSeeder,
         private readonly DefaultModelConfigSeeder $defaultModelConfigSeeder,
         private readonly RateLimitConfigSeeder $rateLimitConfigSeeder,
@@ -83,6 +88,7 @@ final class SeedAllCommand extends Command
         $this->setHelp(
             "Convenience aggregator that runs every idempotent seed step in dependency order.\n\n".
             "  1. app:model:seed              (BMODELS)\n".
+            "  1b. model retirements         (BMODELS — deactivate models retired upstream)\n".
             "  2. app:prompt:seed             (BPROMPTS, ownerId=0)\n".
             "  3. app:config:seed-defaults    (BCONFIG, group=DEFAULTMODEL/ai)\n".
             "  4. app:ratelimit:seed-defaults (BCONFIG, group=RATELIMITS_*/SYSTEM_FLAGS)\n".
@@ -109,6 +115,7 @@ final class SeedAllCommand extends Command
 
         $steps = [
             ['models',      fn (): SeedResult => $this->modelSeeder->seed()],
+            ['model-retirements', fn (): SeedResult => $this->modelRetirementSeeder->seed()],
             ['prompts',     fn (): SeedResult => $this->promptSeeder->seed()],
             ['defaults',    fn (): SeedResult => $this->defaultModelConfigSeeder->seed()],
             ['rate-limits', fn (): SeedResult => $this->rateLimitConfigSeeder->seed()],
