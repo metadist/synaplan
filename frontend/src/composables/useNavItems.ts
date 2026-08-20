@@ -79,7 +79,7 @@ export function useNavItems() {
     // mean two entry points for callers to remember.
     try {
       const status = await modelStatusApi.getStatus()
-      offlineModelsCount.value = status.summary.offline
+      offlineModelsCount.value = status.summary.needsAttention
     } catch {
       offlineModelsCount.value = 0
     }

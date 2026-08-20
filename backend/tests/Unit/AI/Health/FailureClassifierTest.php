@@ -158,11 +158,29 @@ final class FailureClassifierTest extends TestCase
         yield 'groq decommissioned' => ['The model `llama-3.3-70b-versatile` has been decommissioned', FailureKind::Permanent];
         yield 'anthropic not_found_error' => ['not_found_error: model: claude-3-opus', FailureKind::Permanent];
         yield 'deprecated wording' => ['This model is deprecated and will be removed', FailureKind::Permanent];
+        yield 'deprecated parameter is not a retired model' => ['The `functions` parameter is deprecated. Use `tools` instead.', FailureKind::Transient];
+        yield 'invalid_request_error alone is not a user error' => ['invalid_request_error', FailureKind::Transient];
         yield 'invalid key' => ['Incorrect API key provided', FailureKind::Credential];
         yield 'exhausted quota' => ['You exceeded your current quota, please check your plan and billing details', FailureKind::Credential];
         yield 'overloaded' => ['Overloaded, please retry', FailureKind::Transient];
         yield 'timeout' => ['Request timed out after 60s', FailureKind::Transient];
         yield 'context length' => ['This model maximum context length is 8192 tokens', FailureKind::UserError];
+        yield 'safety ratings' => ['The response was blocked by the safety ratings filter', FailureKind::UserError];
+        yield 'unrelated safety outage stays transient' => ['Could not reach the safety endpoint', FailureKind::Transient];
+    }
+
+    /**
+     * OpenAI wraps almost every 4xx as type=invalid_request_error, including
+     * a bad key. That string must not hide a 401, or a credential outage is
+     * filed as a user error and never pages anyone.
+     */
+    public function testUnauthorizedStatusWinsOverGenericInvalidRequestType(): void
+    {
+        $kind = $this->classifier->classify(
+            new ProviderException('invalid_request_error', 'openai', null, 401)
+        );
+
+        self::assertSame(FailureKind::Credential, $kind);
     }
 
     /**

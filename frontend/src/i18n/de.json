@@ -183,6 +183,8 @@
       "exempt": "Von Automatik ausnehmen",
       "unexempt": "Automatik wieder erlauben"
     },
+    "confirmResetTitle": "Fehlerverlauf löschen?",
+    "confirmResetMessage": "„{name}“ wird danach nur noch nach neuer Nutzung bewertet. Eine Prüfung, die das Modell bereits als eingestellt erkannt hat, bleibt bestehen.",
     "messages": {
       "refreshed": "{count} Modell(e) geprüft.",
       "refreshFailed": "Die Prüfung konnte nicht abgeschlossen werden.",

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Controller;
 
+use App\AI\Health\FailureKind;
 use App\AI\Health\ModelHealthState;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Model;
@@ -177,5 +178,67 @@ class AdminModelHealthControllerTest extends WebTestCase
 
         $this->request('POST', '/api/v1/admin/model-health/models/99999999/exempt', ['exempt' => true]);
         self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testResetClearsATrafficVerdictButLeavesAProbeRetirement(): void
+    {
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        $model = $em->getRepository(Model::class)->findOneBy([]);
+        self::assertNotNull($model);
+        $modelId = (int) $model->getId();
+
+        $health = $em->getRepository(ModelHealth::class)->findOneBy(['modelId' => $modelId]);
+        if (null === $health) {
+            $health = (new ModelHealth())->setModelId($modelId);
+            $em->persist($health);
+        }
+        $health
+            ->setState(ModelHealthState::Offline)
+            ->setSource(ModelHealth::SOURCE_TRAFFIC)
+            ->setKind(FailureKind::Permanent->value)
+            ->setMessage('80% of recent calls failed')
+            ->setUpdated(time());
+        $em->flush();
+        $this->createdHealthIds[] = (int) $health->getId();
+
+        $this->request('POST', "/api/v1/admin/model-health/models/{$modelId}/reset");
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+
+        $em->clear();
+        $reloaded = $em->getRepository(ModelHealth::class)->findOneBy(['modelId' => $modelId]);
+        self::assertNotNull($reloaded);
+        self::assertSame(ModelHealthState::Unknown, $reloaded->getState());
+        self::assertNull($reloaded->getMessage());
+        self::assertNull($reloaded->getKind());
+
+        $reloaded
+            ->setState(ModelHealthState::Offline)
+            ->setSource(ModelHealth::SOURCE_PROBE)
+            ->setKind(FailureKind::Permanent->value)
+            ->setMessage('Provider no longer serves this model.')
+            ->setUpdated(time());
+        $em->flush();
+
+        $this->request('POST', "/api/v1/admin/model-health/models/{$modelId}/reset");
+        $em->clear();
+        $stillRetired = $em->getRepository(ModelHealth::class)->findOneBy(['modelId' => $modelId]);
+        self::assertNotNull($stillRetired);
+        self::assertSame(ModelHealthState::Offline, $stillRetired->getState());
+        self::assertSame(ModelHealth::SOURCE_PROBE, $stillRetired->getSource());
+        self::assertSame('Provider no longer serves this model.', $stillRetired->getMessage());
+    }
+
+    public function testExemptRejectsANonObjectJsonBody(): void
+    {
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        $model = $em->getRepository(Model::class)->findOneBy([]);
+        self::assertNotNull($model);
+
+        $this->client->request('POST', '/api/v1/admin/model-health/models/'.$model->getId().'/exempt', [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+        ], '"not-an-object"');
+
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
     }
 }

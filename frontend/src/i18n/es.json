@@ -182,6 +182,8 @@
       "exempt": "Eximir de la automatización",
       "unexempt": "Permitir la automatización de nuevo"
     },
+    "confirmResetTitle": "¿Borrar el historial de errores?",
+    "confirmResetMessage": "Después, \"{name}\" se evaluará solo con el uso nuevo. Una comprobación que ya haya detectado que el modelo está retirado no se deshace.",
     "messages": {
       "refreshed": "Se comprobaron {count} modelo(s).",
       "refreshFailed": "No se pudo completar la comprobación.",

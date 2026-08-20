@@ -41,10 +41,19 @@ final readonly class FailureClassifier
         'no longer supported',
         'has been retired',
         'is retired',
-        'deprecated',
+        // "deprecated" alone matches "parameter X is deprecated" on a 400, which
+        // is a request problem, not a retired model. Keep the phrasing that
+        // providers use when the model itself is going away.
+        'model is deprecated',
+        'has been deprecated',
+        'was deprecated',
+        'deprecated and will be removed',
+        'deprecated model',
         'decommissioned',
         'discontinued',
-        'sunset',
+        'has been sunset',
+        'is sunset',
+        'sunsetting',
         'not_found_error',
     ];
 
@@ -77,14 +86,18 @@ final readonly class FailureClassifier
         'content blocked',
         'content_filter',
         'content_policy',
-        'safety',
+        'safety filter',
+        'safety system',
+        'safety settings',
+        'safety ratings',
+        'content safety',
+        'blocked by safety',
         'context length',
         'context_length_exceeded',
         'maximum context',
         'too many tokens',
         'prompt is too long',
         'string too long',
-        'invalid_request_error',
     ];
 
     /** Recoverable on its own — never a reason to switch a model off. */

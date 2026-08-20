@@ -16,9 +16,9 @@ use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Service für dynamische AI-Modell-Konfiguration basierend auf User-Einstellungen.
+ * Resolves which AI model a user should get, from their settings.
  *
- * Ermöglicht User-spezifische Default-Modelle aus BCONFIG + BMODELS Tabellen
+ * User-specific defaults live in BCONFIG; the catalog of available models is BMODELS.
  */
 final readonly class ModelConfigService
 {
@@ -72,12 +72,12 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Holt Default-Provider für einen User und Capability.
+     * Default provider for a user and capability.
      *
-     * Reihenfolge:
-     * 1. User-spezifische Config (BCONFIG: BOWNERID=userId, BGROUP='ai', BSETTING='default_chat_provider')
-     * 2. Global Default Config (BOWNERID=0)
-     * 3. Smart Fallback from DB
+     * Order:
+     * 1. User-specific config (BCONFIG: BOWNERID=userId, BGROUP='ai', BSETTING='default_chat_provider')
+     * 2. Global default config (BOWNERID=0)
+     * 3. Smart fallback from the database
      */
     public function getDefaultProvider(?int $userId, string $capability = 'chat'): string
     {
@@ -88,7 +88,7 @@ final readonly class ModelConfigService
             return $item->get();
         }
 
-        // 1. User-spezifische Config
+        // 1. User-specific config
         if ($userId) {
             $config = $this->configRepository->findByOwnerGroupAndSetting(
                 $userId,
@@ -99,7 +99,7 @@ final readonly class ModelConfigService
             if ($config) {
                 $provider = $config->getValue();
                 $item->set($provider);
-                $item->expiresAfter(300); // 5 Min Cache
+                $item->expiresAfter(300); // 5 minute cache
                 $this->cache->save($item);
 
                 return $provider;
@@ -180,12 +180,12 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Holt Default-Modell für einen User, Provider und Capability (OLD METHOD - DEPRECATED).
+     * Default model for a user, provider and capability (OLD METHOD - DEPRECATED).
      *
-     * Reihenfolge:
-     * 1. User-spezifische Config (BCONFIG: 'default_chat_model')
-     * 2. BMODELS Tabelle (BPROVIDER, BCAPABILITY, BISDEFAULT=1)
-     * 3. ENV Variable (fallback)
+     * Order:
+     * 1. User-specific config (BCONFIG: 'default_chat_model')
+     * 2. BMODELS table (BPROVIDER, BCAPABILITY, BISDEFAULT=1)
+     * 3. ENV variable (fallback)
      */
     public function getDefaultModelOld(?int $userId, string $provider, string $capability = 'chat'): ?string
     {
@@ -196,7 +196,7 @@ final readonly class ModelConfigService
             return $item->get();
         }
 
-        // 1. User-spezifische Config
+        // 1. User-specific config
         if ($userId) {
             $config = $this->configRepository->findByOwnerGroupAndSetting(
                 $userId,
@@ -214,7 +214,7 @@ final readonly class ModelConfigService
             }
         }
 
-        // 2. BMODELS Tabelle
+        // 2. BMODELS table
         $model = $this->modelRepository->findDefaultByProviderAndCapability($provider, $capability);
 
         if ($model) {
@@ -226,7 +226,7 @@ final readonly class ModelConfigService
             return $modelName;
         }
 
-        // 3. null zurückgeben - Provider nutzt dann seinen eigenen Default
+        // 3. Return null — the provider then uses its own default
         $item->set(null);
         $item->expiresAfter(60);
         $this->cache->save($item);
@@ -235,7 +235,7 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Setzt User-spezifischen Default-Provider.
+     * Set a user-specific default provider.
      */
     public function setDefaultProvider(int $userId, string $capability, string $provider): void
     {
@@ -260,7 +260,7 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Setzt User-spezifisches Default-Modell.
+     * Set a user-specific default model.
      */
     public function setDefaultModel(int $userId, string $capability, string $model): void
     {
@@ -290,7 +290,7 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Holt komplette AI-Config für einen User.
+     * Full AI config for a user.
      */
     public function getUserAiConfig(?int $userId): array
     {

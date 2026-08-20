@@ -105,7 +105,9 @@
                 data-testid="filter-capability"
               >
                 <option value="">{{ $t('adminModelStatus.filters.allCapabilities') }}</option>
-                <option v-for="cap in capabilities" :key="cap" :value="cap">{{ cap }}</option>
+                <option v-for="cap in capabilities" :key="cap" :value="cap">
+                  {{ capabilityLabel(cap) }}
+                </option>
               </select>
             </label>
           </div>
@@ -159,7 +161,7 @@
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 flex-wrap mb-1">
                     <h3 class="text-base font-semibold txt-primary">{{ model.name }}</h3>
-                    <span class="pill text-xs">{{ model.capability }}</span>
+                    <span class="pill text-xs">{{ capabilityLabel(model.capability) }}</span>
                     <span v-if="model.autoDisabled" class="pill text-xs">
                       {{ $t('adminModelStatus.model.autoDisabled') }}
                     </span>
@@ -210,6 +212,7 @@
                     <button
                       class="btn-secondary px-3 py-1.5 rounded-lg text-xs"
                       data-testid="btn-reset-counters"
+                      :disabled="busyModelId === model.id"
                       @click="resetCounters(model)"
                     >
                       {{ $t('adminModelStatus.actions.resetCounters') }}
@@ -217,6 +220,7 @@
                     <button
                       class="btn-secondary px-3 py-1.5 rounded-lg text-xs"
                       data-testid="btn-toggle-exempt"
+                      :disabled="busyModelId === model.id"
                       @click="toggleExempt(model)"
                     >
                       {{
@@ -242,6 +246,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
 import {
   modelStatusApi,
   type ModelStatusEntry,
@@ -251,12 +256,14 @@ import {
 
 const { t, locale } = useI18n()
 const { success, error } = useNotification()
+const { confirm } = useDialog()
 
 const snapshot = ref<ModelStatusSnapshot | null>(null)
 const isLoading = ref(false)
 const isRefreshing = ref(false)
 const onlyProblems = ref(false)
 const capabilityFilter = ref('')
+const busyModelId = ref<number | null>(null)
 
 const ORDERED_STATES: ModelStatusState[] = [
   'offline',
@@ -325,6 +332,12 @@ const formatTime = (unix: number): string => {
   return new Date(unix * 1000).toLocaleString(locale.value)
 }
 
+const capabilityLabel = (tag: string): string => {
+  const key = `config.aiModels.capabilities.${tag}`
+  const label = t(key)
+  return label === key ? tag : label
+}
+
 const load = async () => {
   isLoading.value = true
   try {
@@ -351,6 +364,7 @@ const refresh = async (provider?: string) => {
 
 const toggleExempt = async (model: ModelStatusEntry) => {
   const exempt = model.exemptUntil === 0
+  busyModelId.value = model.id
   try {
     await modelStatusApi.setExempt(model.id, exempt)
     snapshot.value = await modelStatusApi.getStatus()
@@ -359,16 +373,29 @@ const toggleExempt = async (model: ModelStatusEntry) => {
     )
   } catch {
     error(t('adminModelStatus.messages.exemptFailed'))
+  } finally {
+    busyModelId.value = null
   }
 }
 
 const resetCounters = async (model: ModelStatusEntry) => {
+  const confirmed = await confirm({
+    title: t('adminModelStatus.confirmResetTitle'),
+    message: t('adminModelStatus.confirmResetMessage', { name: model.name }),
+    confirmText: t('adminModelStatus.actions.resetCounters'),
+    cancelText: t('common.cancel'),
+  })
+  if (!confirmed) return
+
+  busyModelId.value = model.id
   try {
     await modelStatusApi.resetCounters(model.id)
     snapshot.value = await modelStatusApi.getStatus()
     success(t('adminModelStatus.messages.countersReset'))
   } catch {
     error(t('adminModelStatus.messages.countersResetFailed'))
+  } finally {
+    busyModelId.value = null
   }
 }
 

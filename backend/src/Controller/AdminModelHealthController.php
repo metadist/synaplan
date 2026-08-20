@@ -8,6 +8,8 @@ use App\AI\Health\ModelHealthConfig;
 use App\AI\Health\ModelHealthEvaluator;
 use App\AI\Health\ModelHealthOverview;
 use App\AI\Health\ModelHealthRecorder;
+use App\AI\Health\ModelHealthState;
+use App\Entity\ModelHealth;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
@@ -165,8 +167,7 @@ final class AdminModelHealthController extends AbstractController
     #[OA\Response(response: 503, description: 'The check could not be completed')]
     public function refresh(Request $request): JsonResponse
     {
-        /** @var array<string, mixed> $payload */
-        $payload = json_decode((string) $request->getContent(), true) ?: [];
+        $payload = $this->jsonObject($request);
         $provider = isset($payload['provider']) && is_string($payload['provider']) && '' !== trim($payload['provider'])
             ? [trim($payload['provider'])]
             : [];
@@ -177,7 +178,7 @@ final class AdminModelHealthController extends AbstractController
             $this->logger->error('Manual model health check failed', ['error' => $e->getMessage()]);
 
             return $this->json([
-                'error' => 'The availability check could not be completed: '.$e->getMessage(),
+                'error' => 'The availability check could not be completed.',
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
@@ -233,8 +234,7 @@ final class AdminModelHealthController extends AbstractController
     #[OA\Response(response: 404, description: 'Model not found')]
     public function exempt(int $id, Request $request): JsonResponse
     {
-        /** @var array<string, mixed> $payload */
-        $payload = json_decode((string) $request->getContent(), true) ?: [];
+        $payload = $this->jsonObject($request);
         if (!isset($payload['exempt']) || !is_bool($payload['exempt'])) {
             return $this->json(['error' => 'Field "exempt" must be a boolean'], Response::HTTP_BAD_REQUEST);
         }
@@ -293,6 +293,32 @@ final class AdminModelHealthController extends AbstractController
 
         $this->recorder->reset($id);
 
+        // Traffic counters and the persisted traffic verdict must move together.
+        // Clearing only Redis left the page showing "offline because 50% failed"
+        // next to a 0% error rate, and routing kept avoiding a model the
+        // operator had just asked to judge on fresh calls.
+        $health = $this->healthRepository->findByModelId($id);
+        if (null !== $health && ModelHealth::SOURCE_TRAFFIC === $health->getSource()) {
+            $health
+                ->setState(ModelHealthState::Unknown)
+                ->setKind(null)
+                ->setMessage(null)
+                ->setUpdated(time());
+            $this->entityManager->flush();
+        }
+
+        $this->modelConfigService->invalidateModelHealth();
+
         return $this->json(['success' => true, 'modelId' => $id]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function jsonObject(Request $request): array
+    {
+        $decoded = json_decode((string) $request->getContent(), true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 }

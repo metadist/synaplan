@@ -183,6 +183,8 @@
       "exempt": "Exempt from automation",
       "unexempt": "Allow automation again"
     },
+    "confirmResetTitle": "Clear error history?",
+    "confirmResetMessage": "\"{name}\" will then be judged on new usage only. A check that already found this model retired is not undone.",
     "messages": {
       "refreshed": "Checked {count} model(s).",
       "refreshFailed": "The check could not be completed.",
