@@ -12,10 +12,16 @@ use App\AI\Service\ProviderRegistry;
  * Reachability check for self-hosted providers that have no catalog endpoint
  * (Triton over gRPC, Piper TTS).
  *
- * Their own `isAvailable()` is the free check they already ship, so this probe
- * can say "the service is up" without ever running inference. It cannot say
- * anything about individual models, hence {@see ProbeResult::reachable()} — a
- * reachable service must never be used as grounds for retiring a model.
+ * Their own `isAvailable()` is the free check they already ship. For these
+ * two providers that method means "a server URL was set", not "the server
+ * answers" — Triton constructs a gRPC stub without connecting, Piper only
+ * looks at `SYNAPLAN_TTS_URL`. An empty URL is therefore a skip, the same
+ * rule every cloud probe follows, so an install that never set
+ * `TRITON_SERVER_URL` does not page operators about unused catalog rows
+ * ("3 NVIDIA Triton model(s) failing").
+ *
+ * When a URL is set the probe reports {@see ProbeResult::reachable()}. That
+ * must never be used as grounds for retiring a model: it is not a listing.
  */
 final readonly class LocalProviderAvailabilityProbe implements ModelListProbeInterface
 {
@@ -40,9 +46,14 @@ final readonly class LocalProviderAvailabilityProbe implements ModelListProbeInt
             }
 
             try {
-                return $provider->isAvailable()
-                    ? ProbeResult::reachable(sprintf('%s is reachable.', $provider->getDisplayName()))
-                    : ProbeResult::failed(FailureKind::Transient, sprintf('%s is not reachable.', $provider->getDisplayName()));
+                if (!$provider->isAvailable()) {
+                    return ProbeResult::skipped(sprintf(
+                        '%s is not configured.',
+                        $provider->getDisplayName()
+                    ));
+                }
+
+                return ProbeResult::reachable(sprintf('%s is reachable.', $provider->getDisplayName()));
             } catch (\Throwable $e) {
                 return ProbeResult::failed(FailureKind::Transient, sprintf('%s check failed: %s', $service, $e->getMessage()));
             }
