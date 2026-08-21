@@ -206,9 +206,7 @@ describe('McpServersConfiguration — platform MCP switch', () => {
     const wrapper = mount(McpServersConfiguration, mountOptions)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="mcp-client-status"]').text()).toContain(
-      'MCP calls are off'
-    )
+    expect(wrapper.find('[data-testid="mcp-client-status"]').text()).toContain('MCP calls are off')
     expect(wrapper.find('[data-testid="link-mcp-system-config"]').exists()).toBe(true)
     const enable = wrapper.find('[data-testid="btn-mcp-enable-client"]')
     expect(enable.exists()).toBe(true)

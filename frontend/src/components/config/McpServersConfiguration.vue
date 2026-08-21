@@ -30,11 +30,7 @@
           />
           <div class="min-w-0">
             <p class="text-sm font-semibold txt-primary">
-              {{
-                clientEnabled
-                  ? $t('mcpServers.clientOnTitle')
-                  : $t('mcpServers.clientOffTitle')
-              }}
+              {{ clientEnabled ? $t('mcpServers.clientOnTitle') : $t('mcpServers.clientOffTitle') }}
             </p>
             <p class="text-sm txt-secondary mt-0.5 leading-relaxed">
               {{
@@ -65,10 +61,7 @@
         >
           {{ togglingClient ? $t('common.saving') : $t('mcpServers.clientEnable') }}
         </button>
-        <label
-          v-else-if="isAdmin"
-          class="inline-flex items-center gap-3 cursor-pointer shrink-0"
-        >
+        <label v-else-if="isAdmin" class="inline-flex items-center gap-3 cursor-pointer shrink-0">
           <span class="text-sm txt-secondary">{{ $t('mcpServers.clientToggle') }}</span>
           <span class="relative inline-flex">
             <input

@@ -74,11 +74,11 @@ Shipped so far (2026-08-18): **M0, M1, M3a–M3d, M10** (Dropbox pulled forward)
 
 - 54 targeted backend tests / 263 assertions green: `CalendarEventRunner`, `CalendarEventService`, `CalDavClient`/`CalDavDestinationProvider`, `CalendarEmailChainTest`, `EmailSearchRunner` (IMAP+M365 merge, per-source degradation), `GraphClient`/`GraphMailboxSearcher`, `PlannerChannelCatalog`, `DropboxDestination`, `SaveToFolder`.
 - `UtterancePlanCharacterizationTest` green — today's plan for "put it into my Outlook" is `.ics` + reply, no delivery node.
-- Live `BCONFIG` (fresh seed): `MULTITASK.ROUTING_ENABLED=1`, `EMAIL_SEARCH_ENABLED=1`, `MCP_FETCH_ENABLED=1`, `MCP.CLIENT_ENABLED=1`. No `M365`/`DROPBOX` rows until an operator enters OAuth app credentials (setup guides: `M365SetupGuide.vue`, `DropboxSetupGuide.vue`).
+- Live `BCONFIG` (fresh seed): `MULTITASK.ROUTING_ENABLED=1`, `MULTITASK.EMAIL_SEARCH_ENABLED=1`, `MULTITASK.MCP_FETCH_ENABLED=1`, `MCP.CLIENT_ENABLED=1`. No `M365`/`DROPBOX` rows until an operator enters OAuth app credentials (setup guides: `M365SetupGuide.vue`, `DropboxSetupGuide.vue`).
 
 **Manual acceptance probes on a configured instance:**
 
-1. Connect an M365 account (Channels → Connections), ask "What is the latest mail from <sender>, summarize it" → works today.
+1. Connect an M365 account (Channels → Connections), ask "What is the latest mail from `{sender}`, summarize it" → works today.
 2. Ask "Create a meeting for tomorrow 10am and put it into my Outlook" → since the §6 sprint: creates the event in the connected Outlook calendar (account must be consented with the expanded scopes) AND returns the `.ics` download; on a pre-expansion connection it degrades to the download with a reconnect hint.
 3. `POST /api/v1/files/{id}/send` with `destination=caldav` + `connection_id` → events land in the CalDAV calendar, deduplicated.
 
