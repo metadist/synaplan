@@ -154,17 +154,27 @@ Resources:
                   - ec2:RevokeSecurityGroupEgress
                   - ec2:RevokeSecurityGroupIngress
                   - ec2:AuthorizeSecurityGroupEgress
-                  # Both the subnet and the data volume place themselves with
-                  # `!Select [0, !GetAZs '']`, which CloudFormation resolves with
-                  # the caller's own credentials. Without this the stack fails on
-                  # its first resource, and the AMI it was meant to verify is
-                  # already built and paid for by then.
-                  - ec2:DescribeAvailabilityZones
-                  - ec2:DescribeRouteTables
-                  - ec2:DescribeInternetGateways
-                  - ec2:DescribeNetworkInterfaces
-                  - ec2:DescribeIamInstanceProfileAssociations
+                  # Reading is granted as a whole, deliberately. A CloudFormation
+                  # resource handler reads its own resource back after writing
+                  # it, and which Describe call it picks is an implementation
+                  # detail of the handler rather than something this template can
+                  # see: `!GetAZs` needs DescribeAvailabilityZones, the VPC needs
+                  # DescribeVpcAttribute, the security group needs
+                  # DescribeSecurityGroupRules. Each one that is missing costs a
+                  # failed stack, and this role only ever reads an account that
+                  # holds build artifacts. The writes below stay an explicit list.
+                  - ec2:Describe*
                   - ec2:DeleteTags
+                  # Set from a property the template does declare, each on a
+                  # resource this stack owns: MapPublicIpOnLaunch on the subnet,
+                  # the instance profile on the instance, and the attribute and
+                  # volume changes a stack update performs.
+                  - ec2:ModifySubnetAttribute
+                  - ec2:ModifyInstanceAttribute
+                  - ec2:ModifyVolume
+                  - ec2:AssociateIamInstanceProfile
+                  - ec2:DisassociateIamInstanceProfile
+                  - ec2:ReplaceIamInstanceProfileAssociation
                   - ssm:SendCommand
                   - ssm:GetCommandInvocation
                   - ssm:DescribeInstanceInformation
