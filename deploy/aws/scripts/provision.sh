@@ -94,7 +94,7 @@ rsync -a --delete \
     --exclude '.lifecycle/' \
     --exclude '.env' \
     "$STAGE_DIR/deploy/" "$APP_DIR/deploy/"
-chmod 0755 "$APP_DIR/deploy/scripts"/*.sh "$APP_DIR/deploy/aws/scripts"/*.sh
+chmod 0755 "$APP_DIR/deploy/scripts"/*.sh "$APP_DIR/deploy/host"/*.sh "$APP_DIR/deploy/aws/scripts"/*.sh
 
 # Persistent state lives on a separate EBS volume so an instance can be replaced
 # without losing anything. The application tree keeps the paths lib.sh expects
@@ -105,9 +105,9 @@ ln -sfn "$DATA_MOUNT/.lifecycle" "$APP_DIR/deploy/.lifecycle"
 ln -sfn "$DATA_MOUNT/.env" "$APP_DIR/deploy/.env"
 
 log "Publishing the operator commands"
-ln -sfn "$APP_DIR/deploy/aws/scripts/update.sh" /usr/local/bin/synaplan-update
+ln -sfn "$APP_DIR/deploy/host/update.sh" /usr/local/bin/synaplan-update
 ln -sfn "$APP_DIR/deploy/aws/scripts/snapshot.sh" /usr/local/bin/synaplan-snapshot
-ln -sfn "$APP_DIR/deploy/aws/scripts/configure-tls.sh" /usr/local/bin/synaplan-tls
+ln -sfn "$APP_DIR/deploy/host/configure-tls.sh" /usr/local/bin/synaplan-tls
 ln -sfn "$APP_DIR/deploy/scripts/smoke-test.sh" /usr/local/bin/synaplan-smoke-test
 
 log "Recording the baked release"
@@ -129,7 +129,7 @@ log "Pre-pulling the container images for $SYNAPLAN_VERSION"
 # The whole point: a first boot must not depend on ghcr.io being reachable or
 # fast. A launch in a locked-down VPC comes up from the local image cache.
 systemctl start docker
-SYNAPLAN_VERSION="$SYNAPLAN_VERSION" "$APP_DIR/deploy/aws/scripts/pull-images.sh"
+SYNAPLAN_VERSION="$SYNAPLAN_VERSION" "$APP_DIR/deploy/host/pull-images.sh"
 systemctl stop docker
 
 log "Provisioning complete"

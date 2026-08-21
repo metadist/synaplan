@@ -38,4 +38,4 @@ mainSteps:
       # QuiesceForDailySnapshots in the CloudFormation templates.
       timeoutSeconds: 3600
       runCommand:
-        - /opt/synaplan/deploy/aws/scripts/snapshot-hook.sh '{{ command }}' '{{ executionId }}'
+        - /opt/synaplan/deploy/host/snapshot-hook.sh '{{ command }}' '{{ executionId }}'

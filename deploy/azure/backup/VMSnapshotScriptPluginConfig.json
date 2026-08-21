@@ -1,0 +1,12 @@
+{
+  "pluginName": "ScriptRunner",
+  "preScriptLocation": "/opt/synaplan/deploy/host/snapshot-hook.sh",
+  "postScriptLocation": "/opt/synaplan/deploy/host/snapshot-hook.sh",
+  "preScriptParams": ["pre-script"],
+  "postScriptParams": ["post-script"],
+  "preScriptNoOfRetries": 0,
+  "postScriptNoOfRetries": 0,
+  "timeoutInSeconds": 1800,
+  "continueBackupOnFailure": false,
+  "fsFreezeEnabled": true
+}

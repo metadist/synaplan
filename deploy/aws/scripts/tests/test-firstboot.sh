@@ -82,13 +82,13 @@ new_instance() {
     put_parameters="$tree/put-parameters"
     env_file="$tree/data/.env"
 
-    mkdir -p "$tree/opt/deploy/scripts" "$tree/opt/deploy/aws/scripts" "$tree/data" "$bin"
+    mkdir -p "$tree/opt/deploy/scripts" "$tree/opt/deploy/host" "$tree/data" "$bin"
     : > "$tags"
     : > "$parameters"
     : > "$put_parameters"
 
     printf 'SYNAPLAN_VERSION=9.9.9\n' > "$tree/opt/ami-release"
-    write_stub "$tree/opt/deploy/aws/scripts/configure-tls.sh" 'exit 0'
+    write_stub "$tree/opt/deploy/host/configure-tls.sh" 'exit 0'
     write_stub "$tree/opt/deploy/scripts/prepare.sh" 'exit 0'
 
     # prepare_data_volume() asks this first, and an affirmative answer is the

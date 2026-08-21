@@ -1,6 +1,6 @@
 [Unit]
 Description=Synaplan application stack
-Documentation=https://github.com/metadist/synaplan/blob/main/deploy/aws/README.md
+Documentation=https://github.com/metadist/synaplan/blob/main/deploy/azure/README.md
 After=docker.service synaplan-firstboot.service
 Requires=docker.service synaplan-firstboot.service
 
@@ -10,7 +10,7 @@ RemainAfterExit=yes
 WorkingDirectory=/opt/synaplan/deploy
 # run.sh is the portable start command every platform adapter uses: it resolves
 # the deployment secrets, validates the pinned release, and brings the stack up.
-# The AWS adapter must not reimplement any of that.
+# The Azure adapter must not reimplement any of that.
 ExecStart=/opt/synaplan/deploy/scripts/run.sh
 ExecStop=/opt/synaplan/deploy/host/stop.sh
 # The first start pulls nothing (the images are baked in) but does run database

@@ -147,6 +147,13 @@ build {
     destination = "/tmp/synaplan/deploy"
   }
 
+  # The host layer every cloud image shares: TLS terminator configuration, the
+  # update sequencer, the stop command and the image-bake pull.
+  provisioner "file" {
+    source      = "${local.repo_root}/deploy/host"
+    destination = "/tmp/synaplan/deploy"
+  }
+
   provisioner "file" {
     source      = "${local.repo_root}/deploy/aws"
     destination = "/tmp/synaplan/deploy"

@@ -1,27 +1,47 @@
 #!/usr/bin/env bash
 #
-# In-place update of a running AMI instance, published as `synaplan-update`.
+# In-place update of a running marketplace image instance, published as
+# `synaplan-update`.
 #
 #   sudo synaplan-update 1.4.0
 #
 # It is a thin sequencer over the portable contract — pre-update backup gate,
-# version bump, post-update start and verification. The AWS adapter deliberately
-# owns no update logic of its own, so an instance updates exactly the way a
-# self-hosted install does (docs/UPDATE_SELFHOST.md) and cannot drift from it.
+# version bump, post-update start and verification. No cloud adapter owns update
+# logic of its own, so an instance updates exactly the way a self-hosted install
+# does (docs/UPDATE_SELFHOST.md) and cannot drift from it. That is also why the
+# script lives in deploy/host/ rather than under one cloud: the only difference
+# between the clouds is which guide the operator is pointed at.
 
 set -Eeuo pipefail
-# shellcheck source=../../scripts/lib.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/lib.sh"
+# shellcheck source=../scripts/lib.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/lib.sh"
+
+# Best effort and deliberately silent on failure: this only decorates the help
+# text, and a `synaplan-update` that refused to explain itself because the
+# configuration was unreadable would be worse than one that links the generic
+# guide.
+guide_url() {
+    local platform env_file
+    env_file="$(resolve_compose_env_file 2>/dev/null || true)"
+    [[ -n "$env_file" && -r "$env_file" ]] &&
+        platform="$(awk -F= '/^SYNAPLAN_PLATFORM=/ { print $2; exit }' "$env_file")"
+
+    case "${platform-}" in
+        aws) printf 'https://github.com/metadist/synaplan/blob/main/docs/UPDATE_AWS.md' ;;
+        azure) printf 'https://github.com/metadist/synaplan/blob/main/docs/UPDATE_AZURE.md' ;;
+        *) printf 'https://github.com/metadist/synaplan/blob/main/docs/UPDATE_SELFHOST.md' ;;
+    esac
+}
 
 usage() {
-    cat >&2 <<'USAGE'
+    cat >&2 <<USAGE
 Usage: sudo synaplan-update <version>
 
   <version>  A released SemVer version, without a leading v — for example 1.4.0.
              Released versions: https://github.com/metadist/synaplan/releases
 
 Take a snapshot first:  sudo synaplan-snapshot
-Full guide:             https://github.com/metadist/synaplan/blob/main/docs/UPDATE_AWS.md
+Full guide:             $(guide_url)
 USAGE
     exit 64
 }

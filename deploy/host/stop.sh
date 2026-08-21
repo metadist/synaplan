@@ -7,8 +7,8 @@
 # behind.
 
 set -Eeuo pipefail
-# shellcheck source=../../scripts/lib.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/lib.sh"
+# shellcheck source=../scripts/lib.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/lib.sh"
 
 # compose.yaml declares the managed secrets as `${VAR:?}`, so even a stop has to
 # resolve them before it reaches Compose.
