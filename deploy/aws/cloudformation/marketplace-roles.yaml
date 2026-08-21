@@ -152,18 +152,29 @@ Resources:
                   - ec2:AttachVolume
                   - ec2:DetachVolume
                   - ec2:RevokeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupIngress
                   - ec2:AuthorizeSecurityGroupEgress
+                  # Both the subnet and the data volume place themselves with
+                  # `!Select [0, !GetAZs '']`, which CloudFormation resolves with
+                  # the caller's own credentials. Without this the stack fails on
+                  # its first resource, and the AMI it was meant to verify is
+                  # already built and paid for by then.
+                  - ec2:DescribeAvailabilityZones
                   - ec2:DescribeRouteTables
                   - ec2:DescribeInternetGateways
                   - ec2:DescribeNetworkInterfaces
                   - ec2:DescribeIamInstanceProfileAssociations
+                  - ec2:DeleteTags
                   - ssm:SendCommand
                   - ssm:GetCommandInvocation
                   - ssm:DescribeInstanceInformation
                   - ssm:CreateDocument
                   - ssm:DeleteDocument
                   - ssm:DescribeDocument
+                  - ssm:GetDocument
                   - ssm:AddTagsToResource
+                  - ssm:ListTagsForResource
+                  - ssm:RemoveTagsFromResource
               - Effect: Allow
                 Action:
                   - iam:CreateRole
@@ -183,6 +194,7 @@ Resources:
                   - iam:GetInstanceProfile
                   - iam:AddRoleToInstanceProfile
                   - iam:RemoveRoleFromInstanceProfile
+                  - iam:ListInstanceProfilesForRole
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/synaplan-verify-*'
                   - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:instance-profile/synaplan-verify-*'

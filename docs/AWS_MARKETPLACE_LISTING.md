@@ -112,6 +112,12 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 
+The same command updates the roles later, and it has to be run again whenever
+the template changes: the account keeps the permissions it was deployed with, so
+a permission added here reaches the build role only after a redeploy. A missing
+one shows up as `AccessDenied` in the verification stack, after the AMI it was
+meant to verify has already been built.
+
 - **`AWSMarketplaceAmiIngestion`** lets AWS Marketplace copy a submitted AMI into
   its own account for the security scan. Name it in the Management Portal under
   Settings.
