@@ -33,11 +33,20 @@ const defaultPrompt = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
-const { mockList, mockGetPrompts, mockCreatePrompt, mockUpdatePrompt } = vi.hoisted(() => ({
+const {
+  mockList,
+  mockGetPrompts,
+  mockCreatePrompt,
+  mockUpdatePrompt,
+  mockUpdateConfigValue,
+  authState,
+} = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockGetPrompts: vi.fn(),
   mockCreatePrompt: vi.fn(),
   mockUpdatePrompt: vi.fn(),
+  mockUpdateConfigValue: vi.fn(),
+  authState: { isAdmin: false },
 }))
 
 vi.mock('@/services/api/mcpServersApi', () => ({
@@ -68,7 +77,11 @@ vi.mock('@/composables/useDialog', () => ({
 }))
 
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ isAdmin: false }),
+  useAuthStore: () => authState,
+}))
+
+vi.mock('@/services/api/adminConfigApi', () => ({
+  updateConfigValue: mockUpdateConfigValue,
 }))
 
 const mountOptions = {
@@ -83,8 +96,10 @@ const mountOptions = {
 describe('McpServersConfiguration — task usage panel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    authState.isAdmin = false
     mockList.mockResolvedValue({ clientEnabled: true, servers: [mockServer] })
     mockGetPrompts.mockResolvedValue([defaultPrompt()])
+    mockUpdateConfigValue.mockResolvedValue({ success: true })
   })
 
   it('warns when servers are connected but no task allows MCP data sources', async () => {
@@ -175,5 +190,105 @@ describe('McpServersConfiguration — task usage panel', () => {
       })
     )
     expect(mockCreatePrompt).not.toHaveBeenCalled()
+  })
+})
+
+describe('McpServersConfiguration — platform MCP switch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    authState.isAdmin = true
+    mockList.mockResolvedValue({ clientEnabled: false, servers: [] })
+    mockGetPrompts.mockResolvedValue([])
+    mockUpdateConfigValue.mockResolvedValue({ success: true })
+  })
+
+  it('explains that calls are off and lets an admin turn them on', async () => {
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="mcp-client-status"]').text()).toContain('MCP calls are off')
+    expect(wrapper.find('[data-testid="link-mcp-system-config"]').exists()).toBe(true)
+    const enable = wrapper.find('[data-testid="btn-mcp-enable-client"]')
+    expect(enable.exists()).toBe(true)
+
+    mockList.mockResolvedValue({ clientEnabled: true, servers: [] })
+    await enable.trigger('click')
+    await flushPromises()
+
+    expect(mockUpdateConfigValue).toHaveBeenCalledWith('MCP_CLIENT_ENABLED', 'true')
+    expect(wrapper.find('[data-testid="toggle-mcp-client"]').exists()).toBe(true)
+  })
+
+  it('tells a non-admin to ask an administrator, without a switch', async () => {
+    authState.isAdmin = false
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="btn-mcp-enable-client"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="toggle-mcp-client"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="mcp-client-status"]').text()).toContain(
+      'An administrator needs to turn this on'
+    )
+  })
+})
+
+describe('McpServersConfiguration — add-server templates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    authState.isAdmin = false
+    mockList.mockResolvedValue({ clientEnabled: true, servers: [] })
+    mockGetPrompts.mockResolvedValue([])
+  })
+
+  it('shows a template catalog on the empty page, with Custom selected', async () => {
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="mcp-empty"]').exists()).toBe(true)
+    const custom = wrapper.find('[data-testid="btn-mcp-template-custom"]')
+    const jira = wrapper.find('[data-testid="btn-mcp-template-jira"]')
+    expect(custom.exists()).toBe(true)
+    expect(jira.exists()).toBe(true)
+    expect(custom.attributes('aria-checked')).toBe('true')
+    expect(jira.attributes('aria-checked')).toBe('false')
+  })
+
+  it('opens the form from a template and prefills only that template', async () => {
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="btn-mcp-template-jira"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="section-mcp-editor"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="mcp-empty"]').exists()).toBe(false)
+    const name = wrapper.find('[data-testid="input-mcp-name"]').element as HTMLInputElement
+    expect(name.value).toBe('Jira')
+    expect(wrapper.find('[data-testid="btn-mcp-template-jira"]').attributes('aria-checked')).toBe(
+      'true'
+    )
+  })
+
+  it('clears the named template when it is clicked again', async () => {
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="btn-mcp-add"]').trigger('click')
+    await wrapper.find('[data-testid="btn-mcp-template-jira"]').trigger('click')
+    await flushPromises()
+
+    const name = () => wrapper.find('[data-testid="input-mcp-name"]').element as HTMLInputElement
+    expect(name().value).toBe('Jira')
+
+    await wrapper.find('[data-testid="btn-mcp-template-jira"]').trigger('click')
+    await flushPromises()
+
+    expect(name().value).toBe('')
+    expect(wrapper.find('[data-testid="btn-mcp-template-custom"]').attributes('aria-checked')).toBe(
+      'true'
+    )
+    expect(wrapper.find('[data-testid="btn-mcp-template-jira"]').attributes('aria-checked')).toBe(
+      'false'
+    )
   })
 })

@@ -10,7 +10,7 @@
         <p class="text-xs txt-secondary mt-0.5">
           {{ $t('storage.plan') }}:
           <span class="font-medium txt-brand">{{
-            config.billing.enabled ? planName : $t('storage.unlimited')
+            isUnlimited ? $t('storage.unlimited') : planName
           }}</span>
         </p>
       </div>
@@ -27,13 +27,13 @@
       </div>
       <div class="text-xs txt-secondary">
         {{ stats?.storage.usage_formatted || '0 B' }} /
-        {{ stats?.storage.limit_formatted || '100 MB' }}
+        {{ isUnlimited ? $t('storage.unlimited') : stats?.storage.limit_formatted || '100 MB' }}
       </div>
     </div>
 
     <!-- Warning/Upgrade Message -->
     <div
-      v-if="percentage > 80"
+      v-if="!isUnlimited && percentage > 80"
       class="mt-3 p-2 rounded-lg bg-orange-500/10 dark:bg-orange-500/20 border border-orange-500/30 dark:border-orange-500/40"
     >
       <p class="text-xs text-orange-600 dark:text-orange-400">
@@ -61,6 +61,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { getStorageStats } from '@/services/filesService'
 
+import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
@@ -69,6 +70,7 @@ defineEmits<{
 }>()
 
 const config = useConfigStore()
+const authStore = useAuthStore()
 
 // No purchase path on a custom server in the native app (store IAP only).
 const purchaseAllowed = isPurchaseAllowed()
@@ -77,8 +79,16 @@ type StorageStatsPayload = Awaited<ReturnType<typeof getStorageStats>>
 const stats = ref<StorageStatsPayload | null>(null)
 const loading = ref(true)
 
+const isUnlimited = computed(
+  () =>
+    !config.billing.enabled ||
+    authStore.isAdmin ||
+    stats.value?.storage.unlimited === true ||
+    stats.value?.user_level === 'ADMIN'
+)
+
 const percentage = computed(() => {
-  if (!stats.value?.storage) return 0
+  if (isUnlimited.value || !stats.value?.storage) return 0
   return Math.min(100, stats.value.storage.percentage)
 })
 

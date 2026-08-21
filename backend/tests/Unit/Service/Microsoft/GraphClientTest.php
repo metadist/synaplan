@@ -242,6 +242,97 @@ final class GraphClientTest extends TestCase
         $client->me($this->connection());
     }
 
+    public function testCreateEventPostsTheTransactionIdAndMapsTheWebLink(): void
+    {
+        $captured = [];
+        $client = $this->client([
+            new MockResponse(json_encode([
+                'id' => 'evt-1',
+                'webLink' => 'https://outlook.office.com/calendar/item/evt-1',
+            ]), ['http_code' => 201]),
+        ], $captured);
+
+        $start = new \DateTimeImmutable('2026-08-22T10:00:00', new \DateTimeZone('UTC'));
+        $result = $client->createEvent(
+            $this->connection(),
+            transactionId: 'synaplan-f0-m42-e0',
+            subject: 'Marketing Strategy',
+            start: $start,
+            end: $start->add(new \DateInterval('PT1H')),
+            timezone: 'UTC',
+            body: 'Prep notes',
+            location: 'Room 5',
+            attendees: ['sanam@example.com'],
+        );
+
+        self::assertTrue($result['created']);
+        self::assertSame('evt-1', $result['id']);
+        self::assertStringContainsString('outlook.office.com', $result['webLink']);
+
+        self::assertSame('POST', $captured[0]['method']);
+        self::assertStringEndsWith('/me/events', $captured[0]['url']);
+        $payload = json_decode((string) $captured[0]['options']['body'], true);
+        self::assertSame('synaplan-f0-m42-e0', $payload['transactionId']);
+        self::assertSame('Marketing Strategy', $payload['subject']);
+        self::assertSame('2026-08-22T10:00:00', $payload['start']['dateTime']);
+        self::assertSame('UTC', $payload['start']['timeZone']);
+        self::assertSame('sanam@example.com', $payload['attendees'][0]['emailAddress']['address']);
+    }
+
+    public function testCreateEventTreatsA409AsAlreadyDeliveredNotAnError(): void
+    {
+        $client = $this->client([
+            new MockResponse('{"error":{"code":"ErrorPropertyValidationFailure"}}', ['http_code' => 409]),
+        ]);
+
+        $start = new \DateTimeImmutable('2026-08-22T10:00:00', new \DateTimeZone('UTC'));
+        $result = $client->createEvent(
+            $this->connection(),
+            'synaplan-f0-m42-e0',
+            'Meeting',
+            $start,
+            $start->add(new \DateInterval('PT1H')),
+            'UTC',
+        );
+
+        self::assertFalse($result['created'], 'a repeated transactionId means the event already exists');
+        self::assertSame('', $result['id']);
+    }
+
+    public function testSendMailPostsTheMessageWithBase64Attachments(): void
+    {
+        $captured = [];
+        $client = $this->client([new MockResponse('', ['http_code' => 202])], $captured);
+
+        $client->sendMail(
+            $this->connection(),
+            ['owner@example.com'],
+            'Your Synaplan results',
+            'Here you go.',
+            [['name' => 'meeting.ics', 'contentBytes' => base64_encode('BEGIN:VCALENDAR'), 'contentType' => 'text/calendar']],
+        );
+
+        self::assertSame('POST', $captured[0]['method']);
+        self::assertStringEndsWith('/me/sendMail', $captured[0]['url']);
+        $payload = json_decode((string) $captured[0]['options']['body'], true);
+        self::assertTrue($payload['saveToSentItems']);
+        self::assertSame('owner@example.com', $payload['message']['toRecipients'][0]['emailAddress']['address']);
+        self::assertSame('meeting.ics', $payload['message']['attachments'][0]['name']);
+        self::assertSame('#microsoft.graph.fileAttachment', $payload['message']['attachments'][0]['@odata.type']);
+    }
+
+    public function testSendMailFailureIsSurfacedWithTheGraphError(): void
+    {
+        $client = $this->client([
+            new MockResponse('{"error":{"code":"ErrorSendAsDenied","message":"not allowed"}}', ['http_code' => 403]),
+        ]);
+
+        $this->expectException(GraphException::class);
+        $this->expectExceptionMessageMatches('/ErrorSendAsDenied/');
+
+        $client->sendMail($this->connection(), ['owner@example.com'], 's', 'b');
+    }
+
     private function connection(): Connection
     {
         $connection = new Connection(7, Connection::TYPE_M365, 'Microsoft 365');

@@ -62,6 +62,60 @@ final class PlannerChannelCatalogTest extends TestCase
         self::assertSame('(none)', $catalog->renderForPlanner(null));
     }
 
+    public function testM365WithCalendarScopeYieldsAMailAndAnOutlookCalendarChannel(): void
+    {
+        $m365 = $this->connection(3, Connection::TYPE_M365, 'ada@contoso.com', ['channel' => 'm365']);
+        $m365->setScopes(['User.Read', 'Mail.Read', 'Calendars.ReadWrite', 'Mail.Send']);
+
+        $repo = $this->createMock(ConnectionRepository::class);
+        $repo->method('findByOwner')->willReturn([$m365]);
+
+        $catalog = new PlannerChannelCatalog($repo);
+        $channels = $catalog->forUser(1);
+
+        self::assertCount(2, $channels);
+        self::assertSame('m365', $channels[0]->key);
+        self::assertSame(PlannerChannel::KIND_MAIL, $channels[0]->kind);
+        self::assertSame('outlook', $channels[1]->key);
+        self::assertSame(PlannerChannel::KIND_CALENDAR, $channels[1]->kind);
+        self::assertSame(['calendar_event'], $channels[1]->capabilities);
+        self::assertSame(3, $channels[1]->connectionId);
+        self::assertSame('outlook', $m365->getConfig()['channel_calendar'] ?? null, 'the calendar key is persisted for a stable planner vocabulary');
+
+        $rendered = $catalog->renderForPlanner(1);
+        self::assertStringContainsString('- "outlook": calendar', $rendered);
+    }
+
+    public function testM365WithoutCalendarScopeStaysMailOnly(): void
+    {
+        $m365 = $this->connection(3, Connection::TYPE_M365, 'ada@contoso.com', ['channel' => 'm365']);
+        $m365->setScopes(['User.Read', 'Mail.Read']);
+
+        $repo = $this->createMock(ConnectionRepository::class);
+        $repo->method('findByOwner')->willReturn([$m365]);
+        $repo->expects(self::never())->method('save');
+
+        $channels = (new PlannerChannelCatalog($repo))->forUser(1);
+
+        self::assertCount(1, $channels);
+        self::assertSame(PlannerChannel::KIND_MAIL, $channels[0]->kind);
+    }
+
+    public function testOutlookKeyCollisionWithACaldavCalendarStaysUnique(): void
+    {
+        $caldav = $this->connection(2, 'caldav', 'personal', ['channel' => 'outlook']);
+        $m365 = $this->connection(3, Connection::TYPE_M365, 'ada@contoso.com', ['channel' => 'm365']);
+        $m365->setScopes(['Calendars.ReadWrite']);
+
+        $repo = $this->createMock(ConnectionRepository::class);
+        $repo->method('findByOwner')->willReturn([$caldav, $m365]);
+
+        $channels = (new PlannerChannelCatalog($repo))->forUser(1);
+
+        $keys = array_map(static fn ($c) => $c->key, $channels);
+        self::assertSame(['outlook', 'm365', 'outlook-2'], $keys);
+    }
+
     public function testPersistsADerivedKeyTheFirstTimeAConnectionIsListed(): void
     {
         $connection = $this->connection(1, 'webdav', 'nextcloud-Ordner (admin)');

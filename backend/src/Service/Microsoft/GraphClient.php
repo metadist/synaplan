@@ -160,6 +160,103 @@ final readonly class GraphClient
     }
 
     /**
+     * Create a calendar event (delegated `Calendars.ReadWrite`).
+     *
+     * Idempotent by construction: the caller passes a deterministic
+     * `transactionId` (max 255 chars) and Graph answers 409 for a repeat of
+     * the same transaction — re-running a delivery never duplicates the
+     * event, mirroring the CalDAV UID contract (plan 07 S13).
+     *
+     * @param list<string> $attendees email addresses
+     *
+     * @return array{id: string, webLink: string, created: bool} `created` is
+     *                                                           false when the event already existed (409 on the transactionId)
+     */
+    public function createEvent(
+        Connection $connection,
+        string $transactionId,
+        string $subject,
+        \DateTimeImmutable $start,
+        \DateTimeImmutable $end,
+        string $timezone,
+        ?string $body = null,
+        ?string $location = null,
+        array $attendees = [],
+    ): array {
+        $payload = [
+            'transactionId' => mb_substr($transactionId, 0, 255),
+            'subject' => $subject,
+            'start' => ['dateTime' => $start->format('Y-m-d\TH:i:s'), 'timeZone' => $timezone],
+            'end' => ['dateTime' => $end->format('Y-m-d\TH:i:s'), 'timeZone' => $timezone],
+        ];
+        if (null !== $body && '' !== trim($body)) {
+            $payload['body'] = ['contentType' => 'text', 'content' => $body];
+        }
+        if (null !== $location && '' !== trim($location)) {
+            $payload['location'] = ['displayName' => $location];
+        }
+        if ([] !== $attendees) {
+            $payload['attendees'] = array_map(
+                static fn (string $address): array => [
+                    'emailAddress' => ['address' => $address],
+                    'type' => 'required',
+                ],
+                $attendees,
+            );
+        }
+
+        $result = $this->post($connection, '/me/events', $payload, conflictIsDuplicate: true);
+        if (null === $result) {
+            return ['id' => '', 'webLink' => '', 'created' => false];
+        }
+
+        return [
+            'id' => $this->str($result, 'id'),
+            'webLink' => $this->str($result, 'webLink'),
+            'created' => true,
+        ];
+    }
+
+    /**
+     * Send a mail from the connected user's own mailbox (delegated
+     * `Mail.Send`) — the message lands in their Sent items. Attachments are
+     * inlined base64 (Graph's simple-attachment limit is ~3 MB per file;
+     * larger files must go through a folder destination instead).
+     *
+     * @param list<string>                                                         $to
+     * @param list<array{name: string, contentBytes: string, contentType: string}> $attachments contentBytes = base64
+     */
+    public function sendMail(
+        Connection $connection,
+        array $to,
+        string $subject,
+        string $body,
+        array $attachments = [],
+    ): void {
+        $message = [
+            'subject' => $subject,
+            'body' => ['contentType' => 'text', 'content' => $body],
+            'toRecipients' => array_map(
+                static fn (string $address): array => ['emailAddress' => ['address' => $address]],
+                $to,
+            ),
+        ];
+        if ([] !== $attachments) {
+            $message['attachments'] = array_map(
+                static fn (array $a): array => [
+                    '@odata.type' => '#microsoft.graph.fileAttachment',
+                    'name' => $a['name'],
+                    'contentType' => $a['contentType'],
+                    'contentBytes' => $a['contentBytes'],
+                ],
+                $attachments,
+            );
+        }
+
+        $this->post($connection, '/me/sendMail', ['message' => $message, 'saveToSentItems' => true]);
+    }
+
+    /**
      * @param array<string, mixed> $data a Graph collection payload (`value` list)
      *
      * @return list<array{id: string, subject: string, from: string, receivedAt: string, preview: string, hasAttachments: bool, isRead: bool}>
@@ -259,6 +356,70 @@ final readonly class GraphClient
             }
 
             if ((429 === $status || $status >= 500) && $attempt < self::MAX_RETRIES) {
+                $this->sleepBeforeRetry($retryAfter, $attempt, $status, $connection);
+                continue;
+            }
+
+            throw new GraphException($this->describeFailure($status, $raw));
+        }
+    }
+
+    /**
+     * POST with the same 401-refresh-once and 429/Retry-After discipline as
+     * {@see get()}. 5xx is NOT retried — unlike a read, a write may have been
+     * applied before the error, and only the 409/transactionId contract makes
+     * a repeat safe ({@see createEvent()}); a 429 was rejected before
+     * processing, so retrying it is always safe.
+     *
+     * @param array<string, mixed> $payload
+     * @param bool                 $conflictIsDuplicate when true a 409 answer means
+     *                                                  "this transaction already ran" and returns null instead of throwing
+     *
+     * @return array<string, mixed>|null the decoded response body (empty for 202-style answers), null on a duplicate 409
+     */
+    private function post(Connection $connection, string $path, array $payload, bool $conflictIsDuplicate = false): ?array
+    {
+        $url = self::BASE_URL.$path;
+        $token = $this->tokens->accessTokenFor($connection);
+        $retriedAfter401 = false;
+
+        for ($attempt = 0;; ++$attempt) {
+            try {
+                $response = $this->httpClient->request('POST', $url, [
+                    'headers' => [
+                        'Authorization' => 'Bearer '.$token,
+                        'Accept' => 'application/json',
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => $payload,
+                    'timeout' => self::TIMEOUT_SECONDS,
+                    'max_redirects' => 0,
+                ]);
+
+                $status = $response->getStatusCode();
+                $raw = $response->getContent(false);
+                $retryAfter = $response->getHeaders(false)['retry-after'][0] ?? null;
+            } catch (TransportExceptionInterface $e) {
+                throw new GraphException('Could not reach Microsoft Graph: '.$e->getMessage(), 0, $e);
+            }
+
+            if ($status >= 200 && $status < 300) {
+                $decoded = json_decode($raw, true);
+
+                return is_array($decoded) ? $decoded : [];
+            }
+
+            if (401 === $status && !$retriedAfter401) {
+                $retriedAfter401 = true;
+                $token = $this->tokens->refreshNow($connection);
+                continue;
+            }
+
+            if (409 === $status && $conflictIsDuplicate) {
+                return null;
+            }
+
+            if (429 === $status && $attempt < self::MAX_RETRIES) {
                 $this->sleepBeforeRetry($retryAfter, $attempt, $status, $connection);
                 continue;
             }

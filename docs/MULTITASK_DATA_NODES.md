@@ -35,6 +35,7 @@ Every data node obeys the same rules (plan 09 §2):
 | `web_search` | `WebSearchRunner` | Brave web search | – (provider config) | on |
 | `url_fetch` | `UrlFetchRunner` | A specific URL named in the message (`UrlContentService`: robots.txt/noindex compliant) | `MULTITASK.URL_FETCH_ENABLED` | **on** |
 | `mcp_fetch` | `McpFetchRunner` | The user's connected external MCP servers (`McpClient`, Streamable HTTP) | `MCP.CLIENT_ENABLED` + `MULTITASK.MCP_FETCH_ENABLED` + per-topic `tool_mcp` prompt metadata (optional `mcp_servers` id allowlist) | **on** (seeded) |
+| `mcp_action` | `McpActionRunner` | WRITE actions (create/update — e.g. Confluence pages, Jira tickets) on connected MCP servers whose owner enabled **allow write actions** (`BMCPSERVERS.BALLOWWRITE`); destructive tools always refused | `MCP.CLIENT_ENABLED` + `MULTITASK.MCP_ACTION_ENABLED` + per-topic `tool_mcp` + per-server `allow_write` | **on** (seeded), write opt-in per server **off** |
 | `email_search` | `EmailSearchRunner` | Live read-only search over the user's IMAP accounts (`InboundEmailHandler`) **and** Microsoft 365 connections (`GraphMailboxSearcher`, delegated `Mail.Read`) | `MULTITASK.EMAIL_SEARCH_ENABLED` | **on** (seeded) |
 | `rag_query` | `ChatRunner` | User knowledge base (Qdrant) | – | on |
 
@@ -96,6 +97,10 @@ when its per-user note expands to something.
 - `mcp_fetch` renders the per-user tool sub-catalog (server ids, read-safe
   tools, argument hints) — only when the matched routing topic has
   `tool_mcp = true` ("MCP Data Sources" toggle in AI Instructions).
+- `mcp_action` renders the write-tool sub-catalog — only for servers whose
+  owner enabled **allow write actions**, only tools that DECLARE themselves
+  mutating (`readOnlyHint: false`), and never tools marked destructive
+  (`destructiveHint: true`). Same topic gate as `mcp_fetch`.
 - `email_search` renders the connected-mailbox note — only when the user has
   an active mail source (IMAP account or Microsoft 365 connection).
 

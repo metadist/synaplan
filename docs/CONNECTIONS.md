@@ -125,6 +125,40 @@ the connection UI labels it accordingly.
   content exists only inside that one answer. IMAP accounts (Channels →
   Email Automation) are searched the same way; a user can have both, and the
   results are merged newest-first.
+- **Outlook calendar** (channel `outlook`): "Create a meeting reminder for
+  tomorrow at 10am and put it into my Outlook" creates the event directly in
+  the connected calendar via Microsoft Graph (delegated
+  `Calendars.ReadWrite`). Every event is created with a deterministic Graph
+  `transactionId` derived from the delivering file and source message, so a
+  re-run never duplicates an event (Graph answers 409 for a repeated
+  transaction, which counts as already delivered). The `.ics` download stays
+  attached to the reply as the no-connection fallback.
+- **Mail from your own mailbox** (`Mail.Send`): "mail it to me" results are
+  sent from the connected account itself (they appear in the Outlook Sent
+  items) instead of the platform's system mailbox. If the Graph send fails or
+  an attachment exceeds Graph's ~3 MB simple-attachment limit, delivery falls
+  back to the system mailbox — the mail always arrives.
+
+**Reconnect after a scope change:** accounts connected before the calendar and
+send scopes were added carry only the old grant. They keep working for mail
+search; the calendar channel is simply not offered and sends fall back to the
+system mailbox. Reconnect the account once (*Settings → Connections →
+Reconnect*) to grant the new permissions.
+
+## Jira & Confluence (via MCP)
+
+Jira and Confluence connect through the **MCP servers** page (*Channels → MCP
+servers*), not through this registry: add an Atlassian-capable MCP server
+(for example a self-hosted Atlassian MCP service) with its endpoint URL and
+access token — the Jira/Confluence quick-start presets prefill the form.
+
+- **Read** (`mcp_fetch`): "search Confluence for the onboarding page and
+  summarize it", "list my open Jira tickets" — read-only tools feed the
+  answer.
+- **Write** (`mcp_action`): "create a Confluence page about X", "open a Jira
+  ticket for this bug" — only after the server's owner enables **allow write
+  actions** on that connection. Tools that declare themselves destructive
+  (deletes) are never allowed.
 
 ## Status of a connection
 

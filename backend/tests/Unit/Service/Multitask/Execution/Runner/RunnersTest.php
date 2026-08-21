@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
+use App\Entity\Connection;
 use App\Entity\Message;
 use App\Entity\Prompt;
+use App\Repository\ConnectionRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Calendar\CalendarEventService;
+use App\Service\Connection\PlannerChannelCatalog;
+use App\Service\Destination\DestinationRegistry;
+use App\Service\Destination\RequestedCalendarDelivery;
 use App\Service\File\FileStorageService;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\FileAnalysisHandler;
@@ -614,7 +619,26 @@ final class RunnersTest extends TestCase
             'error' => null,
         ]);
 
-        return new CalendarEventRunner(new CalendarEventService(), $storage, $this->createMock(LoggerInterface::class));
+        return new CalendarEventRunner(
+            new CalendarEventService(),
+            $storage,
+            $this->inertCalendarDelivery(),
+            $this->createMock(LoggerInterface::class),
+        );
+    }
+
+    /**
+     * A real (final readonly) delivery service with empty collaborators — the
+     * tests never set `params.channel`, so it is never invoked.
+     */
+    private function inertCalendarDelivery(): RequestedCalendarDelivery
+    {
+        return new RequestedCalendarDelivery(
+            $this->createMock(ConnectionRepository::class),
+            new DestinationRegistry([]),
+            new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)),
+            $this->createMock(LoggerInterface::class),
+        );
     }
 
     /**
@@ -652,6 +676,144 @@ final class RunnersTest extends TestCase
 
         self::assertTrue($result->isSuccessful());
         self::assertCount(1, $result->files);
+    }
+
+    /**
+     * Phase M step M6: `params.channel` naming a calendar channel delivers the
+     * event into that connected calendar (here: an m365 connection's
+     * "outlook" channel via the `m365_calendar` provider) — and the .ics stays
+     * attached to the reply as the download fallback.
+     */
+    public function testCalendarEventWithChannelParamDeliversIntoTheConnectedCalendar(): void
+    {
+        $uploadDir = sys_get_temp_dir().'/calrunner_'.uniqid();
+        mkdir($uploadDir.'/1/000', 0777, true);
+
+        try {
+            $storage = $this->createMock(FileStorageService::class);
+            $storage->method('storeRawContent')->willReturnCallback(
+                static function (string $content, int $userId, string $filename) use ($uploadDir): array {
+                    $relative = '1/000/'.$filename;
+                    file_put_contents($uploadDir.'/'.$relative, $content);
+
+                    return ['success' => true, 'path' => $relative, 'size' => strlen($content), 'mime' => 'text/calendar'];
+                }
+            );
+
+            $m365 = new Connection(1, Connection::TYPE_M365, 'ada@contoso.com');
+            $m365->setConfig(['channel' => 'm365', 'channel_calendar' => 'outlook']);
+            $m365->setScopes(['Calendars.ReadWrite']);
+            (new \ReflectionProperty(Connection::class, 'id'))->setValue($m365, 3);
+
+            $connections = $this->createMock(ConnectionRepository::class);
+            $connections->method('findByOwner')->willReturn([$m365]);
+            $connections->method('findByIdAndOwner')->willReturn($m365);
+
+            $provider = new class implements \App\Service\Destination\DestinationProvider {
+                /** @var array<string, mixed>|null */
+                public ?array $lastParams = null;
+
+                public function id(): string
+                {
+                    return 'm365_calendar';
+                }
+
+                public function send(\App\Service\Destination\ShareableFile $file, array $params): \App\Service\Destination\DestinationResult
+                {
+                    $this->lastParams = $params;
+
+                    return \App\Service\Destination\DestinationResult::success('1', [
+                        'created' => '1',
+                        'skipped' => '0',
+                        'webLink' => 'https://outlook.office.com/evt',
+                    ]);
+                }
+            };
+
+            $runner = new CalendarEventRunner(
+                new CalendarEventService(),
+                $storage,
+                new RequestedCalendarDelivery(
+                    $connections,
+                    new DestinationRegistry([$provider]),
+                    new PlannerChannelCatalog($connections),
+                    $this->createMock(LoggerInterface::class),
+                ),
+                $this->createMock(LoggerInterface::class),
+                uploadDir: $uploadDir,
+            );
+
+            $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+                'title' => 'Marketing Strategy',
+                'start' => '2026-06-10T10:00:00',
+                'timezone' => 'Europe/Berlin',
+                'channel' => 'outlook',
+            ]);
+
+            $result = $runner->run($node, $this->context($this->message()));
+
+            self::assertTrue($result->isSuccessful(), (string) $result->error);
+            self::assertCount(1, $result->files, 'the .ics download stays attached');
+            self::assertStringContainsString('Added the event to outlook', (string) $result->text);
+            self::assertStringContainsString('https://outlook.office.com/evt', (string) $result->text);
+            self::assertTrue($result->metadata['calendar_delivery']['ok'] ?? false);
+            self::assertSame('outlook', $result->metadata['calendar_delivery']['channel'] ?? null);
+            self::assertSame(3, $provider->lastParams['connection_id'] ?? null);
+        } finally {
+            array_map('unlink', glob($uploadDir.'/1/000/*') ?: []);
+            @rmdir($uploadDir.'/1/000');
+            @rmdir($uploadDir.'/1');
+            @rmdir($uploadDir);
+        }
+    }
+
+    /**
+     * A failed calendar delivery must degrade to the .ics download with an
+     * honest note — never sink the node.
+     */
+    public function testCalendarEventWithUnknownChannelDegradesToTheDownload(): void
+    {
+        $uploadDir = sys_get_temp_dir().'/calrunner_'.uniqid();
+        mkdir($uploadDir.'/1/000', 0777, true);
+
+        try {
+            $storage = $this->createMock(FileStorageService::class);
+            $storage->method('storeRawContent')->willReturnCallback(
+                static function (string $content, int $userId, string $filename) use ($uploadDir): array {
+                    $relative = '1/000/'.$filename;
+                    file_put_contents($uploadDir.'/'.$relative, $content);
+
+                    return ['success' => true, 'path' => $relative, 'size' => strlen($content), 'mime' => 'text/calendar'];
+                }
+            );
+
+            $runner = new CalendarEventRunner(
+                new CalendarEventService(),
+                $storage,
+                $this->inertCalendarDelivery(),
+                $this->createMock(LoggerInterface::class),
+                uploadDir: $uploadDir,
+            );
+
+            $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+                'title' => 'Sync',
+                'start' => '2026-06-10T15:00:00',
+                'timezone' => 'UTC',
+                'channel' => 'invented',
+            ]);
+
+            $result = $runner->run($node, $this->context($this->message()));
+
+            self::assertTrue($result->isSuccessful(), 'delivery failure must not sink the node');
+            self::assertCount(1, $result->files);
+            self::assertStringContainsString('no calendar with this name', (string) $result->text);
+            self::assertFalse($result->metadata['calendar_delivery']['ok'] ?? true);
+        } finally {
+            array_map('unlink', glob($uploadDir.'/1/000/*') ?: []);
+            @rmdir($uploadDir.'/1/000');
+            @rmdir($uploadDir.'/1');
+            @rmdir($uploadDir);
+        }
     }
 
     public function testCalendarEventParamsWinOverInputs(): void

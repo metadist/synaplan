@@ -146,7 +146,7 @@ final readonly class SavedTaskService
                 continue;
             }
             $capability = (string) ($node['capability'] ?? '');
-            if (in_array($capability, ['email_me', 'save_to_folder', 'outbound_webhook'], true)) {
+            if (in_array($capability, ['email_me', 'save_to_folder', 'outbound_webhook', 'mcp_action'], true)) {
                 $mutating = true;
                 break;
             }

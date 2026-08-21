@@ -233,6 +233,12 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    # calendar_event DAG node: the stored .ics lives under the shared uploads
+    # dir; the runner needs the absolute path for a calendar-channel delivery.
+    App\Service\Multitask\Execution\Runner\CalendarEventRunner:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     # Async media job advancer (Release 4.0): finalize step downloads the
     # produced render and saves it under the shared uploads dir.
     App\MessageHandler\AdvanceMediaJobCommandHandler:
