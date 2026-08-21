@@ -164,6 +164,11 @@ Resources:
                   # failed stack, and this role only ever reads an account that
                   # holds build artifacts. The writes below stay an explicit list.
                   - ec2:Describe*
+                  # The only window into a boot that failed before Session
+                  # Manager came up. Without it a failed verification can leave
+                  # no evidence at all, because the cleanup deletes the instance
+                  # that held it.
+                  - ec2:GetConsoleOutput
                   - ec2:DeleteTags
                   # Set from a property the template does declare, each on a
                   # resource this stack owns: MapPublicIpOnLaunch on the subnet,
