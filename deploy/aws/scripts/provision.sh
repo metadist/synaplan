@@ -76,16 +76,33 @@ log "Installing Caddy from the project's own package repository"
 # Caddy terminates TLS on the host. Installed from the vendor repository rather
 # than as a loose binary so the instance keeps receiving security updates
 # through dnf like everything else.
-cat > /etc/yum.repos.d/caddy-stable.repo <<'REPO'
-[caddy-stable]
-name=Caddy stable
-baseurl=https://dl.cloudsmith.io/public/caddy/stable/rpm/fedora/40/$basearch
+#
+# The RPMs live in Fedora COPR, not in the Cloudsmith repository the Caddy
+# install page shows first — that one carries Debian packages only, and asking
+# it for an RPM yields an empty repository that fails as "Unable to find a
+# match: caddy" on every architecture. The EPEL 9 build is the one that fits
+# Amazon Linux 2023: it needs nothing beyond glibc 2.34 and systemd, both of
+# which AL2023 has, and it exists for x86_64 and aarch64 alike.
+#
+# COPR does not sign repository metadata, only the packages, so gpgcheck is on
+# and repo_gpgcheck stays off.
+cat > /etc/yum.repos.d/caddy.repo <<'REPO'
+[caddy]
+name=Caddy (COPR @caddy/caddy, EPEL 9)
+baseurl=https://download.copr.fedorainfracloud.org/results/@caddy/caddy/epel-9-$basearch/
 gpgcheck=1
 enabled=1
-gpgkey=https://dl.cloudsmith.io/public/caddy/stable/gpg.key
-repo_gpgcheck=1
+gpgkey=https://download.copr.fedorainfracloud.org/results/@caddy/caddy/pubkey.gpg
+repo_gpgcheck=0
+skip_if_unavailable=False
 REPO
 dnf -y install caddy
+
+# Same reasoning as the Compose plugin above: prove the thing that was just
+# installed actually runs on this architecture, while the build can still fail
+# cheaply. A broken TLS terminator would otherwise only surface on a customer's
+# first boot.
+caddy version
 
 log "Installing the application tree into $APP_DIR"
 install -d -m 0755 "$APP_DIR"
