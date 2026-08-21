@@ -1,6 +1,6 @@
 # Channels — capability inventory and planning
 
-**Status:** Investigation snapshot 2026-08-21 (verified against code, test suite, and a live seeded stack). **Branch:** `cursor/channel-management-planning-3d6f`.
+**Status:** Investigation snapshot 2026-08-21, updated the same day after the channel sprint shipped on this branch (see §6). **Branch:** `cursor/channel-management-planning-3d6f`.
 
 This document summarizes what the channel system can do TODAY — which channels can enrich prompts (IN) and which can receive results (OUT) — and what is missing to close the two headline gaps: writing meetings/reminders into connected calendars, and richer Microsoft 365 actions. The authoritative work breakdown for the M365 gaps lives in [`saved-task-workflows/10_m365_actions_and_destinations.md`](./saved-task-workflows/10_m365_actions_and_destinations.md) (Phase M); this file is the cross-channel overview.
 
@@ -79,5 +79,25 @@ Shipped so far (2026-08-18): **M0, M1, M3a–M3d, M10** (Dropbox pulled forward)
 **Manual acceptance probes on a configured instance:**
 
 1. Connect an M365 account (Channels → Connections), ask "What is the latest mail from <sender>, summarize it" → works today.
-2. Ask "Create a meeting for tomorrow 10am and put it into my Outlook" → returns an `.ics` download, **not** a calendar entry (expected until M4–M6 ship).
+2. Ask "Create a meeting for tomorrow 10am and put it into my Outlook" → since the §6 sprint: creates the event in the connected Outlook calendar (account must be consented with the expanded scopes) AND returns the `.ics` download; on a pre-expansion connection it degrades to the download with a reconnect hint.
 3. `POST /api/v1/files/{id}/send` with `destination=caldav` + `connection_id` → events land in the CalDAV calendar, deduplicated.
+
+---
+
+## 6. Channel sprint 2026-08-21 — what shipped on this branch
+
+The gaps in §4 were closed on this branch (product-owner request: "enable all missing channels now in this sprint"):
+
+| Gap | Shipped as |
+| --- | ---------- |
+| Jira/Confluence via MCP | Quick-start presets in *Channels → MCP servers* (`McpServersConfiguration.vue`); reads (search pages, summaries, list tickets) via existing `mcp_fetch` |
+| MCP write actions | New `mcp_action` capability + `McpActionRunner`: create Confluence pages / Jira tickets via prompt. Per-server **allow write actions** opt-in (`BMCPSERVERS.BALLOWWRITE`, default off); destructive tools always refused; flag `MULTITASK.MCP_ACTION_ENABLED` seeded ON |
+| M365 scopes | `MicrosoftOAuthConfig::SCOPES` += `Calendars.ReadWrite`, `Mail.Send`. Pre-expansion connections degrade honestly (scope check on `Connection::getScopes()`) and work again after a reconnect |
+| Outlook calendar write (M4–M6) | `GraphClient::createEvent` (idempotent via `transactionId`, 409 = already delivered) + `OutlookCalendarDestinationProvider` (`m365_calendar`) + planner channel `outlook` (m365 connections now expose a mail AND a calendar channel via `PlannerChannelCatalog::channelsForConnection`) |
+| Chat → calendar wiring | `CalendarEventRunner` accepts `params.channel` and delivers through `RequestedCalendarDelivery` — CalDAV **and** Outlook; `.ics` download stays the fallback; failures degrade to the download, never sink the node |
+| Email write via M365 | `M365MailSender` (Graph `sendMail`, lands in the user's Sent items); `email_me` prefers it and falls back to system SMTP |
+| File-send destinations | `POST /files/{id}/send` now documents `dropbox` and accepts `m365_calendar` |
+
+Characterization: `planner_system_prompt.txt` re-recorded (rules 7/9e + examples); `utterance_plans.json` U1 now carries `params.channel = "outlook"` (the M6 review artifact the M1 lock anticipated).
+
+Still open after this sprint: reminders/alarms (`VALARM` / Graph reminders — still not on any roadmap), M2 incremental-consent UX ("Upgrade access"), M7 copy work, M8 OpenCloud, M9 OneDrive, `outbound_webhook`.
