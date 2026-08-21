@@ -44,8 +44,10 @@ x-app-environment: &app-environment
   BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
   BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
   BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE: "${BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE:-false}"
-  # Auth-surface switches (issues #462 / #1517). Empty keeps the default
-  # (enabled); SSO-/OIDC-only deployments set both to "false".
+  # Auth-surface switches (issues #462 / #1517). Empty keeps the application
+  # default, which is enabled, so an existing deployment is unaffected. An
+  # install reachable from the open internet that nobody watches wants
+  # registration off; SSO-/OIDC-only deployments set both to "false".
   REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
   GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
   DB_HOST: db
@@ -85,10 +87,6 @@ x-app-environment: &app-environment
   GOOGLE_GEMINI_API_KEY: "${GOOGLE_GEMINI_API_KEY:-}"
   MISTRAL_API_KEY: "${MISTRAL_API_KEY:-}"
   XAI_API_KEY: "${XAI_API_KEY:-}"
-  # Whether visitors can create their own account. An install reachable from the
-  # open internet that nobody watches wants this off; the application default
-  # stays `true` so an existing deployment is unaffected.
-  REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-true}"
   # Operator billing. Empty keys mean open-source mode: no plans, no quotas, no
   # upgrade prompts, and every tier gate open (see docs/BILLING_SELFHOST.md).
   # Setting them turns this install into a paid product run by YOU, billed

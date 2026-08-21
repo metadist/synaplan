@@ -41,6 +41,86 @@ if grep -q 'ggml-${WHISPER_DEFAULT_MODEL' "$COMPOSE_FILE"; then
     exit 1
 fi
 
+# Every check above reads the file as text, and Compose never parses it in this
+# suite because `docker` is stubbed further down so the tests run without it. A
+# structural YAML defect therefore survives the whole suite and surfaces where
+# it is most expensive: a merge once left REGISTRATION_ENABLED defined twice,
+# which Compose rejects outright, and it was only caught on a Packer-built AMI
+# in the middle of a release build.
+#
+# Duplicate keys are the case worth spelling out, because a lenient parser
+# keeps the last one without complaining. This loader refuses instead.
+#
+# A missing interpreter or PyYAML fails the suite rather than skipping the
+# check. A guard that quietly turns itself off in an environment nobody
+# inspected is the same silence this test exists to end.
+command -v python3 > /dev/null || {
+    echo "python3 is required to parse compose.yaml in this suite" >&2
+    exit 1
+}
+python3 - "$COMPOSE_FILE" <<'PARSE' || exit 1
+import sys
+
+try:
+    import yaml
+except ImportError:
+    sys.exit(
+        'PyYAML is required to parse compose.yaml. Install it with '
+        '"python3 -m pip install pyyaml", or "apt-get install python3-yaml" '
+        'on Debian and Ubuntu.'
+    )
+
+
+class StrictLoader(yaml.SafeLoader):
+    pass
+
+
+MERGE_TAG = 'tag:yaml.org,2002:merge'
+
+
+def reject_duplicate_keys(loader, node, deep=False):
+    # Only the keys actually written at this level, which is what a merge
+    # conflict duplicates. A `<<: *anchor` is skipped and left to the parent
+    # constructor: it flattens the anchor into this mapping, where a key the
+    # anchor already carries is a legitimate override rather than a duplicate.
+    seen = set()
+    for key_node, _ in node.value:
+        if key_node.tag == MERGE_TAG:
+            continue
+
+        key = loader.construct_object(key_node, deep=deep)
+        if key in seen:
+            sys.exit('compose.yaml defines "%s" twice in the same mapping' % key)
+        seen.add(key)
+
+    return yaml.SafeLoader.construct_mapping(loader, node, deep)
+
+
+StrictLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, reject_duplicate_keys
+)
+
+with open(sys.argv[1], encoding='utf-8') as handle:
+    try:
+        yaml.load(handle, StrictLoader)
+    except yaml.YAMLError as error:
+        sys.exit('compose.yaml is not valid YAML: %s' % error)
+PARSE
+
+# The same defect in the file operators actually copy. A repeated key is legal
+# in a .env, which is what makes it worse than in compose.yaml: the last
+# occurrence silently wins, so the comment above the first one documents a
+# default that never takes effect.
+duplicate_env_keys="$(
+    awk -F= '/^[A-Z_][A-Z0-9_]*=/ { print $1 }' "$SCRIPT_DIR/../selfhost.env.example" |
+        sort | uniq -d | tr '\n' ' '
+)"
+if [[ -n "${duplicate_env_keys// /}" ]]; then
+    printf 'selfhost.env.example defines these keys more than once, and the last one silently wins: %s\n' \
+        "$duplicate_env_keys" >&2
+    exit 1
+fi
+
 # Where the deployment reads its configuration from, for each layout that has to
 # work. A managed platform may materialise the configured environment as a .env
 # at the CHECKOUT ROOT, which Compose ignores for `-f deploy/compose.yaml`,
