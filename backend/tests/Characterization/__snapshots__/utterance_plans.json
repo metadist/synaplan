@@ -9,6 +9,7 @@
                     "depends_on": [],
                     "id": "n1",
                     "params": {
+                        "channel": "outlook",
                         "duration_minutes": 60,
                         "start": "2026-08-19T10:00:00",
                         "timezone": "Europe/Berlin",

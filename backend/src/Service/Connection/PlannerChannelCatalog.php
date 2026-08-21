@@ -30,15 +30,40 @@ final readonly class PlannerChannelCatalog
         $used = [];
         $out = [];
         foreach ($this->connections->findByOwner($ownerId) as $connection) {
-            $channel = $this->fromConnection($connection, $used);
-            if (null === $channel) {
-                continue;
+            foreach ($this->channelsForConnection($connection, $used) as $channel) {
+                $used[] = $channel->key;
+                $out[] = $channel;
             }
-            $used[] = $channel->key;
-            $out[] = $channel;
         }
 
         return $out;
+    }
+
+    /**
+     * All planner channels one connection contributes. Most connection types
+     * map to exactly one channel; a Microsoft 365 connection is BOTH a mail
+     * channel ("m365": email_search / email_me) and — once the account was
+     * consented with the calendar scope — an Outlook calendar channel
+     * ("outlook": calendar_event).
+     *
+     * @param list<string> $usedKeys
+     *
+     * @return list<PlannerChannel>
+     */
+    public function channelsForConnection(Connection $connection, array $usedKeys = []): array
+    {
+        $primary = $this->fromConnection($connection, $usedKeys);
+        if (null === $primary) {
+            return [];
+        }
+
+        $channels = [$primary];
+        if (Connection::TYPE_M365 === $connection->getType() && $this->hasCalendarScope($connection)) {
+            $usedKeys[] = $primary->key;
+            $channels[] = $this->calendarChannelForM365($connection, $usedKeys);
+        }
+
+        return $channels;
     }
 
     public function find(int $ownerId, string $key): ?PlannerChannel
@@ -139,6 +164,43 @@ final readonly class PlannerChannelCatalog
             $id,
             self::capabilitiesForKind($kind),
         );
+    }
+
+    /**
+     * The secondary "outlook" calendar channel of an m365 connection. Its key
+     * is persisted under `config.channel_calendar` (the primary mail key owns
+     * `config.channel`) so the planner vocabulary stays stable across turns.
+     *
+     * @param list<string> $usedKeys
+     */
+    private function calendarChannelForM365(Connection $connection, array $usedKeys): PlannerChannel
+    {
+        $config = $connection->getConfig() ?? [];
+        $stored = is_string($config['channel_calendar'] ?? null) ? self::sanitize($config['channel_calendar']) : '';
+        $key = '' !== $stored ? self::unique($stored, $usedKeys) : self::unique('outlook', $usedKeys);
+        if ('' === $stored) {
+            $config['channel_calendar'] = $key;
+            $connection->setConfig($config);
+            $this->connections->save($connection);
+        }
+
+        return new PlannerChannel(
+            $key,
+            PlannerChannel::KIND_CALENDAR,
+            $connection->getName(),
+            (int) $connection->getId(),
+            self::capabilitiesForKind(PlannerChannel::KIND_CALENDAR),
+        );
+    }
+
+    /**
+     * Whether the account was consented with the Graph calendar-write scope —
+     * pre-expansion connections were not, and advertising a calendar channel
+     * the delivery would refuse (403) helps nobody.
+     */
+    private function hasCalendarScope(Connection $connection): bool
+    {
+        return in_array('Calendars.ReadWrite', $connection->getScopes() ?? [], true);
     }
 
     public static function sanitize(string $raw): string

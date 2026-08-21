@@ -20,9 +20,10 @@ use PHPUnit\Framework\TestCase;
  * expected DAG for these four sentences is an explicit, reviewed diff.
  *
  * The plans below describe TODAY's honest behavior. Phase M steps change them
- * on purpose (M6 adds the Outlook delivery to U1, M3 widens U3's mail
- * sources); when that happens this snapshot MUST drift and the diff MUST be
- * reviewed line by line — that is the point of the lock, not an annoyance.
+ * on purpose (M6 added the Outlook delivery to U1 via `params.channel`, M3
+ * widened U3's mail sources); when that happens this snapshot MUST drift and
+ * the diff MUST be reviewed line by line — that is the point of the lock, not
+ * an annoyance.
  *
  * Record/refresh the baseline with: UPDATE_ROUTING_SNAPSHOTS=1
  */
@@ -87,9 +88,11 @@ final class UtterancePlanCharacterizationTest extends TestCase
     private function cases(): array
     {
         return [
-            // U1 — today's honest shape: the .ics artifact. Step M6 extends
-            // this plan with the Outlook (m365 calendar) delivery; the snapshot
-            // diff at that moment is the review artifact.
+            // U1 — Step M6 shipped: with a connected Outlook calendar (the
+            // premise of "put it into my Outlook"), the planner names the
+            // calendar channel and the runner creates the event via Graph.
+            // The .ics stays attached as the download fallback; without a
+            // connected calendar channel `params.channel` is simply omitted.
             'u1_outlook_calendar_write' => [
                 'utterance' => "Create a meeting reminder for tomorrow at 10am for 'Marketing Strategy' and put it into my Outlook",
                 'plan' => [
@@ -105,6 +108,7 @@ final class UtterancePlanCharacterizationTest extends TestCase
                                 'start' => '2026-08-19T10:00:00',
                                 'timezone' => 'Europe/Berlin',
                                 'duration_minutes' => 60,
+                                'channel' => 'outlook',
                             ],
                         ],
                         [

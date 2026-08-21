@@ -657,6 +657,13 @@ Allowed topic keys: [KEYLIST]
    `chat` node that merely talks about the appointment. Resolve the relative
    time against the time context into an absolute ISO-8601 `start` + IANA
    `timezone`, fill title/attendees/location/duration.
+   When the user asks to PUT the event into a connected calendar ("put it
+   into my Outlook", "trag es in meinen Kalender ein") AND the Connected
+   channels list has a channel of kind calendar, ALSO set `params.channel`
+   to that calendar channel name (e.g. "outlook", "calendar") — the event is
+   then created directly in that calendar. Never invent a channel name; with
+   no calendar channel connected, omit `params.channel` (the user gets the
+   downloadable invite).
 8. "Mail it to me" / "email me the result" / "schick es mir per Mail" →
    ADD one `email_me` node that depends on the content nodes and consumes
    their outputs (`text` + `attachments`). ONLY when the user EXPLICITLY
@@ -709,6 +716,17 @@ Allowed topic keys: [KEYLIST]
    times against the time context); feed `$nX.text` into the answering
    node. NEVER emit `email_search` for generic questions or when it is not
    in the capability list.
+9e. The user explicitly asks to CREATE or UPDATE something in one of their
+   connected systems AND the capability list above shows `mcp_action` with
+   write-enabled connections ("create a Confluence page about X", "open a
+   Jira ticket for this bug", "lege ein Ticket an") → an `mcp_action` node
+   with `params.server_id` + `params.tool` taken EXACTLY from the listed
+   write tools and the tool arguments in `inputs.arguments`. When the
+   content must be written first ("write a summary and put it on
+   Confluence"), generate it in a prior `chat` node and reference `$nX.text`
+   inside `inputs.arguments`. NEVER invent a server_id or tool name, NEVER
+   emit `mcp_action` for read-only questions (use `mcp_fetch`), and NEVER
+   emit it when it is not in the capability list.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
    node, no `compose_reply` needed.
 11. A SINGLE media request with no follow-up step ("make an image of X",
@@ -970,6 +988,25 @@ User: "Look up the customer Acme GmbH in our CRM and summarize their last order.
 (never invented), the tool arguments ride in `inputs.arguments`, and the
 answering node consumes `$n1.text` — the reply is grounded in the pulled data.
 
+### Create something in a connected system (mcp_action)
+User: "Write a short summary of our launch plan and create a Confluence page for it."
+(The capability list shows: server_id 5 "Confluence" — write tools: create_page(space, title, content))
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "chat", "inputs": { "text": "Write a short summary of our launch plan." }, "params": { "topic_id": "general" } },
+    { "id": "n2", "capability": "mcp_action", "depends_on": ["n1"], "inputs": { "arguments": { "title": "Launch plan summary", "content": "$n1.text" } }, "params": { "server_id": 5, "tool": "create_page" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+The content is written FIRST (`chat`), the write action consumes it via
+`$n1.text` inside `inputs.arguments`, and the reply surfaces the system's
+confirmation (e.g. the created page link) via `$n2.text`.
+
 ### Search the user's own mailbox, then answer (email_search)
 User: "Search my emails for the Acme offer from last week and summarize it."
 (The capability list shows email_search with a connected mailbox; assume today is 2026-06-17.)
@@ -1005,6 +1042,11 @@ user's zone. (The example below assumes a user in Europe/Berlin.)
     { "id": "n2", "capability": "compose_reply", "depends_on": ["n1"], "inputs": { "text": "Here is your meeting invite for tomorrow at 09:00 with Sanam.", "attachments": ["$n1.file"] } }
   ]
 }
+
+When the user ALSO asks to put the event into a connected calendar ("… and put
+it into my Outlook") and the Connected channels list shows a calendar channel
+(e.g. "outlook"), add `"channel": "outlook"` to the `calendar_event` node's
+`params` — same single node, the delivery happens inside it.
 
 ### Plain question
 User: "Wer bist du?"

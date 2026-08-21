@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
+use App\Entity\Connection;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Repository\ConnectionRepository;
 use App\Repository\UserRepository;
 use App\Service\InternalEmailService;
+use App\Service\Microsoft\GraphClient;
+use App\Service\Microsoft\M365MailSender;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\Runner\EmailMeRunner;
@@ -17,6 +21,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class EmailMeRunnerTest extends TestCase
@@ -83,7 +89,8 @@ final class EmailMeRunnerTest extends TestCase
             $this->repository($user),
             $this->translator(),
             $this->createMock(LoggerInterface::class),
-            $this->uploadDir,
+            m365MailSender: null,
+            uploadDir: $this->uploadDir,
         );
     }
 
@@ -201,6 +208,94 @@ final class EmailMeRunnerTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('email delivery failed: smtp down', (string) $result->error);
+    }
+
+    public function testPrefersTheConnectedM365MailboxWhenSendCapable(): void
+    {
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok('THE POEM'));
+
+        // The system-SMTP path must stay untouched when Graph delivers.
+        $this->emailService->expects(self::never())->method('sendTaskResultEmail');
+
+        $captured = [];
+        $runner = new EmailMeRunner(
+            $this->emailService,
+            $this->repository($this->user()),
+            $this->translator(),
+            $this->createMock(LoggerInterface::class),
+            m365MailSender: $this->m365Sender([new MockResponse('', ['http_code' => 202])], $captured),
+            uploadDir: $this->uploadDir,
+        );
+
+        $result = $runner->run($this->emailNode(), $ctx);
+
+        self::assertTrue($result->isSuccessful(), (string) $result->error);
+        self::assertCount(1, $captured, 'the mail must go out through Graph');
+        self::assertStringEndsWith('/me/sendMail', $captured[0]['url']);
+        $payload = json_decode($captured[0]['body'], true);
+        self::assertSame('alice@example.com', $payload['message']['toRecipients'][0]['emailAddress']['address']);
+    }
+
+    public function testFallsBackToInternalSmtpWhenTheGraphSendFails(): void
+    {
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok('THE POEM'));
+
+        $this->emailService->expects(self::once())->method('sendTaskResultEmail');
+
+        $captured = [];
+        $runner = new EmailMeRunner(
+            $this->emailService,
+            $this->repository($this->user()),
+            $this->translator(),
+            $this->createMock(LoggerInterface::class),
+            m365MailSender: $this->m365Sender([new MockResponse('{"error":{"code":"ErrorSendAsDenied"}}', ['http_code' => 403])], $captured),
+            uploadDir: $this->uploadDir,
+        );
+
+        $result = $runner->run($this->emailNode(), $ctx);
+
+        self::assertTrue($result->isSuccessful(), 'a mail that lands beats a transport preference');
+    }
+
+    /**
+     * A real M365MailSender over MockHttpClient with one send-capable
+     * connection (finals cannot be mocked; this mirrors M365MailSenderTest).
+     *
+     * @param list<MockResponse>                                          $responses
+     * @param list<array{method: string, url: string, body: string}>|null $captured
+     */
+    private function m365Sender(array $responses, ?array &$captured = null): M365MailSender
+    {
+        $connection = new Connection(7, Connection::TYPE_M365, 'ada@contoso.com');
+        $connection->setScopes(['Mail.Read', 'Mail.Send']);
+        $connection->setStatus(Connection::STATUS_CONNECTED);
+        (new \ReflectionProperty(Connection::class, 'id'))->setValue($connection, 3);
+
+        $connections = $this->createMock(ConnectionRepository::class);
+        $connections->method('findByOwner')->willReturn([$connection]);
+
+        $http = new MockHttpClient(function (string $method, string $url, array $options) use (&$responses, &$captured) {
+            if (null !== $captured) {
+                $captured[] = [
+                    'method' => $method,
+                    'url' => $url,
+                    'body' => is_string($options['body'] ?? null) ? $options['body'] : '',
+                ];
+            }
+
+            return array_shift($responses) ?? new MockResponse('{}', ['http_code' => 500]);
+        });
+
+        $tokens = $this->createStub(\App\Service\OAuth\ConnectionAccessTokenProvider::class);
+        $tokens->method('accessTokenFor')->willReturn('at-1');
+
+        return new M365MailSender(
+            new GraphClient($http, $tokens, new \Psr\Log\NullLogger(), static function (int $seconds): void {}),
+            $connections,
+            new \Psr\Log\NullLogger(),
+        );
     }
 
     public function testAttachmentsOutsideUploadsDirAreDropped(): void

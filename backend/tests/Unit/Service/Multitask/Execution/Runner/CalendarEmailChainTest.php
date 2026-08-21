@@ -6,8 +6,12 @@ namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
 use App\Entity\Message;
 use App\Entity\User;
+use App\Repository\ConnectionRepository;
 use App\Repository\UserRepository;
 use App\Service\Calendar\CalendarEventService;
+use App\Service\Connection\PlannerChannelCatalog;
+use App\Service\Destination\DestinationRegistry;
+use App\Service\Destination\RequestedCalendarDelivery;
 use App\Service\File\FileStorageService;
 use App\Service\InternalEmailService;
 use App\Service\Multitask\Execution\NodeContext;
@@ -77,6 +81,12 @@ final class CalendarEmailChainTest extends TestCase
         $calendarRunner = new CalendarEventRunner(
             new CalendarEventService(),
             $fileStorage,
+            new RequestedCalendarDelivery(
+                $this->createMock(ConnectionRepository::class),
+                new DestinationRegistry([]),
+                new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)),
+                $this->createMock(LoggerInterface::class),
+            ),
             $this->createMock(LoggerInterface::class),
         );
 
@@ -165,7 +175,8 @@ final class CalendarEmailChainTest extends TestCase
             $users,
             $translator,
             $this->createMock(LoggerInterface::class),
-            $this->uploadDir,
+            m365MailSender: null,
+            uploadDir: $this->uploadDir,
         );
     }
 }

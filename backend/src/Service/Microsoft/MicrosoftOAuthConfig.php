@@ -46,8 +46,19 @@ final readonly class MicrosoftOAuthConfig implements OAuthProviderSource
      * Delegated scopes requested at consent. `offline_access` is what makes an
      * unattended run possible at all — without it Microsoft issues no refresh
      * token and every schedule dies when the access token expires.
+     *
+     * `Calendars.ReadWrite` (Outlook calendar event creation with dedup reads)
+     * and `Mail.Send` (mail results from the user's own mailbox) joined the
+     * set in Phase M. Connections consented BEFORE that carry only the old
+     * grant in {@see \App\Entity\Connection::getScopes()} — the calendar/mail
+     * write paths check the granted scopes and ask for a reconnect instead of
+     * surfacing a raw Graph 403.
      */
-    public const SCOPES = ['offline_access', 'openid', 'email', 'profile', 'User.Read', 'Mail.Read'];
+    public const SCOPES = ['offline_access', 'openid', 'email', 'profile', 'User.Read', 'Mail.Read', 'Calendars.ReadWrite', 'Mail.Send'];
+
+    /** Granted-scope names the write paths probe for (see SCOPES docblock). */
+    public const SCOPE_CALENDAR_WRITE = 'Calendars.ReadWrite';
+    public const SCOPE_MAIL_SEND = 'Mail.Send';
 
     public function __construct(
         private ConfigRepository $configRepository,
