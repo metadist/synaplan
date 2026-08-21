@@ -59,6 +59,13 @@
           >
             {{ server.enabled ? $t('mcpServers.enabled') : $t('mcpServers.disabled') }}
           </span>
+          <span
+            v-if="server.allow_write"
+            class="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            :data-testid="`mcp-write-badge-${server.id}`"
+          >
+            {{ $t('mcpServers.writeBadge') }}
+          </span>
           <div class="flex items-center gap-2">
             <button
               type="button"
@@ -182,6 +189,31 @@
       </h3>
       <p class="txt-secondary text-sm mb-5">{{ $t('mcpServers.formHint') }}</p>
 
+      <!-- Quick-start presets: prefill the form for well-known systems. -->
+      <div v-if="!editingId" class="mb-5">
+        <p class="text-sm font-medium txt-primary mb-2">{{ $t('mcpServers.presetsLabel') }}</p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="preset in presets"
+            :key="preset.key"
+            type="button"
+            class="text-sm px-3 py-1.5 rounded-lg border transition-colors"
+            :class="
+              activePreset === preset.key
+                ? 'border-[var(--brand)] bg-[var(--brand)]/10 txt-primary'
+                : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary'
+            "
+            :data-testid="`btn-mcp-preset-${preset.key}`"
+            @click="applyPreset(preset)"
+          >
+            {{ preset.label }}
+          </button>
+        </div>
+        <p v-if="activePresetHint" class="text-xs txt-secondary mt-2 leading-relaxed">
+          {{ activePresetHint }}
+        </p>
+      </div>
+
       <div class="space-y-4">
         <label class="block">
           <span class="text-sm font-medium txt-primary">{{ $t('mcpServers.nameLabel') }}</span>
@@ -233,6 +265,20 @@
           <input v-model="form.enabled" type="checkbox" class="accent-[var(--brand)]" />
           {{ $t('mcpServers.enabledLabel') }}
         </label>
+        <div>
+          <label class="inline-flex items-center gap-2 text-sm txt-primary">
+            <input
+              v-model="form.allowWrite"
+              type="checkbox"
+              class="accent-[var(--brand)]"
+              data-testid="input-mcp-allow-write"
+            />
+            {{ $t('mcpServers.allowWriteLabel') }}
+          </label>
+          <p class="text-xs txt-secondary mt-1 leading-relaxed">
+            {{ $t('mcpServers.allowWriteHint') }}
+          </p>
+        </div>
       </div>
 
       <div class="flex flex-wrap items-center gap-3 mt-6">
@@ -296,7 +342,61 @@ const showNotUsedWarning = computed(
 const editorOpen = ref(false)
 const editingId = ref<number | null>(null)
 const editingHasToken = ref(false)
-const form = reactive({ name: '', url: '', authHeader: '', authToken: '', enabled: true })
+const form = reactive({
+  name: '',
+  url: '',
+  authHeader: '',
+  authToken: '',
+  enabled: true,
+  allowWrite: false,
+})
+
+/**
+ * Quick-start presets for well-known systems. They prefill the form (the
+ * user still enters their own MCP endpoint URL and credential) and show a
+ * per-system hint — e.g. how Jira/Confluence tools reach Synaplan through an
+ * Atlassian-capable MCP server.
+ */
+interface McpPreset {
+  key: string
+  label: string
+  name: string
+  authHeader: string
+  allowWrite: boolean
+  hintKey: string
+}
+
+const presets: McpPreset[] = [
+  {
+    key: 'jira',
+    label: 'Jira',
+    name: 'Jira',
+    authHeader: 'Authorization',
+    allowWrite: true,
+    hintKey: 'mcpServers.presetJiraHint',
+  },
+  {
+    key: 'confluence',
+    label: 'Confluence',
+    name: 'Confluence',
+    authHeader: 'Authorization',
+    allowWrite: true,
+    hintKey: 'mcpServers.presetConfluenceHint',
+  },
+]
+
+const activePreset = ref<string | null>(null)
+const activePresetHint = computed(() => {
+  const preset = presets.find((p) => p.key === activePreset.value)
+  return preset ? t(preset.hintKey) : ''
+})
+
+const applyPreset = (preset: McpPreset) => {
+  activePreset.value = preset.key
+  form.name = preset.name
+  form.authHeader = preset.authHeader
+  form.allowWrite = preset.allowWrite
+}
 
 const load = async () => {
   loading.value = true
@@ -369,19 +469,29 @@ const toggleTopicMcp = async (prompt: TaskPrompt) => {
 const startCreate = () => {
   editingId.value = null
   editingHasToken.value = false
-  Object.assign(form, { name: '', url: '', authHeader: '', authToken: '', enabled: true })
+  activePreset.value = null
+  Object.assign(form, {
+    name: '',
+    url: '',
+    authHeader: '',
+    authToken: '',
+    enabled: true,
+    allowWrite: false,
+  })
   editorOpen.value = true
 }
 
 const startEdit = (server: McpServer) => {
   editingId.value = server.id ?? null
   editingHasToken.value = server.has_auth_token ?? false
+  activePreset.value = null
   Object.assign(form, {
     name: server.name ?? '',
     url: server.url ?? '',
     authHeader: server.auth_header ?? '',
     authToken: '',
     enabled: server.enabled ?? true,
+    allowWrite: server.allow_write ?? false,
   })
   editorOpen.value = true
 }
@@ -398,6 +508,7 @@ const save = async () => {
       url: form.url.trim(),
       auth_header: form.authHeader.trim(),
       enabled: form.enabled,
+      allow_write: form.allowWrite,
       // Only send the secret when the user actually typed one — absent keeps
       // the stored value.
       ...(form.authToken !== '' ? { auth_token: form.authToken } : {}),

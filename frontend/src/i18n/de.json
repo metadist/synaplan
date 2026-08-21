@@ -4877,7 +4877,13 @@
     "usageDisabled": "MCP-Datenquellen für diese Aufgabe deaktiviert",
     "usageUpdateFailed": "Aufgabe konnte nicht aktualisiert werden",
     "usageAdvancedHint": "Weitere Optionen pro Aufgabe (Server-Einschränkungen, Anweisungen, Modelle):",
-    "usageAdvancedLink": "KI-Anweisungen"
+    "usageAdvancedLink": "KI-Anweisungen",
+    "presetsLabel": "Schnellstart",
+    "presetJiraHint": "Verbinde einen Jira-fähigen MCP-Server (z. B. einen selbst gehosteten Atlassian-MCP-Dienst) und trage dessen Endpunkt-URL und Zugriffstoken ein. Mit aktivierten Schreibaktionen kannst du deine Tickets auflisten und neue Tickets direkt per Prompt anlegen.",
+    "presetConfluenceHint": "Verbinde einen Confluence-fähigen MCP-Server (z. B. einen selbst gehosteten Atlassian-MCP-Dienst) und trage dessen Endpunkt-URL und Zugriffstoken ein. Mit aktivierten Schreibaktionen kannst du Seiten durchsuchen, Zusammenfassungen erhalten und neue Confluence-Seiten direkt per Prompt anlegen.",
+    "allowWriteLabel": "Schreibaktionen erlauben (Anlegen/Aktualisieren)",
+    "allowWriteHint": "Wenn aktiviert, darf der KI-Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren — zum Beispiel eine neue Confluence-Seite oder ein Jira-Ticket. Löschaktionen sind niemals erlaubt.",
+    "writeBadge": "Schreiben erlaubt"
   },
   "messagesGateway": {
     "title": "KI-Agenten",

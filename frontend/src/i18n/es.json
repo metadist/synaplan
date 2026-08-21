@@ -3957,7 +3957,13 @@
     "usageDisabled": "Fuentes de datos MCP desactivadas para esta tarea",
     "usageUpdateFailed": "No se pudo actualizar la tarea",
     "usageAdvancedHint": "Más opciones por tarea (restricciones de servidores, instrucciones, modelos):",
-    "usageAdvancedLink": "Instrucciones de IA"
+    "usageAdvancedLink": "Instrucciones de IA",
+    "presetsLabel": "Inicio rápido",
+    "presetJiraHint": "Conecta un servidor MCP compatible con Jira (por ejemplo, un servicio MCP de Atlassian autoalojado) e introduce su URL de endpoint y token de acceso. Con las acciones de escritura activadas puedes listar tus tickets y crear tickets nuevos directamente con un prompt.",
+    "presetConfluenceHint": "Conecta un servidor MCP compatible con Confluence (por ejemplo, un servicio MCP de Atlassian autoalojado) e introduce su URL de endpoint y token de acceso. Con las acciones de escritura activadas puedes buscar páginas, obtener resúmenes y crear nuevas páginas de Confluence directamente con un prompt.",
+    "allowWriteLabel": "Permitir acciones de escritura (crear/actualizar)",
+    "allowWriteHint": "Cuando está activado, el asistente de IA puede crear o actualizar contenido en este sistema cuando se lo pidas — por ejemplo una nueva página de Confluence o un ticket de Jira. Las acciones de borrado nunca están permitidas.",
+    "writeBadge": "Escritura permitida"
   },
   "messagesGateway": {
     "title": "Agentes de IA",

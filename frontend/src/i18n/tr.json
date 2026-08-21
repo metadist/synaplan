@@ -3958,7 +3958,13 @@
     "usageDisabled": "Bu görev için MCP veri kaynakları devre dışı bırakıldı",
     "usageUpdateFailed": "Görev güncellenemedi",
     "usageAdvancedHint": "Görev başına daha fazla seçenek (sunucu kısıtlamaları, talimatlar, modeller):",
-    "usageAdvancedLink": "AI Talimatları"
+    "usageAdvancedLink": "AI Talimatları",
+    "presetsLabel": "Hızlı başlangıç",
+    "presetJiraHint": "Jira uyumlu bir MCP sunucusu bağlayın (örneğin kendi barındırdığınız bir Atlassian MCP servisi) ve endpoint URL'sini ile erişim token'ını girin. Yazma eylemleri etkinken biletlerinizi listeleyebilir ve bir prompt ile yeni biletler oluşturabilirsiniz.",
+    "presetConfluenceHint": "Confluence uyumlu bir MCP sunucusu bağlayın (örneğin kendi barındırdığınız bir Atlassian MCP servisi) ve endpoint URL'sini ile erişim token'ını girin. Yazma eylemleri etkinken sayfalarda arama yapabilir, özetler alabilir ve bir prompt ile yeni Confluence sayfaları oluşturabilirsiniz.",
+    "allowWriteLabel": "Yazma eylemlerine izin ver (oluşturma/güncelleme)",
+    "allowWriteHint": "Etkinleştirildiğinde, AI asistanı siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir — örneğin yeni bir Confluence sayfası veya bir Jira bileti. Silme eylemlerine asla izin verilmez.",
+    "writeBadge": "Yazma izinli"
   },
   "messagesGateway": {
     "title": "Yapay zeka ajanları",

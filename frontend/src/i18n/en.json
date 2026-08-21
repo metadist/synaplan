@@ -4943,7 +4943,13 @@
     "usageDisabled": "MCP data sources disabled for this task",
     "usageUpdateFailed": "Could not update the task",
     "usageAdvancedHint": "More options per task (server restrictions, instructions, models):",
-    "usageAdvancedLink": "AI Instructions"
+    "usageAdvancedLink": "AI Instructions",
+    "presetsLabel": "Quick start",
+    "presetJiraHint": "Connect a Jira-capable MCP server (for example a self-hosted Atlassian MCP service) and paste its endpoint URL and access token. With write actions enabled, you can list your tickets and create new tickets straight from a prompt.",
+    "presetConfluenceHint": "Connect a Confluence-capable MCP server (for example a self-hosted Atlassian MCP service) and paste its endpoint URL and access token. With write actions enabled, you can search pages, get summaries, and create new Confluence pages straight from a prompt.",
+    "allowWriteLabel": "Allow write actions (create/update)",
+    "allowWriteHint": "When enabled, the AI assistant may create or update content in this system when you ask for it — for example a new Confluence page or a Jira ticket. Delete actions are never allowed.",
+    "writeBadge": "Writes allowed"
   },
   "messagesGateway": {
     "title": "AI Agents",
