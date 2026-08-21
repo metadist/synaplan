@@ -26,7 +26,9 @@ final class Version20260821180000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         $this->addSql("ALTER TABLE BMCPSERVERS ADD COLUMN IF NOT EXISTS BAUTHMODE VARCHAR(16) DEFAULT 'bearer' NOT NULL AFTER BALLOWWRITE");
-        $this->addSql("ALTER TABLE BMCPSERVERS ADD COLUMN IF NOT EXISTS BOAUTH LONGTEXT NOT NULL DEFAULT '' AFTER BAUTHMODE");
+        // Doctrine maps `type: 'text'` to LONGTEXT NOT NULL with no DEFAULT
+        // (same as BAUTHTOKEN). A `DEFAULT ''` here fails schema:validate.
+        $this->addSql('ALTER TABLE BMCPSERVERS ADD COLUMN IF NOT EXISTS BOAUTH LONGTEXT NOT NULL AFTER BAUTHMODE');
     }
 
     public function down(Schema $schema): void
