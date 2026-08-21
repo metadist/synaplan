@@ -269,23 +269,25 @@ final class QdrantClientDirectTest extends TestCase
     public function testSearchMemoriesDedupesAndKeepsHigherScoringCopy(): void
     {
         $client = $this->buildClient([
-            '/collections/user_memories/points/search' => fn () => new MockResponse(
+            '/collections/user_memories/points/query' => fn () => new MockResponse(
                 json_encode([
                     'result' => [
-                        [
-                            'id' => 11111,
-                            'score' => 0.72,
-                            'payload' => [
-                                '_point_id' => 'mem_1_dup',
-                                'user_id' => 1, 'category' => 'a', 'key' => 'k', 'value' => 'legacy', 'active' => true,
+                        'points' => [
+                            [
+                                'id' => 11111,
+                                'score' => 0.72,
+                                'payload' => [
+                                    '_point_id' => 'mem_1_dup',
+                                    'user_id' => 1, 'category' => 'a', 'key' => 'k', 'value' => 'legacy', 'active' => true,
+                                ],
                             ],
-                        ],
-                        [
-                            'id' => QdrantPointId::uuidFor('mem_1_dup'),
-                            'score' => 0.91,
-                            'payload' => [
-                                '_point_id' => 'mem_1_dup',
-                                'user_id' => 1, 'category' => 'a', 'key' => 'k', 'value' => 'fresh-uuid', 'active' => true,
+                            [
+                                'id' => QdrantPointId::uuidFor('mem_1_dup'),
+                                'score' => 0.91,
+                                'payload' => [
+                                    '_point_id' => 'mem_1_dup',
+                                    'user_id' => 1, 'category' => 'a', 'key' => 'k', 'value' => 'fresh-uuid', 'active' => true,
+                                ],
                             ],
                         ],
                     ],
