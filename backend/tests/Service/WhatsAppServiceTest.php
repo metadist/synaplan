@@ -2047,9 +2047,11 @@ class WhatsAppServiceTest extends TestCase
     /**
      * Document outputs (.ics / .docx from DAG nodes) were silently dropped
      * before — the primary-file gate must accept type 'document' and pass the
-     * required filename.
+     * required filename. Confirmation text is a separate message: Meta accepts
+     * sendMedia() then fetches the link asynchronously, and a 401 on that
+     * fetch would otherwise drop both the file and a caption-only reply.
      */
-    public function testDocumentPrimaryFileIsSentWithFilenameAndCaption(): void
+    public function testDocumentPrimaryFileSendsTextThenDocument(): void
     {
         $sends = $this->dispatchTurn([
             'content' => 'Your meeting invite is attached.',
@@ -2058,10 +2060,59 @@ class WhatsAppServiceTest extends TestCase
             ],
         ]);
 
-        $this->assertCount(1, $sends);
-        $this->assertSame('document', $sends[0]['type']);
-        $this->assertSame('meeting.ics', $sends[0]['document']['filename']);
-        $this->assertSame('Your meeting invite is attached.', $sends[0]['document']['caption']);
+        $this->assertCount(2, $sends);
+        $this->assertSame('text', $sends[0]['type']);
+        $this->assertStringContainsString('Your meeting invite is attached.', $sends[0]['text']['body']);
+        $this->assertSame('document', $sends[1]['type']);
+        $this->assertSame('meeting.ics', $sends[1]['document']['filename']);
+        $this->assertArrayNotHasKey('caption', $sends[1]['document']);
+    }
+
+    /**
+     * Generated office files use `{name}_{timestamp}.docx`, which
+     * StaticUploadController will not serve anonymously. When the file is on
+     * disk we publish a `{userId}_document_{ts}.docx` copy Meta can fetch,
+     * while the WhatsApp filename stays the original display name.
+     */
+    public function testDocumentUrlIsRewrittenToAnonymouslyFetchableFilename(): void
+    {
+        $relative = '01/000/00001/'.date('Y').'/'.date('m').'/notes_1736189000.docx';
+        $absolute = '/tmp/test_uploads/'.$relative;
+        if (!is_dir(dirname($absolute))) {
+            mkdir(dirname($absolute), 0775, true);
+        }
+        file_put_contents($absolute, 'docx-bytes');
+
+        $publishedCopies = [];
+        try {
+            $sends = $this->dispatchTurn([
+                'content' => 'The requested text has been saved to your Dropbox as a Word document.',
+                'metadata' => [
+                    'file' => ['path' => '/api/v1/files/uploads/'.$relative, 'type' => 'document'],
+                ],
+            ]);
+
+            $this->assertCount(2, $sends);
+            $this->assertSame('text', $sends[0]['type']);
+            $this->assertStringContainsString('saved to your Dropbox', $sends[0]['text']['body']);
+            $this->assertSame('document', $sends[1]['type']);
+            $this->assertSame('notes_1736189000.docx', $sends[1]['document']['filename']);
+            $linkPath = (string) parse_url($sends[1]['document']['link'], PHP_URL_PATH);
+            $this->assertMatchesRegularExpression(
+                '/\/\d+_document_\d+\.docx$/',
+                $linkPath,
+                'Meta must fetch an anonymously-servable filename, not the generated office name',
+            );
+            $publishedRelative = ltrim((string) preg_replace('#^/api/v1/files/uploads/#', '', $linkPath), '/');
+            if ('' !== $publishedRelative) {
+                $publishedCopies[] = '/tmp/test_uploads/'.$publishedRelative;
+            }
+        } finally {
+            @unlink($absolute);
+            foreach ($publishedCopies as $copy) {
+                @unlink($copy);
+            }
+        }
     }
 
     /**
