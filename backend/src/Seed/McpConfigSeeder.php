@@ -31,6 +31,7 @@ final readonly class McpConfigSeeder
     {
         $rows = [
             ['ownerId' => 0, 'group' => McpClientConfig::CONFIG_GROUP, 'setting' => McpClientConfig::KEY_CLIENT_ENABLED, 'value' => '1'],
+            ['ownerId' => 0, 'group' => McpClientConfig::CONFIG_GROUP, 'setting' => McpClientConfig::KEY_OAUTH_CONNECTORS_ENABLED, 'value' => '0'],
             ['ownerId' => 0, 'group' => McpClientConfig::CONFIG_GROUP, 'setting' => McpClientConfig::KEY_NODE_TIMEOUT, 'value' => '15'],
         ];
 

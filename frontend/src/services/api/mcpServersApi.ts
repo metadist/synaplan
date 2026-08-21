@@ -33,15 +33,34 @@ export interface McpServerPayload {
   enabled?: boolean
   /** Opt-in: let the AI call mutating tools (create/update) on this server. */
   allow_write?: boolean
+  auth_mode?: 'none' | 'bearer' | 'oauth'
 }
 
+const StartOAuthResponseSchema = z.object({
+  success: z.boolean().optional(),
+  authorize_url: z.string().optional(),
+  error: z.string().optional(),
+})
+
+const DisconnectOAuthResponseSchema = z.object({
+  success: z.boolean().optional(),
+})
+
 export const mcpServersApi = {
-  async list(): Promise<{ clientEnabled: boolean; servers: McpServer[] }> {
+  async list(): Promise<{
+    clientEnabled: boolean
+    oauthConnectorsEnabled: boolean
+    servers: McpServer[]
+  }> {
     const data = await httpClient('/api/v1/mcp-servers', {
       method: 'GET',
       schema: GetApiMcpServersListResponseSchema,
     })
-    return { clientEnabled: data.client_enabled ?? false, servers: data.servers ?? [] }
+    return {
+      clientEnabled: data.client_enabled ?? false,
+      oauthConnectorsEnabled: data.oauth_connectors_enabled === true,
+      servers: data.servers ?? [],
+    }
   },
 
   async create(payload: McpServerPayload): Promise<McpServer> {
@@ -90,5 +109,23 @@ export const mcpServersApi = {
       schema: GetApiMcpServersToolsResponseSchema,
     })
     return data.tools ?? []
+  },
+
+  async startOAuth(id: number): Promise<string> {
+    const data = await httpClient(`/api/v1/mcp-servers/${id}/oauth/start`, {
+      method: 'POST',
+      schema: StartOAuthResponseSchema,
+    })
+    if (!data.authorize_url) {
+      throw new Error(data.error || 'Could not start sign-in')
+    }
+    return data.authorize_url
+  },
+
+  async disconnectOAuth(id: number): Promise<void> {
+    await httpClient(`/api/v1/mcp-servers/${id}/oauth/disconnect`, {
+      method: 'POST',
+      schema: DisconnectOAuthResponseSchema,
+    })
   },
 }

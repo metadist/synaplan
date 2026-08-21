@@ -114,7 +114,7 @@ final readonly class SystemConfigService
                     'dropbox' => ['label' => 'Dropbox', 'fields' => [
                         'DROPBOX_ENABLED', 'DROPBOX_APP_KEY', 'DROPBOX_APP_SECRET', 'DROPBOX_REDIRECT_URI',
                     ]],
-                    'mcp' => ['label' => 'MCP servers', 'fields' => ['MCP_CLIENT_ENABLED']],
+                    'mcp' => ['label' => 'MCP servers', 'fields' => ['MCP_CLIENT_ENABLED', 'MCP_OAUTH_CONNECTORS_ENABLED']],
                 ],
             ],
             'processing' => [
@@ -913,6 +913,15 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => McpClientConfig::CONFIG_GROUP,
                 'dbKey' => McpClientConfig::KEY_CLIENT_ENABLED,
+            ],
+            'MCP_OAUTH_CONNECTORS_ENABLED' => [
+                'tab' => 'channels', 'section' => 'mcp', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let users connect remote MCP servers that sign in with OAuth (Notion, Higgsfield, and any other standard remote MCP). When off, users can still add servers that use an access token. Seeded off — turn this on after you have reviewed the connections page.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => McpClientConfig::CONFIG_GROUP,
+                'dbKey' => McpClientConfig::KEY_OAUTH_CONNECTORS_ENABLED,
             ],
             // === Microsoft 365 app registration (database-backed) ===
             // BCONFIG group M365 (ownerId=0), read by MicrosoftOAuthConfig.

@@ -4015,7 +4015,38 @@
         "name": "n8n",
         "summary": "Flujos de automatización",
         "hint": "Conecta un servidor MCP de n8n para que el asistente pueda inspeccionar o disparar tus flujos de automatización. Pega la URL del endpoint MCP y el token de acceso de tu instancia n8n."
+      },
+      "notion": {
+        "name": "Notion",
+        "summary": "Páginas y bases de datos",
+        "hint": "Guarda la conexión y, a continuación, inicia sesión con tu cuenta de Notion. Synaplan podrá buscar y leer las páginas a las que des acceso. Puedes revocar el acceso en Notion en cualquier momento."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "summary": "Herramientas de imagen y vídeo",
+        "hint": "Guarda la conexión y, a continuación, inicia sesión con tu cuenta de Higgsfield. Consultar el historial es de solo lectura; crear imágenes o vídeos requiere acciones de escritura y consume tus créditos de Higgsfield."
       }
+    },
+    "oauthFormHint": "Este servidor usa el inicio de sesión de tu cuenta. Guárdalo y se te enviará al proveedor para permitir el acceso. No hay token que pegar.",
+    "connect": "Conectar",
+    "reconnect": "Volver a conectar",
+    "connecting": "Abriendo el inicio de sesión…",
+    "connectFailed": "No se pudo iniciar el acceso",
+    "oauthConnected": "Conectado",
+    "oauthReauth": "Acción necesaria (volver a conectar)",
+    "oauthNotConnected": "No conectado",
+    "oauthConnectedToast": "Sesión iniciada correctamente",
+    "disconnect": "Desconectar",
+    "disconnecting": "Desconectando…",
+    "disconnectTitle": "¿Desconectar este servidor?",
+    "disconnectMessage": "Se eliminará el acceso guardado de \"{name}\". El servidor permanece en tu lista — inicia sesión de nuevo para usarlo.",
+    "disconnected": "Acceso eliminado",
+    "disconnectFailed": "No se pudo eliminar el acceso",
+    "oauthError": {
+      "denied": "El inicio de sesión se canceló",
+      "missing_code": "El inicio de sesión no se completó. Inténtalo de nuevo.",
+      "exchange_failed": "No se pudo terminar el inicio de sesión. Inténtalo de nuevo.",
+      "disabled": "Un administrador ha desactivado el inicio de sesión con el proveedor"
     },
     "allowWriteLabel": "Permitir acciones de escritura (crear/actualizar)",
     "allowWriteHint": "Cuando está activado, el asistente puede crear o actualizar contenido en este sistema cuando se lo pidas. Las acciones de borrado nunca están permitidas.",

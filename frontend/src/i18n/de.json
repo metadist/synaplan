@@ -4935,7 +4935,38 @@
         "name": "n8n",
         "summary": "Automatisierungs-Workflows",
         "hint": "Verbinde einen n8n-MCP-Server, damit der Assistent deine Automatisierungs-Workflows einsehen oder auslösen kann. Trage die MCP-Endpunkt-URL und das Zugriffstoken aus deiner n8n-Instanz ein."
+      },
+      "notion": {
+        "name": "Notion",
+        "summary": "Seiten und Datenbanken",
+        "hint": "Speichere die Verbindung und melde dich danach mit deinem Notion-Konto an. Synaplan kann dann Seiten suchen und lesen, die du freigibst. Den Zugriff kannst du jederzeit in Notion widerrufen."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "summary": "Bild- und Videowerkzeuge",
+        "hint": "Speichere die Verbindung und melde dich danach mit deinem Higgsfield-Konto an. Der Verlauf ist nur lesend; Bilder oder Videos erzeugen braucht Schreibaktionen und verbraucht deine Higgsfield-Credits."
       }
+    },
+    "oauthFormHint": "Dieser Server nutzt deine Kontoanmeldung. Speichere ihn, danach wirst du zum Anbieter weitergeleitet. Es gibt kein Zugriffstoken zum Einfügen.",
+    "connect": "Verbinden",
+    "reconnect": "Erneut verbinden",
+    "connecting": "Anmeldung wird geöffnet…",
+    "connectFailed": "Anmeldung konnte nicht gestartet werden",
+    "oauthConnected": "Verbunden",
+    "oauthReauth": "Aktion nötig (erneut verbinden)",
+    "oauthNotConnected": "Nicht verbunden",
+    "oauthConnectedToast": "Erfolgreich angemeldet",
+    "disconnect": "Trennen",
+    "disconnecting": "Wird getrennt…",
+    "disconnectTitle": "Diesen Server trennen?",
+    "disconnectMessage": "Die gespeicherte Anmeldung für \"{name}\" wird gelöscht. Der Server bleibt in der Liste — zur Nutzung erneut anmelden.",
+    "disconnected": "Anmeldung entfernt",
+    "disconnectFailed": "Anmeldung konnte nicht entfernt werden",
+    "oauthError": {
+      "denied": "Anmeldung wurde abgebrochen",
+      "missing_code": "Anmeldung nicht abgeschlossen. Bitte erneut versuchen.",
+      "exchange_failed": "Anmeldung konnte nicht abgeschlossen werden. Bitte erneut versuchen.",
+      "disabled": "Die Anmeldung über den Anbieter ist vom Administrator deaktiviert"
     },
     "allowWriteLabel": "Schreibaktionen erlauben (Anlegen/Aktualisieren)",
     "allowWriteHint": "Wenn aktiviert, darf der Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",

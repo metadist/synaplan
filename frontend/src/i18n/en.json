@@ -5001,7 +5001,38 @@
         "name": "n8n",
         "summary": "Automation workflows",
         "hint": "Connect an n8n MCP server so the assistant can inspect or trigger your automation workflows. Paste the MCP endpoint URL and access token from your n8n instance."
+      },
+      "notion": {
+        "name": "Notion",
+        "summary": "Pages and databases",
+        "hint": "Save the connection, then sign in with your Notion account. Synaplan can then search and read pages you grant access to. You can revoke access in Notion at any time."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "summary": "Image and video tools",
+        "hint": "Save the connection, then sign in with your Higgsfield account. Browsing your history is read-only; creating images or videos needs write actions and uses your Higgsfield credits."
       }
+    },
+    "oauthFormHint": "This server uses your account sign-in. Save it, then you will be sent to the provider to allow access. No access token to paste.",
+    "connect": "Connect",
+    "reconnect": "Reconnect",
+    "connecting": "Opening sign-in…",
+    "connectFailed": "Could not start sign-in",
+    "oauthConnected": "Connected",
+    "oauthReauth": "Action needed (reconnect)",
+    "oauthNotConnected": "Not connected",
+    "oauthConnectedToast": "Signed in successfully",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting…",
+    "disconnectTitle": "Disconnect this server?",
+    "disconnectMessage": "The stored sign-in for \"{name}\" will be deleted. The server stays in your list — sign in again to use it.",
+    "disconnected": "Sign-in removed",
+    "disconnectFailed": "Could not remove the sign-in",
+    "oauthError": {
+      "denied": "Sign-in was cancelled",
+      "missing_code": "Sign-in did not complete. Please try again.",
+      "exchange_failed": "Could not finish sign-in. Please try again.",
+      "disabled": "Connecting with a sign-in is turned off by an administrator"
     },
     "allowWriteLabel": "Allow write actions (create/update)",
     "allowWriteHint": "When enabled, the assistant may create or update content in this system when you ask for it. Delete actions are never allowed.",

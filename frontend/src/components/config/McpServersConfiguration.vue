@@ -108,6 +108,7 @@
         </div>
         <McpTemplatePicker
           :model-value="activeTemplate"
+          :oauth-enabled="oauthConnectorsEnabled"
           @update:model-value="startCreateFromTemplate"
         />
       </div>
@@ -140,7 +141,45 @@
           >
             {{ $t('mcpServers.writeBadge') }}
           </span>
+          <span
+            v-if="server.auth_mode === 'oauth'"
+            class="text-xs px-2 py-1 rounded-full"
+            :class="oauthStatusClass(server.oauth_status)"
+            :data-testid="`mcp-oauth-status-${server.id}`"
+          >
+            {{ oauthStatusLabel(server.oauth_status) }}
+          </span>
           <div class="flex items-center gap-2">
+            <button
+              v-if="server.auth_mode === 'oauth' && oauthConnectorsEnabled"
+              type="button"
+              class="text-sm text-[var(--brand)] hover:underline"
+              :disabled="connectingId === server.id"
+              :data-testid="`btn-mcp-oauth-${server.id}`"
+              @click="startOAuth(server)"
+            >
+              {{
+                connectingId === server.id
+                  ? $t('mcpServers.connecting')
+                  : server.oauth_status === 'not_connected' || !server.oauth_status
+                    ? $t('mcpServers.connect')
+                    : $t('mcpServers.reconnect')
+              }}
+            </button>
+            <button
+              v-if="server.auth_mode === 'oauth' && hasOAuthTokens(server)"
+              type="button"
+              class="text-sm text-[var(--brand)] hover:underline"
+              :disabled="disconnectingId === server.id"
+              :data-testid="`btn-mcp-oauth-disconnect-${server.id}`"
+              @click="disconnectOAuth(server)"
+            >
+              {{
+                disconnectingId === server.id
+                  ? $t('mcpServers.disconnecting')
+                  : $t('mcpServers.disconnect')
+              }}
+            </button>
             <button
               type="button"
               class="text-sm text-[var(--brand)] hover:underline"
@@ -262,10 +301,16 @@
       <h3 class="text-lg font-semibold txt-primary mb-1">
         {{ editingId ? $t('mcpServers.editTitle') : $t('mcpServers.addTitle') }}
       </h3>
-      <p class="txt-secondary text-sm mb-5">{{ $t('mcpServers.formHint') }}</p>
+      <p class="txt-secondary text-sm mb-5">
+        {{ form.authMode === 'oauth' ? $t('mcpServers.oauthFormHint') : $t('mcpServers.formHint') }}
+      </p>
 
       <div v-if="!editingId" class="mb-6">
-        <McpTemplatePicker :model-value="activeTemplate" @update:model-value="applyTemplate" />
+        <McpTemplatePicker
+          :model-value="activeTemplate"
+          :oauth-enabled="oauthConnectorsEnabled"
+          @update:model-value="applyTemplate"
+        />
       </div>
 
       <div class="space-y-4">
@@ -284,11 +329,13 @@
             v-model="form.url"
             type="url"
             placeholder="https://example.com/mcp"
+            :readonly="form.authMode === 'oauth' && !!form.url"
             class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
+            :class="form.authMode === 'oauth' && form.url ? 'opacity-80' : ''"
             data-testid="input-mcp-url"
           />
         </label>
-        <div class="grid sm:grid-cols-2 gap-4">
+        <div v-if="form.authMode !== 'oauth'" class="grid sm:grid-cols-2 gap-4">
           <label class="block">
             <span class="text-sm font-medium txt-primary">{{
               $t('mcpServers.authHeaderLabel')
@@ -360,7 +407,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
@@ -369,6 +416,8 @@ import McpTemplatePicker from '@/components/config/McpTemplatePicker.vue'
 import {
   MCP_CUSTOM_TEMPLATE,
   findMcpServerTemplate,
+  isOAuthTemplate,
+  type McpAuthMode,
   type McpServerTemplate,
 } from '@/config/mcpServerTemplates'
 import { mcpServersApi, type McpServer, type McpTool } from '@/services/api/mcpServersApi'
@@ -378,16 +427,21 @@ import { useAuthStore } from '@/stores/auth'
 const { t, locale } = useI18n()
 const { confirm } = useDialog()
 const { success, error } = useNotification()
+const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
 
 const loading = ref(true)
 const saving = ref(false)
 const clientEnabled = ref(false)
+const oauthConnectorsEnabled = ref(false)
 const togglingClient = ref(false)
 const servers = ref<McpServer[]>([])
 const toolsByServer = reactive<Record<number, McpTool[]>>({})
 const testingId = ref<number | null>(null)
+const connectingId = ref<number | null>(null)
+const disconnectingId = ref<number | null>(null)
 
 // Task usage panel: routing topics with their `tool_mcp` opt-in state.
 const taskPrompts = ref<TaskPrompt[]>([])
@@ -411,6 +465,7 @@ const form = reactive({
   authToken: '',
   enabled: true,
   allowWrite: false,
+  authMode: 'bearer' as McpAuthMode,
 })
 
 const activeTemplate = ref(MCP_CUSTOM_TEMPLATE)
@@ -427,17 +482,25 @@ const applyTemplate = (key: string) => {
   }
   form.authHeader = next.authHeader
   form.allowWrite = next.allowWrite
+  form.authMode = next.authMode ?? 'bearer'
+  if (isOAuthTemplate(next) && next.urlPrefill) {
+    form.url = next.urlPrefill
+    form.authToken = ''
+  } else if (isOAuthTemplate(previous) && form.url === previous.urlPrefill) {
+    form.url = ''
+  }
   activeTemplate.value = key
 }
 
 const resetForm = (template: McpServerTemplate = findMcpServerTemplate(MCP_CUSTOM_TEMPLATE)) => {
   Object.assign(form, {
     name: template.name,
-    url: '',
+    url: template.urlPrefill ?? '',
     authHeader: template.authHeader,
     authToken: '',
     enabled: true,
     allowWrite: template.allowWrite,
+    authMode: template.authMode ?? 'bearer',
   })
   activeTemplate.value = template.key
 }
@@ -467,6 +530,7 @@ const load = async () => {
   try {
     const data = await mcpServersApi.list()
     clientEnabled.value = data.clientEnabled
+    oauthConnectorsEnabled.value = data.oauthConnectorsEnabled
     servers.value = data.servers
   } catch {
     error(t('mcpServers.loadFailed'))
@@ -553,6 +617,7 @@ const startEdit = (server: McpServer) => {
     authToken: '',
     enabled: server.enabled ?? true,
     allowWrite: server.allow_write ?? false,
+    authMode: (server.auth_mode as McpAuthMode | undefined) ?? 'bearer',
   })
   editorOpen.value = true
 }
@@ -571,18 +636,23 @@ const save = async () => {
       auth_header: form.authHeader.trim(),
       enabled: form.enabled,
       allow_write: form.allowWrite,
+      auth_mode: form.authMode,
       // Only send the secret when the user actually typed one — absent keeps
       // the stored value.
       ...(form.authToken !== '' ? { auth_token: form.authToken } : {}),
     }
-    if (editingId.value !== null) {
-      await mcpServersApi.update(editingId.value, payload)
-    } else {
-      await mcpServersApi.create(payload)
-    }
+    const saved =
+      editingId.value !== null
+        ? await mcpServersApi.update(editingId.value, payload)
+        : await mcpServersApi.create(payload)
+    const shouldConnect =
+      payload.auth_mode === 'oauth' && saved.id !== undefined && oauthConnectorsEnabled.value
     success(t('mcpServers.saved'))
     closeEditor()
     await load()
+    if (shouldConnect) {
+      await startOAuth({ ...saved, id: saved.id })
+    }
   } catch (err) {
     error(err instanceof Error && err.message ? err.message : t('mcpServers.saveFailed'))
   } finally {
@@ -626,8 +696,73 @@ const testServer = async (server: McpServer) => {
   }
 }
 
+const oauthStatusLabel = (status: string | null | undefined): string => {
+  if (status === 'connected') return t('mcpServers.oauthConnected')
+  if (status === 'reauth_required') return t('mcpServers.oauthReauth')
+  return t('mcpServers.oauthNotConnected')
+}
+
+const oauthStatusClass = (status: string | null | undefined): string => {
+  if (status === 'connected') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+  if (status === 'reauth_required') return 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+  return 'bg-gray-500/10 txt-secondary'
+}
+
+const hasOAuthTokens = (server: McpServer): boolean =>
+  server.oauth_status === 'connected' || server.oauth_status === 'reauth_required'
+
+// Deliberately NOT gated on oauthConnectorsEnabled: clearing stored tokens
+// must stay possible even after an admin turns the feature off.
+const disconnectOAuth = async (server: McpServer) => {
+  if (server.id === undefined) return
+  const confirmed = await confirm({
+    title: t('mcpServers.disconnectTitle'),
+    message: t('mcpServers.disconnectMessage', { name: server.name ?? '' }),
+    confirmText: t('mcpServers.disconnect'),
+    danger: true,
+  })
+  if (!confirmed) return
+
+  disconnectingId.value = server.id
+  try {
+    await mcpServersApi.disconnectOAuth(server.id)
+    success(t('mcpServers.disconnected'))
+    await load()
+  } catch {
+    error(t('mcpServers.disconnectFailed'))
+  } finally {
+    disconnectingId.value = null
+  }
+}
+
+const startOAuth = async (server: McpServer) => {
+  if (server.id === undefined) return
+  connectingId.value = server.id
+  try {
+    const url = await mcpServersApi.startOAuth(server.id)
+    window.location.assign(url)
+  } catch (err) {
+    error(err instanceof Error && err.message ? err.message : t('mcpServers.connectFailed'))
+    connectingId.value = null
+  }
+}
+
+const consumeOAuthCallback = async () => {
+  const connected = route.query.connected
+  const oauthError = route.query.oauth_error
+  if (typeof connected === 'string' && connected !== '') {
+    success(t('mcpServers.oauthConnectedToast'))
+    await router.replace({ query: { ...route.query, connected: undefined } })
+  } else if (typeof oauthError === 'string' && oauthError !== '') {
+    const key = `mcpServers.oauthError.${oauthError}`
+    error(t(key) === key ? t('mcpServers.oauthError.exchange_failed') : t(key))
+    await router.replace({ query: { ...route.query, oauth_error: undefined } })
+  }
+}
+
 onMounted(() => {
   void load()
   void loadTaskPrompts()
+  void consumeOAuthCallback()
 })
 </script>

@@ -4016,7 +4016,38 @@
         "name": "n8n",
         "summary": "Otomasyon iş akışları",
         "hint": "Asistanın otomasyon iş akışlarınızı incelemesi veya tetiklemesi için bir n8n MCP sunucusu bağlayın. n8n örneğinizdeki MCP uç noktası URL'sini ve erişim token'ını yapıştırın."
+      },
+      "notion": {
+        "name": "Notion",
+        "summary": "Sayfalar ve veritabanları",
+        "hint": "Bağlantıyı kaydedin, ardından Notion hesabınızla oturum açın. Synaplan, izin verdiğiniz sayfaları arayabilir ve okuyabilir. Erişimi Notion'da istediğiniz zaman kaldırabilirsiniz."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "summary": "Görüntü ve video araçları",
+        "hint": "Bağlantıyı kaydedin, ardından Higgsfield hesabınızla oturum açın. Geçmişe bakmak salt okunurdur; görüntü veya video oluşturmak yazma eylemleri ister ve Higgsfield kredilerinizi kullanır."
       }
+    },
+    "oauthFormHint": "Bu sunucu hesap oturumunuzu kullanır. Kaydedin, ardından erişime izin vermek için sağlayıcıya yönlendirilirsiniz. Yapıştırılacak bir erişim token'ı yoktur.",
+    "connect": "Bağlan",
+    "reconnect": "Yeniden bağlan",
+    "connecting": "Oturum açılıyor…",
+    "connectFailed": "Oturum başlatılamadı",
+    "oauthConnected": "Bağlandı",
+    "oauthReauth": "İşlem gerekli (yeniden bağlan)",
+    "oauthNotConnected": "Bağlı değil",
+    "oauthConnectedToast": "Oturum başarıyla açıldı",
+    "disconnect": "Bağlantıyı kes",
+    "disconnecting": "Bağlantı kesiliyor…",
+    "disconnectTitle": "Bu sunucunun bağlantısı kesilsin mi?",
+    "disconnectMessage": "\"{name}\" için kayıtlı oturum silinecek. Sunucu listenizde kalır — kullanmak için yeniden oturum açın.",
+    "disconnected": "Oturum kaldırıldı",
+    "disconnectFailed": "Oturum kaldırılamadı",
+    "oauthError": {
+      "denied": "Oturum iptal edildi",
+      "missing_code": "Oturum tamamlanmadı. Lütfen yeniden deneyin.",
+      "exchange_failed": "Oturum tamamlanamadı. Lütfen yeniden deneyin.",
+      "disabled": "Yönetici, sağlayıcı ile oturum açmayı kapattı"
     },
     "allowWriteLabel": "Yazma eylemlerine izin ver (oluşturma/güncelleme)",
     "allowWriteHint": "Etkinleştirildiğinde asistan, siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir. Silme eylemlerine asla izin verilmez.",

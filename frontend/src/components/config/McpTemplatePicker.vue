@@ -9,7 +9,7 @@
       :aria-label="$t('mcpServers.templatesLabel')"
     >
       <button
-        v-for="template in mcpServerTemplates"
+        v-for="template in templates"
         :key="template.key"
         type="button"
         role="radio"
@@ -71,12 +71,13 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import {
   MCP_CUSTOM_TEMPLATE,
-  mcpServerTemplates,
   nextMcpServerTemplate,
+  visibleMcpServerTemplates,
 } from '@/config/mcpServerTemplates'
 
 const props = defineProps<{
   modelValue: string
+  oauthEnabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -84,6 +85,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const templates = computed(() => visibleMcpServerTemplates(props.oauthEnabled === true))
 
 const hint = computed(() => t(`mcpServers.templates.${props.modelValue}.hint`))
 

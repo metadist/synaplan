@@ -70,14 +70,13 @@ final readonly class OAuthClient
 
     public function exchangeCode(OAuthProviderConfig $provider, string $code, string $codeVerifier): OAuthTokenSet
     {
-        $payload = $this->post($provider, $this->withOptionalScope($provider, [
+        $payload = $this->post($provider, $this->withOptionalScope($provider, $this->withOptionalSecret($provider, [
             'client_id' => $provider->clientId,
-            'client_secret' => $provider->clientSecret,
             'grant_type' => 'authorization_code',
             'code' => $code,
             'redirect_uri' => $provider->redirectUri,
             'code_verifier' => $codeVerifier,
-        ]));
+        ])));
 
         return OAuthTokenSet::fromTokenResponse($payload);
     }
@@ -91,12 +90,11 @@ final readonly class OAuthClient
             throw new OAuthReauthRequiredException('No refresh token stored for this connection');
         }
 
-        $payload = $this->post($provider, $this->withOptionalScope($provider, [
+        $payload = $this->post($provider, $this->withOptionalScope($provider, $this->withOptionalSecret($provider, [
             'client_id' => $provider->clientId,
-            'client_secret' => $provider->clientSecret,
             'grant_type' => 'refresh_token',
             'refresh_token' => $refreshToken,
-        ]));
+        ])));
 
         return OAuthTokenSet::fromTokenResponse($payload, $refreshToken);
     }
@@ -114,6 +112,24 @@ final readonly class OAuthClient
     {
         if ($provider->includeScopeInTokenRequests) {
             $body['scope'] = $provider->scopeString();
+        }
+
+        return $body;
+    }
+
+    /**
+     * Public clients (RFC 7591 `token_endpoint_auth_method: none`) have no
+     * secret. Sending an empty `client_secret` field is rejected by some
+     * authorization servers, so omit it entirely.
+     *
+     * @param array<string, string> $body
+     *
+     * @return array<string, string>
+     */
+    private function withOptionalSecret(OAuthProviderConfig $provider, array $body): array
+    {
+        if ('' !== $provider->clientSecret) {
+            $body['client_secret'] = $provider->clientSecret;
         }
 
         return $body;
