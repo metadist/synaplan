@@ -338,6 +338,31 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Kimi K3 via the HF router — like every Kimi row, pinned to DeepInfra
+     * (`:deepinfra` suffix) so the billed price is deterministic and matches
+     * the catalog rate (DeepInfra snapshot 2026-08-20). K3 outputs text only,
+     * so exactly chat + pic2text variants exist — no text2pic.
+     */
+    public function testKimiK3ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $k3 = ModelCatalog::find('huggingface:moonshotai/Kimi-K3-deepinfra');
+
+        $this->assertCount(2, $k3, 'Expected Kimi K3 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($k3, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('huggingface:moonshotai/Kimi-K3-deepinfra:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('huggingface:moonshotai/Kimi-K3-deepinfra:pic2text'));
+
+        foreach ($k3 as $variant) {
+            $this->assertSame('HuggingFace', $variant['service']);
+            $this->assertSame('moonshotai/Kimi-K3:deepinfra', $variant['providerId']);
+            $this->assertSame('moonshotai/Kimi-K3:deepinfra', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.85, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(14.25, (float) $variant['priceOut'], 1e-9);
+            $this->assertTrue($variant['json']['meta']['forced_thinking'] ?? false, 'K3 always thinks — the provider relies on this flag');
+        }
+    }
+
+    /**
      * The pre-4.8 Claude generations were retired in favour of Opus 4.8 and the
      * 5-series (deactivated in existing installs by Version20260727120000). Their
      * BIDs must never come back: BMESSAGES rows still reference them, and the
