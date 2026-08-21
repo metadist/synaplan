@@ -37,6 +37,24 @@ fail() {
 }
 
 # --------------------------------------------------------------------------
+# The AMI metadata the build hands to EC2
+# --------------------------------------------------------------------------
+
+# Not firstboot, but the same build, and there is nowhere cheaper to catch it.
+# EC2 refuses a non-ASCII AMI description with "Character sets beyond ASCII are
+# not supported", and it refuses it in ModifyImageAttribute — the last call of a
+# ten-minute Packer run, once the image and its snapshots already exist. An em
+# dash in that one line burned exactly that, for both architectures at once.
+non_ascii_ami_metadata="$(
+    grep -E '^[[:space:]]*ami_(description|name)[[:space:]]*=' \
+        "$DEPLOY_ROOT/aws/packer/synaplan.pkr.hcl" |
+        LC_ALL=C grep '[^ -~]' || true
+)"
+if [[ -n "$non_ascii_ami_metadata" ]]; then
+    fail "The AMI name or description carries a character EC2 will reject: $non_ascii_ami_metadata"
+fi
+
+# --------------------------------------------------------------------------
 # The instance, as far as firstboot.sh can tell
 # --------------------------------------------------------------------------
 
