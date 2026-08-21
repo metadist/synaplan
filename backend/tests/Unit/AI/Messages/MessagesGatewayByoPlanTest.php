@@ -15,7 +15,9 @@ use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
 use App\AI\Messages\Vision\VisionPolicy;
 use App\Entity\User;
 use App\Repository\ModelRepository;
+use App\Service\BillingService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use App\Service\Vision\VisionModelResolver;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -29,7 +31,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * BYO-key plan gate in {@see MessagesGateway::prepare()}:
  *  - a BYO key requires at least the Pro plan (403 below it),
  *  - BYO requests are not blocked by the Synaplan cost budget (zero-cost metering),
- *  - operator-key requests stay budget-gated (429 when exhausted).
+ *  - operator-key requests stay budget-gated (429 when exhausted),
+ *  - an install without billing lets every level bring its own key.
  */
 class MessagesGatewayByoPlanTest extends TestCase
 {
@@ -49,16 +52,6 @@ class MessagesGatewayByoPlanTest extends TestCase
         $this->config->method('webFetchMode')->willReturn(MessagesGatewayConfig::WEB_FETCH_OFF);
         $this->config->method('upstreamUrl')->willReturn('https://api.anthropic.com');
 
-        $modelResolver = $this->createMock(MessagesModelResolver::class);
-        $modelResolver->method('resolve')->willReturn([
-            'provider' => 'anthropic',
-            'providerModelId' => 'claude-sonnet-4-5',
-            'displayModel' => 'claude-sonnet-4-5',
-            'model_id' => 42,
-            'requested' => 'claude-sonnet-4-5',
-            'aliased_from' => null,
-        ]);
-
         $this->keyResolver = $this->createMock(UserProviderKeyResolver::class);
 
         $this->rateLimitService = $this->createMock(RateLimitService::class);
@@ -67,6 +60,21 @@ class MessagesGatewayByoPlanTest extends TestCase
             'limit' => 100,
             'used' => 1,
             'remaining' => 99,
+        ]);
+
+        $this->gateway = $this->buildGateway($this->makeGate(billingEnabled: true));
+    }
+
+    private function buildGateway(PremiumFeatureGate $premiumFeatureGate): MessagesGateway
+    {
+        $modelResolver = $this->createMock(MessagesModelResolver::class);
+        $modelResolver->method('resolve')->willReturn([
+            'provider' => 'anthropic',
+            'providerModelId' => 'claude-sonnet-4-5',
+            'displayModel' => 'claude-sonnet-4-5',
+            'model_id' => 42,
+            'requested' => 'claude-sonnet-4-5',
+            'aliased_from' => null,
         ]);
 
         $passthrough = $this->createMock(AnthropicPassthroughTranslator::class);
@@ -92,13 +100,14 @@ class MessagesGatewayByoPlanTest extends TestCase
             ],
         );
 
-        $this->gateway = new MessagesGateway(
+        return new MessagesGateway(
             $this->config,
             $modelResolver,
             $this->createMock(ModelRepository::class),
             $this->createMock(VisionModelResolver::class),
             $this->keyResolver,
             $this->rateLimitService,
+            $premiumFeatureGate,
             $passthrough,
             $toolCatalog,
             $this->createMock(GatewayToolLoop::class),
@@ -108,6 +117,19 @@ class MessagesGatewayByoPlanTest extends TestCase
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(MessageBusInterface::class),
             new NullLogger(),
+        );
+    }
+
+    /**
+     * BillingService and PremiumFeatureGate are final, so the open-source mode
+     * is expressed the way production does it: through the Stripe config.
+     */
+    private function makeGate(bool $billingEnabled): PremiumFeatureGate
+    {
+        return new PremiumFeatureGate(
+            $billingEnabled
+                ? new BillingService('sk_live_test', 'price_1RealPro')
+                : new BillingService('', ''),
         );
     }
 
@@ -188,5 +210,17 @@ class MessagesGatewayByoPlanTest extends TestCase
 
         self::assertTrue($result['ok']);
         self::assertSame('operator', $result['key_source']);
+    }
+
+    public function testByoKeyIsAllowedForEveryLevelWithoutBilling(): void
+    {
+        $this->rateLimitService->method('checkCostBudget')->willReturn($this->budget(true));
+        $this->keyResolver->method('resolve')->willReturn(['key' => 'sk-ant-own', 'source' => 'user']);
+
+        $openSourceGateway = $this->buildGateway($this->makeGate(billingEnabled: false));
+        $result = $openSourceGateway->prepare($this->makeRequest(), $this->makeUser('NEW'));
+
+        self::assertTrue($result['ok']);
+        self::assertSame('user', $result['key_source']);
     }
 }

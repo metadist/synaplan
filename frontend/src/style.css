@@ -65,6 +65,9 @@
   body {
     @apply m-0 text-base leading-relaxed antialiased;
     font-family:
+      /* The bundled variable font (@fontsource-variable) registers under this
+         name; 'Plus Jakarta Sans' still matches a locally installed copy. */
+      'Plus Jakarta Sans Variable',
       'Plus Jakarta Sans',
       -apple-system,
       BlinkMacSystemFont,

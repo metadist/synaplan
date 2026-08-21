@@ -17,13 +17,13 @@ use App\Service\Message\MessageApiFormatter;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\MessageEnqueueService;
 use App\Service\ModelConfigService;
+use App\Service\PremiumFeatureGate;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -46,9 +46,8 @@ class MessageController extends AbstractController
         private VectorizationService $vectorizationService,
         private MessageRepository $messageRepository,
         private MessageApiFormatter $messageApiFormatter,
+        private PremiumFeatureGate $premiumFeatureGate,
         private LoggerInterface $logger,
-        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
-        private bool $costBudgetGateEnabled = false,
     ) {
     }
 
@@ -118,7 +117,7 @@ class MessageController extends AbstractController
                 // verification — not email verification (see #839).
                 'phone_verified' => $user->hasVerifiedPhone(),
             ], Response::HTTP_TOO_MANY_REQUESTS);
-        } elseif ($this->costBudgetGateEnabled) {
+        } elseif ($this->premiumFeatureGate->isCostBudgetEnforced()) {
             $budgetCheck = $this->rateLimitService->checkCostBudget($user);
             if (!$budgetCheck['allowed']) {
                 return $this->json([

@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Controller;
 use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
 use App\Repository\FileRepository;
+use App\Service\BillingService;
 use App\Service\Chat\ChatTitleService;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\File\DocumentGeneratorService;
@@ -22,6 +23,7 @@ use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
+use App\Service\PremiumFeatureGate;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
 use App\Service\UsageStatsService;
@@ -71,6 +73,7 @@ class StreamControllerCancelledResultTest extends TestCase
             new GeneratedFileRegistrar($this->createMock(FileRepository::class), new NullLogger(), '/tmp/upload'),
             $this->createMock(UsageStatsService::class),
             $this->createMock(UsageTaximeterConfig::class),
+            new PremiumFeatureGate(new BillingService('', '')),
         );
     }
 

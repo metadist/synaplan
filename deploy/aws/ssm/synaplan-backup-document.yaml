@@ -1,0 +1,41 @@
+schemaVersion: '2.2'
+description: >-
+  Quiesces Synaplan for an application-consistent EBS snapshot and brings it
+  back afterwards. The CloudFormation templates register this document for you;
+  this file is the copy to use when registering it by hand, with
+  `aws ssm create-document --document-format YAML --document-type Command`.
+
+# Data Lifecycle Manager treats a document as snapshot-aware only when it
+# declares exactly these two parameters and dispatches on them itself. DLM
+# always passes both, so neither has a default: an unset value means the caller
+# is not DLM, and that should fail loudly rather than pause the application with
+# nothing scheduled to resume it.
+parameters:
+  executionId:
+    type: String
+    description: Identifier that Data Lifecycle Manager assigns to a snapshot run.
+    allowedPattern: '^[A-Za-z0-9_\-]{1,128}$'
+  command:
+    type: String
+    description: >-
+      Which half to run. `pre-script` quiesces the application, `post-script`
+      resumes it, `dry-run` proves the hooks are reachable without touching the
+      running stack.
+    allowedValues:
+      - pre-script
+      - post-script
+      - dry-run
+
+mainSteps:
+  - action: aws:runShellScript
+    name: synaplanSnapshotHook
+    precondition:
+      StringEquals: [platformType, Linux]
+    inputs:
+      # The application is unavailable between pre-script and post-script, for
+      # as long as the dump takes. Note that Data Lifecycle Manager imposes its
+      # own limit of 120 seconds on top of this one; see
+      # QuiesceForDailySnapshots in the CloudFormation templates.
+      timeoutSeconds: 3600
+      runCommand:
+        - /opt/synaplan/deploy/aws/scripts/snapshot-hook.sh '{{ command }}' '{{ executionId }}'

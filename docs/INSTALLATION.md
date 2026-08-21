@@ -113,6 +113,21 @@ two is a configuration error.
 > is intended fail-fast behavior, not a bug — read the container log to see
 > which variable is missing.
 
+#### Passwords the deployment generated
+
+An image that invents a per-instance password and hands it over through a
+parameter store or a boot log has to treat that password as one-time use. Set
+
+```dotenv
+BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE=true
+```
+
+and the bootstrap account is created in a state where signing in is all it can
+do: the UI opens the password form, and every other request is answered with
+`403` — the JSON API, the MCP endpoint and the OpenAI-compatible gateway alike,
+so an API key is no way around it. The default is `false`, which is right
+whenever a person chose the password themselves.
+
 The production bootstrap creates or promotes this account only when no
 administrator exists. If an administrator is already present, it changes nothing,
 so it is safe on every start. Later restarts do not reset an existing
@@ -176,8 +191,9 @@ sufficient. Do not publish credentials, deployment logs containing secrets, or
 private endpoint details.
 
 See [Administration Guide](ADMIN.md) for backups, restore, and cleanup, and
-[Update a Self-Hosted Deployment](UPDATE_SELFHOST.md) or
-[Update on Elestio](UPDATE_ELESTIO.md) for version upgrades.
+[Update a Self-Hosted Deployment](UPDATE_SELFHOST.md),
+[Update on Elestio](UPDATE_ELESTIO.md), or
+[Update on AWS (Marketplace AMI)](UPDATE_AWS.md) for version upgrades.
 
 ---
 

@@ -176,6 +176,11 @@ parameters:
     # admin exists, app:bootstrap-admin never changes any account or password.
     env(BOOTSTRAP_ADMIN_EMAIL): ''
     env(BOOTSTRAP_ADMIN_PASSWORD): ''
+    # Marks the bootstrap password as one-time-use: the admin cannot do anything
+    # before replacing it. Off by default — an operator who typed the password
+    # themselves has no reason to change it. Marketplace images that generate a
+    # per-instance password set this to true.
+    env(BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE): 'false'
 
 services:
     _defaults:
@@ -689,6 +694,7 @@ services:
         arguments:
             $bootstrapAdminEmail: '%env(string:BOOTSTRAP_ADMIN_EMAIL)%'
             $bootstrapAdminPassword: '%env(string:BOOTSTRAP_ADMIN_PASSWORD)%'
+            $bootstrapAdminForcePasswordChange: '%env(bool:BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE)%'
 
     # Encryption Service (for sensitive data like IMAP passwords)
     App\Service\EncryptionService:

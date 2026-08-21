@@ -28,6 +28,7 @@ use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\PerfTimer;
+use App\Service\PremiumFeatureGate;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
 use App\Service\TtsTextSanitizer;
@@ -40,7 +41,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -99,8 +99,7 @@ class StreamController extends AbstractController
         private GeneratedFileRegistrar $generatedFileRegistrar,
         private UsageStatsService $usageStatsService,
         private UsageTaximeterConfig $usageTaximeterConfig,
-        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
-        private bool $costBudgetGateEnabled = false,
+        private PremiumFeatureGate $premiumFeatureGate,
     ) {
     }
 
@@ -641,7 +640,7 @@ class StreamController extends AbstractController
                     // verification — not email verification (see #839).
                     'phone_verified' => $user->hasVerifiedPhone(),
                 ];
-            } elseif ($this->costBudgetGateEnabled) {
+            } elseif ($this->premiumFeatureGate->isCostBudgetEnforced()) {
                 $budgetCheck = $this->rateLimitService->checkCostBudget($user);
                 if (!$budgetCheck['allowed']) {
                     $rateLimitError = [

@@ -49,7 +49,7 @@
                 <Icon icon="mdi:rocket-launch-outline" class="w-7 h-7 text-[var(--brand)]" />
               </div>
               <h2 id="paywall-title" class="text-2xl md:text-3xl font-bold txt-primary mb-2">
-                {{ $t(`paywall.title.${reason}`) }}
+                {{ $t(`paywall.title.${reason}`, { brand: config.branding.name }) }}
               </h2>
               <p id="paywall-subtitle" class="txt-secondary text-sm md:text-base">
                 {{ $t(`paywall.subtitle.${reason}`) }}

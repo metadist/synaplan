@@ -7,9 +7,11 @@ namespace App\Tests\Unit\Embedding;
 use App\Entity\RevectorizeRun;
 use App\Entity\User;
 use App\Repository\RevectorizeRunRepository;
+use App\Service\BillingService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\CooldownActiveException;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\PremiumFeatureGate;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -21,7 +23,7 @@ final class EmbeddingModelChangeGuardTest extends TestCase
     protected function setUp(): void
     {
         $this->runRepository = $this->createMock(RevectorizeRunRepository::class);
-        $this->guard = new EmbeddingModelChangeGuard($this->runRepository);
+        $this->guard = new EmbeddingModelChangeGuard($this->runRepository, $this->makeGate(billingEnabled: true));
     }
 
     public function testFreeUserIsBlocked(): void
@@ -124,6 +126,39 @@ final class EmbeddingModelChangeGuardTest extends TestCase
 
         self::assertTrue($status['canChange']);
         self::assertNull($status['reason']);
+    }
+
+    public function testFreeUserIsAllowedWhenBillingIsDisabled(): void
+    {
+        $guard = new EmbeddingModelChangeGuard($this->runRepository, $this->makeGate(billingEnabled: false));
+        $this->runRepository->method('findLatestForScope')->willReturn(null);
+
+        $guard->assertCanChange($this->makeUser('NEW'));
+        $this->addToAssertionCount(1);
+    }
+
+    public function testGetStatusAllowsFreeUserWhenBillingIsDisabled(): void
+    {
+        $guard = new EmbeddingModelChangeGuard($this->runRepository, $this->makeGate(billingEnabled: false));
+        $this->runRepository->method('findLatestForScope')->willReturn(null);
+
+        $status = $guard->getStatus($this->makeUser('NEW'));
+
+        self::assertTrue($status['canChange']);
+        self::assertNull($status['reason']);
+    }
+
+    /**
+     * BillingService and PremiumFeatureGate are final, so the open-source mode
+     * is expressed the way production does it: through the Stripe config.
+     */
+    private function makeGate(bool $billingEnabled): PremiumFeatureGate
+    {
+        return new PremiumFeatureGate(
+            $billingEnabled
+                ? new BillingService('sk_live_test', 'price_1RealPro')
+                : new BillingService('', ''),
+        );
     }
 
     private function makeUser(string $level): User

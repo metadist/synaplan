@@ -3,6 +3,11 @@ import { createPinia } from 'pinia'
 import { VueReCaptcha } from 'vue-recaptcha-v3'
 import router from './router'
 import { i18n } from './i18n'
+// Self-hosted brand font. Imported here rather than from style.css because the
+// widget inlines style.css into a shadow root, where @font-face does nothing and
+// the relative asset URLs would point at the embedding site.
+import '@fontsource-variable/plus-jakarta-sans/wght.css'
+import '@fontsource-variable/plus-jakarta-sans/wght-italic.css'
 import './style.css'
 import './style-v2.css'
 import './assets/markdown.css'

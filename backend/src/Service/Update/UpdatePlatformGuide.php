@@ -18,9 +18,17 @@ final readonly class UpdatePlatformGuide
 {
     public const PLATFORM_SELFHOST = 'selfhost';
     public const PLATFORM_ELESTIO = 'elestio';
+    public const PLATFORM_AWS = 'aws';
 
     public const GUIDE_URL_SELFHOST = 'https://github.com/metadist/synaplan/blob/main/docs/UPDATE_SELFHOST.md';
     public const GUIDE_URL_ELESTIO = 'https://github.com/metadist/synaplan/blob/main/docs/UPDATE_ELESTIO.md';
+    public const GUIDE_URL_AWS = 'https://github.com/metadist/synaplan/blob/main/docs/UPDATE_AWS.md';
+
+    private const GUIDES = [
+        self::PLATFORM_SELFHOST => self::GUIDE_URL_SELFHOST,
+        self::PLATFORM_ELESTIO => self::GUIDE_URL_ELESTIO,
+        self::PLATFORM_AWS => self::GUIDE_URL_AWS,
+    ];
 
     public function __construct(
         private string $platform,
@@ -32,16 +40,13 @@ final readonly class UpdatePlatformGuide
      */
     public function platform(): string
     {
-        return self::PLATFORM_ELESTIO === strtolower(trim($this->platform))
-            ? self::PLATFORM_ELESTIO
-            : self::PLATFORM_SELFHOST;
+        $configured = strtolower(trim($this->platform));
+
+        return isset(self::GUIDES[$configured]) ? $configured : self::PLATFORM_SELFHOST;
     }
 
     public function guideUrl(): string
     {
-        return match ($this->platform()) {
-            self::PLATFORM_ELESTIO => self::GUIDE_URL_ELESTIO,
-            default => self::GUIDE_URL_SELFHOST,
-        };
+        return self::GUIDES[$this->platform()];
     }
 }

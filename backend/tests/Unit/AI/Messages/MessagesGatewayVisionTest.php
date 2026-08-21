@@ -16,7 +16,9 @@ use App\AI\Messages\Vision\VisionPolicy;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ModelRepository;
+use App\Service\BillingService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use App\Service\Vision\VisionModelResolver;
 use PHPUnit\Framework\TestCase;
@@ -190,6 +192,7 @@ final class MessagesGatewayVisionTest extends TestCase
             $visionResolver,
             $keys,
             $rateLimits,
+            new PremiumFeatureGate(new BillingService('sk_live_test', 'price_1RealPro')),
             $passthrough,
             $toolCatalog,
             $this->createMock(GatewayToolLoop::class),

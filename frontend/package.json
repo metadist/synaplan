@@ -45,6 +45,7 @@
     "@capacitor/share": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
     "@capgo/capacitor-updater": "^8.49.7",
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@heroicons/vue": "^2.2.0",
     "@iconify/vue": "^5.0.0",
     "@intlify/core-base": "^11.1.12",

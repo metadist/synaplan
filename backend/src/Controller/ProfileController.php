@@ -314,6 +314,7 @@ class ProfileController extends AbstractController
 
         // Update password
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
+        $user->setMustChangePassword(false);
         $this->em->flush();
 
         $this->logger->info('Password changed', ['user_id' => $user->getId()]);

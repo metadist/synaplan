@@ -240,6 +240,48 @@ final class BootstrapAdminServiceTest extends TestCase
         $this->assertSame(BootstrapAdminService::RESULT_CREATED, $result);
     }
 
+    public function testCreatedAdminKeepsItsPasswordWhenNoChangeIsForced(): void
+    {
+        $createdUser = new User();
+
+        $this->userRepository->method('hasAdmin')->willReturn(false);
+        $this->userRepository->method('findByEmail')->willReturn(null);
+        $this->userLifecycleService->method('createUser')->willReturn($createdUser);
+
+        $this->service->bootstrap('admin@example.com', 'SecurePass123!');
+
+        $this->assertFalse($createdUser->mustChangePassword());
+    }
+
+    public function testCreatedAdminMustReplaceADeploymentGeneratedPassword(): void
+    {
+        $createdUser = new User();
+
+        $this->userRepository->method('hasAdmin')->willReturn(false);
+        $this->userRepository->method('findByEmail')->willReturn(null);
+        $this->userLifecycleService->method('createUser')->willReturn($createdUser);
+        $this->entityManager->expects($this->once())->method('flush');
+
+        $result = $this->service->bootstrap('admin@example.com', 'SecurePass123!', true);
+
+        $this->assertSame(BootstrapAdminService::RESULT_CREATED, $result);
+        $this->assertTrue($createdUser->mustChangePassword());
+    }
+
+    public function testPromotedAdminMustReplaceADeploymentGeneratedPassword(): void
+    {
+        $user = (new User())->setMail('admin@example.com')->setUserLevel('NEW');
+
+        $this->userRepository->method('hasAdmin')->willReturn(false);
+        $this->userRepository->method('findByEmail')->willReturn($user);
+        $this->passwordHasher->method('hashPassword')->willReturn('new-hash');
+
+        $result = $this->service->bootstrap('admin@example.com', 'SecurePass123!', true);
+
+        $this->assertSame(BootstrapAdminService::RESULT_PROMOTED, $result);
+        $this->assertTrue($user->mustChangePassword());
+    }
+
     public function testReleasesLockWhenCreationFails(): void
     {
         $this->userRepository->method('hasAdmin')->willReturn(false);

@@ -12,10 +12,10 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <!-- Web App Manifest for Android/PWA -->
     <link rel="manifest" href="/site.webmanifest" />
-    <!-- Google Fonts: Plus Jakarta Sans (matches synaplan.com branding) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600&display=swap" rel="stylesheet" />
+    <!-- Plus Jakarta Sans ships with the bundle (see main.ts). Loading it from a
+         font CDN would make rendering depend on an outside host, which fails in a
+         private subnet or an air-gapped install, and would send every visitor's
+         request to a third party. -->
     <!-- Theme color for mobile browsers -->
     <meta name="theme-color" content="#003fc7" />
 

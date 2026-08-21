@@ -14,7 +14,9 @@ use App\Entity\Config;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
+use App\Service\BillingService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -49,6 +51,7 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
             $this->createStub(ProviderKeyStore::class),
             $this->configRepository,
             $this->createStub(RateLimitService::class),
+            new PremiumFeatureGate(new BillingService('', '')),
             $this->webSearchTool,
             $this->analyzeImageTool,
             $this->createStub(GatewayToolCatalog::class),

@@ -1,0 +1,369 @@
+name: AWS Marketplace AMI
+
+# Builds the AMI that AWS Marketplace publishes, for both architectures.
+#
+# Not part of CI: it costs EC2 instance hours and it may only ever bake a
+# release whose container images are already published and verified. Release
+# tags therefore trigger it, and it waits for the images to exist before Packer
+# starts. Run it by hand to rebuild an older release, or to try a change without
+# tagging.
+#
+# Authentication is GitHub OIDC against a role in the seller account. There are
+# no long-lived AWS keys in this repository, and there must never be.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Released version to bake in, without a leading v (for example 4.0.16).'
+        required: true
+        type: string
+      architecture:
+        description: 'Which image to build.'
+        required: true
+        default: both
+        type: choice
+        options: [both, x86_64, arm64]
+      verify:
+        description: 'Launch the x86_64 AMI through CloudFormation and smoke-test it. Costs a few cents of instance time.'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aws-ami-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # The Marketplace ingests from us-east-1 only; other regions are produced by
+  # copying the published AMI.
+  AWS_REGION: us-east-1
+  IMAGE_REPOSITORY: ghcr.io/metadist/synaplan
+
+jobs:
+  resolve:
+    name: Resolve the release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      matrix: ${{ steps.version.outputs.matrix }}
+      configured: ${{ steps.credentials.outputs.configured }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Resolve version and architectures
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_ARCHITECTURE: ${{ inputs.architecture || 'both' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${INPUT_VERSION#v}"
+          fi
+
+          # An AMI is immutable once published and customers launch it for
+          # years, so it may only ever bake an immutable tag. `latest` here
+          # would produce an image whose contents nobody can reconstruct.
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::notice::${GITHUB_REF_NAME} is not a plain release; no AMI is built."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            echo 'matrix=[]' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          case "$INPUT_ARCHITECTURE" in
+            x86_64) matrix='["x86_64"]' ;;
+            arm64)  matrix='["arm64"]' ;;
+            *)      matrix='["x86_64","arm64"]' ;;
+          esac
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+          echo "Building the AMI for ${version} (${matrix})." >> "$GITHUB_STEP_SUMMARY"
+
+      # The seller account is the manager's to create, and until it exists this
+      # workflow has nothing to authenticate against. Reported as skipped rather
+      # than failed, so a release run stays green while the account is pending.
+      - name: Check the AWS role
+        id: credentials
+        env:
+          ROLE: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
+        run: |
+          if [ -n "${ROLE:-}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No \`AWS_AMI_BUILD_ROLE_ARN\` secret; the AMI build is skipped." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Packer bakes these images into the AMI. A release tag reaches this
+      # workflow the moment it is pushed, while CI is still building and pushing
+      # them, so waiting is the difference between a correct AMI and a failed —
+      # or worse, a stale — build.
+      - name: Wait for the published container images
+        if: steps.version.outputs.version != '' && steps.credentials.outputs.configured == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if docker manifest inspect "${IMAGE_REPOSITORY}:${VERSION}" >/dev/null 2>&1; then
+              echo "${IMAGE_REPOSITORY}:${VERSION} is published."
+              exit 0
+            fi
+            echo "Attempt ${attempt}: ${IMAGE_REPOSITORY}:${VERSION} is not published yet; waiting."
+            sleep 60
+          done
+          echo "::error::${IMAGE_REPOSITORY}:${VERSION} was never published; refusing to bake an AMI without it."
+          exit 1
+
+  build:
+    name: Build the AMI (${{ matrix.architecture }})
+    runs-on: ubuntu-latest
+    needs: [resolve]
+    if: needs.resolve.outputs.version != '' && needs.resolve.outputs.configured == 'true'
+    permissions:
+      contents: read
+      # Required for the OIDC token that the AWS role trusts. This is what
+      # replaces a stored access key.
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: ${{ fromJSON(needs.resolve.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Assume the build role
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
+          role-session-name: synaplan-ami-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Packer
+        uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3
+        with:
+          version: 1.16.0
+
+      - name: Build
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          packer init deploy/aws/packer/synaplan.pkr.hcl
+          packer build \
+            -var "synaplan_version=${VERSION}" \
+            -var "architecture=${ARCHITECTURE}" \
+            -var "region=${AWS_REGION}" \
+            deploy/aws/packer/synaplan.pkr.hcl
+
+      - name: Report the AMI
+        id: ami
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          ami="$(jq -r '.builds[-1].artifact_id' packer-manifest.json | cut -d: -f2)"
+          [ -n "$ami" ] && [ "$ami" != null ] || {
+            echo "::error::The build produced no AMI id"
+            exit 1
+          }
+          echo "ami=${ami}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Synaplan ${VERSION} — ${ARCHITECTURE}"
+            echo ""
+            echo "AMI: \`${ami}\` in \`${AWS_REGION}\`"
+            echo ""
+            echo "Next: run **Test Add Version** in the AWS Marketplace Management Portal"
+            echo "for the free compliance scan, then verify a launch from"
+            echo "\`deploy/aws/cloudformation/synaplan-new-vpc.yaml\` before submitting."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the build manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: packer-manifest-${{ matrix.architecture }}
+          path: packer-manifest.json
+          retention-days: 30
+
+  verify:
+    name: Launch and smoke-test the AMI
+    runs-on: ubuntu-latest
+    needs: [resolve, build]
+    # Only the x86_64 image is launched. The two AMIs come out of the same
+    # provisioner on the same base OS, so a second launch would re-test the
+    # scripts rather than the architecture, for a second instance-hour.
+    if: >-
+      needs.resolve.outputs.version != '' &&
+      contains(fromJSON(needs.resolve.outputs.matrix), 'x86_64') &&
+      inputs.verify != false
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      STACK_NAME: synaplan-verify-${{ github.run_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Assume the build role
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
+          role-session-name: synaplan-verify-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download the build manifest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: packer-manifest-x86_64
+
+      - name: Read the AMI id
+        id: ami
+        run: |
+          set -euo pipefail
+          ami="$(jq -r '.builds[-1].artifact_id' packer-manifest.json | cut -d: -f2)"
+          echo "ami=${ami}" >> "$GITHUB_OUTPUT"
+
+      # The same template a Marketplace buyer launches, with the same defaults
+      # except the two that only cost money here: the smallest allowed data
+      # volume and no snapshot policy. Testing the AMI without the template
+      # would leave the delivery path — instance profile, tags, security group,
+      # data volume — untested, and that is where a launch actually breaks.
+      - name: Create the stack
+        env:
+          AMI_ID: ${{ steps.ami.outputs.ami }}
+        run: |
+          set -euo pipefail
+          aws cloudformation create-stack \
+            --stack-name "$STACK_NAME" \
+            --template-body file://deploy/aws/cloudformation/synaplan-new-vpc.yaml \
+            --capabilities CAPABILITY_IAM \
+            --on-failure DO_NOTHING \
+            --parameters \
+              "ParameterKey=ImageId,ParameterValue=${AMI_ID}" \
+              ParameterKey=InstanceType,ParameterValue=c7i.xlarge \
+              ParameterKey=DataVolumeSize,ParameterValue=20 \
+              ParameterKey=EnableDailySnapshots,ParameterValue=false \
+              ParameterKey=AdminEmail,ParameterValue=verify@example.com
+          aws cloudformation wait stack-create-complete --stack-name "$STACK_NAME"
+
+      - name: Read the stack outputs
+        id: stack
+        run: |
+          set -euo pipefail
+          outputs="$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].Outputs' --output json)"
+          for key in InstanceId DataVolumeId WebUrl; do
+            value="$(jq -r --arg k "$key" '.[] | select(.OutputKey == $k) | .OutputValue' <<<"$outputs")"
+            echo "${key}=${value}" >> "$GITHUB_OUTPUT"
+          done
+
+      # firstboot.sh generates the configuration, starts the stack and waits for
+      # it to be healthy before it enables the service, so the instance is
+      # reachable well after the stack reports CREATE_COMPLETE.
+      - name: Wait for the web interface
+        env:
+          WEB_URL: ${{ steps.stack.outputs.WebUrl }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            # -k: without a domain the instance serves the self-signed
+            # certificate, which is the configuration under test.
+            if curl -ksSf --max-time 10 "${WEB_URL}/api/health" >/dev/null; then
+              echo "The instance answers on ${WEB_URL}/api/health."
+              exit 0
+            fi
+            echo "Attempt ${attempt}: no answer yet."
+            sleep 15
+          done
+          echo "::error::${WEB_URL} never became healthy."
+          exit 1
+
+      # The same smoke test a self-hosted installation runs, executed on the
+      # instance over Session Manager — which also proves the shell path the
+      # Usage Instructions promise, with no SSH key and no open port 22.
+      - name: Run the smoke test on the instance
+        env:
+          INSTANCE_ID: ${{ steps.stack.outputs.InstanceId }}
+        run: |
+          set -euo pipefail
+          command_id="$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "Synaplan release verification" \
+            --parameters 'commands=["/usr/local/bin/synaplan-smoke-test"]' \
+            --query Command.CommandId --output text)"
+
+          status=Pending
+          for _ in $(seq 1 60); do
+            sleep 10
+            status="$(aws ssm get-command-invocation \
+              --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending)"
+            case "$status" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+          done
+
+          aws ssm get-command-invocation --command-id "$command_id" \
+            --instance-id "$INSTANCE_ID" \
+            --query 'join(`"\n"`, [StandardOutputContent, StandardErrorContent])' \
+            --output text
+
+          [ "$status" = Success ] || {
+            echo "::error::The smoke test on ${INSTANCE_ID} ended as ${status}."
+            exit 1
+          }
+
+      - name: Show why the stack failed
+        if: failure()
+        run: |
+          aws cloudformation describe-stack-events --stack-name "$STACK_NAME" \
+            --query 'reverse(StackEvents[?ResourceStatus!=`CREATE_COMPLETE`].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason])' \
+            --output table || true
+
+      # Unconditional, including after a cancelled run: what is left behind here
+      # is a running instance that bills by the hour. The data volume has
+      # DeletionPolicy Snapshot, so the stack leaves a snapshot of its own
+      # behind, and a verification run has nothing worth keeping.
+      - name: Delete the stack and its leftovers
+        if: always()
+        run: |
+          set -uo pipefail
+          # Resolved here rather than taken from the outputs, so a stack that
+          # never finished creating is cleaned up just as completely.
+          VOLUME_ID="$(aws cloudformation describe-stack-resource \
+            --stack-name "$STACK_NAME" --logical-resource-id DataVolume \
+            --query StackResourceDetail.PhysicalResourceId --output text 2>/dev/null || true)"
+
+          aws cloudformation delete-stack --stack-name "$STACK_NAME" || true
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" || true
+
+          [ -n "$VOLUME_ID" ] && [ "$VOLUME_ID" != None ] || exit 0
+          snapshots="$(aws ec2 describe-snapshots --owner-ids self \
+            --filters "Name=volume-id,Values=${VOLUME_ID}" \
+            --query 'Snapshots[].SnapshotId' --output text)"
+          for snapshot in $snapshots; do
+            echo "Deleting the leftover snapshot ${snapshot}."
+            aws ec2 delete-snapshot --snapshot-id "$snapshot" || true
+          done
