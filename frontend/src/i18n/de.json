@@ -4956,6 +4956,12 @@
     "oauthReauth": "Aktion nötig (erneut verbinden)",
     "oauthNotConnected": "Nicht verbunden",
     "oauthConnectedToast": "Erfolgreich angemeldet",
+    "disconnect": "Trennen",
+    "disconnecting": "Wird getrennt…",
+    "disconnectTitle": "Diesen Server trennen?",
+    "disconnectMessage": "Die gespeicherte Anmeldung für \"{name}\" wird gelöscht. Der Server bleibt in der Liste — zur Nutzung erneut anmelden.",
+    "disconnected": "Anmeldung entfernt",
+    "disconnectFailed": "Anmeldung konnte nicht entfernt werden",
     "oauthError": {
       "denied": "Anmeldung wurde abgebrochen",
       "missing_code": "Anmeldung nicht abgeschlossen. Bitte erneut versuchen.",

@@ -5022,6 +5022,12 @@
     "oauthReauth": "Action needed (reconnect)",
     "oauthNotConnected": "Not connected",
     "oauthConnectedToast": "Signed in successfully",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting…",
+    "disconnectTitle": "Disconnect this server?",
+    "disconnectMessage": "The stored sign-in for \"{name}\" will be deleted. The server stays in your list — sign in again to use it.",
+    "disconnected": "Sign-in removed",
+    "disconnectFailed": "Could not remove the sign-in",
     "oauthError": {
       "denied": "Sign-in was cancelled",
       "missing_code": "Sign-in did not complete. Please try again.",

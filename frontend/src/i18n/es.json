@@ -4036,6 +4036,12 @@
     "oauthReauth": "Acción necesaria (volver a conectar)",
     "oauthNotConnected": "No conectado",
     "oauthConnectedToast": "Sesión iniciada correctamente",
+    "disconnect": "Desconectar",
+    "disconnecting": "Desconectando…",
+    "disconnectTitle": "¿Desconectar este servidor?",
+    "disconnectMessage": "Se eliminará el acceso guardado de \"{name}\". El servidor permanece en tu lista — inicia sesión de nuevo para usarlo.",
+    "disconnected": "Acceso eliminado",
+    "disconnectFailed": "No se pudo eliminar el acceso",
     "oauthError": {
       "denied": "El inicio de sesión se canceló",
       "missing_code": "El inicio de sesión no se completó. Inténtalo de nuevo.",

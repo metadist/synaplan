@@ -167,6 +167,20 @@
               }}
             </button>
             <button
+              v-if="server.auth_mode === 'oauth' && hasOAuthTokens(server)"
+              type="button"
+              class="text-sm text-[var(--brand)] hover:underline"
+              :disabled="disconnectingId === server.id"
+              :data-testid="`btn-mcp-oauth-disconnect-${server.id}`"
+              @click="disconnectOAuth(server)"
+            >
+              {{
+                disconnectingId === server.id
+                  ? $t('mcpServers.disconnecting')
+                  : $t('mcpServers.disconnect')
+              }}
+            </button>
+            <button
               type="button"
               class="text-sm text-[var(--brand)] hover:underline"
               :disabled="testingId === server.id"
@@ -427,6 +441,7 @@ const servers = ref<McpServer[]>([])
 const toolsByServer = reactive<Record<number, McpTool[]>>({})
 const testingId = ref<number | null>(null)
 const connectingId = ref<number | null>(null)
+const disconnectingId = ref<number | null>(null)
 
 // Task usage panel: routing topics with their `tool_mcp` opt-in state.
 const taskPrompts = ref<TaskPrompt[]>([])
@@ -691,6 +706,33 @@ const oauthStatusClass = (status: string | null | undefined): string => {
   if (status === 'connected') return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
   if (status === 'reauth_required') return 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
   return 'bg-gray-500/10 txt-secondary'
+}
+
+const hasOAuthTokens = (server: McpServer): boolean =>
+  server.oauth_status === 'connected' || server.oauth_status === 'reauth_required'
+
+// Deliberately NOT gated on oauthConnectorsEnabled: clearing stored tokens
+// must stay possible even after an admin turns the feature off.
+const disconnectOAuth = async (server: McpServer) => {
+  if (server.id === undefined) return
+  const confirmed = await confirm({
+    title: t('mcpServers.disconnectTitle'),
+    message: t('mcpServers.disconnectMessage', { name: server.name ?? '' }),
+    confirmText: t('mcpServers.disconnect'),
+    danger: true,
+  })
+  if (!confirmed) return
+
+  disconnectingId.value = server.id
+  try {
+    await mcpServersApi.disconnectOAuth(server.id)
+    success(t('mcpServers.disconnected'))
+    await load()
+  } catch {
+    error(t('mcpServers.disconnectFailed'))
+  } finally {
+    disconnectingId.value = null
+  }
 }
 
 const startOAuth = async (server: McpServer) => {

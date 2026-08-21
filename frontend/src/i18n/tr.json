@@ -4037,6 +4037,12 @@
     "oauthReauth": "İşlem gerekli (yeniden bağlan)",
     "oauthNotConnected": "Bağlı değil",
     "oauthConnectedToast": "Oturum başarıyla açıldı",
+    "disconnect": "Bağlantıyı kes",
+    "disconnecting": "Bağlantı kesiliyor…",
+    "disconnectTitle": "Bu sunucunun bağlantısı kesilsin mi?",
+    "disconnectMessage": "\"{name}\" için kayıtlı oturum silinecek. Sunucu listenizde kalır — kullanmak için yeniden oturum açın.",
+    "disconnected": "Oturum kaldırıldı",
+    "disconnectFailed": "Oturum kaldırılamadı",
     "oauthError": {
       "denied": "Oturum iptal edildi",
       "missing_code": "Oturum tamamlanmadı. Lütfen yeniden deneyin.",
