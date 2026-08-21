@@ -379,6 +379,8 @@ Every retirement above needed its own hand-written migration, and three of them 
 
 **What the seeder does**, idempotently and on every container start, for each entry whose row exists and still matches `providerId`: stamps `BRETIREDON` and `BSUCCESSORID`, and forces `BACTIVE = BSELECTABLE = BISDEFAULT = 0`. A re-run writes nothing. A BID an operator repurposed is skipped with a warning. Rows are never deleted — `BMESSAGES` has FKs into `BMODELS` and **BIDs must never be reused**.
 
+The health monitor (`app:model:health-check`) skips every row that carries `BRETIREDON`. A recorded retirement is expected to be missing, so it is not probed and it must not raise the hourly incident mail. Operator-disabled rows without a date stay in the check.
+
 **Why a separate seeder from `ModelSeeder`:** that one treats `BACTIVE`/`BSELECTABLE`/`BISDEFAULT` as operator-owned and never overwrites them, which is right for a live model and wrong for a dead one. A retirement outranks an operator preference — "please keep offering this" on a model the provider switched off only produces a failing request. Keeping the override in its own seeder makes it explicit instead of punching a hole in `ModelSeeder`'s preservation rules.
 
 **`successor: null` is a statement, not a gap.** It means no substitution may be made — an embedding model (a different model is a different vector space; see the `VECTORIZE` warning above) or a provider that shipped no replacement at all. Do not fill it with another provider's model to avoid the null: that assumes an API key the operator may not hold.

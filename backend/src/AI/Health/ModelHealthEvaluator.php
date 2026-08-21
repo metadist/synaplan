@@ -30,6 +30,11 @@ use Psr\Log\LoggerInterface;
  *
  * The catalog wins where it speaks, because a model the provider no longer
  * lists is gone no matter what the counters say.
+ *
+ * Rows that already carry BRETIREDON are skipped: a recorded retirement is
+ * expected to be missing, so probing it again is wasted work and alerting on
+ * it trains operators to ignore the mail. Operator-disabled rows without a
+ * date stay in the check.
  */
 final readonly class ModelHealthEvaluator
 {
@@ -99,11 +104,24 @@ final readonly class ModelHealthEvaluator
 
             $serviceVerdicts = [];
             foreach ($catalogModels as $providerId => $rows) {
+                // A recorded retirement is a closed decision, not news. Probing
+                // those rows again only reconfirms what BRETIREDON already says
+                // and turns the hourly incident mail into a reminder about work
+                // that is already done. Operator-disabled rows (BACTIVE=0, no
+                // retirement date) stay in the check: those can come back.
+                $liveRows = array_values(array_filter(
+                    $rows,
+                    static fn (Model $model): bool => !$model->isRetired()
+                ));
+                if ([] === $liveRows) {
+                    continue;
+                }
+
                 // One confirmation per provider model id, not per BMODELS row:
                 // the same id appears once per capability it is bound to.
                 $presence = $this->presence($service, $probe, $result, (string) $providerId, $budget);
 
-                foreach ($rows as $model) {
+                foreach ($liveRows as $model) {
                     $verdict = $this->judge($service, $model, (string) $providerId, $result, $presence, $now);
                     if (!$dryRun) {
                         $verdict = $this->commit($verdict, $model, $now);

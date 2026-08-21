@@ -51,11 +51,18 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
     private object $lastProbe;
 
     /**
+     * @param Model|list<Model>               $catalog       one model or every model of the service
      * @param array<string, ModelProbeResult> $confirmations provider model id => what the provider says
      * @param list<string>                    $listed        model ids the bulk listing returns
      */
-    private function evaluatorFor(Model $model, array $listed, array $confirmations, bool $authoritative = false): ModelHealthEvaluator
+    private function evaluatorFor(Model|array $catalog, array $listed, array $confirmations, bool $authoritative = false): ModelHealthEvaluator
     {
+        $rows = $catalog instanceof Model ? [$catalog] : $catalog;
+        $indexed = [];
+        foreach ($rows as $model) {
+            $indexed[$model->getProviderId()][] = $model;
+        }
+
         $probe = new class($listed, $confirmations, $authoritative) implements ModelListProbeInterface {
             public int $confirmCalls = 0;
 
@@ -95,9 +102,8 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
         $config = new ModelHealthConfig($configRepository);
 
         $models = $this->createMock(ModelRepository::class);
-        $models->method('findAllServices')->willReturn([$model->getService()]);
-        $models->method('findByServiceIndexedByProviderId')
-            ->willReturn([$model->getProviderId() => [$model]]);
+        $models->method('findAllServices')->willReturn([$rows[0]->getService()]);
+        $models->method('findByServiceIndexedByProviderId')->willReturn($indexed);
 
         $recorder = new ModelHealthRecorder(
             new ArrayAdapter(),
@@ -250,5 +256,72 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
 
         self::assertSame(ModelHealthState::Offline, $run->verdicts[0]->state);
         self::assertTrue($run->verdicts[0]->safeToDisable);
+    }
+
+    /**
+     * BRETIREDON is the operator (or the retirement seeder) saying this model
+     * is gone on purpose. Re-probing it and paging about the same 404 every
+     * hour is how the incident mail trained people to ignore it.
+     */
+    public function testARecordedRetirementIsNotNews(): void
+    {
+        $tts = self::model(320, 'xAI', 'grok-tts', 'text2sound');
+        $tts->setRetiredOn(new \DateTimeImmutable('2026-08-20'));
+
+        $run = $this->evaluatorFor(
+            $tts,
+            ['grok-4.5'],
+            ['grok-tts' => ModelProbeResult::Gone],
+        )->run(dryRun: true);
+
+        self::assertSame([], $run->verdicts, 'A retired model must not produce a verdict');
+        self::assertSame([], $run->alertsRaised, 'A recorded retirement must not page operators');
+        self::assertSame(0, $this->lastProbe->confirmCalls, 'A retired model must not be re-asked');
+    }
+
+    /**
+     * An operator-disabled row without a retirement date is a different claim
+     * ("we switched this off") and must still be checked — it can come back.
+     */
+    public function testAnOperatorDisabledRowWithoutRetirementIsStillChecked(): void
+    {
+        $model = self::model(320, 'xAI', 'grok-tts', 'text2sound');
+        $model->setActive(0);
+
+        $run = $this->evaluatorFor(
+            $model,
+            ['grok-4.5'],
+            ['grok-tts' => ModelProbeResult::Gone],
+        )->run(dryRun: true);
+
+        self::assertSame(ModelHealthState::Offline, $run->verdicts[0]->state);
+        self::assertCount(1, $run->alertsRaised);
+    }
+
+    /**
+     * Skipping the retired sibling must not hide a live model of the same
+     * provider that the provider has also dropped.
+     */
+    public function testALiveSiblingOfARetiredModelStillAlerts(): void
+    {
+        $retired = self::model(320, 'xAI', 'grok-tts', 'text2sound');
+        $retired->setRetiredOn(new \DateTimeImmutable('2026-08-20'));
+        $live = self::model(400, 'xAI', 'grok-new-dead', 'chat');
+
+        $run = $this->evaluatorFor(
+            [$retired, $live],
+            ['grok-4.5'],
+            [
+                'grok-tts' => ModelProbeResult::Gone,
+                'grok-new-dead' => ModelProbeResult::Gone,
+            ],
+        )->run(dryRun: true);
+
+        self::assertCount(1, $run->verdicts);
+        self::assertSame('grok-new-dead', $run->verdicts[0]->providerId);
+        self::assertSame(ModelHealthState::Offline, $run->verdicts[0]->state);
+        self::assertCount(1, $run->alertsRaised);
+        self::assertSame(['grok-new-dead'], $run->alertsRaised[0]->modelNames);
+        self::assertSame(1, $this->lastProbe->confirmCalls, 'Only the live sibling may be confirmed');
     }
 }
