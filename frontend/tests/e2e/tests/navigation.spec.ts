@@ -111,6 +111,28 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     })
   })
 
+  // Saved Tasks + Connections are the two Channels children gated behind
+  // features.savedTasks (SAVEDTASKS.ENABLED). The test stack runs app:seed,
+  // which seeds the global flag ON, so both links must render. If this fails,
+  // check the seeded default before touching the test.
+  test('@ci Channels flyout exposes Saved Tasks and Connections when enabled', async ({ page }) => {
+    await test.step('Arrange: login and wait for nav', async () => {
+      await openApp(page)
+      await ensureNavReady(page)
+    })
+
+    await test.step('Act+Assert: flyout shows the Saved-Tasks surfaces', async () => {
+      const flyout = await openFlyout(page, NAV.sidebarV2Channels)
+      await expect(flyout.locator(NAV.flyoutLinkConnections)).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutLinkSavedTasks)).toBeVisible()
+    })
+
+    await test.step('Act: click Saved Tasks link navigates to /channels/tasks', async () => {
+      await page.locator(NAV.navDropdown).locator(NAV.flyoutLinkSavedTasks).click()
+      await expect(page).toHaveURL(/\/channels\/tasks/, { timeout: TIMEOUTS.STANDARD })
+    })
+  })
+
   test('@ci AI Setup flyout opens with child links', async ({ page }) => {
     await test.step('Arrange: login and ensure advanced mode', async () => {
       await openApp(page)

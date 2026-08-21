@@ -98,6 +98,9 @@ export const selectors = {
     flyoutLinkChatWidget: '[data-testid="link-sidebar-v2-chat-widget"]',
     flyoutLinkMailHandler: '[data-testid="link-sidebar-v2-mail-handler"]',
     flyoutLinkApiDocs: '[data-testid="link-sidebar-v2-api-docs"]',
+    /** Channels flyout children shown only when Saved Tasks is enabled (features.savedTasks) */
+    flyoutLinkConnections: '[data-testid="link-sidebar-v2-connections"]',
+    flyoutLinkSavedTasks: '[data-testid="link-sidebar-v2-saved-tasks"]',
     flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
@@ -279,10 +282,17 @@ export const selectors = {
     stateEmptyFolder: '[data-testid="state-empty-folder"]',
     /** File row action: delete this file (opens ConfirmDialog) */
     btnDeleteFile: '[data-testid="btn-delete"]',
-    /** §4.8: knowledge-base tabs shared by /files and /files/search */
+    /** §4.8: knowledge-base tabs shared by /files and its sub-views */
     tabsBar: '[data-testid="tabs-files"]',
     tabBrowse: '[data-testid="tab-files-browse"]',
     tabSearch: '[data-testid="tab-files-search"]',
+    tabIncoming: '[data-testid="tab-files-incoming"]',
+    tabGenerated: '[data-testid="tab-files-generated"]',
+    tabVectors: '[data-testid="tab-files-vectors"]',
+    /** Sub-view page roots reached via the Files tabs */
+    pageIncoming: '[data-testid="page-files-incoming"]',
+    pageGenerated: '[data-testid="page-files-generated"]',
+    pageVectors: '[data-testid="page-vector-storage"]',
   },
   fileSelection: {
     modal: '[data-testid="modal-file-selection"]',
@@ -311,6 +321,12 @@ export const selectors = {
   loggedOut: {
     page: '[data-testid="page-logged-out"]',
     loginAgainBtn: '[data-testid="btn-login-again"]',
+  },
+  accountDeletion: {
+    /** Public page (Google Play requirement) — reachable without login */
+    page: '[data-testid="page-account-deletion"]',
+    /** CTA linking to the in-app profile where the account is actually deleted */
+    profileLink: '[data-testid="link-profile-delete"]',
   },
   widgets: {
     page: '[data-testid="page-widgets"]',
