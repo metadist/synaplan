@@ -232,10 +232,10 @@ jobs:
           role-session-name: synaplan-verify-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
           # The default hour is not enough any more: waiting out a cold first
-          # boot, collecting diagnostics and deleting the stack can approach it,
-          # and credentials expiring mid-teardown leaves a billing instance
-          # running. The role allows 7200.
-          role-duration-seconds: 5400
+          # boot alone may take fifty minutes. This is the maximum the role
+          # permits; the teardown re-assumes below rather than trusting even
+          # this to outlast a pathological run.
+          role-duration-seconds: 7200
 
       - name: Download the build manifest
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -283,18 +283,19 @@ jobs:
             echo "${key}=${value}" >> "$GITHUB_OUTPUT"
           done
 
-      # firstboot.sh writes the configuration, then synaplan.service brings the
-      # stack up, and only a healthy stack gets served. On a fresh data volume
-      # that start runs the database migrations and waits for eight services, so
-      # synaplan.service allows itself TimeoutStartSec=1800. This wait has to
-      # outlast that budget, or it reports an AMI as dead while its first boot is
-      # still perfectly on schedule — which is exactly what a 15-minute wait did.
+      # The instance answers once firstboot.sh has written the configuration and
+      # synaplan.service has brought the stack up — the two units run in that
+      # order and allow themselves TimeoutStartSec=900 and 1800. A wait shorter
+      # than their combined 2700 seconds calls an AMI dead while its first boot
+      # is still within the budget the units grant it, which is exactly what the
+      # previous 15 minutes did. So: the full budget, plus five minutes for
+      # Caddy and the first request.
       - name: Wait for the web interface
         env:
           WEB_URL: ${{ steps.stack.outputs.WebUrl }}
         run: |
           set -euo pipefail
-          deadline=$((SECONDS + 2400))
+          deadline=$((SECONDS + 3000))
           while [ "$SECONDS" -lt "$deadline" ]; do
             # -k: without a domain the instance serves the self-signed
             # certificate, which is the configuration under test.
@@ -305,7 +306,7 @@ jobs:
             echo "No answer yet, $((SECONDS / 60)) minutes elapsed."
             sleep 20
           done
-          echo "::error::${WEB_URL} never became healthy within 40 minutes."
+          echo "::error::${WEB_URL} never became healthy within 50 minutes."
           exit 1
 
       # The same smoke test a self-hosted installation runs, executed on the
@@ -344,6 +345,22 @@ jobs:
             exit 1
           }
 
+      # A session of its own for everything that follows. The steps above can
+      # legitimately run for hours — each CloudFormation waiter allows roughly
+      # one, the wait for the web interface another fifty minutes — and no
+      # session length can be chosen that certainly outlasts all of them.
+      # Expired credentials in the steps below would cost the diagnosis of the
+      # failure and, worse, the deletion of an instance that bills by the hour.
+      # The OIDC token stays valid for as long as the job does, so this assume
+      # succeeds even where the first one has long expired.
+      - name: Refresh the credentials
+        if: always()
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
+          role-session-name: synaplan-teardown-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Show why the stack failed
         if: failure()
         run: |
@@ -362,7 +379,17 @@ jobs:
           INSTANCE_ID: ${{ steps.stack.outputs.InstanceId }}
         run: |
           set -uo pipefail
-          if [ -z "${INSTANCE_ID:-}" ] || [ "$INSTANCE_ID" = None ]; then
+          instance_id="${INSTANCE_ID:-}"
+          if [ -z "$instance_id" ] || [ "$instance_id" = None ]; then
+            # The outputs are only read on the way through, so a creation that
+            # failed skips them. --on-failure DO_NOTHING can still leave the
+            # instance standing, and then it is the only witness there is.
+            instance_id="$(aws cloudformation describe-stack-resource \
+              --stack-name "$STACK_NAME" --logical-resource-id Instance \
+              --query StackResourceDetail.PhysicalResourceId \
+              --output text 2>/dev/null || true)"
+          fi
+          if [ -z "$instance_id" ] || [ "$instance_id" = None ]; then
             echo "The stack never produced an instance, so there is nothing to collect."
             exit 0
           fi
@@ -372,12 +399,12 @@ jobs:
           # ec2:GetConsoleOutput is missing from an older deployment of
           # marketplace-roles.yaml, and that must not hide the rest.
           echo "::group::Console output"
-          aws ec2 get-console-output --instance-id "$INSTANCE_ID" \
+          aws ec2 get-console-output --instance-id "$instance_id" \
             --query Output --output text || echo "Not available."
           echo "::endgroup::"
 
           ping_status="$(aws ssm describe-instance-information \
-            --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+            --filters "Key=InstanceIds,Values=${instance_id}" \
             --query 'InstanceInformationList[0].PingStatus' \
             --output text 2>/dev/null || true)"
           echo "Session Manager reports the instance as ${ping_status:-unreachable}."
@@ -387,7 +414,7 @@ jobs:
           # the deployment configuration itself, which a bare `compose ps` in a
           # remote shell cannot.
           command_id="$(aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
+            --instance-ids "$instance_id" \
             --document-name AWS-RunShellScript \
             --comment "Synaplan verification diagnostics" \
             --parameters 'commands=[
@@ -401,7 +428,7 @@ jobs:
           for _ in $(seq 1 30); do
             sleep 10
             status="$(aws ssm get-command-invocation \
-              --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+              --command-id "$command_id" --instance-id "$instance_id" \
               --query Status --output text 2>/dev/null || echo Pending)"
             case "$status" in
               Success|Failed|Cancelled|TimedOut) break ;;
@@ -410,7 +437,7 @@ jobs:
 
           echo "::group::The instance's own view"
           aws ssm get-command-invocation --command-id "$command_id" \
-            --instance-id "$INSTANCE_ID" \
+            --instance-id "$instance_id" \
             --query 'join(`"\n"`, [StandardOutputContent, StandardErrorContent])' \
             --output text || true
           echo "::endgroup::"
